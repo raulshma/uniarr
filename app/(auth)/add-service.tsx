@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import {
   HelperText,
@@ -15,6 +15,7 @@ import {
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Controller, useForm } from 'react-hook-form';
+import axios from 'axios';
 
 import { Button } from '@/components/common/Button';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
@@ -87,6 +88,8 @@ const AddServiceScreen = () => {
   const {
     control,
     handleSubmit,
+    setError,
+    clearErrors,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<ServiceConfigInput>({
@@ -104,6 +107,11 @@ const AddServiceScreen = () => {
   const [testError, setTestError] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [urlValidation, setUrlValidation] = useState<{
+    status: 'idle' | 'validating' | 'success' | 'error';
+    message?: string | null;
+  }>({ status: 'idle', message: null });
+  const urlValidationController = useRef<AbortController | null>(null);
   const [serviceTypeModalVisible, setServiceTypeModalVisible] = useState(false);
 
 
@@ -246,6 +254,13 @@ const AddServiceScreen = () => {
     setTestResult(null);
     setTestError(null);
     setFormError(null);
+    setUrlValidation({ status: 'idle', message: null });
+    try {
+      urlValidationController.current?.abort();
+    } catch {
+      // ignore
+    }
+    urlValidationController.current = null;
   }, []);
 
   const runConnectionTest = useCallback(
@@ -526,9 +541,61 @@ const AddServiceScreen = () => {
                   value={value}
                   onChangeText={(text) => {
                     resetDiagnostics();
+                    // Clear any previous URL validation state while user edits
+                    setUrlValidation({ status: 'idle', message: null });
                     onChange(text);
                   }}
-                  onBlur={onBlur}
+                  onBlur={async () => {
+                    onBlur();
+
+                    // If there is already a synchronous validation error from zod, skip async validation
+                    if (errors.url) return;
+
+                    const trimmed = value?.trim();
+                    if (!trimmed) return;
+
+                    // Abort any in-flight validation
+                    try {
+                      urlValidationController.current?.abort();
+                    } catch {
+                      // ignore
+                    }
+
+                    const controller = new AbortController();
+                    urlValidationController.current = controller;
+
+                    setUrlValidation({ status: 'validating', message: 'Validating URL...' });
+
+                    try {
+                      const response = await axios.get(trimmed, {
+                        timeout: 5000,
+                        signal: controller.signal,
+                        // Accept any HTTP status — we only care that the host responded
+                        validateStatus: () => true,
+                      });
+
+                      // If the request was aborted, do nothing
+                      if (controller.signal.aborted) return;
+
+                      if (response && typeof response.status === 'number') {
+                        setUrlValidation({ status: 'success', message: 'URL is reachable.' });
+                        clearErrors('url');
+                      } else {
+                        const msg = 'No response from the host.';
+                        setUrlValidation({ status: 'error', message: msg });
+                        setError('url', { type: 'validate', message: msg });
+                      }
+                    } catch (error) {
+                      // If canceled, ignore
+                      if ((error as any)?.name === 'CanceledError') return;
+
+                      const message = error instanceof Error ? error.message : 'Unable to reach the specified URL.';
+                      setUrlValidation({ status: 'error', message });
+                      setError('url', { type: 'validate', message });
+                    } finally {
+                      urlValidationController.current = null;
+                    }
+                  }}
                   mode="outlined"
                   autoCapitalize="none"
                   keyboardType="url"
@@ -544,6 +611,18 @@ const AddServiceScreen = () => {
             {errors.url ? (
               <HelperText type="error" visible style={styles.helperText}>
                 {errors.url.message}
+              </HelperText>
+            ) : urlValidation.status === 'validating' ? (
+              <HelperText type="info" visible style={styles.helperText}>
+                {urlValidation.message}
+              </HelperText>
+            ) : urlValidation.status === 'success' ? (
+              <HelperText type="info" visible style={styles.helperText}>
+                {urlValidation.message}
+              </HelperText>
+            ) : urlValidation.status === 'error' ? (
+              <HelperText type="error" visible style={styles.helperText}>
+                {urlValidation.message}
               </HelperText>
             ) : null}
           </View>
