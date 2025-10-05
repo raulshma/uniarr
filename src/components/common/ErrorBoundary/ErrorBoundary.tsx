@@ -73,7 +73,7 @@ const DefaultFallback = ({ error, reset }: ErrorBoundaryFallbackProps) => {
 };
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = {
+  override state: ErrorBoundaryState = {
     hasError: false,
     error: null,
   };
@@ -82,7 +82,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     const { onError, context } = this.props;
 
     void logger.error('Unhandled UI error captured', {
@@ -97,7 +97,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
   }
 
-  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+  override componentDidUpdate(prevProps: ErrorBoundaryProps) {
     const { resetKeys } = this.props;
     if (this.state.hasError && !areResetKeysEqual(resetKeys, prevProps.resetKeys)) {
       this.resetErrorBoundary();
@@ -128,7 +128,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return <DefaultFallback error={currentError} reset={reset} />;
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (this.state.hasError) {
       return this.renderFallback();
     }
