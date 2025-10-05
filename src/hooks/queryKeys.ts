@@ -63,6 +63,16 @@ export const queryKeys = {
       { term, params },
     ] as const,
   },
+  qbittorrent: {
+    base: ['qbittorrent'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['qbittorrent', serviceId] as const,
+    torrents: (serviceId: string, filters?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.qbittorrent.service(serviceId),
+      'torrents',
+      filters ?? {},
+    ] as const,
+    transferInfo: (serviceId: string): QueryKeyBuilder => [...queryKeys.qbittorrent.service(serviceId), 'transferInfo'] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

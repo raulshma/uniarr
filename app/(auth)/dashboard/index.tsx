@@ -427,6 +427,9 @@ const DashboardScreen = () => {
         case 'jellyseerr':
           router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: service.config.id } });
           break;
+        case 'qbittorrent':
+          router.push({ pathname: '/(auth)/qbittorrent/[serviceId]', params: { serviceId: service.config.id } });
+          break;
         default:
           Alert.alert('Coming soon', `${serviceTypeLabels[service.config.type]} integration is coming soon.`);
           break;
