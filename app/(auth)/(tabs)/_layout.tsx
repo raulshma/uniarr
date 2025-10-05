@@ -127,8 +127,13 @@ const BottomTabNavigator = () => {
         />
         <CurvedBottomBar.Screen
           name="DashboardTab"
-          position="CENTER"
+          position="LEFT"
           component={() => <DashboardScreen />}
+        />
+        <CurvedBottomBar.Screen
+          name="RecentlyAddedTab"
+          position="CENTER"
+          component={() => <RecentlyAddedScreen />}
         />
         <CurvedBottomBar.Screen
           name="DownloadsTab"
