@@ -15,6 +15,7 @@ import { queryKeys } from '@/hooks/queryKeys';
 interface UseSonarrSeriesResult {
   series: Series[] | undefined;
   isLoading: boolean;
+  isFetching: boolean;
   isError: boolean;
   error: unknown;
   refetch: (options?: RefetchOptions) => Promise<QueryObserverResult<Series[], Error>>;
@@ -71,6 +72,7 @@ export const useSonarrSeries = (serviceId: string): UseSonarrSeriesResult => {
   return {
     series: seriesQuery.data,
     isLoading: seriesQuery.isLoading,
+    isFetching: seriesQuery.isFetching,
     isError: seriesQuery.isError,
     error: seriesQuery.error,
     refetch: seriesQuery.refetch,
