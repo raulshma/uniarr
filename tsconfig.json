@@ -4,11 +4,34 @@
     "strict": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "jsx": "react-jsx",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "incremental": true,
-    "tsBuildInfoFile": ".tscache/tsbuildinfo"
-  }
+    "tsBuildInfoFile": ".tscache/tsbuildinfo",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "useUnknownInCatchVariables": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    "app",
+    "app.config.ts",
+    "App.tsx",
+    "index.ts",
+    "src",
+    "src/types",
+    "__tests__"
+  ],
+  "exclude": [
+    "node_modules",
+    ".expo",
+    ".expo-shared"
+  ]
 }

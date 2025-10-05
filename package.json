@@ -1,7 +1,7 @@
 {
   "name": "uniarr",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -32,6 +32,7 @@
   "devDependencies": {
     "@testing-library/react-native": "^13.3.3",
     "@types/react": "~19.2.0",
+    "@tanstack/react-query-devtools": "^5.90.2",
     "detox": "^20.42.0",
     "jest": "^30.2.0",
     "typescript": "^5.9.3"

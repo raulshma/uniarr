@@ -4,6 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "UniArr",
   slug: "uniarr",
+  scheme: "uniarr",
   owner: "throwaway0acc",
   version: "0.0.1",
   orientation: "portrait",
@@ -32,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: "metro",
     favicon: "./assets/favicon.png",
   },
+  plugins: ["expo-router"],
   extra: {
     eas: {
       projectId: "35355a36-e839-42ed-866f-8e4b1f4b5600",
