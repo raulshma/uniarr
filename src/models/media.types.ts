@@ -30,6 +30,10 @@ export interface Episode {
   readonly quality?: Quality;
   /** Relative path to the episode file, if downloaded. */
   readonly relativePath?: string;
+  /** Poster URL for the episode if available. */
+  readonly posterUrl?: string;
+  /** Size of the episode file in MB if downloaded. */
+  readonly sizeInMB?: number;
 }
 
 /**
@@ -50,6 +54,7 @@ export interface Season {
   readonly monitored: boolean;
   readonly statistics?: MediaStatistics;
   readonly episodes?: Episode[];
+  readonly posterUrl?: string;
 }
 
 /**

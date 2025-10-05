@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
-import { Chip, Divider, List, Text, useTheme } from 'react-native-paper';
+import { Chip, Text, useTheme, ProgressBar } from 'react-native-paper';
 
 import { Button } from '@/components/common/Button';
 import type { AppTheme } from '@/constants/theme';
@@ -48,9 +48,17 @@ const formatRuntime = (runtimeMinutes?: number): string | undefined => {
 };
 
 const formatEpisodeLabel = (episode: Episode): string => {
-  const paddedEpisode = episode.episodeNumber.toString().padStart(2, '0');
-  const paddedSeason = episode.seasonNumber.toString().padStart(2, '0');
-  return `S${paddedSeason}E${paddedEpisode} • ${episode.title}`;
+  return `Chapter ${episode.episodeNumber}: ${episode.title}`;
+};
+
+const formatFileSize = (sizeInMB?: number): string => {
+  if (!sizeInMB) return '';
+
+  if (sizeInMB >= 1024) {
+    return `${(sizeInMB / 1024).toFixed(1)}GB`;
+  }
+
+  return `${sizeInMB}MB`;
 };
 
 const MediaDetails: React.FC<MediaDetailsProps> = ({
@@ -108,11 +116,12 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
   return (
     <ScrollView
-      style={styles.root}
-      contentContainerStyle={{ paddingBottom: theme.custom.spacing.xxl }}
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      contentContainerStyle={{ paddingBottom: 32 }}
       testID={testID}
     >
-      <View style={styles.backdropContainer}>
+      {/* Backdrop Header */}
+      <View style={{ position: 'relative', height: 300 }}>
         {backdropUri ? (
           <Image
             source={{ uri: backdropUri }}
@@ -124,206 +133,179 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
         ) : (
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: theme.colors.surfaceVariant }]} />
         )}
-        <View style={[styles.backdropOverlay, { backgroundColor: theme.colors.backdrop }]} />
-        <View
-          style={[
-            styles.header,
-            {
-              paddingHorizontal: theme.custom.spacing.lg,
-              paddingVertical: theme.custom.spacing.lg,
-            },
-          ]}
-        >
-          <MediaPoster
-            uri={posterUri}
-            size={160}
-            borderRadius={16}
-            accessibilityLabel={`${title} poster`}
-            showPlaceholderLabel
-          />
-          <View style={[styles.headerContent, { marginLeft: theme.custom.spacing.lg }]}>
-            <Text variant="headlineMedium" style={{ color: theme.colors.onSurface }} numberOfLines={2}>
-              {title}
-            </Text>
-            {metaLine ? (
-              <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
-                {metaLine}
-              </Text>
-            ) : null}
-            {rating !== undefined ? (
-              <Chip
-                style={[styles.ratingChip, { backgroundColor: theme.colors.secondaryContainer }]}
-                textStyle={{ color: theme.colors.onSecondaryContainer, fontWeight: '600' }}
-                compact
-              >
-                Rating {rating.toFixed(1)} / 10
-              </Chip>
-            ) : null}
-            {genres && genres.length ? (
-              <View style={styles.genreRow}>
-                {genres.map((genre) => (
-                  <Chip
-                    key={genre}
-                    compact
-                    mode="outlined"
-                    style={[styles.genreChip, { borderColor: theme.colors.outline }]}
-                    textStyle={{ color: theme.colors.onSurfaceVariant }}
-                  >
-                    {genre}
-                  </Chip>
-                ))}
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: theme.colors.backdrop, opacity: 0.7 }]} />
+
+        {/* Header Content */}
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 20 }}>
+          <Text variant="headlineLarge" style={{ color: theme.colors.onSurface, fontWeight: 'bold', marginBottom: 12 }}>
+            {title}
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: 32 }}>
+            {network && (
+              <View style={{ flexDirection: 'column' }}>
+                <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>Network</Text>
+                <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, fontWeight: '600' }}>{network}</Text>
               </View>
-            ) : null}
-            <View style={styles.actions}>
-              {onToggleMonitor ? (
-                <View style={styles.actionItem}>
-                  <Button
-                    mode={monitored ? 'outlined' : 'contained'}
-                    onPress={handleMonitorPress}
-                    loading={isUpdatingMonitor}
-                    disabled={isUpdatingMonitor}
-                  >
-                    {monitored ? 'Unmonitor' : 'Monitor'}
-                  </Button>
-                </View>
-              ) : null}
-              {onSearchPress ? (
-                <View style={styles.actionItem}>
-                  <Button
-                    mode="outlined"
-                    onPress={onSearchPress}
-                    loading={isSearching}
-                    disabled={isSearching}
-                  >
-                    Trigger Search
-                  </Button>
-                </View>
-              ) : null}
-              {onDeletePress ? (
-                <View style={styles.actionItem}>
-                  <Button
-                    mode="outlined"
-                    onPress={onDeletePress}
-                    loading={isDeleting}
-                    disabled={isDeleting}
-                  >
-                    Delete
-                  </Button>
-                </View>
-              ) : null}
-            </View>
+            )}
+            {status && (
+              <View style={{ flexDirection: 'column' }}>
+                <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>Status</Text>
+                <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, fontWeight: '600' }}>{status}</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
 
-      <View style={{ paddingHorizontal: theme.custom.spacing.lg, paddingTop: theme.custom.spacing.lg }}>
-        {overview ? (
-          <View>
-            <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-              Overview
-            </Text>
-            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
-              {overview}
-            </Text>
-          </View>
-        ) : null}
-
-        {showSeasons ? (
-          <View style={{ marginTop: theme.custom.spacing.xl }}>
-            <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-              Seasons
-            </Text>
-            <List.Section>
-              {seasons?.map((season) => {
-                const totalEpisodes = season.statistics?.episodeCount ?? season.episodes?.length ?? 0;
-                const downloadedEpisodesFromEpisodes = season.episodes
-                  ? season.episodes.filter((episode) => episode.hasFile).length
-                  : 0;
-                const downloadedEpisodes = season.statistics?.episodeFileCount ?? downloadedEpisodesFromEpisodes;
-
-                return (
-                  <List.Accordion
-                    key={season.id ?? season.seasonNumber}
-                    title={`Season ${season.seasonNumber}`}
-                    description={`${downloadedEpisodes}/${totalEpisodes} episodes downloaded`}
-                    left={(props) => (
-                      <List.Icon {...props} icon={season.monitored ? 'eye-outline' : 'eye-off-outline'} />
-                    )}
-                  >
-                    {season.episodes?.length ? (
-                      season.episodes.map((episode) => (
-                        <List.Item
-                          key={episode.id ?? `${season.seasonNumber}-${episode.episodeNumber}`}
-                          title={formatEpisodeLabel(episode)}
-                          description={episode.airDate ? `Air date: ${episode.airDate}` : undefined}
-                          left={(props) => (
-                            <List.Icon
-                              {...props}
-                              icon={episode.hasFile ? 'check-circle-outline' : 'cloud-download-outline'}
-                            />
-                          )}
-                        />
-                      ))
-                    ) : (
-                      <View style={{ padding: theme.custom.spacing.md }}>
-                        <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-                          No episode information available.
-                        </Text>
-                      </View>
-                    )}
-                    <Divider />
-                  </List.Accordion>
-                );
-              })}
-            </List.Section>
-          </View>
-        ) : null}
+      {/* Action Buttons */}
+      <View style={{ paddingHorizontal: 20, paddingVertical: 16, backgroundColor: theme.colors.background }}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {onToggleMonitor ? (
+            <Button
+              mode={monitored ? 'outlined' : 'contained'}
+              onPress={handleMonitorPress}
+              loading={isUpdatingMonitor}
+              disabled={isUpdatingMonitor}
+              style={{ flex: 1 }}
+            >
+              {monitored ? 'Unmonitor' : 'Monitor'}
+            </Button>
+          ) : null}
+          {onSearchPress ? (
+            <Button
+              mode="outlined"
+              onPress={onSearchPress}
+              loading={isSearching}
+              disabled={isSearching}
+              style={{ flex: 1 }}
+            >
+              Search Missing
+            </Button>
+          ) : null}
+          {onDeletePress ? (
+            <Button
+              mode="outlined"
+              onPress={onDeletePress}
+              loading={isDeleting}
+              disabled={isDeleting}
+              style={{ flex: 1 }}
+            >
+              Delete
+            </Button>
+          ) : null}
+        </View>
       </View>
+
+      {/* Overview */}
+      {overview ? (
+        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+          <Text variant="titleLarge" style={{ color: theme.colors.onSurface, marginBottom: 16, fontWeight: 'bold' }}>Overview</Text>
+          <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, lineHeight: 24 }}>
+            {overview}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Seasons */}
+      {showSeasons ? (
+        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+          <Text variant="titleLarge" style={{ color: theme.colors.onSurface, marginBottom: 16, fontWeight: 'bold' }}>Seasons</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            {seasons?.map((season) => {
+              const totalEpisodes = season.statistics?.episodeCount ?? season.episodes?.length ?? 0;
+              const downloadedEpisodes = season.statistics?.episodeFileCount ??
+                (season.episodes ? season.episodes.filter((episode) => episode.hasFile).length : 0);
+
+              return (
+                <View key={season.id ?? season.seasonNumber} style={{
+                  width: '48%',
+                  backgroundColor: theme.colors.surfaceVariant,
+                  borderRadius: 12,
+                  padding: 12,
+                  alignItems: 'center'
+                }}>
+                  <MediaPoster
+                    uri={season.posterUrl}
+                    size={120}
+                    borderRadius={12}
+                    accessibilityLabel={`Season ${season.seasonNumber} poster`}
+                    showPlaceholderLabel
+                  />
+                  <View style={{ alignItems: 'center', marginTop: 8 }}>
+                    <Text variant="titleMedium" style={{ color: theme.colors.onSurface, fontWeight: '600' }}>
+                      Season {season.seasonNumber}
+                    </Text>
+                    <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
+                      {totalEpisodes} Episodes
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Episodes */}
+      {showSeasons && seasons?.some(season => season.episodes?.length) ? (
+        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+          <Text variant="titleLarge" style={{ color: theme.colors.onSurface, marginBottom: 16, fontWeight: 'bold' }}>Episodes</Text>
+          {seasons.map((season) =>
+            season.episodes?.map((episode) => {
+              const progress = episode.hasFile ? 1 : 0;
+              const fileSize = formatFileSize(episode.sizeInMB);
+
+              return (
+                <View key={episode.id ?? `${season.seasonNumber}-${episode.episodeNumber}`} style={{
+                  flexDirection: 'row',
+                  backgroundColor: theme.colors.surfaceVariant,
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 12,
+                  alignItems: 'center'
+                }}>
+                  <MediaPoster
+                    uri={episode.posterUrl}
+                    size={80}
+                    borderRadius={8}
+                    accessibilityLabel={`${formatEpisodeLabel(episode)} poster`}
+                    showPlaceholderLabel
+                  />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text variant="titleMedium" style={{ color: theme.colors.onSurface, fontWeight: '600', marginBottom: 4 }}>
+                      {formatEpisodeLabel(episode)}
+                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                        {episode.hasFile ? 'Downloaded' : 'Missing'}
+                      </Text>
+                      {fileSize && (
+                        <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                          {fileSize}
+                        </Text>
+                      )}
+                    </View>
+                    <ProgressBar
+                      progress={progress}
+                      style={{ height: 4, borderRadius: 2 }}
+                      theme={{
+                        colors: {
+                          primary: episode.hasFile ? theme.colors.primary : theme.colors.surfaceVariant
+                        }
+                      }}
+                    />
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+      ) : null}
     </ScrollView>
   );
 };
 
 export default MediaDetails;
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  backdropContainer: {
-    position: 'relative',
-  },
-  backdropOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.55,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  headerContent: {
-    flex: 1,
-  },
-  ratingChip: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-  },
-  genreRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 12,
-  },
-  genreChip: {
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  actionItem: {
-    marginRight: 12,
-    marginBottom: 12,
-  },
-});
+// Styles are defined inline using the theme object to avoid static theme references

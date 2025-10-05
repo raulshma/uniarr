@@ -2,20 +2,21 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, RefreshControl, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import {
+  Icon,
+  IconButton,
+  Menu,
   Searchbar,
-  SegmentedButtons,
   Text,
+  TouchableRipple,
   useTheme,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
-import { MediaCard } from '@/components/media/MediaCard';
-import type { MediaDownloadStatus } from '@/components/media/MediaCard';
+import { MediaPoster } from '@/components/media/MediaPoster';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import { useSonarrSeries } from '@/hooks/useSonarrSeries';
@@ -29,23 +30,12 @@ const FILTER_UNMONITORED = 'unmonitored';
 
 type FilterValue = typeof FILTER_ALL | typeof FILTER_MONITORED | typeof FILTER_UNMONITORED;
 
-const deriveDownloadStatus = (series: Series): MediaDownloadStatus => {
-  const totalEpisodes = series.episodeCount ?? series.statistics?.episodeCount ?? 0;
-  const availableEpisodes = series.episodeFileCount ?? series.statistics?.episodeFileCount ?? 0;
+const FILTER_OPTIONS: FilterValue[] = [FILTER_ALL, FILTER_MONITORED, FILTER_UNMONITORED];
 
-  if (totalEpisodes === 0) {
-    return 'unknown';
-  }
-
-  if (availableEpisodes >= totalEpisodes) {
-    return 'available';
-  }
-
-  if (availableEpisodes > 0) {
-    return 'downloading';
-  }
-
-  return series.monitored ? 'missing' : 'unknown';
+const FILTER_LABELS: Record<FilterValue, string> = {
+  [FILTER_ALL]: 'All Statuses',
+  [FILTER_MONITORED]: 'Monitored',
+  [FILTER_UNMONITORED]: 'Unmonitored',
 };
 
 const normalizeSearchTerm = (input: string): string => input.trim().toLowerCase();
@@ -63,6 +53,7 @@ const SonarrSeriesListScreen = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterValue, setFilterValue] = useState<FilterValue>(FILTER_ALL);
+  const [statusMenuVisible, setStatusMenuVisible] = useState(false);
 
   const { series, isLoading, isFetching, isError, error, refetch } = useSonarrSeries(serviceId);
 
@@ -171,17 +162,59 @@ const SonarrSeriesListScreen = () => {
         },
         listHeader: {
           paddingTop: spacing.lg,
-          paddingBottom: spacing.md,
+          paddingBottom: spacing.lg,
+        },
+        topBar: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: spacing.lg,
+        },
+        topBarSpacer: {
+          width: 48,
+        },
+        topBarTitle: {
+          flex: 1,
+          textAlign: 'center',
+          color: theme.colors.onBackground,
+        },
+        topBarAction: {
+          margin: 0,
         },
         searchBar: {
+          borderRadius: 20,
           marginBottom: spacing.md,
+          backgroundColor: theme.colors.surfaceVariant,
         },
-        filters: {
-          marginBottom: spacing.sm,
+        searchInput: {
+          color: theme.colors.onSurface,
         },
-        filterLabel: {
-          marginBottom: spacing.xs,
-          color: theme.colors.onSurfaceVariant,
+        filterRow: {
+          flexDirection: 'row',
+          marginBottom: spacing.lg,
+        },
+        filterButton: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderRadius: 16,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.sm,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        filterButtonLabel: {
+          color: theme.colors.onSurface,
+        },
+        filterButtonContent: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        filterButtonIcon: {
+          marginLeft: spacing.xs,
+        },
+        filterMenu: {
+          borderRadius: 16,
         },
         emptyContainer: {
           flexGrow: 1,
@@ -190,16 +223,41 @@ const SonarrSeriesListScreen = () => {
         itemSpacing: {
           height: spacing.md,
         },
-        headerRow: {
+        seriesCard: {
           flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          padding: spacing.md,
+          borderRadius: 18,
+        },
+        seriesCardPressed: {
+          opacity: 0.9,
+        },
+        seriesPoster: {
+          marginRight: spacing.lg,
+        },
+        seriesMeta: {
+          flex: 1,
+          justifyContent: 'center',
+        },
+        seriesTitle: {
+          color: theme.colors.onSurface,
+          marginBottom: spacing.xs,
+        },
+        seriesStatus: {
+          color: theme.colors.onSurfaceVariant,
           marginBottom: spacing.sm,
         },
-        headerTitle: {
-          color: theme.colors.onBackground,
+        progressTrack: {
+          height: 6,
+          borderRadius: 999,
+          overflow: 'hidden',
+          backgroundColor: theme.colors.surfaceVariant,
+          marginBottom: spacing.xs,
         },
-        headerMeta: {
+        progressFill: {
+          height: '100%',
+          backgroundColor: theme.colors.primary,
+        },
+        episodesMeta: {
           color: theme.colors.onSurfaceVariant,
         },
       }),
@@ -238,32 +296,51 @@ const SonarrSeriesListScreen = () => {
   const handleClearFilters = useCallback(() => {
     setSearchTerm('');
     setFilterValue(FILTER_ALL);
+    setStatusMenuVisible(false);
+  }, []);
+
+  const handleStatusChange = useCallback((value: FilterValue) => {
+    setFilterValue(value);
+    setStatusMenuVisible(false);
   }, []);
 
   const renderSeriesItem = useCallback(
-    ({ item }: { item: Series }) => (
-      <MediaCard
-        id={item.id}
-        title={item.title}
-        year={item.year}
-        status={item.status}
-        subtitle={item.network}
-        monitored={item.monitored}
-        downloadStatus={deriveDownloadStatus(item)}
-        posterUri={item.posterUrl}
-        type="series"
-        onPress={() => handleSeriesPress(item)}
-        footer={
-          item.episodeCount || item.episodeFileCount ? (
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              Episodes: {item.episodeFileCount ?? item.statistics?.episodeFileCount ?? 0} /{' '}
-              {item.episodeCount ?? item.statistics?.episodeCount ?? 0}
+    ({ item }: { item: Series }) => {
+      const totalEpisodes = item.episodeCount ?? item.statistics?.episodeCount ?? 0;
+      const availableEpisodes = item.episodeFileCount ?? item.statistics?.episodeFileCount ?? 0;
+      const progress = totalEpisodes > 0 ? Math.min(availableEpisodes / totalEpisodes, 1) : 0;
+
+      return (
+        <Pressable
+          onPress={() => handleSeriesPress(item)}
+          style={({ pressed }) => [styles.seriesCard, pressed && styles.seriesCardPressed]}
+        >
+          <MediaPoster
+            uri={item.posterUrl}
+            size={96}
+            borderRadius={16}
+            style={styles.seriesPoster}
+          />
+          <View style={styles.seriesMeta}>
+            <Text variant="titleMedium" numberOfLines={1} style={styles.seriesTitle}>
+              {item.title}
             </Text>
-          ) : null
-        }
-      />
-    ),
-    [handleSeriesPress, theme.colors.onSurfaceVariant],
+            <Text variant="bodyMedium" numberOfLines={1} style={styles.seriesStatus}>
+              {item.status ?? 'Status unavailable'}
+            </Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+            </View>
+            <Text variant="bodySmall" style={styles.episodesMeta}>
+              {totalEpisodes > 0
+                ? `${availableEpisodes} / ${totalEpisodes} episodes`
+                : 'Episodes unavailable'}
+            </Text>
+          </View>
+        </Pressable>
+      );
+    },
+    [handleSeriesPress, styles],
   );
 
   const keyExtractor = useCallback((item: Series) => item.id.toString(), []);
@@ -271,42 +348,68 @@ const SonarrSeriesListScreen = () => {
   const listHeader = useMemo(
     () => (
       <View style={styles.listHeader}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text variant="headlineSmall" style={styles.headerTitle}>
-              Series
-            </Text>
-            <Text variant="bodySmall" style={styles.headerMeta}>
-              Showing {filteredSeries.length} of {totalSeries} series
-            </Text>
-          </View>
-          <Button mode="contained" onPress={handleAddSeries}>
-            Add Series
-          </Button>
+        <View style={styles.topBar}>
+          <View style={styles.topBarSpacer} />
+          <Text variant="headlineSmall" style={styles.topBarTitle}>
+            TV Series
+          </Text>
+          <IconButton
+            icon="plus"
+            size={24}
+            mode="contained"
+            style={styles.topBarAction}
+            containerColor={theme.colors.primary}
+            iconColor={theme.colors.onPrimary}
+            accessibilityLabel="Add series"
+            onPress={handleAddSeries}
+          />
         </View>
         <Searchbar
-          placeholder="Search series"
+          placeholder="Search TV Series"
           value={searchTerm}
           onChangeText={setSearchTerm}
           style={styles.searchBar}
+          inputStyle={styles.searchInput}
+          iconColor={theme.colors.onSurfaceVariant}
+          placeholderTextColor={theme.colors.onSurfaceVariant}
           accessibilityLabel="Search series"
         />
-        <Text variant="labelSmall" style={styles.filterLabel}>
-          Filter by monitoring status
-        </Text>
-        <SegmentedButtons
-          style={styles.filters}
-          value={filterValue}
-          onValueChange={(value) => setFilterValue(value as FilterValue)}
-          buttons={[
-            { label: 'All', value: FILTER_ALL },
-            { label: 'Monitored', value: FILTER_MONITORED },
-            { label: 'Unmonitored', value: FILTER_UNMONITORED },
-          ]}
-        />
+        <View style={styles.filterRow}>
+          <Menu
+            visible={statusMenuVisible}
+            onDismiss={() => setStatusMenuVisible(false)}
+            anchorPosition="bottom"
+            contentStyle={styles.filterMenu}
+            anchor={
+              <TouchableRipple
+                borderless={false}
+                style={styles.filterButton}
+                onPress={() => setStatusMenuVisible(true)}
+              >
+                <View style={styles.filterButtonContent}>
+                  <Text variant="bodyMedium" style={styles.filterButtonLabel}>
+                    {FILTER_LABELS[filterValue]}
+                  </Text>
+                  <View style={styles.filterButtonIcon}>
+                    <Icon source="chevron-down" size={20} color={theme.colors.onSurfaceVariant} />
+                  </View>
+                </View>
+              </TouchableRipple>
+            }
+          >
+            {FILTER_OPTIONS.map((value) => (
+              <Menu.Item
+                key={value}
+                title={FILTER_LABELS[value]}
+                onPress={() => handleStatusChange(value)}
+                trailingIcon={filterValue === value ? 'check' : undefined}
+              />
+            ))}
+          </Menu>
+        </View>
       </View>
     ),
-    [filteredSeries.length, filterValue, handleAddSeries, searchTerm, styles, totalSeries],
+    [filterValue, handleAddSeries, handleStatusChange, searchTerm, statusMenuVisible, styles, theme],
   );
 
   const listEmptyComponent = useMemo(() => {
@@ -385,7 +488,7 @@ const SonarrSeriesListScreen = () => {
       <FlashList
         data={filteredSeries}
         keyExtractor={keyExtractor}
-  renderItem={renderSeriesItem}
+        renderItem={renderSeriesItem}
         ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={listHeader}
