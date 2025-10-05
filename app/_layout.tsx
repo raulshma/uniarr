@@ -1,3 +1,4 @@
+import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
@@ -7,23 +8,29 @@ import { PaperProvider } from 'react-native-paper';
 
 import { queryClient } from '@/config/queryClient';
 import { getAppTheme, type AppTheme } from '@/constants/theme';
+import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthService';
 import { AuthProvider } from '@/services/auth/AuthProvider';
 
 const RootLayout = () => {
   const colorScheme = useColorScheme();
 
   const theme = useMemo<AppTheme>(() => getAppTheme(colorScheme), [colorScheme]);
+  const clerkPublishableKey = useMemo(getClerkPublishableKey, []);
 
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <PaperProvider theme={theme}>
-          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-          <Stack screenOptions={{ headerShown: false }} />
-          <QueryDevtools />
-        </PaperProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+    <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={clerkTokenCache}>
+      <ClerkLoaded>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <PaperProvider theme={theme}>
+              <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+              <Stack screenOptions={{ headerShown: false }} />
+              <QueryDevtools />
+            </PaperProvider>
+          </QueryClientProvider>
+        </AuthProvider>
+      </ClerkLoaded>
+    </ClerkProvider>
   );
 };
 

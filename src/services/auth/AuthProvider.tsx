@@ -1,3 +1,4 @@
+import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-expo';
 import {
   createContext,
   useCallback,
@@ -8,60 +9,61 @@ import {
   type ReactElement,
 } from 'react';
 
-interface StubUser {
-  id: string;
-  email?: string;
-}
+import { getClerkErrorMessage, mapClerkUser, type AuthUser } from '@/services/auth/AuthService';
+import { logger } from '@/services/logger/LoggerService';
 
 interface AuthContextValue {
-  user: StubUser | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const simulateNetworkDelay = async (durationMs: number) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, durationMs);
-  });
-
 export const AuthProvider = ({ children }: PropsWithChildren): ReactElement => {
-  const [user, setUser] = useState<StubUser | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const signIn = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Temporary placeholder implementation. Replace with Clerk integration in TASK-029.
-      await simulateNetworkDelay(400);
-      setUser({ id: 'stub-user', email: 'stub@uniarr.dev' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const { isLoaded: isAuthLoaded, isSignedIn, signOut: clerkSignOut } = useClerkAuth();
+  const { isLoaded: isUserLoaded, user: clerkUser } = useUser();
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const signOut = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await simulateNetworkDelay(250);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
+    if (!isAuthLoaded) {
+      return;
     }
-  }, []);
+
+    setIsTransitioning(true);
+
+    try {
+      await clerkSignOut();
+    } catch (error) {
+      const message = getClerkErrorMessage(
+        error,
+        'Unable to sign out. Please try again in a moment.',
+      );
+
+      void logger.error('Failed to sign out.', {
+        location: 'AuthProvider.signOut',
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      setIsTransitioning(false);
+      throw new Error(message);
+    }
+
+    setIsTransitioning(false);
+  }, [clerkSignOut, isAuthLoaded]);
+
+  const user = useMemo(() => mapClerkUser(clerkUser), [clerkUser]);
+  const isLoading = !isAuthLoaded || !isUserLoaded || isTransitioning;
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isAuthenticated: user !== null,
+      isAuthenticated: Boolean(isSignedIn),
       isLoading,
-      signIn,
       signOut,
     }),
-    [user, isLoading, signIn, signOut],
+    [user, isSignedIn, isLoading, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

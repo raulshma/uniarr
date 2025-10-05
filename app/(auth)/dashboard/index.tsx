@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { Alert, SafeAreaView, StyleSheet } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
 
 import { type AppTheme } from '@/constants/theme';
@@ -36,8 +36,15 @@ const DashboardScreen = () => {
   );
 
   const handleSignOut = useCallback(async () => {
-    await signOut();
-    router.replace('/(public)/login');
+    try {
+      await signOut();
+      router.replace('/(public)/login');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to sign out. Please try again.';
+
+      Alert.alert('Sign out failed', message);
+    }
   }, [router, signOut]);
 
   return (
