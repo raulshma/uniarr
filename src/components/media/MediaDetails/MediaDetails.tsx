@@ -1,6 +1,5 @@
-import React, { useCallback, useMemo } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
+import React, { useCallback } from 'react';
+import { ScrollView, View } from 'react-native';
 import { Chip, Text, useTheme, ProgressBar, Card } from 'react-native-paper';
 
 import { Button } from '@/components/common/Button';

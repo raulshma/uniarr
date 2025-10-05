@@ -47,25 +47,15 @@ type AuthenticatedRequestConfig = AxiosRequestConfig & { _retry?: boolean };
  * Connector responsible for interacting with qBittorrent's Web API.
  */
 export class QBittorrentConnector extends BaseConnector<Torrent> {
-  private sessionCookie?: string;
+  private isAuthenticated = false;
   private authPromise: Promise<void> | null = null;
 
   protected override createHttpClient(): AxiosInstance {
     const instance = super.createHttpClient();
     instance.defaults.withCredentials = true;
 
-    instance.interceptors.request.use((config) => {
-      if (!this.sessionCookie) {
-        return config;
-      }
-
-      const headers = new AxiosHeaders(
-        config.headers as AxiosHeaders | Record<string, AxiosHeaderValue> | string | undefined,
-      );
-      headers.set('Cookie', this.sessionCookie);
-      config.headers = headers;
-      return config;
-    });
+    // Axios automatically handles cookies when withCredentials is true
+    // No need for manual cookie management
 
     instance.interceptors.response.use(
       (response) => response,
@@ -91,14 +81,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
             return Promise.reject(authError);
           }
 
-          if (this.sessionCookie) {
-            const retryHeaders = new AxiosHeaders(
-              originalRequest.headers as AxiosHeaders | Record<string, AxiosHeaderValue> | string | undefined,
-            );
-            retryHeaders.set('Cookie', this.sessionCookie);
-            originalRequest.headers = retryHeaders;
-          }
-
+          // Axios will automatically include cookies in the retry request
           return instance(originalRequest);
         }
 
@@ -238,12 +221,12 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
 
   override dispose(): void {
     void this.logout();
-    this.sessionCookie = undefined;
+    this.isAuthenticated = false;
     super.dispose();
   }
 
   private async ensureAuthenticated(force = false): Promise<void> {
-    if (!force && this.sessionCookie) {
+    if (!force && this.isAuthenticated) {
       return;
     }
 
@@ -294,10 +277,10 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
       
       if (normalizedBody !== 'ok') {
         // Provide more detailed error information with troubleshooting hints
-        let errorMessage = body 
+        let errorMessage = body
           ? `qBittorrent authentication failed. Server responded with: "${body}"`
           : 'qBittorrent authentication failed. No response body received.';
-        
+
         // Add troubleshooting hints based on common issues
         if (body === 'Fails.' || normalizedBody === 'fails.') {
           errorMessage += ' This usually means incorrect username or password. Default credentials are admin/adminadmin.';
@@ -306,7 +289,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
         } else if (body === 'Banned' || normalizedBody === 'banned') {
           errorMessage += ' Your IP address has been banned due to multiple failed login attempts.';
         }
-        
+
         void logger.warn('qBittorrent authentication failed.', {
           serviceId: this.config.id,
           serviceType: this.config.type,
@@ -314,22 +297,23 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
           status: response.status,
           headers: response.headers,
         });
-        
+
         throw new Error(errorMessage);
       }
 
-      this.sessionCookie = this.extractSessionCookie(response);
-      
+      // Authentication successful - Axios will handle cookies automatically
+      this.isAuthenticated = true;
+
       void logger.debug('qBittorrent authentication successful.', {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        sessionCookie: this.sessionCookie ? 'present' : 'missing',
+        hasSetCookie: Boolean(response.headers?.['set-cookie'] || response.headers?.['Set-Cookie']),
       });
     };
 
     this.authPromise = request()
       .catch((error) => {
-        this.sessionCookie = undefined;
+        this.isAuthenticated = false;
         throw handleApiError(error, {
           serviceId: this.config.id,
           serviceType: this.config.type,
@@ -345,7 +329,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
   }
 
   private async logout(): Promise<void> {
-    if (!this.sessionCookie) {
+    if (!this.isAuthenticated) {
       return;
     }
 
@@ -355,7 +339,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
       // Ignore logout errors; the session may already be invalid.
       void error;
     } finally {
-      this.sessionCookie = undefined;
+      this.isAuthenticated = false;
     }
   }
 
@@ -442,45 +426,6 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     return parts.length ? parts : undefined;
   }
 
-  private extractSessionCookie(response: AxiosResponse): string {
-    void logger.debug('Extracting session cookie from response.', {
-      serviceId: this.config.id,
-      serviceType: this.config.type,
-      headers: response.headers,
-      setCookieHeader: response.headers?.['set-cookie'],
-      setCookieHeaderAlt: response.headers?.['Set-Cookie'],
-    });
-
-    const header = (response.headers?.['set-cookie'] ?? response.headers?.['Set-Cookie']) as string | string[] | undefined;
-
-    const rawCookie = Array.isArray(header) ? header[0] : header;
-    if (!rawCookie) {
-      void logger.warn('No session cookie found in response headers.', {
-        serviceId: this.config.id,
-        serviceType: this.config.type,
-        availableHeaders: Object.keys(response.headers || {}),
-      });
-      throw new Error('qBittorrent authentication succeeded but session cookie is missing.');
-    }
-
-    const cookie = rawCookie.split(';')[0] ?? '';
-    if (!cookie) {
-      void logger.warn('Empty session cookie received.', {
-        serviceId: this.config.id,
-        serviceType: this.config.type,
-        rawCookie,
-      });
-      throw new Error('qBittorrent provided an empty session cookie.');
-    }
-
-    void logger.debug('Session cookie extracted successfully.', {
-      serviceId: this.config.id,
-      serviceType: this.config.type,
-      cookie: cookie.substring(0, 10) + '...', // Log partial cookie for security
-    });
-
-    return cookie;
-  }
 
   private async postForm(url: string, payload: Record<string, string>): Promise<void> {
     const body = new URLSearchParams(payload);

@@ -146,13 +146,43 @@ describe('QBittorrentConnector', () => {
 
   it('authenticates with username and password', async () => {
     const connector = createConnector();
-    
+
     // Mock successful authentication
     mockAxiosInstance.post.mockResolvedValueOnce({
       data: 'Ok.',
       headers: {
         'set-cookie': ['SID=abc123; Path=/; HttpOnly'],
       },
+    });
+
+    // Mock version check after authentication
+    mockAxiosInstance.get.mockResolvedValueOnce({
+      data: 'v4.6.2',
+    });
+
+    await connector.initialize();
+    const version = await connector.getVersion();
+
+    expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+      '/api/v2/auth/login',
+      'username=admin&password=password123',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': 'http://qbittorrent.local:8080',
+        },
+      }),
+    );
+    expect(version).toBe('v4.6.2');
+  });
+
+  it('authenticates even when no set-cookie header is present', async () => {
+    const connector = createConnector();
+
+    // Mock successful authentication without set-cookie header
+    mockAxiosInstance.post.mockResolvedValueOnce({
+      data: 'Ok.',
+      headers: {}, // No set-cookie header
     });
 
     // Mock version check after authentication
@@ -202,13 +232,11 @@ describe('QBittorrentConnector', () => {
 
   it('returns mapped torrents from getTorrents', async () => {
     const connector = createConnector();
-    
+
     // Mock authentication
     mockAxiosInstance.post.mockResolvedValueOnce({
       data: 'Ok.',
-      headers: {
-        'set-cookie': ['SID=abc123; Path=/; HttpOnly'],
-      },
+      headers: {}, // No set-cookie header needed
     });
 
     const torrentResponse = {
@@ -281,13 +309,11 @@ describe('QBittorrentConnector', () => {
 
   it('handles torrent operations correctly', async () => {
     const connector = createConnector();
-    
+
     // Mock authentication
     mockAxiosInstance.post.mockResolvedValueOnce({
       data: 'Ok.',
-      headers: {
-        'set-cookie': ['SID=abc123; Path=/; HttpOnly'],
-      },
+      headers: {}, // No set-cookie header needed
     });
 
     const hash = 'abc123def456';
@@ -340,9 +366,7 @@ describe('QBittorrentConnector', () => {
     // Mock authentication
     mockAxiosInstance.post.mockResolvedValueOnce({
       data: 'Ok.',
-      headers: {
-        'set-cookie': ['SID=abc123; Path=/; HttpOnly'],
-      },
+      headers: {}, // No set-cookie header needed
     });
 
     mockAxiosInstance.get.mockRejectedValueOnce(underlying);

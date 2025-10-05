@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { ActivityIndicator, Icon, Text, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
+import { imageCacheService } from '@/services/image/ImageCacheService';
 
 const sizeMap = {
   small: 96,
@@ -40,10 +41,44 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   const theme = useTheme<AppTheme>();
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
+  const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
 
   useEffect(() => {
-    setIsLoading(Boolean(uri));
-    setHasError(false);
+    let isMounted = true;
+
+    const resolve = async () => {
+      if (!uri) {
+        if (isMounted) {
+          setResolvedUri(undefined);
+          setIsLoading(false);
+          setHasError(false);
+        }
+        return;
+      }
+
+      if (isMounted) {
+        setIsLoading(true);
+        setHasError(false);
+        setResolvedUri(undefined);
+      }
+
+      try {
+        const localUri = await imageCacheService.resolveUri(uri);
+        if (isMounted) {
+          setResolvedUri(localUri);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setResolvedUri(uri);
+        }
+      }
+    };
+
+    void resolve();
+
+    return () => {
+      isMounted = false;
+    };
   }, [uri]);
 
   const width = useMemo(() => (typeof size === 'number' ? size : sizeMap[size]), [size]);
@@ -63,7 +98,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     [width, height, borderRadius, style, theme.colors.surfaceVariant],
   );
 
-  const isFallback = hasError || !uri;
+  const isFallback = hasError || !resolvedUri;
 
   const content = isFallback ? (
     <View style={[styles.fallback, { borderRadius }]}>
@@ -76,7 +111,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     </View>
   ) : (
     <Image
-      source={{ uri }}
+      source={{ uri: resolvedUri }}
       style={[StyleSheet.absoluteFillObject, { borderRadius }]}
       accessibilityLabel={accessibilityLabel}
       cachePolicy="memory-disk"
