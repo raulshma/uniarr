@@ -4,6 +4,7 @@ import { IconButton, useTheme } from 'react-native-paper';
 import DashboardScreen from '@/../app/(auth)/(tabs)/dashboard';
 import ServicesScreen from '@/../app/(auth)/(tabs)/services';
 import DownloadsScreen from '@/../app/(auth)/(tabs)/downloads';
+import RecentlyAddedScreen from '@/../app/(auth)/(tabs)/recently-added';
 import SettingsScreen from '@/../app/(auth)/(tabs)/settings';
 
 const Tab = createBottomTabNavigator();
@@ -54,6 +55,16 @@ const BottomTabNavigator = () => {
             <IconButton icon="download" size={size} iconColor={color} />
           ),
           tabBarLabel: 'Downloads',
+        }}
+      />
+      <Tab.Screen
+        name="RecentlyAddedTab"
+        component={RecentlyAddedScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <IconButton icon="plus" size={size} iconColor={color} />
+          ),
+          tabBarLabel: 'Recent',
         }}
       />
       <Tab.Screen

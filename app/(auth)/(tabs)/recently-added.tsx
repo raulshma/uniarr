@@ -4,6 +4,8 @@ import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { Text, useTheme, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TabHeader } from '@/components/common/TabHeader';
+
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
@@ -31,16 +33,6 @@ const RecentlyAddedScreen = () => {
         safeArea: {
           flex: 1,
           backgroundColor: theme.colors.background,
-        },
-        header: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
-          backgroundColor: theme.colors.background,
-        },
-        backButton: {
-          marginLeft: -spacing.xs,
         },
         listContent: {
           paddingHorizontal: spacing.lg,
@@ -201,17 +193,10 @@ const RecentlyAddedScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <IconButton
-          icon="arrow-left"
-          size={24}
-          iconColor={theme.colors.onBackground}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        />
-        <View style={{ flex: 1 }} />
-        <View style={{ width: 48 }} />
-      </View>
+      <TabHeader
+        showBackButton={true}
+        onBackPress={() => router.back()}
+      />
 
       <View style={styles.listContent}>
         {recentlyAdded.items.map((item) => (

@@ -6,6 +6,8 @@ import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { Text, useTheme, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TabHeader } from '@/components/common/TabHeader';
+
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -252,16 +254,6 @@ const DashboardScreen = () => {
           paddingHorizontal: spacing.md,
           paddingBottom: spacing.xxl,
         },
-        header: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: spacing.md,
-          backgroundColor: theme.colors.background,
-        },
-        hamburgerButton: {
-          marginLeft: -spacing.xs,
-        },
         section: {
           marginTop: spacing.lg,
         },
@@ -475,17 +467,14 @@ const DashboardScreen = () => {
   );
 
   const renderHeader = useCallback(() => (
-    <View style={styles.header}>
-      <View style={{ width: 48 }} />
-      <IconButton
-        icon="plus"
-        size={24}
-        iconColor={theme.colors.primary}
-        onPress={handleAddService}
-        style={{ marginRight: -spacing.xs }}
-      />
-    </View>
-  ), [styles, theme, handleAddService]);
+    <TabHeader
+      rightAction={{
+        icon: "plus",
+        onPress: handleAddService,
+        accessibilityLabel: "Add service",
+      }}
+    />
+  ), [handleAddService]);
 
   const renderServiceItem = useCallback(
     ({ item }: { item: ServiceOverviewItem }) => {

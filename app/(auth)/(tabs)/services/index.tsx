@@ -6,6 +6,8 @@ import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { IconButton, Text, useTheme, Portal, Modal, List, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TabHeader } from '@/components/common/TabHeader';
+
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -167,17 +169,6 @@ const ServicesScreen = () => {
     container: {
       flex: 1,
           backgroundColor: theme.colors.background,
-        },
-        header: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.md,
-          backgroundColor: theme.colors.background,
-        },
-        backButton: {
-          marginLeft: -spacing.xs,
         },
         content: {
           flex: 1,
@@ -342,24 +333,16 @@ const ServicesScreen = () => {
   }, [selectedService, queryClient]);
 
   const renderHeader = useCallback(() => (
-    <View style={styles.header}>
-      <IconButton
-        icon="arrow-left"
-        size={24}
-        iconColor={theme.colors.onBackground}
-        onPress={handleBackPress}
-        style={styles.backButton}
-      />
-      <View style={{ width: 48 }} />
-      <IconButton
-        icon="plus"
-        size={24}
-        iconColor={theme.colors.primary}
-        onPress={handleAddService}
-        style={{ marginRight: -spacing.xs }}
-      />
-    </View>
-  ), [styles, theme, handleBackPress, handleAddService]);
+    <TabHeader
+      showBackButton={true}
+      onBackPress={handleBackPress}
+      rightAction={{
+        icon: "plus",
+        onPress: handleAddService,
+        accessibilityLabel: "Add service",
+      }}
+    />
+  ), [handleBackPress, handleAddService]);
 
   const renderServiceItem = useCallback(
     ({ item }: { item: ServiceOverviewItem }) => {

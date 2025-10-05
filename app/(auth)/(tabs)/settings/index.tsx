@@ -6,6 +6,8 @@ import ConfirmDialog from '@/components/common/ConfirmDialog/ConfirmDialog';
 import { Card } from '@/components/common/Card';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TabHeader } from '@/components/common/TabHeader';
+
 import type { AppTheme } from '@/constants/theme';
 import { useAuth } from '@/services/auth/AuthProvider';
 import { imageCacheService, type ImageCacheUsage } from '@/services/image/ImageCacheService';
@@ -48,14 +50,6 @@ const SettingsScreen = () => {
     },
     listSpacer: {
       height: spacing.sm,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      backgroundColor: theme.colors.background,
     },
     section: {
       marginTop: spacing.lg,
@@ -216,17 +210,13 @@ const SettingsScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <View style={{ width: 48 }} />
-          <View style={{ flex: 1 }} />
-          <IconButton
-            icon="cog"
-            size={24}
-            iconColor={theme.colors.primary}
-            onPress={() => {}}
-            style={{ marginRight: -spacing.xs }}
-          />
-        </View>
+        <TabHeader
+          rightAction={{
+            icon: "cog",
+            onPress: () => {},
+            accessibilityLabel: "Settings",
+          }}
+        />
 
         {/* Appearance Section */}
         <View style={styles.section}>
