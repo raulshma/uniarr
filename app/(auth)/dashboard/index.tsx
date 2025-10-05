@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { Alert, SafeAreaView, StyleSheet } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type AppTheme } from '@/constants/theme';
 import { useAuth } from '@/services/auth/AuthProvider';

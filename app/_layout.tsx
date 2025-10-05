@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 import { useMemo, type ComponentType } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { queryClient } from '@/config/queryClient';
 import { getAppTheme, type AppTheme } from '@/constants/theme';
@@ -18,19 +19,21 @@ const RootLayout = () => {
   const clerkPublishableKey = useMemo(getClerkPublishableKey, []);
 
   return (
-    <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={clerkTokenCache}>
-      <ClerkLoaded>
-        <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            <PaperProvider theme={theme}>
-              <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-              <Stack screenOptions={{ headerShown: false }} />
-              <QueryDevtools />
-            </PaperProvider>
-          </QueryClientProvider>
-        </AuthProvider>
-      </ClerkLoaded>
-    </ClerkProvider>
+    <SafeAreaProvider>
+      <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={clerkTokenCache}>
+        <ClerkLoaded>
+          <AuthProvider>
+            <QueryClientProvider client={queryClient}>
+              <PaperProvider theme={theme}>
+                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+                <Stack screenOptions={{ headerShown: false }} />
+                <QueryDevtools />
+              </PaperProvider>
+            </QueryClientProvider>
+          </AuthProvider>
+        </ClerkLoaded>
+      </ClerkProvider>
+    </SafeAreaProvider>
   );
 };
 
