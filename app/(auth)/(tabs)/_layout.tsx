@@ -108,10 +108,10 @@ const BottomTabNavigator = () => {
                 width: 50,
                 height: 50,
               }}
-              onPress={() => navigate('RecentlyAddedTab')}
+              onPress={() => navigate('DashboardTab')}
             >
               <IconButton
-                icon="clock-outline"
+                icon="view-dashboard"
                 size={25}
                 iconColor="gray"
               />
@@ -126,14 +126,14 @@ const BottomTabNavigator = () => {
           component={() => <ServicesScreen />}
         />
         <CurvedBottomBar.Screen
-          name="DashboardTab"
+          name="RecentlyAddedTab"
           position="LEFT"
-          component={() => <DashboardScreen />}
+          component={() => <RecentlyAddedScreen />}
         />
         <CurvedBottomBar.Screen
-          name="RecentlyAddedTab"
+          name="DashboardTab"
           position="CENTER"
-          component={() => <RecentlyAddedScreen />}
+          component={() => <DashboardScreen />}
         />
         <CurvedBottomBar.Screen
           name="DownloadsTab"
