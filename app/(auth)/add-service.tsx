@@ -2,13 +2,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import {
   HelperText,
   Text,
   TextInput,
   useTheme,
-  Menu,
+  Portal,
+  Modal,
   Divider,
   IconButton,
 } from 'react-native-paper';
@@ -103,7 +104,7 @@ const AddServiceScreen = () => {
   const [testError, setTestError] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [serviceTypeMenuVisible, setServiceTypeMenuVisible] = useState(false);
+  const [serviceTypeModalVisible, setServiceTypeModalVisible] = useState(false);
 
 
   const styles = useMemo(
@@ -111,64 +112,135 @@ const AddServiceScreen = () => {
       StyleSheet.create({
         safeArea: {
           flex: 1,
-          backgroundColor: theme.colors.background,
+          backgroundColor: theme.colors.surface,
         },
         headerBar: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
-          backgroundColor: theme.colors.background,
-          borderBottomWidth: 1,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+          backgroundColor: theme.colors.surface,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: theme.colors.outlineVariant,
         },
-        content: {
-          paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.xxl,
-        },
-        header: {
-          marginBottom: spacing.xl,
-        },
         headerTitle: {
-          color: theme.colors.onBackground,
+          color: theme.colors.onSurface,
           fontWeight: '600',
         },
-        headerSubtitle: {
-          marginTop: spacing.xs,
+        content: {
+          flexGrow: 1,
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.lg,
+          paddingBottom: spacing.xxl,
+          gap: spacing.xl,
+        },
+        hero: {
+          gap: spacing.xs,
+        },
+        heroTitle: {
+          color: theme.colors.onSurface,
+          fontWeight: '600',
+        },
+        heroSubtitle: {
           color: theme.colors.onSurfaceVariant,
+        },
+        formCard: {
+          gap: spacing.lg,
         },
         formField: {
-          marginBottom: spacing.lg,
-        },
-        dropdown: {
-          marginTop: spacing.xs,
-        },
-        dropdownInput: {
-          justifyContent: 'center',
+          gap: spacing.xs,
         },
         sectionLabel: {
-          marginBottom: spacing.xs,
-          color: theme.colors.onSurfaceVariant,
+          color: theme.colors.onSurface,
+          fontWeight: '600',
         },
-        diagnostics: {
+        input: {
+          borderRadius: 16,
+          backgroundColor: theme.colors.surface,
+        },
+        outline: {
+          borderRadius: 16,
+          borderWidth: 1,
+        },
+        dropdownAnchor: {
+          justifyContent: 'center',
+        },
+        modalContent: {
+          marginHorizontal: spacing.lg,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 12,
+          paddingVertical: spacing.sm,
+        },
+        optionItem: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+        },
+        optionText: {
+          color: theme.colors.onSurface,
+        },
+        optionDisabled: {
+          opacity: 0.5,
+        },
+        helperText: {
+          marginTop: spacing.xs,
+        },
+        diagnosticsCard: {
           marginTop: spacing.sm,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          borderRadius: 12,
+        },
+        diagnosticsError: {
+          backgroundColor: theme.colors.errorContainer,
+        },
+        diagnosticsSuccess: {
+          backgroundColor: theme.colors.tertiaryContainer,
+        },
+        diagnosticsText: {
+          color: theme.colors.onSurface,
         },
         actions: {
-          marginTop: spacing.xl,
+          marginTop: spacing.lg,
           gap: spacing.md,
         },
         testButton: {
-          marginBottom: spacing.sm,
-          backgroundColor: theme.colors.surfaceVariant,
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.primary,
+          borderWidth: 1,
+        },
+        testButtonLabel: {
+          color: theme.colors.primary,
         },
         saveButton: {
-          marginTop: spacing.xs,
-          backgroundColor: '#C49B2D', // Golden yellow color matching the design
+          backgroundColor: theme.colors.primary,
+        },
+        saveButtonLabel: {
+          color: theme.colors.onPrimary,
         },
       }),
     [theme],
   );
+
+  const inputTheme = useMemo(
+    () => ({
+      colors: {
+        primary: theme.colors.primary,
+        onSurface: theme.colors.onSurface,
+        outline: theme.colors.outlineVariant,
+        placeholder: theme.colors.onSurfaceVariant,
+        background: 'transparent',
+      },
+    }),
+    [
+      theme.colors.onSurface,
+      theme.colors.onSurfaceVariant,
+      theme.colors.outlineVariant,
+      theme.colors.primary,
+    ],
+  );
+
+  const placeholderColor = theme.colors.onSurfaceVariant;
 
   const resetDiagnostics = useCallback(() => {
     setTestResult(null);
@@ -311,7 +383,7 @@ const AddServiceScreen = () => {
         <IconButton
           icon="close"
           size={24}
-          iconColor={theme.colors.onBackground}
+          iconColor={theme.colors.onSurface}
           onPress={() => router.back()}
           accessibilityLabel="Close"
         />
@@ -326,196 +398,243 @@ const AddServiceScreen = () => {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <View style={styles.header}>
-          <Text variant="bodyMedium" style={styles.headerSubtitle}>
-            Connect Sonarr and other automation tools to UniArr. Provide the base URL and credentials to get started.
+        <View style={styles.hero}>
+          <Text variant="titleMedium" style={styles.heroTitle}>
+            Connect your automation services
+          </Text>
+          <Text variant="bodyMedium" style={styles.heroSubtitle}>
+            Enter the connection details exactly as configured in your media server.
           </Text>
         </View>
 
-        <View style={styles.formField}>
-          <Text variant="labelLarge" style={styles.sectionLabel}>
-            Service Type
-          </Text>
-          <View style={styles.dropdown}>
+        <View style={styles.formCard}>
+          <View style={styles.formField}>
+            <Text variant="labelLarge" style={styles.sectionLabel}>
+              Service Type
+            </Text>
             <Controller
               name="type"
               control={control}
               render={({ field: { value, onChange } }) => (
-                <Menu
-                  visible={serviceTypeMenuVisible}
-                  onDismiss={() => setServiceTypeMenuVisible(false)}
-                  anchor={
-                    <TextInput
-                      label=""
-                      value={serviceTypeLabels[value]}
-                      mode="outlined"
-                      style={styles.dropdownInput}
-                      right={
-                        <TextInput.Icon
-                          icon="chevron-down"
-                          onPress={() => setServiceTypeMenuVisible(true)}
-                        />
-                      }
-                      editable={false}
-                      pointerEvents="none"
-                    />
-                  }
-                >
-                  {serviceOptions.map((option) => (
-                    <View key={option.type}>
-                      <Menu.Item
-                        title={
-                          option.supported
-                            ? option.label
-                            : `${option.label} (coming soon)`
+                  <>
+                    <Pressable
+                      onPress={() => setServiceTypeModalVisible(true)}
+                      style={styles.dropdownAnchor}
+                      accessibilityRole="button"
+                    >
+                      <TextInput
+                        value={serviceTypeLabels[value]}
+                        mode="outlined"
+                        style={styles.input}
+                        outlineStyle={styles.outline}
+                        theme={inputTheme}
+                        placeholderTextColor={placeholderColor}
+                        right={
+                          <TextInput.Icon
+                            icon="chevron-down"
+                            onPress={() => setServiceTypeModalVisible(true)}
+                          />
                         }
-                        disabled={!option.supported}
-                        onPress={() => {
-                          if (option.supported) {
-                            resetDiagnostics();
-                            onChange(option.type);
-                            setServiceTypeMenuVisible(false);
-                          }
-                        }}
+                        editable={false}
                       />
-                      {!option.isLast && <Divider />}
-                    </View>
-                  ))}
-                </Menu>
+                    </Pressable>
+
+                    <Portal>
+                      <Modal
+                        visible={serviceTypeModalVisible}
+                        onDismiss={() => setServiceTypeModalVisible(false)}
+                        contentContainerStyle={styles.modalContent}
+                      >
+                        {serviceOptions.map((option) => (
+                          <View key={option.type}>
+                            <Pressable
+                              onPress={() => {
+                                if (option.supported) {
+                                  resetDiagnostics();
+                                  onChange(option.type);
+                                  setServiceTypeModalVisible(false);
+                                }
+                              }}
+                              style={({ pressed }) => [
+                                styles.optionItem,
+                                option.supported ? null : styles.optionDisabled,
+                                pressed ? { opacity: 0.7 } : null,
+                              ]}
+                              accessibilityRole={option.supported ? 'button' : 'text'}
+                            >
+                              <Text style={styles.optionText}>
+                                {option.supported ? option.label : `${option.label} (coming soon)`}
+                              </Text>
+                            </Pressable>
+                            {!option.isLast && <Divider />}
+                          </View>
+                        ))}
+                      </Modal>
+                    </Portal>
+                  </>
               )}
             />
+            {errors.type ? (
+              <HelperText type="error" visible style={styles.helperText}>
+                {errors.type.message}
+              </HelperText>
+            ) : null}
           </View>
-          {errors.type ? (
-            <HelperText type="error" visible>
-              {errors.type.message}
-            </HelperText>
+
+          <View style={styles.formField}>
+            <Text variant="labelLarge" style={styles.sectionLabel}>
+              Service Name
+            </Text>
+            <Controller
+              name="name"
+              control={control}
+              render={({ field: { value, onChange, onBlur } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={(text) => {
+                    resetDiagnostics();
+                    onChange(text);
+                  }}
+                  onBlur={onBlur}
+                  mode="outlined"
+                  autoCapitalize="words"
+                  style={styles.input}
+                  outlineStyle={styles.outline}
+                  theme={inputTheme}
+                  accessibilityLabel="Service name"
+                  placeholder="My Media Server"
+                  placeholderTextColor={placeholderColor}
+                />
+              )}
+            />
+            {errors.name ? (
+              <HelperText type="error" visible style={styles.helperText}>
+                {errors.name.message}
+              </HelperText>
+            ) : null}
+          </View>
+
+          <View style={styles.formField}>
+            <Text variant="labelLarge" style={styles.sectionLabel}>
+              Service URL
+            </Text>
+            <Controller
+              name="url"
+              control={control}
+              render={({ field: { value, onChange, onBlur } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={(text) => {
+                    resetDiagnostics();
+                    onChange(text);
+                  }}
+                  onBlur={onBlur}
+                  mode="outlined"
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  style={styles.input}
+                  outlineStyle={styles.outline}
+                  theme={inputTheme}
+                  accessibilityLabel="Service URL"
+                  placeholder="http://192.168.1.100:8989"
+                  placeholderTextColor={placeholderColor}
+                />
+              )}
+            />
+            {errors.url ? (
+              <HelperText type="error" visible style={styles.helperText}>
+                {errors.url.message}
+              </HelperText>
+            ) : null}
+          </View>
+
+          <View style={styles.formField}>
+            <Text variant="labelLarge" style={styles.sectionLabel}>
+              API Key
+            </Text>
+            <Controller
+              name="apiKey"
+              control={control}
+              render={({ field: { value, onChange, onBlur } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={(text) => {
+                    resetDiagnostics();
+                    onChange(text);
+                  }}
+                  onBlur={onBlur}
+                  mode="outlined"
+                  autoCapitalize="none"
+                  secureTextEntry
+                  style={styles.input}
+                  outlineStyle={styles.outline}
+                  theme={inputTheme}
+                  accessibilityLabel="Service API key"
+                  placeholder="Enter your API key"
+                  placeholderTextColor={placeholderColor}
+                />
+              )}
+            />
+            {errors.apiKey ? (
+              <HelperText type="error" visible style={styles.helperText}>
+                {errors.apiKey.message}
+              </HelperText>
+            ) : null}
+          </View>
+
+          {formError ? (
+            <View style={[styles.diagnosticsCard, styles.diagnosticsError]}>
+              <Text variant="bodySmall" style={styles.diagnosticsText}>
+                {formError}
+              </Text>
+            </View>
           ) : null}
-        </View>
 
-        <Controller
-          name="name"
-          control={control}
-          render={({ field: { value, onChange, onBlur } }) => (
-            <TextInput
-              label="Name"
-              value={value}
-              onChangeText={(text) => {
-                resetDiagnostics();
-                onChange(text);
-              }}
-              onBlur={onBlur}
-              mode="outlined"
-              autoCapitalize="words"
-              style={styles.formField}
-              accessibilityLabel="Service name"
-              placeholder="My Media Server"
-            />
-          )}
-        />
-        {errors.name ? (
-          <HelperText type="error" visible>
-            {errors.name.message}
-          </HelperText>
-        ) : null}
+          {testError ? (
+            <View style={[styles.diagnosticsCard, styles.diagnosticsError]}>
+              <Text variant="bodySmall" style={styles.diagnosticsText}>
+                {testError}
+              </Text>
+            </View>
+          ) : null}
 
-        <Controller
-          name="url"
-          control={control}
-          render={({ field: { value, onChange, onBlur } }) => (
-            <TextInput
-              label="URL"
-              value={value}
-              onChangeText={(text) => {
-                resetDiagnostics();
-                onChange(text);
-              }}
-              onBlur={onBlur}
-              mode="outlined"
-              autoCapitalize="none"
-              keyboardType="url"
-              style={styles.formField}
-              accessibilityLabel="Service URL"
-              placeholder="http://192.168.1.100:8989"
-            />
-          )}
-        />
-        {errors.url ? (
-          <HelperText type="error" visible>
-            {errors.url.message}
-          </HelperText>
-        ) : null}
+          {testResult && !testError ? (
+            <View style={[styles.diagnosticsCard, styles.diagnosticsSuccess]}>
+              <Text variant="bodySmall" style={styles.diagnosticsText}>
+                Connection successful
+                {testResult.version ? ` · Version ${testResult.version}` : ''}
+                {typeof testResult.latency === 'number' ? ` · ${testResult.latency} ms` : ''}
+              </Text>
+            </View>
+          ) : null}
 
-        <Controller
-          name="apiKey"
-          control={control}
-          render={({ field: { value, onChange, onBlur } }) => (
-            <TextInput
-              label="API Key"
-              value={value}
-              onChangeText={(text) => {
-                resetDiagnostics();
-                onChange(text);
-              }}
-              onBlur={onBlur}
-              mode="outlined"
-              autoCapitalize="none"
-              secureTextEntry
-              style={styles.formField}
-              accessibilityLabel="Service API key"
-              placeholder="Enter your API key"
-            />
-          )}
-        />
+          <View style={styles.actions}>
+            <Button
+              mode="contained"
+              onPress={handleSubmit(handleTestConnection)}
+              loading={isTesting}
+              disabled={isSubmitting || isTesting}
+              buttonColor={theme.colors.surface}
+              style={styles.testButton}
+              labelStyle={styles.testButtonLabel}
+              fullWidth
+            >
+              Test Connection
+            </Button>
 
-
-        {errors.apiKey ? (
-          <HelperText type="error" visible>
-            {errors.apiKey.message}
-          </HelperText>
-        ) : null}
-
-        {formError ? (
-          <HelperText type="error" visible style={styles.diagnostics}>
-            {formError}
-          </HelperText>
-        ) : null}
-
-        {testError ? (
-          <HelperText type="error" visible style={styles.diagnostics}>
-            {testError}
-          </HelperText>
-        ) : null}
-
-        {testResult && !testError ? (
-          <HelperText type="info" visible style={styles.diagnostics}>
-            Connection successful
-            {testResult.version ? ` · Version ${testResult.version}` : ''}
-            {typeof testResult.latency === 'number' ? ` · ${testResult.latency} ms` : ''}
-          </HelperText>
-        ) : null}
-
-        <View style={styles.actions}>
-          <Button
-            mode="contained"
-            onPress={handleSubmit(handleTestConnection)}
-            loading={isTesting}
-            disabled={isSubmitting || isTesting}
-            style={styles.testButton}
-            labelStyle={{ color: theme.colors.onSurfaceVariant }}
-          >
-            Test Connection
-          </Button>
-
-          <Button
-            mode="contained"
-            onPress={handleSubmit(handleSave)}
-            loading={isSubmitting}
-            disabled={isSubmitting || isTesting}
-            style={styles.saveButton}
-            labelStyle={{ color: theme.colors.onPrimary }}
-          >
-            Save Service
-          </Button>
+            <Button
+              mode="contained"
+              onPress={handleSubmit(handleSave)}
+              loading={isSubmitting}
+              disabled={isSubmitting || isTesting}
+              buttonColor={theme.colors.primary}
+              style={styles.saveButton}
+              labelStyle={styles.saveButtonLabel}
+              fullWidth
+            >
+              Save Service
+            </Button>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
