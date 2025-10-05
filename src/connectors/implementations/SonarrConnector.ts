@@ -234,7 +234,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       ]);
 
       const series = this.mapSeries(seriesResponse.data);
-      const episodesBySeason = this.groupEpisodesBySeason(episodesResponse.data);
+      const episodesBySeason = this.groupEpisodesBySeason(episodesResponse.data, seriesResponse.data.id);
 
       const seasons: Season[] | undefined = series.seasons?.map((season) => ({
         ...season,
@@ -414,7 +414,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       titleSlug: data.titleSlug,
       rootFolderPath: data.rootFolderPath,
       tags: data.tags,
-      seasons: data.seasons?.map((season) => this.mapSeason(season)),
+      seasons: data.seasons?.map((season) => this.mapSeason(season, data.id)),
       nextAiring: data.nextAiring,
       previousAiring: data.previousAiring,
       added: data.added,
@@ -426,12 +426,13 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     };
   }
 
-  private mapSeason(season: SonarrSeason): Season {
+  private mapSeason(season: SonarrSeason, seriesId?: number): Season {
     return {
       id: season.id,
       seasonNumber: season.seasonNumber,
       monitored: season.monitored,
       statistics: this.mapStatistics(season.statistics),
+      posterUrl: seriesId ? this.buildSeasonPosterUrl(seriesId, season.seasonNumber) : undefined,
     };
   }
 
@@ -447,7 +448,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     };
   }
 
-  private mapEpisode(episode: SonarrEpisode): Episode {
+  private mapEpisode(episode: SonarrEpisode, seriesId?: number): Episode {
     return {
       id: episode.id,
       title: episode.title,
@@ -463,13 +464,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       episodeFileId: episode.episodeFileId,
       quality: episode.quality?.quality ? this.mapQualityResource(episode.quality.quality) : undefined,
       relativePath: episode.relativePath,
+      posterUrl: seriesId ? this.buildEpisodePosterUrl(seriesId, episode.seasonNumber, episode.episodeNumber) : undefined,
     };
   }
 
-  private groupEpisodesBySeason(episodes: SonarrEpisode[]): Map<number, Episode[]> {
+  private groupEpisodesBySeason(episodes: SonarrEpisode[], seriesId: number): Map<number, Episode[]> {
     return episodes.reduce((accumulator, episode) => {
       const collection = accumulator.get(episode.seasonNumber) ?? [];
-      collection.push(this.mapEpisode(episode));
+      collection.push(this.mapEpisode(episode, seriesId));
       accumulator.set(episode.seasonNumber, collection);
       return accumulator;
     }, new Map<number, Episode[]>());
@@ -477,6 +479,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   private findImageUrl(images: SonarrImage[] | undefined, type: SonarrImage['coverType']): string | undefined {
     return images?.find((image) => image.coverType === type)?.remoteUrl ?? undefined;
+  }
+
+  private buildSeasonPosterUrl(seriesId: number, seasonNumber: number): string {
+    return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}.jpg`;
+  }
+
+  private buildEpisodePosterUrl(seriesId: number, seasonNumber: number, episodeNumber: number): string {
+    return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}-episode-${episodeNumber}.jpg`;
   }
 
   private mapQueueRecord(record: SonarrQueueRecord): SonarrQueueItem {
