@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, RefreshControl, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import {
   IconButton,
   ProgressBar,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
+import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import { useQBittorrentTorrents } from '@/hooks/useQBittorrentTorrents';
@@ -618,14 +619,12 @@ const QBittorrentServiceScreen = () => {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={<View style={themeStyles.emptyContainer}>{listEmptyComponent}</View>}
         refreshControl={
-          <RefreshControl
+          <ListRefreshControl
             refreshing={isRefreshing}
             onRefresh={() => {
               void refetch();
               void refreshTransferInfo();
             }}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
           />
         }
       />

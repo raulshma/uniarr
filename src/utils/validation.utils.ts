@@ -26,25 +26,34 @@ export const serviceConfigSchema = z
     username: z.string().trim().min(1, 'Username cannot be empty').optional(),
     password: z.string().trim().min(1, 'Password cannot be empty').optional(),
   })
-  .refine(
-    (data) => {
-      if (data.type === 'qbittorrent') {
-        return Boolean(data.username) && Boolean(data.password);
-      }
-      return Boolean(data.apiKey);
-    },
-    (data) => {
-      if (data.type === 'qbittorrent') {
-        return {
-          message: 'Username and password are required for qBittorrent',
+  .superRefine((data, ctx) => {
+    if (data.type === 'qbittorrent') {
+      if (!data.username) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
           path: ['username'],
-        };
+          message: 'Username is required for qBittorrent',
+        });
       }
-      return {
-        message: 'API key is required',
+
+      if (!data.password) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['password'],
+          message: 'Password is required for qBittorrent',
+        });
+      }
+
+      return;
+    }
+
+    if (!data.apiKey) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
         path: ['apiKey'],
-      };
-    },
-  );
+        message: 'API key is required',
+      });
+    }
+  });
 
 export type ServiceConfigInput = z.infer<typeof serviceConfigSchema>;

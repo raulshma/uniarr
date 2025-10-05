@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { Text, useTheme, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
+import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { ServiceCard } from '@/components/service/ServiceCard';
 import type { ServiceStatusState } from '@/components/service/ServiceStatus';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
@@ -603,11 +604,9 @@ const DashboardScreen = () => {
         ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
         ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
         refreshControl={
-          <RefreshControl
+          <ListRefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => void refetch()}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
+            onRefresh={() => refetch()}
           />
         }
         showsVerticalScrollIndicator={false}

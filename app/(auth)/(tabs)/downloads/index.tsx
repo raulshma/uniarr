@@ -3,14 +3,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { RefreshControl, StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { IconButton, ProgressBar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/common/Button';
-import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
+import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import type { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
@@ -416,11 +416,9 @@ const DownloadsScreen = () => {
         ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl
+          <ListRefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => void refetch()}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
+            onRefresh={() => refetch()}
           />
         }
       />

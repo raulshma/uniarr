@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import {
   Icon,
   IconButton,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
+import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { MediaPoster } from '@/components/media/MediaPoster';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -495,11 +496,9 @@ const SonarrSeriesListScreen = () => {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
         refreshControl={
-          <RefreshControl
+          <ListRefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => void refetch()}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
+            onRefresh={() => refetch()}
           />
         }
       />

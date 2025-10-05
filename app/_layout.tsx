@@ -8,14 +8,13 @@ import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { queryClient } from '@/config/queryClient';
-import { getAppTheme, type AppTheme } from '@/constants/theme';
 import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthService';
 import { AuthProvider } from '@/services/auth/AuthProvider';
+import { useTheme } from '@/hooks/useTheme';
 
 const RootLayout = () => {
   const colorScheme = useColorScheme();
-
-  const theme = useMemo<AppTheme>(() => getAppTheme(colorScheme), [colorScheme]);
+  const theme = useTheme();
   const clerkPublishableKey = useMemo(getClerkPublishableKey, []);
 
   return (
@@ -25,7 +24,7 @@ const RootLayout = () => {
           <AuthProvider>
             <QueryClientProvider client={queryClient}>
               <PaperProvider theme={theme}>
-                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+                <StatusBar style={theme.dark ? 'light' : 'dark'} />
                 <Stack screenOptions={{ headerShown: false }} />
                 <QueryDevtools />
               </PaperProvider>

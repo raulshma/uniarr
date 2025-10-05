@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, RefreshControl, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import {
   Chip,
   Searchbar,
@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
+import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import MovieListItem from '@/components/media/MediaCard/MovieListItem';
 import type { MediaDownloadStatus } from '@/components/media/MediaCard';
 import type { AppTheme } from '@/constants/theme';
@@ -470,11 +471,9 @@ const RadarrMoviesListScreen = () => {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
         refreshControl={
-          <RefreshControl
+          <ListRefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => void refetch()}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
+            onRefresh={() => refetch()}
           />
         }
       />
