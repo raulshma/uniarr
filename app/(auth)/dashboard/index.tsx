@@ -201,7 +201,7 @@ const DashboardScreen = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          backgroundColor: '#0F0F0F',
+          backgroundColor: theme.colors.background,
         },
         listContent: {
           paddingHorizontal: spacing.md,
@@ -213,28 +213,34 @@ const DashboardScreen = () => {
           justifyContent: 'space-between',
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.md,
-          backgroundColor: '#0F0F0F',
+          backgroundColor: theme.colors.background,
         },
         hamburgerButton: {
           marginLeft: -spacing.xs,
         },
         headerTitle: {
-          color: '#FFFFFF',
-          fontSize: 20,
-          fontWeight: 'bold',
+          color: theme.colors.onBackground,
+          fontSize: theme.custom.typography.headlineSmall.fontSize,
+          fontFamily: theme.custom.typography.headlineSmall.fontFamily,
+          lineHeight: theme.custom.typography.headlineSmall.lineHeight,
+          letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
+          fontWeight: '700' as const,
         },
         section: {
           marginTop: spacing.lg,
         },
         sectionTitle: {
-          color: '#FFFFFF',
-          fontSize: 18,
-          fontWeight: '600',
+          color: theme.colors.onBackground,
+          fontSize: theme.custom.typography.titleLarge.fontSize,
+          fontFamily: theme.custom.typography.titleLarge.fontFamily,
+          lineHeight: theme.custom.typography.titleLarge.lineHeight,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
+          fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
           marginBottom: spacing.md,
           paddingHorizontal: spacing.md,
         },
         serviceCard: {
-          backgroundColor: '#1A1A1A',
+          backgroundColor: theme.colors.elevation.level1,
           marginHorizontal: spacing.md,
           marginVertical: spacing.xs,
           borderRadius: 12,
@@ -248,7 +254,7 @@ const DashboardScreen = () => {
           width: 48,
           height: 48,
           borderRadius: 24,
-          backgroundColor: '#2A2A2A',
+          backgroundColor: theme.colors.surfaceVariant,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: spacing.md,
@@ -257,9 +263,12 @@ const DashboardScreen = () => {
           flex: 1,
         },
         serviceName: {
-          color: '#FFFFFF',
-          fontSize: 16,
-          fontWeight: '600',
+          color: theme.colors.onSurface,
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontFamily: theme.custom.typography.titleMedium.fontFamily,
+          lineHeight: theme.custom.typography.titleMedium.lineHeight,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
           marginBottom: spacing.xxs,
         },
         serviceStatus: {
@@ -273,23 +282,27 @@ const DashboardScreen = () => {
           marginRight: spacing.xs,
         },
         statusOnline: {
-          backgroundColor: '#4CAF50',
+          backgroundColor: theme.colors.primary,
         },
         statusOffline: {
-          backgroundColor: '#F44336',
+          backgroundColor: theme.colors.error,
         },
         statusDegraded: {
-          backgroundColor: '#FF9800',
+          backgroundColor: theme.colors.tertiary,
         },
         serviceStatusText: {
-          color: '#CCCCCC',
-          fontSize: 14,
+          color: theme.colors.onSurfaceVariant,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
+          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
+          lineHeight: theme.custom.typography.bodyMedium.lineHeight,
+          letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
+          fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
         },
         serviceArrow: {
-          color: '#666666',
+          color: theme.colors.outline,
         },
         activityCard: {
-          backgroundColor: '#1A1A1A',
+          backgroundColor: theme.colors.elevation.level1,
           marginHorizontal: spacing.md,
           marginVertical: spacing.xs,
           borderRadius: 12,
@@ -303,7 +316,7 @@ const DashboardScreen = () => {
           width: 48,
           height: 48,
           borderRadius: 24,
-          backgroundColor: '#2A2A2A',
+          backgroundColor: theme.colors.surfaceVariant,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: spacing.md,
@@ -312,17 +325,24 @@ const DashboardScreen = () => {
           flex: 1,
         },
         activityTitle: {
-          color: '#FFFFFF',
-          fontSize: 16,
-          fontWeight: '600',
+          color: theme.colors.onSurface,
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontFamily: theme.custom.typography.titleMedium.fontFamily,
+          lineHeight: theme.custom.typography.titleMedium.lineHeight,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
           marginBottom: spacing.xxs,
         },
         activitySubtitle: {
-          color: '#CCCCCC',
-          fontSize: 14,
+          color: theme.colors.onSurfaceVariant,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
+          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
+          lineHeight: theme.custom.typography.bodyMedium.lineHeight,
+          letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
+          fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
         },
         activityArrow: {
-          color: '#666666',
+          color: theme.colors.outline,
         },
         listSpacer: {
           height: spacing.sm,
@@ -413,9 +433,15 @@ const DashboardScreen = () => {
     <View style={styles.header}>
       <View style={{ width: 48 }} />
       <Text style={styles.headerTitle}>Dashboard</Text>
-      <View style={{ width: 48 }} />
+      <IconButton
+        icon="plus"
+        size={24}
+        iconColor={theme.colors.primary}
+        onPress={handleAddService}
+        style={{ marginRight: -spacing.xs }}
+      />
     </View>
-  ), [styles]);
+  ), [styles, theme, handleAddService]);
 
   const renderServiceItem = useCallback(
     ({ item }: { item: ServiceOverviewItem }) => {
@@ -449,7 +475,7 @@ const DashboardScreen = () => {
         <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
           <View style={styles.serviceContent}>
             <View style={styles.serviceIcon}>
-              <IconButton icon={getStatusIcon(item.config.type)} size={24} iconColor="#FFD700" />
+              <IconButton icon={getStatusIcon(item.config.type)} size={24} iconColor={theme.colors.primary} />
             </View>
             <View style={styles.serviceInfo}>
               <Text style={styles.serviceName}>{item.config.name}</Text>
@@ -460,7 +486,7 @@ const DashboardScreen = () => {
                 </Text>
               </View>
             </View>
-            <IconButton icon="chevron-right" size={20} iconColor="#666666" />
+            <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
           </View>
         </Card>
       );
@@ -473,25 +499,25 @@ const DashboardScreen = () => {
       <Card variant="custom" style={styles.activityCard} onPress={() => router.push('/(auth)/downloads')}>
         <View style={styles.activityContent}>
           <View style={styles.activityIcon}>
-            <IconButton icon="download" size={24} iconColor="#FFD700" />
+            <IconButton icon="download" size={24} iconColor={theme.colors.primary} />
           </View>
           <View style={styles.activityInfo}>
             <Text style={styles.activityTitle}>Downloads</Text>
             <Text style={styles.activitySubtitle}>2 active</Text>
           </View>
-          <IconButton icon="chevron-right" size={20} iconColor="#666666" />
+          <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
         </View>
       </Card>
       <Card variant="custom" style={styles.activityCard} onPress={() => {}}>
         <View style={styles.activityContent}>
           <View style={styles.activityIcon}>
-            <IconButton icon="plus" size={24} iconColor="#FFD700" />
+            <IconButton icon="plus" size={24} iconColor={theme.colors.primary} />
           </View>
           <View style={styles.activityInfo}>
             <Text style={styles.activityTitle}>Recently Added</Text>
             <Text style={styles.activitySubtitle}>3 added</Text>
           </View>
-          <IconButton icon="chevron-right" size={20} iconColor="#666666" />
+          <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
         </View>
       </Card>
     </>
@@ -569,8 +595,8 @@ const DashboardScreen = () => {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => void refetch()}
-            colors={['#FFD700']}
-            tintColor="#FFD700"
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
           />
         }
         showsVerticalScrollIndicator={false}

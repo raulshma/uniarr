@@ -33,8 +33,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: "metro",
     favicon: "./assets/favicon.png",
   },
-  plugins: ["expo-router"],
+  plugins: [
+    "expo-router",
+    "expo-secure-store",
+    [
+      "expo-web-browser",
+      {
+        // Disable web-browser plugin for web platform
+        disableWeb: true,
+      },
+    ],
+  ],
   extra: {
+    ...config.extra,
     eas: {
       projectId: "35355a36-e839-42ed-866f-8e4b1f4b5600",
     },

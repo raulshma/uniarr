@@ -5,10 +5,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import {
   HelperText,
-  RadioButton,
   Text,
   TextInput,
   useTheme,
+  Menu,
+  Divider,
+  IconButton,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Controller, useForm } from 'react-hook-form';
@@ -93,8 +95,6 @@ const AddServiceScreen = () => {
       type: defaultType,
       url: '',
       apiKey: '',
-      username: '',
-      password: '',
     },
     mode: 'onChange',
   });
@@ -103,6 +103,7 @@ const AddServiceScreen = () => {
   const [testError, setTestError] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [serviceTypeMenuVisible, setServiceTypeMenuVisible] = useState(false);
 
 
   const styles = useMemo(
@@ -112,36 +113,39 @@ const AddServiceScreen = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
+        headerBar: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          backgroundColor: theme.colors.background,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.outlineVariant,
+        },
         content: {
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.xxl,
         },
         header: {
-          marginBottom: spacing.lg,
+          marginBottom: spacing.xl,
         },
         headerTitle: {
-          marginTop: spacing.md,
           color: theme.colors.onBackground,
+          fontWeight: '600',
         },
         headerSubtitle: {
           marginTop: spacing.xs,
           color: theme.colors.onSurfaceVariant,
         },
         formField: {
-          marginBottom: spacing.md,
+          marginBottom: spacing.lg,
         },
-        radioGroup: {
+        dropdown: {
           marginTop: spacing.xs,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: theme.colors.outlineVariant,
         },
-        radioItem: {
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.surfaceVariant,
-        },
-        lastRadioItem: {
-          borderBottomWidth: 0,
+        dropdownInput: {
+          justifyContent: 'center',
         },
         sectionLabel: {
           marginBottom: spacing.xs,
@@ -153,6 +157,14 @@ const AddServiceScreen = () => {
         actions: {
           marginTop: spacing.xl,
           gap: spacing.md,
+        },
+        testButton: {
+          marginBottom: spacing.sm,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        saveButton: {
+          marginTop: spacing.xs,
+          backgroundColor: '#C49B2D', // Golden yellow color matching the design
         },
       }),
     [theme],
@@ -266,8 +278,6 @@ const AddServiceScreen = () => {
           type: config.type,
           url: '',
           apiKey: '',
-          username: '',
-          password: '',
         });
       } catch (error) {
         const message =
@@ -297,19 +307,26 @@ const AddServiceScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.headerBar}>
+        <IconButton
+          icon="close"
+          size={24}
+          iconColor={theme.colors.onBackground}
+          onPress={() => router.back()}
+          accessibilityLabel="Close"
+        />
+        <Text variant="headlineSmall" style={styles.headerTitle}>
+          Add Service
+        </Text>
+        <View style={{ width: 48 }} />
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <Button mode="text" onPress={() => router.back()} accessibilityLabel="Go back">
-          Back
-        </Button>
-
         <View style={styles.header}>
-          <Text variant="headlineMedium" style={styles.headerTitle}>
-            Add Service
-          </Text>
           <Text variant="bodyMedium" style={styles.headerSubtitle}>
             Connect Sonarr and other automation tools to UniArr. Provide the base URL and credentials to get started.
           </Text>
@@ -319,33 +336,52 @@ const AddServiceScreen = () => {
           <Text variant="labelLarge" style={styles.sectionLabel}>
             Service Type
           </Text>
-          <View style={styles.radioGroup}>
+          <View style={styles.dropdown}>
             <Controller
               name="type"
               control={control}
               render={({ field: { value, onChange } }) => (
-                <RadioButton.Group
-                  value={value}
-                  onValueChange={(nextValue) => {
-                    resetDiagnostics();
-                    onChange(nextValue as ServiceType);
-                  }}
+                <Menu
+                  visible={serviceTypeMenuVisible}
+                  onDismiss={() => setServiceTypeMenuVisible(false)}
+                  anchor={
+                    <TextInput
+                      label=""
+                      value={serviceTypeLabels[value]}
+                      mode="outlined"
+                      style={styles.dropdownInput}
+                      right={
+                        <TextInput.Icon
+                          icon="chevron-down"
+                          onPress={() => setServiceTypeMenuVisible(true)}
+                        />
+                      }
+                      editable={false}
+                      pointerEvents="none"
+                    />
+                  }
                 >
                   {serviceOptions.map((option) => (
-                    <RadioButton.Item
-                      key={option.type}
-                      value={option.type}
-                      label={
-                        option.supported
-                          ? option.label
-                          : `${option.label} (coming soon)`
-                      }
-                      disabled={!option.supported}
-                      mode="android"
-                      style={[styles.radioItem, option.isLast ? styles.lastRadioItem : undefined]}
-                    />
+                    <View key={option.type}>
+                      <Menu.Item
+                        title={
+                          option.supported
+                            ? option.label
+                            : `${option.label} (coming soon)`
+                        }
+                        disabled={!option.supported}
+                        onPress={() => {
+                          if (option.supported) {
+                            resetDiagnostics();
+                            onChange(option.type);
+                            setServiceTypeMenuVisible(false);
+                          }
+                        }}
+                      />
+                      {!option.isLast && <Divider />}
+                    </View>
                   ))}
-                </RadioButton.Group>
+                </Menu>
               )}
             />
           </View>
@@ -361,7 +397,7 @@ const AddServiceScreen = () => {
           control={control}
           render={({ field: { value, onChange, onBlur } }) => (
             <TextInput
-              label="Display Name"
+              label="Name"
               value={value}
               onChangeText={(text) => {
                 resetDiagnostics();
@@ -371,7 +407,8 @@ const AddServiceScreen = () => {
               mode="outlined"
               autoCapitalize="words"
               style={styles.formField}
-              accessibilityLabel="Service display name"
+              accessibilityLabel="Service name"
+              placeholder="My Media Server"
             />
           )}
         />
@@ -386,7 +423,7 @@ const AddServiceScreen = () => {
           control={control}
           render={({ field: { value, onChange, onBlur } }) => (
             <TextInput
-              label="Base URL"
+              label="URL"
               value={value}
               onChangeText={(text) => {
                 resetDiagnostics();
@@ -397,8 +434,8 @@ const AddServiceScreen = () => {
               autoCapitalize="none"
               keyboardType="url"
               style={styles.formField}
-              accessibilityLabel="Service base URL"
-              placeholder="https://example.com"
+              accessibilityLabel="Service URL"
+              placeholder="http://192.168.1.100:8989"
             />
           )}
         />
@@ -425,53 +462,11 @@ const AddServiceScreen = () => {
               secureTextEntry
               style={styles.formField}
               accessibilityLabel="Service API key"
+              placeholder="Enter your API key"
             />
           )}
         />
 
-        <Text variant="labelLarge" style={styles.sectionLabel}>
-          Use username and password instead of an API key
-        </Text>
-
-        <Controller
-          name="username"
-          control={control}
-          render={({ field: { value, onChange, onBlur } }) => (
-            <TextInput
-              label="Username"
-              value={value}
-              onChangeText={(text) => {
-                resetDiagnostics();
-                onChange(text);
-              }}
-              onBlur={onBlur}
-              mode="outlined"
-              autoCapitalize="none"
-              style={styles.formField}
-              accessibilityLabel="Service username"
-            />
-          )}
-        />
-
-        <Controller
-          name="password"
-          control={control}
-          render={({ field: { value, onChange, onBlur } }) => (
-            <TextInput
-              label="Password"
-              value={value}
-              onChangeText={(text) => {
-                resetDiagnostics();
-                onChange(text);
-              }}
-              onBlur={onBlur}
-              mode="outlined"
-              secureTextEntry
-              style={styles.formField}
-              accessibilityLabel="Service password"
-            />
-          )}
-        />
 
         {errors.apiKey ? (
           <HelperText type="error" visible>
@@ -501,10 +496,12 @@ const AddServiceScreen = () => {
 
         <View style={styles.actions}>
           <Button
-            mode="outlined"
+            mode="contained"
             onPress={handleSubmit(handleTestConnection)}
             loading={isTesting}
             disabled={isSubmitting || isTesting}
+            style={styles.testButton}
+            labelStyle={{ color: theme.colors.onSurfaceVariant }}
           >
             Test Connection
           </Button>
@@ -514,6 +511,8 @@ const AddServiceScreen = () => {
             onPress={handleSubmit(handleSave)}
             loading={isSubmitting}
             disabled={isSubmitting || isTesting}
+            style={styles.saveButton}
+            labelStyle={{ color: theme.colors.onPrimary }}
           >
             Save Service
           </Button>

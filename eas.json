@@ -1,0 +1,43 @@
+{
+  "cli": {
+    "version": ">= 16.19.3"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "cache": {
+        "disabled": false
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "cache": {
+        "disabled": false
+      },
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "cache": {
+        "disabled": false
+      },
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

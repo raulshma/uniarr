@@ -1,5 +1,5 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { IconButton } from 'react-native-paper';
+import { IconButton, useTheme } from 'react-native-paper';
 
 import DashboardScreen from '@/../app/(auth)/dashboard';
 import ServicesScreen from '@/../app/(auth)/services';
@@ -9,19 +9,21 @@ import SettingsScreen from '@/../app/(auth)/settings/add-service';
 const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator = () => {
+  const theme = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#1A1A1A',
-          borderTopColor: '#333333',
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.outlineVariant,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#FFD700',
-        tabBarInactiveTintColor: '#666666',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
       }}
     >
       <Tab.Screen
