@@ -213,7 +213,6 @@ const DashboardScreen = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingHorizontal: spacing.md,
-          paddingVertical: spacing.md,
           backgroundColor: theme.colors.background,
         },
         hamburgerButton: {
@@ -442,7 +441,7 @@ const DashboardScreen = () => {
   const renderHeader = useCallback(() => (
     <View style={styles.header}>
       <View style={{ width: 48 }} />
-      <Text style={styles.headerTitle}>Dashboard</Text>
+      {/* <Text style={styles.headerTitle}>Dashboard</Text> */}
       <IconButton
         icon="plus"
         size={24}

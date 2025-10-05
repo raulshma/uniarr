@@ -11,6 +11,7 @@ import { queryClient } from '@/config/queryClient';
 import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthService';
 import { AuthProvider } from '@/services/auth/AuthProvider';
 import { useTheme } from '@/hooks/useTheme';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 const RootLayout = () => {
   const colorScheme = useColorScheme();
@@ -25,7 +26,9 @@ const RootLayout = () => {
             <QueryClientProvider client={queryClient}>
               <PaperProvider theme={theme}>
                 <StatusBar style={theme.dark ? 'light' : 'dark'} />
-                <Stack screenOptions={{ headerShown: false }} />
+                <ErrorBoundary context={{ location: 'RootLayout' }}>
+                  <Stack screenOptions={{ headerShown: false }} />
+                </ErrorBoundary>
                 <QueryDevtools />
               </PaperProvider>
             </QueryClientProvider>
