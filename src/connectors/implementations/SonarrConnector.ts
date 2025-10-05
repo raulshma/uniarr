@@ -1,0 +1,404 @@
+import { BaseConnector } from '@/connectors/base/BaseConnector';
+import type { AddSeriesRequest, Episode, MediaStatistics, Series, Season } from '@/models/media.types';
+import type { SearchOptions } from '@/connectors/base/IConnector';
+import { handleApiError } from '@/utils/error.utils';
+
+interface SonarrImage {
+  readonly coverType: 'poster' | 'fanart' | string;
+  readonly url?: string;
+  readonly remoteUrl?: string;
+}
+
+interface SonarrStatistics {
+  readonly seasonCount?: number;
+  readonly episodeCount?: number;
+  readonly episodeFileCount?: number;
+  readonly percentOfEpisodes?: number;
+}
+
+interface SonarrSeason {
+  readonly id?: number;
+  readonly seasonNumber: number;
+  readonly monitored: boolean;
+  readonly statistics?: SonarrStatistics;
+}
+
+interface SonarrSeries {
+  readonly id: number;
+  readonly title: string;
+  readonly sortTitle?: string;
+  readonly year?: number;
+  readonly status: string;
+  readonly overview?: string;
+  readonly network?: string;
+  readonly genres?: string[];
+  readonly path?: string;
+  readonly qualityProfileId?: number;
+  readonly seasonFolder?: boolean;
+  readonly monitored: boolean;
+  readonly tvdbId?: number;
+  readonly imdbId?: string;
+  readonly tmdbId?: number;
+  readonly traktId?: number;
+  readonly cleanTitle?: string;
+  readonly titleSlug?: string;
+  readonly rootFolderPath?: string;
+  readonly tags?: number[];
+  readonly seasons?: SonarrSeason[];
+  readonly nextAiring?: string;
+  readonly previousAiring?: string;
+  readonly added?: string;
+  readonly images?: SonarrImage[];
+  readonly statistics?: SonarrStatistics;
+}
+
+interface SonarrEpisode {
+  readonly id: number;
+  readonly seriesId: number;
+  readonly episodeFileId?: number;
+  readonly seasonNumber: number;
+  readonly episodeNumber: number;
+  readonly title: string;
+  readonly overview?: string;
+  readonly airDate?: string;
+  readonly airDateUtc?: string;
+  readonly hasFile: boolean;
+  readonly monitored: boolean;
+  readonly absoluteEpisodeNumber?: number;
+  readonly runtime?: number;
+  readonly quality?: {
+    readonly quality?: {
+      readonly id: number;
+      readonly name: string;
+      readonly source?: string;
+      readonly resolution?: number;
+      readonly sort?: number;
+    };
+  };
+  readonly relativePath?: string;
+}
+
+interface SonarrSystemStatus {
+  readonly version?: string;
+}
+
+export interface SonarrQueueItem {
+  readonly id: number;
+  readonly seriesId: number;
+  readonly seriesTitle?: string;
+  readonly episodeId?: number;
+  readonly episodeTitle?: string;
+  readonly seasonNumber?: number;
+  readonly episodeNumber?: number;
+  readonly status?: string;
+  readonly trackedDownloadState?: string;
+  readonly trackedDownloadStatus?: string;
+  readonly downloadId?: string;
+  readonly protocol?: string;
+  readonly size?: number;
+  readonly sizeleft?: number;
+  readonly timeleft?: string;
+}
+
+interface SonarrQueueSeries {
+  readonly id: number;
+  readonly title: string;
+}
+
+interface SonarrQueueEpisode {
+  readonly id: number;
+  readonly title: string;
+  readonly seasonNumber: number;
+  readonly episodeNumber: number;
+}
+
+interface SonarrQueueRecord {
+  readonly id: number;
+  readonly series: SonarrQueueSeries;
+  readonly episode?: SonarrQueueEpisode;
+  readonly status?: string;
+  readonly trackedDownloadState?: string;
+  readonly trackedDownloadStatus?: string;
+  readonly downloadId?: string;
+  readonly protocol?: string;
+  readonly size?: number;
+  readonly sizeleft?: number;
+  readonly timeleft?: string;
+}
+
+interface SonarrQueueResponse {
+  readonly records: SonarrQueueRecord[];
+}
+
+export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
+  async initialize(): Promise<void> {
+    await this.getVersion();
+  }
+
+  async getVersion(): Promise<string> {
+    try {
+      const response = await this.client.get<SonarrSystemStatus>('/api/v3/system/status');
+      return response.data.version ?? 'unknown';
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getVersion',
+        endpoint: '/api/v3/system/status',
+      });
+    }
+  }
+
+  async getSeries(): Promise<Series[]> {
+    try {
+      const response = await this.client.get<SonarrSeries[]>('/api/v3/series');
+      return response.data.map((item) => this.mapSeries(item));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getSeries',
+        endpoint: '/api/v3/series',
+      });
+    }
+  }
+
+  async search(query: string, options?: SearchOptions): Promise<Series[]> {
+    try {
+      const params: Record<string, unknown> = { term: query };
+
+      if (options?.filters) {
+        Object.assign(params, options.filters);
+      }
+
+      const response = await this.client.get<SonarrSeries[]>('/api/v3/series/lookup', {
+        params,
+      });
+
+      return response.data.map((item) => this.mapSeries(item));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'search',
+        endpoint: '/api/v3/series/lookup',
+      });
+    }
+  }
+
+  async getById(id: number): Promise<Series> {
+    try {
+      const [seriesResponse, episodesResponse] = await Promise.all([
+        this.client.get<SonarrSeries>(`/api/v3/series/${id}`),
+        this.client.get<SonarrEpisode[]>(`/api/v3/episode`, {
+          params: { seriesId: id },
+        }),
+      ]);
+
+      const series = this.mapSeries(seriesResponse.data);
+      const episodesBySeason = this.groupEpisodesBySeason(episodesResponse.data);
+
+      const seasons: Season[] | undefined = series.seasons?.map((season) => ({
+        ...season,
+        episodes: episodesBySeason.get(season.seasonNumber),
+      }));
+
+      return {
+        ...series,
+        seasons,
+      };
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getById',
+        endpoint: `/api/v3/series/${id}`,
+      });
+    }
+  }
+
+  async add(request: AddSeriesRequest): Promise<Series> {
+    try {
+      const payload = this.buildAddPayload(request);
+      const response = await this.client.post<SonarrSeries>('/api/v3/series', payload);
+      return this.mapSeries(response.data);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'add',
+        endpoint: '/api/v3/series',
+      });
+    }
+  }
+
+  async triggerSearch(seriesId: number): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesSearch',
+        seriesId,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'triggerSearch',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async getQueue(): Promise<SonarrQueueItem[]> {
+    try {
+      const response = await this.client.get<SonarrQueueResponse>('/api/v3/queue');
+      return (response.data.records ?? []).map((record) => this.mapQueueRecord(record));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getQueue',
+        endpoint: '/api/v3/queue',
+      });
+    }
+  }
+
+  private buildAddPayload(request: AddSeriesRequest): Record<string, unknown> {
+    const addOptions = {
+      searchForMissingEpisodes: request.searchNow ?? request.addOptions?.searchForMissingEpisodes ?? false,
+      monitor: request.addOptions?.monitor,
+    };
+
+    return {
+      tvdbId: request.tvdbId,
+      tmdbId: request.tmdbId,
+      title: request.title,
+      titleSlug: request.titleSlug,
+      qualityProfileId: request.qualityProfileId,
+      languageProfileId: request.languageProfileId,
+      rootFolderPath: request.rootFolderPath,
+      seasonFolder: request.seasonFolder ?? true,
+      monitored: request.monitored ?? true,
+      seriesType: request.seriesType ?? 'standard',
+      tags: request.tags,
+      addOptions,
+    };
+  }
+
+  private mapSeries(data: SonarrSeries): Series {
+    const posterUrl = this.findImageUrl(data.images, 'poster');
+    const backdropUrl = this.findImageUrl(data.images, 'fanart');
+
+    return {
+      id: data.id,
+      title: data.title,
+      sortTitle: data.sortTitle,
+      year: data.year,
+      status: data.status,
+      overview: data.overview,
+      network: data.network,
+      genres: data.genres,
+      path: data.path,
+      qualityProfileId: data.qualityProfileId,
+      seasonFolder: data.seasonFolder,
+      monitored: data.monitored,
+      tvdbId: data.tvdbId,
+      imdbId: data.imdbId,
+      tmdbId: data.tmdbId,
+      traktId: data.traktId,
+      cleanTitle: data.cleanTitle,
+      titleSlug: data.titleSlug,
+      rootFolderPath: data.rootFolderPath,
+      tags: data.tags,
+      seasons: data.seasons?.map((season) => this.mapSeason(season)),
+      nextAiring: data.nextAiring,
+      previousAiring: data.previousAiring,
+      added: data.added,
+      posterUrl,
+      backdropUrl,
+      statistics: this.mapStatistics(data.statistics),
+      episodeCount: data.statistics?.episodeCount,
+      episodeFileCount: data.statistics?.episodeFileCount,
+    };
+  }
+
+  private mapSeason(season: SonarrSeason): Season {
+    return {
+      id: season.id,
+      seasonNumber: season.seasonNumber,
+      monitored: season.monitored,
+      statistics: this.mapStatistics(season.statistics),
+    };
+  }
+
+  private mapStatistics(statistics?: SonarrStatistics): MediaStatistics | undefined {
+    if (!statistics) {
+      return undefined;
+    }
+
+    return {
+      episodeCount: statistics.episodeCount ?? 0,
+      episodeFileCount: statistics.episodeFileCount ?? 0,
+      percentOfEpisodes: statistics.percentOfEpisodes,
+    };
+  }
+
+  private mapEpisode(episode: SonarrEpisode): Episode {
+    return {
+      id: episode.id,
+      title: episode.title,
+      overview: episode.overview,
+      seasonNumber: episode.seasonNumber,
+      episodeNumber: episode.episodeNumber,
+      absoluteEpisodeNumber: episode.absoluteEpisodeNumber,
+      airDate: episode.airDate,
+      airDateUtc: episode.airDateUtc,
+      runtime: episode.runtime,
+      monitored: episode.monitored,
+      hasFile: episode.hasFile,
+      episodeFileId: episode.episodeFileId,
+      quality: episode.quality?.quality
+        ? {
+            id: episode.quality.quality.id,
+            name: episode.quality.quality.name,
+            source: episode.quality.quality.source,
+            resolution: episode.quality.quality.resolution,
+            sort: episode.quality.quality.sort,
+          }
+        : undefined,
+      relativePath: episode.relativePath,
+    };
+  }
+
+  private groupEpisodesBySeason(episodes: SonarrEpisode[]): Map<number, Episode[]> {
+    return episodes.reduce((accumulator, episode) => {
+      const collection = accumulator.get(episode.seasonNumber) ?? [];
+      collection.push(this.mapEpisode(episode));
+      accumulator.set(episode.seasonNumber, collection);
+      return accumulator;
+    }, new Map<number, Episode[]>());
+  }
+
+  private findImageUrl(images: SonarrImage[] | undefined, type: SonarrImage['coverType']): string | undefined {
+    return images?.find((image) => image.coverType === type)?.remoteUrl ?? undefined;
+  }
+
+  private mapQueueRecord(record: SonarrQueueRecord): SonarrQueueItem {
+    return {
+      id: record.id,
+      seriesId: record.series.id,
+      seriesTitle: record.series.title,
+      episodeId: record.episode?.id,
+      episodeTitle: record.episode?.title,
+      seasonNumber: record.episode?.seasonNumber,
+      episodeNumber: record.episode?.episodeNumber,
+      status: record.status,
+      trackedDownloadState: record.trackedDownloadState,
+      trackedDownloadStatus: record.trackedDownloadStatus,
+      downloadId: record.downloadId,
+      protocol: record.protocol,
+      size: record.size,
+      sizeleft: record.sizeleft,
+      timeleft: record.timeleft,
+    };
+  }
+}
