@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
@@ -6,7 +6,6 @@ import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
 import { type AppTheme } from '@/constants/theme';
 import { useAuth } from '@/services/auth/AuthProvider';
 import { spacing } from '@/theme/spacing';
-import BottomTabNavigator from '@/components/navigation/BottomTabNavigator';
 
 const AuthenticatedLayout = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -45,7 +44,12 @@ const AuthenticatedLayout = () => {
     return <Redirect href="/(public)/login" />;
   }
 
-  return <BottomTabNavigator />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="add-service" />
+    </Stack>
+  );
 };
 
 export default AuthenticatedLayout;
