@@ -4,6 +4,10 @@ type QueryKeyBuilder = readonly QueryKeySegment[];
 
 /** Centralised query key factories for TanStack Query resources. */
 export const queryKeys = {
+  services: {
+    base: ['services'] as const,
+    overview: ['services', 'overview'] as const,
+  },
   sonarr: {
     base: ['sonarr'] as const,
     service: (serviceId: string): QueryKeyBuilder => ['sonarr', serviceId] as const,
