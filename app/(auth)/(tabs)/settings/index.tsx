@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
 import { Alert, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
 import { Text, useTheme, Button } from 'react-native-paper';
+import ConfirmDialog from '@/components/common/ConfirmDialog/ConfirmDialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { AppTheme } from '@/constants/theme';
@@ -10,6 +12,7 @@ import { spacing } from '@/theme/spacing';
 const SettingsScreen = () => {
   const router = useRouter();
   const { signOut } = useAuth();
+  const [confirmVisible, setConfirmVisible] = useState(false);
   const theme = useTheme<AppTheme>();
 
   const styles = StyleSheet.create({
@@ -47,12 +50,7 @@ const SettingsScreen = () => {
     }
   };
 
-  const confirmSignOut = () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: handleSignOut },
-    ]);
-  };
+  const confirmSignOut = () => setConfirmVisible(true);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -61,14 +59,23 @@ const SettingsScreen = () => {
         Add Service
       </Button>
 
-      <Button
-        mode="outlined"
-        onPress={confirmSignOut}
-        style={styles.button}
-        textColor={theme.colors.error}
-      >
+      <Button mode="outlined" onPress={confirmSignOut} style={styles.button} textColor={theme.colors.error}>
         Sign out
       </Button>
+
+      <ConfirmDialog
+        visible={confirmVisible}
+        title="Sign out"
+        message="Are you sure you want to sign out?"
+        confirmLabel="Sign out"
+        cancelLabel="Cancel"
+        destructive
+        onCancel={() => setConfirmVisible(false)}
+        onConfirm={() => {
+          setConfirmVisible(false);
+          void handleSignOut();
+        }}
+      />
 
       {/* Add more settings options here as needed */}
     </SafeAreaView>
