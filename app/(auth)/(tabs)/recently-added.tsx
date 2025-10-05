@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { Text, useTheme, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -35,6 +35,9 @@ const RecentlyAddedScreen = () => {
           backgroundColor: theme.colors.background,
         },
         listContent: {
+          flex: 1,
+        },
+        listContentContainer: {
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.xxl,
         },
@@ -92,17 +95,31 @@ const RecentlyAddedScreen = () => {
     void refetch();
   }, [refetch]);
 
+  const extractMediaId = useCallback((id: string, type: 'series' | 'movie'): number => {
+    const prefix = type === 'series' ? 'sonarr-' : 'radarr-';
+    const mediaId = id.replace(prefix, '');
+    return Number(mediaId);
+  }, []);
+
   const handleMediaPress = useCallback((item: RecentlyAddedItem) => {
-    // Navigate to service-specific pages
+    const mediaId = extractMediaId(item.id, item.type);
+
+    // Navigate to detail pages
     switch (item.type) {
       case 'series':
-        router.push({ pathname: '/(auth)/sonarr/[serviceId]', params: { serviceId: item.serviceId } });
+        router.push({
+          pathname: '/(auth)/sonarr/[serviceId]/series/[id]',
+          params: { serviceId: item.serviceId, id: mediaId }
+        });
         break;
       case 'movie':
-        router.push({ pathname: '/(auth)/radarr/[serviceId]', params: { serviceId: item.serviceId } });
+        router.push({
+          pathname: '/(auth)/radarr/[serviceId]/movies/[id]',
+          params: { serviceId: item.serviceId, id: mediaId }
+        });
         break;
     }
-  }, [router]);
+  }, [router, extractMediaId]);
 
   const getMediaIcon = (type: 'series' | 'movie') => {
     return type === 'series' ? 'television-classic' : 'movie-open';
@@ -198,7 +215,7 @@ const RecentlyAddedScreen = () => {
         onBackPress={() => router.back()}
       />
 
-      <View style={styles.listContent}>
+      <ScrollView style={styles.listContent} contentContainerStyle={styles.listContentContainer}>
         {recentlyAdded.items.map((item) => (
           <View key={item.id}>
             {renderMediaItem({ item })}
@@ -207,7 +224,7 @@ const RecentlyAddedScreen = () => {
         {recentlyAdded.items.length === 0 && (
           <View style={styles.emptyContainer}>{listEmptyComponent}</View>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
