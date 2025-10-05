@@ -1,9 +1,9 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import { Text, useTheme, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/common/Button';
@@ -171,6 +171,7 @@ const DashboardScreen = () => {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const {
     data,
@@ -200,61 +201,131 @@ const DashboardScreen = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          backgroundColor: theme.colors.background,
+          backgroundColor: '#0F0F0F',
         },
         listContent: {
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal: spacing.md,
           paddingBottom: spacing.xxl,
         },
         header: {
-          marginBottom: spacing.lg,
-        },
-        headerTopRow: {
           flexDirection: 'row',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: spacing.md,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.md,
+          backgroundColor: '#0F0F0F',
+        },
+        hamburgerButton: {
+          marginLeft: -spacing.xs,
         },
         headerTitle: {
-          color: theme.colors.onBackground,
-          marginBottom: spacing.xs,
+          color: '#FFFFFF',
+          fontSize: 20,
+          fontWeight: 'bold',
         },
-        headerSubtitle: {
-          color: theme.colors.onSurfaceVariant,
+        section: {
+          marginTop: spacing.lg,
         },
-        headerActions: {
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-        },
-        headerActionSpacer: {
-          marginTop: spacing.xs,
-        },
-        summaryCard: {
-          marginBottom: spacing.lg,
-        },
-        summaryRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-        },
-        summaryItem: {
-          flexGrow: 1,
-          flexBasis: '40%',
+        sectionTitle: {
+          color: '#FFFFFF',
+          fontSize: 18,
+          fontWeight: '600',
           marginBottom: spacing.md,
+          paddingHorizontal: spacing.md,
         },
-        summaryLabel: {
-          color: theme.colors.onSurfaceVariant,
+        serviceCard: {
+          backgroundColor: '#1A1A1A',
+          marginHorizontal: spacing.md,
+          marginVertical: spacing.xs,
+          borderRadius: 12,
+          padding: spacing.md,
+        },
+        serviceContent: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        serviceIcon: {
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          backgroundColor: '#2A2A2A',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: spacing.md,
+        },
+        serviceInfo: {
+          flex: 1,
+        },
+        serviceName: {
+          color: '#FFFFFF',
+          fontSize: 16,
+          fontWeight: '600',
           marginBottom: spacing.xxs,
         },
-        summaryValue: {
-          color: theme.colors.onSurface,
+        serviceStatus: {
+          flexDirection: 'row',
+          alignItems: 'center',
         },
-        summaryMeta: {
-          marginTop: spacing.sm,
-          color: theme.colors.onSurfaceVariant,
+        statusIndicator: {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          marginRight: spacing.xs,
+        },
+        statusOnline: {
+          backgroundColor: '#4CAF50',
+        },
+        statusOffline: {
+          backgroundColor: '#F44336',
+        },
+        statusDegraded: {
+          backgroundColor: '#FF9800',
+        },
+        serviceStatusText: {
+          color: '#CCCCCC',
+          fontSize: 14,
+        },
+        serviceArrow: {
+          color: '#666666',
+        },
+        activityCard: {
+          backgroundColor: '#1A1A1A',
+          marginHorizontal: spacing.md,
+          marginVertical: spacing.xs,
+          borderRadius: 12,
+          padding: spacing.md,
+        },
+        activityContent: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        },
+        activityIcon: {
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          backgroundColor: '#2A2A2A',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: spacing.md,
+        },
+        activityInfo: {
+          flex: 1,
+        },
+        activityTitle: {
+          color: '#FFFFFF',
+          fontSize: 16,
+          fontWeight: '600',
+          marginBottom: spacing.xxs,
+        },
+        activitySubtitle: {
+          color: '#CCCCCC',
+          fontSize: 14,
+        },
+        activityArrow: {
+          color: '#666666',
         },
         listSpacer: {
-          height: spacing.md,
+          height: spacing.sm,
         },
         emptyContainer: {
           flexGrow: 1,
@@ -302,6 +373,10 @@ const DashboardScreen = () => {
     };
   }, [services]);
 
+  const handleMenuPress = useCallback(() => {
+    setMenuVisible(true);
+  }, []);
+
   const handleSignOut = useCallback(async () => {
     try {
       await signOut();
@@ -334,99 +409,93 @@ const DashboardScreen = () => {
     [router],
   );
 
-  const renderHeader = useCallback(() => {
-    const lastUpdatedLabel = formatRelativeTime(summary.lastUpdated);
+  const renderHeader = useCallback(() => (
+    <View style={styles.header}>
+      <View style={{ width: 48 }} />
+      <Text style={styles.headerTitle}>Dashboard</Text>
+      <View style={{ width: 48 }} />
+    </View>
+  ), [styles]);
 
-    return (
-      <View style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <View style={{ flex: 1 }}>
-            <Text variant="headlineMedium" style={styles.headerTitle}>
-              Dashboard
-            </Text>
-            <Text variant="bodyMedium" style={styles.headerSubtitle}>
-              {user ? `Welcome back, ${user.firstName ?? user.email ?? 'there'}!` : 'Loading account…'}
-            </Text>
-          </View>
-          <View style={styles.headerActions}>
-            <Button mode="contained" onPress={handleAddService}>
-              Add Service
-            </Button>
-            <Button mode="text" onPress={handleSignOut} style={styles.headerActionSpacer}>
-              Sign Out
-            </Button>
-          </View>
-        </View>
+  const renderServiceItem = useCallback(
+    ({ item }: { item: ServiceOverviewItem }) => {
+      const getStatusColor = (status: ServiceStatusState) => {
+        switch (status) {
+          case 'online':
+            return styles.statusOnline;
+          case 'offline':
+            return styles.statusOffline;
+          case 'degraded':
+            return styles.statusDegraded;
+          default:
+            return styles.statusOffline;
+        }
+      };
 
-        <Card elevation="low" contentPadding="lg" style={styles.summaryCard}>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryItem}>
-              <Text variant="labelMedium" style={styles.summaryLabel}>
-                Total Services
-              </Text>
-              <Text variant="headlineSmall" style={styles.summaryValue}>
-                {summary.total}
-              </Text>
+      const getStatusIcon = (type: ServiceType) => {
+        switch (type) {
+          case 'sonarr':
+            return 'television-classic';
+          case 'radarr':
+            return 'movie-open';
+          case 'qbittorrent':
+            return 'download-network';
+          default:
+            return 'server';
+        }
+      };
+
+      return (
+        <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
+          <View style={styles.serviceContent}>
+            <View style={styles.serviceIcon}>
+              <IconButton icon={getStatusIcon(item.config.type)} size={24} iconColor="#FFD700" />
             </View>
-            <View style={styles.summaryItem}>
-              <Text variant="labelMedium" style={styles.summaryLabel}>
-                Active
-              </Text>
-              <Text variant="headlineSmall" style={styles.summaryValue}>
-                {summary.active}
-              </Text>
+            <View style={styles.serviceInfo}>
+              <Text style={styles.serviceName}>{item.config.name}</Text>
+              <View style={styles.serviceStatus}>
+                <View style={[styles.statusIndicator, getStatusColor(item.status)]} />
+                <Text style={styles.serviceStatusText}>
+                  {item.status === 'online' ? 'Healthy' : item.status === 'offline' ? 'Offline' : 'Degraded'}
+                </Text>
+              </View>
             </View>
-            <View style={styles.summaryItem}>
-              <Text variant="labelMedium" style={styles.summaryLabel}>
-                Online
-              </Text>
-              <Text variant="headlineSmall" style={styles.summaryValue}>
-                {summary.online}
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text variant="labelMedium" style={styles.summaryLabel}>
-                Offline
-              </Text>
-              <Text variant="headlineSmall" style={styles.summaryValue}>
-                {summary.offline}
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text variant="labelMedium" style={styles.summaryLabel}>
-                Degraded
-              </Text>
-              <Text variant="headlineSmall" style={styles.summaryValue}>
-                {summary.degraded}
-              </Text>
-            </View>
+            <IconButton icon="chevron-right" size={20} iconColor="#666666" />
           </View>
-          {lastUpdatedLabel ? (
-            <Text variant="bodySmall" style={styles.summaryMeta}>
-              Last updated {lastUpdatedLabel}
-            </Text>
-          ) : null}
         </Card>
-      </View>
-    );
-  }, [handleAddService, handleSignOut, styles, summary, user]);
-
-  const renderItem = useCallback(
-    ({ item }: { item: ServiceOverviewItem }) => (
-      <ServiceCard
-        id={item.config.id}
-        name={item.config.name}
-        url={item.config.url}
-        status={item.status}
-        statusDescription={item.statusDescription}
-        lastCheckedAt={item.lastCheckedAt}
-        icon={serviceIcons[item.config.type] ?? 'server'}
-        description={serviceTypeLabels[item.config.type]}
-        onPress={() => handleServicePress(item)}
-      />
-    ),
-    [handleServicePress],
+      );
+    },
+    [handleServicePress, styles],
   );
+
+  const renderActivityItem = useCallback(() => (
+    <>
+      <Card variant="custom" style={styles.activityCard} onPress={() => router.push('/(auth)/downloads')}>
+        <View style={styles.activityContent}>
+          <View style={styles.activityIcon}>
+            <IconButton icon="download" size={24} iconColor="#FFD700" />
+          </View>
+          <View style={styles.activityInfo}>
+            <Text style={styles.activityTitle}>Downloads</Text>
+            <Text style={styles.activitySubtitle}>2 active</Text>
+          </View>
+          <IconButton icon="chevron-right" size={20} iconColor="#666666" />
+        </View>
+      </Card>
+      <Card variant="custom" style={styles.activityCard} onPress={() => {}}>
+        <View style={styles.activityContent}>
+          <View style={styles.activityIcon}>
+            <IconButton icon="plus" size={24} iconColor="#FFD700" />
+          </View>
+          <View style={styles.activityInfo}>
+            <Text style={styles.activityTitle}>Recently Added</Text>
+            <Text style={styles.activitySubtitle}>3 added</Text>
+          </View>
+          <IconButton icon="chevron-right" size={20} iconColor="#666666" />
+        </View>
+      </Card>
+    </>
+  ), [router, styles]);
 
   const keyExtractor = useCallback((item: ServiceOverviewItem) => item.config.id, []);
 
@@ -456,7 +525,7 @@ const DashboardScreen = () => {
 
   if (isLoading && services.length === 0) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={styles.container}>
         <LoadingState message="Loading dashboard…" />
       </SafeAreaView>
     );
@@ -465,21 +534,46 @@ const DashboardScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={services}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
+        data={services.length > 0 ? ['header', 'services', 'activity'] : ['header']}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => {
+          switch (item) {
+            case 'header':
+              return renderHeader();
+            case 'services':
+              return (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Services</Text>
+                  {services.map((service) => (
+                    <View key={service.config.id}>
+                      {renderServiceItem({ item: service })}
+                    </View>
+                  ))}
+                </View>
+              );
+            case 'activity':
+              return (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Activity</Text>
+                  {renderActivityItem()}
+                </View>
+              );
+            default:
+              return null;
+          }
+        }}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
-        ListHeaderComponent={renderHeader}
         ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => void refetch()}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
+            colors={['#FFD700']}
+            tintColor="#FFD700"
           />
         }
+        showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
   );

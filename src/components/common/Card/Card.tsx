@@ -1,9 +1,12 @@
 import React, { forwardRef, useMemo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Pressable } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Card as PaperCard, type CardProps as PaperCardProps, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const elevationMap = {
   none: 0,
@@ -20,6 +23,7 @@ export type CardProps = Omit<PaperCardProps, 'elevation' | 'mode' | 'contentStyl
   elevation?: ElevationVariant;
   contentPadding?: keyof AppTheme['custom']['spacing'] | number;
   contentStyle?: StyleProp<ViewStyle>;
+  variant?: 'default' | 'outlined' | 'custom';
 };
 
 const Card = forwardRef<PaperCardRef, CardProps>(
@@ -30,6 +34,7 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       contentStyle,
       elevation = 'medium',
       contentPadding = 'md',
+      variant = 'default',
       onPress,
       ...rest
     },
@@ -49,6 +54,20 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       () => [styles.inner, { padding: paddingValue }, contentStyle],
       [contentStyle, paddingValue],
     );
+
+    if (variant === 'custom') {
+      return (
+        <AnimatedPressable
+          style={[
+            styles.customBase,
+            style,
+          ]}
+          onPress={onPress}
+        >
+          {React.Children.count(children) > 0 ? <View style={innerStyle}>{children}</View> : null}
+        </AnimatedPressable>
+      );
+    }
 
     const cardElevation = elevationMap[elevation];
 
@@ -75,6 +94,10 @@ export default Card;
 const styles = StyleSheet.create({
   base: {
     borderRadius: 16,
+    overflow: 'hidden',
+  },
+  customBase: {
+    borderRadius: 12,
     overflow: 'hidden',
   },
   inner: {

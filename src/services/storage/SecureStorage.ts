@@ -3,8 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import { logger } from '@/services/logger/LoggerService';
 import { type ServiceConfig } from '@/models/service.types';
 
-const INDEX_KEY = 'SecureStorage:index';
-const SERVICE_KEY_PREFIX = 'SecureStorage:service:';
+const INDEX_KEY = 'SecureStorage_index';
+const SERVICE_KEY_PREFIX = 'SecureStorage_service_';
 
 type StoredServiceConfig = Omit<ServiceConfig, 'createdAt' | 'updatedAt'> & {
   createdAt: string;

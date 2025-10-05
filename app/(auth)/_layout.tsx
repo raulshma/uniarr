@@ -1,4 +1,4 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
@@ -6,6 +6,7 @@ import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
 import { type AppTheme } from '@/constants/theme';
 import { useAuth } from '@/services/auth/AuthProvider';
 import { spacing } from '@/theme/spacing';
+import BottomTabNavigator from '@/components/navigation/BottomTabNavigator';
 
 const AuthenticatedLayout = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -18,12 +19,12 @@ const AuthenticatedLayout = () => {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: theme.colors.background,
+          backgroundColor: '#0F0F0F',
           padding: spacing.lg,
         },
         message: {
           marginTop: spacing.sm,
-          color: theme.colors.onSurfaceVariant,
+          color: '#FFFFFF',
         },
       }),
     [theme],
@@ -32,7 +33,7 @@ const AuthenticatedLayout = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator animating color={theme.colors.primary} />
+        <ActivityIndicator animating color="#FFD700" />
         <Text style={styles.message} variant="bodyMedium">
           Checking your session…
         </Text>
@@ -44,7 +45,7 @@ const AuthenticatedLayout = () => {
     return <Redirect href="/(public)/login" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <BottomTabNavigator />;
 };
 
 export default AuthenticatedLayout;
