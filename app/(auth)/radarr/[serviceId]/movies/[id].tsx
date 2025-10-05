@@ -165,6 +165,8 @@ const RadarrMovieDetailsScreen = () => {
             posterUri={movie.posterUrl}
             backdropUri={movie.backdropUrl}
             monitored={movie.monitored}
+            hasFile={movie.hasFile}
+            movieFile={movie.movieFile}
             type="movie"
             rating={movie.ratings?.value}
             onToggleMonitor={handleToggleMonitor}

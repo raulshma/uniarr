@@ -4,8 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, RefreshControl, StyleSheet, View } from 'react-native';
 import {
+  Chip,
   Searchbar,
-  SegmentedButtons,
   Text,
   useTheme,
 } from 'react-native-paper';
@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
-import { MediaCard } from '@/components/media/MediaCard';
+import MovieListItem from '@/components/media/MediaCard/MovieListItem';
 import type { MediaDownloadStatus } from '@/components/media/MediaCard';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -24,10 +24,11 @@ import { logger } from '@/services/logger/LoggerService';
 import { spacing } from '@/theme/spacing';
 
 const FILTER_ALL = 'all';
-const FILTER_MONITORED = 'monitored';
-const FILTER_UNMONITORED = 'unmonitored';
+const FILTER_OWNED = 'owned';
+const FILTER_MISSING = 'missing';
+const FILTER_DOWNLOADING = 'downloading';
 
-type FilterValue = typeof FILTER_ALL | typeof FILTER_MONITORED | typeof FILTER_UNMONITORED;
+type FilterValue = typeof FILTER_ALL | typeof FILTER_OWNED | typeof FILTER_MISSING | typeof FILTER_DOWNLOADING;
 
 const formatRuntime = (runtime?: number): string | undefined => {
   if (!runtime) {
@@ -68,6 +69,22 @@ const deriveDownloadStatus = (movie: Movie): MediaDownloadStatus => {
   }
 
   return movie.monitored ? 'missing' : 'unknown';
+};
+
+const getFilterForMovie = (movie: Movie): FilterValue => {
+  if (movie.hasFile || movie.statistics?.percentAvailable === 100) {
+    return FILTER_OWNED;
+  }
+
+  if (movie.movieFile || movie.statistics?.movieFileCount) {
+    return FILTER_DOWNLOADING;
+  }
+
+  if (movie.monitored) {
+    return FILTER_MISSING;
+  }
+
+  return FILTER_ALL; // This shouldn't happen for properly configured movies
 };
 
 const normalizeSearchTerm = (input: string): string => input.trim().toLowerCase();
@@ -156,14 +173,15 @@ const RadarrMoviesListScreen = () => {
     const query = debouncedSearch;
 
     return movies.filter((item) => {
-      if (filterValue === FILTER_MONITORED && !item.monitored) {
-        return false;
+      // Filter by status category
+      if (filterValue !== FILTER_ALL) {
+        const movieFilter = getFilterForMovie(item);
+        if (movieFilter !== filterValue) {
+          return false;
+        }
       }
 
-      if (filterValue === FILTER_UNMONITORED && item.monitored) {
-        return false;
-      }
-
+      // Filter by search query
       if (query.length === 0) {
         return true;
       }
@@ -190,17 +208,46 @@ const RadarrMoviesListScreen = () => {
           paddingBottom: spacing.xxl,
         },
         listHeader: {
-          paddingTop: spacing.lg,
-          paddingBottom: spacing.md,
+          paddingTop: spacing.xl,
+          paddingBottom: spacing.lg,
         },
         searchBar: {
-          marginBottom: spacing.md,
+          marginBottom: spacing.lg,
         },
-        filters: {
-          marginBottom: spacing.sm,
+        filterPills: {
+          flexDirection: 'row',
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          marginBottom: spacing.md,
+          gap: spacing.md
+        },
+        filterChip: {
+          backgroundColor: theme.colors.surfaceVariant,
+          borderRadius: 25,
+          flex: 0,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.xs,
+          minHeight: 32,
+        },
+        filterChipSelected: {
+          backgroundColor: theme.colors.primary,
+          borderRadius: 25,
+          flex: 0,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.xs,
+          minHeight: 32,
+        },
+        filterChipText: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 16,
+        },
+        filterChipTextSelected: {
+          color: theme.colors.onPrimary,
+          fontSize: 16,
+          fontWeight: '500',
         },
         filterLabel: {
-          marginBottom: spacing.xs,
+          marginBottom: spacing.sm,
           color: theme.colors.onSurfaceVariant,
         },
         emptyContainer: {
@@ -262,41 +309,26 @@ const RadarrMoviesListScreen = () => {
 
   const renderMovieItem = useCallback(
     ({ item }: { item: Movie }) => {
-      const runtime = formatRuntime(item.runtime);
-      const size = formatByteSize(item.statistics?.sizeOnDisk);
-      const footerParts: string[] = [];
-
-      if (runtime) {
-        footerParts.push(runtime);
-      }
-
-      if (size) {
-        footerParts.push(size);
-      }
-
-      const footerContent = footerParts.length ? (
-        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-          {footerParts.join(' • ')}
-        </Text>
-      ) : null;
-
       return (
-        <MediaCard
+        <MovieListItem
           id={item.id}
           title={item.title}
           year={item.year}
+          runtime={item.runtime}
+          sizeOnDisk={item.statistics?.sizeOnDisk}
           status={item.status}
           subtitle={item.studio}
           monitored={item.monitored}
           downloadStatus={deriveDownloadStatus(item)}
           posterUri={item.posterUrl}
-          type="movie"
+          genres={item.genres}
+          studio={item.studio}
+          statistics={item.statistics}
           onPress={() => handleMoviePress(item)}
-          footer={footerContent}
         />
       );
     },
-    [handleMoviePress, theme.colors.onSurfaceVariant],
+    [handleMoviePress],
   );
 
   const keyExtractor = useCallback((item: Movie) => item.id.toString(), []);
@@ -325,18 +357,32 @@ const RadarrMoviesListScreen = () => {
           accessibilityLabel="Search movies"
         />
         <Text variant="labelSmall" style={styles.filterLabel}>
-          Filter by monitoring status
+          Filter by status
         </Text>
-        <SegmentedButtons
-          style={styles.filters}
-          value={filterValue}
-          onValueChange={(value) => setFilterValue(value as FilterValue)}
-          buttons={[
+        <View style={styles.filterPills}>
+          {[
             { label: 'All', value: FILTER_ALL },
-            { label: 'Monitored', value: FILTER_MONITORED },
-            { label: 'Unmonitored', value: FILTER_UNMONITORED },
-          ]}
-        />
+            { label: 'Owned', value: FILTER_OWNED },
+            { label: 'Missing', value: FILTER_MISSING },
+            { label: 'Downloading', value: FILTER_DOWNLOADING },
+          ].map((filter) => (
+            <Chip
+              key={filter.value}
+              mode="flat"
+              onPress={() => setFilterValue(filter.value as FilterValue)}
+              style={[
+                styles.filterChip,
+                filterValue === filter.value && styles.filterChipSelected,
+              ]}
+              textStyle={[
+                styles.filterChipText,
+                filterValue === filter.value && styles.filterChipTextSelected,
+              ]}
+            >
+              {filter.label}
+            </Chip>
+          ))}
+        </View>
       </View>
     ),
     [filteredMovies.length, filterValue, handleAddMovie, searchTerm, styles, totalMovies],

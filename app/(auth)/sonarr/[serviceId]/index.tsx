@@ -376,6 +376,7 @@ const SonarrSeriesListScreen = () => {
         />
         <View style={styles.filterRow}>
           <Menu
+            key={`status-menu-${statusMenuVisible}-${filterValue}`}
             visible={statusMenuVisible}
             onDismiss={() => setStatusMenuVisible(false)}
             anchorPosition="bottom"
