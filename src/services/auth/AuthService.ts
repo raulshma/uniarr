@@ -14,7 +14,7 @@ export interface AuthUser {
   displayName: string;
 }
 
-const TOKEN_CACHE_KEY_PREFIX = 'ClerkToken:';
+const TOKEN_CACHE_KEY_PREFIX = 'ClerkToken_';
 const CLERK_PUBLISHABLE_KEY_ENV = 'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY';
 
 const getStorageKey = (key: string): string => `${TOKEN_CACHE_KEY_PREFIX}${key}`;
