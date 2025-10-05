@@ -61,7 +61,7 @@ const BottomTabNavigator = () => {
       <CurvedBottomBar.Navigator
         id="main-navigator"
         type="DOWN"
-        style={{ backgroundColor: theme.colors.surface }}
+        style={{ backgroundColor: 'transparent' }}
         borderColor={theme.colors.outlineVariant}
         borderWidth={1}
         height={55}
