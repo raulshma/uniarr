@@ -4,7 +4,7 @@ import { IconButton, useTheme } from 'react-native-paper';
 import DashboardScreen from '@/../app/(auth)/dashboard';
 import ServicesScreen from '@/../app/(auth)/services';
 import DownloadsScreen from '@/../app/(auth)/downloads';
-import SettingsScreen from '@/../app/(auth)/settings/add-service';
+import SettingsScreen from '@/../app/(auth)/settings';
 
 const Tab = createBottomTabNavigator();
 
