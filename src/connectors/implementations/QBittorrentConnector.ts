@@ -3,6 +3,7 @@ import type { AxiosHeaderValue, AxiosInstance, AxiosRequestConfig, AxiosResponse
 
 import { BaseConnector } from '@/connectors/base/BaseConnector';
 import { handleApiError } from '@/utils/error.utils';
+import { logger } from '@/services/logger/LoggerService';
 import type { Torrent, TorrentState, TorrentTransferInfo } from '@/models/torrent.types';
 
 const QB_API_PREFIX = '/api/v2';
@@ -264,19 +265,66 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     });
 
     const request = async () => {
+      void logger.debug('Attempting qBittorrent authentication.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        username: this.config.username,
+        url: `${this.config.url}${QB_API_PREFIX}/auth/login`,
+        referer: this.config.url,
+      });
+
       const response = await this.client.post<string>(`${QB_API_PREFIX}/auth/login`, payload.toString(), {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': this.config.url,
         },
         transformResponse: (value) => value,
       });
 
-      this.sessionCookie = this.extractSessionCookie(response);
-
-      const body = typeof response.data === 'string' ? response.data.trim().toLowerCase() : '';
-      if (body !== 'ok') {
-        throw new Error('qBittorrent authentication failed.');
+      const body = typeof response.data === 'string' ? response.data.trim() : '';
+      const normalizedBody = body.toLowerCase().replace(/\.$/, ''); // Remove trailing period and convert to lowercase
+      
+      void logger.debug('qBittorrent authentication response received.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        status: response.status,
+        responseBody: body,
+        hasSetCookie: Boolean(response.headers?.['set-cookie'] || response.headers?.['Set-Cookie']),
+      });
+      
+      if (normalizedBody !== 'ok') {
+        // Provide more detailed error information with troubleshooting hints
+        let errorMessage = body 
+          ? `qBittorrent authentication failed. Server responded with: "${body}"`
+          : 'qBittorrent authentication failed. No response body received.';
+        
+        // Add troubleshooting hints based on common issues
+        if (body === 'Fails.' || normalizedBody === 'fails.') {
+          errorMessage += ' This usually means incorrect username or password. Default credentials are admin/adminadmin.';
+        } else if (body === 'Bad credentials' || normalizedBody === 'bad credentials') {
+          errorMessage += ' The provided credentials are invalid.';
+        } else if (body === 'Banned' || normalizedBody === 'banned') {
+          errorMessage += ' Your IP address has been banned due to multiple failed login attempts.';
+        }
+        
+        void logger.warn('qBittorrent authentication failed.', {
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          responseBody: body,
+          status: response.status,
+          headers: response.headers,
+        });
+        
+        throw new Error(errorMessage);
       }
+
+      this.sessionCookie = this.extractSessionCookie(response);
+      
+      void logger.debug('qBittorrent authentication successful.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        sessionCookie: this.sessionCookie ? 'present' : 'missing',
+      });
     };
 
     this.authPromise = request()
@@ -395,17 +443,41 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
   }
 
   private extractSessionCookie(response: AxiosResponse): string {
+    void logger.debug('Extracting session cookie from response.', {
+      serviceId: this.config.id,
+      serviceType: this.config.type,
+      headers: response.headers,
+      setCookieHeader: response.headers?.['set-cookie'],
+      setCookieHeaderAlt: response.headers?.['Set-Cookie'],
+    });
+
     const header = (response.headers?.['set-cookie'] ?? response.headers?.['Set-Cookie']) as string | string[] | undefined;
 
     const rawCookie = Array.isArray(header) ? header[0] : header;
     if (!rawCookie) {
+      void logger.warn('No session cookie found in response headers.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        availableHeaders: Object.keys(response.headers || {}),
+      });
       throw new Error('qBittorrent authentication succeeded but session cookie is missing.');
     }
 
     const cookie = rawCookie.split(';')[0] ?? '';
     if (!cookie) {
+      void logger.warn('Empty session cookie received.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        rawCookie,
+      });
       throw new Error('qBittorrent provided an empty session cookie.');
     }
+
+    void logger.debug('Session cookie extracted successfully.', {
+      serviceId: this.config.id,
+      serviceType: this.config.type,
+      cookie: cookie.substring(0, 10) + '...', // Log partial cookie for security
+    });
 
     return cookie;
   }

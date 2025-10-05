@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { RefreshControl, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { IconButton, ProgressBar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,20 +29,13 @@ import {
   isTorrentPaused,
 } from '@/utils/torrent.utils';
 
-type ServiceDownloads = {
+type TorrentWithService = Torrent & {
   serviceId: string;
   serviceName: string;
-  torrents: Torrent[];
-  counts: {
-    total: number;
-    active: number;
-    completed: number;
-    paused: number;
-  };
-  transferInfo?: TorrentTransferInfo;
 };
 
 type DownloadsOverview = {
+  torrents: TorrentWithService[];
   totals: {
     total: number;
     active: number;
@@ -51,7 +44,6 @@ type DownloadsOverview = {
     downloadSpeed: number;
     uploadSpeed: number;
   };
-  services: ServiceDownloads[];
 };
 
 const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
@@ -61,6 +53,7 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
 
   if (connectors.length === 0) {
     return {
+      torrents: [],
       totals: {
         total: 0,
         active: 0,
@@ -69,11 +62,14 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
         downloadSpeed: 0,
         uploadSpeed: 0,
       },
-      services: [],
     };
   }
 
-  const services = await Promise.all(
+  const allTorrents: TorrentWithService[] = [];
+  let totalDownloadSpeed = 0;
+  let totalUploadSpeed = 0;
+
+  await Promise.all(
     connectors.map(async (connector) => {
       try {
         const [torrents, transferInfo] = await Promise.all([
@@ -90,24 +86,16 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
             }),
         ]);
 
-        const counts = {
-          total: torrents.length,
-          active: torrents.filter((torrent) => isTorrentActive(torrent)).length,
-          completed: torrents.filter((torrent) => isTorrentCompleted(torrent)).length,
-          paused: torrents.filter((torrent) => isTorrentPaused(torrent)).length,
-        };
-
-        const sortedTorrents = torrents
-          .slice()
-          .sort((a, b) => b.downloadSpeed - a.downloadSpeed);
-
-        return {
+        // Add service info to each torrent
+        const torrentsWithService = torrents.map((torrent) => ({
+          ...torrent,
           serviceId: connector.config.id,
           serviceName: connector.config.name,
-          torrents: sortedTorrents,
-          counts,
-          transferInfo,
-        } satisfies ServiceDownloads;
+        }));
+
+        allTorrents.push(...torrentsWithService);
+        totalDownloadSpeed += transferInfo?.downloadSpeed ?? 0;
+        totalUploadSpeed += transferInfo?.uploadSpeed ?? 0;
       } catch (connectorError) {
         const message = connectorError instanceof Error ? connectorError.message : String(connectorError);
         throw new Error(`Failed to load downloads for ${connector.config.name}: ${message}`);
@@ -115,27 +103,23 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
     }),
   );
 
-  const totals = services.reduce<DownloadsOverview['totals']>(
-    (accumulator, service) => {
-      accumulator.total += service.counts.total;
-      accumulator.active += service.counts.active;
-      accumulator.completed += service.counts.completed;
-      accumulator.paused += service.counts.paused;
-      accumulator.downloadSpeed += service.transferInfo?.downloadSpeed ?? 0;
-      accumulator.uploadSpeed += service.transferInfo?.uploadSpeed ?? 0;
-      return accumulator;
-    },
-    {
-      total: 0,
-      active: 0,
-      completed: 0,
-      paused: 0,
-      downloadSpeed: 0,
-      uploadSpeed: 0,
-    },
-  );
+  // Sort torrents by download speed (active torrents first)
+  const sortedTorrents = allTorrents.sort((a, b) => {
+    if (isTorrentActive(a) && !isTorrentActive(b)) return -1;
+    if (!isTorrentActive(a) && isTorrentActive(b)) return 1;
+    return b.downloadSpeed - a.downloadSpeed;
+  });
 
-  return { totals, services };
+  const totals = {
+    total: allTorrents.length,
+    active: allTorrents.filter((torrent) => isTorrentActive(torrent)).length,
+    completed: allTorrents.filter((torrent) => isTorrentCompleted(torrent)).length,
+    paused: allTorrents.filter((torrent) => isTorrentPaused(torrent)).length,
+    downloadSpeed: totalDownloadSpeed,
+    uploadSpeed: totalUploadSpeed,
+  };
+
+  return { torrents: sortedTorrents, totals };
 };
 
 const DownloadsScreen = () => {
@@ -163,6 +147,7 @@ const DownloadsScreen = () => {
   );
 
   const overview = data ?? {
+    torrents: [],
     totals: {
       total: 0,
       active: 0,
@@ -171,10 +156,9 @@ const DownloadsScreen = () => {
       downloadSpeed: 0,
       uploadSpeed: 0,
     },
-    services: [],
   };
 
-  const hasServices = overview.services.length > 0;
+  const hasTorrents = overview.torrents.length > 0;
   const isRefreshing = isFetching && !isLoading;
 
   const styles = useMemo(
@@ -184,99 +168,82 @@ const DownloadsScreen = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
+        header: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+          backgroundColor: theme.colors.background,
+        },
+        backButton: {
+          marginRight: spacing.md,
+        },
+        headerTitle: {
+          flex: 1,
+          textAlign: 'center',
+          color: theme.colors.onSurface,
+          fontSize: 18,
+          fontWeight: '600',
+        },
         listContent: {
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.xxl,
         },
-        summaryCard: {
-          marginBottom: spacing.lg,
-          padding: spacing.lg,
-          backgroundColor: theme.colors.elevation.level2,
-          borderRadius: spacing.lg,
-        },
-        summaryTitle: {
-          color: theme.colors.onSurface,
-          marginBottom: spacing.sm,
-        },
-        summaryMetrics: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: spacing.md,
-        },
-        metricChip: {
-          flexGrow: 1,
-          flexBasis: '45%',
-          paddingVertical: spacing.xs,
-          paddingHorizontal: spacing.sm,
-          backgroundColor: theme.colors.elevation.level3,
-          borderRadius: spacing.sm,
-        },
-        metricLabel: {
-          color: theme.colors.onSurfaceVariant,
-        },
-        metricValue: {
-          color: theme.colors.onSurface,
-          fontWeight: '600',
-        },
-        serviceCard: {
-          marginBottom: spacing.lg,
-          padding: spacing.lg,
-          borderRadius: spacing.lg,
-        },
-        serviceHeader: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: spacing.sm,
-        },
-        serviceTitle: {
-          color: theme.colors.onSurface,
-        },
-        serviceMeta: {
-          color: theme.colors.onSurfaceVariant,
-        },
-        serviceStats: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: spacing.sm,
-          marginBottom: spacing.md,
-        },
-        statChip: {
-          paddingVertical: spacing.xs,
-          paddingHorizontal: spacing.sm,
-          backgroundColor: theme.colors.elevation.level2,
-          borderRadius: spacing.sm,
-        },
-        statText: {
-          color: theme.colors.onSurfaceVariant,
-        },
-        torrentList: {
-          gap: spacing.sm,
-        },
-        torrentRow: {
+        torrentItem: {
           backgroundColor: theme.colors.elevation.level1,
           borderRadius: spacing.md,
           padding: spacing.md,
+          marginBottom: spacing.sm,
         },
         torrentHeader: {
           flexDirection: 'row',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: spacing.xs,
+          alignItems: 'flex-start',
+          marginBottom: spacing.sm,
         },
         torrentName: {
           flex: 1,
           color: theme.colors.onSurface,
+          fontSize: 14,
+          fontWeight: '500',
           marginRight: spacing.sm,
         },
-        torrentStatus: {
-          color: theme.colors.onSurfaceVariant,
-        },
-        torrentMeta: {
+        torrentActions: {
           flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: spacing.sm,
+          alignItems: 'center',
+          gap: spacing.xs,
+        },
+        actionButton: {
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: theme.colors.elevation.level2,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        progressContainer: {
+          marginBottom: spacing.sm,
+        },
+        progressBar: {
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: theme.colors.elevation.level2,
+        },
+        progressPercentage: {
+          color: theme.colors.onSurface,
+          fontSize: 12,
+          fontWeight: '500',
           marginTop: spacing.xs,
+          textAlign: 'right',
+        },
+        torrentDetails: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        },
+        torrentDetail: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 12,
         },
         emptyContainer: {
           flexGrow: 1,
@@ -290,152 +257,111 @@ const DownloadsScreen = () => {
     router.push('/(auth)/add-service');
   }, [router]);
 
-  const handleOpenService = useCallback(
-    (service: ServiceDownloads) => {
-      router.push({ pathname: '/(auth)/qbittorrent/[serviceId]', params: { serviceId: service.serviceId } });
-    },
-    [router],
-  );
-
   const handleRefresh = useCallback(() => {
     void refetch();
   }, [refetch]);
 
-  const renderServiceItem = useCallback(
-    ({ item }: { item: ServiceDownloads }) => {
-      const transferInfo = item.transferInfo;
-      const topTorrents = item.torrents.slice(0, 3);
+  const handleTorrentAction = useCallback(async (torrent: TorrentWithService, action: 'pause' | 'resume' | 'delete') => {
+    try {
+      const manager = ConnectorManager.getInstance();
+      const connector = manager.getConnector(torrent.serviceId) as QBittorrentConnector;
+      
+      if (!connector) {
+        throw new Error('Service not found');
+      }
+
+      switch (action) {
+        case 'pause':
+          await connector.pauseTorrent(torrent.hash);
+          break;
+        case 'resume':
+          await connector.resumeTorrent(torrent.hash);
+          break;
+        case 'delete':
+          await connector.deleteTorrent(torrent.hash, true);
+          break;
+      }
+      
+      // Refresh data after action
+      void refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      void logger.error('Failed to perform torrent action', { action, torrentHash: torrent.hash, message });
+    }
+  }, [refetch]);
+
+  const renderTorrentItem = useCallback(
+    ({ item }: { item: TorrentWithService }) => {
+      const progress = Math.max(0, Math.min(1, item.progress));
+      const percent = Math.round(progress * 100);
+      const isActive = isTorrentActive(item);
+      const isPaused = isTorrentPaused(item);
+      const isCompleted = isTorrentCompleted(item);
+
+      const getStatusText = () => {
+        if (isCompleted) return 'Completed';
+        if (isPaused) return 'Paused';
+        if (isActive) return `${formatBytes(item.downloaded)} / ${formatBytes(item.size)} • ${formatSpeed(item.downloadSpeed)} • ~${formatEta(item.eta)} remaining`;
+        return deriveTorrentStatusLabel(item);
+      };
+
+      const getActionIcon = () => {
+        if (isCompleted) return 'check';
+        if (isPaused) return 'play';
+        return 'pause';
+      };
+
+      const handleActionPress = () => {
+        if (isCompleted) return; // No action for completed torrents
+        if (isPaused) {
+          void handleTorrentAction(item, 'resume');
+        } else {
+          void handleTorrentAction(item, 'pause');
+        }
+      };
 
       return (
-        <Card variant="custom" style={styles.serviceCard} onPress={() => handleOpenService(item)}>
-          <View style={styles.serviceHeader}>
-            <View>
-              <Text variant="titleLarge" style={styles.serviceTitle}>
-                {item.serviceName}
-              </Text>
-              <Text variant="bodySmall" style={styles.serviceMeta}>
-                {item.counts.active} active • {item.counts.paused} paused • {item.counts.completed} completed
-              </Text>
-            </View>
-            <Button mode="text" onPress={() => handleOpenService(item)}>
-              Open
-            </Button>
-          </View>
-          <View style={styles.serviceStats}>
-            <View style={styles.statChip}>
-              <Text variant="labelSmall" style={styles.statText}>
-                Download speed
-              </Text>
-              <Text variant="bodyMedium" style={styles.serviceTitle}>
-                {formatSpeed(transferInfo?.downloadSpeed ?? 0)}
-              </Text>
-            </View>
-            <View style={styles.statChip}>
-              <Text variant="labelSmall" style={styles.statText}>
-                Upload speed
-              </Text>
-              <Text variant="bodyMedium" style={styles.serviceTitle}>
-                {formatSpeed(transferInfo?.uploadSpeed ?? 0)}
-              </Text>
+        <View style={styles.torrentItem}>
+          <View style={styles.torrentHeader}>
+            <Text style={styles.torrentName} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <View style={styles.torrentActions}>
+              <TouchableOpacity style={styles.actionButton} onPress={handleActionPress}>
+                <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>
+                  {getActionIcon() === 'check' ? '✓' : getActionIcon() === 'play' ? '▶' : '⏸'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={() => void handleTorrentAction(item, 'delete')}
+              >
+                <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.torrentList}>
-            {topTorrents.length === 0 ? (
-              <Text variant="bodySmall" style={styles.serviceMeta}>
-                No torrents currently running.
-              </Text>
-            ) : (
-              topTorrents.map((torrent) => {
-                const progress = Math.max(0, Math.min(1, torrent.progress));
-                const percent = Math.round(progress * 1000) / 10;
-                return (
-                  <View key={torrent.hash} style={styles.torrentRow}>
-                    <View style={styles.torrentHeader}>
-                      <Text variant="titleSmall" numberOfLines={1} style={styles.torrentName}>
-                        {torrent.name}
-                      </Text>
-                      <Text variant="bodySmall" style={styles.torrentStatus}>
-                        {deriveTorrentStatusLabel(torrent)}
-                      </Text>
-                    </View>
-                    <ProgressBar progress={progress} color={theme.colors.primary} />
-                    <View style={styles.torrentMeta}>
-                      <Text variant="bodySmall" style={styles.torrentStatus}>
-                        {percent.toFixed(1)}%
-                      </Text>
-                      <Text variant="bodySmall" style={styles.torrentStatus}>
-                        {formatSpeed(torrent.downloadSpeed)}
-                      </Text>
-                      <Text variant="bodySmall" style={styles.torrentStatus}>
-                        {formatBytes(torrent.downloaded)} / {formatBytes(torrent.size)}
-                      </Text>
-                      <Text variant="bodySmall" style={styles.torrentStatus}>
-                        ETA {formatEta(torrent.eta)}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })
-            )}
+          
+          <View style={styles.progressContainer}>
+            <ProgressBar 
+              progress={progress} 
+              color={theme.colors.primary} 
+              style={styles.progressBar}
+            />
+            <Text style={styles.progressPercentage}>
+              {percent}%
+            </Text>
           </View>
-        </Card>
+          
+          <View style={styles.torrentDetails}>
+            <Text style={styles.torrentDetail}>
+              {getStatusText()}
+            </Text>
+          </View>
+        </View>
       );
     },
-    [handleOpenService, styles.serviceCard, styles.serviceHeader, styles.serviceMeta, styles.serviceStats, styles.statChip, styles.statText, styles.torrentHeader, styles.torrentList, styles.torrentMeta, styles.torrentName, styles.torrentRow, styles.torrentStatus, styles.serviceTitle, theme.colors.primary],
+    [handleTorrentAction, styles, theme.colors],
   );
-
-  const listHeader = useMemo(() => (
-    <View style={styles.summaryCard}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-        <Text variant="headlineSmall" style={styles.summaryTitle}>
-          Downloads
-        </Text>
-        <IconButton icon="refresh" size={24} onPress={handleRefresh} />
-      </View>
-      <View style={styles.summaryMetrics}>
-        <View style={styles.metricChip}>
-          <Text variant="labelSmall" style={styles.metricLabel}>
-            Active
-          </Text>
-          <Text variant="titleMedium" style={styles.metricValue}>
-            {overview.totals.active}
-          </Text>
-        </View>
-        <View style={styles.metricChip}>
-          <Text variant="labelSmall" style={styles.metricLabel}>
-            Paused
-          </Text>
-          <Text variant="titleMedium" style={styles.metricValue}>
-            {overview.totals.paused}
-          </Text>
-        </View>
-        <View style={styles.metricChip}>
-          <Text variant="labelSmall" style={styles.metricLabel}>
-            Completed
-          </Text>
-          <Text variant="titleMedium" style={styles.metricValue}>
-            {overview.totals.completed}
-          </Text>
-        </View>
-        <View style={styles.metricChip}>
-          <Text variant="labelSmall" style={styles.metricLabel}>
-            Download speed
-          </Text>
-          <Text variant="titleMedium" style={styles.metricValue}>
-            {formatSpeed(overview.totals.downloadSpeed)}
-          </Text>
-        </View>
-        <View style={styles.metricChip}>
-          <Text variant="labelSmall" style={styles.metricLabel}>
-            Upload speed
-          </Text>
-          <Text variant="titleMedium" style={styles.metricValue}>
-            {formatSpeed(overview.totals.uploadSpeed)}
-          </Text>
-        </View>
-      </View>
-    </View>
-  ), [handleRefresh, overview.totals.active, overview.totals.completed, overview.totals.downloadSpeed, overview.totals.paused, overview.totals.uploadSpeed, styles.metricChip, styles.metricLabel, styles.metricValue, styles.summaryCard, styles.summaryMetrics, styles.summaryTitle]);
 
   const listEmptyComponent = useMemo(() => {
     if (isError) {
@@ -453,29 +379,40 @@ const DownloadsScreen = () => {
 
     return (
       <EmptyState
-        title="No download services"
-        description="Connect a qBittorrent service to monitor downloads."
-        actionLabel="Add Service"
-        onActionPress={handleAddService}
+        title="No downloads"
+        description="No torrents are currently downloading."
       />
     );
-  }, [error, handleAddService, handleRefresh, isError]);
+  }, [error, handleRefresh, isError]);
 
-  if (isLoading && !hasServices) {
+  if (isLoading && !hasTorrents) {
     return (
       <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
-        <LoadingState message="Loading downloads overview..." />
+        <LoadingState message="Loading downloads..." />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <FlashList<ServiceDownloads>
-        data={overview.services}
-        keyExtractor={(item) => item.serviceId}
-        renderItem={renderServiceItem}
-        ListHeaderComponent={listHeader}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={{ color: theme.colors.onSurface, fontSize: 20 }}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Downloads</Text>
+        <IconButton
+          icon="plus"
+          size={24}
+          iconColor={theme.colors.primary}
+          onPress={handleAddService}
+          style={{ marginRight: -spacing.xs }}
+        />
+      </View>
+      
+      <FlashList<TorrentWithService>
+        data={overview.torrents}
+        keyExtractor={(item) => item.hash}
+        renderItem={renderTorrentItem}
         ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
         contentContainerStyle={styles.listContent}
         refreshControl={

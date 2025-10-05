@@ -15,7 +15,7 @@ const httpSchemeRegex = /^https?:\/\//i;
 export const serviceConfigSchema = z
   .object({
     name: z.string().trim().min(1, 'Name is required'),
-  type: z.enum(serviceTypeValues),
+    type: z.enum(serviceTypeValues),
     url: z
       .string()
       .trim()
@@ -27,10 +27,23 @@ export const serviceConfigSchema = z
     password: z.string().trim().min(1, 'Password cannot be empty').optional(),
   })
   .refine(
-    (data) => Boolean(data.apiKey) || (Boolean(data.username) && Boolean(data.password)),
-    {
-      message: 'Either API key or username/password is required',
-      path: ['apiKey'],
+    (data) => {
+      if (data.type === 'qbittorrent') {
+        return Boolean(data.username) && Boolean(data.password);
+      }
+      return Boolean(data.apiKey);
+    },
+    (data) => {
+      if (data.type === 'qbittorrent') {
+        return {
+          message: 'Username and password are required for qBittorrent',
+          path: ['username'],
+        };
+      }
+      return {
+        message: 'API key is required',
+        path: ['apiKey'],
+      };
     },
   );
 

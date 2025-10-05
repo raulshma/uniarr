@@ -99,6 +99,8 @@ const AddServiceScreen = () => {
       type: defaultType,
       url: '',
       apiKey: '',
+      username: '',
+      password: '',
     },
     mode: 'onChange',
   });
@@ -365,6 +367,8 @@ const AddServiceScreen = () => {
           type: config.type,
           url: '',
           apiKey: '',
+          username: '',
+          password: '',
         });
       } catch (error) {
         const message =
@@ -627,39 +631,120 @@ const AddServiceScreen = () => {
             ) : null}
           </View>
 
-          <View style={styles.formField}>
-            <Text variant="labelLarge" style={styles.sectionLabel}>
-              API Key
-            </Text>
-            <Controller
-              name="apiKey"
-              control={control}
-              render={({ field: { value, onChange, onBlur } }) => (
-                <TextInput
-                  value={value}
-                  onChangeText={(text) => {
-                    resetDiagnostics();
-                    onChange(text);
-                  }}
-                  onBlur={onBlur}
-                  mode="outlined"
-                  autoCapitalize="none"
-                  secureTextEntry
-                  style={styles.input}
-                  outlineStyle={styles.outline}
-                  theme={inputTheme}
-                  accessibilityLabel="Service API key"
-                  placeholder="Enter your API key"
-                  placeholderTextColor={placeholderColor}
-                />
-              )}
-            />
-            {errors.apiKey ? (
-              <HelperText type="error" visible style={styles.helperText}>
-                {errors.apiKey.message}
-              </HelperText>
-            ) : null}
-          </View>
+          <Controller
+            name="type"
+            control={control}
+            render={({ field: { value: serviceType } }) => {
+              if (serviceType === 'qbittorrent') {
+                return (
+                  <>
+                    <View style={styles.formField}>
+                      <Text variant="labelLarge" style={styles.sectionLabel}>
+                        Username
+                      </Text>
+                      <Controller
+                        name="username"
+                        control={control}
+                        render={({ field: { value, onChange, onBlur } }) => (
+                          <TextInput
+                            value={value}
+                            onChangeText={(text) => {
+                              resetDiagnostics();
+                              onChange(text);
+                            }}
+                            onBlur={onBlur}
+                            mode="outlined"
+                            autoCapitalize="none"
+                            style={styles.input}
+                            outlineStyle={styles.outline}
+                            theme={inputTheme}
+                            accessibilityLabel="Username"
+                            placeholder="Enter your username"
+                            placeholderTextColor={placeholderColor}
+                          />
+                        )}
+                      />
+                      {errors.username ? (
+                        <HelperText type="error" visible style={styles.helperText}>
+                          {errors.username.message}
+                        </HelperText>
+                      ) : null}
+                    </View>
+
+                    <View style={styles.formField}>
+                      <Text variant="labelLarge" style={styles.sectionLabel}>
+                        Password
+                      </Text>
+                      <Controller
+                        name="password"
+                        control={control}
+                        render={({ field: { value, onChange, onBlur } }) => (
+                          <TextInput
+                            value={value}
+                            onChangeText={(text) => {
+                              resetDiagnostics();
+                              onChange(text);
+                            }}
+                            onBlur={onBlur}
+                            mode="outlined"
+                            autoCapitalize="none"
+                            secureTextEntry
+                            style={styles.input}
+                            outlineStyle={styles.outline}
+                            theme={inputTheme}
+                            accessibilityLabel="Password"
+                            placeholder="Enter your password"
+                            placeholderTextColor={placeholderColor}
+                          />
+                        )}
+                      />
+                      {errors.password ? (
+                        <HelperText type="error" visible style={styles.helperText}>
+                          {errors.password.message}
+                        </HelperText>
+                      ) : null}
+                    </View>
+                  </>
+                );
+              }
+
+              return (
+                <View style={styles.formField}>
+                  <Text variant="labelLarge" style={styles.sectionLabel}>
+                    API Key
+                  </Text>
+                  <Controller
+                    name="apiKey"
+                    control={control}
+                    render={({ field: { value, onChange, onBlur } }) => (
+                      <TextInput
+                        value={value}
+                        onChangeText={(text) => {
+                          resetDiagnostics();
+                          onChange(text);
+                        }}
+                        onBlur={onBlur}
+                        mode="outlined"
+                        autoCapitalize="none"
+                        secureTextEntry
+                        style={styles.input}
+                        outlineStyle={styles.outline}
+                        theme={inputTheme}
+                        accessibilityLabel="Service API key"
+                        placeholder="Enter your API key"
+                        placeholderTextColor={placeholderColor}
+                      />
+                    )}
+                  />
+                  {errors.apiKey ? (
+                    <HelperText type="error" visible style={styles.helperText}>
+                      {errors.apiKey.message}
+                    </HelperText>
+                  ) : null}
+                </View>
+              );
+            }}
+          />
 
           {formError ? (
             <View style={[styles.diagnosticsCard, styles.diagnosticsError]}>
