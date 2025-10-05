@@ -1,0 +1,181 @@
+import React, { useMemo } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Avatar, IconButton, Text, useTheme } from 'react-native-paper';
+
+import { Card } from '@/components/common/Card';
+import type { AppTheme } from '@/constants/theme';
+import { ServiceStatus, type ServiceStatusState } from '@/components/service/ServiceStatus';
+
+export type ServiceCardProps = {
+  id: string;
+  name: string;
+  url: string;
+  status: ServiceStatusState;
+  statusDescription?: string;
+  lastCheckedAt?: Date | string;
+  icon?: React.ComponentProps<typeof Avatar.Icon>['icon'];
+  description?: string;
+  onPress?: () => void;
+  onEditPress?: () => void;
+  onDeletePress?: () => void;
+  isDeleting?: boolean;
+  style?: StyleProp<ViewStyle>;
+  testID?: string;
+};
+
+const formatRelativeTime = (input?: Date | string): string | undefined => {
+  if (!input) {
+    return undefined;
+  }
+
+  const date = typeof input === 'string' ? new Date(input) : input;
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  const diff = Date.now() - date.getTime();
+  if (diff < 0) {
+    return 'Just now';
+  }
+
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 1) {
+    return 'Just now';
+  }
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+
+  const days = Math.round(hours / 24);
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+
+  const weeks = Math.round(days / 7);
+  if (weeks < 5) {
+    return `${weeks}w ago`;
+  }
+
+  const months = Math.round(days / 30);
+  return `${months}mo ago`;
+};
+
+const ServiceCard: React.FC<ServiceCardProps> = ({
+  name,
+  url,
+  status,
+  statusDescription,
+  lastCheckedAt,
+  icon = 'server',
+  description,
+  onPress,
+  onEditPress,
+  onDeletePress,
+  isDeleting = false,
+  style,
+  testID,
+}) => {
+  const theme = useTheme<AppTheme>();
+
+  const relativeTime = useMemo(() => formatRelativeTime(lastCheckedAt), [lastCheckedAt]);
+
+  return (
+    <Card onPress={onPress} contentPadding="md" style={style} testID={testID}>
+      <View style={styles.root}>
+        <Avatar.Icon
+          size={48}
+          icon={icon}
+          style={{ backgroundColor: theme.colors.primaryContainer }}
+          color={theme.colors.onPrimaryContainer}
+        />
+
+        <View style={[styles.meta, { marginLeft: theme.custom.spacing.md }]}>
+          <View style={styles.titleRow}>
+            <Text variant="titleMedium" style={{ color: theme.colors.onSurface }} numberOfLines={1}>
+              {name}
+            </Text>
+            <View style={styles.statusWrapper}>
+              <ServiceStatus status={status} />
+            </View>
+          </View>
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }} numberOfLines={2}>
+            {url}
+          </Text>
+          {description ? (
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }} numberOfLines={2}>
+              {description}
+            </Text>
+          ) : null}
+          {statusDescription ? (
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }} numberOfLines={2}>
+              {statusDescription}
+            </Text>
+          ) : null}
+          {relativeTime ? (
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
+              Last checked {relativeTime}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.actions}>
+          {onEditPress ? (
+            <IconButton
+              icon="pencil"
+              size={20}
+              onPress={onEditPress}
+              accessibilityLabel={`Edit ${name}`}
+            />
+          ) : null}
+          {onDeletePress ? (
+            isDeleting ? (
+              <ActivityIndicator size={20} style={styles.deleteSpinner} />
+            ) : (
+              <IconButton
+                icon="delete"
+                size={20}
+                onPress={onDeletePress}
+                disabled={isDeleting}
+                accessibilityLabel={`Delete ${name}`}
+              />
+            )
+          ) : null}
+        </View>
+      </View>
+    </Card>
+  );
+};
+
+export default ServiceCard;
+
+const styles = StyleSheet.create({
+  root: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  meta: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  statusWrapper: {
+    marginLeft: 12,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  deleteSpinner: {
+    marginHorizontal: 4,
+  },
+});
