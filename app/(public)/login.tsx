@@ -1,7 +1,7 @@
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, HelperText, Text, TextInput, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AuthSession from 'expo-auth-session';
@@ -46,27 +46,83 @@ const LoginScreen = () => {
         container: {
           flex: 1,
           backgroundColor: theme.colors.background,
-          justifyContent: 'center',
-          paddingHorizontal: spacing.lg,
         },
-        title: {
-          marginBottom: spacing.sm,
+        content: {
+          flex: 1,
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.xxl,
+          paddingBottom: spacing.lg,
+          justifyContent: 'space-between',
+        },
+        header: {
+          alignItems: 'center',
+        },
+        brand: {
+          color: theme.colors.primary,
+          marginBottom: spacing.md,
+        },
+        welcomeTitle: {
           color: theme.colors.onBackground,
+          marginBottom: spacing.xs,
           textAlign: 'center',
         },
         subtitle: {
-          marginBottom: spacing.lg,
           color: theme.colors.onSurfaceVariant,
           textAlign: 'center',
+        },
+        form: {
+          marginTop: spacing.xl,
         },
         formSpacing: {
           marginBottom: spacing.md,
         },
+        forgotPasswordContainer: {
+          alignItems: 'flex-end',
+          marginBottom: spacing.lg,
+        },
+        forgotPasswordText: {
+          color: theme.colors.primary,
+        },
         error: {
           marginBottom: spacing.md,
         },
-        googleButton: {
-          marginTop: spacing.md,
+        primaryButton: {
+          marginBottom: spacing.md,
+        },
+        dividerRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginVertical: spacing.lg,
+        },
+        dividerLine: {
+          flex: 1,
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: theme.colors.outlineVariant,
+        },
+        dividerText: {
+          marginHorizontal: spacing.sm,
+          color: theme.colors.onSurfaceVariant,
+        },
+        socialRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginTop: spacing.sm,
+        },
+        socialButton: {
+          flex: 1,
+          marginHorizontal: spacing.xs,
+        },
+        footer: {
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        footerText: {
+          color: theme.colors.onSurfaceVariant,
+        },
+        signUpText: {
+          marginLeft: spacing.xs,
+          color: theme.colors.primary,
         },
       }),
     [theme],
@@ -161,69 +217,141 @@ const LoginScreen = () => {
     }
   }, [isSubmitting, router, startSSOFlow]);
 
+  const handleFacebookSignIn = useCallback(() => {
+    void logger.info('Facebook sign-in pressed', {
+      location: 'LoginScreen.handleFacebookSignIn',
+    });
+  }, []);
+
+  const handleForgotPassword = useCallback(() => {
+    void logger.info('Forgot password pressed', {
+      location: 'LoginScreen.handleForgotPassword',
+    });
+  }, []);
+
+  const handleSignUp = useCallback(() => {
+    void logger.info('Sign up pressed', {
+      location: 'LoginScreen.handleSignUp',
+    });
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
-      <Text variant="headlineMedium" style={styles.title}>
-        Welcome to UniArr
-      </Text>
-      <Text variant="bodyMedium" style={styles.subtitle}>
-        Sign in to continue managing your media automation services.
-      </Text>
-      <TextInput
-        label="Email"
-        value={identifier}
-        onChangeText={setIdentifier}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        textContentType="emailAddress"
-        autoComplete="email"
-        style={styles.formSpacing}
-        returnKeyType="next"
-        accessibilityLabel="Email address"
-        mode="outlined"
-        disabled={isSubmitting}
-      />
-      <TextInput
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        textContentType="password"
-        autoComplete="password"
-        style={styles.formSpacing}
-        returnKeyType="done"
-        onSubmitEditing={handleSignIn}
-        accessibilityLabel="Password"
-        mode="outlined"
-        disabled={isSubmitting}
-      />
-      {Boolean(errorMessage) && (
-        <HelperText type="error" visible style={styles.error}>
-          {errorMessage}
-        </HelperText>
-      )}
-      <Button
-        mode="contained"
-        onPress={handleSignIn}
-        loading={isSubmitting}
-        disabled={
-          isSubmitting || !isLoaded || identifier.trim().length === 0 || password.length === 0
-        }
-        accessibilityRole="button"
-      >
-        Sign In
-      </Button>
-      <Button
-        mode="outlined"
-        onPress={handleGoogleSignIn}
-        loading={isSubmitting}
-        disabled={isSubmitting || !isLoaded}
-        icon="google"
-        style={styles.googleButton}
-        accessibilityRole="button"
-      >
-        Sign in with Google
-      </Button>
+      <View style={styles.content}>
+        <View>
+          <View style={styles.header}>
+            <Text variant="titleMedium" style={styles.brand}>
+              Media Manager
+            </Text>
+            <Text variant="displaySmall" style={styles.welcomeTitle}>
+              Welcome Back
+            </Text>
+            <Text variant="bodyLarge" style={styles.subtitle}>
+              Sign in to continue your media journey.
+            </Text>
+          </View>
+
+          <View style={styles.form}>
+            <TextInput
+              label="Email or Username"
+              value={identifier}
+              onChangeText={setIdentifier}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
+              style={styles.formSpacing}
+              returnKeyType="next"
+              accessibilityLabel="Email or username"
+              mode="outlined"
+              disabled={isSubmitting}
+              left={<TextInput.Icon icon="email-outline" />}
+            />
+            <TextInput
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              textContentType="password"
+              autoComplete="password"
+              style={styles.formSpacing}
+              returnKeyType="done"
+              onSubmitEditing={handleSignIn}
+              accessibilityLabel="Password"
+              mode="outlined"
+              disabled={isSubmitting}
+              left={<TextInput.Icon icon="lock-outline" />}
+            />
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              accessibilityRole="button"
+              style={styles.forgotPasswordContainer}
+            >
+              <Text variant="labelLarge" style={styles.forgotPasswordText}>
+                Forgot Password?
+              </Text>
+            </TouchableOpacity>
+            {Boolean(errorMessage) && (
+              <HelperText type="error" visible style={styles.error}>
+                {errorMessage}
+              </HelperText>
+            )}
+            <Button
+              mode="contained"
+              onPress={handleSignIn}
+              loading={isSubmitting}
+              disabled={
+                isSubmitting || !isLoaded || identifier.trim().length === 0 || password.length === 0
+              }
+              accessibilityRole="button"
+              style={styles.primaryButton}
+            >
+              Log In
+            </Button>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text variant="labelLarge" style={styles.dividerText}>
+                Or continue with
+              </Text>
+              <View style={styles.dividerLine} />
+            </View>
+            <View style={styles.socialRow}>
+              <Button
+                mode="outlined"
+                onPress={handleGoogleSignIn}
+                loading={isSubmitting}
+                disabled={isSubmitting || !isLoaded}
+                icon="google"
+                accessibilityRole="button"
+                style={styles.socialButton}
+              >
+                Google
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={handleFacebookSignIn}
+                disabled={isSubmitting || !isLoaded}
+                icon="facebook"
+                accessibilityRole="button"
+                style={styles.socialButton}
+              >
+                Facebook
+              </Button>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <Text variant="bodyMedium" style={styles.footerText}>
+            Don't have an account?
+          </Text>
+          <TouchableOpacity onPress={handleSignUp} accessibilityRole="button">
+            <Text variant="bodyMedium" style={styles.signUpText}>
+              Sign up
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </SafeAreaView>
   );
 };
