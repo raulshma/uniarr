@@ -1,5 +1,15 @@
 import { BaseConnector } from '@/connectors/base/BaseConnector';
-import type { AddSeriesRequest, Episode, MediaStatistics, Series, Season } from '@/models/media.types';
+import type {
+  AddSeriesRequest,
+  Episode,
+  MediaStatistics,
+  Quality,
+  QualityProfile,
+  QualityProfileItem,
+  RootFolder,
+  Series,
+  Season,
+} from '@/models/media.types';
 import type { SearchOptions } from '@/connectors/base/IConnector';
 import { handleApiError } from '@/utils/error.utils';
 
@@ -130,6 +140,34 @@ interface SonarrQueueResponse {
   readonly records: SonarrQueueRecord[];
 }
 
+interface SonarrQualityItem {
+  readonly id: number;
+  readonly name: string;
+  readonly source?: string;
+  readonly resolution?: number;
+  readonly sort?: number;
+}
+
+interface SonarrQualityProfileItem {
+  readonly allowed: boolean;
+  readonly quality: SonarrQualityItem;
+}
+
+interface SonarrQualityProfile {
+  readonly id: number;
+  readonly name: string;
+  readonly upgradeAllowed?: boolean;
+  readonly cutoff: SonarrQualityItem;
+  readonly items: SonarrQualityProfileItem[];
+}
+
+interface SonarrRootFolder {
+  readonly id: number;
+  readonly path: string;
+  readonly accessible?: boolean;
+  readonly freeSpace?: number;
+}
+
 export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async initialize(): Promise<void> {
     await this.getVersion();
@@ -248,6 +286,73 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
+  async setMonitored(seriesId: number, monitored: boolean): Promise<void> {
+    try {
+      await this.client.post('/api/v3/series/monitor', {
+        seriesIds: [seriesId],
+        monitored,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'setMonitored',
+        endpoint: '/api/v3/series/monitor',
+      });
+    }
+  }
+
+  async deleteSeries(
+    seriesId: number,
+    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
+  ): Promise<void> {
+    try {
+      const params = {
+        deleteFiles: options.deleteFiles ?? false,
+        addImportListExclusion: options.addImportListExclusion ?? false,
+      };
+
+      await this.client.delete(`/api/v3/series/${seriesId}`, {
+        params,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'deleteSeries',
+        endpoint: `/api/v3/series/${seriesId}`,
+      });
+    }
+  }
+
+  async getQualityProfiles(): Promise<QualityProfile[]> {
+    try {
+      const response = await this.client.get<SonarrQualityProfile[]>('/api/v3/qualityprofile');
+      return response.data.map((profile) => this.mapQualityProfile(profile));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getQualityProfiles',
+        endpoint: '/api/v3/qualityprofile',
+      });
+    }
+  }
+
+  async getRootFolders(): Promise<RootFolder[]> {
+    try {
+      const response = await this.client.get<SonarrRootFolder[]>('/api/v3/rootfolder');
+      return response.data.map((folder) => this.mapRootFolder(folder));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getRootFolders',
+        endpoint: '/api/v3/rootfolder',
+      });
+    }
+  }
+
   async getQueue(): Promise<SonarrQueueItem[]> {
     try {
       const response = await this.client.get<SonarrQueueResponse>('/api/v3/queue');
@@ -356,15 +461,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       monitored: episode.monitored,
       hasFile: episode.hasFile,
       episodeFileId: episode.episodeFileId,
-      quality: episode.quality?.quality
-        ? {
-            id: episode.quality.quality.id,
-            name: episode.quality.quality.name,
-            source: episode.quality.quality.source,
-            resolution: episode.quality.quality.resolution,
-            sort: episode.quality.quality.sort,
-          }
-        : undefined,
+      quality: episode.quality?.quality ? this.mapQualityResource(episode.quality.quality) : undefined,
       relativePath: episode.relativePath,
     };
   }
@@ -399,6 +496,42 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       size: record.size,
       sizeleft: record.sizeleft,
       timeleft: record.timeleft,
+    };
+  }
+
+  private mapQualityProfile(profile: SonarrQualityProfile): QualityProfile {
+    return {
+      id: profile.id,
+      name: profile.name,
+      upgradeAllowed: profile.upgradeAllowed,
+      cutoff: this.mapQualityResource(profile.cutoff),
+      items: profile.items.map((item) => this.mapQualityProfileItem(item)),
+    };
+  }
+
+  private mapQualityProfileItem(item: SonarrQualityProfileItem): QualityProfileItem {
+    return {
+      allowed: item.allowed,
+      quality: this.mapQualityResource(item.quality),
+    };
+  }
+
+  private mapQualityResource(resource: SonarrQualityItem): Quality {
+    return {
+      id: resource.id,
+      name: resource.name,
+      source: resource.source,
+      resolution: resource.resolution,
+      sort: resource.sort,
+    };
+  }
+
+  private mapRootFolder(folder: SonarrRootFolder): RootFolder {
+    return {
+      id: folder.id,
+      path: folder.path,
+      accessible: folder.accessible,
+      freeSpace: folder.freeSpace,
     };
   }
 }

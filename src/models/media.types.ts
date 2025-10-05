@@ -130,6 +130,16 @@ export interface QualityProfile {
 }
 
 /**
+ * Root folder configuration within Sonarr where series can be stored.
+ */
+export interface RootFolder {
+  readonly id: number;
+  readonly path: string;
+  readonly accessible?: boolean;
+  readonly freeSpace?: number;
+}
+
+/**
  * Request payload for adding a series to Sonarr.
  */
 export interface AddSeriesRequest {

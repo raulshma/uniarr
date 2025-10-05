@@ -1,0 +1,524 @@
+import { BaseConnector } from '@/connectors/base/BaseConnector';
+import type { SearchOptions } from '@/connectors/base/IConnector';
+import type { Quality, QualityProfile, QualityProfileItem, RootFolder } from '@/models/media.types';
+import type {
+  AddMovieRequest,
+  Movie,
+  MovieFile,
+  MovieRatings,
+  MovieStatistics,
+  RadarrQueueItem,
+} from '@/models/movie.types';
+import { handleApiError } from '@/utils/error.utils';
+
+interface RadarrSystemStatus {
+  readonly version?: string;
+}
+
+interface RadarrMovieImage {
+  readonly coverType: string;
+  readonly url?: string;
+  readonly remoteUrl?: string;
+}
+
+interface RadarrRatings {
+  readonly value?: number;
+  readonly votes?: number;
+  readonly type?: string;
+}
+
+interface RadarrMovieFileQuality {
+  readonly quality?: RadarrQualityItem;
+  readonly revision?: {
+    readonly version?: number;
+    readonly real?: number;
+    readonly isRepack?: boolean;
+  };
+}
+
+interface RadarrMovieFile {
+  readonly id: number;
+  readonly relativePath?: string;
+  readonly size?: number;
+  readonly quality?: RadarrMovieFileQuality;
+  readonly dateAdded?: string;
+  readonly sceneName?: string;
+}
+
+interface RadarrMovieStatistics {
+  readonly movieFileCount?: number;
+  readonly sizeOnDisk?: number;
+  readonly percentAvailable?: number;
+}
+
+interface RadarrQualityItem {
+  readonly id: number;
+  readonly name: string;
+  readonly source?: string;
+  readonly resolution?: number;
+  readonly sort?: number;
+}
+
+interface RadarrQualityProfileItem {
+  readonly allowed: boolean;
+  readonly quality: RadarrQualityItem;
+}
+
+interface RadarrQualityProfile {
+  readonly id: number;
+  readonly name: string;
+  readonly upgradeAllowed?: boolean;
+  readonly cutoff: RadarrQualityItem;
+  readonly items: RadarrQualityProfileItem[];
+}
+
+interface RadarrRootFolder {
+  readonly id: number;
+  readonly path: string;
+  readonly accessible?: boolean;
+  readonly freeSpace?: number;
+}
+
+interface RadarrQueueMovie {
+  readonly id: number;
+  readonly title: string;
+}
+
+interface RadarrQueueRecord {
+  readonly id: number;
+  readonly movie: RadarrQueueMovie;
+  readonly status?: string;
+  readonly trackedDownloadState?: string;
+  readonly trackedDownloadStatus?: string;
+  readonly protocol?: string;
+  readonly size?: number;
+  readonly sizeleft?: number;
+  readonly timeleft?: string;
+}
+
+interface RadarrQueueResponse {
+  readonly records: RadarrQueueRecord[];
+}
+
+interface RadarrMovie {
+  readonly id: number;
+  readonly title: string;
+  readonly sortTitle?: string;
+  readonly year?: number;
+  readonly status?: string;
+  readonly overview?: string;
+  readonly studio?: string;
+  readonly genres?: string[];
+  readonly path?: string;
+  readonly qualityProfileId?: number;
+  readonly monitored: boolean;
+  readonly hasFile: boolean;
+  readonly isAvailable?: boolean;
+  readonly minimumAvailability?: string;
+  readonly runtime?: number;
+  readonly certification?: string;
+  readonly imdbId?: string;
+  readonly tmdbId?: number;
+  readonly titleSlug?: string;
+  readonly website?: string;
+  readonly inCinemas?: string;
+  readonly digitalRelease?: string;
+  readonly physicalRelease?: string;
+  readonly releaseDate?: string;
+  readonly tags?: number[];
+  readonly images?: RadarrMovieImage[];
+  readonly movieFile?: RadarrMovieFile;
+  readonly ratings?: RadarrRatings;
+  readonly statistics?: RadarrMovieStatistics;
+}
+
+const RADARR_API_PREFIX = '/api/v3';
+
+export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
+  async initialize(): Promise<void> {
+    await this.getVersion();
+  }
+
+  async getVersion(): Promise<string> {
+    try {
+      const response = await this.client.get<RadarrSystemStatus>(`${RADARR_API_PREFIX}/system/status`);
+      return response.data.version ?? 'unknown';
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getVersion',
+        endpoint: `${RADARR_API_PREFIX}/system/status`,
+      });
+    }
+  }
+
+  async getMovies(): Promise<Movie[]> {
+    try {
+      const response = await this.client.get<RadarrMovie[]>(`${RADARR_API_PREFIX}/movie`);
+      return response.data.map((item) => this.mapMovie(item));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getMovies',
+        endpoint: `${RADARR_API_PREFIX}/movie`,
+      });
+    }
+  }
+
+  async search(query: string, options?: SearchOptions): Promise<Movie[]> {
+    try {
+      const params: Record<string, unknown> = { term: query };
+
+      if (options?.filters) {
+        Object.assign(params, options.filters);
+      }
+
+      const response = await this.client.get<RadarrMovie[]>(`${RADARR_API_PREFIX}/movie/lookup`, {
+        params,
+      });
+
+      return response.data.map((item) => this.mapMovie(item));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'search',
+        endpoint: `${RADARR_API_PREFIX}/movie/lookup`,
+      });
+    }
+  }
+
+  async getById(id: number): Promise<Movie> {
+    try {
+      const response = await this.client.get<RadarrMovie>(`${RADARR_API_PREFIX}/movie/${id}`);
+      return this.mapMovie(response.data);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getById',
+        endpoint: `${RADARR_API_PREFIX}/movie/${id}`,
+      });
+    }
+  }
+
+  async add(request: AddMovieRequest): Promise<Movie> {
+    try {
+      const payload = this.buildAddPayload(request);
+      const response = await this.client.post<RadarrMovie>(`${RADARR_API_PREFIX}/movie`, payload);
+      return this.mapMovie(response.data);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'add',
+        endpoint: `${RADARR_API_PREFIX}/movie`,
+      });
+    }
+  }
+
+  async triggerSearch(movieId: number): Promise<void> {
+    try {
+      await this.client.post(`${RADARR_API_PREFIX}/command`, {
+        name: 'MoviesSearch',
+        movieIds: [movieId],
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'triggerSearch',
+        endpoint: `${RADARR_API_PREFIX}/command`,
+      });
+    }
+  }
+
+  async setMonitored(movieId: number, monitored: boolean): Promise<void> {
+    try {
+      const existing = await this.client.get<RadarrMovie>(`${RADARR_API_PREFIX}/movie/${movieId}`);
+      const payload = {
+        ...existing.data,
+        monitored,
+      };
+
+      await this.client.put(`${RADARR_API_PREFIX}/movie/${movieId}`, payload);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'setMonitored',
+        endpoint: `${RADARR_API_PREFIX}/movie/${movieId}`,
+      });
+    }
+  }
+
+  async deleteMovie(
+    movieId: number,
+    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
+  ): Promise<void> {
+    try {
+      const params = {
+        deleteFiles: options.deleteFiles ?? false,
+        addImportListExclusion: options.addImportListExclusion ?? false,
+      };
+
+      await this.client.delete(`${RADARR_API_PREFIX}/movie/${movieId}`, {
+        params,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'deleteMovie',
+        endpoint: `${RADARR_API_PREFIX}/movie/${movieId}`,
+      });
+    }
+  }
+
+  async getQualityProfiles(): Promise<QualityProfile[]> {
+    try {
+      const response = await this.client.get<RadarrQualityProfile[]>(`${RADARR_API_PREFIX}/qualityprofile`);
+      return response.data.map((profile) => this.mapQualityProfile(profile));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getQualityProfiles',
+        endpoint: `${RADARR_API_PREFIX}/qualityprofile`,
+      });
+    }
+  }
+
+  async getRootFolders(): Promise<RootFolder[]> {
+    try {
+      const response = await this.client.get<RadarrRootFolder[]>(`${RADARR_API_PREFIX}/rootfolder`);
+      return response.data.map((folder) => this.mapRootFolder(folder));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getRootFolders',
+        endpoint: `${RADARR_API_PREFIX}/rootfolder`,
+      });
+    }
+  }
+
+  async getQueue(): Promise<RadarrQueueItem[]> {
+    try {
+      const response = await this.client.get<RadarrQueueResponse>(`${RADARR_API_PREFIX}/queue`);
+      return (response.data.records ?? []).map((record) => this.mapQueueRecord(record));
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getQueue',
+        endpoint: `${RADARR_API_PREFIX}/queue`,
+      });
+    }
+  }
+
+  private buildAddPayload(request: AddMovieRequest): Record<string, unknown> {
+    const sanitizedRoot = this.trimTrailingSlash(request.rootFolderPath);
+    const pathSuffix = request.path ?? this.buildDefaultPathSuffix(request.title, request.year);
+    const path = `${sanitizedRoot}/${pathSuffix}`;
+
+    const addOptions = {
+      searchOnAdd: request.searchOnAdd ?? request.searchForMovie ?? false,
+      searchForMovie: request.searchForMovie ?? request.searchOnAdd ?? false,
+      monitor: request.monitored ? 'movie' : 'none',
+    };
+
+    return {
+      title: request.title,
+      qualityProfileId: request.qualityProfileId,
+      tmdbId: request.tmdbId,
+      year: request.year,
+      titleSlug: request.titleSlug,
+      images: request.images?.map((image) => ({
+        coverType: image.coverType,
+        url: image.url,
+        remoteUrl: image.remoteUrl,
+      })),
+      rootFolderPath: request.rootFolderPath,
+      monitored: request.monitored,
+      minimumAvailability: request.minimumAvailability ?? 'announced',
+      tags: request.tags ?? [],
+      addOptions,
+      path,
+    };
+  }
+
+  private buildDefaultPathSuffix(title: string, year?: number): string {
+    const normalizedTitle = title.replace(/[:\\/*?"<>|]/g, '').trim();
+    return year ? `${normalizedTitle} (${year})` : normalizedTitle;
+  }
+
+  private trimTrailingSlash(input: string): string {
+    return input.replace(/[\\/]+$/u, '');
+  }
+
+  private mapMovie(data: RadarrMovie): Movie {
+    const posterUrl = this.resolveImageUrl(this.findImageUrl(data.images, 'poster'));
+    const backdropUrl = this.resolveImageUrl(this.findImageUrl(data.images, 'fanart'));
+
+    return {
+      id: data.id,
+      title: data.title,
+      sortTitle: data.sortTitle,
+      year: data.year,
+      status: data.status,
+      overview: data.overview,
+      studio: data.studio,
+      genres: data.genres,
+      path: data.path,
+      qualityProfileId: data.qualityProfileId,
+      monitored: data.monitored,
+      hasFile: data.hasFile,
+      isAvailable: data.isAvailable,
+      minimumAvailability: data.minimumAvailability,
+      runtime: data.runtime,
+      certification: data.certification,
+      imdbId: data.imdbId,
+      tmdbId: data.tmdbId,
+      titleSlug: data.titleSlug,
+      website: data.website,
+      inCinemas: data.inCinemas,
+      digitalRelease: data.digitalRelease,
+      physicalRelease: data.physicalRelease,
+      releaseDate: data.releaseDate,
+      tags: data.tags,
+      posterUrl,
+      backdropUrl,
+      ratings: this.mapRatings(data.ratings),
+      statistics: this.mapStatistics(data.statistics),
+      movieFile: this.mapMovieFile(data.movieFile),
+      images: data.images?.map((image) => ({
+        coverType: image.coverType,
+        url: image.url,
+        remoteUrl: image.remoteUrl,
+      })),
+    };
+  }
+
+  private mapRatings(ratings?: RadarrRatings): MovieRatings | undefined {
+    if (!ratings) {
+      return undefined;
+    }
+
+    return {
+      value: ratings.value,
+      votes: ratings.votes,
+      type: ratings.type,
+    };
+  }
+
+  private mapStatistics(statistics?: RadarrMovieStatistics): MovieStatistics | undefined {
+    if (!statistics) {
+      return undefined;
+    }
+
+    return {
+      movieFileCount: statistics.movieFileCount,
+      sizeOnDisk: statistics.sizeOnDisk,
+      percentAvailable: statistics.percentAvailable,
+    };
+  }
+
+  private mapMovieFile(movieFile?: RadarrMovieFile): MovieFile | undefined {
+    if (!movieFile) {
+      return undefined;
+    }
+
+    return {
+      id: movieFile.id,
+      relativePath: movieFile.relativePath,
+      size: movieFile.size,
+      dateAdded: movieFile.dateAdded,
+      sceneName: movieFile.sceneName,
+      quality: movieFile.quality
+        ? {
+            quality: movieFile.quality.quality ? this.mapQualityResource(movieFile.quality.quality) : undefined,
+            revision: movieFile.quality.revision,
+          }
+        : undefined,
+    };
+  }
+
+  private mapQueueRecord(record: RadarrQueueRecord): RadarrQueueItem {
+    return {
+      id: record.id,
+      movieId: record.movie.id,
+      title: record.movie.title,
+      status: record.status,
+      trackedDownloadState: record.trackedDownloadState,
+      trackedDownloadStatus: record.trackedDownloadStatus,
+      protocol: record.protocol,
+      size: record.size,
+      sizeleft: record.sizeleft,
+      timeleft: record.timeleft,
+    };
+  }
+
+  private mapQualityProfile(profile: RadarrQualityProfile): QualityProfile {
+    return {
+      id: profile.id,
+      name: profile.name,
+      upgradeAllowed: profile.upgradeAllowed,
+      cutoff: this.mapQualityResource(profile.cutoff),
+      items: profile.items.map((item) => this.mapQualityProfileItem(item)),
+    };
+  }
+
+  private mapQualityProfileItem(item: RadarrQualityProfileItem): QualityProfileItem {
+    return {
+      allowed: item.allowed,
+      quality: this.mapQualityResource(item.quality),
+    };
+  }
+
+  private mapQualityResource(resource: RadarrQualityItem): Quality {
+    return {
+      id: resource.id,
+      name: resource.name,
+      source: resource.source,
+      resolution: resource.resolution,
+      sort: resource.sort,
+    };
+  }
+
+  private mapRootFolder(folder: RadarrRootFolder): RootFolder {
+    return {
+      id: folder.id,
+      path: folder.path,
+      accessible: folder.accessible,
+      freeSpace: folder.freeSpace,
+    };
+  }
+
+  private findImageUrl(images: RadarrMovieImage[] | undefined, type: string): string | undefined {
+    if (!images?.length) {
+      return undefined;
+    }
+
+    const match = images.find((image) => image.coverType === type);
+    if (!match) {
+      return undefined;
+    }
+
+    return match.remoteUrl ?? match.url;
+  }
+
+  private resolveImageUrl(url: string | undefined): string | undefined {
+    if (!url) {
+      return undefined;
+    }
+
+    try {
+      return new URL(url, this.client.defaults.baseURL).toString();
+    } catch (_error) {
+      return url;
+    }
+  }
+}

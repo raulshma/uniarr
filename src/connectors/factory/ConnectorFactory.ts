@@ -2,6 +2,7 @@ import type { IConnector } from '@/connectors/base/IConnector';
 import type { ServiceConfig, ServiceType } from '@/models/service.types';
 
 import { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
+import { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 
 type ConnectorConstructor<TConnector extends IConnector = IConnector> = new (
   config: ServiceConfig,
@@ -11,6 +12,7 @@ const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
   // SonarrConnector uses specialized generics for its request payload, so we cast to the
   // generic constructor type expected by the registry.
   sonarr: SonarrConnector as ConnectorConstructor,
+  radarr: RadarrConnector as ConnectorConstructor,
 };
 
 /** Factory responsible for creating connector instances based on service metadata. */

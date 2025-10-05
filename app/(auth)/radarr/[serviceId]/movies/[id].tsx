@@ -9,39 +9,19 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
 import { MediaDetails } from '@/components/media/MediaDetails';
 import type { AppTheme } from '@/constants/theme';
-import type { Series } from '@/models/media.types';
-import { useSonarrSeriesDetails } from '@/hooks/useSonarrSeriesDetails';
+import { useRadarrMovieDetails } from '@/hooks/useRadarrMovieDetails';
 import { spacing } from '@/theme/spacing';
 
-const findEpisodeRuntime = (series?: Series): number | undefined => {
-  if (!series?.seasons) {
-    return undefined;
-  }
-
-  for (const season of series.seasons) {
-    if (!season?.episodes?.length) {
-      continue;
-    }
-
-    const runtime = season.episodes.find((episode) => episode.runtime)?.runtime;
-    if (runtime) {
-      return runtime;
-    }
-  }
-
-  return undefined;
-};
-
-const SonarrSeriesDetailsScreen = () => {
+const RadarrMovieDetailsScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const { serviceId, id } = useLocalSearchParams<{ serviceId?: string; id?: string }>();
-  const numericSeriesId = Number(id);
-  const isSeriesIdValid = Number.isFinite(numericSeriesId);
+  const numericMovieId = Number(id);
+  const isMovieIdValid = Number.isFinite(numericMovieId);
   const serviceKey = serviceId ?? '';
 
   const {
-    series,
+    movie,
     isLoading,
     isFetching,
     isError,
@@ -51,11 +31,11 @@ const SonarrSeriesDetailsScreen = () => {
     isTogglingMonitor,
     triggerSearch,
     isTriggeringSearch,
-    deleteSeriesAsync,
+    deleteMovieAsync,
     isDeleting,
-  } = useSonarrSeriesDetails({
+  } = useRadarrMovieDetails({
     serviceId: serviceKey,
-    seriesId: numericSeriesId,
+    movieId: numericMovieId,
   });
 
   const styles = useMemo(
@@ -76,20 +56,9 @@ const SonarrSeriesDetailsScreen = () => {
           justifyContent: 'space-between',
           marginBottom: spacing.md,
         },
-        title: {
-          marginBottom: spacing.sm,
-          textAlign: 'center',
-          color: theme.colors.onBackground,
-        },
-        subtitle: {
-          textAlign: 'center',
-          color: theme.colors.onSurfaceVariant,
-        },
       }),
     [theme],
   );
-
-  const runtimeMinutes = useMemo(() => findEpisodeRuntime(series), [series]);
 
   const handleToggleMonitor = useCallback(
     (nextState: boolean) => {
@@ -102,10 +71,10 @@ const SonarrSeriesDetailsScreen = () => {
     triggerSearch();
   }, [triggerSearch]);
 
-  const handleDeleteSeries = useCallback(() => {
+  const handleDeleteMovie = useCallback(() => {
     Alert.alert(
-      'Remove Series',
-      'Are you sure you want to remove this series from Sonarr? Existing files will be kept.',
+      'Remove Movie',
+      'Are you sure you want to remove this movie from Radarr? Existing files will be kept.',
       [
         {
           text: 'Cancel',
@@ -115,12 +84,12 @@ const SonarrSeriesDetailsScreen = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            void deleteSeriesAsync()
+            void deleteMovieAsync()
               .then(() => {
                 router.back();
               })
               .catch((err) => {
-                const message = err instanceof Error ? err.message : 'Unable to delete series.';
+                const message = err instanceof Error ? err.message : 'Unable to delete movie.';
                 Alert.alert('Delete Failed', message);
               });
           },
@@ -128,15 +97,15 @@ const SonarrSeriesDetailsScreen = () => {
       ],
       { cancelable: true },
     );
-  }, [deleteSeriesAsync, router]);
+  }, [deleteMovieAsync, router]);
 
-  if (!serviceId || !isSeriesIdValid) {
+  if (!serviceId || !isMovieIdValid) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={[styles.container, { justifyContent: 'center' }]}>
           <EmptyState
-            title="Missing series information"
-            description="We couldn't find the service or series identifier. Please navigate from the Sonarr library again."
+            title="Missing movie information"
+            description="We couldn't find the service or movie identifier. Please navigate from the Radarr library again."
             actionLabel="Go back"
             onActionPress={() => router.back()}
             icon="alert-circle-outline"
@@ -146,23 +115,23 @@ const SonarrSeriesDetailsScreen = () => {
     );
   }
 
-  if (isLoading && !series) {
+  if (isLoading && !movie) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={[styles.container, { justifyContent: 'center' }]}>
-          <LoadingState message="Loading series details" />
+          <LoadingState message="Loading movie details" />
         </View>
       </SafeAreaView>
     );
   }
 
   if (isError) {
-    const message = error instanceof Error ? error.message : 'Unable to load series details.';
+    const message = error instanceof Error ? error.message : 'Unable to load movie details.';
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={[styles.container, { justifyContent: 'center' }]}>
           <EmptyState
-            title="Failed to load series"
+            title="Failed to load movie"
             description={message}
             actionLabel="Retry"
             onActionPress={() => {
@@ -184,31 +153,31 @@ const SonarrSeriesDetailsScreen = () => {
           </Button>
           {isFetching ? <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>Refreshing…</Text> : null}
         </View>
-        {series ? (
+        {movie ? (
           <MediaDetails
-            title={series.title}
-            year={series.year}
-            status={series.status}
-            overview={series.overview}
-            genres={series.genres}
-            network={series.network}
-            posterUri={series.posterUrl}
-            backdropUri={series.backdropUrl}
-            monitored={series.monitored}
-            seasons={series.seasons}
-            runtimeMinutes={runtimeMinutes}
-            type="series"
+            title={movie.title}
+            year={movie.year}
+            status={movie.status}
+            overview={movie.overview}
+            genres={movie.genres}
+            runtimeMinutes={movie.runtime}
+            network={movie.studio}
+            posterUri={movie.posterUrl}
+            backdropUri={movie.backdropUrl}
+            monitored={movie.monitored}
+            type="movie"
+            rating={movie.ratings?.value}
             onToggleMonitor={handleToggleMonitor}
             onSearchPress={handleTriggerSearch}
-            onDeletePress={handleDeleteSeries}
+            onDeletePress={handleDeleteMovie}
             isUpdatingMonitor={isTogglingMonitor}
             isSearching={isTriggeringSearch}
             isDeleting={isDeleting}
           />
         ) : (
           <EmptyState
-            title="No series data"
-            description="We couldn't load details for this series."
+            title="No movie data"
+            description="We couldn't load details for this movie."
             actionLabel="Go back"
             onActionPress={() => router.back()}
             icon="alert-circle-outline"
@@ -219,4 +188,4 @@ const SonarrSeriesDetailsScreen = () => {
   );
 };
 
-export default SonarrSeriesDetailsScreen;
+export default RadarrMovieDetailsScreen;

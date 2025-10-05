@@ -21,23 +21,24 @@ import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { MediaCard } from '@/components/media/MediaCard';
 import type { AppTheme } from '@/constants/theme';
-import type { AddSeriesRequest, QualityProfile, RootFolder, Series } from '@/models/media.types';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
+import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 import { queryKeys } from '@/hooks/queryKeys';
+import type { AddMovieRequest, Movie } from '@/models/movie.types';
+import type { QualityProfile, RootFolder } from '@/models/media.types';
 import { spacing } from '@/theme/spacing';
 
 const searchDebounceMs = 400;
 
-const addSeriesSchema = z.object({
+const addMovieSchema = z.object({
   qualityProfileId: z.number().int().min(1, 'Select a quality profile'),
   rootFolderPath: z.string().min(1, 'Select a root folder'),
   monitored: z.boolean(),
-  searchForMissingEpisodes: z.boolean(),
-  seasonFolder: z.boolean(),
+  searchOnAdd: z.boolean(),
+  minimumAvailability: z.string().min(1, 'Select minimum availability'),
 });
 
-type AddSeriesFormValues = z.infer<typeof addSeriesSchema>;
+type AddMovieFormValues = z.infer<typeof addMovieSchema>;
 
 const formatByteSize = (bytes?: number): string | undefined => {
   if (bytes === undefined || bytes === null) {
@@ -68,17 +69,15 @@ const rootFolderDescription = (folder: RootFolder): string | undefined => {
   return parts.length ? parts.join(' • ') : undefined;
 };
 
-const buildTitleSlug = (series: Series): string | undefined => {
-  if (series.titleSlug) {
-    return series.titleSlug;
-  }
-  if (series.cleanTitle) {
-    return series.cleanTitle;
-  }
-  return series.title.replace(/\s+/g, '-').toLowerCase();
-};
+const availabilityOptions = [
+  { label: 'Announced', value: 'announced' },
+  { label: 'In Cinemas', value: 'inCinemas' },
+  { label: 'Released', value: 'released' },
+  { label: 'PreDB', value: 'preDB' },
+  { label: 'TBA', value: 'tba' },
+];
 
-const SonarrAddSeriesScreen = () => {
+const RadarrAddMovieScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const queryClient = useQueryClient();
@@ -88,22 +87,22 @@ const SonarrAddSeriesScreen = () => {
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
   const connector = useMemo(() => {
     const instance = manager.getConnector(serviceKey);
-    if (!instance || instance.config.type !== 'sonarr') {
+    if (!instance || instance.config.type !== 'radarr') {
       return undefined;
     }
-    return instance as SonarrConnector;
+    return instance as RadarrConnector;
   }, [manager, serviceKey]);
 
   const ensureConnector = useCallback(() => {
     if (!connector) {
-      throw new Error(`Sonarr connector not registered for service ${serviceKey}.`);
+      throw new Error(`Radarr connector not registered for service ${serviceKey}.`);
     }
     return connector;
   }, [connector, serviceKey]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
-  const [selectedSeries, setSelectedSeries] = useState<Series | undefined>(undefined);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | undefined>(undefined);
 
   const {
     control,
@@ -111,14 +110,14 @@ const SonarrAddSeriesScreen = () => {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<AddSeriesFormValues>({
-    resolver: zodResolver(addSeriesSchema),
+  } = useForm<AddMovieFormValues>({
+    resolver: zodResolver(addMovieSchema),
     defaultValues: {
       qualityProfileId: undefined,
       rootFolderPath: '',
       monitored: true,
-      searchForMissingEpisodes: true,
-      seasonFolder: true,
+      searchOnAdd: true,
+      minimumAvailability: 'released',
     },
     mode: 'onChange',
   });
@@ -135,26 +134,26 @@ const SonarrAddSeriesScreen = () => {
 
   useEffect(() => {
     if (!debouncedTerm.length) {
-      setSelectedSeries(undefined);
+      setSelectedMovie(undefined);
     }
   }, [debouncedTerm]);
 
   const qualityProfilesQuery = useQuery<QualityProfile[]>({
-    queryKey: queryKeys.sonarr.qualityProfiles(serviceKey),
+    queryKey: queryKeys.radarr.qualityProfiles(serviceKey),
     queryFn: async () => ensureConnector().getQualityProfiles(),
     enabled: Boolean(connector),
     staleTime: 30 * 60 * 1000,
   });
 
   const rootFoldersQuery = useQuery<RootFolder[]>({
-    queryKey: queryKeys.sonarr.rootFolders(serviceKey),
+    queryKey: queryKeys.radarr.rootFolders(serviceKey),
     queryFn: async () => ensureConnector().getRootFolders(),
     enabled: Boolean(connector),
     staleTime: 10 * 60 * 1000,
   });
 
-  const searchQuery = useQuery<Series[]>({
-    queryKey: queryKeys.sonarr.search(serviceKey, debouncedTerm, undefined),
+  const searchQuery = useQuery<Movie[]>({
+    queryKey: queryKeys.radarr.search(serviceKey, debouncedTerm, undefined),
     queryFn: async () => ensureConnector().search(debouncedTerm),
     enabled: Boolean(connector) && debouncedTerm.length >= 2,
     gcTime: 5 * 60 * 1000,
@@ -165,50 +164,51 @@ const SonarrAddSeriesScreen = () => {
   const searchResults = searchQuery.data ?? [];
 
   useEffect(() => {
-    if (!selectedSeries) {
+    if (!selectedMovie) {
       return;
     }
-    setValue('monitored', selectedSeries.monitored ?? true);
-    setValue('seasonFolder', selectedSeries.seasonFolder ?? true);
-  }, [selectedSeries, setValue]);
+    setValue('monitored', selectedMovie.monitored ?? true);
+    const availability = selectedMovie.minimumAvailability ?? 'released';
+    setValue('minimumAvailability', availability, { shouldValidate: true });
+  }, [selectedMovie, setValue]);
 
   useEffect(() => {
     if (!qualityProfiles.length) {
       return;
     }
-    if (selectedSeries?.qualityProfileId && selectedSeries.qualityProfileId !== watchedQualityProfileId) {
-      setValue('qualityProfileId', selectedSeries.qualityProfileId, { shouldValidate: true });
+    if (selectedMovie?.qualityProfileId && selectedMovie.qualityProfileId !== watchedQualityProfileId) {
+      setValue('qualityProfileId', selectedMovie.qualityProfileId, { shouldValidate: true });
       return;
     }
     if (!watchedQualityProfileId) {
-      setValue('qualityProfileId', qualityProfiles[0].id, { shouldValidate: true });
+      setValue('qualityProfileId', qualityProfiles[0]!.id, { shouldValidate: true });
     }
-  }, [qualityProfiles, selectedSeries, setValue, watchedQualityProfileId]);
+  }, [qualityProfiles, selectedMovie, setValue, watchedQualityProfileId]);
 
   useEffect(() => {
     if (!rootFolders.length) {
       return;
     }
     if (!watchedRootFolderPath) {
-      setValue('rootFolderPath', rootFolders[0].path, { shouldValidate: true });
+      setValue('rootFolderPath', rootFolders[0]!.path, { shouldValidate: true });
     }
   }, [rootFolders, setValue, watchedRootFolderPath]);
 
-  const addSeriesMutation = useMutation<Series, Error, AddSeriesRequest>({
-    mutationKey: queryKeys.sonarr.seriesList(serviceKey),
-    mutationFn: async (request: AddSeriesRequest) => {
-      const sonarr = ensureConnector();
-      return sonarr.add(request);
+  const addMovieMutation = useMutation<Movie, Error, AddMovieRequest>({
+    mutationKey: queryKeys.radarr.moviesList(serviceKey),
+    mutationFn: async (request: AddMovieRequest) => {
+      const radarr = ensureConnector();
+      return radarr.add(request);
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.seriesList(serviceKey) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.queue(serviceKey) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.radarr.moviesList(serviceKey) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.radarr.queue(serviceKey) }),
       ]);
     },
   });
 
-  const canSubmit = Boolean(selectedSeries) && Boolean(watchedQualityProfileId) && Boolean(watchedRootFolderPath);
+  const canSubmit = Boolean(selectedMovie?.tmdbId) && Boolean(watchedQualityProfileId) && Boolean(watchedRootFolderPath);
 
   const styles = useMemo(
     () =>
@@ -267,49 +267,53 @@ const SonarrAddSeriesScreen = () => {
     [theme.colors.background, theme.colors.error, theme.colors.onSurface, theme.colors.primary],
   );
 
-  const handleSelectSeries = useCallback((series: Series) => {
-    setSelectedSeries(series);
+  const handleSelectMovie = useCallback((movie: Movie) => {
+    setSelectedMovie(movie);
   }, []);
 
   const onSubmit = useCallback(
-    async (values: AddSeriesFormValues) => {
-      if (!selectedSeries) {
-        Alert.alert('Select a series', 'Choose a series from the search results before adding.');
+    async (values: AddMovieFormValues) => {
+      if (!selectedMovie) {
+        Alert.alert('Select a movie', 'Choose a movie from the search results before adding.');
         return;
       }
 
-      const payload: AddSeriesRequest = {
-        title: selectedSeries.title,
-        titleSlug: buildTitleSlug(selectedSeries),
-        tvdbId: selectedSeries.tvdbId,
-        tmdbId: selectedSeries.tmdbId,
+      if (!selectedMovie.tmdbId) {
+        Alert.alert('Missing TMDb ID', 'The selected movie is missing a TMDb identifier and cannot be added automatically.');
+        return;
+      }
+
+      const payload: AddMovieRequest = {
+        title: selectedMovie.title,
+        tmdbId: selectedMovie.tmdbId,
+        year: selectedMovie.year,
+        titleSlug: selectedMovie.titleSlug,
         qualityProfileId: values.qualityProfileId,
         rootFolderPath: values.rootFolderPath,
         monitored: values.monitored,
-        seasonFolder: values.seasonFolder,
-        tags: selectedSeries.tags,
-        searchNow: values.searchForMissingEpisodes,
-        addOptions: {
-          searchForMissingEpisodes: values.searchForMissingEpisodes,
-          monitor: values.monitored ? 'all' : 'none',
-        },
+        minimumAvailability: values.minimumAvailability,
+        tags: selectedMovie.tags,
+        searchOnAdd: values.searchOnAdd,
+        searchForMovie: values.searchOnAdd,
+        images: selectedMovie.images,
+        path: selectedMovie.path,
       };
 
       try {
-        const createdSeries = await addSeriesMutation.mutateAsync(payload);
+        const createdMovie = await addMovieMutation.mutateAsync(payload);
         router.replace({
-          pathname: '/(auth)/sonarr/[serviceId]/series/[id]',
+          pathname: '/(auth)/radarr/[serviceId]/movies/[id]',
           params: {
             serviceId: serviceKey,
-            id: String(createdSeries.id),
+            id: String(createdMovie.id),
           },
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to add series at this time.';
-        Alert.alert('Add series failed', message);
+        const message = error instanceof Error ? error.message : 'Unable to add movie at this time.';
+        Alert.alert('Add movie failed', message);
       }
     },
-    [addSeriesMutation, router, selectedSeries, serviceKey],
+    [addMovieMutation, router, selectedMovie, serviceKey],
   );
 
   if (!serviceId) {
@@ -318,7 +322,7 @@ const SonarrAddSeriesScreen = () => {
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
           <EmptyState
             title="Missing service information"
-            description="We could not determine which Sonarr service to use. Return to the Sonarr library and try again."
+            description="We could not determine which Radarr service to use. Return to the Radarr library and try again."
             actionLabel="Go back"
             onActionPress={() => router.back()}
             icon="alert-circle-outline"
@@ -333,8 +337,8 @@ const SonarrAddSeriesScreen = () => {
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
           <EmptyState
-            title="Sonarr service unavailable"
-            description="We couldn't find a configured Sonarr connector for this service. Add the service again from settings."
+            title="Radarr service unavailable"
+            description="We couldn't find a configured Radarr connector for this service. Add the service again from settings."
             actionLabel="Go back"
             onActionPress={() => router.back()}
             icon="alert-circle-outline"
@@ -345,11 +349,11 @@ const SonarrAddSeriesScreen = () => {
   }
 
   const searchHelperMessage = debouncedTerm.length < 2
-    ? 'Enter at least 2 characters to search Sonarr.'
+    ? 'Enter at least 2 characters to search Radarr.'
     : undefined;
 
-  const addErrorMessage = addSeriesMutation.error instanceof Error
-    ? addSeriesMutation.error.message
+  const addErrorMessage = addMovieMutation.error instanceof Error
+    ? addMovieMutation.error.message
     : undefined;
 
   return (
@@ -369,11 +373,11 @@ const SonarrAddSeriesScreen = () => {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View>
             <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-              Search Sonarr
+              Search Radarr
             </Text>
             <TextInput
               mode="outlined"
-              placeholder="Search for a series"
+              placeholder="Search for a movie"
               value={searchTerm}
               onChangeText={setSearchTerm}
               style={styles.searchInput}
@@ -387,7 +391,7 @@ const SonarrAddSeriesScreen = () => {
             ) : null}
             {searchQuery.isError ? (
               <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
-                Unable to search Sonarr right now. Please try again.
+                Unable to search Radarr right now. Please try again.
               </HelperText>
             ) : null}
           </View>
@@ -398,41 +402,41 @@ const SonarrAddSeriesScreen = () => {
             ) : null}
             {!searchQuery.isLoading && !searchQuery.isFetching && debouncedTerm.length >= 2 && !searchResults.length ? (
               <HelperText type="info" style={styles.helperText}>
-                No series found for your search.
+                No movies found for your search.
               </HelperText>
             ) : null}
-            {searchResults.map((series: Series) => {
-              const isSelected = selectedSeries?.id === series.id;
+            {searchResults.map((movie: Movie) => {
+              const isSelected = selectedMovie?.id === movie.id;
               return (
                 <MediaCard
-                  key={series.id}
-                  id={series.id}
-                  title={series.title}
-                  year={series.year}
-                  status={series.status}
-                  posterUri={series.posterUrl}
-                  monitored={series.monitored}
-                  type="series"
-                  onPress={() => handleSelectSeries(series)}
+                  key={movie.id}
+                  id={movie.id}
+                  title={movie.title}
+                  year={movie.year}
+                  status={movie.status}
+                  posterUri={movie.posterUrl}
+                  monitored={movie.monitored}
+                  type="movie"
+                  onPress={() => handleSelectMovie(movie)}
                   style={[styles.resultCard, isSelected ? styles.selectedResult : null]}
                 />
               );
             })}
           </View>
 
-          {selectedSeries ? (
+          {selectedMovie ? (
             <View style={styles.section}>
               <Text variant="titleMedium" style={styles.sectionTitle}>
-                Selected Series
+                Selected Movie
               </Text>
               <MediaCard
-                id={selectedSeries.id}
-                title={selectedSeries.title}
-                year={selectedSeries.year}
-                status={selectedSeries.status}
-                posterUri={selectedSeries.posterUrl}
-                monitored={selectedSeries.monitored}
-                type="series"
+                id={selectedMovie.id}
+                title={selectedMovie.title}
+                year={selectedMovie.year}
+                status={selectedMovie.status}
+                posterUri={selectedMovie.posterUrl}
+                monitored={selectedMovie.monitored}
+                type="movie"
               />
             </View>
           ) : null}
@@ -444,31 +448,26 @@ const SonarrAddSeriesScreen = () => {
             {qualityProfilesQuery.isLoading ? (
               <ActivityIndicator animating color={theme.colors.primary} />
             ) : qualityProfiles.length ? (
-              <Controller<AddSeriesFormValues, 'qualityProfileId'>
+              <Controller<AddMovieFormValues, 'qualityProfileId'>
                 control={control}
                 name="qualityProfileId"
-                render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'qualityProfileId'> }) => (
-                  <RadioButton.Group
-                    onValueChange={(value: string) => field.onChange(Number(value))}
-                    value={field.value ? String(field.value) : ''}
-                  >
-                    <List.Section>
-                      {qualityProfiles.map((profile: QualityProfile) => (
-                        <RadioButton.Item
-                          key={profile.id}
-                          value={String(profile.id)}
-                          label={profile.name}
-                          style={styles.radioItem}
-                          status={field.value === profile.id ? 'checked' : 'unchecked'}
-                        />
-                      ))}
-                    </List.Section>
-                  </RadioButton.Group>
+                render={({ field }: { field: ControllerRenderProps<AddMovieFormValues, 'qualityProfileId'> }) => (
+                  <List.Section>
+                    {qualityProfiles.map((profile: QualityProfile) => (
+                      <List.Item
+                        key={profile.id}
+                        title={profile.name}
+                        left={() => <RadioButton value={String(profile.id)} status={field.value === profile.id ? 'checked' : 'unchecked'} />}
+                        onPress={() => field.onChange(profile.id)}
+                        style={styles.radioItem}
+                      />
+                    ))}
+                  </List.Section>
                 )}
               />
             ) : (
               <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
-                No quality profiles found. Add at least one quality profile in Sonarr.
+                No quality profiles found. Add at least one quality profile in Radarr.
               </HelperText>
             )}
             {errors.qualityProfileId ? (
@@ -485,29 +484,27 @@ const SonarrAddSeriesScreen = () => {
             {rootFoldersQuery.isLoading ? (
               <ActivityIndicator animating color={theme.colors.primary} />
             ) : rootFolders.length ? (
-              <Controller<AddSeriesFormValues, 'rootFolderPath'>
+              <Controller<AddMovieFormValues, 'rootFolderPath'>
                 control={control}
                 name="rootFolderPath"
-                render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'rootFolderPath'> }) => (
-                  <RadioButton.Group onValueChange={(value: string) => field.onChange(value)} value={field.value}>
-                    <List.Section>
-                      {rootFolders.map((folder: RootFolder) => (
-                        <RadioButton.Item
-                          key={folder.id}
-                          value={folder.path}
-                          label={folder.path}
-                          description={rootFolderDescription(folder)}
-                          style={styles.radioItem}
-                          status={field.value === folder.path ? 'checked' : 'unchecked'}
-                        />
-                      ))}
-                    </List.Section>
-                  </RadioButton.Group>
+                render={({ field }: { field: ControllerRenderProps<AddMovieFormValues, 'rootFolderPath'> }) => (
+                  <List.Section>
+                    {rootFolders.map((folder: RootFolder) => (
+                      <List.Item
+                        key={folder.id}
+                        title={folder.path}
+                        description={rootFolderDescription(folder)}
+                        left={() => <RadioButton value={folder.path} status={field.value === folder.path ? 'checked' : 'unchecked'} />}
+                        onPress={() => field.onChange(folder.path)}
+                        style={styles.radioItem}
+                      />
+                    ))}
+                  </List.Section>
                 )}
               />
             ) : (
               <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
-                No root folders found. Configure at least one root folder in Sonarr.
+                No root folders found. Configure at least one root folder in Radarr.
               </HelperText>
             )}
             {errors.rootFolderPath ? (
@@ -521,45 +518,60 @@ const SonarrAddSeriesScreen = () => {
             <Text variant="titleMedium" style={styles.sectionTitle}>
               Options
             </Text>
-            <Controller<AddSeriesFormValues, 'monitored'>
+            <Controller<AddMovieFormValues, 'monitored'>
               control={control}
               name="monitored"
-              render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'monitored'> }) => (
+              render={({ field }: { field: ControllerRenderProps<AddMovieFormValues, 'monitored'> }) => (
                 <List.Item
-                  title="Monitor series"
-                  description="Keep the series monitored for new or missing episodes."
+                  title="Monitor movie"
+                  description="Monitor the movie for availability and future upgrades."
                   right={() => (
                     <Switch value={field.value} onValueChange={field.onChange} accessibilityLabel="Toggle monitored" />
                   )}
                 />
               )}
             />
-            <Controller<AddSeriesFormValues, 'seasonFolder'>
+            <Controller<AddMovieFormValues, 'searchOnAdd'>
               control={control}
-              name="seasonFolder"
-              render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'seasonFolder'> }) => (
-                <List.Item
-                  title="Create season folders"
-                  description="Organise episodes into season-specific folders."
-                  right={() => (
-                    <Switch value={field.value} onValueChange={field.onChange} accessibilityLabel="Toggle season folders" />
-                  )}
-                />
-              )}
-            />
-            <Controller<AddSeriesFormValues, 'searchForMissingEpisodes'>
-              control={control}
-              name="searchForMissingEpisodes"
-              render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'searchForMissingEpisodes'> }) => (
+              name="searchOnAdd"
+              render={({ field }: { field: ControllerRenderProps<AddMovieFormValues, 'searchOnAdd'> }) => (
                 <List.Item
                   title="Search immediately"
-                  description="Start searching for missing episodes right after adding."
+                  description="Start searching for the movie right after adding."
                   right={() => (
                     <Switch value={field.value} onValueChange={field.onChange} accessibilityLabel="Toggle search immediately" />
                   )}
                 />
               )}
             />
+          </View>
+
+          <View style={styles.section}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Minimum Availability
+            </Text>
+            <Controller<AddMovieFormValues, 'minimumAvailability'>
+              control={control}
+              name="minimumAvailability"
+              render={({ field }: { field: ControllerRenderProps<AddMovieFormValues, 'minimumAvailability'> }) => (
+                <List.Section>
+                  {availabilityOptions.map((option) => (
+                    <List.Item
+                      key={option.value}
+                      title={option.label}
+                      left={() => <RadioButton value={option.value} status={field.value === option.value ? 'checked' : 'unchecked'} />}
+                      onPress={() => field.onChange(option.value)}
+                      style={styles.radioItem}
+                    />
+                  ))}
+                </List.Section>
+              )}
+            />
+            {errors.minimumAvailability ? (
+              <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
+                {errors.minimumAvailability.message}
+              </HelperText>
+            ) : null}
           </View>
 
           {addErrorMessage ? (
@@ -573,10 +585,10 @@ const SonarrAddSeriesScreen = () => {
           <Button
             mode="contained"
             onPress={handleSubmit(onSubmit)}
-            disabled={!canSubmit || addSeriesMutation.isPending}
-            loading={addSeriesMutation.isPending}
+            disabled={!canSubmit || addMovieMutation.isPending}
+            loading={addMovieMutation.isPending}
           >
-            Add Series
+            Add Movie
           </Button>
         </View>
       </View>
@@ -584,4 +596,4 @@ const SonarrAddSeriesScreen = () => {
   );
 };
 
-export default SonarrAddSeriesScreen;
+export default RadarrAddMovieScreen;
