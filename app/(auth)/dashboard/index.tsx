@@ -412,7 +412,7 @@ const DashboardScreen = () => {
   }, [router, signOut]);
 
   const handleAddService = useCallback(() => {
-    router.push('/(auth)/settings/add-service');
+    router.push('/(auth)/add-service');
   }, [router]);
 
   const handleServicePress = useCallback(

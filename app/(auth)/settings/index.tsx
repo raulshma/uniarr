@@ -28,7 +28,7 @@ const SettingsScreen = () => {
   });
 
   const handleAddService = () => {
-    router.push('/(auth)/settings/add-service');
+    router.push('/(auth)/add-service');
   };
 
   return (

@@ -287,7 +287,7 @@ const DownloadsScreen = () => {
   );
 
   const handleAddService = useCallback(() => {
-    router.push('/(auth)/settings/add-service');
+    router.push('/(auth)/add-service');
   }, [router]);
 
   const handleOpenService = useCallback(
