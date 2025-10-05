@@ -176,14 +176,7 @@ const DownloadsScreen = () => {
           backgroundColor: theme.colors.background,
         },
         backButton: {
-          marginRight: spacing.md,
-        },
-        headerTitle: {
-          flex: 1,
-          textAlign: 'center',
-          color: theme.colors.onSurface,
-          fontSize: 18,
-          fontWeight: '600',
+          marginLeft: -spacing.xs,
         },
         listContent: {
           paddingHorizontal: spacing.lg,
@@ -396,10 +389,14 @@ const DownloadsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={{ color: theme.colors.onSurface, fontSize: 20 }}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Downloads</Text>
+        <IconButton
+          icon="arrow-left"
+          size={24}
+          iconColor={theme.colors.onBackground}
+          onPress={() => router.back()}
+          style={styles.backButton}
+        />
+        <View style={{ flex: 1 }} />
         <IconButton
           icon="plus"
           size={24}

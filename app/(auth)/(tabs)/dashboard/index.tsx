@@ -16,6 +16,9 @@ import type { ServiceStatusState } from '@/components/service/ServiceStatus';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import { queryKeys } from '@/hooks/queryKeys';
+import { useRecentlyAdded } from '@/hooks/useRecentlyAdded';
+import type { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
+import { isTorrentActive } from '@/utils/torrent.utils';
 import type { AppTheme } from '@/constants/theme';
 import type { ServiceConfig, ServiceType } from '@/models/service.types';
 import { useAuth } from '@/services/auth/AuthProvider';
@@ -168,6 +171,32 @@ const formatRelativeTime = (input?: Date): string | undefined => {
   return `${months}mo ago`;
 };
 
+const fetchDownloadsSummary = async (): Promise<{ active: number; total: number }> => {
+  const manager = ConnectorManager.getInstance();
+  await manager.loadSavedServices();
+  const connectors = manager.getConnectorsByType('qbittorrent') as QBittorrentConnector[];
+
+  if (connectors.length === 0) {
+    return { active: 0, total: 0 };
+  }
+
+  let totalActive = 0;
+  let totalTorrents = 0;
+
+  for (const connector of connectors) {
+    try {
+      const torrents = await connector.getTorrents();
+      totalTorrents += torrents.length;
+      totalActive += torrents.filter(isTorrentActive).length;
+    } catch (error) {
+      // Skip this connector if it fails
+      console.warn(`Failed to fetch torrents from ${connector.config.name}:`, error);
+    }
+  }
+
+  return { active: totalActive, total: totalTorrents };
+};
+
 const DashboardScreen = () => {
   const { user, signOut } = useAuth();
   const router = useRouter();
@@ -187,6 +216,21 @@ const DashboardScreen = () => {
     refetchInterval: 60000,
     staleTime: 30000,
   });
+
+  const {
+    data: downloadsData,
+    isLoading: isLoadingDownloads,
+  } = useQuery({
+    queryKey: queryKeys.activity.downloadsOverview,
+    queryFn: fetchDownloadsSummary,
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+
+  const {
+    recentlyAdded: recentlyAddedData,
+    isLoading: isLoadingRecentlyAdded,
+  } = useRecentlyAdded();
 
   useFocusEffect(
     useCallback(() => {
@@ -217,14 +261,6 @@ const DashboardScreen = () => {
         },
         hamburgerButton: {
           marginLeft: -spacing.xs,
-        },
-        headerTitle: {
-          color: theme.colors.onBackground,
-          fontSize: theme.custom.typography.headlineSmall.fontSize,
-          fontFamily: theme.custom.typography.headlineSmall.fontFamily,
-          lineHeight: theme.custom.typography.headlineSmall.lineHeight,
-          letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
-          fontWeight: '700' as const,
         },
         section: {
           marginTop: spacing.lg,
@@ -441,7 +477,6 @@ const DashboardScreen = () => {
   const renderHeader = useCallback(() => (
     <View style={styles.header}>
       <View style={{ width: 48 }} />
-      {/* <Text style={styles.headerTitle}>Dashboard</Text> */}
       <IconButton
         icon="plus"
         size={24}
@@ -505,34 +540,44 @@ const DashboardScreen = () => {
     [handleServicePress, styles],
   );
 
-  const renderActivityItem = useCallback(() => (
-    <>
-      <Card variant="custom" style={styles.activityCard} onPress={() => router.push('/(auth)/downloads')}>
-        <View style={styles.activityContent}>
-          <View style={styles.activityIcon}>
-            <IconButton icon="download" size={24} iconColor={theme.colors.primary} />
+  const renderActivityItem = useCallback(() => {
+    const downloadsActive = downloadsData?.active ?? 0;
+    const downloadsTotal = downloadsData?.total ?? 0;
+    const recentlyAddedTotal = recentlyAddedData?.total ?? 0;
+
+    return (
+      <>
+        <Card variant="custom" style={styles.activityCard} onPress={() => router.push('/(auth)/downloads')}>
+          <View style={styles.activityContent}>
+            <View style={styles.activityIcon}>
+              <IconButton icon="download" size={24} iconColor={theme.colors.primary} />
+            </View>
+            <View style={styles.activityInfo}>
+              <Text style={styles.activityTitle}>Downloads</Text>
+              <Text style={styles.activitySubtitle}>
+                {downloadsActive > 0 ? `${downloadsActive} active` : `${downloadsTotal} total`}
+              </Text>
+            </View>
+            <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
           </View>
-          <View style={styles.activityInfo}>
-            <Text style={styles.activityTitle}>Downloads</Text>
-            <Text style={styles.activitySubtitle}>2 active</Text>
+        </Card>
+        <Card variant="custom" style={styles.activityCard} onPress={() => router.push('/(auth)/recently-added')}>
+          <View style={styles.activityContent}>
+            <View style={styles.activityIcon}>
+              <IconButton icon="plus" size={24} iconColor={theme.colors.primary} />
+            </View>
+            <View style={styles.activityInfo}>
+              <Text style={styles.activityTitle}>Recently Added</Text>
+              <Text style={styles.activitySubtitle}>
+                {recentlyAddedTotal > 0 ? `${recentlyAddedTotal} added` : 'No recent activity'}
+              </Text>
+            </View>
+            <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
           </View>
-          <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
-        </View>
-      </Card>
-      <Card variant="custom" style={styles.activityCard} onPress={() => {}}>
-        <View style={styles.activityContent}>
-          <View style={styles.activityIcon}>
-            <IconButton icon="plus" size={24} iconColor={theme.colors.primary} />
-          </View>
-          <View style={styles.activityInfo}>
-            <Text style={styles.activityTitle}>Recently Added</Text>
-            <Text style={styles.activitySubtitle}>3 added</Text>
-          </View>
-          <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
-        </View>
-      </Card>
-    </>
-  ), [router, styles]);
+        </Card>
+      </>
+    );
+  }, [router, styles, downloadsData, recentlyAddedData, theme]);
 
   const keyExtractor = useCallback((item: ServiceOverviewItem) => item.config.id, []);
 

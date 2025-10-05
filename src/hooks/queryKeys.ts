@@ -8,6 +8,11 @@ export const queryKeys = {
     base: ['services'] as const,
     overview: ['services', 'overview'] as const,
   },
+  activity: {
+    base: ['activity'] as const,
+    recentlyAdded: ['activity', 'recentlyAdded'] as const,
+    downloadsOverview: ['activity', 'downloadsOverview'] as const,
+  },
   sonarr: {
     base: ['sonarr'] as const,
     service: (serviceId: string): QueryKeyBuilder => ['sonarr', serviceId] as const,

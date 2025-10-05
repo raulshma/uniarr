@@ -57,14 +57,6 @@ const SettingsScreen = () => {
       paddingVertical: spacing.md,
       backgroundColor: theme.colors.background,
     },
-    headerTitle: {
-      color: theme.colors.onBackground,
-      fontSize: theme.custom.typography.headlineSmall.fontSize,
-      fontFamily: theme.custom.typography.headlineSmall.fontFamily,
-      lineHeight: theme.custom.typography.headlineSmall.lineHeight,
-      letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
-      fontWeight: '700' as const,
-    },
     section: {
       marginTop: spacing.lg,
     },
@@ -226,7 +218,7 @@ const SettingsScreen = () => {
         {/* Header */}
         <View style={styles.header}>
           <View style={{ width: 48 }} />
-          <Text style={styles.headerTitle}>Settings</Text>
+          <View style={{ flex: 1 }} />
           <IconButton
             icon="cog"
             size={24}

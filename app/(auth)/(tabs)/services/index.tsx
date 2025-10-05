@@ -179,14 +179,6 @@ const ServicesScreen = () => {
         backButton: {
           marginLeft: -spacing.xs,
         },
-        headerTitle: {
-          color: theme.colors.onBackground,
-          fontSize: theme.custom.typography.headlineSmall.fontSize,
-          fontFamily: theme.custom.typography.headlineSmall.fontFamily,
-          lineHeight: theme.custom.typography.headlineSmall.lineHeight,
-          letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
-          fontWeight: '700' as const,
-        },
         content: {
           flex: 1,
           paddingHorizontal: spacing.md,
@@ -250,10 +242,6 @@ const ServicesScreen = () => {
         },
         serviceMenu: {
           color: theme.colors.outline,
-        },
-        addButton: {
-          marginHorizontal: spacing.md,
-          marginBottom: spacing.xl,
         },
         listSpacer: {
           height: spacing.sm,
@@ -362,10 +350,16 @@ const ServicesScreen = () => {
         onPress={handleBackPress}
         style={styles.backButton}
       />
-      <Text style={styles.headerTitle}>Services</Text>
       <View style={{ width: 48 }} />
+      <IconButton
+        icon="plus"
+        size={24}
+        iconColor={theme.colors.primary}
+        onPress={handleAddService}
+        style={{ marginRight: -spacing.xs }}
+      />
     </View>
-  ), [styles, theme, handleBackPress]);
+  ), [styles, theme, handleBackPress, handleAddService]);
 
   const renderServiceItem = useCallback(
     ({ item }: { item: ServiceOverviewItem }) => {
@@ -486,20 +480,6 @@ const ServicesScreen = () => {
         }
         showsVerticalScrollIndicator={false}
       />
-      {services.length > 0 && (
-        <View style={styles.addButton}>
-          <Button
-            mode="contained"
-            onPress={handleAddService}
-            icon="plus"
-            style={{
-              backgroundColor: theme.colors.primary,
-            }}
-          >
-            Add New Service
-          </Button>
-        </View>
-      )}
 
       <Portal>
         <Modal
