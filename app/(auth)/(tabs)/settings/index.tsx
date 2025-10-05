@@ -43,49 +43,40 @@ const SettingsScreen = () => {
       backgroundColor: theme.colors.background
     },
     scrollContainer: {
-      padding: spacing.lg,
-      paddingBottom: spacing.xxxl
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.xxl
+    },
+    listSpacer: {
+      height: spacing.sm,
     },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: spacing.lg,
-      paddingTop: spacing.sm,
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      backgroundColor: theme.colors.background,
     },
-    backButton: {
-      marginRight: spacing.md,
-    },
-    title: {
+    headerTitle: {
+      color: theme.colors.onBackground,
       fontSize: theme.custom.typography.headlineSmall.fontSize,
       fontFamily: theme.custom.typography.headlineSmall.fontFamily,
-      color: theme.colors.onBackground,
-      fontWeight: '600',
+      lineHeight: theme.custom.typography.headlineSmall.lineHeight,
+      letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
+      fontWeight: '700' as const,
     },
     section: {
-      marginBottom: spacing.lg,
+      marginTop: spacing.lg,
     },
     sectionTitle: {
-      fontSize: theme.custom.typography.titleMedium.fontSize,
-      fontFamily: theme.custom.typography.titleMedium.fontFamily,
       color: theme.colors.onBackground,
-      fontWeight: '600',
+      fontSize: theme.custom.typography.titleLarge.fontSize,
+      fontFamily: theme.custom.typography.titleLarge.fontFamily,
+      lineHeight: theme.custom.typography.titleLarge.lineHeight,
+      letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
+      fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
       marginBottom: spacing.md,
-    },
-    settingRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: spacing.sm,
-    },
-    settingLabel: {
-      fontSize: theme.custom.typography.bodyLarge.fontSize,
-      fontFamily: theme.custom.typography.bodyLarge.fontFamily,
-      color: theme.colors.onSurface,
-    },
-    settingValue: {
-      fontSize: theme.custom.typography.bodyMedium.fontSize,
-      fontFamily: theme.custom.typography.bodyMedium.fontFamily,
-      color: theme.colors.onSurfaceVariant,
+      paddingHorizontal: spacing.md,
     },
     themeOptions: {
       flexDirection: 'row',
@@ -95,7 +86,57 @@ const SettingsScreen = () => {
     themeChip: {
       borderRadius: 16,
     },
+    settingCard: {
+      backgroundColor: theme.colors.elevation.level1,
+      marginHorizontal: spacing.md,
+      marginVertical: spacing.xs,
+      borderRadius: 12,
+      padding: spacing.md,
+    },
+    settingContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    settingIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.surfaceVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+    },
+    settingInfo: {
+      flex: 1,
+    },
+    settingTitle: {
+      color: theme.colors.onSurface,
+      fontSize: theme.custom.typography.titleMedium.fontSize,
+      fontFamily: theme.custom.typography.titleMedium.fontFamily,
+      lineHeight: theme.custom.typography.titleMedium.lineHeight,
+      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+      marginBottom: spacing.xxs,
+    },
+    settingSubtitle: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: theme.custom.typography.bodyMedium.fontSize,
+      fontFamily: theme.custom.typography.bodyMedium.fontFamily,
+      lineHeight: theme.custom.typography.bodyMedium.lineHeight,
+      letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
+      fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
+      marginBottom: spacing.xxs,
+    },
+    settingValue: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: theme.custom.typography.bodySmall.fontSize,
+      fontFamily: theme.custom.typography.bodySmall.fontFamily,
+      lineHeight: theme.custom.typography.bodySmall.lineHeight,
+      letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
+      fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
+    },
     signOutButton: {
+      marginHorizontal: spacing.md,
       marginTop: spacing.lg,
       marginBottom: 0,
     },
@@ -166,8 +207,8 @@ const SettingsScreen = () => {
   const getThemeChipColor = (chipTheme: 'light' | 'dark' | 'system') => {
     if (themePreference === chipTheme) {
       return {
-        backgroundColor: theme.colors.primary,
-        textColor: theme.colors.onPrimary,
+        backgroundColor: theme.colors.primaryContainer,
+        textColor: theme.colors.onPrimaryContainer,
       };
     }
     return {
@@ -178,74 +219,85 @@ const SettingsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollContainer}>
+      <ScrollView
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
         <View style={styles.header}>
+          <View style={{ width: 48 }} />
+          <Text style={styles.headerTitle}>Settings</Text>
           <IconButton
-            icon="arrow-left"
+            icon="cog"
             size={24}
-            onPress={() => router.back()}
-            style={styles.backButton}
-            iconColor={theme.colors.onBackground}
+            iconColor={theme.colors.primary}
+            onPress={() => {}}
+            style={{ marginRight: -spacing.xs }}
           />
-      <Text style={styles.title}>Settings</Text>
         </View>
 
         {/* Appearance Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <Card contentPadding="md">
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>Theme</Text>
-              <View style={styles.themeOptions}>
-                <Chip
-                  mode="outlined"
-                  style={[
-                    styles.themeChip,
-                    { backgroundColor: getThemeChipColor('light').backgroundColor }
-                  ]}
-                  textStyle={{ color: getThemeChipColor('light').textColor }}
-                  onPress={() => handleThemeSelection('light')}
-                >
-                  Light
-                </Chip>
-                <Chip
-                  mode="outlined"
-                  style={[
-                    styles.themeChip,
-                    { backgroundColor: getThemeChipColor('dark').backgroundColor }
-                  ]}
-                  textStyle={{ color: getThemeChipColor('dark').textColor }}
-                  onPress={() => handleThemeSelection('dark')}
-                >
-                  Dark
-                </Chip>
-                <Chip
-                  mode="outlined"
-                  style={[
-                    styles.themeChip,
-                    { backgroundColor: getThemeChipColor('system').backgroundColor }
-                  ]}
-                  textStyle={{ color: getThemeChipColor('system').textColor }}
-                  onPress={() => handleThemeSelection('system')}
-                >
-                  System
-                </Chip>
+          <Card variant="custom" style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="palette" size={24} iconColor={theme.colors.primary} />
               </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Theme</Text>
+                <Text style={styles.settingSubtitle}>Choose your preferred theme</Text>
+                <View style={styles.themeOptions}>
+                  <Chip
+                    mode={themePreference === 'light' ? 'flat' : 'outlined'}
+                    style={[
+                      styles.themeChip,
+                      { backgroundColor: getThemeChipColor('light').backgroundColor }
+                    ]}
+                    textStyle={{ color: getThemeChipColor('light').textColor }}
+                    onPress={() => handleThemeSelection('light')}
+                  >
+                    Light
+                  </Chip>
+                  <Chip
+                    mode={themePreference === 'dark' ? 'flat' : 'outlined'}
+                    style={[
+                      styles.themeChip,
+                      { backgroundColor: getThemeChipColor('dark').backgroundColor }
+                    ]}
+                    textStyle={{ color: getThemeChipColor('dark').textColor }}
+                    onPress={() => handleThemeSelection('dark')}
+                  >
+                    Dark
+                  </Chip>
+                  <Chip
+                    mode={themePreference === 'system' ? 'flat' : 'outlined'}
+                    style={[
+                      styles.themeChip,
+                      { backgroundColor: getThemeChipColor('system').backgroundColor }
+                    ]}
+                    textStyle={{ color: getThemeChipColor('system').textColor }}
+                    onPress={() => handleThemeSelection('system')}
+                  >
+                    System
+                  </Chip>
+                </View>
+              </View>
+              <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
             </View>
           </Card>
         </View>
 
         {/* Notifications Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <Card contentPadding="md">
-            <View style={styles.settingRow}>
-              <View>
-                <Text style={styles.settingLabel}>Enable Notifications</Text>
-                <Text style={{ ...styles.settingValue, fontSize: 12, marginTop: 2 }}>
-                  Receive push notifications.
-                </Text>
+          <Card variant="custom" style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="bell" size={24} iconColor={theme.colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Enable Notifications</Text>
+                <Text style={styles.settingSubtitle}>Receive push notifications</Text>
               </View>
               <Switch
                 value={notificationsEnabled}
@@ -258,39 +310,32 @@ const SettingsScreen = () => {
 
         {/* Data Refresh Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Refresh</Text>
-          <Card contentPadding="md">
-            <View style={styles.settingRow}>
-              <View>
-                <Text style={styles.settingLabel}>Refresh Interval</Text>
-                <Text style={{ ...styles.settingValue, fontSize: 12, marginTop: 2 }}>
-                  How often to refresh data.
-                </Text>
+          <Card variant="custom" style={styles.settingCard} onPress={handleRefreshIntervalPress}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="refresh" size={24} iconColor={theme.colors.primary} />
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Refresh Interval</Text>
+                <Text style={styles.settingSubtitle}>How often to refresh data</Text>
                 <Text style={styles.settingValue}>{refreshIntervalMinutes} minutes</Text>
-                <IconButton
-                  icon="chevron-right"
-                  size={20}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  onPress={handleRefreshIntervalPress}
-                />
               </View>
+              <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
             </View>
           </Card>
         </View>
 
         {/* Storage Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Storage</Text>
-          <Card contentPadding="md">
-            <View style={styles.settingRow}>
-              <View style={{ flex: 1, paddingRight: spacing.sm }}>
-                <Text style={styles.settingLabel}>Image Cache</Text>
-                <Text style={{ ...styles.settingValue, fontSize: 12, marginTop: 2 }}>
-                  Cached artwork for posters and backdrops.
-                </Text>
-                <Text style={{ ...styles.settingValue, fontSize: 12, marginTop: 6 }}>
+          <Card variant="custom" style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="folder" size={24} iconColor={theme.colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Image Cache</Text>
+                <Text style={styles.settingSubtitle}>Cached artwork for posters and backdrops</Text>
+                <Text style={styles.settingValue}>
                   {isFetchingCacheUsage
                     ? 'Calculating…'
                     : `${imageCacheUsage.formattedSize}${
@@ -317,27 +362,32 @@ const SettingsScreen = () => {
 
         {/* Services Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Services</Text>
-          <Card contentPadding="md">
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>Manage Services</Text>
-              <IconButton
-                icon="chevron-right"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={() => router.push('/(auth)/(tabs)/services')}
-              />
+          <Card variant="custom" style={styles.settingCard} onPress={() => router.push('/(auth)/(tabs)/services')}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="server" size={24} iconColor={theme.colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Manage Services</Text>
+                <Text style={styles.settingSubtitle}>Configure your connected services</Text>
+              </View>
+              <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
             </View>
           </Card>
         </View>
 
         {/* About Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <Card contentPadding="md">
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>App Version</Text>
-              <Text style={styles.settingValue}>1.2.3</Text>
+          <Card variant="custom" style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="information" size={24} iconColor={theme.colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>App Version</Text>
+                <Text style={styles.settingSubtitle}>Uniarr version 1.2.3</Text>
+              </View>
+              <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
             </View>
           </Card>
         </View>
