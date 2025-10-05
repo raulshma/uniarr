@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Chip,
   Searchbar,
@@ -13,9 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import MovieListItem from '@/components/media/MediaCard/MovieListItem';
+import { MovieListItemSkeleton } from '@/components/media/MediaCard';
+import { SkeletonPlaceholder } from '@/components/common/Skeleton';
 import type { MediaDownloadStatus } from '@/components/media/MediaCard';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -426,8 +427,35 @@ const RadarrMoviesListScreen = () => {
 
   if (isInitialLoad) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
-        <LoadingState message="Loading movies..." />
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.xxl,
+          }}
+        >
+          <View style={styles.listHeader}>
+            <View style={styles.headerRow}>
+              <View>
+                <SkeletonPlaceholder width="60%" height={28} borderRadius={10} style={{ marginBottom: spacing.xs }} />
+                <SkeletonPlaceholder width="40%" height={18} borderRadius={8} />
+              </View>
+              <SkeletonPlaceholder width={120} height={40} borderRadius={20} />
+            </View>
+            <SkeletonPlaceholder width="100%" height={48} borderRadius={24} style={styles.searchBar} />
+            <SkeletonPlaceholder width="35%" height={16} borderRadius={8} style={styles.filterLabel} />
+            <View style={styles.filterPills}>
+              {[0, 1, 2, 3].map((pill) => (
+                <SkeletonPlaceholder key={`pill-${pill}`} width={92} height={32} borderRadius={16} />
+              ))}
+            </View>
+          </View>
+          {Array.from({ length: 6 }).map((_, index) => (
+            <View key={index} style={{ marginBottom: spacing.md }}>
+              <MovieListItemSkeleton />
+            </View>
+          ))}
+        </ScrollView>
       </SafeAreaView>
     );
   }

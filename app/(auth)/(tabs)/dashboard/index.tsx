@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, useTheme, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,9 +11,9 @@ import { TabHeader } from '@/components/common/TabHeader';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
-import { ServiceCard } from '@/components/service/ServiceCard';
+import { ServiceCard, ServiceCardSkeleton } from '@/components/service/ServiceCard';
+import { ListRowSkeleton, SkeletonPlaceholder } from '@/components/common/Skeleton';
 import type { ServiceStatusState } from '@/components/service/ServiceStatus';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -597,7 +597,31 @@ const DashboardScreen = () => {
   if (isLoading && services.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <LoadingState message="Loading dashboard…" />
+        <ScrollView contentContainerStyle={styles.listContent}>
+          <TabHeader
+            rightAction={{
+              icon: 'plus',
+              onPress: handleAddService,
+              accessibilityLabel: 'Add service',
+            }}
+          />
+          <View style={styles.section}>
+            <SkeletonPlaceholder width="40%" height={28} borderRadius={10} style={{ marginBottom: spacing.md }} />
+            {Array.from({ length: 3 }).map((_, index) => (
+              <View key={index} style={{ marginBottom: spacing.sm }}>
+                <ServiceCardSkeleton />
+              </View>
+            ))}
+          </View>
+          <View style={styles.section}>
+            <SkeletonPlaceholder width="40%" height={28} borderRadius={10} style={{ marginBottom: spacing.md }} />
+            {Array.from({ length: 2 }).map((_, index) => (
+              <View key={`activity-${index}`} style={{ marginBottom: spacing.sm }}>
+                <ListRowSkeleton showSecondaryLine={true} />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }

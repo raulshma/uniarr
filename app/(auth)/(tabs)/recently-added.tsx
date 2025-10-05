@@ -8,7 +8,7 @@ import { TabHeader } from '@/components/common/TabHeader';
 
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
+import { ListRowSkeleton } from '@/components/common/Skeleton';
 import { MediaCard } from '@/components/media/MediaCard';
 import { useRecentlyAdded, type RecentlyAddedItem } from '@/hooks/useRecentlyAdded';
 import type { AppTheme } from '@/constants/theme';
@@ -203,7 +203,17 @@ const RecentlyAddedScreen = () => {
   if (isLoading && recentlyAdded.items.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <LoadingState message="Loading recently added..." />
+        <TabHeader
+          showBackButton={true}
+          onBackPress={() => router.back()}
+        />
+        <ScrollView style={styles.listContent} contentContainerStyle={styles.listContentContainer}>
+          {Array.from({ length: 6 }).map((_, index) => (
+            <View key={index} style={{ marginBottom: spacing.sm }}>
+              <ListRowSkeleton />
+            </View>
+          ))}
+        </ScrollView>
       </SafeAreaView>
     );
   }

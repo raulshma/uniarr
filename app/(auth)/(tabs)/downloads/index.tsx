@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { IconButton, ProgressBar, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,8 +11,9 @@ import { TabHeader } from '@/components/common/TabHeader';
 
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
+import { SkeletonPlaceholder } from '@/components/common/Skeleton';
+import { TorrentCardSkeleton } from '@/components/torrents';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import type { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
@@ -372,8 +373,27 @@ const DownloadsScreen = () => {
 
   if (isLoading && !hasTorrents) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
-        <LoadingState message="Loading downloads..." />
+      <SafeAreaView style={styles.safeArea}>
+        <TabHeader
+          showBackButton={true}
+          onBackPress={() => router.back()}
+          rightAction={{
+            icon: 'plus',
+            onPress: handleAddService,
+            accessibilityLabel: 'Add service',
+          }}
+        />
+        <ScrollView contentContainerStyle={styles.listContent}>
+          <View style={{ marginBottom: spacing.lg }}>
+            <SkeletonPlaceholder width="60%" height={28} borderRadius={10} style={{ marginBottom: spacing.xs }} />
+            <SkeletonPlaceholder width="40%" height={18} borderRadius={8} />
+          </View>
+          {Array.from({ length: 5 }).map((_, index) => (
+            <View key={index} style={{ marginBottom: spacing.md }}>
+              <TorrentCardSkeleton showActions={false} />
+            </View>
+          ))}
+        </ScrollView>
       </SafeAreaView>
     );
   }

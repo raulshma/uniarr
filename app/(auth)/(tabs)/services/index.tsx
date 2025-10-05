@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { IconButton, Text, useTheme, Portal, Modal, List, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,10 +11,11 @@ import { TabHeader } from '@/components/common/TabHeader';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { ServiceStatus } from '@/components/service/ServiceStatus';
 import type { ServiceStatusState } from '@/components/service/ServiceStatus';
+import { ServiceCardSkeleton } from '@/components/service/ServiceCard';
+import { SkeletonPlaceholder } from '@/components/common/Skeleton';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import { queryKeys } from '@/hooks/queryKeys';
@@ -422,7 +423,25 @@ const ServicesScreen = () => {
   if (isLoading && services.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <LoadingState message="Loading services…" />
+        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.lg }}>
+          <TabHeader
+            showBackButton={true}
+            onBackPress={handleBackPress}
+            rightAction={{
+              icon: 'plus',
+              onPress: handleAddService,
+              accessibilityLabel: 'Add service',
+            }}
+          />
+          <View style={[styles.section, { marginTop: spacing.lg }]}>
+            <SkeletonPlaceholder width="50%" height={28} borderRadius={10} style={{ marginBottom: spacing.md }} />
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View key={index} style={{ marginBottom: spacing.sm }}>
+                <ServiceCardSkeleton />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }

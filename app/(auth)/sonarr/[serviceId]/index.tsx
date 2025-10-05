@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Icon,
   IconButton,
@@ -15,9 +15,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { MediaPoster } from '@/components/media/MediaPoster';
+import { SkeletonPlaceholder } from '@/components/common/Skeleton';
+import { SeriesListItemSkeleton } from '@/components/media/skeletons';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import { useSonarrSeries } from '@/hooks/useSonarrSeries';
@@ -451,8 +452,30 @@ const SonarrSeriesListScreen = () => {
 
   if (isInitialLoad) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
-        <LoadingState message="Loading series..." />
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.xxl,
+          }}
+        >
+          <View style={styles.listHeader}>
+            <View style={styles.topBar}>
+              <View style={styles.topBarSpacer}>
+                <SkeletonPlaceholder width={32} height={32} borderRadius={16} />
+              </View>
+              <SkeletonPlaceholder width="40%" height={28} borderRadius={10} />
+              <SkeletonPlaceholder width={44} height={44} borderRadius={22} />
+            </View>
+            <SkeletonPlaceholder width="100%" height={48} borderRadius={24} style={{ marginBottom: spacing.md }} />
+            <SkeletonPlaceholder width="55%" height={36} borderRadius={18} />
+          </View>
+          {Array.from({ length: 6 }).map((_, index) => (
+            <View key={index} style={{ marginBottom: spacing.md }}>
+              <SeriesListItemSkeleton />
+            </View>
+          ))}
+        </ScrollView>
       </SafeAreaView>
     );
   }

@@ -2,15 +2,15 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Chip, Searchbar, SegmentedButtons, Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
-import { MediaCard, type MediaDownloadStatus } from '@/components/media/MediaCard';
+import { MediaCard, MediaCardSkeleton, type MediaDownloadStatus } from '@/components/media/MediaCard';
+import { SkeletonPlaceholder } from '@/components/common/Skeleton';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import { useJellyseerrRequests } from '@/hooks/useJellyseerrRequests';
@@ -511,8 +511,41 @@ const JellyseerrRequestsScreen = () => {
 
   if (isInitialLoad) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
-        <LoadingState message="Loading requests..." />
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.xxl,
+          }}
+        >
+          <View style={styles.listHeader}>
+            <View style={styles.headerRow}>
+              <View>
+                <SkeletonPlaceholder width="55%" height={28} borderRadius={10} style={{ marginBottom: spacing.xs }} />
+                <SkeletonPlaceholder width="40%" height={18} borderRadius={8} />
+              </View>
+              <SkeletonPlaceholder width={148} height={40} borderRadius={20} />
+            </View>
+            <SkeletonPlaceholder width="100%" height={48} borderRadius={24} style={styles.searchBar} />
+            <SkeletonPlaceholder width="35%" height={16} borderRadius={8} style={styles.filterLabel} />
+            <View style={[styles.filters, { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }]}>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <SkeletonPlaceholder key={`segment-${index}`} width={112} height={36} borderRadius={12} />
+              ))}
+            </View>
+            <View style={styles.paginationRow}>
+              <SkeletonPlaceholder width={120} height={36} borderRadius={18} />
+              <SkeletonPlaceholder width={100} height={20} borderRadius={8} />
+              <SkeletonPlaceholder width={120} height={36} borderRadius={18} />
+            </View>
+          </View>
+          {Array.from({ length: 5 }).map((_, index) => (
+            <View key={index} style={{ marginBottom: spacing.lg }}>
+              <SkeletonPlaceholder width={96} height={28} borderRadius={14} style={{ marginBottom: spacing.sm }} />
+              <MediaCardSkeleton />
+            </View>
+          ))}
+        </ScrollView>
       </SafeAreaView>
     );
   }
