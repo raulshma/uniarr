@@ -78,7 +78,7 @@ const BottomTabNavigator = () => {
           shadowRadius: 5,
         }}
         screenListeners={undefined}
-        screenOptions={undefined}
+        screenOptions={{ headerShown: false }}
         defaultScreenOptions={undefined}
         backBehavior="history"
         renderCircle={({ selectedTab, navigate }: { selectedTab: string; navigate: (routeName: string) => void }) => (
