@@ -3,6 +3,7 @@ import type { ServiceConfig, ServiceType } from '@/models/service.types';
 
 import { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
 import { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
+import { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 
 type ConnectorConstructor<TConnector extends IConnector = IConnector> = new (
   config: ServiceConfig,
@@ -13,6 +14,7 @@ const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
   // generic constructor type expected by the registry.
   sonarr: SonarrConnector as ConnectorConstructor,
   radarr: RadarrConnector as ConnectorConstructor,
+  jellyseerr: JellyseerrConnector as ConnectorConstructor,
 };
 
 /** Factory responsible for creating connector instances based on service metadata. */

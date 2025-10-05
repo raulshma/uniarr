@@ -44,6 +44,25 @@ export const queryKeys = {
     ] as const,
     queue: (serviceId: string): QueryKeyBuilder => [...queryKeys.radarr.service(serviceId), 'queue'] as const,
   },
+  jellyseerr: {
+    base: ['jellyseerr'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['jellyseerr', serviceId] as const,
+    requestsList: (serviceId: string, params?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'requests',
+      params ?? {},
+    ] as const,
+    requestDetail: (serviceId: string, requestId: number): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'requests',
+      requestId,
+    ] as const,
+    search: (serviceId: string, term: string, params?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'search',
+      { term, params },
+    ] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

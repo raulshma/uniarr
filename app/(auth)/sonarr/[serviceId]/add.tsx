@@ -181,7 +181,7 @@ const SonarrAddSeriesScreen = () => {
       return;
     }
     if (!watchedQualityProfileId) {
-      setValue('qualityProfileId', qualityProfiles[0].id, { shouldValidate: true });
+      setValue('qualityProfileId', qualityProfiles[0]!.id, { shouldValidate: true });
     }
   }, [qualityProfiles, selectedSeries, setValue, watchedQualityProfileId]);
 
@@ -190,7 +190,7 @@ const SonarrAddSeriesScreen = () => {
       return;
     }
     if (!watchedRootFolderPath) {
-      setValue('rootFolderPath', rootFolders[0].path, { shouldValidate: true });
+      setValue('rootFolderPath', rootFolders[0]!.path, { shouldValidate: true });
     }
   }, [rootFolders, setValue, watchedRootFolderPath]);
 
@@ -496,7 +496,6 @@ const SonarrAddSeriesScreen = () => {
                           key={folder.id}
                           value={folder.path}
                           label={folder.path}
-                          description={rootFolderDescription(folder)}
                           style={styles.radioItem}
                           status={field.value === folder.path ? 'checked' : 'unchecked'}
                         />

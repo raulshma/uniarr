@@ -421,6 +421,12 @@ const DashboardScreen = () => {
         case 'sonarr':
           router.push({ pathname: '/(auth)/sonarr/[serviceId]', params: { serviceId: service.config.id } });
           break;
+        case 'radarr':
+          router.push({ pathname: '/(auth)/radarr/[serviceId]', params: { serviceId: service.config.id } });
+          break;
+        case 'jellyseerr':
+          router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: service.config.id } });
+          break;
         default:
           Alert.alert('Coming soon', `${serviceTypeLabels[service.config.type]} integration is coming soon.`);
           break;
@@ -464,6 +470,8 @@ const DashboardScreen = () => {
             return 'television-classic';
           case 'radarr':
             return 'movie-open';
+          case 'jellyseerr':
+            return 'account-search';
           case 'qbittorrent':
             return 'download-network';
           default:
