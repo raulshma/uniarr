@@ -167,8 +167,6 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
 
 export default NetworkScanResults;
 
-export type { NetworkScanResultsProps };
-
 const styles = StyleSheet.create({
   scanSummary: {
     marginBottom: 16,
