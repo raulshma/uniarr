@@ -15,6 +15,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { useNotificationRegistration } from '@/hooks/useNotificationRegistration';
+import { useNotificationResponseHandler } from '@/hooks/useNotificationResponseHandler';
 
 const RootLayout = () => {
   const colorScheme = useColorScheme();
@@ -69,6 +71,8 @@ const RootNavigator = () => {
 
 const AppContent = () => {
   const { isOnline } = useOfflineSync();
+  useNotificationRegistration();
+  useNotificationResponseHandler();
 
   return (
     <View style={{ flex: 1 }}>

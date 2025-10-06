@@ -1,0 +1,166 @@
+import { pushNotificationService } from '@/services/notifications/PushNotificationService';
+import { logger } from '@/services/logger/LoggerService';
+import {
+  selectDownloadNotificationsEnabled,
+  selectFailedDownloadNotificationsEnabled,
+  selectNotificationsEnabled,
+  selectRequestNotificationsEnabled,
+  selectServiceHealthNotificationsEnabled,
+  useSettingsStore,
+} from '@/store/settingsStore';
+import {
+  NOTIFICATION_CATEGORIES,
+  type DownloadNotificationPayload,
+  type FailedDownloadNotificationPayload,
+  type RequestNotificationPayload,
+  type ServiceHealthNotificationPayload,
+} from '@/models/notification.types';
+import { formatBytes } from '@/utils/torrent.utils';
+
+const COMPLETED_CATEGORY = NOTIFICATION_CATEGORIES.downloads;
+const FAILURE_CATEGORY = NOTIFICATION_CATEGORIES.failures;
+const REQUEST_CATEGORY = NOTIFICATION_CATEGORIES.requests;
+const SERVICE_CATEGORY = NOTIFICATION_CATEGORIES.serviceHealth;
+
+class NotificationEventService {
+  private static instance: NotificationEventService | null = null;
+
+  static getInstance(): NotificationEventService {
+    if (!NotificationEventService.instance) {
+      NotificationEventService.instance = new NotificationEventService();
+    }
+
+    return NotificationEventService.instance;
+  }
+
+  async notifyDownloadCompleted(payload: DownloadNotificationPayload): Promise<void> {
+    const state = useSettingsStore.getState();
+    if (
+      !selectNotificationsEnabled(state) ||
+      !selectDownloadNotificationsEnabled(state)
+    ) {
+      return;
+    }
+
+    const sizeLabel = formatBytes(payload.torrent.size);
+
+    await pushNotificationService.presentImmediateNotification({
+      title: `Download complete • ${payload.serviceName}`,
+      body: `${payload.torrent.name} (${sizeLabel}) is ready to enjoy.`,
+      category: COMPLETED_CATEGORY,
+      data: {
+        serviceId: payload.serviceId,
+        torrentHash: payload.torrent.hash,
+      },
+    });
+  }
+
+  async notifyDownloadFailed(payload: FailedDownloadNotificationPayload): Promise<void> {
+    const state = useSettingsStore.getState();
+    if (
+      !selectNotificationsEnabled(state) ||
+      !selectFailedDownloadNotificationsEnabled(state)
+    ) {
+      return;
+    }
+
+    const reason = payload.reason ?? payload.torrent.state ?? 'Unknown reason';
+
+    await pushNotificationService.presentImmediateNotification({
+      title: `Download failed • ${payload.serviceName}`,
+      body: `${payload.torrent.name} did not finish (${reason}).`,
+      category: FAILURE_CATEGORY,
+      data: {
+        serviceId: payload.serviceId,
+        torrentHash: payload.torrent.hash,
+      },
+    });
+  }
+
+  async notifyNewRequest(payload: RequestNotificationPayload): Promise<void> {
+    const state = useSettingsStore.getState();
+    if (
+      !selectNotificationsEnabled(state) ||
+      !selectRequestNotificationsEnabled(state)
+    ) {
+      return;
+    }
+
+    const requestedBy =
+      payload.request.requestedBy?.displayName ??
+      payload.request.requestedBy?.username ??
+      payload.request.requestedBy?.email ??
+      'Someone';
+
+    const mediaTitle = payload.request.media.title ?? 'A new request';
+    const mediaTypeLabel = payload.request.mediaType === 'movie' ? 'Movie' : 'Series';
+
+    await pushNotificationService.presentImmediateNotification({
+      title: `${mediaTypeLabel} request • ${payload.serviceName}`,
+      body: `${requestedBy} requested ${mediaTitle}.`,
+      category: REQUEST_CATEGORY,
+      data: {
+        serviceId: payload.serviceId,
+        requestId: payload.request.id,
+        mediaType: payload.request.mediaType,
+      },
+    });
+  }
+
+  async notifyServiceStatusChange(payload: ServiceHealthNotificationPayload): Promise<void> {
+    const state = useSettingsStore.getState();
+    if (
+      !selectNotificationsEnabled(state) ||
+      !selectServiceHealthNotificationsEnabled(state)
+    ) {
+      return;
+    }
+
+    const status = payload.health.status;
+    const isOffline = status === 'offline';
+    const isDegraded = status === 'degraded';
+    const wasOffline = payload.previousStatus === 'offline';
+
+    if (status === payload.previousStatus) {
+      return;
+    }
+
+    if (isOffline || isDegraded) {
+      const label = isOffline ? 'offline' : 'degraded';
+      const message = payload.health.message ?? 'Check service connectivity.';
+
+      await pushNotificationService.presentImmediateNotification({
+        title: `${payload.serviceName} ${label}`,
+        body: message,
+        category: SERVICE_CATEGORY,
+        data: {
+          serviceId: payload.serviceId,
+          status,
+        },
+      });
+      return;
+    }
+
+    if (status === 'healthy' && wasOffline) {
+      await pushNotificationService.presentImmediateNotification({
+        title: `${payload.serviceName} restored`,
+        body: 'Service connectivity has been restored.',
+        category: SERVICE_CATEGORY,
+        data: {
+          serviceId: payload.serviceId,
+          status,
+        },
+      });
+      return;
+    }
+  }
+
+  async notifyInitializationSkipped(reason: string): Promise<void> {
+    await logger.warn('Notification event skipped.', {
+      location: 'NotificationEventService.notifyInitializationSkipped',
+      reason,
+    });
+  }
+}
+
+export const notificationEventService = NotificationEventService.getInstance();

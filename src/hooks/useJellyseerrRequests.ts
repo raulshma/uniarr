@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   keepPreviousData,
   useMutation,
@@ -19,6 +19,7 @@ import type {
   JellyseerrRequestList,
   JellyseerrRequestQueryOptions,
 } from '@/models/jellyseerr.types';
+import { notificationEventService } from '@/services/notifications/NotificationEventService';
 
 const JELLYSEERR_SERVICE_TYPE = 'jellyseerr';
 
@@ -118,6 +119,8 @@ export const useJellyseerrRequests = (
   const queryClient = useQueryClient();
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
   const hasConnector = manager.getConnector(serviceId)?.config.type === JELLYSEERR_SERVICE_TYPE;
+  const previousRequestIdsRef = useRef<Set<number>>(new Set());
+  const hasHydratedRef = useRef(false);
 
   const normalizedOptions = useMemo(() => sanitizeQueryOptions(options), [
     options?.take,
@@ -193,8 +196,43 @@ export const useJellyseerrRequests = (
 
   const data = requestsQuery.data;
 
+  const items = data?.items;
+
+  useEffect(() => {
+    if (!hasConnector || !items) {
+      previousRequestIdsRef.current = new Set();
+      hasHydratedRef.current = false;
+      return;
+    }
+
+    const connector = manager.getConnector(serviceId) as JellyseerrConnector | undefined;
+    const serviceName = connector?.config.name ?? 'Jellyseerr';
+    const previousIds = previousRequestIdsRef.current;
+    const hasHydrated = hasHydratedRef.current;
+    const nextIds = new Set<number>();
+
+    for (const request of items) {
+      nextIds.add(request.id);
+
+      if (!hasHydrated) {
+        continue;
+      }
+
+      if (!previousIds.has(request.id) && request.status === 'pending') {
+        void notificationEventService.notifyNewRequest({
+          serviceId,
+          serviceName,
+          request,
+        });
+      }
+    }
+
+    previousRequestIdsRef.current = nextIds;
+    hasHydratedRef.current = true;
+  }, [hasConnector, items, manager, serviceId]);
+
   return {
-    requests: data?.items,
+    requests: items,
     total: data?.total ?? 0,
     pageInfo: data?.pageInfo,
     isLoading: requestsQuery.isLoading,

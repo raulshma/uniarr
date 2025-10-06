@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   useMutation,
   useQuery,
@@ -11,6 +11,8 @@ import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import type { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { Torrent, TorrentTransferInfo } from '@/models/torrent.types';
+import { isTorrentCompleted } from '@/utils/torrent.utils';
+import { notificationEventService } from '@/services/notifications/NotificationEventService';
 
 const QB_SERVICE_TYPE = 'qbittorrent';
 
@@ -71,6 +73,8 @@ export const useQBittorrentTorrents = (
   const queryClient = useQueryClient();
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
   const hasConnector = manager.getConnector(serviceId)?.config.type === QB_SERVICE_TYPE;
+  const previousTorrentsRef = useRef<Map<string, { progress: number; state: Torrent['state'] }>>(new Map());
+  const hasHydratedRef = useRef(false);
 
   const resolveConnector = useCallback(() => ensureConnector(manager, serviceId), [manager, serviceId]);
 
@@ -149,8 +153,54 @@ export const useQBittorrentTorrents = (
     },
   });
 
+  const torrents = torrentsQuery.data;
+
+  useEffect(() => {
+    if (!hasConnector || !torrents) {
+      previousTorrentsRef.current.clear();
+      hasHydratedRef.current = false;
+      return;
+    }
+
+    const connector = manager.getConnector(serviceId) as QBittorrentConnector | undefined;
+    const serviceName = connector?.config.name ?? 'qBittorrent';
+    const previous = previousTorrentsRef.current;
+    const hasHydrated = hasHydratedRef.current;
+    const nextState = new Map<string, { progress: number; state: Torrent['state'] }>();
+
+    for (const torrent of torrents) {
+      if (hasHydrated) {
+        const last = previous.get(torrent.hash);
+
+        if (isTorrentCompleted(torrent) && (!last || last.progress < 1)) {
+          void notificationEventService.notifyDownloadCompleted({
+            serviceId,
+            serviceName,
+            torrent,
+          });
+        }
+
+        const isFailure = FAILED_TORRENT_STATES.has(torrent.state);
+        const wasFailure = last ? FAILED_TORRENT_STATES.has(last.state) : false;
+        if (isFailure && !wasFailure) {
+          void notificationEventService.notifyDownloadFailed({
+            serviceId,
+            serviceName,
+            torrent,
+            reason: torrent.state,
+          });
+        }
+      }
+
+      nextState.set(torrent.hash, { progress: torrent.progress, state: torrent.state });
+    }
+
+    previousTorrentsRef.current = nextState;
+    hasHydratedRef.current = true;
+  }, [hasConnector, manager, serviceId, torrents]);
+
   return {
-    torrents: torrentsQuery.data,
+    torrents,
     transferInfo: transferInfoQuery.data,
     isLoading: torrentsQuery.isLoading,
     isFetching: torrentsQuery.isFetching,
@@ -179,3 +229,5 @@ export const useQBittorrentTorrents = (
     transferError: transferInfoQuery.error,
   };
 };
+
+const FAILED_TORRENT_STATES: ReadonlySet<Torrent['state']> = new Set(['error', 'missingFiles']);

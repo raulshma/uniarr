@@ -26,9 +26,17 @@ const SettingsScreen = () => {
   const {
     theme: themePreference,
     notificationsEnabled,
+    downloadNotificationsEnabled,
+    failedDownloadNotificationsEnabled,
+    requestNotificationsEnabled,
+    serviceHealthNotificationsEnabled,
     refreshIntervalMinutes,
     setTheme,
     setNotificationsEnabled,
+    setDownloadNotificationsEnabled,
+    setFailedDownloadNotificationsEnabled,
+    setRequestNotificationsEnabled,
+    setServiceHealthNotificationsEnabled,
     setRefreshIntervalMinutes,
   } = useSettingsStore();
   const [imageCacheUsage, setImageCacheUsage] = useState<ImageCacheUsage>({
@@ -284,6 +292,74 @@ const SettingsScreen = () => {
               <Switch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
+                color={theme.colors.primary}
+              />
+            </View>
+          </Card>
+          <Card variant="custom" style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="check-circle" size={24} iconColor={theme.colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Completed Downloads</Text>
+                <Text style={styles.settingSubtitle}>Notify when downloads finish</Text>
+              </View>
+              <Switch
+                value={downloadNotificationsEnabled && notificationsEnabled}
+                onValueChange={setDownloadNotificationsEnabled}
+                disabled={!notificationsEnabled}
+                color={theme.colors.primary}
+              />
+            </View>
+          </Card>
+          <Card variant="custom" style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="alert-circle" size={24} iconColor={theme.colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Failed Downloads</Text>
+                <Text style={styles.settingSubtitle}>Notify when downloads fail</Text>
+              </View>
+              <Switch
+                value={failedDownloadNotificationsEnabled && notificationsEnabled}
+                onValueChange={setFailedDownloadNotificationsEnabled}
+                disabled={!notificationsEnabled}
+                color={theme.colors.primary}
+              />
+            </View>
+          </Card>
+          <Card variant="custom" style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="account-plus" size={24} iconColor={theme.colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>New Requests</Text>
+                <Text style={styles.settingSubtitle}>Notify when requests come in</Text>
+              </View>
+              <Switch
+                value={requestNotificationsEnabled && notificationsEnabled}
+                onValueChange={setRequestNotificationsEnabled}
+                disabled={!notificationsEnabled}
+                color={theme.colors.primary}
+              />
+            </View>
+          </Card>
+          <Card variant="custom" style={styles.settingCard}>
+            <View style={styles.settingContent}>
+              <View style={styles.settingIcon}>
+                <IconButton icon="server-network" size={24} iconColor={theme.colors.primary} />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Service Health</Text>
+                <Text style={styles.settingSubtitle}>Notify on service outages</Text>
+              </View>
+              <Switch
+                value={serviceHealthNotificationsEnabled && notificationsEnabled}
+                onValueChange={setServiceHealthNotificationsEnabled}
+                disabled={!notificationsEnabled}
                 color={theme.colors.primary}
               />
             </View>

@@ -10,6 +10,10 @@ type SettingsData = {
   theme: ThemePreference;
   notificationsEnabled: boolean;
   releaseNotificationsEnabled: boolean;
+  downloadNotificationsEnabled: boolean;
+  failedDownloadNotificationsEnabled: boolean;
+  requestNotificationsEnabled: boolean;
+  serviceHealthNotificationsEnabled: boolean;
   refreshIntervalMinutes: number;
 };
 
@@ -17,6 +21,10 @@ interface SettingsState extends SettingsData {
   setTheme: (theme: ThemePreference) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   setReleaseNotificationsEnabled: (enabled: boolean) => void;
+  setDownloadNotificationsEnabled: (enabled: boolean) => void;
+  setFailedDownloadNotificationsEnabled: (enabled: boolean) => void;
+  setRequestNotificationsEnabled: (enabled: boolean) => void;
+  setServiceHealthNotificationsEnabled: (enabled: boolean) => void;
   setRefreshIntervalMinutes: (minutes: number) => void;
   reset: () => void;
 }
@@ -38,6 +46,10 @@ const defaultSettings: SettingsData = {
   theme: 'system',
   notificationsEnabled: true,
   releaseNotificationsEnabled: false,
+  downloadNotificationsEnabled: true,
+  failedDownloadNotificationsEnabled: true,
+  requestNotificationsEnabled: true,
+  serviceHealthNotificationsEnabled: true,
   refreshIntervalMinutes: DEFAULT_REFRESH_INTERVAL,
 };
 
@@ -48,6 +60,12 @@ export const useSettingsStore = create<SettingsState>()(
       setTheme: (theme) => set({ theme }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setReleaseNotificationsEnabled: (enabled) => set({ releaseNotificationsEnabled: enabled }),
+      setDownloadNotificationsEnabled: (enabled) => set({ downloadNotificationsEnabled: enabled }),
+      setFailedDownloadNotificationsEnabled: (enabled) =>
+        set({ failedDownloadNotificationsEnabled: enabled }),
+      setRequestNotificationsEnabled: (enabled) => set({ requestNotificationsEnabled: enabled }),
+      setServiceHealthNotificationsEnabled: (enabled) =>
+        set({ serviceHealthNotificationsEnabled: enabled }),
       setRefreshIntervalMinutes: (minutes) =>
         set({ refreshIntervalMinutes: clampRefreshInterval(minutes) }),
       reset: () => set({ ...defaultSettings }),
@@ -97,5 +115,13 @@ export const selectThemePreference = (state: SettingsState): ThemePreference => 
 export const selectNotificationsEnabled = (state: SettingsState): boolean => state.notificationsEnabled;
 export const selectReleaseNotificationsEnabled = (state: SettingsState): boolean =>
   state.releaseNotificationsEnabled;
+export const selectDownloadNotificationsEnabled = (state: SettingsState): boolean =>
+  state.downloadNotificationsEnabled;
+export const selectFailedDownloadNotificationsEnabled = (state: SettingsState): boolean =>
+  state.failedDownloadNotificationsEnabled;
+export const selectRequestNotificationsEnabled = (state: SettingsState): boolean =>
+  state.requestNotificationsEnabled;
+export const selectServiceHealthNotificationsEnabled = (state: SettingsState): boolean =>
+  state.serviceHealthNotificationsEnabled;
 export const selectRefreshIntervalMinutes = (state: SettingsState): number =>
   state.refreshIntervalMinutes;
