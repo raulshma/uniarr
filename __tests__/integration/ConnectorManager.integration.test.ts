@@ -75,10 +75,12 @@ jest.mock('@/connectors/implementations/SonarrConnector', () => ({
       success: true,
       version: '4.0.0',
       latency: 100,
-    }),
-    getSeries: jest.fn().mockResolvedValue([]),
-    search: jest.fn().mockResolvedValue([]),
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Series' }),
+    } as any),
+    getSeries: jest.fn().mockResolvedValue([] as any),
+    search: jest.fn().mockResolvedValue([] as any),
+    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Series' } as any),
+    initialize: jest.fn().mockResolvedValue(undefined as any),
+    dispose: jest.fn().mockResolvedValue(undefined as any),
   })),
 }));
 
@@ -88,10 +90,12 @@ jest.mock('@/connectors/implementations/RadarrConnector', () => ({
       success: true,
       version: '5.0.0',
       latency: 150,
-    }),
-    getMovies: jest.fn().mockResolvedValue([]),
-    search: jest.fn().mockResolvedValue([]),
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Movie' }),
+    } as any),
+    getMovies: jest.fn().mockResolvedValue([] as any),
+    search: jest.fn().mockResolvedValue([] as any),
+    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Movie' } as any),
+    initialize: jest.fn().mockResolvedValue(undefined as any),
+    dispose: jest.fn().mockResolvedValue(undefined as any),
   })),
 }));
 
@@ -244,7 +248,7 @@ describe('ConnectorManager Integration Tests', () => {
       // Mock one service to fail during connection test
       const { RadarrConnector } = require('@/connectors/implementations/RadarrConnector');
       const failingConnector = {
-        testConnection: jest.fn().mockRejectedValue(new Error('Connection failed')),
+        testConnection: jest.fn().mockRejectedValue(new Error('Connection failed') as any),
       };
       RadarrConnector.mockImplementationOnce(() => failingConnector);
 

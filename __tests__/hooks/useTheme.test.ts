@@ -11,10 +11,7 @@ jest.mock('@/store/settingsStore', () => ({
 
 // Mock react-native useColorScheme
 const mockUseColorScheme = jest.fn();
-jest.mock('react-native', () => ({
-  ...jest.requireActual('react-native'),
-  useColorScheme: mockUseColorScheme,
-}));
+jest.mock('react-native/Libraries/Utilities/useColorScheme', () => mockUseColorScheme);
 
 describe('useTheme', () => {
   beforeEach(() => {

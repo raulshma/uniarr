@@ -52,6 +52,7 @@ jest.mock('@/services/storage/SecureStorage', () => ({
 }));
 
 // Mock connector implementations
+// @ts-ignore - Jest mock typing issues
 jest.mock('@/connectors/implementations/SonarrConnector', () => ({
   SonarrConnector: jest.fn().mockImplementation(() => ({
     testConnection: jest.fn().mockResolvedValue({
@@ -63,7 +64,7 @@ jest.mock('@/connectors/implementations/SonarrConnector', () => ({
     search: jest.fn().mockResolvedValue([]),
     add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Series' }),
     initialize: jest.fn().mockResolvedValue(undefined),
-    dispose: jest.fn(),
+    dispose: jest.fn().mockResolvedValue(undefined),
     getHealth: jest.fn().mockResolvedValue({ status: 'healthy', lastChecked: new Date() }),
     getVersion: jest.fn().mockResolvedValue('4.0.0'),
   })),
@@ -126,6 +127,7 @@ describe('Error Propagation Integration Tests', () => {
         cause: new Error('Too many requests'),
       });
 
+      // @ts-ignore - Jest mock typing issues
       connector!.getSeries = jest.fn().mockRejectedValue(apiError);
 
       // Error should propagate up
@@ -159,6 +161,7 @@ describe('Error Propagation Integration Tests', () => {
         message: 'Request failed with status code 500',
       };
 
+      // @ts-ignore - Jest mock typing issues
       (connector as any)!.testConnection = jest.fn().mockRejectedValue(networkError);
 
       // Should transform network error to ApiError
@@ -212,6 +215,7 @@ describe('Error Propagation Integration Tests', () => {
       // Mock one service to fail during connection test
       const { RadarrConnector } = require('@/connectors/implementations/RadarrConnector');
       const failingConnector = {
+        // @ts-ignore - Jest mock typing issues
         testConnection: jest.fn().mockRejectedValue(new Error('Connection timeout')),
       };
       RadarrConnector.mockImplementationOnce(() => failingConnector);
@@ -286,6 +290,8 @@ describe('Error Propagation Integration Tests', () => {
         statusCode: 500,
       });
 
+      // @ts-ignore - Jest mock typing issues
+      // @ts-ignore - Jest mock typing issues
       (connector as any)!.getSeries = jest.fn().mockRejectedValue(apiError);
 
       // The hook should handle the error properly
@@ -315,6 +321,7 @@ describe('Error Propagation Integration Tests', () => {
 
       // Mock network connectivity error
       const networkError = new Error('Network request failed');
+      // @ts-ignore - Jest mock typing issues
       (connector as any)!.getSeries = jest.fn().mockRejectedValue(networkError);
 
       // Should propagate network error as ApiError
@@ -348,6 +355,7 @@ describe('Error Propagation Integration Tests', () => {
       const successResult = [{ id: 1, title: 'Series 1' }];
 
       connector!.getSeries
+        // @ts-ignore - Jest mock typing issues
         .mockRejectedValueOnce(apiError)
         .mockResolvedValueOnce(successResult);
 
@@ -388,10 +396,12 @@ describe('Error Propagation Integration Tests', () => {
       const { RadarrConnector } = require('@/connectors/implementations/RadarrConnector');
 
       const failingSonarrConnector = {
+        // @ts-ignore - Jest mock typing issues
         testConnection: jest.fn().mockRejectedValue(new Error('Service unavailable')),
       };
 
       const failingRadarrConnector = {
+        // @ts-ignore - Jest mock typing issues
         testConnection: jest.fn().mockRejectedValue(new Error('Service unavailable')),
       };
 
@@ -439,6 +449,7 @@ describe('Error Propagation Integration Tests', () => {
       ];
 
       for (const { type, error } of errors) {
+        // @ts-ignore - Jest mock typing issues
         (connector as any)!.getSeries = jest.fn().mockRejectedValueOnce(error);
 
         const result = await (connector as any)!.getSeries().catch((e: any) => e);
@@ -473,6 +484,7 @@ describe('Error Propagation Integration Tests', () => {
         cause: new Error('Invalid search parameters'),
       });
 
+      // @ts-ignore - Jest mock typing issues
       connector!.search = jest.fn().mockRejectedValue(apiError);
 
       await expect(connector!.search('test')).rejects.toThrow(ApiError);
@@ -511,6 +523,8 @@ describe('Error Propagation Integration Tests', () => {
         statusCode: 408,
       });
 
+      // @ts-ignore - Jest mock typing issues
+      // @ts-ignore - Jest mock typing issues
       (connector as any)!.getSeries = jest.fn().mockRejectedValue(apiError);
 
       // Execute multiple operations that fail

@@ -79,33 +79,40 @@ jest.mock('@/connectors/implementations/SonarrConnector', () => ({
       success: true,
       version: '4.0.0',
       latency: 100,
-    }),
+    } as any),
     getSeries: jest.fn().mockResolvedValue([
       { id: 1, title: 'Series 1', status: 'continuing' },
       { id: 2, title: 'Series 2', status: 'ended' },
-    ]),
-    search: jest.fn().mockResolvedValue([]),
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'New Series' }),
-    initialize: jest.fn().mockResolvedValue(undefined),
-    dispose: jest.fn(),
-    getHealth: jest.fn().mockResolvedValue({ status: 'healthy', lastChecked: new Date() }),
-    getVersion: jest.fn().mockResolvedValue('4.0.0'),
+    ] as any),
+    search: jest.fn().mockResolvedValue([] as any),
+    add: jest.fn().mockResolvedValue({ id: 1, title: 'New Series' } as any),
+    initialize: jest.fn().mockResolvedValue(undefined as any),
+    dispose: jest.fn().mockResolvedValue(undefined as any),
+    getHealth: jest.fn().mockResolvedValue({ status: 'healthy', lastChecked: new Date() } as any),
+    getVersion: jest.fn().mockResolvedValue('4.0.0' as any),
   })),
 }));
 
 // Create a test wrapper component for React Query
-const createTestQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-      staleTime: 0,
-      gcTime: 0,
+const createTestQueryClient = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: 0,
+        gcTime: 0,
+      },
+      mutations: {
+        retry: false,
+      },
     },
-    mutations: {
-      retry: false,
-    },
-  },
-});
+  });
+
+  // Spy on invalidateQueries method
+  jest.spyOn(queryClient, 'invalidateQueries');
+
+  return queryClient;
+};
 
 const TestWrapper = ({ children }: { children: ReactNode }) => {
   const queryClient = createTestQueryClient();
@@ -305,7 +312,7 @@ describe('Query Invalidation Integration Tests', () => {
       };
 
       // Mock query invalidation to fail for one query type
-      queryClient.invalidateQueries.mockImplementation((queryKey) => {
+      queryClient.invalidateQueries = jest.fn().mockImplementation((queryKey: any) => {
         if (queryKey === queryKeys.services.overview) {
           throw new Error('Invalidation failed');
         }
