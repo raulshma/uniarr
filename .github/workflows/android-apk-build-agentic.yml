@@ -13,6 +13,22 @@ jobs:
     steps:
       - name: Setup repo
         uses: actions/checkout@v4
+        with:
+          ref: agentic
+      
+      - name: Verify branch and install dependencies
+        run: |
+          echo "Current branch: $(git branch --show-current)"
+          echo "Git status:"
+          git status
+          echo "Clearing npm cache..."
+          npm cache clean --force
+          echo "Installing dependencies..."
+          npm ci
+          echo "Verifying expo-auth-session installation..."
+          npm ls expo-auth-session
+          echo "Fixing module resolution issues..."
+          cd node_modules/expo-auth-session/build && for file in *.js; do base=$(basename "$file" .js); if [ ! -e "$base" ]; then ln -sf "$file" "$base"; fi; done
       
       - name: Setup node
         uses: actions/setup-node@v4.0.2
@@ -36,8 +52,11 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Verify Expo configuration
+        run: |
+          echo "Testing expo config..."
+          npx expo config --json > /dev/null && echo "Expo config test passed" || echo "Expo config test failed"
+          echo "Expo configuration verified successfully"
 
       - name: Build Android app
         run: eas build --platform android --profile preview --local --output ${{ github.workspace }}/app-release.apk

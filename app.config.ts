@@ -55,12 +55,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         disableWeb: true,
       },
     ],
-    [
-      "expo-auth-session",
-      {
-        schemes: ["uniarr"],
-      },
-    ],
   ],
   extra: {
     ...config.extra,
