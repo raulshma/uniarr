@@ -29,8 +29,10 @@ const FILTER_ALL = 'all';
 const FILTER_OWNED = 'owned';
 const FILTER_MISSING = 'missing';
 const FILTER_DOWNLOADING = 'downloading';
+const FILTER_MONITORED = 'monitored';
+const FILTER_UNMONITORED = 'unmonitored';
 
-type FilterValue = typeof FILTER_ALL | typeof FILTER_OWNED | typeof FILTER_MISSING | typeof FILTER_DOWNLOADING;
+type FilterValue = typeof FILTER_ALL | typeof FILTER_OWNED | typeof FILTER_MISSING | typeof FILTER_DOWNLOADING | typeof FILTER_MONITORED | typeof FILTER_UNMONITORED;
 
 const formatRuntime = (runtime?: number): string | undefined => {
   if (!runtime) {
@@ -178,9 +180,19 @@ const RadarrMoviesListScreen = () => {
     return movies.filter((item) => {
       // Filter by status category
       if (filterValue !== FILTER_ALL) {
-        const movieFilter = getFilterForMovie(item);
-        if (movieFilter !== filterValue) {
+        if (filterValue === FILTER_MONITORED && !item.monitored) {
           return false;
+        }
+
+        if (filterValue === FILTER_UNMONITORED && item.monitored) {
+          return false;
+        }
+
+        if (filterValue === FILTER_OWNED || filterValue === FILTER_MISSING || filterValue === FILTER_DOWNLOADING) {
+          const movieFilter = getFilterForMovie(item);
+          if (movieFilter !== filterValue) {
+            return false;
+          }
         }
       }
 
@@ -232,35 +244,35 @@ const RadarrMoviesListScreen = () => {
         },
         filterPills: {
           flexDirection: 'row',
-          justifyContent: 'flex-start',
-          alignItems: 'center',
           marginBottom: spacing.md,
-          gap: spacing.md,
-          flexWrap: 'wrap',
+        },
+        filterPillsScroll: {
+          flexDirection: 'row',
+          gap: spacing.sm,
         },
         filterChip: {
           backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 25,
+          borderRadius: 20,
           flex: 0,
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.xs,
-          minHeight: 32,
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.xxxs,
+          minHeight: 28,
         },
         filterChipSelected: {
           backgroundColor: theme.colors.primary,
-          borderRadius: 25,
+          borderRadius: 20,
           flex: 0,
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.xs,
-          minHeight: 32,
+          paddingHorizontal: spacing.xs,
+          paddingVertical: spacing.xxxs,
+          minHeight: 28,
         },
         filterChipText: {
           color: theme.colors.onSurfaceVariant,
-          fontSize: 16,
+          fontSize: 14,
         },
         filterChipTextSelected: {
           color: theme.colors.onPrimary,
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: '500',
         },
         emptyContainer: {
@@ -357,12 +369,19 @@ const RadarrMoviesListScreen = () => {
           style={styles.searchBar}
           accessibilityLabel="Search movies"
         />
-        <View style={styles.filterPills}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterPillsScroll}
+          style={styles.filterPills}
+        >
           {[
             { label: 'All', value: FILTER_ALL },
             { label: 'Owned', value: FILTER_OWNED },
             { label: 'Missing', value: FILTER_MISSING },
             { label: 'Downloading', value: FILTER_DOWNLOADING },
+            { label: 'Monitored', value: FILTER_MONITORED },
+            { label: 'Unmonitored', value: FILTER_UNMONITORED },
           ].map((filter) => (
             <Chip
               key={filter.value}
@@ -380,7 +399,7 @@ const RadarrMoviesListScreen = () => {
               {filter.label}
             </Chip>
           ))}
-        </View>
+        </ScrollView>
       </View>
     ),
     [filteredMovies.length, filterValue, handleAddMovie, searchTerm, styles, totalMovies],
@@ -439,11 +458,16 @@ const RadarrMoviesListScreen = () => {
               <SkeletonPlaceholder width={120} height={40} borderRadius={20} />
             </View>
             <SkeletonPlaceholder width="100%" height={48} borderRadius={24} style={styles.searchBar} />
-            <View style={styles.filterPills}>
-              {[0, 1, 2, 3].map((pill) => (
-                <SkeletonPlaceholder key={`pill-${pill}`} width={92} height={32} borderRadius={16} />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterPillsScroll}
+              style={styles.filterPills}
+            >
+              {[0, 1, 2, 3, 4, 5].map((pill) => (
+                <SkeletonPlaceholder key={`pill-${pill}`} width={80} height={28} borderRadius={14} />
               ))}
-            </View>
+            </ScrollView>
           </View>
           {Array.from({ length: 6 }).map((_, index) => (
             <View key={index} style={{ marginBottom: spacing.md }}>
