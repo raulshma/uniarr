@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { Chip, Text, useTheme, Card, Surface, Portal, Dialog, TouchableRipple, Button } from 'react-native-paper';
+import { Chip, Text, useTheme, Card, Surface, Portal, Dialog, TouchableRipple, Button, Switch } from 'react-native-paper';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import type { AppTheme } from '@/constants/theme';
@@ -104,16 +104,15 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
   const handleSeasonPress = useCallback((season: Season) => {
     setSelectedSeason(season);
-    setEpisodesModalVisible(true);
   }, []);
 
-  const handleCloseEpisodesModal = useCallback(() => {
-    setEpisodesModalVisible(false);
+  const handleBackToSeasons = useCallback(() => {
     setSelectedSeason(null);
   }, []);
 
 
   const showSeasons = type === 'series' && seasons?.length;
+  const showEpisodes = showSeasons && (selectedSeason || seasons?.length === 1);
 
   // Format file size for display
   const formatFileSize = (sizeInBytes?: number): string => {
@@ -183,7 +182,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
       {/* Movie Details Card */}
       <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-        <Card style={{ backgroundColor: theme.colors.surfaceVariant, borderRadius: 12 }}>
+        <Card style={{ backgroundColor: theme.colors.elevation.level1, borderRadius: 12 }}>
           <Card.Content style={{ padding: 16 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
               <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
@@ -210,10 +209,10 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
               <Chip
                 mode="flat"
                 style={{
-                  backgroundColor: '#FFD700', // Golden color
+                  backgroundColor: theme.colors.primary,
                   borderRadius: 16
                 }}
-                textStyle={{ color: '#000000', fontWeight: '600' }}
+                textStyle={{ color: theme.colors.onPrimary, fontWeight: '600' }}
               >
                 {hasFile ? 'Owned' : 'Missing'}
               </Chip>
@@ -232,7 +231,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
           File Information
         </Text>
 
-        <Card style={{ backgroundColor: theme.colors.surfaceVariant, borderRadius: 12 }}>
+        <Card style={{ backgroundColor: theme.colors.elevation.level1, borderRadius: 12 }}>
           <Card.Content style={{ padding: 16 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
               <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
@@ -264,8 +263,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
               onPress={onSearchPress}
               loading={isSearching}
               disabled={isSearching}
-              buttonColor="#B8860B"
-              textColor="#FFFFFF"
+              buttonColor={theme.colors.primary}
+              textColor={theme.colors.onPrimary}
               style={{
                 flex: 1,
                 borderRadius: 8,
@@ -281,8 +280,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             onPress={handleMonitorPress}
             loading={isUpdatingMonitor}
             disabled={isUpdatingMonitor}
-            buttonColor="#FFD700"
-            textColor="#000000"
+            buttonColor={theme.colors.primary}
+            textColor={theme.colors.onPrimary}
             style={{
               flex: 1,
               borderRadius: 8,
@@ -309,7 +308,6 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
               const totalEpisodes = season.statistics?.episodeCount ?? season.episodes?.length ?? 0;
               const downloadedEpisodes = season.statistics?.episodeFileCount ??
                 (season.episodes ? season.episodes.filter((episode) => episode.hasFile).length : 0);
-              const progress = totalEpisodes > 0 ? downloadedEpisodes / totalEpisodes : 0;
 
               return (
                 <Animated.View
@@ -318,7 +316,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                   style={{
                     borderRadius: 16,
                     overflow: 'hidden',
-                    shadowColor: '#000',
+                    backgroundColor: theme.colors.elevation.level1,
+                    shadowColor: theme.colors.shadow,
                     shadowOffset: { width: 0, height: 2 },
                     shadowOpacity: 0.1,
                     shadowRadius: 4,
@@ -328,7 +327,6 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                   <TouchableRipple
                     onPress={() => handleSeasonPress(season)}
                     style={{
-                      backgroundColor: theme.colors.surfaceVariant,
                       padding: 16,
                     }}
                     borderless={false}
@@ -355,31 +353,22 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                         </Text>
                         <Text variant="bodyMedium" style={{
                           color: theme.colors.onSurfaceVariant,
-                          marginBottom: 8
                         }}>
-                          {totalEpisodes} Episodes
-                        </Text>
-                        <View style={{
-                          height: 6,
-                          borderRadius: 3,
-                          backgroundColor: theme.colors.surface,
-                          overflow: 'hidden'
-                        }}>
-                          <View style={{
-                            height: '100%',
-                            width: `${Math.round(progress * 100)}%`,
-                            backgroundColor: progress === 1 ? theme.colors.primary : theme.colors.primaryContainer,
-                            borderRadius: 3,
-                          }} />
-                        </View>
-                        <Text variant="bodySmall" style={{
-                          color: theme.colors.onSurfaceVariant,
-                          marginTop: 4,
-                          fontWeight: '500'
-                        }}>
-                          {downloadedEpisodes} / {totalEpisodes} episodes
+                          {totalEpisodes} Episodes • {downloadedEpisodes} Downloaded
                         </Text>
                       </View>
+                      <Switch
+                        value={season.monitored ?? true}
+                        onValueChange={() => {
+                          // TODO: Handle season monitoring toggle
+                          console.log('Toggle season monitoring for season', season.seasonNumber);
+                        }}
+                        color={theme.colors.primary}
+                        trackColor={{
+                          false: theme.colors.surfaceVariant,
+                          true: theme.colors.primaryContainer,
+                        }}
+                      />
                     </View>
                   </TouchableRipple>
                 </Animated.View>
@@ -389,120 +378,156 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
         </View>
       ) : null}
 
-      {/* Episodes Modal */}
-      <Portal>
-        <Dialog
-          visible={episodesModalVisible}
-          onDismiss={handleCloseEpisodesModal}
-          style={{
-            borderRadius: 16,
-            backgroundColor: theme.colors.elevation.level1,
-            maxHeight: '80%',
-          }}
-        >
-          <Dialog.Title style={{
-            color: theme.colors.onSurface,
-            fontWeight: '600',
-          }}>
-            {selectedSeason ? `Season ${selectedSeason.seasonNumber} Episodes` : 'Episodes'}
-          </Dialog.Title>
-          <Dialog.ScrollArea style={{ maxHeight: '70%' }}>
-            <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-              {selectedSeason?.episodes && selectedSeason.episodes.length > 0 ? (
-                selectedSeason.episodes.map((episode, index) => (
-                  <View
-                    key={episode.id ?? `${selectedSeason.seasonNumber}-${episode.episodeNumber}`}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: episode.hasFile ? theme.colors.surfaceVariant : theme.colors.surface,
-                      borderRadius: 12,
-                      padding: 12,
-                      marginBottom: 8,
-                      borderWidth: 1,
-                      borderColor: episode.hasFile ? theme.colors.outlineVariant : theme.colors.error,
-                    }}
-                  >
-                    <View style={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 8,
-                      backgroundColor: episode.hasFile ? theme.colors.primaryContainer : theme.colors.errorContainer,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 12,
-                    }}>
-                      <MediaPoster
-                        uri={episode.posterUrl}
-                        size={56}
-                        borderRadius={6}
-                        accessibilityLabel={`Episode ${episode.episodeNumber} poster`}
-                        showPlaceholderLabel
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text variant="titleMedium" style={{
-                        color: theme.colors.onSurface,
-                        fontWeight: '600',
-                        marginBottom: 4,
-                      }}>
-                        Episode {episode.episodeNumber}: {episode.title}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={{
-                          backgroundColor: episode.hasFile ? theme.colors.primary : theme.colors.error,
-                          borderRadius: 8,
-                          paddingHorizontal: 6,
-                          paddingVertical: 2,
-                          marginRight: 8,
-                        }}>
-                          <Text variant="labelSmall" style={{
-                            color: episode.hasFile ? theme.colors.onPrimary : theme.colors.onError,
-                            fontWeight: '600',
-                          }}>
-                            {episode.hasFile ? '✓ DOWNLOADED' : '⚠ MISSING'}
-                          </Text>
-                        </View>
-                        {episode.sizeInMB && (
-                          <Text variant="bodySmall" style={{
-                            color: theme.colors.onSurfaceVariant,
-                            fontWeight: '500',
-                          }}>
-                            {formatFileSize(episode.sizeInMB)}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <View style={{
-                  backgroundColor: theme.colors.surfaceVariant,
+      {/* Episodes Section */}
+      {showEpisodes ? (
+        <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            {seasons && seasons.length > 1 && selectedSeason && (
+              <Button
+                mode="text"
+                onPress={handleBackToSeasons}
+                style={{ marginRight: 8 }}
+                labelStyle={{ fontSize: 12 }}
+              >
+                ← Seasons
+              </Button>
+            )}
+            <Text variant="titleLarge" style={{
+              color: theme.colors.onSurface,
+              fontWeight: 'bold',
+              flex: 1
+            }}>
+              {selectedSeason ? `Season ${selectedSeason.seasonNumber} Episodes` : 'Episodes'}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
+            {(selectedSeason || seasons?.[0])?.episodes?.map((episode, index) => (
+              <View
+                key={episode.id ?? `${(selectedSeason || seasons?.[0])?.seasonNumber}-${episode.episodeNumber}`}
+                style={{
+                  width: '48%',
+                  backgroundColor: theme.colors.elevation.level1,
                   borderRadius: 12,
-                  padding: 20,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderColor: episode.hasFile ? theme.colors.outlineVariant : theme.colors.error,
+                }}
+              >
+                <View style={{
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}>
+                  <MediaPoster
+                    uri={episode.posterUrl}
+                    size={80}
+                    borderRadius={8}
+                    accessibilityLabel={`Episode ${episode.episodeNumber} poster`}
+                    showPlaceholderLabel
+                  />
+                </View>
+
+                <Text
+                  variant="bodyMedium"
+                  numberOfLines={2}
+                  style={{
+                    color: theme.colors.onSurface,
+                    fontWeight: '600',
+                    marginBottom: 8,
+                    textAlign: 'center',
+                  }}
+                >
+                  Chapter {episode.episodeNumber}: {episode.title}
+                </Text>
+
+                <View style={{
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: episode.hasFile ? theme.colors.primary : theme.colors.error,
+                  marginBottom: 8,
+                }} />
+
+                <View style={{
+                  backgroundColor: episode.hasFile ? theme.colors.primaryContainer : theme.colors.errorContainer,
+                  borderRadius: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
                   alignItems: 'center',
                 }}>
-                  <Text variant="bodyMedium" style={{
-                    color: theme.colors.onSurfaceVariant,
-                    textAlign: 'center',
+                  <Text variant="labelSmall" style={{
+                    color: episode.hasFile ? theme.colors.onPrimaryContainer : theme.colors.onErrorContainer,
+                    fontWeight: '600',
                   }}>
-                    No episodes available for this season
+                    {episode.hasFile ? 'Downloaded • 42m' : 'Missing • 35m'}
                   </Text>
                 </View>
-              )}
-            </View>
-          </Dialog.ScrollArea>
-          <Dialog.Actions>
+
+                {episode.hasFile && episode.sizeInMB && (
+                  <Text variant="bodySmall" style={{
+                    color: theme.colors.onSurfaceVariant,
+                    marginTop: 4,
+                    textAlign: 'center',
+                    fontWeight: '500',
+                  }}>
+                    {formatFileSize(episode.sizeInMB)}
+                  </Text>
+                )}
+              </View>
+            )) || (
+              <View style={{
+                width: '100%',
+                backgroundColor: theme.colors.elevation.level1,
+                borderRadius: 12,
+                padding: 20,
+                alignItems: 'center',
+              }}>
+                <Text variant="bodyMedium" style={{
+                  color: theme.colors.onSurfaceVariant,
+                  textAlign: 'center',
+                }}>
+                  No episodes available for this season
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Action Buttons for Episodes */}
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Button
+              mode="contained"
+              onPress={() => {
+                // TODO: Handle search missing episodes
+                console.log('Search missing episodes');
+              }}
+              buttonColor={theme.colors.primary}
+              textColor={theme.colors.onPrimary}
+              style={{
+                flex: 1,
+                borderRadius: 8,
+              }}
+              labelStyle={{ fontWeight: '600' }}
+            >
+              Search Missing
+            </Button>
+
             <Button
               mode="outlined"
-              onPress={handleCloseEpisodesModal}
+              onPress={() => {
+                // TODO: Handle unmonitor all episodes
+                console.log('Unmonitor all episodes');
+              }}
               textColor={theme.colors.onSurfaceVariant}
+              style={{
+                flex: 1,
+                borderRadius: 8,
+              }}
+              labelStyle={{ fontWeight: '600' }}
             >
-              Close
+              Unmonitor All
             </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+          </View>
+        </View>
+      ) : null}
 
     </ScrollView>
   );
