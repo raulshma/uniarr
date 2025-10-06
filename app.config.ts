@@ -28,6 +28,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "com.raulshma.uniarr",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
+    intentFilters: [
+      {
+        action: "VIEW",
+        data: [
+          {
+            scheme: "uniarr",
+          },
+        ],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+    ],
   },
   web: {
     bundler: "metro",
@@ -42,6 +53,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         // Disable web-browser plugin for web platform
         disableWeb: true,
+      },
+    ],
+    [
+      "expo-auth-session",
+      {
+        schemes: ["uniarr"],
       },
     ],
   ],
