@@ -27,4 +27,10 @@ export {
   AnimatedHeader,
   AnimatedList,
   AnimatedFilter,
+  AnimatedListItem,
+  AnimatedSection,
+  AnimatedProgress,
+  AnimatedStatus,
+  AnimatedPressable,
+  AnimatedScrollView,
 } from './AnimatedComponents';

@@ -13,6 +13,7 @@ import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
+import { AnimatedListItem, AnimatedSection, AnimatedScrollView } from '@/components/common/AnimatedComponents';
 import { ServiceStatus } from '@/components/service/ServiceStatus';
 import type { ServiceStatusState } from '@/components/service/ServiceStatus';
 import { ServiceCardSkeleton } from '@/components/service/ServiceCard';
@@ -364,66 +365,68 @@ const ServicesScreen = () => {
     />
   ), [handleBackPress, handleAddService]);
 
-  const ServiceCard = React.memo(({ item }: { item: ServiceOverviewItem }) => {
+  const ServiceCard = React.memo(({ item, index }: { item: ServiceOverviewItem; index: number }) => {
     const displayName = serviceDisplayNames[item.config.type] || item.config.name;
     const serviceType = serviceTypeLabels[item.config.type];
     const iconName = serviceIcons[item.config.type];
 
     return (
-      <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
-        <View style={styles.serviceContent}>
-          <View style={styles.serviceIcon}>
-            <IconButton icon={iconName} size={24} iconColor={theme.colors.primary} />
-          </View>
-          <View style={styles.serviceInfo}>
-            <Text style={styles.serviceName}>{displayName}</Text>
-            <Text style={styles.serviceType}>{serviceType}</Text>
-            <View style={styles.serviceStatus}>
-              <ServiceStatus
-                status={item.status}
-                showLabel={false}
-                size="sm"
-              />
-              <Text
-                style={{
-                  color: item.status === 'online'
-                    ? theme.colors.primary
-                    : item.status === 'offline'
-                    ? theme.colors.error
-                    : theme.colors.tertiary,
-                  fontSize: 14,
-                  marginLeft: 4,
-                }}
-              >
-                {item.status === 'online' ? 'Connected' : item.status === 'offline' ? 'Offline' : 'Degraded'}
-              </Text>
+      <AnimatedListItem index={index} totalItems={services.length}>
+        <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
+          <View style={styles.serviceContent}>
+            <View style={styles.serviceIcon}>
+              <IconButton icon={iconName} size={24} iconColor={theme.colors.primary} />
             </View>
+            <View style={styles.serviceInfo}>
+              <Text style={styles.serviceName}>{displayName}</Text>
+              <Text style={styles.serviceType}>{serviceType}</Text>
+              <View style={styles.serviceStatus}>
+                <ServiceStatus
+                  status={item.status}
+                  showLabel={false}
+                  size="sm"
+                />
+                <Text
+                  style={{
+                    color: item.status === 'online'
+                      ? theme.colors.primary
+                      : item.status === 'offline'
+                      ? theme.colors.error
+                      : theme.colors.tertiary,
+                    fontSize: 14,
+                    marginLeft: 4,
+                  }}
+                >
+                  {item.status === 'online' ? 'Connected' : item.status === 'offline' ? 'Offline' : 'Degraded'}
+                </Text>
+              </View>
+            </View>
+            <IconButton
+              icon="dots-vertical"
+              size={20}
+              iconColor={theme.colors.outline}
+              onPress={() => handleServiceMenuPress(item)}
+            />
           </View>
-          <IconButton
-            icon="dots-vertical"
-            size={20}
-            iconColor={theme.colors.outline}
-            onPress={() => handleServiceMenuPress(item)}
-          />
-        </View>
-      </Card>
+        </Card>
+      </AnimatedListItem>
     );
   });
 
   const renderServiceItem = useCallback(
-    ({ item }: { item: ServiceOverviewItem }) => (
-      <ServiceCard item={item} />
+    ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
+      <ServiceCard item={item} index={index} />
     ),
     [],
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: ServicesListItem }) => {
+    ({ item, index }: { item: ServicesListItem; index: number }) => {
       switch (item.type) {
         case 'header':
           return renderHeader();
         case 'service':
-          return renderServiceItem({ item: item.data });
+          return renderServiceItem({ item: item.data, index });
         default:
           return null;
       }
@@ -471,7 +474,7 @@ const ServicesScreen = () => {
   if (isLoading && services.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.lg }}>
+        <AnimatedScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.lg }}>
           <TabHeader
             showBackButton={true}
             onBackPress={handleBackPress}
@@ -481,15 +484,15 @@ const ServicesScreen = () => {
               accessibilityLabel: 'Add service',
             }}
           />
-          <View style={[styles.section, { marginTop: spacing.lg }]}>
+          <AnimatedSection style={styles.section} delay={100}>
             <SkeletonPlaceholder width="50%" height={28} borderRadius={10} style={{ marginBottom: spacing.md }} />
             {Array.from({ length: 4 }).map((_, index) => (
-              <View key={index} style={{ marginBottom: spacing.sm }}>
+              <AnimatedListItem key={index} index={index} totalItems={4} style={{ marginBottom: spacing.sm }}>
                 <ServiceCardSkeleton />
-              </View>
+              </AnimatedListItem>
             ))}
-          </View>
-        </ScrollView>
+          </AnimatedSection>
+        </AnimatedScrollView>
       </SafeAreaView>
     );
   }
@@ -501,7 +504,7 @@ const ServicesScreen = () => {
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         contentContainerStyle={services.length === 0 ? { flex: 1 } : undefined}
-        ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
+        ListEmptyComponent={<AnimatedSection style={styles.emptyContainer} delay={100}>{listEmptyComponent}</AnimatedSection>}
         refreshControl={
           <ListRefreshControl
             refreshing={isRefreshing}
@@ -523,18 +526,20 @@ const ServicesScreen = () => {
             borderRadius: 12,
           }}
         >
-          <List.Item
-            title="Edit Service"
-            left={(props) => <List.Icon {...props} icon="pencil" />}
-            onPress={handleEditService}
-          />
-          <Divider />
-          <List.Item
-            title="Delete Service"
-            titleStyle={{ color: theme.colors.error }}
-            left={(props) => <List.Icon {...props} icon="delete" color={theme.colors.error} />}
-            onPress={handleDeleteService}
-          />
+          <AnimatedSection delay={50}>
+            <List.Item
+              title="Edit Service"
+              left={(props) => <List.Icon {...props} icon="pencil" />}
+              onPress={handleEditService}
+            />
+            <Divider />
+            <List.Item
+              title="Delete Service"
+              titleStyle={{ color: theme.colors.error }}
+              left={(props) => <List.Icon {...props} icon="delete" color={theme.colors.error} />}
+              onPress={handleDeleteService}
+            />
+          </AnimatedSection>
         </Modal>
       </Portal>
     </SafeAreaView>

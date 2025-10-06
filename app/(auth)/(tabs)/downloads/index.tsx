@@ -13,6 +13,7 @@ import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { SkeletonPlaceholder } from '@/components/common/Skeleton';
+import { AnimatedListItem, AnimatedSection, AnimatedProgress } from '@/components/common/AnimatedComponents';
 import { TorrentCardSkeleton } from '@/components/torrents';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -277,7 +278,7 @@ const DownloadsScreen = () => {
   }, [refetch]);
 
   const renderTorrentItem = useCallback(
-    ({ item }: { item: TorrentWithService }) => {
+    ({ item, index }: { item: TorrentWithService; index: number }) => {
       const progress = Math.max(0, Math.min(1, item.progress));
       const percent = Math.round(progress * 100);
       const isActive = isTorrentActive(item);
@@ -307,46 +308,48 @@ const DownloadsScreen = () => {
       };
 
       return (
-        <View style={styles.torrentItem}>
-          <View style={styles.torrentHeader}>
-            <Text style={styles.torrentName} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <View style={styles.torrentActions}>
-              <TouchableOpacity style={styles.actionButton} onPress={handleActionPress}>
-                <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>
-                  {getActionIcon() === 'check' ? '✓' : getActionIcon() === 'play' ? '▶' : '⏸'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionButton} 
-                onPress={() => void handleTorrentAction(item, 'delete')}
-              >
-                <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>✕</Text>
-              </TouchableOpacity>
+        <AnimatedListItem index={index} totalItems={overview.torrents.length}>
+          <View style={styles.torrentItem}>
+            <View style={styles.torrentHeader}>
+              <Text style={styles.torrentName} numberOfLines={2}>
+                {item.name}
+              </Text>
+              <View style={styles.torrentActions}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleActionPress}>
+                  <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>
+                    {getActionIcon() === 'check' ? '✓' : getActionIcon() === 'play' ? '▶' : '⏸'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => void handleTorrentAction(item, 'delete')}
+                >
+                  <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <AnimatedProgress style={styles.progressContainer}>
+              <ProgressBar
+                progress={progress}
+                color={theme.colors.primary}
+                style={styles.progressBar}
+              />
+              <Text style={styles.progressPercentage}>
+                {percent}%
+              </Text>
+            </AnimatedProgress>
+
+            <View style={styles.torrentDetails}>
+              <Text style={styles.torrentDetail}>
+                {getStatusText()}
+              </Text>
             </View>
           </View>
-          
-          <View style={styles.progressContainer}>
-            <ProgressBar 
-              progress={progress} 
-              color={theme.colors.primary} 
-              style={styles.progressBar}
-            />
-            <Text style={styles.progressPercentage}>
-              {percent}%
-            </Text>
-          </View>
-          
-          <View style={styles.torrentDetails}>
-            <Text style={styles.torrentDetail}>
-              {getStatusText()}
-            </Text>
-          </View>
-        </View>
+        </AnimatedListItem>
       );
     },
-    [handleTorrentAction, styles, theme.colors],
+    [handleTorrentAction, styles, theme.colors, overview.torrents.length],
   );
 
   const listEmptyComponent = useMemo(() => {
@@ -383,17 +386,17 @@ const DownloadsScreen = () => {
             accessibilityLabel: 'Add service',
           }}
         />
-        <ScrollView contentContainerStyle={styles.listContent}>
+        <AnimatedSection style={styles.listContent} delay={100}>
           <View style={{ marginBottom: spacing.lg }}>
             <SkeletonPlaceholder width="60%" height={28} borderRadius={10} style={{ marginBottom: spacing.xs }} />
             <SkeletonPlaceholder width="40%" height={18} borderRadius={8} />
           </View>
           {Array.from({ length: 5 }).map((_, index) => (
-            <View key={index} style={{ marginBottom: spacing.md }}>
+            <AnimatedListItem key={index} index={index} totalItems={5} style={{ marginBottom: spacing.md }}>
               <TorrentCardSkeleton showActions={false} />
-            </View>
+            </AnimatedListItem>
           ))}
-        </ScrollView>
+        </AnimatedSection>
       </SafeAreaView>
     );
   }
@@ -409,12 +412,12 @@ const DownloadsScreen = () => {
           accessibilityLabel: "Add service",
         }}
       />
-      
+
       <FlashList<TorrentWithService>
         data={overview.torrents}
         keyExtractor={(item) => item.hash}
         renderItem={renderTorrentItem}
-        ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
+        ListEmptyComponent={<AnimatedSection style={styles.emptyContainer} delay={100}>{listEmptyComponent}</AnimatedSection>}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <ListRefreshControl

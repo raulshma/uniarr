@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Text, useTheme, Button, Switch, IconButton, Chip, Portal, Dialog } from 'react-native-paper';
 import ConfirmDialog from '@/components/common/ConfirmDialog/ConfirmDialog';
 import { Card } from '@/components/common/Card';
+import { AnimatedListItem, AnimatedSection, AnimatedScrollView } from '@/components/common/AnimatedComponents';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TabHeader } from '@/components/common/TabHeader';
@@ -213,9 +214,8 @@ const SettingsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
+      <AnimatedScrollView
         contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <TabHeader
@@ -227,239 +227,261 @@ const SettingsScreen = () => {
         />
 
         {/* Appearance Section */}
-        <View style={styles.section}>
+        <AnimatedSection style={styles.section} delay={50}>
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <Card variant="custom" style={styles.settingCard}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="palette" size={24} iconColor={theme.colors.primary} />
-              </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Theme</Text>
-                <Text style={styles.settingSubtitle}>Choose your preferred theme</Text>
-                <View style={styles.themeOptions}>
-                  <Chip
-                    mode={themePreference === 'light' ? 'flat' : 'outlined'}
-                    style={[
-                      styles.themeChip,
-                      { backgroundColor: getThemeChipColor('light').backgroundColor }
-                    ]}
-                    textStyle={{ color: getThemeChipColor('light').textColor }}
-                    onPress={() => handleThemeSelection('light')}
-                  >
-                    Light
-                  </Chip>
-                  <Chip
-                    mode={themePreference === 'dark' ? 'flat' : 'outlined'}
-                    style={[
-                      styles.themeChip,
-                      { backgroundColor: getThemeChipColor('dark').backgroundColor }
-                    ]}
-                    textStyle={{ color: getThemeChipColor('dark').textColor }}
-                    onPress={() => handleThemeSelection('dark')}
-                  >
-                    Dark
-                  </Chip>
-                  <Chip
-                    mode={themePreference === 'system' ? 'flat' : 'outlined'}
-                    style={[
-                      styles.themeChip,
-                      { backgroundColor: getThemeChipColor('system').backgroundColor }
-                    ]}
-                    textStyle={{ color: getThemeChipColor('system').textColor }}
-                    onPress={() => handleThemeSelection('system')}
-                  >
-                    System
-                  </Chip>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="palette" size={24} iconColor={theme.colors.primary} />
                 </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Theme</Text>
+                  <Text style={styles.settingSubtitle}>Choose your preferred theme</Text>
+                  <View style={styles.themeOptions}>
+                    <Chip
+                      mode={themePreference === 'light' ? 'flat' : 'outlined'}
+                      style={[
+                        styles.themeChip,
+                        { backgroundColor: getThemeChipColor('light').backgroundColor }
+                      ]}
+                      textStyle={{ color: getThemeChipColor('light').textColor }}
+                      onPress={() => handleThemeSelection('light')}
+                    >
+                      Light
+                    </Chip>
+                    <Chip
+                      mode={themePreference === 'dark' ? 'flat' : 'outlined'}
+                      style={[
+                        styles.themeChip,
+                        { backgroundColor: getThemeChipColor('dark').backgroundColor }
+                      ]}
+                      textStyle={{ color: getThemeChipColor('dark').textColor }}
+                      onPress={() => handleThemeSelection('dark')}
+                    >
+                      Dark
+                    </Chip>
+                    <Chip
+                      mode={themePreference === 'system' ? 'flat' : 'outlined'}
+                      style={[
+                        styles.themeChip,
+                        { backgroundColor: getThemeChipColor('system').backgroundColor }
+                      ]}
+                      textStyle={{ color: getThemeChipColor('system').textColor }}
+                      onPress={() => handleThemeSelection('system')}
+                    >
+                      System
+                    </Chip>
+                  </View>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
               </View>
-              <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
-            </View>
-          </Card>
-        </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
 
         {/* Notifications Section */}
-        <View style={styles.section}>
-          <Card variant="custom" style={styles.settingCard}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="bell" size={24} iconColor={theme.colors.primary} />
+        <AnimatedSection style={styles.section} delay={100}>
+          <AnimatedListItem index={0} totalItems={5}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="bell" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Enable Notifications</Text>
+                  <Text style={styles.settingSubtitle}>Receive push notifications</Text>
+                </View>
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={setNotificationsEnabled}
+                  color={theme.colors.primary}
+                />
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Enable Notifications</Text>
-                <Text style={styles.settingSubtitle}>Receive push notifications</Text>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={1} totalItems={5}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="check-circle" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Completed Downloads</Text>
+                  <Text style={styles.settingSubtitle}>Notify when downloads finish</Text>
+                </View>
+                <Switch
+                  value={downloadNotificationsEnabled && notificationsEnabled}
+                  onValueChange={setDownloadNotificationsEnabled}
+                  disabled={!notificationsEnabled}
+                  color={theme.colors.primary}
+                />
               </View>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
-                color={theme.colors.primary}
-              />
-            </View>
-          </Card>
-          <Card variant="custom" style={styles.settingCard}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="check-circle" size={24} iconColor={theme.colors.primary} />
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={2} totalItems={5}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="alert-circle" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Failed Downloads</Text>
+                  <Text style={styles.settingSubtitle}>Notify when downloads fail</Text>
+                </View>
+                <Switch
+                  value={failedDownloadNotificationsEnabled && notificationsEnabled}
+                  onValueChange={setFailedDownloadNotificationsEnabled}
+                  disabled={!notificationsEnabled}
+                  color={theme.colors.primary}
+                />
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Completed Downloads</Text>
-                <Text style={styles.settingSubtitle}>Notify when downloads finish</Text>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={3} totalItems={5}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="account-plus" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>New Requests</Text>
+                  <Text style={styles.settingSubtitle}>Notify when requests come in</Text>
+                </View>
+                <Switch
+                  value={requestNotificationsEnabled && notificationsEnabled}
+                  onValueChange={setRequestNotificationsEnabled}
+                  disabled={!notificationsEnabled}
+                  color={theme.colors.primary}
+                />
               </View>
-              <Switch
-                value={downloadNotificationsEnabled && notificationsEnabled}
-                onValueChange={setDownloadNotificationsEnabled}
-                disabled={!notificationsEnabled}
-                color={theme.colors.primary}
-              />
-            </View>
-          </Card>
-          <Card variant="custom" style={styles.settingCard}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="alert-circle" size={24} iconColor={theme.colors.primary} />
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={4} totalItems={5}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="server-network" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Service Health</Text>
+                  <Text style={styles.settingSubtitle}>Notify on service outages</Text>
+                </View>
+                <Switch
+                  value={serviceHealthNotificationsEnabled && notificationsEnabled}
+                  onValueChange={setServiceHealthNotificationsEnabled}
+                  disabled={!notificationsEnabled}
+                  color={theme.colors.primary}
+                />
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Failed Downloads</Text>
-                <Text style={styles.settingSubtitle}>Notify when downloads fail</Text>
-              </View>
-              <Switch
-                value={failedDownloadNotificationsEnabled && notificationsEnabled}
-                onValueChange={setFailedDownloadNotificationsEnabled}
-                disabled={!notificationsEnabled}
-                color={theme.colors.primary}
-              />
-            </View>
-          </Card>
-          <Card variant="custom" style={styles.settingCard}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="account-plus" size={24} iconColor={theme.colors.primary} />
-              </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>New Requests</Text>
-                <Text style={styles.settingSubtitle}>Notify when requests come in</Text>
-              </View>
-              <Switch
-                value={requestNotificationsEnabled && notificationsEnabled}
-                onValueChange={setRequestNotificationsEnabled}
-                disabled={!notificationsEnabled}
-                color={theme.colors.primary}
-              />
-            </View>
-          </Card>
-          <Card variant="custom" style={styles.settingCard}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="server-network" size={24} iconColor={theme.colors.primary} />
-              </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Service Health</Text>
-                <Text style={styles.settingSubtitle}>Notify on service outages</Text>
-              </View>
-              <Switch
-                value={serviceHealthNotificationsEnabled && notificationsEnabled}
-                onValueChange={setServiceHealthNotificationsEnabled}
-                disabled={!notificationsEnabled}
-                color={theme.colors.primary}
-              />
-            </View>
-          </Card>
-        </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
 
         {/* Data Refresh Section */}
-        <View style={styles.section}>
-          <Card variant="custom" style={styles.settingCard} onPress={handleRefreshIntervalPress}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="refresh" size={24} iconColor={theme.colors.primary} />
+        <AnimatedSection style={styles.section} delay={150}>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card variant="custom" style={styles.settingCard} onPress={handleRefreshIntervalPress}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="refresh" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Refresh Interval</Text>
+                  <Text style={styles.settingSubtitle}>How often to refresh data</Text>
+                  <Text style={styles.settingValue}>{refreshIntervalMinutes} minutes</Text>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Refresh Interval</Text>
-                <Text style={styles.settingSubtitle}>How often to refresh data</Text>
-                <Text style={styles.settingValue}>{refreshIntervalMinutes} minutes</Text>
-              </View>
-              <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
-            </View>
-          </Card>
-        </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
 
         {/* Storage Section */}
-        <View style={styles.section}>
-          <Card variant="custom" style={styles.settingCard}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="folder" size={24} iconColor={theme.colors.primary} />
+        <AnimatedSection style={styles.section} delay={200}>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="folder" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Image Cache</Text>
+                  <Text style={styles.settingSubtitle}>Cached artwork for posters and backdrops</Text>
+                  <Text style={styles.settingValue}>
+                    {isFetchingCacheUsage
+                      ? 'Calculating…'
+                      : `${imageCacheUsage.formattedSize}${
+                          imageCacheUsage.fileCount ? ` • ${imageCacheUsage.fileCount} files` : ''
+                        }`}
+                  </Text>
+                </View>
+                <Button
+                  mode="contained-tonal"
+                  compact
+                  onPress={handleClearImageCache}
+                  loading={isClearingImageCache}
+                  disabled={
+                    isClearingImageCache ||
+                    isFetchingCacheUsage ||
+                    imageCacheUsage.size === 0
+                  }
+                >
+                  Clear
+                </Button>
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Image Cache</Text>
-                <Text style={styles.settingSubtitle}>Cached artwork for posters and backdrops</Text>
-                <Text style={styles.settingValue}>
-                  {isFetchingCacheUsage
-                    ? 'Calculating…'
-                    : `${imageCacheUsage.formattedSize}${
-                        imageCacheUsage.fileCount ? ` • ${imageCacheUsage.fileCount} files` : ''
-                      }`}
-                </Text>
-              </View>
-              <Button
-                mode="contained-tonal"
-                compact
-                onPress={handleClearImageCache}
-                loading={isClearingImageCache}
-                disabled={
-                  isClearingImageCache ||
-                  isFetchingCacheUsage ||
-                  imageCacheUsage.size === 0
-                }
-              >
-                Clear
-              </Button>
-            </View>
-          </Card>
-        </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
 
         {/* Services Section */}
-        <View style={styles.section}>
-          <Card variant="custom" style={styles.settingCard} onPress={() => router.push('/(auth)/(tabs)/services')}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="server" size={24} iconColor={theme.colors.primary} />
+        <AnimatedSection style={styles.section} delay={250}>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card variant="custom" style={styles.settingCard} onPress={() => router.push('/(auth)/(tabs)/services')}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="server" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Manage Services</Text>
+                  <Text style={styles.settingSubtitle}>Configure your connected services</Text>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Manage Services</Text>
-                <Text style={styles.settingSubtitle}>Configure your connected services</Text>
-              </View>
-              <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
-            </View>
-          </Card>
-        </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
 
         {/* About Section */}
-        <View style={styles.section}>
-          <Card variant="custom" style={styles.settingCard}>
-            <View style={styles.settingContent}>
-              <View style={styles.settingIcon}>
-                <IconButton icon="information" size={24} iconColor={theme.colors.primary} />
+        <AnimatedSection style={styles.section} delay={300}>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="information" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>App Version</Text>
+                  <Text style={styles.settingSubtitle}>Uniarr version 1.2.3</Text>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
               </View>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>App Version</Text>
-                <Text style={styles.settingSubtitle}>Uniarr version 1.2.3</Text>
-              </View>
-              <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
-            </View>
-          </Card>
-        </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
 
         {/* Sign Out Button */}
-        <Button
-          mode="outlined"
-          onPress={confirmSignOut}
-          style={styles.signOutButton}
-          textColor={theme.colors.error}
-          icon="logout"
-        >
-          Sign out
-        </Button>
+        <AnimatedListItem index={0} totalItems={1} style={{ marginTop: spacing.lg }}>
+          <Button
+            mode="outlined"
+            onPress={confirmSignOut}
+            style={styles.signOutButton}
+            textColor={theme.colors.error}
+            icon="logout"
+          >
+            Sign out
+          </Button>
+        </AnimatedListItem>
 
         <ConfirmDialog
           visible={confirmVisible}
@@ -507,7 +529,7 @@ const SettingsScreen = () => {
             </Dialog.Actions>
           </Dialog>
         </Portal>
-      </ScrollView>
+      </AnimatedScrollView>
     </SafeAreaView>
   );
 };
