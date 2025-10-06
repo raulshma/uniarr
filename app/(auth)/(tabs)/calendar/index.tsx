@@ -18,6 +18,7 @@ import {
 } from '@/components/calendar';
 import { useCalendar } from '@/hooks/useCalendar';
 import type { AppTheme } from '@/constants/theme';
+import type { CalendarView, CalendarFilters, CalendarMonth, CalendarWeek, CalendarDay } from '@/models/calendar.types';
 
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -59,11 +60,11 @@ const CalendarScreen = () => {
     window.location.reload();
   }, []);
 
-  const handleViewChange = useCallback((view: any) => {
+  const handleViewChange = useCallback((view: CalendarView) => {
     setView(view);
   }, [setView]);
 
-  const handleFiltersChange = useCallback((filters: any) => {
+  const handleFiltersChange = useCallback((filters: Partial<CalendarFilters>) => {
     setFilters(filters);
   }, [setFilters]);
 
@@ -100,7 +101,7 @@ const CalendarScreen = () => {
 
     const hasReleases = 'totalReleases' in calendarData 
       ? calendarData.totalReleases > 0 
-      : calendarData.releases?.length > 0;
+      : 'releases' in calendarData && calendarData.releases?.length > 0;
 
     if (!hasReleases) {
       return (
@@ -117,7 +118,7 @@ const CalendarScreen = () => {
       case 'month':
         return (
           <CalendarMonthView
-            data={calendarData as any}
+            data={calendarData as CalendarMonth}
             selectedDate={state.selectedDate}
             onDateSelect={handleDateSelect}
             onReleasePress={handleReleasePress}
@@ -126,7 +127,7 @@ const CalendarScreen = () => {
       case 'week':
         return (
           <CalendarWeekView
-            data={calendarData as any}
+            data={calendarData as CalendarWeek}
             selectedDate={state.selectedDate}
             onDateSelect={handleDateSelect}
             onReleasePress={handleReleasePress}
@@ -135,21 +136,21 @@ const CalendarScreen = () => {
       case 'day':
         return (
           <CalendarDayView
-            data={calendarData as any}
+            data={calendarData as CalendarDay}
             onReleasePress={handleReleasePress}
           />
         );
       case 'list':
         return (
           <CalendarListView
-            releases={calendarData.releases || []}
+            releases={'releases' in calendarData ? calendarData.releases : []}
             onReleasePress={handleReleasePress}
           />
         );
       default:
         return (
           <CalendarMonthView
-            data={calendarData as any}
+            data={calendarData as CalendarMonth}
             selectedDate={state.selectedDate}
             onDateSelect={handleDateSelect}
             onReleasePress={handleReleasePress}

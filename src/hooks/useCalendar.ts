@@ -13,6 +13,22 @@ import type {
   MediaType,
   ReleaseStatus
 } from '@/models/calendar.types';
+
+export interface UseCalendarReturn {
+  state: CalendarState & { isLoading: boolean; error?: string };
+  calendarData: CalendarMonth | CalendarWeek | CalendarDay;
+  stats: CalendarStats;
+  navigation: CalendarNavigation;
+  setView: (view: CalendarView) => void;
+  setCurrentDate: (date: string) => void;
+  setSelectedDate: (date?: string) => void;
+  setFilters: (filters: Partial<CalendarFilters>) => void;
+  clearFilters: () => void;
+  goToToday: () => void;
+  goToPrevious: () => void;
+  goToNext: () => void;
+  goToDate: (date: string) => void;
+}
 import { queryKeys } from '@/hooks/queryKeys';
 import { 
   formatDate, 
@@ -39,7 +55,7 @@ const DEFAULT_STATE: CalendarState = {
 /**
  * Hook for managing calendar state and data
  */
-export const useCalendar = () => {
+export const useCalendar = (): UseCalendarReturn => {
   const [state, setState] = useState<CalendarState>(DEFAULT_STATE);
 
   // Fetch releases from calendar service

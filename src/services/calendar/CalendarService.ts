@@ -3,6 +3,8 @@ import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import { secureStorage } from '@/services/storage/SecureStorage';
 import type { Series } from '@/models/media.types';
 import type { Movie } from '@/models/movie.types';
+import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
+import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 
 /**
  * Service for fetching and managing calendar data from various media services
@@ -76,7 +78,7 @@ export class CalendarService {
       throw new Error(`Sonarr connector not found for service ${serviceId}`);
     }
 
-    const sonarrConnector = connector as any; // Type assertion for now
+    const sonarrConnector = connector as SonarrConnector;
     const series = await sonarrConnector.getSeries();
     
     const releases: MediaRelease[] = [];
@@ -152,7 +154,7 @@ export class CalendarService {
       throw new Error(`Radarr connector not found for service ${serviceId}`);
     }
 
-    const radarrConnector = connector as any; // Type assertion for now
+    const radarrConnector = connector as RadarrConnector;
     const movies = await radarrConnector.getMovies();
     
     const releases: MediaRelease[] = [];
