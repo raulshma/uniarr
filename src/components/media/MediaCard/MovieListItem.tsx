@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Pressable } from 'react-native';
 import { IconButton, Text, useTheme } from 'react-native-paper';
-import { TouchableRipple } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
 import { MediaPoster } from '@/components/media/MediaPoster';
@@ -111,11 +110,14 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
     metadataParts.push(formattedSize);
   }
 
-  if (genres && genres.length > 0) {
-    metadataParts.push(genres.slice(0, 2).join(', '));
+  if (genres && Array.isArray(genres) && genres.length > 0) {
+    const validGenres = genres.filter((genre): genre is string => typeof genre === 'string');
+    if (validGenres.length > 0) {
+      metadataParts.push(validGenres.slice(0, 2).join(', '));
+    }
   }
 
-  if (studio) {
+  if (typeof studio === 'string') {
     metadataParts.push(studio);
   }
 
@@ -131,7 +133,6 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
           alignItems: 'center',
           paddingVertical: theme.custom.spacing.sm,
           paddingHorizontal: theme.custom.spacing.md,
-          backgroundColor: theme.colors.surface,
           borderRadius: 12,
           marginVertical: 2,
         },
@@ -187,7 +188,7 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
       return null; // No indicator for available movies
     }
 
-    if (statusIndicator === 'downloading' && percentAvailable) {
+    if (statusIndicator === 'downloading' && typeof percentAvailable === 'number') {
       return (
         <View style={styles.statusIndicator}>
           <Text style={styles.statusText}>{percentAvailable}%</Text>
@@ -207,47 +208,49 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
   };
 
   return (
-    <TouchableRipple
+    <Pressable
       onPress={onPress}
-      style={[styles.root, style]}
+      style={({ pressed }) => [
+        styles.root,
+        style,
+        pressed && { opacity: 0.8 }
+      ]}
       testID={testID}
     >
-      <View style={styles.root}>
-        <View style={{ position: 'relative' }}>
-          <MediaPoster
-            uri={posterUri}
-            size="small"
-            borderRadius={8}
-            showPlaceholderLabel={false}
-            style={styles.poster}
-          />
-          {renderStatusIndicator()}
-        </View>
-        <View style={styles.content}>
-          <View style={styles.titleRow}>
-            <Text variant="titleMedium" style={styles.title} numberOfLines={1}>
-              {title}
-            </Text>
-            {year && (
-              <Text variant="bodyMedium" style={styles.year}>
-                {year}
-              </Text>
-            )}
-          </View>
-          {metadata && (
-            <Text variant="bodySmall" style={styles.metadata} numberOfLines={1}>
-              {metadata}
+      <View style={{ position: 'relative' }}>
+        <MediaPoster
+          uri={posterUri}
+          size="small"
+          borderRadius={8}
+          showPlaceholderLabel={false}
+          style={styles.poster}
+        />
+        {renderStatusIndicator()}
+      </View>
+      <View style={styles.content}>
+        <View style={styles.titleRow}>
+          <Text variant="titleMedium" style={styles.title} numberOfLines={1}>
+            {typeof title === 'string' ? title : 'Unknown Title'}
+          </Text>
+          {typeof year === 'number' && (
+            <Text variant="bodyMedium" style={styles.year}>
+              {year}
             </Text>
           )}
         </View>
-        <IconButton
-          icon="chevron-right"
-          size={20}
-          iconColor={theme.colors.onSurfaceVariant}
-          style={styles.chevron}
-        />
+        {metadata && (
+          <Text variant="bodySmall" style={styles.metadata} numberOfLines={1}>
+            {metadata}
+          </Text>
+        )}
       </View>
-    </TouchableRipple>
+      <IconButton
+        icon="chevron-right"
+        size={20}
+        iconColor={theme.colors.onSurfaceVariant}
+        style={styles.chevron}
+      />
+    </Pressable>
   );
 };
 

@@ -21,7 +21,6 @@ const MovieListItemSkeleton: React.FC<MovieListItemSkeletonProps> = ({ style }) 
           alignItems: 'center',
           paddingVertical: theme.custom.spacing.sm,
           paddingHorizontal: theme.custom.spacing.md,
-          backgroundColor: theme.colors.elevation.level1,
           borderRadius: 12,
         },
         poster: {

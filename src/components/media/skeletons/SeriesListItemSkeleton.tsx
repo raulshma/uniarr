@@ -20,7 +20,6 @@ const SeriesListItemSkeleton: React.FC<SeriesListItemSkeletonProps> = ({ style }
           flexDirection: 'row',
           padding: theme.custom.spacing.md,
           borderRadius: 18,
-          backgroundColor: theme.colors.elevation.level1,
         },
         poster: {
           marginRight: theme.custom.spacing.lg,

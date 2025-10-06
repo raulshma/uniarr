@@ -61,7 +61,7 @@ const SonarrSeriesListScreen = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(normalizeSearchTerm(searchTerm));
+      setDebouncedSearch(searchTerm.trim().toLowerCase());
     }, 300);
 
     return () => clearTimeout(timer);

@@ -6,15 +6,11 @@ import { Card, useTheme } from 'react-native-paper';
 import { SkeletonPlaceholder } from '@/components/common/Skeleton';
 import type { AppTheme } from '@/constants/theme';
 
-export type MediaDetailsSkeletonProps = {
+export type MovieDetailsSkeletonProps = {
   style?: StyleProp<ViewStyle>;
-  showSeasons?: boolean;
 };
 
-const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
-  style,
-  showSeasons = true
-}) => {
+const MovieDetailsSkeleton: React.FC<MovieDetailsSkeletonProps> = ({ style }) => {
   const theme = useTheme<AppTheme>();
 
   const styles = useMemo(
@@ -65,34 +61,6 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
         fileInfoCard: {
           backgroundColor: theme.colors.surfaceVariant,
           borderRadius: 12,
-        },
-        seasonsSection: {
-          paddingHorizontal: 20,
-          marginTop: 32,
-        },
-        seasonsContainer: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 16,
-        },
-        seasonCard: {
-          width: '48%',
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 12,
-          padding: 12,
-          alignItems: 'center',
-        },
-        episodesSection: {
-          paddingHorizontal: 20,
-          marginTop: 24,
-        },
-        episodeItem: {
-          flexDirection: 'row',
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 12,
-          padding: 12,
-          marginBottom: 12,
-          alignItems: 'center',
         },
       }),
     [theme],
@@ -157,54 +125,8 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
           </Card.Content>
         </Card>
       </View>
-
-      {/* Seasons - Only for series */}
-      {showSeasons && (
-        <View style={styles.seasonsSection}>
-          <SkeletonPlaceholder width="25%" height={24} borderRadius={8} style={styles.sectionTitle} />
-          <View style={styles.seasonsContainer}>
-            <View style={styles.seasonCard}>
-              <SkeletonPlaceholder width={120} height={180} borderRadius={12} />
-              <View style={{ alignItems: 'center', marginTop: 8 }}>
-                <SkeletonPlaceholder width="60%" height={18} borderRadius={6} style={{ marginBottom: 4 }} />
-                <SkeletonPlaceholder width="50%" height={14} borderRadius={6} />
-              </View>
-            </View>
-            <View style={styles.seasonCard}>
-              <SkeletonPlaceholder width={120} height={180} borderRadius={12} />
-              <View style={{ alignItems: 'center', marginTop: 8 }}>
-                <SkeletonPlaceholder width="60%" height={18} borderRadius={6} style={{ marginBottom: 4 }} />
-                <SkeletonPlaceholder width="50%" height={14} borderRadius={6} />
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Episodes - Only for series */}
-      {showSeasons && (
-        <View style={styles.episodesSection}>
-          <SkeletonPlaceholder width="25%" height={24} borderRadius={8} style={styles.sectionTitle} />
-          <View style={styles.episodeItem}>
-            <SkeletonPlaceholder width={80} height={120} borderRadius={8} style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <SkeletonPlaceholder width="70%" height={18} borderRadius={6} style={{ marginBottom: 6 }} />
-              <SkeletonPlaceholder width="50%" height={14} borderRadius={6} style={{ marginBottom: 8 }} />
-              <SkeletonPlaceholder width="30%" height={14} borderRadius={6} />
-            </View>
-          </View>
-          <View style={styles.episodeItem}>
-            <SkeletonPlaceholder width={80} height={120} borderRadius={8} style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <SkeletonPlaceholder width="70%" height={18} borderRadius={6} style={{ marginBottom: 6 }} />
-              <SkeletonPlaceholder width="50%" height={14} borderRadius={6} style={{ marginBottom: 8 }} />
-              <SkeletonPlaceholder width="30%" height={14} borderRadius={6} />
-            </View>
-          </View>
-        </View>
-      )}
     </ScrollView>
   );
 };
 
-export default MediaDetailsSkeleton;
+export default MovieDetailsSkeleton;

@@ -55,13 +55,13 @@ const MediaCard: React.FC<MediaCardProps> = ({
 
   const secondaryLine = useMemo(() => {
     const meta: string[] = [];
-    if (year) {
+    if (typeof year === 'number') {
       meta.push(String(year));
     }
-    if (status) {
+    if (typeof status === 'string') {
       meta.push(status);
     }
-    if (subtitle) {
+    if (typeof subtitle === 'string') {
       meta.push(subtitle);
     }
     return meta.join(' • ');
@@ -137,7 +137,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
         />
         <View style={styles.meta}>
           <Text variant="titleMedium" numberOfLines={2} style={[styles.title, { color: theme.colors.onSurface }]}>
-            {title}
+            {typeof title === 'string' ? title : 'Unknown Title'}
           </Text>
           <Text variant="bodyMedium" numberOfLines={2} style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
             {secondaryText}

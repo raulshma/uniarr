@@ -14,9 +14,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
+import { SkeletonPlaceholder } from '@/components/common/Skeleton/';
 import MovieListItem from '@/components/media/MediaCard/MovieListItem';
 import { MovieListItemSkeleton } from '@/components/media/MediaCard';
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
 import type { MediaDownloadStatus } from '@/components/media/MediaCard';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -107,9 +107,10 @@ const RadarrMoviesListScreen = () => {
 
   const { movies, isLoading, isFetching, isError, error, refetch } = useRadarrMovies(serviceId);
 
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(normalizeSearchTerm(searchTerm));
+      setDebouncedSearch(searchTerm.trim().toLowerCase());
     }, 300);
 
     return () => clearTimeout(timer);
@@ -188,7 +189,7 @@ const RadarrMoviesListScreen = () => {
         return true;
       }
 
-      const candidates = [item.title, item.sortTitle]
+      const candidates = [item.title, item.sortTitle, item.overview]
         .filter(Boolean)
         .map((value) => value!.toLowerCase());
 
@@ -213,6 +214,19 @@ const RadarrMoviesListScreen = () => {
           paddingTop: spacing.xl,
           paddingBottom: spacing.lg,
         },
+        headerRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: spacing.lg,
+        },
+        headerTitle: {
+          color: theme.colors.onSurface,
+        },
+        headerMeta: {
+          color: theme.colors.onSurfaceVariant,
+          marginTop: spacing.xs,
+        },
         searchBar: {
           marginBottom: spacing.lg,
         },
@@ -221,7 +235,8 @@ const RadarrMoviesListScreen = () => {
           justifyContent: 'flex-start',
           alignItems: 'center',
           marginBottom: spacing.md,
-          gap: spacing.md
+          gap: spacing.md,
+          flexWrap: 'wrap',
         },
         filterChip: {
           backgroundColor: theme.colors.surfaceVariant,
@@ -248,28 +263,12 @@ const RadarrMoviesListScreen = () => {
           fontSize: 16,
           fontWeight: '500',
         },
-        filterLabel: {
-          marginBottom: spacing.sm,
-          color: theme.colors.onSurfaceVariant,
-        },
         emptyContainer: {
           flexGrow: 1,
           paddingTop: spacing.xl,
         },
         itemSpacing: {
           height: spacing.md,
-        },
-        headerRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: spacing.sm,
-        },
-        headerTitle: {
-          color: theme.colors.onBackground,
-        },
-        headerMeta: {
-          color: theme.colors.onSurfaceVariant,
         },
       }),
     [theme],
@@ -358,9 +357,6 @@ const RadarrMoviesListScreen = () => {
           style={styles.searchBar}
           accessibilityLabel="Search movies"
         />
-        <Text variant="labelSmall" style={styles.filterLabel}>
-          Filter by status
-        </Text>
         <View style={styles.filterPills}>
           {[
             { label: 'All', value: FILTER_ALL },
@@ -443,7 +439,6 @@ const RadarrMoviesListScreen = () => {
               <SkeletonPlaceholder width={120} height={40} borderRadius={20} />
             </View>
             <SkeletonPlaceholder width="100%" height={48} borderRadius={24} style={styles.searchBar} />
-            <SkeletonPlaceholder width="35%" height={16} borderRadius={8} style={styles.filterLabel} />
             <View style={styles.filterPills}>
               {[0, 1, 2, 3].map((pill) => (
                 <SkeletonPlaceholder key={`pill-${pill}`} width={92} height={32} borderRadius={16} />
