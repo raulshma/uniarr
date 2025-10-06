@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { ActivityIndicator, Icon, Text, useTheme } from 'react-native-paper';
+import { BlurView } from 'expo-blur';
+import { Icon, Text, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
 import { imageCacheService } from '@/services/image/ImageCacheService';
@@ -42,6 +43,11 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
+  // Animation values
+  const blurOpacity = useRef(new Animated.Value(1)).current;
+  const imageOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let isMounted = true;
@@ -60,6 +66,10 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         setIsLoading(true);
         setHasError(false);
         setResolvedUri(undefined);
+        setImageLoaded(false);
+        // Reset animation values
+        blurOpacity.setValue(1);
+        imageOpacity.setValue(0);
       }
 
       try {
@@ -83,6 +93,25 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
 
   const width = useMemo(() => (typeof size === 'number' ? size : sizeMap[size]), [size]);
   const height = useMemo(() => Math.round(width / aspectRatio), [width, aspectRatio]);
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+    setImageLoaded(true);
+    
+    // Animate blur fade out and image fade in
+    Animated.parallel([
+      Animated.timing(blurOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(imageOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const containerStyle = useMemo(
     () => [
@@ -110,28 +139,44 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       ) : null}
     </View>
   ) : (
-    <Image
-      source={{ uri: resolvedUri }}
-      style={[StyleSheet.absoluteFillObject, { borderRadius }]}
-      accessibilityLabel={accessibilityLabel}
-      cachePolicy="memory-disk"
-      contentFit="cover"
-      transition={200}
-      onLoadEnd={() => setIsLoading(false)}
-      onError={() => {
-        setIsLoading(false);
-        setHasError(true);
-      }}
-    />
+    <>
+      {/* Blurred placeholder */}
+      {isLoading && (
+        <Animated.View style={[styles.blurContainer, { borderRadius, opacity: blurOpacity }]}>
+          <BlurView
+            intensity={20}
+            tint="light"
+            style={[StyleSheet.absoluteFillObject, { borderRadius }]}
+          >
+            <View style={[styles.blurContent, { borderRadius }]}>
+              <Icon source="image-outline" size={24} color={theme.colors.onSurfaceVariant} />
+            </View>
+          </BlurView>
+        </Animated.View>
+      )}
+      
+      {/* Actual image */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: imageOpacity }]}>
+        <Image
+          source={{ uri: resolvedUri }}
+          style={[StyleSheet.absoluteFillObject, { borderRadius }]}
+          accessibilityLabel={accessibilityLabel}
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          transition={0} // Disable expo-image transition since we're handling it manually
+          onLoadEnd={handleImageLoad}
+          onError={() => {
+            setIsLoading(false);
+            setHasError(true);
+            // Reset animations on error
+            blurOpacity.setValue(0);
+            imageOpacity.setValue(0);
+          }}
+        />
+      </Animated.View>
+    </>
   );
 
-  const overlay = isLoading ? (
-    <View style={[styles.overlay, { borderRadius }]}
-      accessibilityHint="Image loading"
-    >
-      <ActivityIndicator size={24} color={theme.colors.primary} />
-    </View>
-  ) : null;
 
   const effectiveLabel = accessibilityLabel ?? (isFallback ? 'Media artwork unavailable' : 'Media artwork');
 
@@ -144,7 +189,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       >
         <View style={containerStyle} pointerEvents="none">
           {content}
-          {overlay}
         </View>
       </Pressable>
     );
@@ -153,7 +197,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   return (
     <View style={containerStyle} accessibilityRole="image" accessibilityLabel={effectiveLabel}>
       {content}
-      {overlay}
     </View>
   );
 };
@@ -171,10 +214,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
-  overlay: {
+  blurContainer: {
     ...StyleSheet.absoluteFillObject,
+  },
+  blurContent: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
 });
