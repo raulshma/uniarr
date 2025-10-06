@@ -49,6 +49,7 @@ type SummaryMetrics = {
 
 type DashboardListItem =
   | { type: 'header' }
+  | { type: 'services' }
   | { type: 'service'; data: ServiceOverviewItem }
   | { type: 'activity' };
 
@@ -258,12 +259,16 @@ const DashboardScreen = () => {
     const items: DashboardListItem[] = [{ type: 'header' }];
 
     if (services.length > 0) {
-      items.push({ type: 'activity' });
+      items.push({ type: 'services' });
     }
 
     services.forEach((service) => {
       items.push({ type: 'service', data: service });
     });
+
+    if (services.length > 0) {
+      items.push({ type: 'activity' });
+    }
 
     return items;
   }, [services]);
@@ -277,7 +282,7 @@ const DashboardScreen = () => {
         },
         listContent: {
           paddingHorizontal: spacing.md,
-          paddingBottom: spacing.xxl,
+          paddingBottom: 100, // Increased to account for curved tab bar (60px + 20px center button extension + extra padding)
         },
         section: {
           marginTop: spacing.lg,
@@ -602,6 +607,12 @@ const DashboardScreen = () => {
       switch (item.type) {
         case 'header':
           return renderHeader();
+        case 'services':
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Services</Text>
+            </View>
+          );
         case 'service':
           return renderServiceItem({ item: item.data });
         case 'activity':
@@ -622,6 +633,8 @@ const DashboardScreen = () => {
     switch (item.type) {
       case 'header':
         return 'header';
+      case 'services':
+        return 'services';
       case 'service':
         return `service-${item.data.config.id}`;
       case 'activity':
