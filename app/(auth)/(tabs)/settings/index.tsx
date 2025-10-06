@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { Alert, StyleSheet, View, ScrollView } from 'react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, useTheme, Button, Switch, IconButton, Chip, Portal, Dialog } from 'react-native-paper';
 import ConfirmDialog from '@/components/common/ConfirmDialog/ConfirmDialog';
 import { Card } from '@/components/common/Card';
-import { AnimatedListItem, AnimatedSection, AnimatedScrollView } from '@/components/common/AnimatedComponents';
+import { AnimatedListItem, AnimatedScrollView, AnimatedSection } from '@/components/common/AnimatedComponents';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TabHeader } from '@/components/common/TabHeader';
@@ -15,6 +15,8 @@ import { imageCacheService, type ImageCacheUsage } from '@/services/image/ImageC
 import { logger } from '@/services/logger/LoggerService';
 import { spacing } from '@/theme/spacing';
 import { useSettingsStore } from '@/store/settingsStore';
+import type { NotificationCategory } from '@/models/notification.types';
+import { getCategoryFriendlyName } from '@/utils/quietHours.utils';
 
 const SettingsScreen = () => {
   const router = useRouter();
@@ -32,6 +34,7 @@ const SettingsScreen = () => {
     requestNotificationsEnabled,
     serviceHealthNotificationsEnabled,
     refreshIntervalMinutes,
+  quietHours,
     setTheme,
     setNotificationsEnabled,
     setDownloadNotificationsEnabled,
@@ -212,6 +215,19 @@ const SettingsScreen = () => {
     };
   };
 
+  const quietHoursValue = useMemo(() => {
+    const enabled = Object.entries(quietHours).filter(([, config]) => config.enabled);
+    if (enabled.length === 0) {
+      return 'Disabled';
+    }
+
+    const labels = enabled
+      .map(([category]) => getCategoryFriendlyName(category as NotificationCategory))
+      .join(', ');
+
+    return `Active: ${labels}`;
+  }, [quietHours]);
+
   return (
     <SafeAreaView style={styles.container}>
       <AnimatedScrollView
@@ -282,7 +298,7 @@ const SettingsScreen = () => {
 
         {/* Notifications Section */}
         <AnimatedSection style={styles.section} delay={100}>
-          <AnimatedListItem index={0} totalItems={5}>
+          <AnimatedListItem index={0} totalItems={6}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -300,7 +316,7 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={5}>
+          <AnimatedListItem index={1} totalItems={6}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -319,7 +335,7 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={2} totalItems={5}>
+          <AnimatedListItem index={2} totalItems={6}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -338,7 +354,7 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={3} totalItems={5}>
+          <AnimatedListItem index={3} totalItems={6}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -357,7 +373,7 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={4} totalItems={5}>
+          <AnimatedListItem index={4} totalItems={6}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -373,6 +389,25 @@ const SettingsScreen = () => {
                   disabled={!notificationsEnabled}
                   color={theme.colors.primary}
                 />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={5} totalItems={6}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push('/(auth)/(tabs)/settings/quiet-hours')}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="moon-waning-crescent" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Quiet Hours</Text>
+                  <Text style={styles.settingSubtitle}>Silence notifications on a schedule</Text>
+                  <Text style={styles.settingValue}>{quietHoursValue}</Text>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
               </View>
             </Card>
           </AnimatedListItem>

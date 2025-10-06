@@ -11,6 +11,18 @@ export const NOTIFICATION_CATEGORIES: Record<NotificationCategory, NotificationC
   failures: 'failures',
 };
 
+export type QuietHoursDay = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
+
+export type QuietHoursPreset = 'weeknights' | 'weekends' | 'everyday' | 'custom';
+
+export interface QuietHoursConfig {
+  readonly enabled: boolean;
+  readonly start: string; // HH:mm in 24h format
+  readonly end: string; // HH:mm in 24h format
+  readonly days: QuietHoursDay[];
+  readonly preset: QuietHoursPreset;
+}
+
 export interface NotificationMessage {
   readonly title: string;
   readonly body: string;

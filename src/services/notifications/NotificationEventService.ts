@@ -1,4 +1,3 @@
-import { pushNotificationService } from '@/services/notifications/PushNotificationService';
 import { logger } from '@/services/logger/LoggerService';
 import {
   selectDownloadNotificationsEnabled,
@@ -6,6 +5,7 @@ import {
   selectNotificationsEnabled,
   selectRequestNotificationsEnabled,
   selectServiceHealthNotificationsEnabled,
+  selectCriticalHealthAlertsBypassQuietHours,
   useSettingsStore,
 } from '@/store/settingsStore';
 import {
@@ -16,6 +16,7 @@ import {
   type ServiceHealthNotificationPayload,
 } from '@/models/notification.types';
 import { formatBytes } from '@/utils/torrent.utils';
+import { quietHoursService } from '@/services/notifications/QuietHoursService';
 
 const COMPLETED_CATEGORY = NOTIFICATION_CATEGORIES.downloads;
 const FAILURE_CATEGORY = NOTIFICATION_CATEGORIES.failures;
@@ -44,7 +45,7 @@ class NotificationEventService {
 
     const sizeLabel = formatBytes(payload.torrent.size);
 
-    await pushNotificationService.presentImmediateNotification({
+    const message = {
       title: `Download complete • ${payload.serviceName}`,
       body: `${payload.torrent.name} (${sizeLabel}) is ready to enjoy.`,
       category: COMPLETED_CATEGORY,
@@ -52,7 +53,13 @@ class NotificationEventService {
         serviceId: payload.serviceId,
         torrentHash: payload.torrent.hash,
       },
-    });
+    } as const;
+
+    await quietHoursService.deliverNotification(
+      COMPLETED_CATEGORY,
+      message,
+      `${payload.torrent.name} • ${sizeLabel}`,
+    );
   }
 
   async notifyDownloadFailed(payload: FailedDownloadNotificationPayload): Promise<void> {
@@ -66,7 +73,7 @@ class NotificationEventService {
 
     const reason = payload.reason ?? payload.torrent.state ?? 'Unknown reason';
 
-    await pushNotificationService.presentImmediateNotification({
+    const message = {
       title: `Download failed • ${payload.serviceName}`,
       body: `${payload.torrent.name} did not finish (${reason}).`,
       category: FAILURE_CATEGORY,
@@ -74,7 +81,13 @@ class NotificationEventService {
         serviceId: payload.serviceId,
         torrentHash: payload.torrent.hash,
       },
-    });
+    } as const;
+
+    await quietHoursService.deliverNotification(
+      FAILURE_CATEGORY,
+      message,
+      `${payload.torrent.name} → ${reason}`,
+    );
   }
 
   async notifyNewRequest(payload: RequestNotificationPayload): Promise<void> {
@@ -95,7 +108,7 @@ class NotificationEventService {
     const mediaTitle = payload.request.media.title ?? 'A new request';
     const mediaTypeLabel = payload.request.mediaType === 'movie' ? 'Movie' : 'Series';
 
-    await pushNotificationService.presentImmediateNotification({
+    const message = {
       title: `${mediaTypeLabel} request • ${payload.serviceName}`,
       body: `${requestedBy} requested ${mediaTitle}.`,
       category: REQUEST_CATEGORY,
@@ -104,7 +117,13 @@ class NotificationEventService {
         requestId: payload.request.id,
         mediaType: payload.request.mediaType,
       },
-    });
+    } as const;
+
+    await quietHoursService.deliverNotification(
+      REQUEST_CATEGORY,
+      message,
+      `${requestedBy} → ${mediaTitle}`,
+    );
   }
 
   async notifyServiceStatusChange(payload: ServiceHealthNotificationPayload): Promise<void> {
@@ -129,7 +148,7 @@ class NotificationEventService {
       const label = isOffline ? 'offline' : 'degraded';
       const message = payload.health.message ?? 'Check service connectivity.';
 
-      await pushNotificationService.presentImmediateNotification({
+      const notification = {
         title: `${payload.serviceName} ${label}`,
         body: message,
         category: SERVICE_CATEGORY,
@@ -137,12 +156,22 @@ class NotificationEventService {
           serviceId: payload.serviceId,
           status,
         },
-      });
+      } as const;
+
+      const bypassQuietHours =
+        selectCriticalHealthAlertsBypassQuietHours(state) && status === 'offline';
+
+      await quietHoursService.deliverNotification(
+        SERVICE_CATEGORY,
+        notification,
+        `${payload.serviceName}: ${label}`,
+        { bypassQuietHours },
+      );
       return;
     }
 
     if (status === 'healthy' && wasOffline) {
-      await pushNotificationService.presentImmediateNotification({
+      const notification = {
         title: `${payload.serviceName} restored`,
         body: 'Service connectivity has been restored.',
         category: SERVICE_CATEGORY,
@@ -150,7 +179,13 @@ class NotificationEventService {
           serviceId: payload.serviceId,
           status,
         },
-      });
+      } as const;
+
+      await quietHoursService.deliverNotification(
+        SERVICE_CATEGORY,
+        notification,
+        `${payload.serviceName}: restored`,
+      );
       return;
     }
   }

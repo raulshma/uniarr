@@ -3,6 +3,11 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { logger } from '@/services/logger/LoggerService';
+import type { NotificationCategory, QuietHoursConfig } from '@/models/notification.types';
+import {
+  createDefaultQuietHoursConfig,
+  normalizeQuietHoursConfig,
+} from '@/utils/quietHours.utils';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -15,6 +20,8 @@ type SettingsData = {
   requestNotificationsEnabled: boolean;
   serviceHealthNotificationsEnabled: boolean;
   refreshIntervalMinutes: number;
+  quietHours: Record<NotificationCategory, QuietHoursConfig>;
+  criticalHealthAlertsBypassQuietHours: boolean;
 };
 
 interface SettingsState extends SettingsData {
@@ -26,6 +33,11 @@ interface SettingsState extends SettingsData {
   setRequestNotificationsEnabled: (enabled: boolean) => void;
   setServiceHealthNotificationsEnabled: (enabled: boolean) => void;
   setRefreshIntervalMinutes: (minutes: number) => void;
+  updateQuietHoursConfig: (
+    category: NotificationCategory,
+    partial: Partial<QuietHoursConfig>,
+  ) => void;
+  setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -42,7 +54,14 @@ const clampRefreshInterval = (minutes: number): number => {
   return Math.min(Math.max(Math.round(minutes), MIN_REFRESH_INTERVAL), MAX_REFRESH_INTERVAL);
 };
 
-const defaultSettings: SettingsData = {
+const createDefaultQuietHoursState = (): Record<NotificationCategory, QuietHoursConfig> => ({
+  downloads: createDefaultQuietHoursConfig('weeknights'),
+  failures: createDefaultQuietHoursConfig('weeknights'),
+  requests: createDefaultQuietHoursConfig('weeknights'),
+  serviceHealth: createDefaultQuietHoursConfig('everyday'),
+});
+
+const createDefaultSettings = (): SettingsData => ({
   theme: 'system',
   notificationsEnabled: true,
   releaseNotificationsEnabled: false,
@@ -51,12 +70,14 @@ const defaultSettings: SettingsData = {
   requestNotificationsEnabled: true,
   serviceHealthNotificationsEnabled: true,
   refreshIntervalMinutes: DEFAULT_REFRESH_INTERVAL,
-};
+  quietHours: createDefaultQuietHoursState(),
+  criticalHealthAlertsBypassQuietHours: true,
+});
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      ...defaultSettings,
+      ...createDefaultSettings(),
       setTheme: (theme) => set({ theme }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setReleaseNotificationsEnabled: (enabled) => set({ releaseNotificationsEnabled: enabled }),
@@ -68,11 +89,23 @@ export const useSettingsStore = create<SettingsState>()(
         set({ serviceHealthNotificationsEnabled: enabled }),
       setRefreshIntervalMinutes: (minutes) =>
         set({ refreshIntervalMinutes: clampRefreshInterval(minutes) }),
-      reset: () => set({ ...defaultSettings }),
+      updateQuietHoursConfig: (category, partial) =>
+        set((state) => ({
+          quietHours: {
+            ...state.quietHours,
+            [category]: normalizeQuietHoursConfig({
+              ...state.quietHours[category],
+              ...partial,
+            }),
+          },
+        })),
+      setCriticalHealthAlertsBypassQuietHours: (enabled) =>
+        set({ criticalHealthAlertsBypassQuietHours: enabled }),
+      reset: () => set(createDefaultSettings()),
     }),
     {
       name: STORAGE_KEY,
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -91,20 +124,59 @@ export const useSettingsStore = create<SettingsState>()(
         if (normalizedInterval !== state.refreshIntervalMinutes) {
           state.refreshIntervalMinutes = normalizedInterval;
         }
+
+        const quietHoursEntries = Object.entries(state.quietHours ?? {}) as [
+          NotificationCategory,
+          QuietHoursConfig,
+        ][];
+
+        state.quietHours = quietHoursEntries.reduce(
+          (acc, [category, config]) => ({
+            ...acc,
+            [category]: normalizeQuietHoursConfig(config),
+          }),
+          {} as Record<NotificationCategory, QuietHoursConfig>,
+        );
+
+        const baseDefaults = createDefaultSettings();
+        (Object.keys(baseDefaults.quietHours) as NotificationCategory[]).forEach((category) => {
+          if (!state.quietHours[category]) {
+            state.quietHours[category] = baseDefaults.quietHours[category];
+          }
+        });
       },
       migrate: (persistedState) => {
         if (!persistedState) {
-          return defaultSettings;
+          return createDefaultSettings();
         }
 
         const partial = persistedState as Partial<SettingsData>;
+        const baseDefaults = createDefaultSettings();
+
+        const quietHours = (Object.keys(baseDefaults.quietHours) as NotificationCategory[]).reduce(
+          (acc, category) => {
+            const persistedConfig = partial.quietHours?.[category];
+            const baseConfig = baseDefaults.quietHours[category];
+
+            acc[category] = persistedConfig
+              ? normalizeQuietHoursConfig({ ...baseConfig, ...persistedConfig })
+              : baseConfig;
+
+            return acc;
+          },
+          {} as Record<NotificationCategory, QuietHoursConfig>,
+        );
 
         return {
-          ...defaultSettings,
+          ...baseDefaults,
           ...partial,
           refreshIntervalMinutes: clampRefreshInterval(
-            partial.refreshIntervalMinutes ?? defaultSettings.refreshIntervalMinutes,
+            partial.refreshIntervalMinutes ?? baseDefaults.refreshIntervalMinutes,
           ),
+          quietHours,
+          criticalHealthAlertsBypassQuietHours:
+            partial.criticalHealthAlertsBypassQuietHours ??
+            baseDefaults.criticalHealthAlertsBypassQuietHours,
         } satisfies SettingsData;
       },
     },
@@ -125,3 +197,13 @@ export const selectServiceHealthNotificationsEnabled = (state: SettingsState): b
   state.serviceHealthNotificationsEnabled;
 export const selectRefreshIntervalMinutes = (state: SettingsState): number =>
   state.refreshIntervalMinutes;
+export const selectQuietHours = (
+  state: SettingsState,
+): Record<NotificationCategory, QuietHoursConfig> => state.quietHours;
+export const selectQuietHoursForCategory = (
+  category: NotificationCategory,
+) =>
+  (state: SettingsState): QuietHoursConfig =>
+    state.quietHours[category] ?? createDefaultQuietHoursState()[category];
+export const selectCriticalHealthAlertsBypassQuietHours = (state: SettingsState): boolean =>
+  state.criticalHealthAlertsBypassQuietHours;

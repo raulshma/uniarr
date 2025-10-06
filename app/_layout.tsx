@@ -17,6 +17,7 @@ import { OfflineIndicator } from '@/components/common/OfflineIndicator';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useNotificationRegistration } from '@/hooks/useNotificationRegistration';
 import { useNotificationResponseHandler } from '@/hooks/useNotificationResponseHandler';
+import { useQuietHoursManager } from '@/hooks/useQuietHoursManager';
 
 const RootLayout = () => {
   const colorScheme = useColorScheme();
@@ -73,6 +74,7 @@ const AppContent = () => {
   const { isOnline } = useOfflineSync();
   useNotificationRegistration();
   useNotificationResponseHandler();
+  useQuietHoursManager();
 
   return (
     <View style={{ flex: 1 }}>
