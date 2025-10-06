@@ -39,7 +39,7 @@ const RecentlyAddedScreen = () => {
         },
         listContentContainer: {
           paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.xxl,
+          paddingBottom: 80,
         },
         mediaItem: {
           backgroundColor: theme.colors.elevation.level1,

@@ -46,7 +46,7 @@ const SettingsScreen = () => {
     },
     scrollContainer: {
       paddingHorizontal: spacing.md,
-      paddingBottom: spacing.xxl
+      paddingBottom: spacing.xxxxl
     },
     listSpacer: {
       height: spacing.sm,
@@ -206,7 +206,7 @@ const SettingsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
-        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
