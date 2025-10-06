@@ -25,6 +25,7 @@ export interface MediaRelease {
   readonly tmdbId?: number;
   readonly tvdbId?: number;
   readonly network?: string;
+  readonly year?: number;
   readonly seasonNumber?: number;
   readonly episodeNumber?: number;
   readonly seriesId?: string;

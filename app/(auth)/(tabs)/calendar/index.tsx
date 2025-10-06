@@ -18,7 +18,8 @@ import {
 } from '@/components/calendar';
 import { useCalendar } from '@/hooks/useCalendar';
 import type { AppTheme } from '@/constants/theme';
-import type { CalendarView, CalendarFilters, CalendarMonth, CalendarWeek, CalendarDay } from '@/models/calendar.types';
+import type { CalendarView, CalendarMonth, CalendarWeek, CalendarDay } from '@/models/calendar.types';
+import type { CalendarFilters } from '@/models/calendar.types';
 
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();

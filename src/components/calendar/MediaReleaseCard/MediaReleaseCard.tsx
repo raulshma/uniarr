@@ -61,7 +61,6 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
         ? theme.custom.typography.bodySmall.letterSpacing 
         : theme.custom.typography.bodyMedium.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      numberOfLines: compact ? 1 : 2,
     },
     subtitle: {
       fontSize: theme.custom.typography.labelSmall.fontSize,
@@ -218,8 +217,8 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
                 <Chip
                   compact
                   mode="flat"
-                  style={[styles.chip, { backgroundColor: statusChipStyle.background }]}
-                  textStyle={{ color: statusChipStyle.text }}
+                  style={[styles.chip, { backgroundColor: statusChipStyle.backgroundColor }]}
+                  textStyle={{ color: statusChipStyle.textColor }}
                 >
                   {statusConfig.label}
                 </Chip>
@@ -237,8 +236,8 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
                   <Chip
                     compact
                     mode="flat"
-                    style={[styles.chip, { backgroundColor: downloadChipStyle.background }]}
-                    textStyle={{ color: downloadChipStyle.text }}
+                    style={[styles.chip, { backgroundColor: downloadChipStyle.backgroundColor }]}
+                    textStyle={{ color: downloadChipStyle.textColor }}
                   >
                     {downloadStatusConfig!.label}
                   </Chip>

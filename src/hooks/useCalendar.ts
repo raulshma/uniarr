@@ -24,6 +24,22 @@ import {
 } from '@/utils/calendar.utils';
 import { CalendarService } from '@/services/calendar/CalendarService';
 
+export interface UseCalendarReturn {
+  state: CalendarState & { isLoading: boolean; error?: string };
+  calendarData: CalendarMonth | CalendarWeek | CalendarDay;
+  stats: CalendarStats;
+  navigation: CalendarNavigation;
+  setView: (view: CalendarView) => void;
+  setCurrentDate: (date: string) => void;
+  setSelectedDate: (date?: string) => void;
+  setFilters: (filters: Partial<CalendarFilters>) => void;
+  clearFilters: () => void;
+  goToToday: () => void;
+  goToPrevious: () => void;
+  goToNext: () => void;
+  goToDate: (date: string) => void;
+}
+
 const DEFAULT_FILTERS: CalendarFilters = {
   mediaTypes: ['movie', 'series', 'episode'],
   statuses: ['upcoming', 'released'],
