@@ -19,7 +19,6 @@ const RootLayout = () => {
   const colorScheme = useColorScheme();
   const theme = useTheme();
   const clerkPublishableKey = useMemo(getClerkPublishableKey, []);
-  const { isOnline } = useOfflineSync();
 
   return (
     <SafeAreaProvider>
@@ -30,10 +29,7 @@ const RootLayout = () => {
               <PaperProvider theme={theme}>
                 <StatusBar style={theme.dark ? 'light' : 'dark'} />
                 <ErrorBoundary context={{ location: 'RootLayout' }}>
-                  <View style={{ flex: 1 }}>
-                    <OfflineIndicator isVisible={!isOnline} />
-                    <Stack screenOptions={{ headerShown: false }} />
-                  </View>
+                  <AppContent />
                 </ErrorBoundary>
                 <QueryDevtools />
               </PaperProvider>
@@ -42,6 +38,17 @@ const RootLayout = () => {
         </ClerkLoaded>
       </ClerkProvider>
     </SafeAreaProvider>
+  );
+};
+
+const AppContent = () => {
+  const { isOnline } = useOfflineSync();
+
+  return (
+    <View style={{ flex: 1 }}>
+      <OfflineIndicator isVisible={!isOnline} />
+      <Stack screenOptions={{ headerShown: false }} />
+    </View>
   );
 };
 
