@@ -1,8 +1,8 @@
 import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
-import { Stack } from 'expo-router';
-import { useMemo, type ComponentType } from 'react';
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { useMemo, type ComponentType, useEffect } from 'react';
 import { Platform, useColorScheme, View } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { queryClient } from '@/config/queryClient';
 import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthService';
-import { AuthProvider } from '@/services/auth/AuthProvider';
+import { AuthProvider, useAuth } from '@/services/auth/AuthProvider';
 import { useTheme } from '@/hooks/useTheme';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
@@ -44,13 +44,36 @@ const RootLayout = () => {
   );
 };
 
+const RootNavigator = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    const inPublicGroup = segments[0] === '(public)';
+
+    if (isAuthenticated && !inAuthGroup) {
+      // User is authenticated but not in auth group, redirect to dashboard
+      router.replace('/(auth)/dashboard');
+    } else if (!isAuthenticated && !inPublicGroup) {
+      // User is not authenticated and not in public group, redirect to login
+      router.replace('/(public)/login');
+    }
+  }, [isAuthenticated, isLoading, segments, router]);
+
+  return <Slot />;
+};
+
 const AppContent = () => {
   const { isOnline } = useOfflineSync();
 
   return (
     <View style={{ flex: 1 }}>
       <OfflineIndicator isVisible={!isOnline} />
-      <Stack screenOptions={{ headerShown: false }} />
+      <RootNavigator />
     </View>
   );
 };
