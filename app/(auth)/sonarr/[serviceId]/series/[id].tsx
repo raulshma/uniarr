@@ -1,9 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import SheetTransition from '@/components/common/SheetTransition';
 
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -40,7 +39,6 @@ const SonarrSeriesDetailsScreen = () => {
   const numericSeriesId = Number(id);
   const isSeriesIdValid = Number.isFinite(numericSeriesId);
   const serviceKey = serviceId ?? '';
-  const [isVisible, setIsVisible] = useState(true);
 
   const {
     series,
@@ -119,8 +117,7 @@ const SonarrSeriesDetailsScreen = () => {
           onPress: () => {
             void deleteSeriesAsync()
               .then(() => {
-                setIsVisible(false);
-                setTimeout(() => router.back(), 300);
+                router.back();
               })
               .catch((err) => {
                 const message = err instanceof Error ? err.message : 'Unable to delete series.';
@@ -149,19 +146,11 @@ const SonarrSeriesDetailsScreen = () => {
   }
 
   const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(() => router.back(), 300);
+    router.back();
   };
 
-  // Render only the SheetTransition content since we're using transparentModal presentation
   return (
-    <SheetTransition
-      visible={isVisible}
-      onClose={handleClose}
-      style={{
-        backgroundColor: theme.colors.background,
-      }}
-    >
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Button mode="text" onPress={handleClose} accessibilityLabel="Go back">
@@ -217,7 +206,7 @@ const SonarrSeriesDetailsScreen = () => {
           </View>
         )}
       </View>
-    </SheetTransition>
+    </SafeAreaView>
   );
 };
 

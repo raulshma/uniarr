@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +8,6 @@ import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { MediaDetails } from '@/components/media/MediaDetails';
 import { MovieDetailsSkeleton } from '@/components/media/skeletons';
-import SheetTransition from '@/components/common/SheetTransition';
 import type { AppTheme } from '@/constants/theme';
 import { useRadarrMovieDetails } from '@/hooks/useRadarrMovieDetails';
 import { spacing } from '@/theme/spacing';
@@ -20,7 +19,6 @@ const RadarrMovieDetailsScreen = () => {
   const numericMovieId = Number(id);
   const isMovieIdValid = Number.isFinite(numericMovieId);
   const serviceKey = serviceId ?? '';
-  const [isVisible, setIsVisible] = useState(true);
 
   const {
     movie,
@@ -88,8 +86,7 @@ const RadarrMovieDetailsScreen = () => {
           onPress: () => {
             void deleteMovieAsync()
               .then(() => {
-                setIsVisible(false);
-                setTimeout(() => router.back(), 300);
+                router.back();
               })
               .catch((err) => {
                 const message = err instanceof Error ? err.message : 'Unable to delete movie.';
@@ -118,19 +115,11 @@ const RadarrMovieDetailsScreen = () => {
   }
 
   const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(() => router.back(), 300);
+    router.back();
   };
 
-  // Render only the SheetTransition content since we're using transparentModal presentation
   return (
-    <SheetTransition
-      visible={isVisible}
-      onClose={handleClose}
-      style={{
-        backgroundColor: theme.colors.background,
-      }}
-    >
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Button mode="text" onPress={handleClose} accessibilityLabel="Go back">
@@ -176,7 +165,7 @@ const RadarrMovieDetailsScreen = () => {
           </View>
         )}
       </View>
-    </SheetTransition>
+    </SafeAreaView>
   );
 };
 
