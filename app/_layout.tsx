@@ -6,6 +6,7 @@ import { useMemo, type ComponentType } from 'react';
 import { Platform, useColorScheme, View } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { queryClient } from '@/config/queryClient';
 import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthService';
@@ -21,23 +22,25 @@ const RootLayout = () => {
   const clerkPublishableKey = useMemo(getClerkPublishableKey, []);
 
   return (
-    <SafeAreaProvider>
-      <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={clerkTokenCache}>
-        <ClerkLoaded>
-          <AuthProvider>
-            <QueryClientProvider client={queryClient}>
-              <PaperProvider theme={theme}>
-                <StatusBar style={theme.dark ? 'light' : 'dark'} />
-                <ErrorBoundary context={{ location: 'RootLayout' }}>
-                  <AppContent />
-                </ErrorBoundary>
-                <QueryDevtools />
-              </PaperProvider>
-            </QueryClientProvider>
-          </AuthProvider>
-        </ClerkLoaded>
-      </ClerkProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={clerkTokenCache}>
+          <ClerkLoaded>
+            <AuthProvider>
+              <QueryClientProvider client={queryClient}>
+                <PaperProvider theme={theme}>
+                  <StatusBar style={theme.dark ? 'light' : 'dark'} />
+                  <ErrorBoundary context={{ location: 'RootLayout' }}>
+                    <AppContent />
+                  </ErrorBoundary>
+                  <QueryDevtools />
+                </PaperProvider>
+              </QueryClientProvider>
+            </AuthProvider>
+          </ClerkLoaded>
+        </ClerkProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 };
 
@@ -61,7 +64,7 @@ type DevtoolsComponentProps = {
 const WebDevtools: ComponentType<DevtoolsComponentProps> | null =
   __DEV__ && Platform.OS === 'web'
     ? // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-      (require('@tanstack/react-query-devtools').ReactQueryDevtools as ComponentType<DevtoolsComponentProps>)
+    (require('@tanstack/react-query-devtools').ReactQueryDevtools as ComponentType<DevtoolsComponentProps>)
     : null;
 
 const QueryDevtools = () => {

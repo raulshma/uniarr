@@ -1,13 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import SheetTransition from '@/components/common/SheetTransition';
 
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
 import { MediaDetails } from '@/components/media/MediaDetails';
+import { MediaDetailsSkeleton } from '@/components/media/skeletons';
 import type { AppTheme } from '@/constants/theme';
 import type { Series } from '@/models/media.types';
 import { useSonarrSeriesDetails } from '@/hooks/useSonarrSeriesDetails';
@@ -39,6 +40,7 @@ const SonarrSeriesDetailsScreen = () => {
   const numericSeriesId = Number(id);
   const isSeriesIdValid = Number.isFinite(numericSeriesId);
   const serviceKey = serviceId ?? '';
+  const [isVisible, setIsVisible] = useState(true);
 
   const {
     series,
@@ -117,7 +119,8 @@ const SonarrSeriesDetailsScreen = () => {
           onPress: () => {
             void deleteSeriesAsync()
               .then(() => {
-                router.back();
+                setIsVisible(false);
+                setTimeout(() => router.back(), 300);
               })
               .catch((err) => {
                 const message = err instanceof Error ? err.message : 'Unable to delete series.';
@@ -130,61 +133,58 @@ const SonarrSeriesDetailsScreen = () => {
     );
   }, [deleteSeriesAsync, router]);
 
+  // Handle error states outside of sheet for immediate feedback
   if (!serviceId || !isSeriesIdValid) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.container, { justifyContent: 'center' }]}>
-          <EmptyState
-            title="Missing series information"
-            description="We couldn't find the service or series identifier. Please navigate from the Sonarr library again."
-            actionLabel="Go back"
-            onActionPress={() => router.back()}
-            icon="alert-circle-outline"
-          />
-        </View>
-      </SafeAreaView>
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <EmptyState
+          title="Missing series information"
+          description="We couldn't find the service or series identifier. Please navigate from the Sonarr library again."
+          actionLabel="Go back"
+          onActionPress={() => router.back()}
+          icon="alert-circle-outline"
+        />
+      </View>
     );
   }
 
-  if (isLoading && !series) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.container, { justifyContent: 'center' }]}>
-          <LoadingState message="Loading series details" />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const handleClose = () => {
+    setIsVisible(false);
+    setTimeout(() => router.back(), 300);
+  };
 
-  if (isError) {
-    const message = error instanceof Error ? error.message : 'Unable to load series details.';
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.container, { justifyContent: 'center' }]}>
-          <EmptyState
-            title="Failed to load series"
-            description={message}
-            actionLabel="Retry"
-            onActionPress={() => {
-              void refetch();
-            }}
-            icon="alert-circle-outline"
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // Render only the SheetTransition content since we're using transparentModal presentation
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SheetTransition
+      visible={isVisible}
+      onClose={handleClose}
+      style={{
+        backgroundColor: theme.colors.background,
+      }}
+    >
       <View style={styles.container}>
         <View style={styles.header}>
-          <Button mode="text" onPress={() => router.back()} accessibilityLabel="Go back">
+          <Button mode="text" onPress={handleClose} accessibilityLabel="Go back">
             Back
           </Button>
           {isFetching ? <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>Refreshing…</Text> : null}
         </View>
-        {series ? (
+
+        {isLoading && !series ? (
+          <MediaDetailsSkeleton showSeasons={true} />
+        ) : isError ? (
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <EmptyState
+              title="Failed to load series"
+              description={error instanceof Error ? error.message : 'Unable to load series details.'}
+              actionLabel="Retry"
+              onActionPress={() => {
+                void refetch();
+              }}
+              icon="alert-circle-outline"
+            />
+          </View>
+        ) : series ? (
           <MediaDetails
             title={series.title}
             year={series.year}
@@ -206,16 +206,18 @@ const SonarrSeriesDetailsScreen = () => {
             isDeleting={isDeleting}
           />
         ) : (
-          <EmptyState
-            title="No series data"
-            description="We couldn't load details for this series."
-            actionLabel="Go back"
-            onActionPress={() => router.back()}
-            icon="alert-circle-outline"
-          />
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <EmptyState
+              title="No series data"
+              description="We couldn't load details for this series."
+              actionLabel="Go back"
+              onActionPress={handleClose}
+              icon="alert-circle-outline"
+            />
+          </View>
         )}
       </View>
-    </SafeAreaView>
+    </SheetTransition>
   );
 };
 
