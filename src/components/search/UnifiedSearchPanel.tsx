@@ -12,6 +12,7 @@ import {
 } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 
+import { Card } from '@/components/common/Card';
 import type { AppTheme } from '@/constants/theme';
 import { spacing } from '@/theme/spacing';
 import { useUnifiedSearch } from '@/hooks/useUnifiedSearch';
@@ -110,11 +111,11 @@ export const UnifiedSearchPanel: React.FC = () => {
       StyleSheet.create({
         container: {
           padding: spacing.md,
-          borderRadius: 16,
-          backgroundColor: theme.colors.elevation.level2,
+          backgroundColor: theme.colors.elevation.level1,
+          borderRadius: 12,
         },
         header: {
-          marginBottom: spacing.sm,
+          marginBottom: spacing.md,
         },
         headerTitle: {
           color: theme.colors.onSurface,
@@ -125,7 +126,11 @@ export const UnifiedSearchPanel: React.FC = () => {
           fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
         },
         searchRow: {
-          marginBottom: spacing.sm,
+          marginBottom: spacing.md,
+        },
+        searchInput: {
+          backgroundColor: theme.colors.surface,
+          borderRadius: 8,
         },
         helperRow: {
           flexDirection: 'row',
@@ -137,15 +142,16 @@ export const UnifiedSearchPanel: React.FC = () => {
           flexDirection: 'row',
           flexWrap: 'wrap',
           gap: spacing.xs,
-          marginBottom: spacing.sm,
+          marginBottom: spacing.md,
         },
         resultContainer: {
           gap: spacing.sm,
         },
         resultCard: {
-          borderRadius: 12,
-          backgroundColor: theme.colors.elevation.level3,
+          borderRadius: 8,
+          backgroundColor: theme.colors.surfaceVariant,
           padding: spacing.md,
+          marginBottom: spacing.xs,
         },
         resultHeader: {
           flexDirection: 'row',
@@ -305,7 +311,16 @@ export const UnifiedSearchPanel: React.FC = () => {
 
       if (item.isInLibrary) {
         statusChips.push(
-          <Chip key="library" compact icon="check" elevated>
+          <Chip
+            key="library"
+            compact
+            mode="outlined"
+            icon="check"
+            textStyle={{
+              fontSize: theme.custom.typography.labelSmall.fontSize,
+              fontFamily: theme.custom.typography.labelSmall.fontFamily,
+            }}
+          >
             In Library
           </Chip>,
         );
@@ -313,7 +328,16 @@ export const UnifiedSearchPanel: React.FC = () => {
 
       if (item.isRequested) {
         statusChips.push(
-          <Chip key="requested" compact icon="ticket-confirmation">
+          <Chip
+            key="requested"
+            compact
+            mode="outlined"
+            icon="ticket-confirmation"
+            textStyle={{
+              fontSize: theme.custom.typography.labelSmall.fontSize,
+              fontFamily: theme.custom.typography.labelSmall.fontFamily,
+            }}
+          >
             Requested
           </Chip>,
         );
@@ -321,19 +345,37 @@ export const UnifiedSearchPanel: React.FC = () => {
 
       if (item.isAvailable) {
         statusChips.push(
-          <Chip key="available" compact icon="check-decagram">
+          <Chip
+            key="available"
+            compact
+            mode="outlined"
+            icon="check-decagram"
+            textStyle={{
+              fontSize: theme.custom.typography.labelSmall.fontSize,
+              fontFamily: theme.custom.typography.labelSmall.fontFamily,
+            }}
+          >
             Available
           </Chip>,
         );
       }
 
       return (
-        <View key={item.id} style={styles.resultCard}>
+        <Card key={item.id} variant="custom" style={styles.resultCard}>
           <View style={styles.resultHeader}>
             <Text style={styles.resultTitle} numberOfLines={2}>
               {item.title}
             </Text>
-            <Chip compact>{serviceLabel}</Chip>
+            <Chip
+              compact
+              mode="outlined"
+              textStyle={{
+                fontSize: theme.custom.typography.labelSmall.fontSize,
+                fontFamily: theme.custom.typography.labelSmall.fontFamily,
+              }}
+            >
+              {serviceLabel}
+            </Chip>
           </View>
           {releaseLabel ? (
             <Text style={styles.resultSubtitle}>{releaseLabel}</Text>
@@ -347,19 +389,27 @@ export const UnifiedSearchPanel: React.FC = () => {
             <View style={[styles.resultActions, { marginTop: spacing.sm }]}>{statusChips}</View>
           ) : null}
           <View style={styles.resultActions}>
-            <Button mode="contained" onPress={() => handlePrimaryAction(item)}>
+            <Button
+              mode="contained"
+              onPress={() => handlePrimaryAction(item)}
+              labelStyle={{
+                fontSize: theme.custom.typography.labelLarge.fontSize,
+                fontFamily: theme.custom.typography.labelLarge.fontFamily,
+              }}
+            >
               {item.serviceType === 'jellyseerr' ? 'View in Jellyseerr' : `Add via ${serviceTypeLabels[item.serviceType] ?? 'Service'}`}
             </Button>
             <IconButton
               icon="open-in-new"
               accessibilityLabel="Open service"
               onPress={() => handleOpenService(item)}
+              size={20}
             />
           </View>
-        </View>
+        </Card>
       );
     },
-    [handleOpenService, handlePrimaryAction, styles, theme.colors.onSurfaceVariant],
+    [handleOpenService, handlePrimaryAction, styles, theme.colors.onSurfaceVariant, theme.custom.typography],
   );
 
   const renderErrorHelper = useMemo(() => {
@@ -380,18 +430,23 @@ export const UnifiedSearchPanel: React.FC = () => {
   }, [errors, serviceNameById, styles.errorText]);
 
   return (
-    <View style={styles.container}>
+    <Card variant="custom" style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Unified Search</Text>
       </View>
       <View style={styles.searchRow}>
         <TextInput
-          mode="outlined"
+          mode="flat"
           placeholder="Search across Sonarr, Radarr, Jellyseerr"
+          placeholderTextColor={theme.colors.onSurfaceVariant}
           value={searchTerm}
           onChangeText={setSearchTerm}
           onFocus={() => setIsInputFocused(true)}
           onBlur={() => setIsInputFocused(false)}
+          style={styles.searchInput}
+          contentStyle={{ backgroundColor: 'transparent' }}
+          underlineColor={theme.colors.outline}
+          activeUnderlineColor={theme.colors.primary}
           right={
             searchTerm ? <TextInput.Icon icon="close" onPress={() => setSearchTerm('')} /> : undefined
           }
@@ -406,13 +461,31 @@ export const UnifiedSearchPanel: React.FC = () => {
       <View style={styles.helperRow}>
         <Text style={{ color: theme.colors.onSurfaceVariant }}>Services</Text>
         {serviceFilters.length ? (
-          <Button compact onPress={clearServiceFilters}>
+          <Button
+            compact
+            mode="text"
+            onPress={clearServiceFilters}
+            textColor={theme.colors.primary}
+            labelStyle={{
+              fontSize: theme.custom.typography.labelMedium.fontSize,
+              fontFamily: theme.custom.typography.labelMedium.fontFamily,
+            }}
+          >
             Clear
           </Button>
         ) : null}
       </View>
       <View style={styles.chipRow}>
-        <Chip selected={serviceFilters.length === 0} onPress={clearServiceFilters} compact>
+        <Chip
+          selected={serviceFilters.length === 0}
+          onPress={clearServiceFilters}
+          compact
+          mode={serviceFilters.length === 0 ? "flat" : "outlined"}
+          textStyle={{
+            fontSize: theme.custom.typography.labelMedium.fontSize,
+            fontFamily: theme.custom.typography.labelMedium.fontFamily,
+          }}
+        >
           All services
         </Chip>
         {areServicesLoading ? (
@@ -424,6 +497,11 @@ export const UnifiedSearchPanel: React.FC = () => {
               compact
               selected={serviceFilters.includes(service.serviceId)}
               onPress={() => toggleService(service.serviceId)}
+              mode={serviceFilters.includes(service.serviceId) ? "flat" : "outlined"}
+              textStyle={{
+                fontSize: theme.custom.typography.labelMedium.fontSize,
+                fontFamily: theme.custom.typography.labelMedium.fontFamily,
+              }}
             >
               {service.serviceName}
             </Chip>
@@ -434,13 +512,31 @@ export const UnifiedSearchPanel: React.FC = () => {
       <View style={styles.helperRow}>
         <Text style={{ color: theme.colors.onSurfaceVariant }}>Media types</Text>
         {mediaFilters.length ? (
-          <Button compact onPress={clearMediaFilters}>
+          <Button
+            compact
+            mode="text"
+            onPress={clearMediaFilters}
+            textColor={theme.colors.primary}
+            labelStyle={{
+              fontSize: theme.custom.typography.labelMedium.fontSize,
+              fontFamily: theme.custom.typography.labelMedium.fontFamily,
+            }}
+          >
             Clear
           </Button>
         ) : null}
       </View>
       <View style={styles.chipRow}>
-        <Chip selected={mediaFilters.length === 0} onPress={clearMediaFilters} compact>
+        <Chip
+          selected={mediaFilters.length === 0}
+          onPress={clearMediaFilters}
+          compact
+          mode={mediaFilters.length === 0 ? "flat" : "outlined"}
+          textStyle={{
+            fontSize: theme.custom.typography.labelMedium.fontSize,
+            fontFamily: theme.custom.typography.labelMedium.fontFamily,
+          }}
+        >
           All media
         </Chip>
         {mediaFilterOptions.map((option) => (
@@ -449,6 +545,11 @@ export const UnifiedSearchPanel: React.FC = () => {
             compact
             selected={mediaFilters.includes(option)}
             onPress={() => toggleMedia(option)}
+            mode={mediaFilters.includes(option) ? "flat" : "outlined"}
+            textStyle={{
+              fontSize: theme.custom.typography.labelMedium.fontSize,
+              fontFamily: theme.custom.typography.labelMedium.fontFamily,
+            }}
           >
             {mediaTypeLabels[option]}
           </Chip>
@@ -476,7 +577,16 @@ export const UnifiedSearchPanel: React.FC = () => {
           <View style={styles.historyHeader}>
             <Text style={{ color: theme.colors.onSurfaceVariant }}>Recent searches</Text>
             {history.length ? (
-              <Button compact onPress={clearHistory}>
+              <Button
+                compact
+                mode="text"
+                onPress={clearHistory}
+                textColor={theme.colors.primary}
+                labelStyle={{
+                  fontSize: theme.custom.typography.labelMedium.fontSize,
+                  fontFamily: theme.custom.typography.labelMedium.fontFamily,
+                }}
+              >
                 Clear all
               </Button>
             ) : null}
@@ -489,9 +599,14 @@ export const UnifiedSearchPanel: React.FC = () => {
                 <Chip
                   key={buildIdentifier(entry)}
                   compact
+                  mode="outlined"
                   onPress={() => handleHistorySelect(entry)}
                   onClose={() => removeHistoryEntry(entry)}
                   closeIcon="close"
+                  textStyle={{
+                    fontSize: theme.custom.typography.labelMedium.fontSize,
+                    fontFamily: theme.custom.typography.labelMedium.fontFamily,
+                  }}
                 >
                   {entry.term}
                 </Chip>
@@ -502,6 +617,6 @@ export const UnifiedSearchPanel: React.FC = () => {
           )}
         </View>
       )}
-    </View>
+    </Card>
   );
 };
