@@ -19,7 +19,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
   const insets = useSafeAreaInsets();
 
   // Generate the curved path for the bottom bar
-  const curvedPath = getPathDown(screenWidth, 60, 60, true, 'CENTER');
+  const curvedPath = getPathDown(screenWidth, 80, 80, true, 'CENTER');
 
   const renderTab = (route: any, index: number) => {
     const descriptor = descriptors[route.key];
@@ -188,7 +188,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
     <View style={[styles.mainContainer, { paddingBottom: insets.bottom }]}>
       {/* Curved background */}
       <View style={styles.curvedBackground}>
-        <Svg width={screenWidth} height={60}>
+        <Svg width={screenWidth} height={80}>
           <Path
             fill={theme.colors.surface}
             d={curvedPath}
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
+    height: 80,
   },
   curvedBackground: {
     position: 'absolute',
@@ -241,13 +241,13 @@ const styles = StyleSheet.create({
     right: 0,
   },
   contentContainer: {
-    height: 60,
+    height: 80,
     alignItems: 'center',
   },
   tabPosition: {
     position: 'absolute',
     width: 60, // Fixed width for each tab area
-    height: 60,
+    height: 80,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',
-    bottom: 20,
+    bottom: 30,
     left: (screenWidth / 2) - 28,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
