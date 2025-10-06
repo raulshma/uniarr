@@ -5,6 +5,7 @@ import { BaseConnector } from '@/connectors/base/BaseConnector';
 import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
 import type { Torrent, TorrentState, TorrentTransferInfo } from '@/models/torrent.types';
+import type { SystemHealth } from '@/connectors/base/IConnector';
 
 const QB_API_PREFIX = '/api/v2';
 
@@ -114,6 +115,44 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
         operation: 'getVersion',
         endpoint: `${QB_API_PREFIX}/app/version`,
       });
+    }
+  }
+
+  override async getHealth(): Promise<SystemHealth> {
+    try {
+      await this.ensureAuthenticated();
+
+      // Use the app/version endpoint as a health check since qBittorrent doesn't have a dedicated health endpoint
+      const response = await this.client.get<string>(`${QB_API_PREFIX}/app/version`, {
+        responseType: 'text',
+        transformResponse: (value) => value,
+      });
+
+      const version = typeof response.data === 'string' ? response.data.trim() : undefined;
+      
+      return {
+        status: 'healthy',
+        message: 'qBittorrent is running and accessible.',
+        lastChecked: new Date(),
+        details: {
+          version: version && version.length > 0 ? version : 'unknown',
+          apiVersion: 'v2',
+        },
+      };
+    } catch (error) {
+      const diagnostic = handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getHealth',
+        endpoint: `${QB_API_PREFIX}/app/version`,
+      });
+
+      return {
+        status: diagnostic.isNetworkError ? 'offline' : 'degraded',
+        message: diagnostic.message,
+        lastChecked: new Date(),
+        details: diagnostic.details,
+      };
     }
   }
 
