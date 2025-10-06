@@ -76,6 +76,9 @@ export class NetworkScannerService {
 
       // Get local IP and subnet
       const localIp = await NetworkInfo.getIPV4Address();
+      if (!localIp) {
+        throw new Error('Unable to determine local IP address');
+      }
       const subnet = this.getSubnetFromIp(localIp);
 
       void logger.debug('Network info retrieved', {
