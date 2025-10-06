@@ -66,12 +66,12 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
       if (!grouped[release.releaseDate]) {
         grouped[release.releaseDate] = [];
       }
-      grouped[release.releaseDate].push(release);
+      grouped[release.releaseDate]?.push(release);
     });
 
     // Sort releases within each date by title
     Object.keys(grouped).forEach(date => {
-      grouped[date].sort((a, b) => a.title.localeCompare(b.title));
+      grouped[date]?.sort((a, b) => a.title.localeCompare(b.title));
     });
 
     // Sort dates
@@ -81,7 +81,7 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
 
     return sortedDates.map(date => ({
       date,
-      releases: grouped[date],
+      releases: grouped[date] || [],
     }));
   }, [releases]);
 
@@ -152,7 +152,6 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
         keyExtractor={(item) => item.date}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        estimatedItemSize={200}
       />
     </View>
   );

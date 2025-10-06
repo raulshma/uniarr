@@ -47,7 +47,7 @@ const DEFAULT_FILTERS: CalendarFilters = {
 };
 
 const DEFAULT_STATE: CalendarState = {
-  currentDate: new Date().toISOString().split('T')[0],
+  currentDate: new Date().toISOString().split('T')[0]!,
   view: 'month',
   filters: DEFAULT_FILTERS,
   isLoading: false,
@@ -61,7 +61,7 @@ export const useCalendar = (): UseCalendarReturn => {
 
   // Fetch releases from calendar service
   const { data: releases = [], isLoading, error } = useQuery({
-    queryKey: queryKeys.calendar.releases(state.currentDate, state.filters),
+    queryKey: queryKeys.calendar.releases(state.currentDate, state.filters as any),
     queryFn: async (): Promise<MediaRelease[]> => {
       const calendarService = CalendarService.getInstance();
       return calendarService.getReleases(state.filters);
@@ -107,7 +107,7 @@ export const useCalendar = (): UseCalendarReturn => {
   }, [updateState]);
 
   const goToToday = useCallback(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0]!;
     setCurrentDate(today);
     setSelectedDate(today);
   }, [setCurrentDate, setSelectedDate]);
@@ -128,7 +128,7 @@ export const useCalendar = (): UseCalendarReturn => {
         break;
     }
     
-    setCurrentDate(newDate.toISOString().split('T')[0]);
+    setCurrentDate(newDate.toISOString().split('T')[0]!);
   }, [state.currentDate, state.view, setCurrentDate]);
 
   const goToNext = useCallback(() => {
@@ -147,7 +147,7 @@ export const useCalendar = (): UseCalendarReturn => {
         break;
     }
     
-    setCurrentDate(newDate.toISOString().split('T')[0]);
+    setCurrentDate(newDate.toISOString().split('T')[0]!);
   }, [state.currentDate, state.view, setCurrentDate]);
 
   const goToDate = useCallback((date: string) => {
@@ -315,14 +315,14 @@ function generateMonthData(current: Date, releases: MediaRelease[]): CalendarMon
     for (let i = 0; i < 7; i++) {
       const dayDate = new Date(currentWeek);
       dayDate.setDate(currentWeek.getDate() + i);
-      const dateStr = dayDate.toISOString().split('T')[0];
+      const dateStr = dayDate.toISOString().split('T')[0]!;
       
       const dayReleases = releases.filter(release => release.releaseDate === dateStr);
       
       days.push({
         date: dateStr,
         isCurrentMonth: dayDate.getMonth() === month,
-        isToday: dateStr === new Date().toISOString().split('T')[0],
+        isToday: dateStr === new Date().toISOString().split('T')[0]!,
         isSelected: false, // Will be set by parent component
         releases: dayReleases,
       });
@@ -359,14 +359,14 @@ function generateWeekData(current: Date, releases: MediaRelease[]): CalendarWeek
   for (let i = 0; i < 7; i++) {
     const dayDate = new Date(startOfWeek);
     dayDate.setDate(startOfWeek.getDate() + i);
-    const dateStr = dayDate.toISOString().split('T')[0];
+    const dateStr = dayDate.toISOString().split('T')[0]!;
     
     const dayReleases = releases.filter(release => release.releaseDate === dateStr);
     
     days.push({
       date: dateStr,
       isCurrentMonth: true,
-      isToday: dateStr === new Date().toISOString().split('T')[0],
+      isToday: dateStr === new Date().toISOString().split('T')[0]!,
       isSelected: false,
       releases: dayReleases,
     });
@@ -380,13 +380,13 @@ function generateWeekData(current: Date, releases: MediaRelease[]): CalendarWeek
 }
 
 function generateDayData(current: Date, releases: MediaRelease[]): CalendarDay {
-  const dateStr = current.toISOString().split('T')[0];
+  const dateStr = current.toISOString().split('T')[0]!;
   const dayReleases = releases.filter(release => release.releaseDate === dateStr);
   
   return {
     date: dateStr,
     isCurrentMonth: true,
-    isToday: dateStr === new Date().toISOString().split('T')[0],
+    isToday: dateStr === new Date().toISOString().split('T')[0]!,
     isSelected: false,
     releases: dayReleases,
   };

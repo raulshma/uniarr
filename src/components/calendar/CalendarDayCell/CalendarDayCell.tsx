@@ -115,7 +115,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   };
 
   const getContainerStyle = () => {
-    const baseStyle = [styles.container];
+    const baseStyle: any[] = [styles.container];
     if (isSelected) {
       baseStyle.push({ backgroundColor: theme.colors.primaryContainer });
     }

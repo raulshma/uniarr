@@ -14,7 +14,7 @@ import {
   CalendarDayView,
   CalendarListView,
   CalendarStats,
-  CalendarFilters,
+  CalendarFilters as CalendarFiltersComponent,
 } from '@/components/calendar';
 import { useCalendar } from '@/hooks/useCalendar';
 import type { AppTheme } from '@/constants/theme';
@@ -188,7 +188,7 @@ const CalendarScreen = () => {
         >
           <CalendarStats stats={stats} />
           
-          <CalendarFilters
+          <CalendarFiltersComponent
             filters={state.filters}
             onFiltersChange={handleFiltersChange}
             onClearFilters={handleClearFilters}

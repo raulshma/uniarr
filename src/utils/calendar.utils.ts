@@ -6,7 +6,7 @@ import type { MediaRelease, CalendarDay, CalendarWeek, CalendarMonth } from '@/m
 
 export const formatDate = (date: Date | string): string => {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return dateObj.toISOString().split('T')[0];
+  return dateObj.toISOString().split('T')[0]!;
 };
 
 export const formatDateDisplay = (date: Date | string): string => {
@@ -96,12 +96,12 @@ export const groupReleasesByDate = (releases: MediaRelease[]): { [date: string]:
     if (!grouped[release.releaseDate]) {
       grouped[release.releaseDate] = [];
     }
-    grouped[release.releaseDate].push(release);
+    grouped[release.releaseDate]?.push(release);
   });
 
   // Sort releases within each date by title
   Object.keys(grouped).forEach(date => {
-    grouped[date].sort((a, b) => a.title.localeCompare(b.title));
+    grouped[date]?.sort((a, b) => a.title.localeCompare(b.title));
   });
 
   return grouped;
@@ -156,7 +156,7 @@ export const getReleasesForMonth = (releases: MediaRelease[], date: string): Med
 
 export const validateDateString = (dateString: string): boolean => {
   const date = new Date(dateString);
-  return date instanceof Date && !isNaN(date.getTime()) && dateString.match(/^\d{4}-\d{2}-\d{2}$/);
+  return date instanceof Date && !isNaN(date.getTime()) && Boolean(dateString.match(/^\d{4}-\d{2}-\d{2}$/));
 };
 
 export const getDateRangeForView = (currentDate: string, view: 'month' | 'week' | 'day'): { start: string; end: string } => {

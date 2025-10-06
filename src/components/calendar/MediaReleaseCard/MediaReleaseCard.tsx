@@ -141,8 +141,8 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
 
     const colors = toneColorMap[tone] || toneColorMap.outline;
     return {
-      backgroundColor: colors.background,
-      textColor: colors.text,
+      backgroundColor: colors?.background || theme.colors.surfaceVariant,
+      textColor: colors?.text || theme.colors.onSurfaceVariant,
     };
   };
 

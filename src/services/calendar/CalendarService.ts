@@ -90,7 +90,7 @@ export class CalendarService {
           id: `sonarr-${serviceId}-series-${seriesItem.id}`,
           title: seriesItem.title,
           type: 'series',
-          releaseDate: seriesItem.nextAiring.split('T')[0],
+          releaseDate: seriesItem.nextAiring.split('T')[0]!,
           status: this.determineReleaseStatus(seriesItem.nextAiring),
           posterUrl: seriesItem.posterUrl,
           backdropUrl: seriesItem.backdropUrl,
@@ -118,7 +118,7 @@ export class CalendarService {
                   id: `sonarr-${serviceId}-episode-${episode.id}`,
                   title: episode.title,
                   type: 'episode',
-                  releaseDate: episode.airDate.split('T')[0],
+                  releaseDate: episode.airDate.split('T')[0]!,
                   status: this.determineReleaseStatus(episode.airDate),
                   posterUrl: seriesItem.posterUrl,
                   overview: episode.overview,
@@ -160,14 +160,14 @@ export class CalendarService {
     const releases: MediaRelease[] = [];
     
     for (const movie of movies) {
-      // For now, we'll use the movie's added date as a placeholder
-      // In a real implementation, you'd fetch upcoming releases from TMDB or similar
-      if (movie.added) {
+      // Use the movie's release date or inCinemas date
+      const releaseDate = movie.releaseDate || movie.inCinemas || movie.digitalRelease;
+      if (releaseDate) {
         const release: MediaRelease = {
           id: `radarr-${serviceId}-movie-${movie.id}`,
           title: movie.title,
           type: 'movie',
-          releaseDate: movie.added.split('T')[0],
+          releaseDate: releaseDate.split('T')[0]!,
           status: 'released', // Movies in Radarr are typically already released
           posterUrl: movie.posterUrl,
           backdropUrl: movie.backdropUrl,
