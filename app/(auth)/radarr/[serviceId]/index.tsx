@@ -10,6 +10,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
 
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -321,24 +322,30 @@ const RadarrMoviesListScreen = () => {
   }, []);
 
   const renderMovieItem = useCallback(
-    ({ item }: { item: Movie }) => {
+    ({ item, index }: { item: Movie; index: number }) => {
       return (
-        <MovieListItem
-          id={item.id}
-          title={item.title}
-          year={item.year}
-          runtime={item.runtime}
-          sizeOnDisk={item.statistics?.sizeOnDisk}
-          status={item.status}
-          subtitle={item.studio}
-          monitored={item.monitored}
-          downloadStatus={deriveDownloadStatus(item)}
-          posterUri={item.posterUrl}
-          genres={item.genres}
-          studio={item.studio}
-          statistics={item.statistics}
-          onPress={() => handleMoviePress(item)}
-        />
+        <Animated.View
+          entering={FadeInUp.delay(index * 50).springify()}
+          exiting={FadeOut.springify()}
+          layout={Layout.springify()}
+        >
+          <MovieListItem
+            id={item.id}
+            title={item.title}
+            year={item.year}
+            runtime={item.runtime}
+            sizeOnDisk={item.statistics?.sizeOnDisk}
+            status={item.status}
+            subtitle={item.studio}
+            monitored={item.monitored}
+            downloadStatus={deriveDownloadStatus(item)}
+            posterUri={item.posterUrl}
+            genres={item.genres}
+            studio={item.studio}
+            statistics={item.statistics}
+            onPress={() => handleMoviePress(item)}
+          />
+        </Animated.View>
       );
     },
     [handleMoviePress],
@@ -348,8 +355,16 @@ const RadarrMoviesListScreen = () => {
 
   const listHeader = useMemo(
     () => (
-      <View style={styles.listHeader}>
-        <View style={styles.headerRow}>
+      <Animated.View 
+        style={styles.listHeader}
+        entering={FadeInDown.springify()}
+        layout={Layout.springify()}
+      >
+        <Animated.View 
+          style={styles.headerRow}
+          entering={FadeInDown.delay(100).springify()}
+          layout={Layout.springify()}
+        >
           <View>
             <Text variant="headlineSmall" style={styles.headerTitle}>
               Movies
@@ -358,49 +373,60 @@ const RadarrMoviesListScreen = () => {
               Showing {filteredMovies.length} of {totalMovies} movies
             </Text>
           </View>
-          <Button mode="contained" onPress={handleAddMovie}>
-            Add Movie
-          </Button>
-        </View>
-        <Searchbar
-          placeholder="Search movies"
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          style={styles.searchBar}
-          accessibilityLabel="Search movies"
-        />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterPillsScroll}
-          style={styles.filterPills}
-        >
-          {[
-            { label: 'All', value: FILTER_ALL },
-            { label: 'Owned', value: FILTER_OWNED },
-            { label: 'Missing', value: FILTER_MISSING },
-            { label: 'Downloading', value: FILTER_DOWNLOADING },
-            { label: 'Monitored', value: FILTER_MONITORED },
-            { label: 'Unmonitored', value: FILTER_UNMONITORED },
-          ].map((filter) => (
-            <Chip
-              key={filter.value}
-              mode="flat"
-              onPress={() => setFilterValue(filter.value as FilterValue)}
-              style={[
-                styles.filterChip,
-                filterValue === filter.value && styles.filterChipSelected,
-              ]}
-              textStyle={[
-                styles.filterChipText,
-                filterValue === filter.value && styles.filterChipTextSelected,
-              ]}
-            >
-              {filter.label}
-            </Chip>
-          ))}
-        </ScrollView>
-      </View>
+          <Animated.View entering={FadeInDown.delay(200).springify()}>
+            <Button mode="contained" onPress={handleAddMovie}>
+              Add Movie
+            </Button>
+          </Animated.View>
+        </Animated.View>
+        <Animated.View entering={FadeInDown.delay(300).springify()}>
+          <Searchbar
+            placeholder="Search movies"
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            style={styles.searchBar}
+            accessibilityLabel="Search movies"
+          />
+        </Animated.View>
+        <Animated.View entering={FadeInDown.delay(400).springify()}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterPillsScroll}
+            style={styles.filterPills}
+          >
+            {[
+              { label: 'All', value: FILTER_ALL },
+              { label: 'Owned', value: FILTER_OWNED },
+              { label: 'Missing', value: FILTER_MISSING },
+              { label: 'Downloading', value: FILTER_DOWNLOADING },
+              { label: 'Monitored', value: FILTER_MONITORED },
+              { label: 'Unmonitored', value: FILTER_UNMONITORED },
+            ].map((filter, index) => (
+              <Animated.View
+                key={filter.value}
+                entering={FadeInDown.delay(500 + index * 50).springify()}
+                layout={Layout.springify()}
+              >
+                <Chip
+                  mode="flat"
+                  onPress={() => setFilterValue(filter.value as FilterValue)}
+                  style={[
+                    styles.filterChip,
+                    filterValue === filter.value && styles.filterChipSelected,
+                  ]}
+                  textStyle={[
+                    styles.filterChipText,
+                    filterValue === filter.value && styles.filterChipTextSelected,
+                  ]}
+                >
+                  {filter.label}
+                </Chip>
+              </Animated.View>
+            ))}
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
     ),
     [filteredMovies.length, filterValue, handleAddMovie, searchTerm, styles, totalMovies],
   );
@@ -408,22 +434,26 @@ const RadarrMoviesListScreen = () => {
   const listEmptyComponent = useMemo(() => {
     if (filteredMovies.length === 0 && totalMovies > 0) {
       return (
-        <EmptyState
-          title="No movies match your filters"
-          description="Try a different search query or reset the filters."
-          actionLabel="Clear filters"
-          onActionPress={handleClearFilters}
-        />
+        <Animated.View entering={FadeIn.delay(200).springify()}>
+          <EmptyState
+            title="No movies match your filters"
+            description="Try a different search query or reset the filters."
+            actionLabel="Clear filters"
+            onActionPress={handleClearFilters}
+          />
+        </Animated.View>
       );
     }
 
     return (
-      <EmptyState
-        title="No movies available"
-        description="Add a movie in Radarr or adjust your filters to see it here."
-        actionLabel="Add Movie"
-        onActionPress={handleAddMovie}
-      />
+      <Animated.View entering={FadeIn.delay(200).springify()}>
+        <EmptyState
+          title="No movies available"
+          description="Add a movie in Radarr or adjust your filters to see it here."
+          actionLabel="Add Movie"
+          onActionPress={handleAddMovie}
+        />
+      </Animated.View>
     );
   }, [filteredMovies.length, handleAddMovie, handleClearFilters, totalMovies]);
 
@@ -509,21 +539,27 @@ const RadarrMoviesListScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <FlashList
-        data={filteredMovies}
-        keyExtractor={keyExtractor}
-        renderItem={renderMovieItem}
-        ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
-        refreshControl={
-          <ListRefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => refetch()}
-          />
-        }
-      />
+      <Animated.View 
+        style={{ flex: 1 }}
+        entering={FadeIn.delay(100).springify()}
+        layout={Layout.springify()}
+      >
+        <FlashList
+          data={filteredMovies}
+          keyExtractor={keyExtractor}
+          renderItem={renderMovieItem}
+          ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
+          contentContainerStyle={styles.listContent}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
+          refreshControl={
+            <ListRefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => refetch()}
+            />
+          }
+        />
+      </Animated.View>
     </SafeAreaView>
   );
 };

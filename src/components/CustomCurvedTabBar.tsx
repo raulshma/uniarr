@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Pressable, StyleSheet, Dimensions, type PressableStateCallbackType } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -68,19 +68,56 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
         iconName = 'help-circle';
     }
 
+    const labelCandidate = (() => {
+      if (typeof options.tabBarLabel === 'string') {
+        return options.tabBarLabel;
+      }
+
+      if (typeof options.title === 'string') {
+        return options.title;
+      }
+
+      return route.name;
+    })();
+
+    const accessibilityLabel = `${labelCandidate} tab`;
+    const accessibilityHint = isFocused
+      ? `You're currently viewing the ${labelCandidate} tab`
+      : `Navigate to the ${labelCandidate} tab`;
+
     return (
-      <TouchableOpacity
+      <Pressable
         key={route.key}
         onPress={onPress}
         onLongPress={onLongPress}
-        style={styles.tabItem}
+        style={(state: PressableStateCallbackType) => {
+          const { pressed } = state;
+          const isFocused = Boolean((state as { focused?: boolean }).focused);
+          const composed: any[] = [styles.tabItem];
+
+          if (pressed) {
+            composed.push(styles.tabItemPressed);
+          }
+
+          if (isFocused) {
+            composed.push(styles.tabItemFocused);
+            composed.push({ borderColor: theme.colors.primary });
+          }
+
+          return composed;
+        }}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: isFocused }}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={accessibilityHint}
+        focusable
       >
         <MaterialCommunityIcons
           name={iconName as any}
           size={24}
           color={isFocused ? theme.colors.primary : theme.colors.onSurfaceVariant}
         />
-      </TouchableOpacity>
+      </Pressable>
     );
   };
 
@@ -102,20 +139,48 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
       }
     };
 
+    const accessibilityLabel = isDashboardFocused ? 'Dashboard tab, selected' : 'Dashboard tab';
+    const accessibilityHint = isDashboardFocused
+      ? 'Displays the dashboard overview'
+      : 'Navigate to the dashboard overview';
+
     return (
-      <TouchableOpacity
+      <Pressable
         onPress={onPress}
-        style={[styles.centerButton, {
-          backgroundColor: isDashboardFocused ? theme.colors.primary : theme.colors.surfaceVariant,
-          shadowColor: theme.colors.shadow,
-        }]}
+        style={(state: PressableStateCallbackType) => {
+          const { pressed } = state;
+          const isFocused = Boolean((state as { focused?: boolean }).focused);
+          const composed: any[] = [
+            styles.centerButton,
+            {
+              backgroundColor: isDashboardFocused ? theme.colors.primary : theme.colors.surfaceVariant,
+              shadowColor: theme.colors.shadow,
+            },
+          ];
+
+          if (pressed) {
+            composed.push(styles.centerButtonPressed);
+          }
+
+          if (isFocused) {
+            composed.push(styles.centerButtonFocused);
+            composed.push({ borderColor: theme.colors.primary });
+          }
+
+          return composed;
+        }}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: isDashboardFocused }}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={accessibilityHint}
+        focusable
       >
         <MaterialCommunityIcons
           name="view-dashboard"
           size={28}
           color={isDashboardFocused ? theme.colors.onPrimary : theme.colors.onSurfaceVariant}
         />
-      </TouchableOpacity>
+      </Pressable>
     );
   };
 
@@ -192,6 +257,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
   },
+  tabItemPressed: {
+    opacity: 0.85,
+  },
+  tabItemFocused: {
+    borderWidth: 2,
+    borderRadius: 28,
+    paddingVertical: 6,
+  },
   centerButton: {
     width: 56,
     height: 56,
@@ -205,6 +278,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 8,
+  },
+  centerButtonPressed: {
+    opacity: 0.9,
+  },
+  centerButtonFocused: {
+    borderWidth: 2,
   },
 });
 

@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
 
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -121,12 +122,16 @@ const RadarrMovieDetailsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <Animated.View 
+          style={styles.header}
+          entering={FadeInDown.delay(200).springify()}
+          layout={Layout.springify()}
+        >
           <Button mode="text" onPress={handleClose} accessibilityLabel="Go back">
             Back
           </Button>
           {isFetching ? <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>Refreshing…</Text> : null}
-        </View>
+        </Animated.View>
 
         {isLoading && !movie ? (
           <MovieDetailsSkeleton />

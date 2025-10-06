@@ -85,8 +85,50 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
 
   const relativeTime = useMemo(() => formatRelativeTime(lastCheckedAt), [lastCheckedAt]);
 
+  const statusLabel = useMemo(() => {
+    switch (status) {
+      case 'online':
+        return 'Online';
+      case 'degraded':
+        return 'Degraded';
+      case 'offline':
+      default:
+        return 'Offline';
+    }
+  }, [status]);
+
+  const cardAccessibilityLabel = useMemo(() => {
+    const fragments: string[] = [];
+
+    fragments.push(`Service ${name}`);
+
+    if (statusLabel) {
+      fragments.push(`Status ${statusLabel}`);
+    }
+
+    if (statusDescription) {
+      fragments.push(statusDescription);
+    }
+
+    if (relativeTime) {
+      fragments.push(`Last checked ${relativeTime}`);
+    }
+
+    return fragments.join('. ');
+  }, [name, relativeTime, statusDescription, statusLabel]);
+
+  const cardAccessibilityHint = onPress ? 'Open service details' : undefined;
+
   return (
-    <Card onPress={onPress} contentPadding="md" style={style} testID={testID}>
+    <Card
+      onPress={onPress}
+      contentPadding="md"
+      style={style}
+      testID={testID}
+      accessibilityLabel={cardAccessibilityLabel}
+      accessibilityHint={cardAccessibilityHint}
+      focusable={Boolean(onPress)}
+    >
       <View style={styles.root}>
         <Avatar.Icon
           size={48}
@@ -131,6 +173,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               size={20}
               onPress={onEditPress}
               accessibilityLabel={`Edit ${name}`}
+              accessibilityHint="Opens the edit service form"
             />
           ) : null}
           {onDeletePress ? (
@@ -143,6 +186,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
                 onPress={onDeletePress}
                 disabled={isDeleting}
                 accessibilityLabel={`Delete ${name}`}
+                accessibilityHint="Removes this service"
               />
             )
           ) : null}

@@ -49,8 +49,15 @@ const ServiceStatus: React.FC<ServiceStatusProps> = ({
   const indicatorSize = sizeMap[size];
   const appliedLabel = label ?? statusText[status];
 
+  const accessibilityLabel = appliedLabel;
+
   return (
-    <View style={styles.container} testID={testID} accessibilityRole="text">
+    <View
+      style={styles.container}
+      testID={testID}
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+    >
       <View
         style={[
           styles.indicator,

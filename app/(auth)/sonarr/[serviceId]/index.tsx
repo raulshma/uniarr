@@ -13,6 +13,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/common/EmptyState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
@@ -307,39 +308,45 @@ const SonarrSeriesListScreen = () => {
   }, []);
 
   const renderSeriesItem = useCallback(
-    ({ item }: { item: Series }) => {
+    ({ item, index }: { item: Series; index: number }) => {
       const totalEpisodes = item.episodeCount ?? item.statistics?.episodeCount ?? 0;
       const availableEpisodes = item.episodeFileCount ?? item.statistics?.episodeFileCount ?? 0;
       const progress = totalEpisodes > 0 ? Math.min(availableEpisodes / totalEpisodes, 1) : 0;
 
       return (
-        <Pressable
-          onPress={() => handleSeriesPress(item)}
-          style={({ pressed }) => [styles.seriesCard, pressed && styles.seriesCardPressed]}
+        <Animated.View
+          entering={FadeInUp.delay(index * 50).springify()}
+          exiting={FadeOut.springify()}
+          layout={Layout.springify()}
         >
-          <MediaPoster
-            uri={item.posterUrl}
-            size={96}
-            borderRadius={16}
-            style={styles.seriesPoster}
-          />
-          <View style={styles.seriesMeta}>
-            <Text variant="titleMedium" numberOfLines={1} style={styles.seriesTitle}>
-              {item.title}
-            </Text>
-            <Text variant="bodyMedium" numberOfLines={1} style={styles.seriesStatus}>
-              {item.status ?? 'Status unavailable'}
-            </Text>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+          <Pressable
+            onPress={() => handleSeriesPress(item)}
+            style={({ pressed }) => [styles.seriesCard, pressed && styles.seriesCardPressed]}
+          >
+            <MediaPoster
+              uri={item.posterUrl}
+              size={96}
+              borderRadius={16}
+              style={styles.seriesPoster}
+            />
+            <View style={styles.seriesMeta}>
+              <Text variant="titleMedium" numberOfLines={1} style={styles.seriesTitle}>
+                {item.title}
+              </Text>
+              <Text variant="bodyMedium" numberOfLines={1} style={styles.seriesStatus}>
+                {item.status ?? 'Status unavailable'}
+              </Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+              </View>
+              <Text variant="bodySmall" style={styles.episodesMeta}>
+                {totalEpisodes > 0
+                  ? `${availableEpisodes} / ${totalEpisodes} episodes`
+                  : 'Episodes unavailable'}
+              </Text>
             </View>
-            <Text variant="bodySmall" style={styles.episodesMeta}>
-              {totalEpisodes > 0
-                ? `${availableEpisodes} / ${totalEpisodes} episodes`
-                : 'Episodes unavailable'}
-            </Text>
-          </View>
-        </Pressable>
+          </Pressable>
+        </Animated.View>
       );
     },
     [handleSeriesPress, styles],
@@ -349,68 +356,82 @@ const SonarrSeriesListScreen = () => {
 
   const listHeader = useMemo(
     () => (
-      <View style={styles.listHeader}>
-        <View style={styles.topBar}>
+      <Animated.View 
+        style={styles.listHeader}
+        entering={FadeInDown.springify()}
+        layout={Layout.springify()}
+      >
+        <Animated.View 
+          style={styles.topBar}
+          entering={FadeInDown.delay(100).springify()}
+          layout={Layout.springify()}
+        >
           <View style={styles.topBarSpacer} />
           <Text variant="headlineSmall" style={styles.topBarTitle}>
             TV Series
           </Text>
-          <IconButton
-            icon="plus"
-            size={24}
-            mode="contained"
-            style={styles.topBarAction}
-            containerColor={theme.colors.primary}
-            iconColor={theme.colors.onPrimary}
-            accessibilityLabel="Add series"
-            onPress={handleAddSeries}
+          <Animated.View entering={FadeInDown.delay(200).springify()}>
+            <IconButton
+              icon="plus"
+              size={24}
+              mode="contained"
+              style={styles.topBarAction}
+              containerColor={theme.colors.primary}
+              iconColor={theme.colors.onPrimary}
+              accessibilityLabel="Add series"
+              onPress={handleAddSeries}
+            />
+          </Animated.View>
+        </Animated.View>
+        <Animated.View entering={FadeInDown.delay(300).springify()}>
+          <Searchbar
+            placeholder="Search TV Series"
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            style={styles.searchBar}
+            inputStyle={styles.searchInput}
+            iconColor={theme.colors.onSurfaceVariant}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
+            accessibilityLabel="Search series"
           />
-        </View>
-        <Searchbar
-          placeholder="Search TV Series"
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          style={styles.searchBar}
-          inputStyle={styles.searchInput}
-          iconColor={theme.colors.onSurfaceVariant}
-          placeholderTextColor={theme.colors.onSurfaceVariant}
-          accessibilityLabel="Search series"
-        />
-        <View style={styles.filterRow}>
-          <Menu
-            key={`status-menu-${statusMenuVisible}-${filterValue}`}
-            visible={statusMenuVisible}
-            onDismiss={() => setStatusMenuVisible(false)}
-            anchorPosition="bottom"
-            contentStyle={styles.filterMenu}
-            anchor={
-              <TouchableRipple
-                borderless={false}
-                style={styles.filterButton}
-                onPress={() => setStatusMenuVisible(true)}
-              >
-                <View style={styles.filterButtonContent}>
-                  <Text variant="bodyMedium" style={styles.filterButtonLabel}>
-                    {FILTER_LABELS[filterValue]}
-                  </Text>
-                  <View style={styles.filterButtonIcon}>
-                    <Icon source="chevron-down" size={20} color={theme.colors.onSurfaceVariant} />
+        </Animated.View>
+        <Animated.View entering={FadeInDown.delay(400).springify()}>
+          <View style={styles.filterRow}>
+            <Menu
+              key={`status-menu-${statusMenuVisible}-${filterValue}`}
+              visible={statusMenuVisible}
+              onDismiss={() => setStatusMenuVisible(false)}
+              anchorPosition="bottom"
+              contentStyle={styles.filterMenu}
+              anchor={
+                <TouchableRipple
+                  borderless={false}
+                  style={styles.filterButton}
+                  onPress={() => setStatusMenuVisible(true)}
+                >
+                  <View style={styles.filterButtonContent}>
+                    <Text variant="bodyMedium" style={styles.filterButtonLabel}>
+                      {FILTER_LABELS[filterValue]}
+                    </Text>
+                    <View style={styles.filterButtonIcon}>
+                      <Icon source="chevron-down" size={20} color={theme.colors.onSurfaceVariant} />
+                    </View>
                   </View>
-                </View>
-              </TouchableRipple>
-            }
-          >
-            {FILTER_OPTIONS.map((value) => (
-              <Menu.Item
-                key={value}
-                title={FILTER_LABELS[value]}
-                onPress={() => handleStatusChange(value)}
-                trailingIcon={filterValue === value ? 'check' : undefined}
-              />
-            ))}
-          </Menu>
-        </View>
-      </View>
+                </TouchableRipple>
+              }
+            >
+              {FILTER_OPTIONS.map((value) => (
+                <Menu.Item
+                  key={value}
+                  title={FILTER_LABELS[value]}
+                  onPress={() => handleStatusChange(value)}
+                  trailingIcon={filterValue === value ? 'check' : undefined}
+                />
+              ))}
+            </Menu>
+          </View>
+        </Animated.View>
+      </Animated.View>
     ),
     [filterValue, handleAddSeries, handleStatusChange, searchTerm, statusMenuVisible, styles, theme],
   );
@@ -418,22 +439,26 @@ const SonarrSeriesListScreen = () => {
   const listEmptyComponent = useMemo(() => {
     if (filteredSeries.length === 0 && totalSeries > 0) {
       return (
-        <EmptyState
-          title="No series match your filters"
-          description="Try a different search query or reset the filters."
-          actionLabel="Clear filters"
-          onActionPress={handleClearFilters}
-        />
+        <Animated.View entering={FadeIn.delay(200).springify()}>
+          <EmptyState
+            title="No series match your filters"
+            description="Try a different search query or reset the filters."
+            actionLabel="Clear filters"
+            onActionPress={handleClearFilters}
+          />
+        </Animated.View>
       );
     }
 
     return (
-      <EmptyState
-        title="No series available"
-        description="Add a series in Sonarr or adjust your filters to see it here."
-        actionLabel="Add Series"
-        onActionPress={handleAddSeries}
-      />
+      <Animated.View entering={FadeIn.delay(200).springify()}>
+        <EmptyState
+          title="No series available"
+          description="Add a series in Sonarr or adjust your filters to see it here."
+          actionLabel="Add Series"
+          onActionPress={handleAddSeries}
+        />
+      </Animated.View>
     );
   }, [filteredSeries.length, handleAddSeries, handleClearFilters, totalSeries]);
 
@@ -510,21 +535,27 @@ const SonarrSeriesListScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <FlashList
-        data={filteredSeries}
-        keyExtractor={keyExtractor}
-        renderItem={renderSeriesItem}
-        ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
-        refreshControl={
-          <ListRefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => refetch()}
-          />
-        }
-      />
+      <Animated.View 
+        style={{ flex: 1 }}
+        entering={FadeIn.delay(100).springify()}
+        layout={Layout.springify()}
+      >
+        <FlashList
+          data={filteredSeries}
+          keyExtractor={keyExtractor}
+          renderItem={renderSeriesItem}
+          ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
+          contentContainerStyle={styles.listContent}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
+          refreshControl={
+            <ListRefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => refetch()}
+            />
+          }
+        />
+      </Animated.View>
     </SafeAreaView>
   );
 };
