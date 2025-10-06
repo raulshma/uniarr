@@ -482,11 +482,35 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private buildSeasonPosterUrl(seriesId: number, seasonNumber: number): string {
-    return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}.jpg`;
+    try {
+      const url = new URL(`/api/v3/MediaCover/${seriesId}/season-${seasonNumber}.jpg`, this.config.url);
+      if (this.config.apiKey) {
+        url.searchParams.set('apikey', this.config.apiKey);
+      }
+      return url.toString();
+    } catch (_e) {
+      // Fallback to string concat if URL construction fails for any reason
+      return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}.jpg${
+        this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
+      }`;
+    }
   }
 
   private buildEpisodePosterUrl(seriesId: number, seasonNumber: number, episodeNumber: number): string {
-    return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}-episode-${episodeNumber}.jpg`;
+    try {
+      const url = new URL(
+        `/api/v3/MediaCover/${seriesId}/season-${seasonNumber}-episode-${episodeNumber}.jpg`,
+        this.config.url,
+      );
+      if (this.config.apiKey) {
+        url.searchParams.set('apikey', this.config.apiKey);
+      }
+      return url.toString();
+    } catch (_e) {
+      return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}-episode-${episodeNumber}.jpg${
+        this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
+      }`;
+    }
   }
 
   private mapQueueRecord(record: SonarrQueueRecord): SonarrQueueItem {

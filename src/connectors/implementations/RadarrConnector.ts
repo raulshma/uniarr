@@ -516,7 +516,18 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
 
     try {
-      return new URL(url, this.client.defaults.baseURL).toString();
+      const resolved = new URL(url, this.client.defaults.baseURL as string);
+
+      // If the connector has an apiKey and the resolved URL is within the same origin,
+      // append the apikey as a query parameter so image requests can be authenticated.
+      if (this.config.apiKey) {
+        const base = new URL(this.client.defaults.baseURL as string);
+        if (resolved.origin === base.origin) {
+          resolved.searchParams.set('apikey', this.config.apiKey);
+        }
+      }
+
+      return resolved.toString();
     } catch (_error) {
       return url;
     }

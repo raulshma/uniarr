@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
 import { Icon, Text, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
@@ -43,11 +42,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  
-  // Animation values
-  const blurOpacity = useRef(new Animated.Value(1)).current;
-  const imageOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let isMounted = true;
@@ -66,10 +60,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         setIsLoading(true);
         setHasError(false);
         setResolvedUri(undefined);
-        setImageLoaded(false);
-        // Reset animation values
-        blurOpacity.setValue(1);
-        imageOpacity.setValue(0);
       }
 
       try {
@@ -96,21 +86,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
 
   const handleImageLoad = () => {
     setIsLoading(false);
-    setImageLoaded(true);
-    
-    // Animate blur fade out and image fade in
-    Animated.parallel([
-      Animated.timing(blurOpacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(imageOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
   };
 
   const containerStyle = useMemo(
@@ -139,42 +114,20 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       ) : null}
     </View>
   ) : (
-    <>
-      {/* Blurred placeholder */}
-      {isLoading && (
-        <Animated.View style={[styles.blurContainer, { borderRadius, opacity: blurOpacity }]}>
-          <BlurView
-            intensity={20}
-            tint="light"
-            style={[StyleSheet.absoluteFillObject, { borderRadius }]}
-          >
-            <View style={[styles.blurContent, { borderRadius }]}>
-              <Icon source="image-outline" size={24} color={theme.colors.onSurfaceVariant} />
-            </View>
-          </BlurView>
-        </Animated.View>
-      )}
-      
-      {/* Actual image */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: imageOpacity }]}>
-        <Image
-          source={{ uri: resolvedUri }}
-          style={[StyleSheet.absoluteFillObject, { borderRadius }]}
-          accessibilityLabel={accessibilityLabel}
-          cachePolicy="memory-disk"
-          contentFit="cover"
-          transition={0} // Disable expo-image transition since we're handling it manually
-          onLoadEnd={handleImageLoad}
-          onError={() => {
-            setIsLoading(false);
-            setHasError(true);
-            // Reset animations on error
-            blurOpacity.setValue(0);
-            imageOpacity.setValue(0);
-          }}
-        />
-      </Animated.View>
-    </>
+    <Image
+      source={{ uri: resolvedUri }}
+      style={[StyleSheet.absoluteFillObject, { borderRadius }]}
+      accessibilityLabel={accessibilityLabel}
+      cachePolicy="memory-disk"
+      contentFit="cover"
+      transition={0}
+      onLoad={handleImageLoad}
+      onLoadEnd={handleImageLoad}
+      onError={() => {
+        setIsLoading(false);
+        setHasError(true);
+      }}
+    />
   );
 
 
@@ -213,14 +166,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-  },
-  blurContainer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  blurContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
 });

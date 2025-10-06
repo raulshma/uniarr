@@ -1,6 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+// Use legacy FileSystem API to avoid deprecation warnings for getInfoAsync.
+// TODO: migrate to the new File/Directory API from `expo-file-system` to remove
+// the legacy dependency and use the modern APIs for file info and operations.
+import * as FileSystem from 'expo-file-system/legacy';
 import { Image } from 'expo-image';
+import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 
 import { logger } from '@/services/logger/LoggerService';
 
@@ -58,6 +62,30 @@ class ImageCacheService {
         uri,
         error: this.stringifyError(error),
       });
+    }
+
+    // If the image couldn't be resolved to a cached path, check whether the
+    // URI belongs to one of our registered connectors and, if so, append an
+    // apikey query parameter so the native image loader can authenticate the
+    // request. This mirrors the behavior used when prefetching images.
+    try {
+      const connectors = ConnectorManager.getInstance().getAllConnectors();
+      for (const connector of connectors) {
+        try {
+          const base = connector.config.url.replace(/\/+$/, '');
+          if (uri.startsWith(base) && connector.config.apiKey) {
+            const parsed = new URL(uri);
+            if (!parsed.searchParams.has('apikey')) {
+              parsed.searchParams.set('apikey', connector.config.apiKey);
+              return parsed.toString();
+            }
+          }
+        } catch {
+          // ignore URL parsing errors
+        }
+      }
+    } catch {
+      // ignore failures looking up connectors
     }
 
     return uri;
@@ -242,7 +270,32 @@ class ImageCacheService {
         return prefetchedPath;
       }
 
-      const success = await Image.prefetch(uri, { cachePolicy: 'disk' });
+      // If the image is hosted by one of the configured connectors and that connector
+      // requires an API key, append the apikey query parameter so the image fetch
+      // is authenticated. We prefer appending the query string over relying on
+      // request headers because the native image loader APIs may not forward
+      // custom headers for remote image requests.
+      const connectors = ConnectorManager.getInstance().getAllConnectors();
+      let fetchUri = uri;
+
+      for (const connector of connectors) {
+        try {
+          const base = connector.config.url.replace(/\/+$/, '');
+          if (fetchUri.startsWith(base) && connector.config.apiKey) {
+            // Only add apikey if it's not already present
+            const parsed = new URL(fetchUri);
+            if (!parsed.searchParams.has('apikey')) {
+              parsed.searchParams.set('apikey', connector.config.apiKey);
+              fetchUri = parsed.toString();
+            }
+            break;
+          }
+        } catch {
+          // Ignore any URL parsing issues and continue
+        }
+      }
+
+      const success = await Image.prefetch(fetchUri, { cachePolicy: 'disk' });
       if (!success) {
         return null;
       }
