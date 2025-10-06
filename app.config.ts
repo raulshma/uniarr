@@ -19,6 +19,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.uniarr.app",
+    infoPlist: {
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: true,
+      },
+    },
   },
   android: {
     adaptiveIcon: {
@@ -28,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "com.raulshma.uniarr",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
+    usesCleartextTraffic: true,
     intentFilters: [
       {
         action: "VIEW",
