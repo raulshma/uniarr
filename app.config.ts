@@ -33,7 +33,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "com.raulshma.uniarr",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
-    usesCleartextTraffic: true,
     intentFilters: [
       {
         action: "VIEW",
