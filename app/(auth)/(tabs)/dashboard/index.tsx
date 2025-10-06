@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { ServiceCard, ServiceCardSkeleton } from '@/components/service/ServiceCard';
 import { ListRowSkeleton, SkeletonPlaceholder } from '@/components/common/Skeleton';
+import { UnifiedSearchPanel } from '@/components/search/UnifiedSearchPanel';
 import type { ServiceStatusState } from '@/components/service/ServiceStatus';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -49,9 +50,11 @@ type SummaryMetrics = {
 
 type DashboardListItem =
   | { type: 'header' }
+  | { type: 'search' }
   | { type: 'services' }
   | { type: 'service'; data: ServiceOverviewItem }
-  | { type: 'activity' };
+  | { type: 'activity' }
+  | { type: 'empty' };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: 'Sonarr',
@@ -252,23 +255,20 @@ const DashboardScreen = () => {
   const isRefreshing = isFetching && !isLoading;
 
   const listData: DashboardListItem[] = useMemo(() => {
+    const items: DashboardListItem[] = [{ type: 'header' }, { type: 'search' }];
+
     if (services.length === 0) {
-      return [{ type: 'header' }];
+      items.push({ type: 'empty' });
+      return items;
     }
 
-    const items: DashboardListItem[] = [{ type: 'header' }];
-
-    if (services.length > 0) {
-      items.push({ type: 'services' });
-    }
+    items.push({ type: 'services' });
 
     services.forEach((service) => {
       items.push({ type: 'service', data: service });
     });
 
-    if (services.length > 0) {
-      items.push({ type: 'activity' });
-    }
+    items.push({ type: 'activity' });
 
     return items;
   }, [services]);
@@ -286,6 +286,10 @@ const DashboardScreen = () => {
         },
         section: {
           marginTop: spacing.lg,
+        },
+        searchWrapper: {
+          marginTop: spacing.lg,
+          marginHorizontal: spacing.md,
         },
         sectionTitle: {
           color: theme.colors.onBackground,
@@ -602,51 +606,7 @@ const DashboardScreen = () => {
     );
   }, [router, styles, downloadsData, recentlyAddedData, theme]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: DashboardListItem }) => {
-      switch (item.type) {
-        case 'header':
-          return renderHeader();
-        case 'services':
-          return (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Services</Text>
-            </View>
-          );
-        case 'service':
-          return renderServiceItem({ item: item.data });
-        case 'activity':
-          return (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Activity</Text>
-              {renderActivityItem()}
-            </View>
-          );
-        default:
-          return null;
-      }
-    },
-    [renderHeader, renderServiceItem, styles],
-  );
-
-  const keyExtractor = useCallback((item: DashboardListItem) => {
-    switch (item.type) {
-      case 'header':
-        return 'header';
-      case 'services':
-        return 'services';
-      case 'service':
-        return `service-${item.data.config.id}`;
-      case 'activity':
-        return 'activity';
-      default:
-        return 'unknown';
-    }
-  }, []);
-
-  const getItemType = useCallback((item: DashboardListItem) => item.type, []);
-
-  const listEmptyComponent = useMemo(() => {
+  const emptyServicesContent = useMemo(() => {
     if (isError) {
       const message = error instanceof Error ? error.message : 'Unable to load services.';
 
@@ -670,6 +630,63 @@ const DashboardScreen = () => {
     );
   }, [error, handleAddService, isError, refetch]);
 
+  const renderItem = useCallback(
+    ({ item }: { item: DashboardListItem }) => {
+      switch (item.type) {
+        case 'header':
+          return renderHeader();
+        case 'search':
+          return (
+            <View style={styles.searchWrapper}>
+              <UnifiedSearchPanel />
+            </View>
+          );
+        case 'services':
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Services</Text>
+            </View>
+          );
+        case 'service':
+          return renderServiceItem({ item: item.data });
+        case 'activity':
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Activity</Text>
+              {renderActivityItem()}
+            </View>
+          );
+        case 'empty':
+          return <View style={styles.section}>{emptyServicesContent}</View>;
+        default:
+          return null;
+      }
+    },
+    [emptyServicesContent, renderActivityItem, renderHeader, renderServiceItem, styles],
+  );
+
+  const keyExtractor = useCallback((item: DashboardListItem) => {
+    switch (item.type) {
+      case 'header':
+        return 'header';
+      case 'search':
+        return 'search';
+      case 'services':
+        return 'services';
+      case 'service':
+        return `service-${item.data.config.id}`;
+      case 'activity':
+        return 'activity';
+      case 'empty':
+        return 'empty';
+      default:
+        return 'unknown';
+    }
+  }, []);
+
+  const getItemType = useCallback((item: DashboardListItem) => item.type, []);
+
+
   if (isLoading && services.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
@@ -681,6 +698,9 @@ const DashboardScreen = () => {
               accessibilityLabel: 'Add service',
             }}
           />
+          <View style={styles.searchWrapper}>
+            <UnifiedSearchPanel />
+          </View>
           <View style={styles.section}>
             <SkeletonPlaceholder width="40%" height={28} borderRadius={10} style={{ marginBottom: spacing.md }} />
             {Array.from({ length: 3 }).map((_, index) => (
@@ -710,7 +730,7 @@ const DashboardScreen = () => {
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
-        ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
+        ListEmptyComponent={<View style={styles.emptyContainer}>{emptyServicesContent}</View>}
         refreshControl={
           <ListRefreshControl
             refreshing={isRefreshing}

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
@@ -81,8 +81,20 @@ const RadarrAddMovieScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const queryClient = useQueryClient();
-  const { serviceId } = useLocalSearchParams<{ serviceId?: string }>();
+  const { serviceId, query: initialQueryParam, tmdbId: tmdbIdParam } =
+    useLocalSearchParams<{ serviceId?: string; query?: string; tmdbId?: string }>();
   const serviceKey = serviceId ?? '';
+  const initialQuery = typeof initialQueryParam === 'string' ? initialQueryParam.trim() : '';
+
+  const parseNumberParam = (value?: string): number | undefined => {
+    if (!value) {
+      return undefined;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  const prefillTmdbId = parseNumberParam(tmdbIdParam);
 
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
   const connector = useMemo(() => {
@@ -100,9 +112,19 @@ const RadarrAddMovieScreen = () => {
     return connector;
   }, [connector, serviceKey]);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedTerm, setDebouncedTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialQuery);
+  const [debouncedTerm, setDebouncedTerm] = useState(initialQuery);
   const [selectedMovie, setSelectedMovie] = useState<Movie | undefined>(undefined);
+  const prefillAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (!initialQuery) {
+      return;
+    }
+
+    setSearchTerm((current) => (current.trim().length === 0 ? initialQuery : current));
+    setDebouncedTerm((current) => (current.trim().length === 0 ? initialQuery : current));
+  }, [initialQuery]);
 
   const {
     control,
@@ -162,6 +184,30 @@ const RadarrAddMovieScreen = () => {
   const qualityProfiles = qualityProfilesQuery.data ?? [];
   const rootFolders = rootFoldersQuery.data ?? [];
   const searchResults = searchQuery.data ?? [];
+
+  useEffect(() => {
+    prefillAppliedRef.current = false;
+  }, [prefillTmdbId]);
+
+  useEffect(() => {
+    if (prefillAppliedRef.current) {
+      return;
+    }
+
+    if (searchResults.length === 0) {
+      return;
+    }
+
+    if (prefillTmdbId === undefined) {
+      return;
+    }
+
+    const match = searchResults.find((movie) => movie.tmdbId === prefillTmdbId);
+    if (match) {
+      setSelectedMovie(match);
+      prefillAppliedRef.current = true;
+    }
+  }, [prefillTmdbId, searchResults]);
 
   useEffect(() => {
     if (!selectedMovie) {

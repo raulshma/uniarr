@@ -1,9 +1,28 @@
+import type { UnifiedSearchMediaType } from '@/models/search.types';
+
 type QueryKeySegment = string | number | boolean | Record<string, unknown> | undefined;
 
 type QueryKeyBuilder = readonly QueryKeySegment[];
 
 /** Centralised query key factories for TanStack Query resources. */
 export const queryKeys = {
+  unifiedSearch: {
+    base: ['unifiedSearch'] as const,
+    results: (
+      term: string,
+      options?: { serviceIds?: string[]; mediaTypes?: UnifiedSearchMediaType[] },
+    ): QueryKeyBuilder => [
+      'unifiedSearch',
+      'results',
+      {
+        term: term.trim(),
+        services: options?.serviceIds ? [...options.serviceIds].sort() : undefined,
+        mediaTypes: options?.mediaTypes ? [...options.mediaTypes].sort() : undefined,
+      },
+    ] as const,
+    history: ['unifiedSearch', 'history'] as const,
+    services: ['unifiedSearch', 'services'] as const,
+  },
   services: {
     base: ['services'] as const,
     overview: ['services', 'overview'] as const,
