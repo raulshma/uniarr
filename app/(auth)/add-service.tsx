@@ -18,12 +18,15 @@ import { Controller, useForm } from 'react-hook-form';
 import axios from 'axios';
 
 import { Button } from '@/components/common/Button';
+import NetworkScanResults from '@/components/service/NetworkScanResults';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorFactory } from '@/connectors/factory/ConnectorFactory';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import type { AppTheme } from '@/constants/theme';
 import type { ServiceConfig, ServiceType } from '@/models/service.types';
+import type { DiscoveredService } from '@/services/network/NetworkScannerService';
 import { queryKeys } from '@/hooks/queryKeys';
+import { useNetworkScan } from '@/hooks/useNetworkScan';
 import { logger } from '@/services/logger/LoggerService';
 import { secureStorage } from '@/services/storage/SecureStorage';
 import { spacing } from '@/theme/spacing';
@@ -115,6 +118,9 @@ const AddServiceScreen = () => {
   }>({ status: 'idle', message: null });
   const urlValidationController = useRef<AbortController | null>(null);
   const [serviceTypeModalVisible, setServiceTypeModalVisible] = useState(false);
+  const [networkScanModalVisible, setNetworkScanModalVisible] = useState(false);
+
+  const { isScanning, scanResult, error: scanError, scanNetwork, stopScan, reset: resetScan } = useNetworkScan();
 
 
   const styles = useMemo(
@@ -155,6 +161,13 @@ const AddServiceScreen = () => {
         heroSubtitle: {
           color: theme.colors.onSurfaceVariant,
         },
+        scanNetworkButton: {
+          marginTop: spacing.md,
+          backgroundColor: theme.colors.surface,
+        },
+        scanNetworkButtonLabel: {
+          color: theme.colors.primary,
+        },
         formCard: {
           gap: spacing.lg,
         },
@@ -191,6 +204,22 @@ const AddServiceScreen = () => {
         },
         optionDisabled: {
           opacity: 0.5,
+        },
+        networkScanHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.md,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.sm,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.colors.outlineVariant,
+        },
+        networkScanTitle: {
+          fontWeight: '600',
+        },
+        networkScanResults: {
+          flex: 1,
         },
         helperText: {
           marginTop: spacing.xs,
@@ -264,6 +293,36 @@ const AddServiceScreen = () => {
     }
     urlValidationController.current = null;
   }, []);
+
+  const handleServiceSelect = useCallback((service: DiscoveredService) => {
+    // Close the network scan modal
+    setNetworkScanModalVisible(false);
+
+    // Reset form and populate with discovered service data
+    reset({
+      name: service.name,
+      type: service.type,
+      url: service.url,
+      apiKey: '',
+      username: '',
+      password: '',
+    });
+
+    // Clear any existing diagnostics
+    resetDiagnostics();
+
+    void logger.info('Service selected from network scan', {
+      location: 'AddServiceScreen.handleServiceSelect',
+      serviceType: service.type,
+      url: service.url,
+    });
+  }, [reset, resetDiagnostics]);
+
+  const handleScanNetwork = useCallback(async () => {
+    setNetworkScanModalVisible(true);
+    resetScan();
+    await scanNetwork();
+  }, [scanNetwork, resetScan]);
 
   const runConnectionTest = useCallback(
     async (config: ServiceConfig): Promise<ConnectionResult> => {
@@ -424,6 +483,15 @@ const AddServiceScreen = () => {
           <Text variant="bodyMedium" style={styles.heroSubtitle}>
             Enter the connection details exactly as configured in your media server.
           </Text>
+          <Button
+            mode="outlined"
+            onPress={handleScanNetwork}
+            style={styles.scanNetworkButton}
+            labelStyle={styles.scanNetworkButtonLabel}
+            icon="lan"
+          >
+            Scan Network for Services
+          </Button>
         </View>
 
         <View style={styles.formCard}>
@@ -488,6 +556,48 @@ const AddServiceScreen = () => {
                             {!option.isLast && <Divider />}
                           </View>
                         ))}
+                      </Modal>
+                    </Portal>
+
+                    <Portal>
+                      <Modal
+                        visible={networkScanModalVisible}
+                        onDismiss={() => {
+                          setNetworkScanModalVisible(false);
+                          stopScan();
+                        }}
+                        contentContainerStyle={styles.modalContent}
+                      >
+                        <View style={styles.networkScanHeader}>
+                          <Text variant="titleMedium" style={[styles.networkScanTitle, { color: theme.colors.onSurface }]}>
+                            Network Scan Results
+                          </Text>
+                          <IconButton
+                            icon="close"
+                            size={24}
+                            onPress={() => {
+                              setNetworkScanModalVisible(false);
+                              stopScan();
+                            }}
+                            accessibilityLabel="Close network scan"
+                          />
+                        </View>
+                        <NetworkScanResults
+                          services={scanResult?.services || []}
+                          isScanning={isScanning}
+                          scanDuration={scanResult?.scanDuration}
+                          scannedHosts={scanResult?.scannedHosts}
+                          onServicePress={handleServiceSelect}
+                          onScanAgain={scanNetwork}
+                          style={styles.networkScanResults}
+                        />
+                        {scanError ? (
+                          <View style={[styles.diagnosticsCard, styles.diagnosticsError]}>
+                            <Text variant="bodySmall" style={styles.diagnosticsText}>
+                              {scanError}
+                            </Text>
+                          </View>
+                        ) : null}
                       </Modal>
                     </Portal>
                   </>
