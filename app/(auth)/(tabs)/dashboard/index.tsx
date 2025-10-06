@@ -2,9 +2,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Text, useTheme, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlashList } from '@shopify/flash-list';
 
 import { TabHeader } from '@/components/common/TabHeader';
 
@@ -26,6 +27,7 @@ import type { ServiceConfig, ServiceType } from '@/models/service.types';
 import { useAuth } from '@/services/auth/AuthProvider';
 import { secureStorage } from '@/services/storage/SecureStorage';
 import { spacing } from '@/theme/spacing';
+import React from 'react';
 
 type ServiceOverviewItem = {
   config: ServiceConfig;
@@ -44,6 +46,11 @@ type SummaryMetrics = {
   offline: number;
   lastUpdated?: Date;
 };
+
+type DashboardListItem =
+  | { type: 'header' }
+  | { type: 'service'; data: ServiceOverviewItem }
+  | { type: 'activity' };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: 'Sonarr',
@@ -242,6 +249,24 @@ const DashboardScreen = () => {
 
   const services = data ?? [];
   const isRefreshing = isFetching && !isLoading;
+
+  const listData: DashboardListItem[] = useMemo(() => {
+    if (services.length === 0) {
+      return [{ type: 'header' }];
+    }
+
+    const items: DashboardListItem[] = [{ type: 'header' }];
+
+    if (services.length > 0) {
+      items.push({ type: 'activity' });
+    }
+
+    services.forEach((service) => {
+      items.push({ type: 'service', data: service });
+    });
+
+    return items;
+  }, [services]);
 
   const styles = useMemo(
     () =>
@@ -476,57 +501,61 @@ const DashboardScreen = () => {
     />
   ), [handleAddService]);
 
-  const renderServiceItem = useCallback(
-    ({ item }: { item: ServiceOverviewItem }) => {
-      const getStatusColor = (status: ServiceStatusState) => {
-        switch (status) {
-          case 'online':
-            return styles.statusOnline;
-          case 'offline':
-            return styles.statusOffline;
-          case 'degraded':
-            return styles.statusDegraded;
-          default:
-            return styles.statusOffline;
-        }
-      };
+  const ServiceCard = React.memo(({ item }: { item: ServiceOverviewItem }) => {
+    const getStatusColor = (status: ServiceStatusState) => {
+      switch (status) {
+        case 'online':
+          return styles.statusOnline;
+        case 'offline':
+          return styles.statusOffline;
+        case 'degraded':
+          return styles.statusDegraded;
+        default:
+          return styles.statusOffline;
+      }
+    };
 
-      const getStatusIcon = (type: ServiceType) => {
-        switch (type) {
-          case 'sonarr':
-            return 'television-classic';
-          case 'radarr':
-            return 'movie-open';
-          case 'jellyseerr':
-            return 'account-search';
-          case 'qbittorrent':
-            return 'download-network';
-          default:
-            return 'server';
-        }
-      };
+    const getStatusIcon = (type: ServiceType) => {
+      switch (type) {
+        case 'sonarr':
+          return 'television-classic';
+        case 'radarr':
+          return 'movie-open';
+        case 'jellyseerr':
+          return 'account-search';
+        case 'qbittorrent':
+          return 'download-network';
+        default:
+          return 'server';
+      }
+    };
 
-      return (
-        <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
-          <View style={styles.serviceContent}>
-            <View style={styles.serviceIcon}>
-              <IconButton icon={getStatusIcon(item.config.type)} size={24} iconColor={theme.colors.primary} />
-            </View>
-            <View style={styles.serviceInfo}>
-              <Text style={styles.serviceName}>{item.config.name}</Text>
-              <View style={styles.serviceStatus}>
-                <View style={[styles.statusIndicator, getStatusColor(item.status)]} />
-                <Text style={styles.serviceStatusText}>
-                  {item.status === 'online' ? 'Healthy' : item.status === 'offline' ? 'Offline' : 'Degraded'}
-                </Text>
-              </View>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+    return (
+      <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
+        <View style={styles.serviceContent}>
+          <View style={styles.serviceIcon}>
+            <IconButton icon={getStatusIcon(item.config.type)} size={24} iconColor={theme.colors.primary} />
           </View>
-        </Card>
-      );
-    },
-    [handleServicePress, styles],
+          <View style={styles.serviceInfo}>
+            <Text style={styles.serviceName}>{item.config.name}</Text>
+            <View style={styles.serviceStatus}>
+              <View style={[styles.statusIndicator, getStatusColor(item.status)]} />
+              <Text style={styles.serviceStatusText}>
+                {item.status === 'online' ? 'Healthy' : item.status === 'offline' ? 'Offline' : 'Degraded'}
+              </Text>
+            </View>
+          </View>
+          <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+        </View>
+      </Card>
+    );
+  });
+
+  const renderServiceItem = useCallback(
+    ({ item }: { item: ServiceOverviewItem }) => (
+      <ServiceCard item={item} />
+    ),
+    [],
   );
 
   const renderActivityItem = useCallback(() => {
@@ -568,7 +597,41 @@ const DashboardScreen = () => {
     );
   }, [router, styles, downloadsData, recentlyAddedData, theme]);
 
-  const keyExtractor = useCallback((item: ServiceOverviewItem) => item.config.id, []);
+  const renderItem = useCallback(
+    ({ item }: { item: DashboardListItem }) => {
+      switch (item.type) {
+        case 'header':
+          return renderHeader();
+        case 'service':
+          return renderServiceItem({ item: item.data });
+        case 'activity':
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Activity</Text>
+              {renderActivityItem()}
+            </View>
+          );
+        default:
+          return null;
+      }
+    },
+    [renderHeader, renderServiceItem, styles],
+  );
+
+  const keyExtractor = useCallback((item: DashboardListItem) => {
+    switch (item.type) {
+      case 'header':
+        return 'header';
+      case 'service':
+        return `service-${item.data.config.id}`;
+      case 'activity':
+        return 'activity';
+      default:
+        return 'unknown';
+    }
+  }, []);
+
+  const getItemType = useCallback((item: DashboardListItem) => item.type, []);
 
   const listEmptyComponent = useMemo(() => {
     if (isError) {
@@ -628,35 +691,10 @@ const DashboardScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList
-        data={services.length > 0 ? ['header', 'services', 'activity'] : ['header']}
-        keyExtractor={(item) => item}
-        renderItem={({ item }) => {
-          switch (item) {
-            case 'header':
-              return renderHeader();
-            case 'services':
-              return (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Services</Text>
-                  {services.map((service) => (
-                    <View key={service.config.id}>
-                      {renderServiceItem({ item: service })}
-                    </View>
-                  ))}
-                </View>
-              );
-            case 'activity':
-              return (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Activity</Text>
-                  {renderActivityItem()}
-                </View>
-              );
-            default:
-              return null;
-          }
-        }}
+      <FlashList
+        data={listData}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
         ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
@@ -667,6 +705,8 @@ const DashboardScreen = () => {
           />
         }
         showsVerticalScrollIndicator={false}
+        getItemType={getItemType}
+        removeClippedSubviews={true}
       />
     </SafeAreaView>
   );

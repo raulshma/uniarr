@@ -2,9 +2,10 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Alert, FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { IconButton, Text, useTheme, Portal, Modal, List, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlashList } from '@shopify/flash-list';
 
 import { TabHeader } from '@/components/common/TabHeader';
 
@@ -33,6 +34,10 @@ type ServiceOverviewItem = {
   latency?: number;
   version?: string;
 };
+
+type ServicesListItem =
+  | { type: 'header' }
+  | { type: 'service'; data: ServiceOverviewItem };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: 'Sonarr',
@@ -163,6 +168,20 @@ const ServicesScreen = () => {
 
   const services = data ?? [];
   const isRefreshing = isFetching && !isLoading;
+
+  const listData: ServicesListItem[] = useMemo(() => {
+    if (services.length === 0) {
+      return [{ type: 'header' }];
+    }
+
+    const items: ServicesListItem[] = [{ type: 'header' }];
+
+    services.forEach((service) => {
+      items.push({ type: 'service', data: service });
+    });
+
+    return items;
+  }, [services]);
 
   const styles = useMemo(
     () =>
@@ -345,56 +364,85 @@ const ServicesScreen = () => {
     />
   ), [handleBackPress, handleAddService]);
 
-  const renderServiceItem = useCallback(
-    ({ item }: { item: ServiceOverviewItem }) => {
-      const displayName = serviceDisplayNames[item.config.type] || item.config.name;
-      const serviceType = serviceTypeLabels[item.config.type];
-      const iconName = serviceIcons[item.config.type];
+  const ServiceCard = React.memo(({ item }: { item: ServiceOverviewItem }) => {
+    const displayName = serviceDisplayNames[item.config.type] || item.config.name;
+    const serviceType = serviceTypeLabels[item.config.type];
+    const iconName = serviceIcons[item.config.type];
 
-      return (
-        <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
-          <View style={styles.serviceContent}>
-            <View style={styles.serviceIcon}>
-              <IconButton icon={iconName} size={24} iconColor={theme.colors.primary} />
-            </View>
-            <View style={styles.serviceInfo}>
-              <Text style={styles.serviceName}>{displayName}</Text>
-              <Text style={styles.serviceType}>{serviceType}</Text>
-              <View style={styles.serviceStatus}>
-                <ServiceStatus
-                  status={item.status}
-                  showLabel={false}
-                  size="sm"
-                />
-                <Text
-                  style={{
-                    color: item.status === 'online'
-                      ? theme.colors.primary
-                      : item.status === 'offline'
-                      ? theme.colors.error
-                      : theme.colors.tertiary,
-                    fontSize: 14,
-                    marginLeft: 4,
-                  }}
-                >
-                  {item.status === 'online' ? 'Connected' : item.status === 'offline' ? 'Offline' : 'Degraded'}
-                </Text>
-              </View>
-            </View>
-            <IconButton
-              icon="dots-vertical"
-              size={20}
-              iconColor={theme.colors.outline}
-              onPress={() => handleServiceMenuPress(item)}
-            />
+    return (
+      <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
+        <View style={styles.serviceContent}>
+          <View style={styles.serviceIcon}>
+            <IconButton icon={iconName} size={24} iconColor={theme.colors.primary} />
           </View>
-        </Card>
-      );
-    },
-    [handleServicePress, styles, theme],
+          <View style={styles.serviceInfo}>
+            <Text style={styles.serviceName}>{displayName}</Text>
+            <Text style={styles.serviceType}>{serviceType}</Text>
+            <View style={styles.serviceStatus}>
+              <ServiceStatus
+                status={item.status}
+                showLabel={false}
+                size="sm"
+              />
+              <Text
+                style={{
+                  color: item.status === 'online'
+                    ? theme.colors.primary
+                    : item.status === 'offline'
+                    ? theme.colors.error
+                    : theme.colors.tertiary,
+                  fontSize: 14,
+                  marginLeft: 4,
+                }}
+              >
+                {item.status === 'online' ? 'Connected' : item.status === 'offline' ? 'Offline' : 'Degraded'}
+              </Text>
+            </View>
+          </View>
+          <IconButton
+            icon="dots-vertical"
+            size={20}
+            iconColor={theme.colors.outline}
+            onPress={() => handleServiceMenuPress(item)}
+          />
+        </View>
+      </Card>
+    );
+  });
+
+  const renderServiceItem = useCallback(
+    ({ item }: { item: ServiceOverviewItem }) => (
+      <ServiceCard item={item} />
+    ),
+    [],
   );
 
-  const keyExtractor = useCallback((item: ServiceOverviewItem) => item.config.id, []);
+  const renderItem = useCallback(
+    ({ item }: { item: ServicesListItem }) => {
+      switch (item.type) {
+        case 'header':
+          return renderHeader();
+        case 'service':
+          return renderServiceItem({ item: item.data });
+        default:
+          return null;
+      }
+    },
+    [renderHeader, renderServiceItem],
+  );
+
+  const keyExtractor = useCallback((item: ServicesListItem) => {
+    switch (item.type) {
+      case 'header':
+        return 'header';
+      case 'service':
+        return `service-${item.data.config.id}`;
+      default:
+        return 'unknown';
+    }
+  }, []);
+
+  const getItemType = useCallback((item: ServicesListItem) => item.type, []);
 
   const listEmptyComponent = useMemo(() => {
     if (isError) {
@@ -448,30 +496,10 @@ const ServicesScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList
-        data={services.length > 0 ? ['header', 'services'] : ['header']}
-        keyExtractor={(item) => item}
-        renderItem={({ item }) => {
-          switch (item) {
-            case 'header':
-              return renderHeader();
-            case 'services':
-              return (
-                <View style={styles.content}>
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Manage Services</Text>
-                    {services.map((service) => (
-                      <View key={service.config.id}>
-                        {renderServiceItem({ item: service })}
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              );
-            default:
-              return null;
-          }
-        }}
+      <FlashList
+        data={listData}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
         contentContainerStyle={services.length === 0 ? { flex: 1 } : undefined}
         ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
         refreshControl={
@@ -481,6 +509,8 @@ const ServicesScreen = () => {
           />
         }
         showsVerticalScrollIndicator={false}
+        getItemType={getItemType}
+        removeClippedSubviews={true}
       />
 
       <Portal>

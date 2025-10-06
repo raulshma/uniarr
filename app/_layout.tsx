@@ -3,7 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
 import { useMemo, type ComponentType } from 'react';
-import { Platform, useColorScheme } from 'react-native';
+import { Platform, useColorScheme, View } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -12,11 +12,14 @@ import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthSer
 import { AuthProvider } from '@/services/auth/AuthProvider';
 import { useTheme } from '@/hooks/useTheme';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { OfflineIndicator } from '@/components/common/OfflineIndicator';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 const RootLayout = () => {
   const colorScheme = useColorScheme();
   const theme = useTheme();
   const clerkPublishableKey = useMemo(getClerkPublishableKey, []);
+  const { isOnline } = useOfflineSync();
 
   return (
     <SafeAreaProvider>
@@ -27,7 +30,10 @@ const RootLayout = () => {
               <PaperProvider theme={theme}>
                 <StatusBar style={theme.dark ? 'light' : 'dark'} />
                 <ErrorBoundary context={{ location: 'RootLayout' }}>
-                  <Stack screenOptions={{ headerShown: false }} />
+                  <View style={{ flex: 1 }}>
+                    <OfflineIndicator isVisible={!isOnline} />
+                    <Stack screenOptions={{ headerShown: false }} />
+                  </View>
                 </ErrorBoundary>
                 <QueryDevtools />
               </PaperProvider>
