@@ -23,13 +23,18 @@ const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
 export class ConnectorFactory {
   /** Instantiate a connector for the provided service configuration. */
   static create(config: ServiceConfig): IConnector {
+    console.log('🏭 [ConnectorFactory] Creating connector for type:', config.type);
     const constructor = connectorRegistry[config.type];
 
     if (!constructor) {
+      console.error('🏭 [ConnectorFactory] Unsupported service type:', config.type);
       throw new Error(`Unsupported service type: ${config.type}`);
     }
 
-    return new constructor(config);
+    console.log('🏭 [ConnectorFactory] Constructor found, creating instance...');
+    const connector = new constructor(config);
+    console.log('🏭 [ConnectorFactory] Connector instance created');
+    return connector;
   }
 
   /** Return the list of service types currently supported by the factory. */

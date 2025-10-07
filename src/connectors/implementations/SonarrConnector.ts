@@ -170,14 +170,44 @@ interface SonarrRootFolder {
 
 export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async initialize(): Promise<void> {
+    console.log('🔧 [SonarrConnector] Initializing...');
     await this.getVersion();
+    console.log('🔧 [SonarrConnector] Initialization completed');
   }
 
   async getVersion(): Promise<string> {
     try {
+      const fullUrl = `${this.config.url}/api/v3/system/status`;
+      console.log('🔧 [SonarrConnector] Getting version from:', fullUrl);
+      console.log('🔧 [SonarrConnector] Config details:', {
+        url: this.config.url,
+        apiKey: this.config.apiKey ? '***' : 'missing',
+        timeout: this.config.timeout
+      });
+      
       const response = await this.client.get<SonarrSystemStatus>('/api/v3/system/status');
-      return response.data.version ?? 'unknown';
+      const version = response.data.version ?? 'unknown';
+      console.log('🔧 [SonarrConnector] Version retrieved successfully:', version);
+      console.log('🔧 [SonarrConnector] Response status:', response.status);
+      console.log('🔧 [SonarrConnector] Response headers:', response.headers);
+      return version;
     } catch (error) {
+      console.error('🔧 [SonarrConnector] Version request failed:', error);
+      const axiosError = error as any;
+      console.error('🔧 [SonarrConnector] Error details:', {
+        message: axiosError.message,
+        code: axiosError.code,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        data: axiosError.response?.data
+      });
+      
+      // Check if it's a network connectivity issue
+      if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ENOTFOUND' || axiosError.code === 'ETIMEDOUT') {
+        console.error('🔧 [SonarrConnector] Network connectivity issue detected');
+        console.error('🔧 [SonarrConnector] This might be a VPN or firewall issue');
+      }
+      
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,

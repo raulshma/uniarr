@@ -4,6 +4,28 @@ import { SonarrConnector, type SonarrQueueItem } from '@/connectors/implementati
 import type { ServiceConfig } from '@/models/service.types';
 import { ApiError, handleApiError } from '@/utils/error.utils';
 
+// Mock network utilities
+jest.mock('@/utils/network.utils', () => ({
+  testNetworkConnectivity: jest.fn().mockResolvedValue({
+    success: true,
+    latency: 50,
+  }),
+  diagnoseVpnIssues: jest.fn().mockReturnValue([]),
+}));
+
+// Mock API test utilities
+jest.mock('@/utils/api-test.utils', () => ({
+  testSonarrApi: jest.fn().mockResolvedValue({
+    success: true,
+  }),
+  testRadarrApi: jest.fn().mockResolvedValue({
+    success: true,
+  }),
+  testQBittorrentApi: jest.fn().mockResolvedValue({
+    success: true,
+  }),
+}));
+
 // Type definitions for mocks
 type MockAxiosInstance = {
   get: jest.MockedFunction<any>;

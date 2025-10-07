@@ -73,24 +73,23 @@ jest.mock('@/services/storage/SecureStorage', () => ({
 }));
 
 // Mock connector implementations
-// @ts-ignore - Jest mock typing issues
 jest.mock('@/connectors/implementations/SonarrConnector', () => ({
   SonarrConnector: jest.fn().mockImplementation(() => ({
     testConnection: jest.fn().mockResolvedValue({
       success: true,
       version: '4.0.0',
       latency: 100,
-    } as any),
+    }),
     getSeries: jest.fn().mockResolvedValue([
       { id: 1, title: 'Series 1', status: 'continuing' },
       { id: 2, title: 'Series 2', status: 'ended' },
-    ] as any),
-    search: jest.fn().mockResolvedValue([] as any),
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'New Series' } as any),
-    initialize: jest.fn().mockResolvedValue(undefined as any),
-    dispose: jest.fn().mockResolvedValue(undefined as any),
-    getHealth: jest.fn().mockResolvedValue({ status: 'healthy', lastChecked: new Date() } as any),
-    getVersion: jest.fn().mockResolvedValue('4.0.0' as any),
+    ]),
+    search: jest.fn().mockResolvedValue([]),
+    add: jest.fn().mockResolvedValue({ id: 1, title: 'New Series' }),
+    initialize: jest.fn().mockResolvedValue(undefined),
+    dispose: jest.fn().mockResolvedValue(undefined),
+    getHealth: jest.fn().mockResolvedValue({ status: 'healthy', lastChecked: new Date() }),
+    getVersion: jest.fn().mockResolvedValue('4.0.0'),
   })),
 }));
 
