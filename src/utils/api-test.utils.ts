@@ -196,3 +196,55 @@ export async function testQBittorrentApi(baseUrl: string, username?: string, pas
     };
   }
 }
+
+/**
+ * Test Jellyseerr API specifically
+ */
+export async function testJellyseerrApi(baseUrl: string, username?: string, password?: string, timeout: number = 15000): Promise<ApiTestResult> {
+  const fullUrl = `${baseUrl}/api/v1/status`;
+  console.log('🧪 [ApiTest] Testing Jellyseerr API:', fullUrl);
+  console.log('🧪 [ApiTest] Username provided:', username ? 'Yes' : 'No');
+  console.log('🧪 [ApiTest] Password provided:', password ? 'Yes' : 'No');
+  console.log('🧪 [ApiTest] Timeout:', timeout);
+
+  try {
+    const authConfig = username && password ? { auth: { username, password } } : {};
+    
+    const response = await axios.get(fullUrl, {
+      timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'UniArr/1.0.0',
+      },
+      ...authConfig,
+    });
+
+    console.log('✅ [ApiTest] Jellyseerr API worked:', {
+      status: response.status,
+      data: response.data,
+    });
+
+    return {
+      success: true,
+      status: response.status,
+      data: response.data,
+      headers: response.headers as Record<string, string>,
+    };
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    console.log('❌ [ApiTest] Jellyseerr API failed:', {
+      status: axiosError.response?.status,
+      message: axiosError.message,
+      code: axiosError.code,
+      data: axiosError.response?.data,
+    });
+
+    return {
+      success: false,
+      status: axiosError.response?.status,
+      error: axiosError.message,
+      data: axiosError.response?.data,
+    };
+  }
+}

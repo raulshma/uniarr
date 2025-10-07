@@ -29,8 +29,8 @@ export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' 
   }
   
   // Service-specific validation
-  if (serviceType === 'sonarr' || serviceType === 'radarr' || serviceType === 'jellyseerr' || serviceType === 'prowlarr') {
-    // Sonarr/Radarr/Jellyseerr/Prowlarr API keys are typically 32 characters
+  if (serviceType === 'sonarr' || serviceType === 'radarr' || serviceType === 'prowlarr') {
+    // Sonarr/Radarr/Prowlarr API keys are typically 32 characters
     if (trimmedKey.length !== 32) {
       issues.push(`${serviceType} API key should be 32 characters long (current: ${trimmedKey.length})`);
     }
@@ -41,9 +41,9 @@ export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' 
     }
   }
   
-  if (serviceType === 'qbittorrent') {
-    // qBittorrent doesn't use API keys, it uses username/password
-    issues.push('qBittorrent uses username/password authentication, not API keys');
+  if (serviceType === 'qbittorrent' || serviceType === 'jellyseerr') {
+    // qBittorrent and Jellyseerr don't use API keys, they use username/password
+    issues.push(`${serviceType} uses username/password authentication, not API keys`);
   }
   
   return {
@@ -62,7 +62,7 @@ export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbitto
     case 'radarr':
       return 'Go to Radarr → Settings → General → Security → API Key';
     case 'jellyseerr':
-      return 'Go to Jellyseerr → Settings → General → API Key';
+      return 'Jellyseerr uses username/password authentication. Use your Jellyfin credentials.';
     case 'prowlarr':
       return 'Go to Prowlarr → Settings → General → API Key';
     case 'qbittorrent':
@@ -97,8 +97,8 @@ export function testApiKeyFormat(apiKey: string, serviceType: 'sonarr' | 'radarr
     'If the API key is correct, check if the service is running and accessible',
   ];
   
-  if (serviceType === 'qbittorrent') {
-    suggestions.push('qBittorrent uses username/password authentication, not API keys');
+  if (serviceType === 'qbittorrent' || serviceType === 'jellyseerr') {
+    suggestions.push(`${serviceType} uses username/password authentication, not API keys`);
   }
   
   return {

@@ -47,6 +47,26 @@ export const serviceConfigSchema = z
       return;
     }
 
+    if (data.type === 'jellyseerr') {
+      if (!data.username) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['username'],
+          message: 'Username is required for Jellyseerr',
+        });
+      }
+
+      if (!data.password) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['password'],
+          message: 'Password is required for Jellyseerr',
+        });
+      }
+
+      return;
+    }
+
     if (!data.apiKey) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
