@@ -450,10 +450,13 @@ const buildDeclineBody = (options?: JellyseerrDeclineOptions): DeclineRequestBod
 
 export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, CreateJellyseerrRequest> {
   async initialize(): Promise<void> {
+    await this.ensureAuthenticated();
     await this.getVersion();
   }
 
   async getVersion(): Promise<string> {
+    await this.ensureAuthenticated();
+    
     try {
       const response = await this.client.get<ApiStatusResponse>(STATUS_ENDPOINT);
       return response.data.version ?? response.data.commitTag ?? 'unknown';
@@ -468,6 +471,8 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   }
 
   async getRequests(options?: JellyseerrRequestQueryOptions): Promise<JellyseerrRequestList> {
+    await this.ensureAuthenticated();
+    
     try {
       const params = normalizeRequestQuery(options);
       const response = await this.client.get<ApiPaginatedResponse<ApiRequest>>(REQUEST_ENDPOINT, { params });
@@ -483,6 +488,8 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   }
 
   async getRequestById(id: number): Promise<JellyseerrRequest> {
+    await this.ensureAuthenticated();
+    
     try {
       const response = await this.client.get<ApiRequest>(`${REQUEST_ENDPOINT}/${id}`);
       return mapRequest(response.data);
@@ -497,6 +504,8 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   }
 
   async createRequest(payload: CreateJellyseerrRequest): Promise<JellyseerrRequest> {
+    await this.ensureAuthenticated();
+    
     try {
       const response = await this.client.post<ApiRequest>(REQUEST_ENDPOINT, buildCreatePayload(payload));
       return mapRequest(response.data);
@@ -511,6 +520,8 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   }
 
   async approveRequest(requestId: number, options?: JellyseerrApprovalOptions): Promise<JellyseerrRequest> {
+    await this.ensureAuthenticated();
+    
     try {
       const response = await this.client.post<ApiRequest>(
         `${REQUEST_ENDPOINT}/${requestId}/approve`,
@@ -528,6 +539,8 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   }
 
   async declineRequest(requestId: number, options?: JellyseerrDeclineOptions): Promise<JellyseerrRequest> {
+    await this.ensureAuthenticated();
+    
     try {
       const response = await this.client.post<ApiRequest>(
         `${REQUEST_ENDPOINT}/${requestId}/decline`,
@@ -545,6 +558,8 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   }
 
   async deleteRequest(requestId: number): Promise<boolean> {
+    await this.ensureAuthenticated();
+    
     try {
       await this.client.delete(`${REQUEST_ENDPOINT}/${requestId}`);
       return true;
@@ -559,6 +574,8 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   }
 
   async search(query: string, options?: SearchOptions): Promise<JellyseerrSearchResult[]> {
+    await this.ensureAuthenticated();
+    
     try {
       const params: Record<string, unknown> = {
         query,
