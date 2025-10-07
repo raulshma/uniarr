@@ -54,6 +54,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-notifications",
     [
+      "expo-build-properties",
+      {
+        android: {
+          usesCleartextTraffic: true,
+        },
+      },
+    ],
+    [
       "expo-web-browser",
       {
         // Disable web-browser plugin for web platform
