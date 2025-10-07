@@ -816,7 +816,7 @@ const AddServiceScreen = () => {
                       <Controller
                         name="username"
                         control={control}
-                        render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
+                        render={({ field: { value, onChange, onBlur } }: { field: { value: string | undefined; onChange: (value: string) => void; onBlur: () => void } }) => (
                           <TextInput
                             value={value}
                             onChangeText={(text: string) => {
@@ -849,7 +849,7 @@ const AddServiceScreen = () => {
                       <Controller
                         name="password"
                         control={control}
-                        render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
+                        render={({ field: { value, onChange, onBlur } }: { field: { value: string | undefined; onChange: (value: string) => void; onBlur: () => void } }) => (
                           <TextInput
                             value={value}
                             onChangeText={(text: string) => {
@@ -887,7 +887,7 @@ const AddServiceScreen = () => {
                   <Controller
                     name="apiKey"
                     control={control}
-                    render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
+                    render={({ field: { value, onChange, onBlur } }: { field: { value: string | undefined; onChange: (value: string) => void; onBlur: () => void } }) => (
                       <TextInput
                         value={value}
                         onChangeText={(text: string) => {
