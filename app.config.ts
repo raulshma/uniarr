@@ -33,7 +33,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "com.raulshma.uniarr",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
-    usesCleartextTraffic: true,
     intentFilters: [
       {
         action: "VIEW",
@@ -54,6 +53,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-router",
     "expo-secure-store",
     "expo-notifications",
+    [
+      "expo-build-properties",
+      {
+        android: {
+          usesCleartextTraffic: true,
+        },
+      },
+    ],
     [
       "expo-web-browser",
       {

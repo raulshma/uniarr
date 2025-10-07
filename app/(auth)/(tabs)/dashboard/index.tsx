@@ -602,6 +602,20 @@ const DashboardScreen = () => {
             <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
           </View>
         </Card>
+        <Card variant="custom" style={styles.activityCard} onPress={() => router.push('/(auth)/calendar')}>
+          <View style={styles.activityContent}>
+            <View style={styles.activityIcon}>
+              <IconButton icon="calendar" size={24} iconColor={theme.colors.primary} />
+            </View>
+            <View style={styles.activityInfo}>
+              <Text style={styles.activityTitle}>Release Calendar</Text>
+              <Text style={styles.activitySubtitle}>
+                View upcoming media releases
+              </Text>
+            </View>
+            <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+          </View>
+        </Card>
       </>
     );
   }, [router, styles, downloadsData, recentlyAddedData, theme]);
