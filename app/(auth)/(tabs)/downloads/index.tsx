@@ -173,7 +173,7 @@ const DownloadsScreen = () => {
           backgroundColor: theme.colors.background,
         },
         listContent: {
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal: spacing.md,
           paddingBottom: 80,
         },
         torrentItem: {
