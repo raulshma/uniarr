@@ -21,6 +21,12 @@ jobs:
           echo "Current branch: $(git branch --show-current)"
           echo "Git status:"
           git status
+          # Verify we're on the agentic branch
+          if [ "$(git branch --show-current)" != "agentic" ]; then
+            echo "Error: Expected to be on 'agentic' branch, but currently on '$(git branch --show-current)'"
+            exit 1
+          fi
+          echo "Branch verification passed - currently on agentic branch"
           echo "Installing dependencies..."
           npm ci
           echo "Verifying expo-auth-session installation..."
