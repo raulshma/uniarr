@@ -86,6 +86,7 @@ interface SonarrEpisode {
     };
   };
   readonly relativePath?: string;
+  readonly images?: SonarrImage[];
 }
 
 interface SonarrSystemStatus {
@@ -479,6 +480,12 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private mapEpisode(episode: SonarrEpisode, seriesId?: number): Episode {
+    // Try to get poster from images array first (if available in API response)
+    // Try screenshot first as it's more commonly available for episodes
+    const posterUrl = this.findImageUrl(episode.images, 'screenshot') 
+      ?? this.findImageUrl(episode.images, 'poster')
+      ?? (seriesId ? this.buildEpisodePosterUrl(seriesId, episode.id) : undefined);
+
     return {
       id: episode.id,
       title: episode.title,
@@ -494,7 +501,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       episodeFileId: episode.episodeFileId,
       quality: episode.quality?.quality ? this.mapQualityResource(episode.quality.quality) : undefined,
       relativePath: episode.relativePath,
-      posterUrl: seriesId ? this.buildEpisodePosterUrl(seriesId, episode.seasonNumber, episode.episodeNumber) : undefined,
+      posterUrl,
     };
   }
 
@@ -526,10 +533,12 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  private buildEpisodePosterUrl(seriesId: number, seasonNumber: number, episodeNumber: number): string {
+  private buildEpisodePosterUrl(seriesId: number, episodeId: number): string {
     try {
+      // Try the episode-specific MediaCover endpoint format
+      // Use 'screenshot' as the image type for episodes (most common)
       const url = new URL(
-        `/api/v3/MediaCover/${seriesId}/season-${seasonNumber}-episode-${episodeNumber}.jpg`,
+        `/api/v3/MediaCover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
         this.config.url,
       );
       if (this.config.apiKey) {
@@ -537,7 +546,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       }
       return url.toString();
     } catch (_e) {
-      return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}-episode-${episodeNumber}.jpg${
+      return `${this.config.url}/api/v3/MediaCover/${seriesId}/episode-${episodeId}-screenshot.jpg${
         this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
       }`;
     }
