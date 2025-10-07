@@ -312,7 +312,11 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       const response = await this.client.get<RadarrQualityProfile[]>(`${RADARR_API_PREFIX}/qualityprofile`);
       return response.data.map((profile) => this.mapQualityProfile(profile));
     } catch (error) {
-      throw handleApiError(error, {
+      // Provide more specific error message for quality profile issues
+      const enhancedError = new Error(
+        'Failed to load quality profiles. This may be due to corrupted custom formats in Radarr. Please check your Radarr quality profiles and custom formats, then try again.'
+      );
+      throw handleApiError(enhancedError, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'getQualityProfiles',
