@@ -324,6 +324,7 @@ export abstract class BaseConnector<
     
     // For session-based auth (qBittorrent), we don't need to set auth here
     // as the session is managed through cookies
+    // For API key auth (Sonarr/Radarr), the API key is handled in getDefaultHeaders()
     return {};
   }
 
