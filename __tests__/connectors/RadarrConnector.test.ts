@@ -5,6 +5,28 @@ import type { ServiceConfig } from '@/models/service.types';
 import type { RadarrQueueItem } from '@/models/movie.types';
 import { ApiError, handleApiError } from '@/utils/error.utils';
 
+// Mock network utilities
+jest.mock('@/utils/network.utils', () => ({
+  testNetworkConnectivity: jest.fn().mockResolvedValue({
+    success: true,
+    latency: 50,
+  }),
+  diagnoseVpnIssues: jest.fn().mockReturnValue([]),
+}));
+
+// Mock API test utilities
+jest.mock('@/utils/api-test.utils', () => ({
+  testSonarrApi: jest.fn().mockResolvedValue({
+    success: true,
+  }),
+  testRadarrApi: jest.fn().mockResolvedValue({
+    success: true,
+  }),
+  testQBittorrentApi: jest.fn().mockResolvedValue({
+    success: true,
+  }),
+}));
+
 type MockAxiosInstance = {
   get: jest.MockedFunction<any>;
   post: jest.MockedFunction<any>;
@@ -194,7 +216,7 @@ describe('RadarrConnector', () => {
       title: 'Dune: Part Two',
       monitored: true,
       hasFile: false,
-      posterUrl: 'http://radarr.local:7878/media/poster.jpg',
+      posterUrl: 'http://radarr.local:7878/media/poster.jpg?apikey=secret-key',
       backdropUrl: 'https://cdn.example.com/backdrop.jpg',
     });
     expect(movie.movieFile?.quality?.quality?.name).toBe('Bluray-2160p');
