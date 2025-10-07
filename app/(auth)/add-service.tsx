@@ -125,11 +125,17 @@ const AddServiceScreen = () => {
   const [debugSteps, setDebugSteps] = useState<DebugStep[]>([]);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
 
+  // Debug showDebugPanel state changes
+  useEffect(() => {
+    console.log('🧪 [AddService] showDebugPanel changed to:', showDebugPanel);
+  }, [showDebugPanel]);
+
   const { isScanning, scanResult, error: scanError, scanNetwork, stopScan, reset: resetScan } = useNetworkScan();
 
   // Subscribe to debug logger
   useEffect(() => {
     const unsubscribe = debugLogger.subscribe((steps) => {
+      console.log('🧪 [AddService] Debug steps updated:', steps);
       setDebugSteps(steps);
     });
     return unsubscribe;
@@ -331,7 +337,7 @@ const AddServiceScreen = () => {
     });
   }, [reset, resetDiagnostics]);
 
-  const handleScanNetwork = useCallback(async () => {
+  const handleScanNetwork = useCallback(async (): Promise<void> => {
     setNetworkScanModalVisible(true);
     resetScan();
     await scanNetwork();
@@ -351,24 +357,29 @@ const AddServiceScreen = () => {
   );
 
   const handleTestConnection = useCallback(
-    async (values: ServiceConfigInput) => {
+    async (values: ServiceConfigInput): Promise<void> => {
+      console.log('🧪 [AddService] handleTestConnection called with values:', values);
+      console.log('🧪 [AddService] Form errors:', errors);
       resetDiagnostics();
       debugLogger.clear();
       setShowDebugPanel(true);
+      console.log('🧪 [AddService] Debug panel should be visible now');
 
       if (!supportedTypeSet.has(values.type)) {
+        console.log('❌ [AddService] Service type not supported:', values.type);
         debugLogger.addError('Service type not supported', `Selected service type '${values.type}' is not available yet.`);
         setTestError('Selected service type is not available yet.');
         return;
       }
 
+      console.log('🧪 [AddService] Starting test connection...');
       setIsTesting(true);
 
       try {
         const config = buildServiceConfig(values, generateServiceId());
         
         // Validate API key format first
-        if (values.apiKey && values.type !== 'qbittorrent') {
+        if (values.apiKey && values.type !== 'qbittorrent' && values.type !== 'jellyseerr') {
           const apiKeyTest = testApiKeyFormat(values.apiKey, values.type);
           debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
           
@@ -378,16 +389,21 @@ const AddServiceScreen = () => {
           }
         }
         
+        console.log('🧪 [AddService] Starting connection test for:', config.type, config.url);
         const result = await runConnectionTest(config);
+        console.log('🧪 [AddService] Connection test result:', result);
 
         if (result.success) {
           setTestResult(result);
+          console.log('✅ [AddService] Connection test successful');
         } else {
+          console.log('❌ [AddService] Connection test failed:', result.message);
           setTestError(result.message ?? 'Unable to connect to the selected service.');
         }
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Unable to test the connection. Check the configuration and try again.';
+        console.error('❌ [AddService] Connection test error:', error);
         debugLogger.addError('Connection test failed', message);
         setTestError(message);
 
@@ -404,8 +420,8 @@ const AddServiceScreen = () => {
   );
 
   const handleSave = useCallback(
-    async (values: ServiceConfigInput) => {
-      console.log('💾 Starting save service with values:', values);
+    async (values: ServiceConfigInput): Promise<void> => {
+      console.log('💾 [AddService] handleSave called with values:', values);
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
@@ -443,6 +459,7 @@ const AddServiceScreen = () => {
         console.log('✅ Connection test result for save:', testOutcome);
 
         if (!testOutcome.success) {
+          console.log('❌ Connection test failed during save:', testOutcome.message);
           setFormError(testOutcome.message ?? 'Unable to verify the connection.');
           return;
         }
@@ -546,7 +563,7 @@ const AddServiceScreen = () => {
             <Controller
               name="type"
               control={control}
-              render={({ field: { value, onChange } }) => (
+              render={({ field: { value, onChange } }: { field: { value: ServiceType; onChange: (value: ServiceType) => void } }) => (
                   <>
                     <Pressable
                       onPress={() => setServiceTypeModalVisible(true)}
@@ -576,7 +593,7 @@ const AddServiceScreen = () => {
                         onDismiss={() => setServiceTypeModalVisible(false)}
                         contentContainerStyle={styles.modalContent}
                       >
-                        {serviceOptions.map((option) => (
+                        {serviceOptions.map((option: { type: ServiceType; label: string; supported: boolean; isLast: boolean }) => (
                           <View key={option.type}>
                             <Pressable
                               onPress={() => {
@@ -586,7 +603,7 @@ const AddServiceScreen = () => {
                                   setServiceTypeModalVisible(false);
                                 }
                               }}
-                              style={({ pressed }) => [
+                              style={({ pressed }: { pressed: boolean }) => [
                                 styles.optionItem,
                                 option.supported ? null : styles.optionDisabled,
                                 pressed ? { opacity: 0.7 } : null,
@@ -661,10 +678,10 @@ const AddServiceScreen = () => {
             <Controller
               name="name"
               control={control}
-              render={({ field: { value, onChange, onBlur } }) => (
+              render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
                 <TextInput
                   value={value}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     resetDiagnostics();
                     onChange(text);
                   }}
@@ -694,16 +711,16 @@ const AddServiceScreen = () => {
             <Controller
               name="url"
               control={control}
-              render={({ field: { value, onChange, onBlur } }) => (
+              render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
                 <TextInput
                   value={value}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     resetDiagnostics();
                     // Clear any previous URL validation state while user edits
                     setUrlValidation({ status: 'idle', message: null });
                     onChange(text);
                   }}
-                  onBlur={async () => {
+                  onBlur={async (): Promise<void> => {
                     onBlur();
 
                     // If there is already a synchronous validation error from zod, skip async validation
@@ -788,8 +805,8 @@ const AddServiceScreen = () => {
           <Controller
             name="type"
             control={control}
-            render={({ field: { value: serviceType } }) => {
-              if (serviceType === 'qbittorrent') {
+            render={({ field: { value: serviceType } }: { field: { value: ServiceType } }) => {
+              if (serviceType === 'qbittorrent' || serviceType === 'jellyseerr') {
                 return (
                   <>
                     <View style={styles.formField}>
@@ -799,10 +816,10 @@ const AddServiceScreen = () => {
                       <Controller
                         name="username"
                         control={control}
-                        render={({ field: { value, onChange, onBlur } }) => (
+                        render={({ field: { value, onChange, onBlur } }: { field: { value: string | undefined; onChange: (value: string) => void; onBlur: () => void } }) => (
                           <TextInput
                             value={value}
-                            onChangeText={(text) => {
+                            onChangeText={(text: string) => {
                               resetDiagnostics();
                               onChange(text);
                             }}
@@ -832,10 +849,10 @@ const AddServiceScreen = () => {
                       <Controller
                         name="password"
                         control={control}
-                        render={({ field: { value, onChange, onBlur } }) => (
+                        render={({ field: { value, onChange, onBlur } }: { field: { value: string | undefined; onChange: (value: string) => void; onBlur: () => void } }) => (
                           <TextInput
                             value={value}
-                            onChangeText={(text) => {
+                            onChangeText={(text: string) => {
                               resetDiagnostics();
                               onChange(text);
                             }}
@@ -870,10 +887,10 @@ const AddServiceScreen = () => {
                   <Controller
                     name="apiKey"
                     control={control}
-                    render={({ field: { value, onChange, onBlur } }) => (
+                    render={({ field: { value, onChange, onBlur } }: { field: { value: string | undefined; onChange: (value: string) => void; onBlur: () => void } }) => (
                       <TextInput
                         value={value}
-                        onChangeText={(text) => {
+                        onChangeText={(text: string) => {
                           resetDiagnostics();
                           onChange(text);
                         }}
@@ -926,10 +943,90 @@ const AddServiceScreen = () => {
             </View>
           ) : null}
 
+          {/* Debug Information */}
+          <View style={[styles.diagnosticsCard, { backgroundColor: theme.colors.surfaceVariant }]}>
+            <Text variant="bodySmall" style={styles.diagnosticsText}>
+              Debug Info:
+            </Text>
+            <Text variant="bodySmall" style={styles.diagnosticsText}>
+              Form Errors: {JSON.stringify(errors, null, 2)}
+            </Text>
+            <Text variant="bodySmall" style={styles.diagnosticsText}>
+              Is Submitting: {isSubmitting.toString()}
+            </Text>
+            <Text variant="bodySmall" style={styles.diagnosticsText}>
+              Is Testing: {isTesting.toString()}
+            </Text>
+            <Text variant="bodySmall" style={styles.diagnosticsText}>
+              Show Debug Panel: {showDebugPanel.toString()}
+            </Text>
+            <Text variant="bodySmall" style={styles.diagnosticsText}>
+              Debug Steps Count: {debugSteps.length}
+            </Text>
+          </View>
+
           <View style={styles.actions}>
             <Button
+              mode="outlined"
+              onPress={() => {
+                console.log('🧪 [AddService] Test Debug Panel button pressed');
+                debugLogger.addStep({
+                  id: 'test-step',
+                  title: 'Test Step',
+                  status: 'success',
+                  message: 'This is a test debug step',
+                  details: 'Debug panel is working correctly'
+                });
+                setShowDebugPanel(true);
+              }}
+              style={{ marginBottom: spacing.sm }}
+              fullWidth
+            >
+              Test Debug Panel
+            </Button>
+
+            <Button
+              mode="outlined"
+              onPress={() => {
+                console.log('🧪 [AddService] Test Error Display button pressed');
+                setTestError('This is a test error message');
+                setFormError('This is a test form error message');
+              }}
+              style={{ marginBottom: spacing.sm }}
+              fullWidth
+            >
+              Test Error Display
+            </Button>
+
+            <Button
+              mode="outlined"
+              onPress={() => {
+                console.log('🧪 [AddService] Test Connection (No Validation) button pressed');
+                const testValues = {
+                  name: 'Test Service',
+                  type: 'sonarr' as const,
+                  url: 'http://192.168.1.100:8989',
+                  apiKey: 'test-key',
+                  username: '',
+                  password: ''
+                };
+                handleTestConnection(testValues);
+              }}
+              style={{ marginBottom: spacing.sm }}
+              fullWidth
+            >
+              Test Connection (No Validation)
+            </Button>
+
+            <Button
               mode="contained"
-              onPress={handleSubmit(handleTestConnection)}
+              onPress={() => {
+                console.log('🧪 [AddService] Test Connection button pressed');
+                console.log('🧪 [AddService] Form errors:', errors);
+                console.log('🧪 [AddService] Is submitting:', isSubmitting);
+                console.log('🧪 [AddService] Is testing:', isTesting);
+                handleSubmit(handleTestConnection)();
+              }}
               loading={isTesting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.surface}
@@ -942,7 +1039,13 @@ const AddServiceScreen = () => {
 
             <Button
               mode="contained"
-              onPress={handleSubmit(handleSave)}
+              onPress={() => {
+                console.log('💾 [AddService] Save Service button pressed');
+                console.log('💾 [AddService] Form errors:', errors);
+                console.log('💾 [AddService] Is submitting:', isSubmitting);
+                console.log('💾 [AddService] Is testing:', isTesting);
+                handleSubmit(handleSave)();
+              }}
               loading={isSubmitting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.primary}

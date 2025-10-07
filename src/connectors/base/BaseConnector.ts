@@ -5,7 +5,7 @@ import type { ServiceConfig } from '@/models/service.types';
 import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
 import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
-import { testSonarrApi, testRadarrApi, testQBittorrentApi } from '@/utils/api-test.utils';
+import { testSonarrApi, testRadarrApi, testQBittorrentApi, testJellyseerrApi } from '@/utils/api-test.utils';
 import { debugLogger } from '@/utils/debug-logger';
 
 /**
@@ -44,7 +44,8 @@ export abstract class BaseConnector<
     debugLogger.startConnectionTest(this.config.type, this.config.url);
 
     try {
-      // First, test basic network connectivity
+      // For VPN connections, we'll be more lenient with network tests
+      // and focus on the actual API endpoint test
       debugLogger.addStep({
         id: 'network-test-start',
         title: 'Testing Network Connectivity',
@@ -52,23 +53,25 @@ export abstract class BaseConnector<
         message: `Testing connection to ${this.config.url}`,
       });
       
-      const networkTest = await testNetworkConnectivity(this.config.url, this.config.timeout ?? 10000);
+      // Test basic network connectivity with increased timeout for VPN
+      const networkTimeout = this.config.timeout ?? 15000; // Increased timeout for VPN
+      const networkTest = await testNetworkConnectivity(this.config.url, networkTimeout);
       
       if (!networkTest.success) {
+        // For VPN connections, don't fail immediately on network test
+        // Instead, log the issue and continue with API test
         const vpnIssues = diagnoseVpnIssues({ code: 'ERR_NETWORK', message: networkTest.error }, this.config.type);
-        debugLogger.addNetworkTest(false, networkTest.error);
-        debugLogger.addError(`Network connectivity failed: ${networkTest.error}`, vpnIssues.join('\n'));
+        debugLogger.addWarning(
+          `Network test failed but continuing with API test: ${networkTest.error}`,
+          vpnIssues.join('\n')
+        );
         
-        return {
-          success: false,
-          message: `Network connectivity failed: ${networkTest.error}. ${vpnIssues.join(' ')}`,
-          latency: networkTest.latency,
-        };
+        // Don't return early - continue with API test
+      } else {
+        debugLogger.addNetworkTest(true);
       }
       
-      debugLogger.addNetworkTest(true);
-      
-      // Test API endpoint specifically
+      // Test API endpoint specifically with more robust error handling
       debugLogger.addStep({
         id: 'api-test-start',
         title: 'Testing API Authentication',
@@ -77,19 +80,30 @@ export abstract class BaseConnector<
       });
       
       let apiTest;
+      const apiTimeout = Math.max(networkTimeout, 20000); // Ensure API test has enough time
+      
       if (this.config.type === 'sonarr') {
-        apiTest = await testSonarrApi(this.config.url, this.config.apiKey);
+        apiTest = await testSonarrApi(this.config.url, this.config.apiKey, apiTimeout);
       } else if (this.config.type === 'radarr') {
-        apiTest = await testRadarrApi(this.config.url, this.config.apiKey);
+        apiTest = await testRadarrApi(this.config.url, this.config.apiKey, apiTimeout);
       } else if (this.config.type === 'qbittorrent') {
-        apiTest = await testQBittorrentApi(this.config.url, this.config.username, this.config.password);
+        apiTest = await testQBittorrentApi(this.config.url, this.config.username, this.config.password, apiTimeout);
+      } else if (this.config.type === 'jellyseerr') {
+        apiTest = await testJellyseerrApi(this.config.url, this.config.username, this.config.password, apiTimeout);
       }
       
       if (apiTest && !apiTest.success) {
-        debugLogger.addError(`API test failed: ${apiTest.error}`, `Status: ${apiTest.status}\nData: ${JSON.stringify(apiTest.data)}`);
+        const vpnIssues = diagnoseVpnIssues({ 
+          code: apiTest.status === 401 ? 'AUTH_ERROR' : 'API_ERROR', 
+          message: apiTest.error 
+        }, this.config.type);
+        
+        debugLogger.addError(`API test failed: ${apiTest.error}`, 
+          `Status: ${apiTest.status}\nData: ${JSON.stringify(apiTest.data)}\n\nVPN Issues:\n${vpnIssues.join('\n')}`);
+        
         return {
           success: false,
-          message: `API test failed: ${apiTest.error}`,
+          message: `API test failed: ${apiTest.error}. ${vpnIssues.join(' ')}`,
           latency: Date.now() - startedAt,
         };
       }
@@ -183,6 +197,7 @@ export abstract class BaseConnector<
       baseURL: this.config.url,
       timeout: this.config.timeout ?? 30_000,
       headers: this.getDefaultHeaders(),
+      ...this.getAuthConfig(),
     });
 
     instance.interceptors.request.use(
@@ -264,6 +279,22 @@ export abstract class BaseConnector<
     }
 
     return headers;
+  }
+
+  /**
+   * Get authentication configuration for the HTTP client.
+   * Override this method in connectors that use different auth methods.
+   */
+  protected getAuthConfig(): { auth?: { username: string; password: string } } {
+    if (this.config.username && this.config.password) {
+      return {
+        auth: {
+          username: this.config.username,
+          password: this.config.password,
+        },
+      };
+    }
+    return {};
   }
 
   /** Log and surface Axios errors that occur during the request lifecycle. */
