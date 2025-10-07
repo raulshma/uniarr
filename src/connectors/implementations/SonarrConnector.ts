@@ -361,7 +361,11 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       const response = await this.client.get<SonarrQualityProfile[]>('/api/v3/qualityprofile');
       return response.data.map((profile: SonarrQualityProfile) => this.mapQualityProfile(profile));
     } catch (error) {
-      throw handleApiError(error, {
+      // Provide more specific error message for quality profile issues
+      const enhancedError = new Error(
+        'Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.'
+      );
+      throw handleApiError(enhancedError, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'getQualityProfiles',
