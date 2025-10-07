@@ -38,11 +38,15 @@ export abstract class BaseConnector<
   /** Test connectivity to the remote service and return diagnostic information. */
   async testConnection(): Promise<ConnectionResult> {
     const startedAt = Date.now();
+    console.log('🔧 [BaseConnector] Starting testConnection for:', this.config.type, this.config.url);
 
     try {
+      console.log('🔧 [BaseConnector] Calling initialize...');
       await this.initialize();
+      console.log('🔧 [BaseConnector] Initialize completed, getting version...');
       const version = await this.getVersion();
       const latency = Date.now() - startedAt;
+      console.log('🔧 [BaseConnector] Version retrieved:', version, 'Latency:', latency);
 
       return {
         success: true,
@@ -51,6 +55,7 @@ export abstract class BaseConnector<
         version,
       };
     } catch (error) {
+      console.error('🔧 [BaseConnector] Test connection error:', error);
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,

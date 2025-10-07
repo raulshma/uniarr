@@ -339,18 +339,23 @@ const AddServiceScreen = () => {
 
   const handleTestConnection = useCallback(
     async (values: ServiceConfigInput) => {
+      console.log('🔍 Starting connection test with values:', values);
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
+        console.log('❌ Service type not supported:', values.type);
         setTestError('Selected service type is not available yet.');
         return;
       }
 
       setIsTesting(true);
+      console.log('🔄 Testing connection...');
 
       try {
         const config = buildServiceConfig(values, generateServiceId());
+        console.log('📋 Built config:', config);
         const result = await runConnectionTest(config);
+        console.log('✅ Connection test result:', result);
 
         if (result.success) {
           setTestResult(result);
@@ -358,6 +363,7 @@ const AddServiceScreen = () => {
           setTestError(result.message ?? 'Unable to connect to the selected service.');
         }
       } catch (error) {
+        console.error('❌ Connection test error:', error);
         const message =
           error instanceof Error ? error.message : 'Unable to test the connection. Check the configuration and try again.';
         setTestError(message);
@@ -369,6 +375,7 @@ const AddServiceScreen = () => {
         });
       } finally {
         setIsTesting(false);
+        console.log('🏁 Connection test completed');
       }
     },
     [resetDiagnostics, runConnectionTest, supportedTypeSet],
@@ -376,19 +383,25 @@ const AddServiceScreen = () => {
 
   const handleSave = useCallback(
     async (values: ServiceConfigInput) => {
+      console.log('💾 Starting save service with values:', values);
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
+        console.log('❌ Service type not supported:', values.type);
         setFormError('This service type is not supported yet.');
         return;
       }
 
       const config = buildServiceConfig(values, generateServiceId());
+      console.log('📋 Built config for save:', config);
 
       try {
+        console.log('🔍 Checking existing services...');
         const existingServices = await secureStorage.getServiceConfigs();
+        console.log('📋 Existing services:', existingServices.length);
 
         if (existingServices.some((service) => service.name.trim().toLowerCase() === config.name.toLowerCase())) {
+          console.log('❌ Service name already exists');
           setFormError('A service with this name already exists. Choose a different name.');
           return;
         }
@@ -398,22 +411,30 @@ const AddServiceScreen = () => {
             (service) => service.type === config.type && service.url.toLowerCase() === config.url.toLowerCase(),
           )
         ) {
+          console.log('❌ Service already configured');
           setFormError('This service is already configured.');
           return;
         }
 
+        console.log('🔄 Testing connection before save...');
         const testOutcome = await runConnectionTest(config);
+        console.log('✅ Connection test result for save:', testOutcome);
 
         if (!testOutcome.success) {
           setFormError(testOutcome.message ?? 'Unable to verify the connection.');
           return;
         }
 
+        console.log('💾 Adding connector to manager...');
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
+        console.log('✅ Connector added to manager');
 
+        console.log('🔄 Invalidating queries...');
         await queryClient.invalidateQueries({ queryKey: queryKeys.services.overview });
+        console.log('✅ Queries invalidated');
 
+        console.log('🎉 Service saved successfully, showing alert...');
         Alert.alert('Service added', `${serviceTypeLabels[config.type]} has been connected successfully.`, [
           {
             text: 'OK',
@@ -430,6 +451,7 @@ const AddServiceScreen = () => {
           password: '',
         });
       } catch (error) {
+        console.error('❌ Save service error:', error);
         const message =
           error instanceof Error ? error.message : 'Something went wrong while saving the service configuration.';
         setFormError(message);
@@ -885,7 +907,11 @@ const AddServiceScreen = () => {
           <View style={styles.actions}>
             <Button
               mode="contained"
-              onPress={handleSubmit(handleTestConnection)}
+              onPress={() => {
+                console.log('🔘 Test Connection button pressed');
+                console.log('📋 Form state:', { isSubmitting, isTesting, errors });
+                handleSubmit(handleTestConnection)();
+              }}
               loading={isTesting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.surface}
@@ -898,7 +924,11 @@ const AddServiceScreen = () => {
 
             <Button
               mode="contained"
-              onPress={handleSubmit(handleSave)}
+              onPress={() => {
+                console.log('🔘 Save Service button pressed');
+                console.log('📋 Form state:', { isSubmitting, isTesting, errors });
+                handleSubmit(handleSave)();
+              }}
               loading={isSubmitting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.primary}

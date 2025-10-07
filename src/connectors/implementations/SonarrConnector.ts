@@ -170,14 +170,20 @@ interface SonarrRootFolder {
 
 export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async initialize(): Promise<void> {
+    console.log('🔧 [SonarrConnector] Initializing...');
     await this.getVersion();
+    console.log('🔧 [SonarrConnector] Initialization completed');
   }
 
   async getVersion(): Promise<string> {
     try {
+      console.log('🔧 [SonarrConnector] Getting version from:', `${this.config.url}/api/v3/system/status`);
       const response = await this.client.get<SonarrSystemStatus>('/api/v3/system/status');
-      return response.data.version ?? 'unknown';
+      const version = response.data.version ?? 'unknown';
+      console.log('🔧 [SonarrConnector] Version retrieved:', version);
+      return version;
     } catch (error) {
+      console.error('🔧 [SonarrConnector] Version request failed:', error);
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,

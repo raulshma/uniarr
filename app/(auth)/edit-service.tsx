@@ -315,20 +315,28 @@ const EditServiceScreen = () => {
 
   const handleTestConnection = useCallback(
     async (values: ServiceConfigInput) => {
-      if (!existingConfig) return;
+      console.log('🔍 [Edit] Starting connection test with values:', values);
+      if (!existingConfig) {
+        console.log('❌ [Edit] No existing config');
+        return;
+      }
 
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
+        console.log('❌ [Edit] Service type not supported:', values.type);
         setTestError('Selected service type is not available yet.');
         return;
       }
 
       setIsTesting(true);
+      console.log('🔄 [Edit] Testing connection...');
 
       try {
         const config = buildServiceConfig(values, existingConfig);
+        console.log('📋 [Edit] Built config:', config);
         const result = await runConnectionTest(config);
+        console.log('✅ [Edit] Connection test result:', result);
 
         if (result.success) {
           setTestResult(result);
@@ -336,6 +344,7 @@ const EditServiceScreen = () => {
           setTestError(result.message ?? 'Unable to connect to the selected service.');
         }
       } catch (error) {
+        console.error('❌ [Edit] Connection test error:', error);
         const message =
           error instanceof Error ? error.message : 'Unable to test the connection. Check the configuration and try again.';
         setTestError(message);
@@ -347,6 +356,7 @@ const EditServiceScreen = () => {
         });
       } finally {
         setIsTesting(false);
+        console.log('🏁 [Edit] Connection test completed');
       }
     },
     [existingConfig, resetDiagnostics, runConnectionTest, supportedTypeSet],
@@ -354,22 +364,31 @@ const EditServiceScreen = () => {
 
   const handleSave = useCallback(
     async (values: ServiceConfigInput) => {
-      if (!existingConfig) return;
+      console.log('💾 [Edit] Starting save service with values:', values);
+      if (!existingConfig) {
+        console.log('❌ [Edit] No existing config for save');
+        return;
+      }
 
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
+        console.log('❌ [Edit] Service type not supported:', values.type);
         setFormError('This service type is not supported yet.');
         return;
       }
 
       const config = buildServiceConfig(values, existingConfig);
+      console.log('📋 [Edit] Built config for save:', config);
 
       try {
+        console.log('🔍 [Edit] Checking existing services...');
         const existingServices = await secureStorage.getServiceConfigs();
+        console.log('📋 [Edit] Existing services:', existingServices.length);
 
         // Check for name conflicts (excluding current service)
         if (existingServices.some((service) => service.id !== config.id && service.name.trim().toLowerCase() === config.name.toLowerCase())) {
+          console.log('❌ [Edit] Service name already exists');
           setFormError('A service with this name already exists. Choose a different name.');
           return;
         }
@@ -380,22 +399,30 @@ const EditServiceScreen = () => {
             (service) => service.id !== config.id && service.type === config.type && service.url.toLowerCase() === config.url.toLowerCase(),
           )
         ) {
+          console.log('❌ [Edit] Service already configured');
           setFormError('This service is already configured.');
           return;
         }
 
+        console.log('🔄 [Edit] Testing connection before save...');
         const testOutcome = await runConnectionTest(config);
+        console.log('✅ [Edit] Connection test result for save:', testOutcome);
 
         if (!testOutcome.success) {
           setFormError(testOutcome.message ?? 'Unable to verify the connection.');
           return;
         }
 
+        console.log('💾 [Edit] Adding connector to manager...');
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
+        console.log('✅ [Edit] Connector added to manager');
 
+        console.log('🔄 [Edit] Invalidating queries...');
         await queryClient.invalidateQueries({ queryKey: queryKeys.services.overview });
+        console.log('✅ [Edit] Queries invalidated');
 
+        console.log('🎉 [Edit] Service updated successfully, showing alert...');
         Alert.alert('Service updated', `${serviceTypeLabels[config.type]} has been updated successfully.`, [
           {
             text: 'OK',
@@ -403,6 +430,7 @@ const EditServiceScreen = () => {
           },
         ]);
       } catch (error) {
+        console.error('❌ [Edit] Save service error:', error);
         const message =
           error instanceof Error ? error.message : 'Something went wrong while updating the service configuration.';
         setFormError(message);
@@ -853,7 +881,11 @@ const EditServiceScreen = () => {
           <View style={styles.actions}>
             <Button
               mode="contained"
-              onPress={handleSubmit(handleTestConnection)}
+              onPress={() => {
+                console.log('🔘 [Edit] Test Connection button pressed');
+                console.log('📋 [Edit] Form state:', { isSubmitting, isTesting, errors });
+                handleSubmit(handleTestConnection)();
+              }}
               loading={isTesting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.surface}
@@ -866,7 +898,11 @@ const EditServiceScreen = () => {
 
             <Button
               mode="contained"
-              onPress={handleSubmit(handleSave)}
+              onPress={() => {
+                console.log('🔘 [Edit] Update Service button pressed');
+                console.log('📋 [Edit] Form state:', { isSubmitting, isTesting, errors });
+                handleSubmit(handleSave)();
+              }}
               loading={isSubmitting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.primary}
