@@ -221,7 +221,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getSeries(): Promise<Series[]> {
     try {
       const response = await this.client.get<SonarrSeries[]>('/api/v3/series');
-      return response.data.map((item) => this.mapSeries(item));
+      return response.data.map((item: SonarrSeries) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -244,7 +244,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         params,
       });
 
-      return response.data.map((item) => this.mapSeries(item));
+      return response.data.map((item: SonarrSeries) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -359,7 +359,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getQualityProfiles(): Promise<QualityProfile[]> {
     try {
       const response = await this.client.get<SonarrQualityProfile[]>('/api/v3/qualityprofile');
-      return response.data.map((profile) => this.mapQualityProfile(profile));
+      return response.data.map((profile: SonarrQualityProfile) => this.mapQualityProfile(profile));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -373,7 +373,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getRootFolders(): Promise<RootFolder[]> {
     try {
       const response = await this.client.get<SonarrRootFolder[]>('/api/v3/rootfolder');
-      return response.data.map((folder) => this.mapRootFolder(folder));
+      return response.data.map((folder: SonarrRootFolder) => this.mapRootFolder(folder));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -387,7 +387,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getQueue(): Promise<SonarrQueueItem[]> {
     try {
       const response = await this.client.get<SonarrQueueResponse>('/api/v3/queue');
-      return (response.data.records ?? []).map((record) => this.mapQueueRecord(record));
+      return (response.data.records ?? []).map((record: SonarrQueueRecord) => this.mapQueueRecord(record));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
