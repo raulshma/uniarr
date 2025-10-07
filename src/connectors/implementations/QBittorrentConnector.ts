@@ -48,7 +48,6 @@ type AuthenticatedRequestConfig = AxiosRequestConfig & { _retry?: boolean };
  * Connector responsible for interacting with qBittorrent's Web API.
  */
 export class QBittorrentConnector extends BaseConnector<Torrent> {
-  private isAuthenticated = false;
   private authPromise: Promise<void> | null = null;
 
   protected override createHttpClient(): AxiosInstance {
@@ -77,7 +76,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
           originalRequest._retry = true;
 
           try {
-            await this.authenticate();
+            await this.ensureAuthenticated();
           } catch (authError) {
             return Promise.reject(authError);
           }
@@ -95,7 +94,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
 
   async initialize(): Promise<void> {
     console.log('🔧 [QBittorrentConnector] Initializing...');
-    await this.ensureAuthenticated(true);
+    await this.ensureAuthenticated();
     console.log('🔧 [QBittorrentConnector] Initialization completed');
   }
 
@@ -266,138 +265,10 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
   }
 
   override dispose(): void {
-    void this.logout();
-    this.isAuthenticated = false;
+    // Session-based auth doesn't require explicit logout
     super.dispose();
   }
 
-  private async ensureAuthenticated(force = false): Promise<void> {
-    if (!force && this.isAuthenticated) {
-      return;
-    }
-
-    await this.authenticate();
-  }
-
-  private async authenticate(): Promise<void> {
-    console.log('🔐 [QBittorrentConnector] Starting authentication...');
-    if (this.authPromise) {
-      console.log('🔐 [QBittorrentConnector] Authentication already in progress, waiting...');
-      return this.authPromise;
-    }
-
-    if (!this.config.username || !this.config.password) {
-      console.error('🔐 [QBittorrentConnector] Missing credentials');
-      throw new Error('qBittorrent credentials are required.');
-    }
-
-    const payload = new URLSearchParams({
-      username: this.config.username,
-      password: this.config.password,
-    });
-
-    const request = async () => {
-      console.log('🔐 [QBittorrentConnector] Attempting authentication to:', `${this.config.url}${QB_API_PREFIX}/auth/login`);
-      void logger.debug('Attempting qBittorrent authentication.', {
-        serviceId: this.config.id,
-        serviceType: this.config.type,
-        username: this.config.username,
-        url: `${this.config.url}${QB_API_PREFIX}/auth/login`,
-        referer: this.config.url,
-      });
-
-      const response = await this.client.post<string>(`${QB_API_PREFIX}/auth/login`, payload.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Referer': this.config.url,
-        },
-        transformResponse: (value) => value,
-      });
-
-      const body = typeof response.data === 'string' ? response.data.trim() : '';
-      const normalizedBody = body.toLowerCase().replace(/\.$/, ''); // Remove trailing period and convert to lowercase
-      
-      console.log('🔐 [QBittorrentConnector] Authentication response:', body, 'Status:', response.status);
-      
-      void logger.debug('qBittorrent authentication response received.', {
-        serviceId: this.config.id,
-        serviceType: this.config.type,
-        status: response.status,
-        responseBody: body,
-        hasSetCookie: Boolean(response.headers?.['set-cookie'] || response.headers?.['Set-Cookie']),
-      });
-      
-      if (normalizedBody !== 'ok') {
-        // Provide more detailed error information with troubleshooting hints
-        let errorMessage = body
-          ? `qBittorrent authentication failed. Server responded with: "${body}"`
-          : 'qBittorrent authentication failed. No response body received.';
-
-        // Add troubleshooting hints based on common issues
-        if (body === 'Fails.' || normalizedBody === 'fails.') {
-          errorMessage += ' This usually means incorrect username or password. Default credentials are admin/adminadmin.';
-        } else if (body === 'Bad credentials' || normalizedBody === 'bad credentials') {
-          errorMessage += ' The provided credentials are invalid.';
-        } else if (body === 'Banned' || normalizedBody === 'banned') {
-          errorMessage += ' Your IP address has been banned due to multiple failed login attempts.';
-        }
-
-        console.error('🔐 [QBittorrentConnector] Authentication failed:', errorMessage);
-
-        void logger.warn('qBittorrent authentication failed.', {
-          serviceId: this.config.id,
-          serviceType: this.config.type,
-          responseBody: body,
-          status: response.status,
-          headers: response.headers,
-        });
-
-        throw new Error(errorMessage);
-      }
-
-      // Authentication successful - Axios will handle cookies automatically
-      this.isAuthenticated = true;
-      console.log('🔐 [QBittorrentConnector] Authentication successful');
-
-      void logger.debug('qBittorrent authentication successful.', {
-        serviceId: this.config.id,
-        serviceType: this.config.type,
-        hasSetCookie: Boolean(response.headers?.['set-cookie'] || response.headers?.['Set-Cookie']),
-      });
-    };
-
-    this.authPromise = request()
-      .catch((error) => {
-        this.isAuthenticated = false;
-        console.error('🔐 [QBittorrentConnector] Authentication error:', error);
-        throw handleApiError(error, {
-          serviceId: this.config.id,
-          serviceType: this.config.type,
-          operation: 'authenticate',
-          endpoint: `${QB_API_PREFIX}/auth/login`,
-        });
-      })
-      .finally(() => {
-        this.authPromise = null;
-      });
-
-    return this.authPromise;
-  }
-
-  private async logout(): Promise<void> {
-    if (!this.isAuthenticated) {
-      return;
-    }
-
-    try {
-      await this.client.post(`${QB_API_PREFIX}/auth/logout`);
-    } catch (error) {
-      // Ignore logout errors; the session may already be invalid.
-      void error;
-    } finally {
-      this.isAuthenticated = false;
-    }
-  }
 
   private mapTorrent(raw: QBittorrentTorrent): Torrent {
     return {

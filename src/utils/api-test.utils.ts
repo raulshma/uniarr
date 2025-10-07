@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
 
 export interface ApiTestResult {
   success: boolean;
@@ -155,10 +156,35 @@ export async function testRadarrApi(baseUrl: string, apiKey?: string, timeout: n
 export async function testQBittorrentApi(baseUrl: string, username?: string, password?: string, timeout: number = 15000): Promise<ApiTestResult> {
   const fullUrl = `${baseUrl}/api/v2/app/version`;
   console.log('🧪 [ApiTest] Testing qBittorrent API:', fullUrl);
+  console.log('🧪 [ApiTest] Username provided:', username ? 'Yes' : 'No');
+  console.log('🧪 [ApiTest] Password provided:', password ? 'Yes' : 'No');
   console.log('🧪 [ApiTest] Timeout:', timeout);
 
   try {
-    // qBittorrent doesn't use API key, it uses session-based auth
+    // Create a mock service config for testing
+    const mockConfig = {
+      id: 'test-qbittorrent',
+      name: 'Test qBittorrent',
+      type: 'qbittorrent' as const,
+      url: baseUrl,
+      username,
+      password,
+      enabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Use the new authentication system
+    const authResult = await ServiceAuthHelper.authenticateService(mockConfig);
+    
+    if (!authResult.success || !authResult.authenticated) {
+      return {
+        success: false,
+        error: authResult.error || 'Authentication failed',
+      };
+    }
+
+    // Test the actual API endpoint
     const response = await axios.get(fullUrl, {
       timeout,
       headers: {
@@ -166,6 +192,7 @@ export async function testQBittorrentApi(baseUrl: string, username?: string, pas
         'Accept': 'application/json',
         'User-Agent': 'UniArr/1.0.0',
       },
+      withCredentials: true, // Important for session cookies
     });
 
     console.log('✅ [ApiTest] qBittorrent API worked:', {
@@ -208,6 +235,30 @@ export async function testJellyseerrApi(baseUrl: string, username?: string, pass
   console.log('🧪 [ApiTest] Timeout:', timeout);
 
   try {
+    // Create a mock service config for testing
+    const mockConfig = {
+      id: 'test-jellyseerr',
+      name: 'Test Jellyseerr',
+      type: 'jellyseerr' as const,
+      url: baseUrl,
+      username,
+      password,
+      enabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Use the new authentication system
+    const authResult = await ServiceAuthHelper.authenticateService(mockConfig);
+    
+    if (!authResult.success || !authResult.authenticated) {
+      return {
+        success: false,
+        error: authResult.error || 'Authentication failed',
+      };
+    }
+
+    // Test the actual API endpoint
     const authConfig = username && password ? { auth: { username, password } } : {};
     
     const response = await axios.get(fullUrl, {
