@@ -1,9 +1,8 @@
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet, View, ScrollView } from 'react-native';
-import { useTheme } from 'react-native-paper';
+import { useTheme, Appbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { TabHeader } from '@/components/common/TabHeader';
+import { useRouter } from 'expo-router';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -23,6 +22,7 @@ import type { CalendarFilters } from '@/models/calendar.types';
 
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();
+  const router = useRouter();
   const {
     state,
     calendarData,
@@ -43,7 +43,7 @@ const CalendarScreen = () => {
       flex: 1,
     },
     scrollContent: {
-      paddingBottom: 100, // Account for tab bar
+      paddingBottom: 20, // Account for safe area
     },
   });
 
@@ -162,17 +162,18 @@ const CalendarScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TabHeader
-        title="Calendar"
-        rightAction={{
-          icon: "filter",
-          onPress: () => {
+      <Appbar.Header>
+        <Appbar.BackAction onPress={() => router.back()} />
+        <Appbar.Content title="Release Calendar" />
+        <Appbar.Action
+          icon="filter"
+          onPress={() => {
             // TODO: Toggle filters visibility
             console.log('Toggle filters');
-          },
-          accessibilityLabel: "Toggle filters",
-        }}
-      />
+          }}
+          accessibilityLabel="Toggle filters"
+        />
+      </Appbar.Header>
       
       <View style={styles.content}>
         <CalendarHeader
