@@ -4,6 +4,7 @@ import type { AddItemRequest, ConnectionResult, IConnector, SystemHealth } from 
 import type { ServiceConfig } from '@/models/service.types';
 import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
+import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -41,6 +42,23 @@ export abstract class BaseConnector<
     console.log('🔧 [BaseConnector] Starting testConnection for:', this.config.type, this.config.url);
 
     try {
+      // First, test basic network connectivity
+      console.log('🌐 [BaseConnector] Testing basic network connectivity...');
+      const networkTest = await testNetworkConnectivity(this.config.url, this.config.timeout ?? 10000);
+      
+      if (!networkTest.success) {
+        console.error('🌐 [BaseConnector] Basic network test failed:', networkTest.error);
+        const vpnIssues = diagnoseVpnIssues({ code: 'ERR_NETWORK', message: networkTest.error }, this.config.type);
+        console.error('🌐 [BaseConnector] VPN diagnosis:', vpnIssues);
+        
+        return {
+          success: false,
+          message: `Network connectivity failed: ${networkTest.error}. ${vpnIssues.join(' ')}`,
+          latency: networkTest.latency,
+        };
+      }
+      
+      console.log('🌐 [BaseConnector] Basic network test passed, testing service...');
       console.log('🔧 [BaseConnector] Calling initialize...');
       await this.initialize();
       console.log('🔧 [BaseConnector] Initialize completed, getting version...');
@@ -56,6 +74,13 @@ export abstract class BaseConnector<
       };
     } catch (error) {
       console.error('🔧 [BaseConnector] Test connection error:', error);
+      
+      // Diagnose VPN-specific issues
+      const vpnIssues = diagnoseVpnIssues(error, this.config.type);
+      if (vpnIssues.length > 0) {
+        console.error('🌐 [BaseConnector] VPN issues detected:', vpnIssues);
+      }
+      
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
@@ -68,11 +93,12 @@ export abstract class BaseConnector<
         message: diagnostic.message,
         statusCode: diagnostic.statusCode,
         code: diagnostic.code,
+        vpnIssues,
       });
 
       return {
         success: false,
-        message: diagnostic.message,
+        message: `${diagnostic.message}${vpnIssues.length > 0 ? ` ${vpnIssues.join(' ')}` : ''}`,
         latency: Date.now() - startedAt,
       };
     }
