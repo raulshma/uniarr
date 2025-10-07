@@ -86,6 +86,7 @@ interface SonarrEpisode {
     };
   };
   readonly relativePath?: string;
+  readonly images?: SonarrImage[];
 }
 
 interface SonarrSystemStatus {
@@ -220,7 +221,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getSeries(): Promise<Series[]> {
     try {
       const response = await this.client.get<SonarrSeries[]>('/api/v3/series');
-      return response.data.map((item) => this.mapSeries(item));
+      return response.data.map((item: SonarrSeries) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -243,7 +244,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         params,
       });
 
-      return response.data.map((item) => this.mapSeries(item));
+      return response.data.map((item: SonarrSeries) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -358,7 +359,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getQualityProfiles(): Promise<QualityProfile[]> {
     try {
       const response = await this.client.get<SonarrQualityProfile[]>('/api/v3/qualityprofile');
-      return response.data.map((profile) => this.mapQualityProfile(profile));
+      return response.data.map((profile: SonarrQualityProfile) => this.mapQualityProfile(profile));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -372,7 +373,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getRootFolders(): Promise<RootFolder[]> {
     try {
       const response = await this.client.get<SonarrRootFolder[]>('/api/v3/rootfolder');
-      return response.data.map((folder) => this.mapRootFolder(folder));
+      return response.data.map((folder: SonarrRootFolder) => this.mapRootFolder(folder));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -386,7 +387,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getQueue(): Promise<SonarrQueueItem[]> {
     try {
       const response = await this.client.get<SonarrQueueResponse>('/api/v3/queue');
-      return (response.data.records ?? []).map((record) => this.mapQueueRecord(record));
+      return (response.data.records ?? []).map((record: SonarrQueueRecord) => this.mapQueueRecord(record));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -479,6 +480,12 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private mapEpisode(episode: SonarrEpisode, seriesId?: number): Episode {
+    // Try to get poster from images array first (if available in API response)
+    // Try screenshot first as it's more commonly available for episodes
+    const posterUrl = this.findImageUrl(episode.images, 'screenshot') 
+      ?? this.findImageUrl(episode.images, 'poster')
+      ?? (seriesId ? this.buildEpisodePosterUrl(seriesId, episode.id) : undefined);
+
     return {
       id: episode.id,
       title: episode.title,
@@ -494,7 +501,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       episodeFileId: episode.episodeFileId,
       quality: episode.quality?.quality ? this.mapQualityResource(episode.quality.quality) : undefined,
       relativePath: episode.relativePath,
-      posterUrl: seriesId ? this.buildEpisodePosterUrl(seriesId, episode.seasonNumber, episode.episodeNumber) : undefined,
+      posterUrl,
     };
   }
 
@@ -526,10 +533,12 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  private buildEpisodePosterUrl(seriesId: number, seasonNumber: number, episodeNumber: number): string {
+  private buildEpisodePosterUrl(seriesId: number, episodeId: number): string {
     try {
+      // Try the episode-specific MediaCover endpoint format
+      // Use 'screenshot' as the image type for episodes (most common)
       const url = new URL(
-        `/api/v3/MediaCover/${seriesId}/season-${seasonNumber}-episode-${episodeNumber}.jpg`,
+        `/api/v3/MediaCover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
         this.config.url,
       );
       if (this.config.apiKey) {
@@ -537,7 +546,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       }
       return url.toString();
     } catch (_e) {
-      return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}-episode-${episodeNumber}.jpg${
+      return `${this.config.url}/api/v3/MediaCover/${seriesId}/episode-${episodeId}-screenshot.jpg${
         this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
       }`;
     }
