@@ -7,6 +7,7 @@ import { logger } from '@/services/logger/LoggerService';
 import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
 import { testSonarrApi, testRadarrApi, testQBittorrentApi, testJellyseerrApi } from '@/utils/api-test.utils';
 import { debugLogger } from '@/utils/debug-logger';
+import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -17,6 +18,7 @@ export abstract class BaseConnector<
   TUpdatePayload = Partial<TResource>,
 > implements IConnector<TResource, TCreatePayload, TUpdatePayload> {
   protected readonly client: AxiosInstance;
+  private isAuthenticated = false;
 
   constructor(public readonly config: ServiceConfig) {
     this.client = this.createHttpClient();
@@ -71,7 +73,7 @@ export abstract class BaseConnector<
         debugLogger.addNetworkTest(true);
       }
       
-      // Test API endpoint specifically with more robust error handling
+      // Test API endpoint using the new authentication system
       debugLogger.addStep({
         id: 'api-test-start',
         title: 'Testing API Authentication',
@@ -79,36 +81,25 @@ export abstract class BaseConnector<
         message: `Testing ${this.config.type} API endpoint`,
       });
       
-      let apiTest;
-      const apiTimeout = Math.max(networkTimeout, 20000); // Ensure API test has enough time
-      
-      if (this.config.type === 'sonarr') {
-        apiTest = await testSonarrApi(this.config.url, this.config.apiKey, apiTimeout);
-      } else if (this.config.type === 'radarr') {
-        apiTest = await testRadarrApi(this.config.url, this.config.apiKey, apiTimeout);
-      } else if (this.config.type === 'qbittorrent') {
-        apiTest = await testQBittorrentApi(this.config.url, this.config.username, this.config.password, apiTimeout);
-      } else if (this.config.type === 'jellyseerr') {
-        apiTest = await testJellyseerrApi(this.config.url, this.config.username, this.config.password, apiTimeout);
-      }
-      
-      if (apiTest && !apiTest.success) {
+      try {
+        await this.ensureAuthenticated();
+        debugLogger.addSuccess('API authentication successful');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
         const vpnIssues = diagnoseVpnIssues({ 
-          code: apiTest.status === 401 ? 'AUTH_ERROR' : 'API_ERROR', 
-          message: apiTest.error 
+          code: 'AUTH_ERROR', 
+          message: errorMessage 
         }, this.config.type);
         
-        debugLogger.addError(`API test failed: ${apiTest.error}`, 
-          `Status: ${apiTest.status}\nData: ${JSON.stringify(apiTest.data)}\n\nVPN Issues:\n${vpnIssues.join('\n')}`);
+        debugLogger.addError(`API authentication failed: ${errorMessage}`, 
+          `VPN Issues:\n${vpnIssues.join('\n')}`);
         
         return {
           success: false,
-          message: `API test failed: ${apiTest.error}. ${vpnIssues.join(' ')}`,
+          message: `API authentication failed: ${errorMessage}. ${vpnIssues.join(' ')}`,
           latency: Date.now() - startedAt,
         };
       }
-      
-      debugLogger.addSuccess('API authentication successful');
       
       // Test service initialization
       debugLogger.addStep({
@@ -282,16 +273,47 @@ export abstract class BaseConnector<
   }
 
   /**
+   * Ensure the service is authenticated before making requests
+   */
+  protected async ensureAuthenticated(): Promise<void> {
+    if (this.isAuthenticated) {
+      return;
+    }
+
+    try {
+      const result = await ServiceAuthHelper.authenticateService(this.config);
+      
+      if (!result.success || !result.authenticated) {
+        throw new Error(result.error || 'Authentication failed');
+      }
+
+      this.isAuthenticated = true;
+      
+      void logger.debug('Service authenticated successfully.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+      });
+    } catch (error) {
+      this.isAuthenticated = false;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
+      
+      void logger.error('Service authentication failed.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        error: errorMessage,
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
    * Get authentication configuration for the HTTP client.
-   * Override this method in connectors that use different auth methods.
+   * This method now uses the centralized authentication system.
    */
   protected getAuthConfig(): { auth?: { username: string; password: string } } {
-    // Sonarr and Radarr only use API key authentication, not username/password
-    if (this.config.type === 'sonarr' || this.config.type === 'radarr') {
-      return {};
-    }
-    
-    if (this.config.username && this.config.password) {
+    // For services that use basic auth, we still need to provide credentials to axios
+    if (this.config.type === 'jellyseerr' && this.config.username && this.config.password) {
       return {
         auth: {
           username: this.config.username,
@@ -299,6 +321,10 @@ export abstract class BaseConnector<
         },
       };
     }
+    
+    // For session-based auth (qBittorrent), we don't need to set auth here
+    // as the session is managed through cookies
+    // For API key auth (Sonarr/Radarr), the API key is handled in getDefaultHeaders()
     return {};
   }
 
