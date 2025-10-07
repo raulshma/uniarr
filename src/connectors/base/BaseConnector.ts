@@ -5,6 +5,7 @@ import type { ServiceConfig } from '@/models/service.types';
 import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
 import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
+import { testSonarrApi, testRadarrApi, testQBittorrentApi } from '@/utils/api-test.utils';
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -58,7 +59,28 @@ export abstract class BaseConnector<
         };
       }
       
-      console.log('🌐 [BaseConnector] Basic network test passed, testing service...');
+      console.log('🌐 [BaseConnector] Basic network test passed, testing API...');
+      
+      // Test API endpoint specifically
+      let apiTest;
+      if (this.config.type === 'sonarr') {
+        apiTest = await testSonarrApi(this.config.url, this.config.apiKey);
+      } else if (this.config.type === 'radarr') {
+        apiTest = await testRadarrApi(this.config.url, this.config.apiKey);
+      } else if (this.config.type === 'qbittorrent') {
+        apiTest = await testQBittorrentApi(this.config.url, this.config.username, this.config.password);
+      }
+      
+      if (apiTest && !apiTest.success) {
+        console.error('🧪 [BaseConnector] API test failed:', apiTest.error);
+        return {
+          success: false,
+          message: `API test failed: ${apiTest.error}`,
+          latency: Date.now() - startedAt,
+        };
+      }
+      
+      console.log('🧪 [BaseConnector] API test passed, testing service...');
       console.log('🔧 [BaseConnector] Calling initialize...');
       await this.initialize();
       console.log('🔧 [BaseConnector] Initialize completed, getting version...');
@@ -143,6 +165,14 @@ export abstract class BaseConnector<
 
     instance.interceptors.request.use(
       (requestConfig) => {
+        console.log('📤 [BaseConnector] Outgoing request:', {
+          method: requestConfig.method?.toUpperCase(),
+          url: requestConfig.url,
+          fullUrl: `${this.config.url}${requestConfig.url}`,
+          headers: requestConfig.headers,
+          timeout: requestConfig.timeout,
+        });
+        
         void logger.debug('Outgoing connector request.', {
           serviceId: this.config.id,
           serviceType: this.config.type,
@@ -153,6 +183,7 @@ export abstract class BaseConnector<
         return requestConfig;
       },
       (error) => {
+        console.error('📤 [BaseConnector] Request setup error:', error);
         this.logRequestError(error);
         return Promise.reject(error);
       },
@@ -160,6 +191,15 @@ export abstract class BaseConnector<
 
     instance.interceptors.response.use(
       (response) => {
+        console.log('📥 [BaseConnector] Response received:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.config.url,
+          headers: response.headers,
+          dataType: typeof response.data,
+          dataLength: response.data ? JSON.stringify(response.data).length : 0,
+        });
+        
         void logger.debug('Connector response received.', {
           serviceId: this.config.id,
           serviceType: this.config.type,
@@ -170,6 +210,16 @@ export abstract class BaseConnector<
         return response;
       },
       (error) => {
+        console.error('📥 [BaseConnector] Response error:', {
+          message: error.message,
+          code: error.code,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          url: error.config?.url,
+          headers: error.response?.headers,
+          data: error.response?.data,
+        });
+        
         this.handleHttpError(error);
         return Promise.reject(error);
       },

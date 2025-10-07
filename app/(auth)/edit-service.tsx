@@ -31,6 +31,7 @@ import {
   serviceConfigSchema,
   type ServiceConfigInput,
 } from '@/utils/validation.utils';
+import { testApiKeyFormat } from '@/utils/api-key-validator';
 
 const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'prowlarr'];
 
@@ -335,6 +336,19 @@ const EditServiceScreen = () => {
       try {
         const config = buildServiceConfig(values, existingConfig);
         console.log('📋 [Edit] Built config:', config);
+        
+        // Validate API key format first
+        if (values.apiKey && values.type !== 'qbittorrent') {
+          const apiKeyTest = testApiKeyFormat(values.apiKey, values.type);
+          console.log('🔑 [Edit] API key validation:', apiKeyTest);
+          
+          if (!apiKeyTest.isValid) {
+            console.error('❌ [Edit] API key validation failed:', apiKeyTest.message);
+            setTestError(`${apiKeyTest.message}. ${apiKeyTest.suggestions.join(' ')}`);
+            return;
+          }
+        }
+        
         const result = await runConnectionTest(config);
         console.log('✅ [Edit] Connection test result:', result);
 
