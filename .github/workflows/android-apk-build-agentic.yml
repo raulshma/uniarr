@@ -21,8 +21,6 @@ jobs:
           echo "Current branch: $(git branch --show-current)"
           echo "Git status:"
           git status
-          echo "Clearing npm cache..."
-          npm cache clean --force
           echo "Installing dependencies..."
           npm ci
           echo "Verifying expo-auth-session installation..."
