@@ -349,7 +349,7 @@ const EditServiceScreen = () => {
         const config = buildServiceConfig(values, existingConfig);
         
         // Validate API key format first
-        if (values.apiKey && values.type !== 'qbittorrent') {
+        if (values.apiKey && values.type !== 'qbittorrent' && values.type !== 'jellyseerr') {
           const apiKeyTest = testApiKeyFormat(values.apiKey, values.type);
           debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
           
@@ -763,7 +763,7 @@ const EditServiceScreen = () => {
             name="type"
             control={control}
             render={({ field: { value: serviceType } }) => {
-              if (serviceType === 'qbittorrent') {
+              if (serviceType === 'qbittorrent' || serviceType === 'jellyseerr') {
                 return (
                   <>
                     <View style={styles.formField}>

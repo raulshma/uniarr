@@ -5,7 +5,7 @@ import type { ServiceConfig } from '@/models/service.types';
 import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
 import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
-import { testSonarrApi, testRadarrApi, testQBittorrentApi } from '@/utils/api-test.utils';
+import { testSonarrApi, testRadarrApi, testQBittorrentApi, testJellyseerrApi } from '@/utils/api-test.utils';
 import { debugLogger } from '@/utils/debug-logger';
 
 /**
@@ -88,6 +88,8 @@ export abstract class BaseConnector<
         apiTest = await testRadarrApi(this.config.url, this.config.apiKey, apiTimeout);
       } else if (this.config.type === 'qbittorrent') {
         apiTest = await testQBittorrentApi(this.config.url, this.config.username, this.config.password, apiTimeout);
+      } else if (this.config.type === 'jellyseerr') {
+        apiTest = await testJellyseerrApi(this.config.url, this.config.username, this.config.password, apiTimeout);
       }
       
       if (apiTest && !apiTest.success) {
@@ -195,6 +197,7 @@ export abstract class BaseConnector<
       baseURL: this.config.url,
       timeout: this.config.timeout ?? 30_000,
       headers: this.getDefaultHeaders(),
+      ...this.getAuthConfig(),
     });
 
     instance.interceptors.request.use(
@@ -276,6 +279,22 @@ export abstract class BaseConnector<
     }
 
     return headers;
+  }
+
+  /**
+   * Get authentication configuration for the HTTP client.
+   * Override this method in connectors that use different auth methods.
+   */
+  protected getAuthConfig(): { auth?: { username: string; password: string } } {
+    if (this.config.username && this.config.password) {
+      return {
+        auth: {
+          username: this.config.username,
+          password: this.config.password,
+        },
+      };
+    }
+    return {};
   }
 
   /** Log and surface Axios errors that occur during the request lifecycle. */
