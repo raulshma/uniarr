@@ -493,6 +493,10 @@ const RadarrAddMovieScreen = () => {
             </Text>
             {qualityProfilesQuery.isLoading ? (
               <ActivityIndicator animating color={theme.colors.primary} />
+            ) : qualityProfilesQuery.isError ? (
+              <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
+                Failed to load quality profiles. This may be due to corrupted custom formats in Radarr. Please check your Radarr quality profiles and custom formats, then try again.
+              </HelperText>
             ) : qualityProfiles.length ? (
               <Controller<AddMovieFormValues, 'qualityProfileId'>
                 control={control}
