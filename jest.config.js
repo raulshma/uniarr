@@ -6,4 +6,5 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   clearMocks: true,
+  setupFilesAfterEnv: ['<rootDir>/__tests__/setup.ts'],
 };

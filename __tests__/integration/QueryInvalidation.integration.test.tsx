@@ -73,6 +73,7 @@ jest.mock('@/services/storage/SecureStorage', () => ({
 }));
 
 // Mock connector implementations
+// @ts-ignore - Jest mock typing issues
 jest.mock('@/connectors/implementations/SonarrConnector', () => ({
   SonarrConnector: jest.fn().mockImplementation(() => ({
     testConnection: jest.fn().mockResolvedValue({
@@ -317,7 +318,7 @@ describe('Query Invalidation Integration Tests', () => {
           throw new Error('Invalidation failed');
         }
         return Promise.resolve();
-      });
+      }) as any;
 
       // Should not throw despite invalidation failure
       await expect(manager.addConnector(serviceConfig)).resolves.toBeDefined();

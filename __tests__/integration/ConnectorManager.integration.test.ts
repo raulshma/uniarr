@@ -69,33 +69,47 @@ jest.mock('@/services/storage/SecureStorage', () => ({
 }));
 
 // Mock connector implementations
+// @ts-ignore - Jest mock typing issues
 jest.mock('@/connectors/implementations/SonarrConnector', () => ({
   SonarrConnector: jest.fn().mockImplementation(() => ({
+    // @ts-ignore
     testConnection: jest.fn().mockResolvedValue({
       success: true,
       version: '4.0.0',
       latency: 100,
-    } as any),
-    getSeries: jest.fn().mockResolvedValue([] as any),
-    search: jest.fn().mockResolvedValue([] as any),
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Series' } as any),
-    initialize: jest.fn().mockResolvedValue(undefined as any),
-    dispose: jest.fn().mockResolvedValue(undefined as any),
+    }),
+    // @ts-ignore
+    getSeries: jest.fn().mockResolvedValue([]),
+    // @ts-ignore
+    search: jest.fn().mockResolvedValue([]),
+    // @ts-ignore
+    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Series' }),
+    // @ts-ignore
+    initialize: jest.fn().mockResolvedValue(undefined),
+    // @ts-ignore
+    dispose: jest.fn().mockResolvedValue(undefined),
   })),
 }));
 
+// @ts-ignore - Jest mock typing issues
 jest.mock('@/connectors/implementations/RadarrConnector', () => ({
   RadarrConnector: jest.fn().mockImplementation(() => ({
+    // @ts-ignore
     testConnection: jest.fn().mockResolvedValue({
       success: true,
       version: '5.0.0',
       latency: 150,
-    } as any),
-    getMovies: jest.fn().mockResolvedValue([] as any),
-    search: jest.fn().mockResolvedValue([] as any),
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Movie' } as any),
-    initialize: jest.fn().mockResolvedValue(undefined as any),
-    dispose: jest.fn().mockResolvedValue(undefined as any),
+    }),
+    // @ts-ignore
+    getMovies: jest.fn().mockResolvedValue([]),
+    // @ts-ignore
+    search: jest.fn().mockResolvedValue([]),
+    // @ts-ignore
+    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Movie' }),
+    // @ts-ignore
+    initialize: jest.fn().mockResolvedValue(undefined),
+    // @ts-ignore
+    dispose: jest.fn().mockResolvedValue(undefined),
   })),
 }));
 
@@ -169,6 +183,7 @@ describe('ConnectorManager Integration Tests', () => {
       // Mock one service to fail
       const { SonarrConnector } = require('@/connectors/implementations/SonarrConnector');
       const failingConnector = {
+        // @ts-ignore
         testConnection: jest.fn().mockResolvedValue({
           success: false,
           message: 'Connection failed',
@@ -248,7 +263,8 @@ describe('ConnectorManager Integration Tests', () => {
       // Mock one service to fail during connection test
       const { RadarrConnector } = require('@/connectors/implementations/RadarrConnector');
       const failingConnector = {
-        testConnection: jest.fn().mockRejectedValue(new Error('Connection failed') as any),
+        // @ts-ignore
+        testConnection: jest.fn().mockRejectedValue(new Error('Connection failed')),
       };
       RadarrConnector.mockImplementationOnce(() => failingConnector);
 
