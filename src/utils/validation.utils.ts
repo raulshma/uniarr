@@ -22,13 +22,13 @@ export const serviceConfigSchema = z
       .min(1, 'URL is required')
       .url('Invalid URL')
       .refine((value) => httpSchemeRegex.test(value), 'URL must start with http:// or https://'),
-    apiKey: z.string().trim().min(1, 'API key cannot be empty').optional(),
-    username: z.string().trim().min(1, 'Username cannot be empty').optional(),
-    password: z.string().trim().min(1, 'Password cannot be empty').optional(),
+    apiKey: z.string().trim().optional(),
+    username: z.string().trim().optional(),
+    password: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.type === 'qbittorrent') {
-      if (!data.username) {
+      if (!data.username || data.username.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['username'],
@@ -36,7 +36,7 @@ export const serviceConfigSchema = z
         });
       }
 
-      if (!data.password) {
+      if (!data.password || data.password.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['password'],
@@ -48,7 +48,7 @@ export const serviceConfigSchema = z
     }
 
     if (data.type === 'jellyseerr') {
-      if (!data.username) {
+      if (!data.username || data.username.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['username'],
@@ -56,7 +56,7 @@ export const serviceConfigSchema = z
         });
       }
 
-      if (!data.password) {
+      if (!data.password || data.password.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['password'],
@@ -69,7 +69,7 @@ export const serviceConfigSchema = z
 
     // For Sonarr and Radarr, only API key is required
     if (data.type === 'sonarr' || data.type === 'radarr') {
-      if (!data.apiKey) {
+      if (!data.apiKey || data.apiKey.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['apiKey'],
@@ -80,12 +80,15 @@ export const serviceConfigSchema = z
     }
 
     // For other services (like prowlarr), API key is required
-    if (!data.apiKey) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['apiKey'],
-        message: 'API key is required',
-      });
+    if (data.type === 'prowlarr') {
+      if (!data.apiKey || data.apiKey.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['apiKey'],
+          message: 'API key is required for Prowlarr',
+        });
+      }
+      return;
     }
   });
 
