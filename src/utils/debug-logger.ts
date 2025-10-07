@@ -5,6 +5,7 @@ class DebugLogger {
   private listeners: ((steps: DebugStep[]) => void)[] = [];
 
   addStep(step: Omit<DebugStep, 'timestamp'>) {
+    console.log('🧪 [DebugLogger] Adding step:', step);
     const newStep: DebugStep = {
       id: step.id,
       title: step.title,
@@ -15,11 +16,12 @@ class DebugLogger {
     };
     
     this.steps.push(newStep);
+    console.log('🧪 [DebugLogger] Total steps now:', this.steps.length);
     this.notifyListeners();
   }
 
   updateStep(stepId: string, updates: Partial<Omit<DebugStep, 'id' | 'timestamp'>>) {
-    const stepIndex = this.steps.findIndex(step => step.id === stepId);
+    const stepIndex = this.steps.findIndex((step: DebugStep) => step.id === stepId);
     if (stepIndex !== -1 && this.steps[stepIndex]) {
       const existingStep = this.steps[stepIndex];
       this.steps[stepIndex] = {
@@ -51,6 +53,7 @@ class DebugLogger {
   }
 
   private notifyListeners() {
+    console.log('🧪 [DebugLogger] Notifying listeners, total steps:', this.steps.length);
     this.listeners.forEach(listener => listener([...this.steps]));
   }
 
@@ -70,6 +73,16 @@ class DebugLogger {
       title: 'Network Connectivity Test',
       status: success ? 'success' : 'error',
       message: success ? 'Network is reachable' : `Network error: ${error}`,
+    });
+  }
+
+  addWarning(message: string, details?: string) {
+    this.addStep({
+      id: `warning-${Date.now()}`,
+      title: 'Warning',
+      status: 'warning',
+      message,
+      details,
     });
   }
 

@@ -6,7 +6,7 @@ import { spacing } from '@/theme/spacing';
 export interface DebugStep {
   id: string;
   title: string;
-  status: 'pending' | 'running' | 'success' | 'error';
+  status: 'pending' | 'running' | 'success' | 'error' | 'warning';
   message?: string;
   details?: string;
   timestamp: Date;
@@ -24,7 +24,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
   isVisible,
   onClose,
   onClear,
-}) => {
+}: DebugPanelProps) => {
   const theme = useTheme();
 
   if (!isVisible) return null;
@@ -35,6 +35,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
         return theme.colors.primary;
       case 'error':
         return theme.colors.error;
+      case 'warning':
+        return theme.colors.tertiary;
       case 'running':
         return theme.colors.tertiary;
       case 'pending':
@@ -49,6 +51,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
         return 'check-circle';
       case 'error':
         return 'alert-circle';
+      case 'warning':
+        return 'alert';
       case 'running':
         return 'loading';
       case 'pending':
@@ -82,7 +86,7 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
               No debug information available. Try testing a connection.
             </Text>
           ) : (
-            steps.map((step, index) => (
+            steps.map((step: DebugStep, index: number) => (
               <View key={step.id} style={styles.stepContainer}>
                 <View style={styles.stepHeader}>
                   <Chip
