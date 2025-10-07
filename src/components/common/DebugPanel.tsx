@@ -9,7 +9,7 @@ export interface DebugStep {
   status: 'pending' | 'running' | 'success' | 'error';
   message?: string;
   details?: string;
-  timestamp?: Date;
+  timestamp: Date;
 }
 
 interface DebugPanelProps {

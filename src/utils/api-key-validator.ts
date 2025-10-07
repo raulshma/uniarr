@@ -1,7 +1,7 @@
 /**
  * Validate API key format for different services
  */
-export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent'): {
+export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr'): {
   isValid: boolean;
   issues: string[];
 } {
@@ -29,8 +29,8 @@ export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' 
   }
   
   // Service-specific validation
-  if (serviceType === 'sonarr' || serviceType === 'radarr') {
-    // Sonarr/Radarr API keys are typically 32 characters
+  if (serviceType === 'sonarr' || serviceType === 'radarr' || serviceType === 'jellyseerr' || serviceType === 'prowlarr') {
+    // Sonarr/Radarr/Jellyseerr/Prowlarr API keys are typically 32 characters
     if (trimmedKey.length !== 32) {
       issues.push(`${serviceType} API key should be 32 characters long (current: ${trimmedKey.length})`);
     }
@@ -55,12 +55,16 @@ export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' 
 /**
  * Get API key from service settings (for testing)
  */
-export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbittorrent'): string {
+export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr'): string {
   switch (serviceType) {
     case 'sonarr':
       return 'Go to Sonarr → Settings → General → Security → API Key';
     case 'radarr':
       return 'Go to Radarr → Settings → General → Security → API Key';
+    case 'jellyseerr':
+      return 'Go to Jellyseerr → Settings → General → API Key';
+    case 'prowlarr':
+      return 'Go to Prowlarr → Settings → General → API Key';
     case 'qbittorrent':
       return 'qBittorrent uses username/password. Check Settings → Web UI → Authentication';
     default:
@@ -71,7 +75,7 @@ export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbitto
 /**
  * Test API key format and provide suggestions
  */
-export function testApiKeyFormat(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent'): {
+export function testApiKeyFormat(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr'): {
   isValid: boolean;
   message: string;
   suggestions: string[];

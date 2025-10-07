@@ -159,16 +159,17 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       return version;
     } catch (error) {
       console.error('🔧 [RadarrConnector] Version request failed:', error);
+      const axiosError = error as any;
       console.error('🔧 [RadarrConnector] Error details:', {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data
+        message: axiosError.message,
+        code: axiosError.code,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        data: axiosError.response?.data
       });
       
       // Check if it's a network connectivity issue
-      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+      if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ENOTFOUND' || axiosError.code === 'ETIMEDOUT') {
         console.error('🔧 [RadarrConnector] Network connectivity issue detected');
         console.error('🔧 [RadarrConnector] This might be a VPN or firewall issue');
       }

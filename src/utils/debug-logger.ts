@@ -6,7 +6,11 @@ class DebugLogger {
 
   addStep(step: Omit<DebugStep, 'timestamp'>) {
     const newStep: DebugStep = {
-      ...step,
+      id: step.id,
+      title: step.title,
+      status: step.status,
+      message: step.message,
+      details: step.details,
       timestamp: new Date(),
     };
     
@@ -16,10 +20,15 @@ class DebugLogger {
 
   updateStep(stepId: string, updates: Partial<Omit<DebugStep, 'id' | 'timestamp'>>) {
     const stepIndex = this.steps.findIndex(step => step.id === stepId);
-    if (stepIndex !== -1) {
+    if (stepIndex !== -1 && this.steps[stepIndex]) {
+      const existingStep = this.steps[stepIndex];
       this.steps[stepIndex] = {
-        ...this.steps[stepIndex],
-        ...updates,
+        id: existingStep.id,
+        title: updates.title ?? existingStep.title,
+        status: updates.status ?? existingStep.status,
+        message: updates.message ?? existingStep.message,
+        details: updates.details ?? existingStep.details,
+        timestamp: existingStep.timestamp,
       };
       this.notifyListeners();
     }

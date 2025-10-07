@@ -193,16 +193,17 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       return version;
     } catch (error) {
       console.error('🔧 [SonarrConnector] Version request failed:', error);
+      const axiosError = error as any;
       console.error('🔧 [SonarrConnector] Error details:', {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data
+        message: axiosError.message,
+        code: axiosError.code,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        data: axiosError.response?.data
       });
       
       // Check if it's a network connectivity issue
-      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+      if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ENOTFOUND' || axiosError.code === 'ETIMEDOUT') {
         console.error('🔧 [SonarrConnector] Network connectivity issue detected');
         console.error('🔧 [SonarrConnector] This might be a VPN or firewall issue');
       }
