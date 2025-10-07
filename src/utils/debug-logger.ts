@@ -21,7 +21,7 @@ class DebugLogger {
   }
 
   updateStep(stepId: string, updates: Partial<Omit<DebugStep, 'id' | 'timestamp'>>) {
-    const stepIndex = this.steps.findIndex(step => step.id === stepId);
+    const stepIndex = this.steps.findIndex((step: DebugStep) => step.id === stepId);
     if (stepIndex !== -1 && this.steps[stepIndex]) {
       const existingStep = this.steps[stepIndex];
       this.steps[stepIndex] = {

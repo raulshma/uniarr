@@ -337,7 +337,7 @@ const AddServiceScreen = () => {
     });
   }, [reset, resetDiagnostics]);
 
-  const handleScanNetwork = useCallback(async () => {
+  const handleScanNetwork = useCallback(async (): Promise<void> => {
     setNetworkScanModalVisible(true);
     resetScan();
     await scanNetwork();
@@ -357,7 +357,7 @@ const AddServiceScreen = () => {
   );
 
   const handleTestConnection = useCallback(
-    async (values: ServiceConfigInput) => {
+    async (values: ServiceConfigInput): Promise<void> => {
       console.log('🧪 [AddService] handleTestConnection called with values:', values);
       console.log('🧪 [AddService] Form errors:', errors);
       resetDiagnostics();
@@ -420,7 +420,7 @@ const AddServiceScreen = () => {
   );
 
   const handleSave = useCallback(
-    async (values: ServiceConfigInput) => {
+    async (values: ServiceConfigInput): Promise<void> => {
       console.log('💾 [AddService] handleSave called with values:', values);
       resetDiagnostics();
 
@@ -563,7 +563,7 @@ const AddServiceScreen = () => {
             <Controller
               name="type"
               control={control}
-              render={({ field: { value, onChange } }) => (
+              render={({ field: { value, onChange } }: { field: { value: ServiceType; onChange: (value: ServiceType) => void } }) => (
                   <>
                     <Pressable
                       onPress={() => setServiceTypeModalVisible(true)}
@@ -593,7 +593,7 @@ const AddServiceScreen = () => {
                         onDismiss={() => setServiceTypeModalVisible(false)}
                         contentContainerStyle={styles.modalContent}
                       >
-                        {serviceOptions.map((option) => (
+                        {serviceOptions.map((option: { type: ServiceType; label: string; supported: boolean; isLast: boolean }) => (
                           <View key={option.type}>
                             <Pressable
                               onPress={() => {
@@ -603,7 +603,7 @@ const AddServiceScreen = () => {
                                   setServiceTypeModalVisible(false);
                                 }
                               }}
-                              style={({ pressed }) => [
+                              style={({ pressed }: { pressed: boolean }) => [
                                 styles.optionItem,
                                 option.supported ? null : styles.optionDisabled,
                                 pressed ? { opacity: 0.7 } : null,
@@ -678,10 +678,10 @@ const AddServiceScreen = () => {
             <Controller
               name="name"
               control={control}
-              render={({ field: { value, onChange, onBlur } }) => (
+              render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
                 <TextInput
                   value={value}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     resetDiagnostics();
                     onChange(text);
                   }}
@@ -711,16 +711,16 @@ const AddServiceScreen = () => {
             <Controller
               name="url"
               control={control}
-              render={({ field: { value, onChange, onBlur } }) => (
+              render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
                 <TextInput
                   value={value}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     resetDiagnostics();
                     // Clear any previous URL validation state while user edits
                     setUrlValidation({ status: 'idle', message: null });
                     onChange(text);
                   }}
-                  onBlur={async () => {
+                  onBlur={async (): Promise<void> => {
                     onBlur();
 
                     // If there is already a synchronous validation error from zod, skip async validation
@@ -805,7 +805,7 @@ const AddServiceScreen = () => {
           <Controller
             name="type"
             control={control}
-            render={({ field: { value: serviceType } }) => {
+            render={({ field: { value: serviceType } }: { field: { value: ServiceType } }) => {
               if (serviceType === 'qbittorrent') {
                 return (
                   <>
@@ -816,10 +816,10 @@ const AddServiceScreen = () => {
                       <Controller
                         name="username"
                         control={control}
-                        render={({ field: { value, onChange, onBlur } }) => (
+                        render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
                           <TextInput
                             value={value}
-                            onChangeText={(text) => {
+                            onChangeText={(text: string) => {
                               resetDiagnostics();
                               onChange(text);
                             }}
@@ -849,10 +849,10 @@ const AddServiceScreen = () => {
                       <Controller
                         name="password"
                         control={control}
-                        render={({ field: { value, onChange, onBlur } }) => (
+                        render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
                           <TextInput
                             value={value}
-                            onChangeText={(text) => {
+                            onChangeText={(text: string) => {
                               resetDiagnostics();
                               onChange(text);
                             }}
@@ -887,10 +887,10 @@ const AddServiceScreen = () => {
                   <Controller
                     name="apiKey"
                     control={control}
-                    render={({ field: { value, onChange, onBlur } }) => (
+                    render={({ field: { value, onChange, onBlur } }: { field: { value: string; onChange: (value: string) => void; onBlur: () => void } }) => (
                       <TextInput
                         value={value}
-                        onChangeText={(text) => {
+                        onChangeText={(text: string) => {
                           resetDiagnostics();
                           onChange(text);
                         }}
