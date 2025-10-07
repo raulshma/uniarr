@@ -18,6 +18,7 @@ import { Controller, useForm } from 'react-hook-form';
 import axios from 'axios';
 
 import { Button } from '@/components/common/Button';
+import { DebugPanel, type DebugStep } from '@/components/common/DebugPanel';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorFactory } from '@/connectors/factory/ConnectorFactory';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -32,6 +33,7 @@ import {
   type ServiceConfigInput,
 } from '@/utils/validation.utils';
 import { testApiKeyFormat } from '@/utils/api-key-validator';
+import { debugLogger } from '@/utils/debug-logger';
 
 const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'prowlarr'];
 
@@ -152,6 +154,16 @@ const EditServiceScreen = () => {
   }>({ status: 'idle', message: null });
   const urlValidationController = useRef<AbortController | null>(null);
   const [serviceTypeModalVisible, setServiceTypeModalVisible] = useState(false);
+  const [debugSteps, setDebugSteps] = useState<DebugStep[]>([]);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+
+  // Subscribe to debug logger
+  useEffect(() => {
+    const unsubscribe = debugLogger.subscribe((steps) => {
+      setDebugSteps(steps);
+    });
+    return unsubscribe;
+  }, []);
 
   const styles = useMemo(
     () =>
@@ -316,41 +328,38 @@ const EditServiceScreen = () => {
 
   const handleTestConnection = useCallback(
     async (values: ServiceConfigInput) => {
-      console.log('🔍 [Edit] Starting connection test with values:', values);
       if (!existingConfig) {
-        console.log('❌ [Edit] No existing config');
+        debugLogger.addError('No existing config', 'Cannot test connection without existing service configuration');
         return;
       }
 
       resetDiagnostics();
+      debugLogger.clear();
+      setShowDebugPanel(true);
 
       if (!supportedTypeSet.has(values.type)) {
-        console.log('❌ [Edit] Service type not supported:', values.type);
+        debugLogger.addError('Service type not supported', `Selected service type '${values.type}' is not available yet.`);
         setTestError('Selected service type is not available yet.');
         return;
       }
 
       setIsTesting(true);
-      console.log('🔄 [Edit] Testing connection...');
 
       try {
         const config = buildServiceConfig(values, existingConfig);
-        console.log('📋 [Edit] Built config:', config);
         
         // Validate API key format first
         if (values.apiKey && values.type !== 'qbittorrent') {
           const apiKeyTest = testApiKeyFormat(values.apiKey, values.type);
-          console.log('🔑 [Edit] API key validation:', apiKeyTest);
+          debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
           
           if (!apiKeyTest.isValid) {
-            console.error('❌ [Edit] API key validation failed:', apiKeyTest.message);
             setTestError(`${apiKeyTest.message}. ${apiKeyTest.suggestions.join(' ')}`);
             return;
           }
         }
         
         const result = await runConnectionTest(config);
-        console.log('✅ [Edit] Connection test result:', result);
 
         if (result.success) {
           setTestResult(result);
@@ -358,9 +367,9 @@ const EditServiceScreen = () => {
           setTestError(result.message ?? 'Unable to connect to the selected service.');
         }
       } catch (error) {
-        console.error('❌ [Edit] Connection test error:', error);
         const message =
           error instanceof Error ? error.message : 'Unable to test the connection. Check the configuration and try again.';
+        debugLogger.addError('Connection test failed', message);
         setTestError(message);
 
         void logger.warn('Service connection test failed.', {
@@ -370,7 +379,6 @@ const EditServiceScreen = () => {
         });
       } finally {
         setIsTesting(false);
-        console.log('🏁 [Edit] Connection test completed');
       }
     },
     [existingConfig, resetDiagnostics, runConnectionTest, supportedTypeSet],
@@ -895,11 +903,7 @@ const EditServiceScreen = () => {
           <View style={styles.actions}>
             <Button
               mode="contained"
-              onPress={() => {
-                console.log('🔘 [Edit] Test Connection button pressed');
-                console.log('📋 [Edit] Form state:', { isSubmitting, isTesting, errors });
-                handleSubmit(handleTestConnection)();
-              }}
+              onPress={handleSubmit(handleTestConnection)}
               loading={isTesting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.surface}
@@ -912,11 +916,7 @@ const EditServiceScreen = () => {
 
             <Button
               mode="contained"
-              onPress={() => {
-                console.log('🔘 [Edit] Update Service button pressed');
-                console.log('📋 [Edit] Form state:', { isSubmitting, isTesting, errors });
-                handleSubmit(handleSave)();
-              }}
+              onPress={handleSubmit(handleSave)}
               loading={isSubmitting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.primary}
@@ -929,6 +929,16 @@ const EditServiceScreen = () => {
           </View>
         </View>
       </ScrollView>
+      
+      <DebugPanel
+        steps={debugSteps}
+        isVisible={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+        onClear={() => {
+          debugLogger.clear();
+          setDebugSteps([]);
+        }}
+      />
     </SafeAreaView>
   );
 };

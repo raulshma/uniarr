@@ -6,6 +6,7 @@ import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
 import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
 import { testSonarrApi, testRadarrApi, testQBittorrentApi } from '@/utils/api-test.utils';
+import { debugLogger } from '@/utils/debug-logger';
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -40,17 +41,23 @@ export abstract class BaseConnector<
   /** Test connectivity to the remote service and return diagnostic information. */
   async testConnection(): Promise<ConnectionResult> {
     const startedAt = Date.now();
-    console.log('🔧 [BaseConnector] Starting testConnection for:', this.config.type, this.config.url);
+    debugLogger.startConnectionTest(this.config.type, this.config.url);
 
     try {
       // First, test basic network connectivity
-      console.log('🌐 [BaseConnector] Testing basic network connectivity...');
+      debugLogger.addStep({
+        id: 'network-test-start',
+        title: 'Testing Network Connectivity',
+        status: 'running',
+        message: `Testing connection to ${this.config.url}`,
+      });
+      
       const networkTest = await testNetworkConnectivity(this.config.url, this.config.timeout ?? 10000);
       
       if (!networkTest.success) {
-        console.error('🌐 [BaseConnector] Basic network test failed:', networkTest.error);
         const vpnIssues = diagnoseVpnIssues({ code: 'ERR_NETWORK', message: networkTest.error }, this.config.type);
-        console.error('🌐 [BaseConnector] VPN diagnosis:', vpnIssues);
+        debugLogger.addNetworkTest(false, networkTest.error);
+        debugLogger.addError(`Network connectivity failed: ${networkTest.error}`, vpnIssues.join('\n'));
         
         return {
           success: false,
@@ -59,9 +66,16 @@ export abstract class BaseConnector<
         };
       }
       
-      console.log('🌐 [BaseConnector] Basic network test passed, testing API...');
+      debugLogger.addNetworkTest(true);
       
       // Test API endpoint specifically
+      debugLogger.addStep({
+        id: 'api-test-start',
+        title: 'Testing API Authentication',
+        status: 'running',
+        message: `Testing ${this.config.type} API endpoint`,
+      });
+      
       let apiTest;
       if (this.config.type === 'sonarr') {
         apiTest = await testSonarrApi(this.config.url, this.config.apiKey);
@@ -72,7 +86,7 @@ export abstract class BaseConnector<
       }
       
       if (apiTest && !apiTest.success) {
-        console.error('🧪 [BaseConnector] API test failed:', apiTest.error);
+        debugLogger.addError(`API test failed: ${apiTest.error}`, `Status: ${apiTest.status}\nData: ${JSON.stringify(apiTest.data)}`);
         return {
           success: false,
           message: `API test failed: ${apiTest.error}`,
@@ -80,13 +94,21 @@ export abstract class BaseConnector<
         };
       }
       
-      console.log('🧪 [BaseConnector] API test passed, testing service...');
-      console.log('🔧 [BaseConnector] Calling initialize...');
+      debugLogger.addSuccess('API authentication successful');
+      
+      // Test service initialization
+      debugLogger.addStep({
+        id: 'service-test-start',
+        title: 'Testing Service Connection',
+        status: 'running',
+        message: `Initializing ${this.config.type} service`,
+      });
+      
       await this.initialize();
-      console.log('🔧 [BaseConnector] Initialize completed, getting version...');
       const version = await this.getVersion();
       const latency = Date.now() - startedAt;
-      console.log('🔧 [BaseConnector] Version retrieved:', version, 'Latency:', latency);
+      
+      debugLogger.addServiceTest(this.config.type, true, version);
 
       return {
         success: true,
@@ -95,19 +117,19 @@ export abstract class BaseConnector<
         version,
       };
     } catch (error) {
-      console.error('🔧 [BaseConnector] Test connection error:', error);
-      
       // Diagnose VPN-specific issues
       const vpnIssues = diagnoseVpnIssues(error, this.config.type);
-      if (vpnIssues.length > 0) {
-        console.error('🌐 [BaseConnector] VPN issues detected:', vpnIssues);
-      }
       
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'testConnection',
       });
+
+      debugLogger.addError(
+        `Service test failed: ${diagnostic.message}`,
+        vpnIssues.length > 0 ? `VPN Issues:\n${vpnIssues.join('\n')}` : undefined
+      );
 
       void logger.error('Connector test failed.', {
         serviceId: this.config.id,

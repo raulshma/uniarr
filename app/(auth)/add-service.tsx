@@ -18,6 +18,7 @@ import { Controller, useForm } from 'react-hook-form';
 import axios from 'axios';
 
 import { Button } from '@/components/common/Button';
+import { DebugPanel, type DebugStep } from '@/components/common/DebugPanel';
 import NetworkScanResults from '@/components/service/NetworkScanResults';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorFactory } from '@/connectors/factory/ConnectorFactory';
@@ -35,6 +36,7 @@ import {
   type ServiceConfigInput,
 } from '@/utils/validation.utils';
 import { testApiKeyFormat } from '@/utils/api-key-validator';
+import { debugLogger } from '@/utils/debug-logger';
 
 const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'prowlarr'];
 
@@ -120,8 +122,18 @@ const AddServiceScreen = () => {
   const urlValidationController = useRef<AbortController | null>(null);
   const [serviceTypeModalVisible, setServiceTypeModalVisible] = useState(false);
   const [networkScanModalVisible, setNetworkScanModalVisible] = useState(false);
+  const [debugSteps, setDebugSteps] = useState<DebugStep[]>([]);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
 
   const { isScanning, scanResult, error: scanError, scanNetwork, stopScan, reset: resetScan } = useNetworkScan();
+
+  // Subscribe to debug logger
+  useEffect(() => {
+    const unsubscribe = debugLogger.subscribe((steps) => {
+      setDebugSteps(steps);
+    });
+    return unsubscribe;
+  }, []);
 
 
   const styles = useMemo(
@@ -340,36 +352,33 @@ const AddServiceScreen = () => {
 
   const handleTestConnection = useCallback(
     async (values: ServiceConfigInput) => {
-      console.log('🔍 Starting connection test with values:', values);
       resetDiagnostics();
+      debugLogger.clear();
+      setShowDebugPanel(true);
 
       if (!supportedTypeSet.has(values.type)) {
-        console.log('❌ Service type not supported:', values.type);
+        debugLogger.addError('Service type not supported', `Selected service type '${values.type}' is not available yet.`);
         setTestError('Selected service type is not available yet.');
         return;
       }
 
       setIsTesting(true);
-      console.log('🔄 Testing connection...');
 
       try {
         const config = buildServiceConfig(values, generateServiceId());
-        console.log('📋 Built config:', config);
         
         // Validate API key format first
         if (values.apiKey && values.type !== 'qbittorrent') {
           const apiKeyTest = testApiKeyFormat(values.apiKey, values.type);
-          console.log('🔑 API key validation:', apiKeyTest);
+          debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
           
           if (!apiKeyTest.isValid) {
-            console.error('❌ API key validation failed:', apiKeyTest.message);
             setTestError(`${apiKeyTest.message}. ${apiKeyTest.suggestions.join(' ')}`);
             return;
           }
         }
         
         const result = await runConnectionTest(config);
-        console.log('✅ Connection test result:', result);
 
         if (result.success) {
           setTestResult(result);
@@ -377,9 +386,9 @@ const AddServiceScreen = () => {
           setTestError(result.message ?? 'Unable to connect to the selected service.');
         }
       } catch (error) {
-        console.error('❌ Connection test error:', error);
         const message =
           error instanceof Error ? error.message : 'Unable to test the connection. Check the configuration and try again.';
+        debugLogger.addError('Connection test failed', message);
         setTestError(message);
 
         void logger.warn('Service connection test failed.', {
@@ -389,7 +398,6 @@ const AddServiceScreen = () => {
         });
       } finally {
         setIsTesting(false);
-        console.log('🏁 Connection test completed');
       }
     },
     [resetDiagnostics, runConnectionTest, supportedTypeSet],
@@ -921,11 +929,7 @@ const AddServiceScreen = () => {
           <View style={styles.actions}>
             <Button
               mode="contained"
-              onPress={() => {
-                console.log('🔘 Test Connection button pressed');
-                console.log('📋 Form state:', { isSubmitting, isTesting, errors });
-                handleSubmit(handleTestConnection)();
-              }}
+              onPress={handleSubmit(handleTestConnection)}
               loading={isTesting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.surface}
@@ -938,11 +942,7 @@ const AddServiceScreen = () => {
 
             <Button
               mode="contained"
-              onPress={() => {
-                console.log('🔘 Save Service button pressed');
-                console.log('📋 Form state:', { isSubmitting, isTesting, errors });
-                handleSubmit(handleSave)();
-              }}
+              onPress={handleSubmit(handleSave)}
               loading={isSubmitting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.primary}
@@ -955,6 +955,16 @@ const AddServiceScreen = () => {
           </View>
         </View>
       </ScrollView>
+      
+      <DebugPanel
+        steps={debugSteps}
+        isVisible={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+        onClear={() => {
+          debugLogger.clear();
+          setDebugSteps([]);
+        }}
+      />
     </SafeAreaView>
   );
 };
