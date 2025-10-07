@@ -16,7 +16,7 @@ jobs:
         with:
           ref: agentic
       
-      - name: Verify branch and install dependencies
+      - name: Verify branch
         run: |
           echo "Current branch: $(git branch --show-current)"
       
