@@ -4,6 +4,9 @@ import type { AddItemRequest, ConnectionResult, IConnector, SystemHealth } from 
 import type { ServiceConfig } from '@/models/service.types';
 import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
+import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
+import { testSonarrApi, testRadarrApi, testQBittorrentApi } from '@/utils/api-test.utils';
+import { debugLogger } from '@/utils/debug-logger';
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -38,11 +41,74 @@ export abstract class BaseConnector<
   /** Test connectivity to the remote service and return diagnostic information. */
   async testConnection(): Promise<ConnectionResult> {
     const startedAt = Date.now();
+    debugLogger.startConnectionTest(this.config.type, this.config.url);
 
     try {
+      // First, test basic network connectivity
+      debugLogger.addStep({
+        id: 'network-test-start',
+        title: 'Testing Network Connectivity',
+        status: 'running',
+        message: `Testing connection to ${this.config.url}`,
+      });
+      
+      const networkTest = await testNetworkConnectivity(this.config.url, this.config.timeout ?? 10000);
+      
+      if (!networkTest.success) {
+        const vpnIssues = diagnoseVpnIssues({ code: 'ERR_NETWORK', message: networkTest.error }, this.config.type);
+        debugLogger.addNetworkTest(false, networkTest.error);
+        debugLogger.addError(`Network connectivity failed: ${networkTest.error}`, vpnIssues.join('\n'));
+        
+        return {
+          success: false,
+          message: `Network connectivity failed: ${networkTest.error}. ${vpnIssues.join(' ')}`,
+          latency: networkTest.latency,
+        };
+      }
+      
+      debugLogger.addNetworkTest(true);
+      
+      // Test API endpoint specifically
+      debugLogger.addStep({
+        id: 'api-test-start',
+        title: 'Testing API Authentication',
+        status: 'running',
+        message: `Testing ${this.config.type} API endpoint`,
+      });
+      
+      let apiTest;
+      if (this.config.type === 'sonarr') {
+        apiTest = await testSonarrApi(this.config.url, this.config.apiKey);
+      } else if (this.config.type === 'radarr') {
+        apiTest = await testRadarrApi(this.config.url, this.config.apiKey);
+      } else if (this.config.type === 'qbittorrent') {
+        apiTest = await testQBittorrentApi(this.config.url, this.config.username, this.config.password);
+      }
+      
+      if (apiTest && !apiTest.success) {
+        debugLogger.addError(`API test failed: ${apiTest.error}`, `Status: ${apiTest.status}\nData: ${JSON.stringify(apiTest.data)}`);
+        return {
+          success: false,
+          message: `API test failed: ${apiTest.error}`,
+          latency: Date.now() - startedAt,
+        };
+      }
+      
+      debugLogger.addSuccess('API authentication successful');
+      
+      // Test service initialization
+      debugLogger.addStep({
+        id: 'service-test-start',
+        title: 'Testing Service Connection',
+        status: 'running',
+        message: `Initializing ${this.config.type} service`,
+      });
+      
       await this.initialize();
       const version = await this.getVersion();
       const latency = Date.now() - startedAt;
+      
+      debugLogger.addServiceTest(this.config.type, true, version);
 
       return {
         success: true,
@@ -51,11 +117,19 @@ export abstract class BaseConnector<
         version,
       };
     } catch (error) {
+      // Diagnose VPN-specific issues
+      const vpnIssues = diagnoseVpnIssues(error, this.config.type);
+      
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'testConnection',
       });
+
+      debugLogger.addError(
+        `Service test failed: ${diagnostic.message}`,
+        vpnIssues.length > 0 ? `VPN Issues:\n${vpnIssues.join('\n')}` : undefined
+      );
 
       void logger.error('Connector test failed.', {
         serviceId: this.config.id,
@@ -63,11 +137,12 @@ export abstract class BaseConnector<
         message: diagnostic.message,
         statusCode: diagnostic.statusCode,
         code: diagnostic.code,
+        vpnIssues,
       });
 
       return {
         success: false,
-        message: diagnostic.message,
+        message: `${diagnostic.message}${vpnIssues.length > 0 ? ` ${vpnIssues.join(' ')}` : ''}`,
         latency: Date.now() - startedAt,
       };
     }
@@ -112,6 +187,14 @@ export abstract class BaseConnector<
 
     instance.interceptors.request.use(
       (requestConfig) => {
+        console.log('📤 [BaseConnector] Outgoing request:', {
+          method: requestConfig.method?.toUpperCase(),
+          url: requestConfig.url,
+          fullUrl: `${this.config.url}${requestConfig.url}`,
+          headers: requestConfig.headers,
+          timeout: requestConfig.timeout,
+        });
+        
         void logger.debug('Outgoing connector request.', {
           serviceId: this.config.id,
           serviceType: this.config.type,
@@ -122,6 +205,7 @@ export abstract class BaseConnector<
         return requestConfig;
       },
       (error) => {
+        console.error('📤 [BaseConnector] Request setup error:', error);
         this.logRequestError(error);
         return Promise.reject(error);
       },
@@ -129,6 +213,15 @@ export abstract class BaseConnector<
 
     instance.interceptors.response.use(
       (response) => {
+        console.log('📥 [BaseConnector] Response received:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.config.url,
+          headers: response.headers,
+          dataType: typeof response.data,
+          dataLength: response.data ? JSON.stringify(response.data).length : 0,
+        });
+        
         void logger.debug('Connector response received.', {
           serviceId: this.config.id,
           serviceType: this.config.type,
@@ -139,6 +232,16 @@ export abstract class BaseConnector<
         return response;
       },
       (error) => {
+        console.error('📥 [BaseConnector] Response error:', {
+          message: error.message,
+          code: error.code,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          url: error.config?.url,
+          headers: error.response?.headers,
+          data: error.response?.data,
+        });
+        
         this.handleHttpError(error);
         return Promise.reject(error);
       },

@@ -94,21 +94,28 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
   }
 
   async initialize(): Promise<void> {
+    console.log('🔧 [QBittorrentConnector] Initializing...');
     await this.ensureAuthenticated(true);
+    console.log('🔧 [QBittorrentConnector] Initialization completed');
   }
 
   async getVersion(): Promise<string> {
+    console.log('🔧 [QBittorrentConnector] Getting version...');
     await this.ensureAuthenticated();
 
     try {
+      console.log('🔧 [QBittorrentConnector] Making version request to:', `${this.config.url}${QB_API_PREFIX}/app/version`);
       const response = await this.client.get<string>(`${QB_API_PREFIX}/app/version`, {
         responseType: 'text',
         transformResponse: (value) => value,
       });
 
       const version = typeof response.data === 'string' ? response.data.trim() : undefined;
-      return version && version.length > 0 ? version : 'unknown';
+      const finalVersion = version && version.length > 0 ? version : 'unknown';
+      console.log('🔧 [QBittorrentConnector] Version retrieved:', finalVersion);
+      return finalVersion;
     } catch (error) {
+      console.error('🔧 [QBittorrentConnector] Version request failed:', error);
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
@@ -273,11 +280,14 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
   }
 
   private async authenticate(): Promise<void> {
+    console.log('🔐 [QBittorrentConnector] Starting authentication...');
     if (this.authPromise) {
+      console.log('🔐 [QBittorrentConnector] Authentication already in progress, waiting...');
       return this.authPromise;
     }
 
     if (!this.config.username || !this.config.password) {
+      console.error('🔐 [QBittorrentConnector] Missing credentials');
       throw new Error('qBittorrent credentials are required.');
     }
 
@@ -287,6 +297,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     });
 
     const request = async () => {
+      console.log('🔐 [QBittorrentConnector] Attempting authentication to:', `${this.config.url}${QB_API_PREFIX}/auth/login`);
       void logger.debug('Attempting qBittorrent authentication.', {
         serviceId: this.config.id,
         serviceType: this.config.type,
@@ -305,6 +316,8 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
 
       const body = typeof response.data === 'string' ? response.data.trim() : '';
       const normalizedBody = body.toLowerCase().replace(/\.$/, ''); // Remove trailing period and convert to lowercase
+      
+      console.log('🔐 [QBittorrentConnector] Authentication response:', body, 'Status:', response.status);
       
       void logger.debug('qBittorrent authentication response received.', {
         serviceId: this.config.id,
@@ -329,6 +342,8 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
           errorMessage += ' Your IP address has been banned due to multiple failed login attempts.';
         }
 
+        console.error('🔐 [QBittorrentConnector] Authentication failed:', errorMessage);
+
         void logger.warn('qBittorrent authentication failed.', {
           serviceId: this.config.id,
           serviceType: this.config.type,
@@ -342,6 +357,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
 
       // Authentication successful - Axios will handle cookies automatically
       this.isAuthenticated = true;
+      console.log('🔐 [QBittorrentConnector] Authentication successful');
 
       void logger.debug('qBittorrent authentication successful.', {
         serviceId: this.config.id,
@@ -353,6 +369,7 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
     this.authPromise = request()
       .catch((error) => {
         this.isAuthenticated = false;
+        console.error('🔐 [QBittorrentConnector] Authentication error:', error);
         throw handleApiError(error, {
           serviceId: this.config.id,
           serviceType: this.config.type,

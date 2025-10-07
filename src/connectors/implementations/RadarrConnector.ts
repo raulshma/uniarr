@@ -136,14 +136,44 @@ const RADARR_API_PREFIX = '/api/v3';
 
 export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async initialize(): Promise<void> {
+    console.log('🔧 [RadarrConnector] Initializing...');
     await this.getVersion();
+    console.log('🔧 [RadarrConnector] Initialization completed');
   }
 
   async getVersion(): Promise<string> {
     try {
+      const fullUrl = `${this.config.url}${RADARR_API_PREFIX}/system/status`;
+      console.log('🔧 [RadarrConnector] Getting version from:', fullUrl);
+      console.log('🔧 [RadarrConnector] Config details:', {
+        url: this.config.url,
+        apiKey: this.config.apiKey ? '***' : 'missing',
+        timeout: this.config.timeout
+      });
+      
       const response = await this.client.get<RadarrSystemStatus>(`${RADARR_API_PREFIX}/system/status`);
-      return response.data.version ?? 'unknown';
+      const version = response.data.version ?? 'unknown';
+      console.log('🔧 [RadarrConnector] Version retrieved successfully:', version);
+      console.log('🔧 [RadarrConnector] Response status:', response.status);
+      console.log('🔧 [RadarrConnector] Response headers:', response.headers);
+      return version;
     } catch (error) {
+      console.error('🔧 [RadarrConnector] Version request failed:', error);
+      const axiosError = error as any;
+      console.error('🔧 [RadarrConnector] Error details:', {
+        message: axiosError.message,
+        code: axiosError.code,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        data: axiosError.response?.data
+      });
+      
+      // Check if it's a network connectivity issue
+      if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ENOTFOUND' || axiosError.code === 'ETIMEDOUT') {
+        console.error('🔧 [RadarrConnector] Network connectivity issue detected');
+        console.error('🔧 [RadarrConnector] This might be a VPN or firewall issue');
+      }
+      
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,

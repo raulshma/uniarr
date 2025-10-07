@@ -51,17 +51,24 @@ export class ConnectorManager {
     config: ServiceConfig,
     options: AddConnectorOptions = {},
   ): Promise<IConnector> {
+    console.log('🏭 [ConnectorManager] Adding connector:', config.type, config.id);
+    
     const existing = this.connectors.get(config.id);
     if (existing) {
+      console.log('🏭 [ConnectorManager] Disposing existing connector');
       existing.dispose();
       this.connectors.delete(config.id);
     }
 
+    console.log('🏭 [ConnectorManager] Creating connector via factory...');
     const connector = ConnectorFactory.create(config);
+    console.log('🏭 [ConnectorManager] Connector created, adding to map...');
     this.connectors.set(config.id, connector);
 
     if (options.persist !== false) {
+      console.log('🏭 [ConnectorManager] Persisting config to storage...');
       await secureStorage.saveServiceConfig(config);
+      console.log('🏭 [ConnectorManager] Config persisted');
     }
 
     void logger.info('Connector registered.', {
@@ -69,6 +76,7 @@ export class ConnectorManager {
       serviceType: config.type,
     });
 
+    console.log('🏭 [ConnectorManager] Connector registration completed');
     return connector;
   }
 

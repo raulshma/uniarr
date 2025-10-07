@@ -27,6 +27,7 @@ class SecureStorage {
   }
 
   async saveServiceConfig(config: ServiceConfig): Promise<void> {
+    console.log('💾 [SecureStorage] Saving service config:', config.type, config.id);
     await this.ensureInitialized();
 
     const now = new Date();
@@ -38,9 +39,13 @@ class SecureStorage {
       updatedAt: now,
     };
 
+    console.log('💾 [SecureStorage] Normalized config:', normalized);
     this.cache.set(normalized.id, normalized);
+    console.log('💾 [SecureStorage] Config added to cache, persisting...');
     await this.persistConfig(normalized);
+    console.log('💾 [SecureStorage] Config persisted, updating index...');
     await this.persistIndex();
+    console.log('💾 [SecureStorage] Service config saved successfully');
   }
 
   async getServiceConfigs(): Promise<ServiceConfig[]> {

@@ -18,6 +18,7 @@ import { Controller, useForm } from 'react-hook-form';
 import axios from 'axios';
 
 import { Button } from '@/components/common/Button';
+import { DebugPanel, type DebugStep } from '@/components/common/DebugPanel';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorFactory } from '@/connectors/factory/ConnectorFactory';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -31,6 +32,8 @@ import {
   serviceConfigSchema,
   type ServiceConfigInput,
 } from '@/utils/validation.utils';
+import { testApiKeyFormat } from '@/utils/api-key-validator';
+import { debugLogger } from '@/utils/debug-logger';
 
 const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'prowlarr'];
 
@@ -151,6 +154,16 @@ const EditServiceScreen = () => {
   }>({ status: 'idle', message: null });
   const urlValidationController = useRef<AbortController | null>(null);
   const [serviceTypeModalVisible, setServiceTypeModalVisible] = useState(false);
+  const [debugSteps, setDebugSteps] = useState<DebugStep[]>([]);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+
+  // Subscribe to debug logger
+  useEffect(() => {
+    const unsubscribe = debugLogger.subscribe((steps) => {
+      setDebugSteps(steps);
+    });
+    return unsubscribe;
+  }, []);
 
   const styles = useMemo(
     () =>
@@ -315,11 +328,17 @@ const EditServiceScreen = () => {
 
   const handleTestConnection = useCallback(
     async (values: ServiceConfigInput) => {
-      if (!existingConfig) return;
+      if (!existingConfig) {
+        debugLogger.addError('No existing config', 'Cannot test connection without existing service configuration');
+        return;
+      }
 
       resetDiagnostics();
+      debugLogger.clear();
+      setShowDebugPanel(true);
 
       if (!supportedTypeSet.has(values.type)) {
+        debugLogger.addError('Service type not supported', `Selected service type '${values.type}' is not available yet.`);
         setTestError('Selected service type is not available yet.');
         return;
       }
@@ -328,6 +347,18 @@ const EditServiceScreen = () => {
 
       try {
         const config = buildServiceConfig(values, existingConfig);
+        
+        // Validate API key format first
+        if (values.apiKey && values.type !== 'qbittorrent') {
+          const apiKeyTest = testApiKeyFormat(values.apiKey, values.type);
+          debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
+          
+          if (!apiKeyTest.isValid) {
+            setTestError(`${apiKeyTest.message}. ${apiKeyTest.suggestions.join(' ')}`);
+            return;
+          }
+        }
+        
         const result = await runConnectionTest(config);
 
         if (result.success) {
@@ -338,6 +369,7 @@ const EditServiceScreen = () => {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Unable to test the connection. Check the configuration and try again.';
+        debugLogger.addError('Connection test failed', message);
         setTestError(message);
 
         void logger.warn('Service connection test failed.', {
@@ -354,22 +386,31 @@ const EditServiceScreen = () => {
 
   const handleSave = useCallback(
     async (values: ServiceConfigInput) => {
-      if (!existingConfig) return;
+      console.log('💾 [Edit] Starting save service with values:', values);
+      if (!existingConfig) {
+        console.log('❌ [Edit] No existing config for save');
+        return;
+      }
 
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
+        console.log('❌ [Edit] Service type not supported:', values.type);
         setFormError('This service type is not supported yet.');
         return;
       }
 
       const config = buildServiceConfig(values, existingConfig);
+      console.log('📋 [Edit] Built config for save:', config);
 
       try {
+        console.log('🔍 [Edit] Checking existing services...');
         const existingServices = await secureStorage.getServiceConfigs();
+        console.log('📋 [Edit] Existing services:', existingServices.length);
 
         // Check for name conflicts (excluding current service)
         if (existingServices.some((service) => service.id !== config.id && service.name.trim().toLowerCase() === config.name.toLowerCase())) {
+          console.log('❌ [Edit] Service name already exists');
           setFormError('A service with this name already exists. Choose a different name.');
           return;
         }
@@ -380,22 +421,30 @@ const EditServiceScreen = () => {
             (service) => service.id !== config.id && service.type === config.type && service.url.toLowerCase() === config.url.toLowerCase(),
           )
         ) {
+          console.log('❌ [Edit] Service already configured');
           setFormError('This service is already configured.');
           return;
         }
 
+        console.log('🔄 [Edit] Testing connection before save...');
         const testOutcome = await runConnectionTest(config);
+        console.log('✅ [Edit] Connection test result for save:', testOutcome);
 
         if (!testOutcome.success) {
           setFormError(testOutcome.message ?? 'Unable to verify the connection.');
           return;
         }
 
+        console.log('💾 [Edit] Adding connector to manager...');
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
+        console.log('✅ [Edit] Connector added to manager');
 
+        console.log('🔄 [Edit] Invalidating queries...');
         await queryClient.invalidateQueries({ queryKey: queryKeys.services.overview });
+        console.log('✅ [Edit] Queries invalidated');
 
+        console.log('🎉 [Edit] Service updated successfully, showing alert...');
         Alert.alert('Service updated', `${serviceTypeLabels[config.type]} has been updated successfully.`, [
           {
             text: 'OK',
@@ -403,6 +452,7 @@ const EditServiceScreen = () => {
           },
         ]);
       } catch (error) {
+        console.error('❌ [Edit] Save service error:', error);
         const message =
           error instanceof Error ? error.message : 'Something went wrong while updating the service configuration.';
         setFormError(message);
@@ -879,6 +929,16 @@ const EditServiceScreen = () => {
           </View>
         </View>
       </ScrollView>
+      
+      <DebugPanel
+        steps={debugSteps}
+        isVisible={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+        onClear={() => {
+          debugLogger.clear();
+          setDebugSteps([]);
+        }}
+      />
     </SafeAreaView>
   );
 };
