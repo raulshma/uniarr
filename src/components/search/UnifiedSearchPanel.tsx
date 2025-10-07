@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 
 import { Card } from '@/components/common/Card';
+import { AnimatedSection } from '@/components/common/AnimatedComponents';
 import type { AppTheme } from '@/constants/theme';
 import { spacing } from '@/theme/spacing';
 import { useUnifiedSearch } from '@/hooks/useUnifiedSearch';
@@ -76,6 +77,7 @@ export const UnifiedSearchPanel: React.FC = () => {
   const [serviceFilters, setServiceFilters] = useState<string[]>([]);
   const [mediaFilters, setMediaFilters] = useState<UnifiedSearchMediaType[]>([]);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const {
     results,
@@ -114,23 +116,21 @@ export const UnifiedSearchPanel: React.FC = () => {
           backgroundColor: theme.colors.elevation.level1,
           borderRadius: 12,
         },
-        header: {
-          marginBottom: spacing.md,
-        },
-        headerTitle: {
-          color: theme.colors.onSurface,
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontFamily: theme.custom.typography.titleMedium.fontFamily,
-          lineHeight: theme.custom.typography.titleMedium.lineHeight,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
-        },
         searchRow: {
-          marginBottom: spacing.md,
+          marginBottom: spacing.sm,
+        },
+        searchInputContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.xs,
         },
         searchInput: {
+          flex: 1,
           backgroundColor: theme.colors.surface,
           borderRadius: 8,
+        },
+        expandButton: {
+          margin: 0,
         },
         helperRow: {
           flexDirection: 'row',
@@ -200,6 +200,9 @@ export const UnifiedSearchPanel: React.FC = () => {
         },
         errorText: {
           color: theme.colors.error,
+        },
+        filtersSection: {
+          marginTop: spacing.xs,
         },
       }),
     [theme],
@@ -431,130 +434,142 @@ export const UnifiedSearchPanel: React.FC = () => {
 
   return (
     <Card variant="custom" style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Unified Search</Text>
-      </View>
       <View style={styles.searchRow}>
-        <TextInput
-          mode="flat"
-          placeholder="Search across Sonarr, Radarr, Jellyseerr"
-          placeholderTextColor={theme.colors.onSurfaceVariant}
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          onFocus={() => setIsInputFocused(true)}
-          onBlur={() => setIsInputFocused(false)}
-          style={styles.searchInput}
-          contentStyle={{ backgroundColor: 'transparent' }}
-          underlineColor={theme.colors.outline}
-          activeUnderlineColor={theme.colors.primary}
-          right={
-            searchTerm ? <TextInput.Icon icon="close" onPress={() => setSearchTerm('')} /> : undefined
-          }
-        />
-        {searchTerm.trim().length < minSearchLength ? (
+        <View style={styles.searchInputContainer}>
+          <TextInput
+            mode="flat"
+            placeholder="Search across Sonarr, Radarr, Jellyseerr"
+            placeholderTextColor={theme.colors.onSurfaceVariant}
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+            style={styles.searchInput}
+            contentStyle={{ backgroundColor: 'transparent' }}
+            underlineColor={theme.colors.outline}
+            activeUnderlineColor={theme.colors.primary}
+            left={<TextInput.Icon icon="magnify" />}
+            right={
+              searchTerm ? <TextInput.Icon icon="close" onPress={() => setSearchTerm('')} /> : undefined
+            }
+          />
+          <IconButton
+            icon={isExpanded ? 'chevron-up' : 'tune'}
+            size={24}
+            mode="contained-tonal"
+            onPress={() => setIsExpanded(!isExpanded)}
+            style={styles.expandButton}
+            accessibilityLabel={isExpanded ? 'Collapse filters' : 'Expand filters'}
+          />
+        </View>
+        {searchTerm.trim().length < minSearchLength && searchTerm.trim().length > 0 ? (
           <HelperText type="info">
             Enter at least {minSearchLength} characters to search all services.
           </HelperText>
         ) : null}
       </View>
 
-      <View style={styles.helperRow}>
-        <Text style={{ color: theme.colors.onSurfaceVariant }}>Services</Text>
-        {serviceFilters.length ? (
-          <Button
-            compact
-            mode="text"
-            onPress={clearServiceFilters}
-            textColor={theme.colors.primary}
-            labelStyle={{
-              fontSize: theme.custom.typography.labelMedium.fontSize,
-              fontFamily: theme.custom.typography.labelMedium.fontFamily,
-            }}
-          >
-            Clear
-          </Button>
-        ) : null}
-      </View>
-      <View style={styles.chipRow}>
-        <Chip
-          selected={serviceFilters.length === 0}
-          onPress={clearServiceFilters}
-          compact
-          mode={serviceFilters.length === 0 ? "flat" : "outlined"}
-          textStyle={{
-            fontSize: theme.custom.typography.labelMedium.fontSize,
-            fontFamily: theme.custom.typography.labelMedium.fontFamily,
-          }}
-        >
-          All services
-        </Chip>
-        {areServicesLoading ? (
-          <ActivityIndicator animating size="small" />
-        ) : (
-          searchableServices.map((service) => (
+      {isExpanded && (
+        <AnimatedSection style={styles.filtersSection}>
+          <View style={styles.helperRow}>
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>Services</Text>
+            {serviceFilters.length ? (
+              <Button
+                compact
+                mode="text"
+                onPress={clearServiceFilters}
+                textColor={theme.colors.primary}
+                labelStyle={{
+                  fontSize: theme.custom.typography.labelMedium.fontSize,
+                  fontFamily: theme.custom.typography.labelMedium.fontFamily,
+                }}
+              >
+                Clear
+              </Button>
+            ) : null}
+          </View>
+          <View style={styles.chipRow}>
             <Chip
-              key={service.serviceId}
+              selected={serviceFilters.length === 0}
+              onPress={clearServiceFilters}
               compact
-              selected={serviceFilters.includes(service.serviceId)}
-              onPress={() => toggleService(service.serviceId)}
-              mode={serviceFilters.includes(service.serviceId) ? "flat" : "outlined"}
+              mode={serviceFilters.length === 0 ? "flat" : "outlined"}
               textStyle={{
                 fontSize: theme.custom.typography.labelMedium.fontSize,
                 fontFamily: theme.custom.typography.labelMedium.fontFamily,
               }}
             >
-              {service.serviceName}
+              All services
             </Chip>
-          ))
-        )}
-      </View>
+            {areServicesLoading ? (
+              <ActivityIndicator animating size="small" />
+            ) : (
+              searchableServices.map((service) => (
+                <Chip
+                  key={service.serviceId}
+                  compact
+                  selected={serviceFilters.includes(service.serviceId)}
+                  onPress={() => toggleService(service.serviceId)}
+                  mode={serviceFilters.includes(service.serviceId) ? "flat" : "outlined"}
+                  textStyle={{
+                    fontSize: theme.custom.typography.labelMedium.fontSize,
+                    fontFamily: theme.custom.typography.labelMedium.fontFamily,
+                  }}
+                >
+                  {service.serviceName}
+                </Chip>
+              ))
+            )}
+          </View>
 
-      <View style={styles.helperRow}>
-        <Text style={{ color: theme.colors.onSurfaceVariant }}>Media types</Text>
-        {mediaFilters.length ? (
-          <Button
-            compact
-            mode="text"
-            onPress={clearMediaFilters}
-            textColor={theme.colors.primary}
-            labelStyle={{
-              fontSize: theme.custom.typography.labelMedium.fontSize,
-              fontFamily: theme.custom.typography.labelMedium.fontFamily,
-            }}
-          >
-            Clear
-          </Button>
-        ) : null}
-      </View>
-      <View style={styles.chipRow}>
-        <Chip
-          selected={mediaFilters.length === 0}
-          onPress={clearMediaFilters}
-          compact
-          mode={mediaFilters.length === 0 ? "flat" : "outlined"}
-          textStyle={{
-            fontSize: theme.custom.typography.labelMedium.fontSize,
-            fontFamily: theme.custom.typography.labelMedium.fontFamily,
-          }}
-        >
-          All media
-        </Chip>
-        {mediaFilterOptions.map((option) => (
-          <Chip
-            key={option}
-            compact
-            selected={mediaFilters.includes(option)}
-            onPress={() => toggleMedia(option)}
-            mode={mediaFilters.includes(option) ? "flat" : "outlined"}
-            textStyle={{
-              fontSize: theme.custom.typography.labelMedium.fontSize,
-              fontFamily: theme.custom.typography.labelMedium.fontFamily,
-            }}
-          >
-            {mediaTypeLabels[option]}
-          </Chip>
-        ))}
-      </View>
+          <View style={styles.helperRow}>
+            <Text style={{ color: theme.colors.onSurfaceVariant }}>Media types</Text>
+            {mediaFilters.length ? (
+              <Button
+                compact
+                mode="text"
+                onPress={clearMediaFilters}
+                textColor={theme.colors.primary}
+                labelStyle={{
+                  fontSize: theme.custom.typography.labelMedium.fontSize,
+                  fontFamily: theme.custom.typography.labelMedium.fontFamily,
+                }}
+              >
+                Clear
+              </Button>
+            ) : null}
+          </View>
+          <View style={styles.chipRow}>
+            <Chip
+              selected={mediaFilters.length === 0}
+              onPress={clearMediaFilters}
+              compact
+              mode={mediaFilters.length === 0 ? "flat" : "outlined"}
+              textStyle={{
+                fontSize: theme.custom.typography.labelMedium.fontSize,
+                fontFamily: theme.custom.typography.labelMedium.fontFamily,
+              }}
+            >
+              All media
+            </Chip>
+            {mediaFilterOptions.map((option) => (
+              <Chip
+                key={option}
+                compact
+                selected={mediaFilters.includes(option)}
+                onPress={() => toggleMedia(option)}
+                mode={mediaFilters.includes(option) ? "flat" : "outlined"}
+                textStyle={{
+                  fontSize: theme.custom.typography.labelMedium.fontSize,
+                  fontFamily: theme.custom.typography.labelMedium.fontFamily,
+                }}
+              >
+                {mediaTypeLabels[option]}
+              </Chip>
+            ))}
+          </View>
+        </AnimatedSection>
+      )}
 
       {hasActiveQuery ? (
         <View style={styles.resultContainer}>
