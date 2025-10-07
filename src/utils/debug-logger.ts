@@ -5,6 +5,7 @@ class DebugLogger {
   private listeners: ((steps: DebugStep[]) => void)[] = [];
 
   addStep(step: Omit<DebugStep, 'timestamp'>) {
+    console.log('🧪 [DebugLogger] Adding step:', step);
     const newStep: DebugStep = {
       id: step.id,
       title: step.title,
@@ -15,6 +16,7 @@ class DebugLogger {
     };
     
     this.steps.push(newStep);
+    console.log('🧪 [DebugLogger] Total steps now:', this.steps.length);
     this.notifyListeners();
   }
 
@@ -51,6 +53,7 @@ class DebugLogger {
   }
 
   private notifyListeners() {
+    console.log('🧪 [DebugLogger] Notifying listeners, total steps:', this.steps.length);
     this.listeners.forEach(listener => listener([...this.steps]));
   }
 
