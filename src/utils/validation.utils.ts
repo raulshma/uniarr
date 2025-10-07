@@ -67,6 +67,19 @@ export const serviceConfigSchema = z
       return;
     }
 
+    // For Sonarr and Radarr, only API key is required
+    if (data.type === 'sonarr' || data.type === 'radarr') {
+      if (!data.apiKey) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['apiKey'],
+          message: 'API key is required for Sonarr and Radarr',
+        });
+      }
+      return;
+    }
+
+    // For other services (like prowlarr), API key is required
     if (!data.apiKey) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

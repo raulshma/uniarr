@@ -286,6 +286,11 @@ export abstract class BaseConnector<
    * Override this method in connectors that use different auth methods.
    */
   protected getAuthConfig(): { auth?: { username: string; password: string } } {
+    // Sonarr and Radarr only use API key authentication, not username/password
+    if (this.config.type === 'sonarr' || this.config.type === 'radarr') {
+      return {};
+    }
+    
     if (this.config.username && this.config.password) {
       return {
         auth: {
