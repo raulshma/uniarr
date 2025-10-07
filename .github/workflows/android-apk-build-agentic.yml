@@ -16,19 +16,9 @@ jobs:
         with:
           ref: agentic
       
-      - name: Verify branch and install dependencies
+      - name: Verify branch
         run: |
           echo "Current branch: $(git branch --show-current)"
-          echo "Git status:"
-          git status
-          echo "Clearing npm cache..."
-          npm cache clean --force
-          echo "Installing dependencies..."
-          npm ci
-          echo "Verifying expo-auth-session installation..."
-          npm ls expo-auth-session
-          echo "Fixing module resolution issues..."
-          cd node_modules/expo-auth-session/build && for file in *.js; do base=$(basename "$file" .js); if [ ! -e "$base" ]; then ln -sf "$file" "$base"; fi; done
       
       - name: Setup node
         uses: actions/setup-node@v4.0.2
