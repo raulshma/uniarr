@@ -73,6 +73,16 @@ class DebugLogger {
     });
   }
 
+  addWarning(message: string, details?: string) {
+    this.addStep({
+      id: `warning-${Date.now()}`,
+      title: 'Warning',
+      status: 'warning',
+      message,
+      details,
+    });
+  }
+
   addApiKeyValidation(isValid: boolean, message: string, suggestions?: string[]) {
     this.addStep({
       id: 'api-key-validation',

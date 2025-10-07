@@ -378,16 +378,21 @@ const AddServiceScreen = () => {
           }
         }
         
+        console.log('🧪 [AddService] Starting connection test for:', config.type, config.url);
         const result = await runConnectionTest(config);
+        console.log('🧪 [AddService] Connection test result:', result);
 
         if (result.success) {
           setTestResult(result);
+          console.log('✅ [AddService] Connection test successful');
         } else {
+          console.log('❌ [AddService] Connection test failed:', result.message);
           setTestError(result.message ?? 'Unable to connect to the selected service.');
         }
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Unable to test the connection. Check the configuration and try again.';
+        console.error('❌ [AddService] Connection test error:', error);
         debugLogger.addError('Connection test failed', message);
         setTestError(message);
 
@@ -443,6 +448,7 @@ const AddServiceScreen = () => {
         console.log('✅ Connection test result for save:', testOutcome);
 
         if (!testOutcome.success) {
+          console.log('❌ Connection test failed during save:', testOutcome.message);
           setFormError(testOutcome.message ?? 'Unable to verify the connection.');
           return;
         }
