@@ -12,6 +12,7 @@ import {
   Modal,
   Divider,
   IconButton,
+  Switch,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Controller, useForm } from 'react-hook-form';
@@ -124,6 +125,7 @@ const AddServiceScreen = () => {
   const [networkScanModalVisible, setNetworkScanModalVisible] = useState(false);
   const [debugSteps, setDebugSteps] = useState<DebugStep[]>([]);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   // Debug showDebugPanel state changes
   useEffect(() => {
@@ -275,6 +277,18 @@ const AddServiceScreen = () => {
         },
         saveButtonLabel: {
           color: theme.colors.onPrimary,
+        },
+        debugToggleContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: spacing.sm,
+        },
+        debugInfoContainer: {
+          marginTop: spacing.sm,
+          paddingTop: spacing.sm,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.outlineVariant,
         },
       }),
     [theme],
@@ -943,81 +957,40 @@ const AddServiceScreen = () => {
             </View>
           ) : null}
 
-          {/* Debug Information */}
+          {/* Debug Information Toggle */}
           <View style={[styles.diagnosticsCard, { backgroundColor: theme.colors.surfaceVariant }]}>
-            <Text variant="bodySmall" style={styles.diagnosticsText}>
-              Debug Info:
-            </Text>
-            <Text variant="bodySmall" style={styles.diagnosticsText}>
-              Form Errors: {JSON.stringify(errors, null, 2)}
-            </Text>
-            <Text variant="bodySmall" style={styles.diagnosticsText}>
-              Is Submitting: {isSubmitting.toString()}
-            </Text>
-            <Text variant="bodySmall" style={styles.diagnosticsText}>
-              Is Testing: {isTesting.toString()}
-            </Text>
-            <Text variant="bodySmall" style={styles.diagnosticsText}>
-              Show Debug Panel: {showDebugPanel.toString()}
-            </Text>
-            <Text variant="bodySmall" style={styles.diagnosticsText}>
-              Debug Steps Count: {debugSteps.length}
-            </Text>
+            <View style={styles.debugToggleContainer}>
+              <Text variant="bodySmall" style={styles.diagnosticsText}>
+                Show Debug Information
+              </Text>
+              <Switch
+                value={showDebugInfo}
+                onValueChange={setShowDebugInfo}
+                color={theme.colors.primary}
+              />
+            </View>
+            {showDebugInfo && (
+              <View style={styles.debugInfoContainer}>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Form Errors: {JSON.stringify(errors, null, 2)}
+                </Text>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Is Submitting: {isSubmitting.toString()}
+                </Text>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Is Testing: {isTesting.toString()}
+                </Text>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Show Debug Panel: {showDebugPanel.toString()}
+                </Text>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Debug Steps Count: {debugSteps.length}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.actions}>
-            <Button
-              mode="outlined"
-              onPress={() => {
-                console.log('🧪 [AddService] Test Debug Panel button pressed');
-                debugLogger.addStep({
-                  id: 'test-step',
-                  title: 'Test Step',
-                  status: 'success',
-                  message: 'This is a test debug step',
-                  details: 'Debug panel is working correctly'
-                });
-                setShowDebugPanel(true);
-              }}
-              style={{ marginBottom: spacing.sm }}
-              fullWidth
-            >
-              Test Debug Panel
-            </Button>
-
-            <Button
-              mode="outlined"
-              onPress={() => {
-                console.log('🧪 [AddService] Test Error Display button pressed');
-                setTestError('This is a test error message');
-                setFormError('This is a test form error message');
-              }}
-              style={{ marginBottom: spacing.sm }}
-              fullWidth
-            >
-              Test Error Display
-            </Button>
-
-            <Button
-              mode="outlined"
-              onPress={() => {
-                console.log('🧪 [AddService] Test Connection (No Validation) button pressed');
-                const testValues = {
-                  name: 'Test Service',
-                  type: 'sonarr' as const,
-                  url: 'http://192.168.1.100:8989',
-                  apiKey: 'test-key',
-                  username: '',
-                  password: ''
-                };
-                handleTestConnection(testValues);
-              }}
-              style={{ marginBottom: spacing.sm }}
-              fullWidth
-            >
-              Test Connection (No Validation)
-            </Button>
-
             <Button
               mode="contained"
               onPress={() => {

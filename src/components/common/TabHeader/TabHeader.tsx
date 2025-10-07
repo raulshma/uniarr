@@ -38,12 +38,13 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: spacing.md,
       paddingTop: 0,
-      paddingBottom: spacing.md,
+      paddingBottom: spacing.sm,
       backgroundColor: theme.colors.background,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.elevation.level1,
+      minHeight: 48,
     },
     leftSection: {
       width: 48,
@@ -59,11 +60,11 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
     },
     title: {
       color: theme.colors.onBackground,
-      fontSize: theme.custom.typography.titleLarge.fontSize,
-      fontFamily: theme.custom.typography.titleLarge.fontFamily,
-      fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
-      letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
-      lineHeight: theme.custom.typography.titleLarge.lineHeight,
+      fontSize: theme.custom.typography.titleMedium.fontSize,
+      fontFamily: theme.custom.typography.titleMedium.fontFamily,
+      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+      lineHeight: theme.custom.typography.titleMedium.lineHeight,
     },
   });
 
@@ -79,7 +80,7 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
         {showBackButton ? (
           <IconButton
             icon="arrow-left"
-            size={24}
+            size={20}
             iconColor={theme.colors.onBackground}
             onPress={handleBackPress}
             accessibilityLabel="Go back"
@@ -87,7 +88,7 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
         ) : leftAction ? (
           <IconButton
             icon={leftAction.icon}
-            size={24}
+            size={20}
             iconColor={leftAction.disabled ? theme.colors.onSurfaceDisabled : theme.colors.onBackground}
             onPress={leftAction.onPress}
             accessibilityLabel={leftAction.accessibilityLabel}
@@ -110,7 +111,7 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
         {rightAction ? (
           <IconButton
             icon={rightAction.icon}
-            size={24}
+            size={20}
             iconColor={rightAction.disabled ? theme.colors.onSurfaceDisabled : theme.colors.primary}
             onPress={rightAction.onPress}
             accessibilityLabel={rightAction.accessibilityLabel}

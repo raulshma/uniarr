@@ -39,7 +39,7 @@ const RecentlyAddedScreen = () => {
           flex: 1,
         },
         listContentContainer: {
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal: spacing.md,
           paddingBottom: 80,
         },
         mediaItem: {
