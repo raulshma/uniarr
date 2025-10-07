@@ -42,11 +42,8 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Verify Expo configuration
-        run: |
-          echo "Testing expo config..."
-          npx expo config --json > /dev/null && echo "Expo config test passed" || echo "Expo config test failed"
-          echo "Expo configuration verified successfully"
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build Android app
         run: eas build --platform android --profile preview --local --output ${{ github.workspace }}/app-release.apk
