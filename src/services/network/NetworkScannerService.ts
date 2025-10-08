@@ -12,6 +12,8 @@ try {
 
 import { logger } from '@/services/logger/LoggerService';
 import type { ServiceType } from '@/models/service.types';
+import { secureStorage } from '@/services/storage/SecureStorage';
+import type { NetworkScanHistory, RecentIP } from '@/services/storage/SecureStorage';
 
 export interface DiscoveredService {
   id: string;
@@ -188,6 +190,9 @@ export class NetworkScannerService {
         subnet,
         servicesFound: discoveredServices.map(s => ({ type: s.type, url: s.url, name: s.name })),
       });
+
+      // Save scan history and recent IPs
+      void this.saveScanHistory(result, subnet, customIpAddress);
 
       return result;
     } finally {
@@ -592,5 +597,91 @@ export class NetworkScannerService {
   private isValidIpAddress(ip: string): boolean {
     const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
     return ipRegex.test(ip);
+  }
+
+  /**
+   * Save scan history and recent IPs to storage
+   */
+  private async saveScanHistory(result: NetworkScanResult, subnet: string, customIpAddress?: string): Promise<void> {
+    try {
+      const scanHistory: NetworkScanHistory = {
+        id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        duration: result.scanDuration,
+        scannedHosts: result.scannedHosts,
+        servicesFound: result.services.length,
+        subnet,
+        customIp: customIpAddress,
+        services: result.services.map(s => ({
+          type: s.type,
+          name: s.name,
+          url: s.url,
+          port: s.port,
+          version: s.version,
+          requiresAuth: s.requiresAuth,
+        })),
+      };
+
+      await secureStorage.saveNetworkScanHistory(scanHistory);
+
+      // Add recent IPs (the subnet and any custom IP)
+      if (customIpAddress) {
+        await secureStorage.addRecentIP(customIpAddress, subnet, result.services.length);
+      } else {
+        // Add the subnet's gateway as a recent IP
+        const gatewayIp = `${subnet}.1`;
+        await secureStorage.addRecentIP(gatewayIp, subnet, result.services.length);
+      }
+    } catch (error) {
+      void logger.warn('Failed to save scan history', {
+        location: 'NetworkScannerService.saveScanHistory',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Get scan history from storage
+   */
+  async getScanHistory(): Promise<NetworkScanHistory[]> {
+    try {
+      return await secureStorage.getNetworkScanHistory();
+    } catch (error) {
+      void logger.error('Failed to get scan history', {
+        location: 'NetworkScannerService.getScanHistory',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Get recent IPs from storage
+   */
+  async getRecentIPs(): Promise<RecentIP[]> {
+    try {
+      return await secureStorage.getRecentIPs();
+    } catch (error) {
+      void logger.error('Failed to get recent IPs', {
+        location: 'NetworkScannerService.getRecentIPs',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Clear scan history
+   */
+  async clearScanHistory(): Promise<void> {
+    try {
+      await secureStorage.clearNetworkScanHistory();
+      await secureStorage.clearRecentIPs();
+    } catch (error) {
+      void logger.error('Failed to clear scan history', {
+        location: 'NetworkScannerService.clearScanHistory',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }
 }

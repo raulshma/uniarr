@@ -74,7 +74,7 @@ const SettingsScreen = () => {
       letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
       fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
       marginBottom: spacing.md,
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.xs,
     },
     themeOptions: {
       flexDirection: 'row',
@@ -86,7 +86,7 @@ const SettingsScreen = () => {
     },
     settingCard: {
       backgroundColor: theme.colors.elevation.level1,
-      marginHorizontal: spacing.md,
+      marginHorizontal: spacing.xs,
       marginVertical: spacing.xs,
       borderRadius: 12,
       padding: spacing.md,
@@ -134,7 +134,7 @@ const SettingsScreen = () => {
       fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
     },
     signOutButton: {
-      marginHorizontal: spacing.md,
+      marginHorizontal: spacing.xs,
       marginTop: spacing.lg,
       marginBottom: 0,
     },

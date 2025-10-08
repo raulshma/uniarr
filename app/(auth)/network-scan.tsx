@@ -1,23 +1,32 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { ProgressBar, Text, useTheme, TextInput } from 'react-native-paper';
+import { ProgressBar, Text, useTheme, TextInput, SegmentedButtons } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/common/Button';
 import { LoadingState } from '@/components/common/LoadingState';
 import NetworkScanResults from '@/components/service/NetworkScanResults/NetworkScanResults';
+import NetworkScanHistory from '@/components/service/NetworkScanResults/NetworkScanHistory';
 import type { AppTheme } from '@/constants/theme';
 import type { DiscoveredService } from '@/services/network/NetworkScannerService';
+import type { NetworkScanHistory as ScanHistoryType, RecentIP } from '@/services/storage/SecureStorage';
 import { useNetworkScan } from '@/hooks/useNetworkScan';
 import { spacing } from '@/theme/spacing';
+import { NetworkScannerService } from '@/services/network/NetworkScannerService';
 
 const NetworkScanScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const [customIpAddress, setCustomIpAddress] = useState('');
+  const [activeTab, setActiveTab] = useState<'scan' | 'history'>('scan');
+  const [scanHistory, setScanHistory] = useState<ScanHistoryType[]>([]);
+  const [recentIPs, setRecentIPs] = useState<RecentIP[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const { isScanning, scanResult, error: scanError, scanProgress, scanNetwork, stopScan, reset: resetScan } = useNetworkScan();
+
+  const scannerService = useMemo(() => new NetworkScannerService(), []);
 
   const styles = useMemo(
     () =>
@@ -87,6 +96,17 @@ const NetworkScanScreen = () => {
         ipInputLabel: {
           color: theme.colors.onSurfaceVariant,
         },
+        tabContainer: {
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.md,
+        },
+        segmentedButtons: {
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        historyContainer: {
+          flex: 1,
+          paddingBottom: spacing.xxl,
+        },
       }),
     [theme],
   );
@@ -118,6 +138,56 @@ const NetworkScanScreen = () => {
     if (!scanProgress || scanProgress.totalHosts === 0) return 0;
     return scanProgress.currentHost / scanProgress.totalHosts;
   }, [scanProgress]);
+
+  const loadScanHistory = useCallback(async () => {
+    setIsLoadingHistory(true);
+    try {
+      const [history, ips] = await Promise.all([
+        scannerService.getScanHistory(),
+        scannerService.getRecentIPs(),
+      ]);
+      setScanHistory(history);
+      setRecentIPs(ips);
+    } catch (error) {
+      console.warn('Failed to load scan history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [scannerService]);
+
+  const handleClearHistory = useCallback(async () => {
+    Alert.alert(
+      'Clear History',
+      'Are you sure you want to clear all scan history and recent IP addresses?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await scannerService.clearScanHistory();
+              setScanHistory([]);
+              setRecentIPs([]);
+            } catch (error) {
+              console.warn('Failed to clear scan history:', error);
+            }
+          },
+        },
+      ]
+    );
+  }, [scannerService]);
+
+  const handleIPSelect = useCallback((ip: string) => {
+    setCustomIpAddress(ip);
+    setActiveTab('scan');
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadScanHistory();
+    }
+  }, [activeTab, loadScanHistory]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -178,51 +248,89 @@ const NetworkScanScreen = () => {
           </View>
         )}
 
-        <View style={styles.actions}>
-          {!isScanning ? (
-            <>
-              <Button
-                mode="contained"
-                onPress={() => handleStartScan(true)}
-                icon="flash"
-                fullWidth
-              >
-                Quick Scan (Fast)
-              </Button>
-              <Button
-                mode="outlined"
-                onPress={() => handleStartScan(false)}
-                icon="lan"
-                fullWidth
-              >
-                Full Scan (All IPs 1-254)
-              </Button>
-            </>
-          ) : (
-            <Button
-              mode="contained"
-              onPress={handleStopScan}
-              style={styles.stopButton}
-              labelStyle={styles.stopButtonLabel}
-              icon="stop"
-              fullWidth
-            >
-              Stop Scanning
-            </Button>
-          )}
-        </View>
-
-        <View style={styles.resultsContainer}>
-          <NetworkScanResults
-            services={scanResult?.services || (scanProgress?.servicesFound || [])}
-            isScanning={isScanning}
-            scanDuration={scanResult?.scanDuration}
-            scannedHosts={scanResult?.scannedHosts}
-            scanProgress={scanProgress}
-            onServicePress={handleServiceSelect}
-            onScanAgain={handleStartScan}
+        {/* Tab Navigation */}
+        <View style={styles.tabContainer}>
+          <SegmentedButtons
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as 'scan' | 'history')}
+            buttons={[
+              {
+                value: 'scan',
+                label: 'Network Scan',
+                icon: 'lan',
+              },
+              {
+                value: 'history',
+                label: 'History',
+                icon: 'history',
+              },
+            ]}
+            style={styles.segmentedButtons}
           />
         </View>
+
+        {activeTab === 'scan' ? (
+          <>
+            <View style={styles.actions}>
+              {!isScanning ? (
+                <>
+                  <Button
+                    mode="contained"
+                    onPress={() => handleStartScan(true)}
+                    icon="flash"
+                    fullWidth
+                  >
+                    Quick Scan (Fast)
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    onPress={() => handleStartScan(false)}
+                    icon="lan"
+                    fullWidth
+                  >
+                    Full Scan (All IPs 1-254)
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  mode="contained"
+                  onPress={handleStopScan}
+                  style={styles.stopButton}
+                  labelStyle={styles.stopButtonLabel}
+                  icon="stop"
+                  fullWidth
+                >
+                  Stop Scanning
+                </Button>
+              )}
+            </View>
+
+            <View style={styles.resultsContainer}>
+              <NetworkScanResults
+                services={scanResult?.services || (scanProgress?.servicesFound || [])}
+                isScanning={isScanning}
+                scanDuration={scanResult?.scanDuration}
+                scannedHosts={scanResult?.scannedHosts}
+                scanProgress={scanProgress}
+                onServicePress={handleServiceSelect}
+                onScanAgain={handleStartScan}
+              />
+            </View>
+          </>
+        ) : (
+          <View style={styles.historyContainer}>
+            {isLoadingHistory ? (
+              <LoadingState message="Loading scan history..." />
+            ) : (
+              <NetworkScanHistory
+                scanHistory={scanHistory}
+                recentIPs={recentIPs}
+                onClearHistory={handleClearHistory}
+                onIPSelect={handleIPSelect}
+              />
+            )}
+          </View>
+        )}
 
         {scanError && (
           <View style={{ marginTop: spacing.md }}>

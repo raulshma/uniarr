@@ -5,11 +5,38 @@ import { type ServiceConfig } from '@/models/service.types';
 
 const INDEX_KEY = 'SecureStorage_index';
 const SERVICE_KEY_PREFIX = 'SecureStorage_service_';
+const SCAN_HISTORY_KEY = 'SecureStorage_scan_history';
+const RECENT_IPS_KEY = 'SecureStorage_recent_ips';
 
 type StoredServiceConfig = Omit<ServiceConfig, 'createdAt' | 'updatedAt'> & {
   createdAt: string;
   updatedAt: string;
 };
+
+export interface NetworkScanHistory {
+  id: string;
+  timestamp: string;
+  duration: number;
+  scannedHosts: number;
+  servicesFound: number;
+  subnet: string;
+  customIp?: string;
+  services: Array<{
+    type: string;
+    name: string;
+    url: string;
+    port: number;
+    version?: string;
+    requiresAuth?: boolean;
+  }>;
+}
+
+export interface RecentIP {
+  ip: string;
+  timestamp: string;
+  subnet?: string;
+  servicesFound?: number;
+}
 
 class SecureStorage {
   private static instance: SecureStorage | null = null;
@@ -76,6 +103,106 @@ class SecureStorage {
     await Promise.all(ids.map((id) => SecureStore.deleteItemAsync(this.getServiceKey(id))));
     await SecureStore.deleteItemAsync(INDEX_KEY);
     this.cache.clear();
+  }
+
+  async saveNetworkScanHistory(history: NetworkScanHistory): Promise<void> {
+    try {
+      const existingHistory = await this.getNetworkScanHistory();
+      const updatedHistory = [history, ...existingHistory.slice(0, 19)]; // Keep only last 20 scans
+
+      await SecureStore.setItemAsync(SCAN_HISTORY_KEY, JSON.stringify(updatedHistory));
+    } catch (error) {
+      await logger.error('Failed to save network scan history.', {
+        location: 'SecureStorage.saveNetworkScanHistory',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  async getNetworkScanHistory(): Promise<NetworkScanHistory[]> {
+    try {
+      const serialized = await SecureStore.getItemAsync(SCAN_HISTORY_KEY);
+      if (!serialized) {
+        return [];
+      }
+
+      return JSON.parse(serialized) as NetworkScanHistory[];
+    } catch (error) {
+      await logger.error('Failed to read network scan history.', {
+        location: 'SecureStorage.getNetworkScanHistory',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  async addRecentIP(ip: string, subnet?: string, servicesFound?: number): Promise<void> {
+    try {
+      const recentIPs = await this.getRecentIPs();
+      const existingIndex = recentIPs.findIndex(r => r.ip === ip);
+
+      const recentIP: RecentIP = {
+        ip,
+        timestamp: new Date().toISOString(),
+        subnet,
+        servicesFound,
+      };
+
+      if (existingIndex >= 0) {
+        recentIPs[existingIndex] = recentIP;
+      } else {
+        recentIPs.unshift(recentIP);
+      }
+
+      // Keep only last 10 recent IPs
+      const updatedIPs = recentIPs.slice(0, 10);
+
+      await SecureStore.setItemAsync(RECENT_IPS_KEY, JSON.stringify(updatedIPs));
+    } catch (error) {
+      await logger.error('Failed to add recent IP.', {
+        location: 'SecureStorage.addRecentIP',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  async getRecentIPs(): Promise<RecentIP[]> {
+    try {
+      const serialized = await SecureStore.getItemAsync(RECENT_IPS_KEY);
+      if (!serialized) {
+        return [];
+      }
+
+      return JSON.parse(serialized) as RecentIP[];
+    } catch (error) {
+      await logger.error('Failed to read recent IPs.', {
+        location: 'SecureStorage.getRecentIPs',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  async clearNetworkScanHistory(): Promise<void> {
+    try {
+      await SecureStore.deleteItemAsync(SCAN_HISTORY_KEY);
+    } catch (error) {
+      await logger.error('Failed to clear network scan history.', {
+        location: 'SecureStorage.clearNetworkScanHistory',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  async clearRecentIPs(): Promise<void> {
+    try {
+      await SecureStore.deleteItemAsync(RECENT_IPS_KEY);
+    } catch (error) {
+      await logger.error('Failed to clear recent IPs.', {
+        location: 'SecureStorage.clearRecentIPs',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private async ensureInitialized(): Promise<void> {
