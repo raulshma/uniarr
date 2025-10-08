@@ -7,7 +7,7 @@ export interface UseNetworkScanReturn {
   scanResult: NetworkScanResult | null;
   error: string | null;
   scanProgress: ScanProgress | null;
-  scanNetwork: (progressCallback?: ProgressCallback) => Promise<void>;
+  scanNetwork: (progressCallback?: ProgressCallback, fastScan?: boolean, customIpAddress?: string) => Promise<void>;
   stopScan: () => void;
   reset: () => void;
 }
@@ -20,7 +20,7 @@ export const useNetworkScan = (): UseNetworkScanReturn => {
 
   const scanner = useMemo(() => new NetworkScannerService(), []);
 
-  const scanNetwork = useCallback(async (progressCallback?: ProgressCallback) => {
+  const scanNetwork = useCallback(async (progressCallback?: ProgressCallback, fastScan: boolean = true, customIpAddress?: string) => {
     setIsScanning(true);
     setError(null);
     setScanResult(null);
@@ -30,7 +30,7 @@ export const useNetworkScan = (): UseNetworkScanReturn => {
       const result = await scanner.scanNetwork((progress) => {
         setScanProgress(progress);
         progressCallback?.(progress);
-      });
+      }, fastScan, customIpAddress);
       setScanResult(result);
       setScanProgress(null); // Clear progress when done
     } catch (err) {

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { ProgressBar, Text, useTheme } from 'react-native-paper';
+import { ProgressBar, Text, useTheme, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/common/Button';
@@ -15,6 +15,7 @@ import { spacing } from '@/theme/spacing';
 const NetworkScanScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const [customIpAddress, setCustomIpAddress] = useState('');
 
   const { isScanning, scanResult, error: scanError, scanProgress, scanNetwork, stopScan, reset: resetScan } = useNetworkScan();
 
@@ -24,6 +25,7 @@ const NetworkScanScreen = () => {
         safeArea: {
           flex: 1,
           backgroundColor: theme.colors.surface,
+          paddingBottom: spacing.xxl,
         },
         headerBar: {
           flexDirection: 'row',
@@ -74,6 +76,16 @@ const NetworkScanScreen = () => {
         },
         resultsContainer: {
           flex: 1,
+          paddingBottom: spacing.xxl,
+        },
+        ipInputContainer: {
+          gap: spacing.sm,
+        },
+        ipInput: {
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        ipInputLabel: {
+          color: theme.colors.onSurfaceVariant,
         },
       }),
     [theme],
@@ -93,10 +105,10 @@ const NetworkScanScreen = () => {
     });
   }, [router]);
 
-  const handleStartScan = useCallback(async () => {
+  const handleStartScan = useCallback(async (fastScan: boolean = true) => {
     resetScan();
-    await scanNetwork();
-  }, [scanNetwork, resetScan]);
+    await scanNetwork(undefined, fastScan, customIpAddress || undefined);
+  }, [scanNetwork, resetScan, customIpAddress]);
 
   const handleStopScan = useCallback(() => {
     stopScan();
@@ -134,8 +146,24 @@ const NetworkScanScreen = () => {
             Scan for Services
           </Text>
           <Text variant="bodyMedium" style={styles.heroSubtitle}>
-            Automatically discover Sonarr, Radarr, Jellyseerr, qBittorrent, and Prowlarr services on your local network.
+            Automatically discover Sonarr, Radarr, Jellyseerr, qBittorrent, and Prowlarr services on your local network. Quick scan checks common IPs first, while comprehensive scan covers all IPs (1-254) in your subnet.
           </Text>
+        </View>
+
+        <View style={styles.ipInputContainer}>
+          <Text variant="bodyMedium" style={styles.ipInputLabel}>
+            Custom IP Address (Optional)
+          </Text>
+          <TextInput
+            mode="outlined"
+            label="Enter IP address (e.g., 192.168.1.100)"
+            value={customIpAddress}
+            onChangeText={setCustomIpAddress}
+            style={styles.ipInput}
+            keyboardType="numeric"
+            placeholder="Leave empty to scan local network"
+            disabled={isScanning}
+          />
         </View>
 
         {isScanning && scanProgress && (
@@ -152,14 +180,24 @@ const NetworkScanScreen = () => {
 
         <View style={styles.actions}>
           {!isScanning ? (
-            <Button
-              mode="contained"
-              onPress={handleStartScan}
-              icon="lan"
-              fullWidth
-            >
-              Start Network Scan
-            </Button>
+            <>
+              <Button
+                mode="contained"
+                onPress={() => handleStartScan(true)}
+                icon="flash"
+                fullWidth
+              >
+                Quick Scan (Fast)
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={() => handleStartScan(false)}
+                icon="lan"
+                fullWidth
+              >
+                Full Scan (All IPs 1-254)
+              </Button>
+            </>
           ) : (
             <Button
               mode="contained"

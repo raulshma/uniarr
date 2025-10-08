@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
 import type { AppTheme } from '@/constants/theme';
 import type { DiscoveredService, ScanProgress } from '@/services/network/NetworkScannerService';
+import { sanitizeAndTruncateText, sanitizeServiceVersion } from '@/utils/validation.utils';
 
 export type NetworkScanResultsProps = {
   services: DiscoveredService[];
@@ -151,15 +152,15 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
                   />
 
                   <View style={[styles.serviceInfo, { marginLeft: theme.custom.spacing.md }]}>
-                    <Text variant="titleMedium" style={[styles.serviceName, { color: theme.colors.onSurface }]}>
-                      {service.name}
+                    <Text variant="titleMedium" style={[styles.serviceName, { color: theme.colors.onSurface }]} numberOfLines={1}>
+                      {sanitizeAndTruncateText(service.name, 40)}
                     </Text>
-                    <Text variant="bodyMedium" style={[styles.serviceUrl, { color: theme.colors.onSurfaceVariant }]}>
-                      {service.url}
+                    <Text variant="bodyMedium" style={[styles.serviceUrl, { color: theme.colors.onSurfaceVariant }]} numberOfLines={1}>
+                      {sanitizeAndTruncateText(service.url, 60)}
                     </Text>
                     {service.version ? (
-                      <Text variant="bodySmall" style={[styles.serviceVersion, { color: theme.colors.onSurfaceVariant }]}>
-                        Version {service.version}
+                      <Text variant="bodySmall" style={[styles.serviceVersion, { color: theme.colors.onSurfaceVariant }]} numberOfLines={1}>
+                        Version {sanitizeServiceVersion(service.version)}
                       </Text>
                     ) : null}
                   </View>

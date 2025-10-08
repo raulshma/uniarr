@@ -85,3 +85,49 @@ export const serviceConfigSchema = z
   });
 
 export type ServiceConfigInput = z.infer<typeof serviceConfigSchema>;
+
+/**
+ * Sanitizes text by removing HTML tags and truncating to specified length
+ */
+export const sanitizeAndTruncateText = (text: string | undefined | null, maxLength: number = 50): string => {
+  if (!text) return '';
+  
+  // Remove HTML tags
+  const sanitized = text.replace(/<[^>]*>/g, '');
+  
+  // Truncate if too long
+  if (sanitized.length > maxLength) {
+    return sanitized.substring(0, maxLength).trim() + '...';
+  }
+  
+  return sanitized.trim();
+};
+
+/**
+ * Sanitizes service version text specifically for display
+ */
+export const sanitizeServiceVersion = (version: string | undefined | null): string => {
+  if (!version) return '';
+  
+  // Remove HTML tags and common HTML entities
+  let sanitized = version
+    .replace(/<[^>]*>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+  
+  // If it looks like HTML content, return a generic message
+  if (sanitized.includes('<!DOCTYPE') || sanitized.includes('<html') || sanitized.includes('<body')) {
+    return 'Version detected';
+  }
+  
+  // Truncate to reasonable length for version display
+  if (sanitized.length > 30) {
+    return sanitized.substring(0, 30).trim() + '...';
+  }
+  
+  return sanitized;
+};

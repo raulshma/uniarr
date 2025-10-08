@@ -76,8 +76,9 @@ const SERVICE_DETECTION_CONFIGS: Record<ServiceType, ServiceDetectionConfig> = {
 export class NetworkScannerService {
   private isScanning = false;
   private abortController: AbortController | null = null;
+  private fastScanMode = true; // Default to fast scan for better UX
 
-  async scanNetwork(progressCallback?: ProgressCallback): Promise<NetworkScanResult> {
+  async scanNetwork(progressCallback?: ProgressCallback, fastScan: boolean = true, customIpAddress?: string): Promise<NetworkScanResult> {
     if (this.isScanning) {
       throw new Error('Network scan is already in progress');
     }
@@ -93,8 +94,20 @@ export class NetworkScannerService {
       });
 
       // Get local IP and subnet
-      const localIp = await this.getLocalIpAddress();
-      const subnet = this.getSubnetFromIp(localIp);
+      let localIp: string;
+      let subnet: string;
+      
+      if (customIpAddress) {
+        // Validate custom IP address
+        if (!this.isValidIpAddress(customIpAddress)) {
+          throw new Error('Invalid IP address format. Please enter a valid IP address (e.g., 192.168.1.100)');
+        }
+        localIp = customIpAddress;
+        subnet = this.getSubnetFromIp(customIpAddress);
+      } else {
+        localIp = await this.getLocalIpAddress();
+        subnet = this.getSubnetFromIp(localIp);
+      }
 
       void logger.debug('Network info retrieved', {
         location: 'NetworkScannerService.scanNetwork',
@@ -103,30 +116,58 @@ export class NetworkScannerService {
       });
 
       // Calculate total hosts to scan
-      const allHosts = this.generateHostIps(subnet);
-      const totalServiceTypes = Object.keys(SERVICE_DETECTION_CONFIGS).length;
-      const totalHosts = allHosts.length * totalServiceTypes;
+      let allHosts: string[];
+      let totalHosts: number;
+      
+      if (customIpAddress) {
+        // For custom IP, only scan that specific IP
+        allHosts = [customIpAddress];
+        totalHosts = allHosts.length * Object.keys(SERVICE_DETECTION_CONFIGS).length;
+      } else {
+        // For network scan, scan all IPs in subnet
+        allHosts = this.generateHostIps(subnet);
+        totalHosts = allHosts.length * Object.keys(SERVICE_DETECTION_CONFIGS).length;
+      }
 
       void logger.info('Starting service scan', {
         location: 'NetworkScannerService.scanNetwork',
         subnet,
         totalHosts,
         servicesToScan: Object.keys(SERVICE_DETECTION_CONFIGS),
+        customIpAddress: !!customIpAddress,
+        scanType: customIpAddress ? 'custom-ip' : 'network-subnet',
       });
 
-      // Scan common ports for each service type
+      // Scan common ports for each service type with early termination
       const discoveredServices: DiscoveredService[] = [];
-      let scannedHosts = 0;
+      let cumulativeScannedHosts = 0;
 
-      for (const [serviceType, config] of Object.entries(SERVICE_DETECTION_CONFIGS)) {
-        if (this.abortController?.signal.aborted) {
-          break;
+      // Scan priority hosts first for quick results
+      let priorityHosts: string[];
+      if (customIpAddress) {
+        // For custom IP, the priority host is just that IP
+        priorityHosts = [customIpAddress];
+      } else {
+        // For network scan, use priority hosts
+        priorityHosts = this.generatePriorityHosts(subnet);
+      }
+      
+      const priorityServices = await this.scanPriorityHosts(priorityHosts, progressCallback, totalHosts, discoveredServices, cumulativeScannedHosts);
+      discoveredServices.push(...priorityServices);
+      cumulativeScannedHosts += priorityHosts.length * Object.keys(SERVICE_DETECTION_CONFIGS).length;
+
+      // If fast scan is disabled and not using custom IP, continue with comprehensive scan
+      if (!fastScan && !customIpAddress && !this.abortController?.signal.aborted) {
+        for (const [serviceType, config] of Object.entries(SERVICE_DETECTION_CONFIGS)) {
+          if (this.abortController?.signal.aborted) {
+            break;
+          }
+
+          const serviceTypeKey = serviceType as ServiceType;
+          const services = await this.scanServiceType(serviceTypeKey, config, subnet, cumulativeScannedHosts, progressCallback, totalHosts, discoveredServices);
+          discoveredServices.push(...services);
+          cumulativeScannedHosts += allHosts.length;
         }
-
-        const serviceTypeKey = serviceType as ServiceType;
-        const services = await this.scanServiceType(serviceTypeKey, config, subnet, scannedHosts, progressCallback, totalHosts, discoveredServices);
-        discoveredServices.push(...services);
-        scannedHosts += services.length;
       }
 
       const scanDuration = Date.now() - startTime;
@@ -134,14 +175,14 @@ export class NetworkScannerService {
       const result: NetworkScanResult = {
         services: discoveredServices,
         scanDuration,
-        scannedHosts,
+        scannedHosts: cumulativeScannedHosts,
       };
 
       void logger.info('Network scan completed', {
         location: 'NetworkScannerService.scanNetwork',
         discoveredServices: discoveredServices.length,
         scanDuration,
-        scannedHosts,
+        scannedHosts: cumulativeScannedHosts,
         subnet,
         servicesFound: discoveredServices.map(s => ({ type: s.type, url: s.url, name: s.name })),
       });
@@ -164,7 +205,7 @@ export class NetworkScannerService {
   ): Promise<DiscoveredService[]> {
     const discoveredServices: DiscoveredService[] = [];
     const hosts = this.generateHostIps(subnet);
-    const CONCURRENT_REQUESTS = 15; // Limit concurrent requests to avoid overwhelming the network
+    const CONCURRENT_REQUESTS = 30; // Increased concurrency for faster scanning
 
     for (const port of config.commonPorts) {
       if (this.abortController?.signal.aborted) {
@@ -260,7 +301,7 @@ export class NetworkScannerService {
     try {
       const client = axios.create({
         baseURL: baseUrl,
-        timeout: 2000, // Reduced timeout for faster scanning
+        timeout: 1000, // Aggressive timeout for faster scanning
         signal: this.abortController?.signal,
       });
 
@@ -286,7 +327,18 @@ export class NetworkScannerService {
           response = await client.get(config.detectionEndpoint, {
             responseType: 'text',
           });
-          version = response.data?.trim();
+          // qBittorrent might return HTML error pages, try to extract version from response
+          if (typeof response.data === 'string') {
+            const versionMatch = response.data.match(/v?(\d+\.\d+\.\d+)/);
+            if (versionMatch) {
+              version = versionMatch[1];
+            } else {
+              // If it looks like HTML, don't set version
+              version = response.data.includes('<') ? undefined : response.data.trim();
+            }
+          } else {
+            version = response.data?.trim();
+          }
           break;
 
         case 'prowlarr':
@@ -381,22 +433,86 @@ export class NetworkScannerService {
     return '192.168.1';
   }
 
+  private generatePriorityHosts(subnet: string): string[] {
+    // Scan most common device IPs first for quick results
+    return [
+      '127.0.0.1', // localhost
+      `${subnet}.1`,   // Router/gateway
+      `${subnet}.2`,   // Common device
+      `${subnet}.100`, // Common device
+      `${subnet}.101`, // Common device
+      `${subnet}.102`, // Common device
+      `${subnet}.200`, // Common device
+      `${subnet}.254`, // Router backup
+    ];
+  }
+
+  private async scanPriorityHosts(
+    priorityHosts: string[],
+    progressCallback?: ProgressCallback,
+    totalHosts?: number,
+    allDiscoveredServices?: DiscoveredService[],
+    startScannedHosts: number = 0,
+  ): Promise<DiscoveredService[]> {
+    const discoveredServices: DiscoveredService[] = [];
+    const CONCURRENT_REQUESTS = 30;
+
+    // Scan all service types on priority hosts concurrently
+    const allPromises: Promise<DiscoveredService | null>[] = [];
+
+    for (const host of priorityHosts) {
+      for (const [serviceType, config] of Object.entries(SERVICE_DETECTION_CONFIGS)) {
+        for (const port of config.commonPorts) {
+          const promise = this.detectServiceAtUrl(serviceType as ServiceType, `http://${host}:${port}`, config);
+          allPromises.push(promise);
+        }
+      }
+    }
+
+    // Execute all priority scans concurrently
+    const results = await Promise.allSettled(allPromises);
+    
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) {
+        discoveredServices.push(result.value);
+      }
+    }
+
+    // Update progress
+    if (progressCallback && totalHosts && allDiscoveredServices) {
+      progressCallback({
+        currentHost: startScannedHosts + priorityHosts.length * Object.keys(SERVICE_DETECTION_CONFIGS).length,
+        totalHosts,
+        currentService: 'Priority Scan',
+        servicesFound: [...allDiscoveredServices, ...discoveredServices],
+      });
+    }
+
+    return discoveredServices;
+  }
+
   private generateHostIps(subnet: string): string[] {
     const hosts: string[] = [];
 
-    // Scan all hosts in subnet (1-254) for comprehensive coverage
-    for (let i = 1; i <= 254; i++) {
-      hosts.push(`${subnet}.${i}`);
-    }
-
-    // Also add localhost for testing
-    const additionalIps = [
+    // Smart scanning: prioritize common router and device IPs first
+    const priorityIps = [
       '127.0.0.1', // localhost
+      `${subnet}.1`,   // Router/gateway
+      `${subnet}.2`,   // Common device
+      `${subnet}.100`, // Common device
+      `${subnet}.101`, // Common device
+      `${subnet}.102`, // Common device
+      `${subnet}.200`, // Common device
+      `${subnet}.254`, // Router backup
     ];
 
-    // Add additional IPs if they're not already in the list
-    for (const ip of additionalIps) {
-      if (!hosts.includes(ip)) {
+    // Add priority IPs first
+    hosts.push(...priorityIps);
+
+    // Scan ALL remaining IPs in the subnet (1-254) for comprehensive coverage
+    for (let i = 1; i <= 254; i++) {
+      const ip = `${subnet}.${i}`;
+      if (!priorityIps.includes(ip)) {
         hosts.push(ip);
       }
     }
@@ -440,5 +556,13 @@ export class NetworkScannerService {
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
+  }
+
+  /**
+   * Validate IP address format
+   */
+  private isValidIpAddress(ip: string): boolean {
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return ipRegex.test(ip);
   }
 }
