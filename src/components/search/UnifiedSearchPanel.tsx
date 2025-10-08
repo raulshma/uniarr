@@ -112,7 +112,7 @@ export const UnifiedSearchPanel: React.FC = () => {
     () =>
       StyleSheet.create({
         container: {
-          padding: spacing.md,
+          padding: spacing.xs,
           backgroundColor: theme.colors.elevation.level1,
           borderRadius: 12,
         },
