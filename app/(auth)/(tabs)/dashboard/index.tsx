@@ -281,14 +281,13 @@ const DashboardScreen = () => {
           backgroundColor: theme.colors.background,
         },
         listContent: {
-          paddingHorizontal: spacing.md,
           paddingBottom: 100, // Increased to account for curved tab bar (60px + 20px center button extension + extra padding)
         },
         section: {
-          marginTop: spacing.lg,
+          marginTop: spacing.xs,
         },
         searchWrapper: {
-          marginTop: spacing.lg,
+          marginTop: spacing.xxs,
           marginHorizontal: spacing.md,
         },
         sectionTitle: {
