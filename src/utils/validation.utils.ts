@@ -48,19 +48,11 @@ export const serviceConfigSchema = z
     }
 
     if (data.type === 'jellyseerr') {
-      if (!data.username || data.username.trim().length === 0) {
+      if (!data.apiKey || data.apiKey.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['username'],
-          message: 'Username is required for Jellyseerr',
-        });
-      }
-
-      if (!data.password || data.password.trim().length === 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['password'],
-          message: 'Password is required for Jellyseerr',
+          path: ['apiKey'],
+          message: 'API key is required for Jellyseerr',
         });
       }
 

@@ -227,11 +227,10 @@ export async function testQBittorrentApi(baseUrl: string, username?: string, pas
 /**
  * Test Jellyseerr API specifically
  */
-export async function testJellyseerrApi(baseUrl: string, username?: string, password?: string, timeout: number = 15000): Promise<ApiTestResult> {
+export async function testJellyseerrApi(baseUrl: string, apiKey?: string, timeout: number = 15000): Promise<ApiTestResult> {
   const fullUrl = `${baseUrl}/api/v1/status`;
   console.log('🧪 [ApiTest] Testing Jellyseerr API:', fullUrl);
-  console.log('🧪 [ApiTest] Username provided:', username ? 'Yes' : 'No');
-  console.log('🧪 [ApiTest] Password provided:', password ? 'Yes' : 'No');
+  console.log('🧪 [ApiTest] API Key provided:', apiKey ? 'Yes' : 'No');
   console.log('🧪 [ApiTest] Timeout:', timeout);
 
   try {
@@ -241,8 +240,7 @@ export async function testJellyseerrApi(baseUrl: string, username?: string, pass
       name: 'Test Jellyseerr',
       type: 'jellyseerr' as const,
       url: baseUrl,
-      username,
-      password,
+      apiKey,
       enabled: true,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -250,7 +248,7 @@ export async function testJellyseerrApi(baseUrl: string, username?: string, pass
 
     // Use the new authentication system
     const authResult = await ServiceAuthHelper.authenticateService(mockConfig);
-    
+
     if (!authResult.success || !authResult.authenticated) {
       return {
         success: false,
@@ -258,17 +256,15 @@ export async function testJellyseerrApi(baseUrl: string, username?: string, pass
       };
     }
 
-    // Test the actual API endpoint
-    const authConfig = username && password ? { auth: { username, password } } : {};
-    
+    // Test the actual API endpoint using API key in headers
     const response = await axios.get(fullUrl, {
       timeout,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'UniArr/1.0.0',
+        ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
       },
-      ...authConfig,
     });
 
     console.log('✅ [ApiTest] Jellyseerr API worked:', {

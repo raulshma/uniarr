@@ -16,7 +16,7 @@ describe('Authentication System', () => {
     it('should return correct authentication methods for each service type', () => {
       expect(AuthProviderFactory.getAuthMethod('sonarr')).toBe('api-key');
       expect(AuthProviderFactory.getAuthMethod('radarr')).toBe('api-key');
-      expect(AuthProviderFactory.getAuthMethod('jellyseerr')).toBe('basic');
+      expect(AuthProviderFactory.getAuthMethod('jellyseerr')).toBe('api-key');
       expect(AuthProviderFactory.getAuthMethod('qbittorrent')).toBe('session');
       expect(AuthProviderFactory.getAuthMethod('prowlarr')).toBe('api-key');
     });
@@ -32,7 +32,7 @@ describe('Authentication System', () => {
     it('should return correct required credentials for each service type', () => {
       expect(AuthProviderFactory.getRequiredCredentials('sonarr')).toEqual(['apiKey']);
       expect(AuthProviderFactory.getRequiredCredentials('radarr')).toEqual(['apiKey']);
-      expect(AuthProviderFactory.getRequiredCredentials('jellyseerr')).toEqual(['username', 'password']);
+      expect(AuthProviderFactory.getRequiredCredentials('jellyseerr')).toEqual(['apiKey']);
       expect(AuthProviderFactory.getRequiredCredentials('qbittorrent')).toEqual(['username', 'password']);
       expect(AuthProviderFactory.getRequiredCredentials('prowlarr')).toEqual(['apiKey']);
     });
@@ -65,21 +65,19 @@ describe('Authentication System', () => {
       expect(invalidValidation.valid).toBe(false);
       expect(invalidValidation.errors).toContain('API key is required for this service type');
 
-      // Valid basic auth service
-      const validBasicAuthConfig = createMockServiceConfig('jellyseerr', {
-        username: 'testuser',
-        password: 'testpass',
+      // Valid API key service
+      const validJellyseerrConfig = createMockServiceConfig('jellyseerr', {
+        apiKey: 'test-api-key',
       });
-      const basicValidation = ServiceAuthHelper.validateServiceConfig(validBasicAuthConfig);
-      expect(basicValidation.valid).toBe(true);
-      expect(basicValidation.errors).toHaveLength(0);
+      const jellyseerrValidation = ServiceAuthHelper.validateServiceConfig(validJellyseerrConfig);
+      expect(jellyseerrValidation.valid).toBe(true);
+      expect(jellyseerrValidation.errors).toHaveLength(0);
 
-      // Invalid basic auth service (missing credentials)
-      const invalidBasicAuthConfig = createMockServiceConfig('jellyseerr');
-      const invalidBasicValidation = ServiceAuthHelper.validateServiceConfig(invalidBasicAuthConfig);
-      expect(invalidBasicValidation.valid).toBe(false);
-      expect(invalidBasicValidation.errors).toContain('Username is required for this service type');
-      expect(invalidBasicValidation.errors).toContain('Password is required for this service type');
+      // Invalid API key service (missing API key)
+      const invalidJellyseerrConfig = createMockServiceConfig('jellyseerr');
+      const invalidJellyseerrValidation = ServiceAuthHelper.validateServiceConfig(invalidJellyseerrConfig);
+      expect(invalidJellyseerrValidation.valid).toBe(false);
+      expect(invalidJellyseerrValidation.errors).toContain('API key is required for this service type');
 
       // Invalid service (missing URL)
       const invalidUrlConfig = createMockServiceConfig('sonarr', {
@@ -93,17 +91,15 @@ describe('Authentication System', () => {
 
     it('should create correct authentication configuration', () => {
       const config = createMockServiceConfig('jellyseerr', {
-        username: 'testuser',
-        password: 'testpass',
+        apiKey: 'test-api-key',
         url: 'http://localhost:8080',
         timeout: 30000,
       });
 
       const authConfig = ServiceAuthHelper.createAuthConfig(config);
-      
-      expect(authConfig.method).toBe('basic');
-      expect(authConfig.credentials.username).toBe('testuser');
-      expect(authConfig.credentials.password).toBe('testpass');
+
+      expect(authConfig.method).toBe('api-key');
+      expect(authConfig.credentials.apiKey).toBe('test-api-key');
       expect(authConfig.baseUrl).toBe('http://localhost:8080');
       expect(authConfig.timeout).toBe(30000);
     });
@@ -142,8 +138,7 @@ describe('Authentication System', () => {
     it('should handle authentication errors gracefully', async () => {
       const invalidConfig = createMockServiceConfig('jellyseerr', {
         url: 'http://invalid-url-that-does-not-exist',
-        username: 'invalid',
-        password: 'invalid',
+        apiKey: 'invalid-key',
       });
 
       // This should not throw an error, but return a failed result

@@ -44,29 +44,26 @@ describe('Authentication Integration', () => {
   });
 
   describe('JellyseerrConnector', () => {
-    it('should use basic authentication', () => {
+    it('should use API key authentication', () => {
       const config = createMockServiceConfig('jellyseerr', {
-        username: 'testuser',
-        password: 'testpass',
+        apiKey: 'test-api-key',
       });
 
       const connector = new JellyseerrConnector(config);
-      
+
       // Verify the connector was created successfully
       expect(connector).toBeDefined();
       expect(connector.config.type).toBe('jellyseerr');
-      expect(connector.config.username).toBe('testuser');
-      expect(connector.config.password).toBe('testpass');
+      expect(connector.config.apiKey).toBe('test-api-key');
     });
 
     it('should have authentication methods available', () => {
       const config = createMockServiceConfig('jellyseerr', {
-        username: 'testuser',
-        password: 'testpass',
+        apiKey: 'test-api-key',
       });
 
       const connector = new JellyseerrConnector(config);
-      
+
       // Check that the connector has the expected methods
       expect(typeof connector.initialize).toBe('function');
       expect(typeof connector.getVersion).toBe('function');
@@ -110,17 +107,16 @@ describe('Authentication Integration', () => {
   describe('Authentication System Integration', () => {
     it('should handle missing credentials gracefully', () => {
       const configWithoutCredentials = createMockServiceConfig('jellyseerr');
-      
+
       // Should not throw when creating connector without credentials
       expect(() => new JellyseerrConnector(configWithoutCredentials)).not.toThrow();
     });
 
     it('should handle different service types correctly', () => {
       const jellyseerrConfig = createMockServiceConfig('jellyseerr', {
-        username: 'user',
-        password: 'pass',
+        apiKey: 'test-api-key',
       });
-      
+
       const qbittorrentConfig = createMockServiceConfig('qbittorrent', {
         username: 'admin',
         password: 'admin',

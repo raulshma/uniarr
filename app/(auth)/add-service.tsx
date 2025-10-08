@@ -387,10 +387,10 @@ const AddServiceScreen = () => {
         const config = buildServiceConfig(values, generateServiceId());
         
         // Validate API key format first
-        if (values.apiKey && values.type !== 'qbittorrent' && values.type !== 'jellyseerr') {
+        if (values.apiKey && values.type !== 'qbittorrent') {
           const apiKeyTest = testApiKeyFormat(values.apiKey, values.type);
           debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
-          
+
           if (!apiKeyTest.isValid) {
             setTestError(`${apiKeyTest.message}. ${apiKeyTest.suggestions.join(' ')}`);
             return;
@@ -773,7 +773,7 @@ const AddServiceScreen = () => {
             name="type"
             control={control}
             render={({ field: { value: serviceType } }: { field: { value: ServiceType } }) => {
-              if (serviceType === 'qbittorrent' || serviceType === 'jellyseerr') {
+              if (serviceType === 'qbittorrent') {
                 return (
                   <>
                     <View style={styles.formField}>
