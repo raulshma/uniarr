@@ -1,7 +1,10 @@
 import { Stack } from 'expo-router';
+import { useTheme } from 'react-native-paper';
+import type { AppTheme } from '@/constants/theme';
 
 const PublicLayout = () => {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  const theme = useTheme<AppTheme>();
+  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }} />;
 };
 
 export default PublicLayout;
