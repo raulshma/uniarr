@@ -21,6 +21,8 @@ export interface DiscoveredService {
   port: number;
   version?: string;
   detectedAt: Date;
+  requiresAuth?: boolean;
+  authError?: string;
 }
 
 export interface NetworkScanResult {
@@ -307,14 +309,34 @@ export class NetworkScannerService {
 
       let response;
       let version: string | undefined;
+      let requiresAuth = false;
+      let authError: string | undefined;
 
       switch (serviceType) {
         case 'sonarr':
         case 'radarr':
-          response = await client.get(config.detectionEndpoint);
-          // Only parse version for successful responses, not 401 auth errors
-          if (response.status >= 200 && response.status < 300) {
-            version = response.data?.version;
+          try {
+            response = await client.get(config.detectionEndpoint);
+            // Only parse version for successful responses, not 401 auth errors
+            if (response.status >= 200 && response.status < 300) {
+              version = response.data?.version;
+            }
+          } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              // 401 Unauthorized means the service is present but requires authentication
+              requiresAuth = true;
+              authError = 'Authentication required - API key needed';
+              void logger.info('Service detected but requires authentication', {
+                location: 'NetworkScannerService.detectServiceAtUrl',
+                serviceType,
+                url: baseUrl,
+                status: 401,
+              });
+              // Create a mock response for 401 to continue processing
+              response = { status: 401, data: {} };
+            } else {
+              throw error; // Re-throw other errors
+            }
           }
           break;
 
@@ -361,14 +383,20 @@ export class NetworkScannerService {
           const url = new URL(baseUrl);
           const port = parseInt(url.port, 10);
 
+          const serviceName = requiresAuth 
+            ? `${serviceType.charAt(0).toUpperCase() + serviceType.slice(1)} (${url.hostname}:${port}) - Auth Required`
+            : `${serviceType.charAt(0).toUpperCase() + serviceType.slice(1)} (${url.hostname}:${port})`;
+
           return {
             id: `discovered_${serviceType}_${url.hostname}_${port}_${Date.now()}`,
             type: serviceType,
-            name: `${serviceType.charAt(0).toUpperCase() + serviceType.slice(1)} (${url.hostname}:${port})`,
+            name: serviceName,
             url: baseUrl,
             port,
-            version: isAuthRequiredService && response.status === 401 ? undefined : version, // Don't set version for 401 responses
+            version: requiresAuth ? undefined : version, // Don't set version for 401 responses
             detectedAt: new Date(),
+            requiresAuth,
+            authError,
           };
         }
       }

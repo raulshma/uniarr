@@ -163,6 +163,11 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
                         Version {sanitizeServiceVersion(service.version)}
                       </Text>
                     ) : null}
+                    {service.requiresAuth ? (
+                      <Text variant="bodySmall" style={[styles.authRequired, { color: theme.colors.error }]} numberOfLines={1}>
+                        🔐 Authentication required
+                      </Text>
+                    ) : null}
                   </View>
 
                   {onServicePress ? (
@@ -241,5 +246,9 @@ const styles = StyleSheet.create({
   },
   serviceVersion: {
     marginTop: 2,
+  },
+  authRequired: {
+    marginTop: 2,
+    fontWeight: '500',
   },
 });
