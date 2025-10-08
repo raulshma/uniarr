@@ -5,6 +5,7 @@ import { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
 import { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 import { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 import { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
+import { ProwlarrConnector } from '@/connectors/implementations/ProwlarrConnector';
 
 type ConnectorConstructor<TConnector extends IConnector = IConnector> = new (
   config: ServiceConfig,
@@ -17,6 +18,7 @@ const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
   radarr: RadarrConnector as ConnectorConstructor,
   jellyseerr: JellyseerrConnector as ConnectorConstructor,
   qbittorrent: QBittorrentConnector as ConnectorConstructor,
+  prowlarr: ProwlarrConnector as ConnectorConstructor,
 };
 
 /** Factory responsible for creating connector instances based on service metadata. */

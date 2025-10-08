@@ -289,6 +289,9 @@ const ServicesScreen = () => {
         case 'qbittorrent':
           router.push({ pathname: '/(auth)/qbittorrent/[serviceId]', params: { serviceId: service.config.id } });
           break;
+        case 'prowlarr':
+          router.push({ pathname: '/(auth)/prowlarr/[serviceId]', params: { serviceId: service.config.id } });
+          break;
         default:
           // For now, just show a message for unsupported services
           break;

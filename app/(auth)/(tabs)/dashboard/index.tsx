@@ -492,6 +492,9 @@ const DashboardScreen = () => {
         case 'qbittorrent':
           router.push({ pathname: '/(auth)/qbittorrent/[serviceId]', params: { serviceId: service.config.id } });
           break;
+        case 'prowlarr':
+          router.push({ pathname: '/(auth)/prowlarr/[serviceId]', params: { serviceId: service.config.id } });
+          break;
         default:
           Alert.alert('Coming soon', `${serviceTypeLabels[service.config.type]} integration is coming soon.`);
           break;
@@ -534,6 +537,8 @@ const DashboardScreen = () => {
           return 'account-search';
         case 'qbittorrent':
           return 'download-network';
+        case 'prowlarr':
+          return 'radar';
         default:
           return 'server';
       }

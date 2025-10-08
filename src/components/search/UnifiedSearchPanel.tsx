@@ -2,7 +2,6 @@ import React, { JSX, useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
-  Button,
   Chip,
   HelperText,
   IconButton,
@@ -14,6 +13,7 @@ import { useRouter } from 'expo-router';
 
 import { Card } from '@/components/common/Card';
 import { AnimatedSection } from '@/components/common/AnimatedComponents';
+import { Button } from '@/components/common/Button';
 import type { AppTheme } from '@/constants/theme';
 import { spacing } from '@/theme/spacing';
 import { useUnifiedSearch } from '@/hooks/useUnifiedSearch';
@@ -395,6 +395,7 @@ export const UnifiedSearchPanel: React.FC = () => {
             <Button
               mode="contained"
               onPress={() => handlePrimaryAction(item)}
+              align="left"
               labelStyle={{
                 fontSize: theme.custom.typography.labelLarge.fontSize,
                 fontFamily: theme.custom.typography.labelLarge.fontFamily,
@@ -478,6 +479,7 @@ export const UnifiedSearchPanel: React.FC = () => {
                 compact
                 mode="text"
                 onPress={clearServiceFilters}
+                align="left"
                 textColor={theme.colors.primary}
                 labelStyle={{
                   fontSize: theme.custom.typography.labelMedium.fontSize,
@@ -529,6 +531,7 @@ export const UnifiedSearchPanel: React.FC = () => {
                 compact
                 mode="text"
                 onPress={clearMediaFilters}
+                align="left"
                 textColor={theme.colors.primary}
                 labelStyle={{
                   fontSize: theme.custom.typography.labelMedium.fontSize,

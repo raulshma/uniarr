@@ -205,11 +205,7 @@ export class AuthManager implements IAuthManager {
     // Try to extract service type from service ID
     // Service IDs typically follow patterns like "jellyseerr-123", "sonarr-456", etc.
     const parts = serviceId.split('-');
-    if (parts.length > 0) {
-      return parts[0];
-    }
-    
-    return 'unknown';
+    return parts[0] || 'unknown';
   }
 }
 
