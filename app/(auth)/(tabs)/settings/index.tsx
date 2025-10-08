@@ -396,7 +396,7 @@ const SettingsScreen = () => {
             <Card
               variant="custom"
               style={styles.settingCard}
-              onPress={() => router.push('/(auth)/(tabs)/settings/quiet-hours')}
+              onPress={() => router.push('/(auth)/settings/quiet-hours')}
             >
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
