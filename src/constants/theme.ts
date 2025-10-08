@@ -25,5 +25,8 @@ export const lightTheme: AppTheme = createTheme(MD3LightTheme, lightColors);
 
 export const darkTheme: AppTheme = createTheme(MD3DarkTheme, darkColors);
 
+// Default theme for initialization - use dark theme as default to prevent white flash
+export const defaultTheme: AppTheme = darkTheme;
+
 export const getAppTheme = (scheme: ColorSchemeName): AppTheme =>
   scheme === 'dark' ? darkTheme : lightTheme;
