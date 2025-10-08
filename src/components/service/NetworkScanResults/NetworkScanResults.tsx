@@ -1,19 +1,20 @@
 import React, { useMemo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, IconButton, Text, useTheme } from 'react-native-paper';
 
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
 import type { AppTheme } from '@/constants/theme';
-import type { DiscoveredService } from '@/services/network/NetworkScannerService';
+import type { DiscoveredService, ScanProgress } from '@/services/network/NetworkScannerService';
 
 export type NetworkScanResultsProps = {
   services: DiscoveredService[];
   isScanning: boolean;
   scanDuration?: number;
   scannedHosts?: number;
+  scanProgress?: ScanProgress | null;
   onServicePress?: (service: DiscoveredService) => void;
   onScanAgain?: () => void;
   style?: StyleProp<ViewStyle>;
@@ -25,6 +26,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
   isScanning,
   scanDuration,
   scannedHosts,
+  scanProgress,
   onServicePress,
   onScanAgain,
   style,
@@ -54,19 +56,8 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
     return `${hosts} hosts`;
   };
 
-  if (isScanning) {
-    return (
-      <Card contentPadding="lg" style={style} testID={testID}>
-        <LoadingState
-          size="large"
-          message="Scanning network for services..."
-          testID={`${testID}-loading`}
-        />
-      </Card>
-    );
-  }
-
-  if (services.length === 0) {
+  // Show empty state only when not scanning and no services found
+  if (!isScanning && services.length === 0) {
     return (
       <Card contentPadding="lg" style={style} testID={testID}>
         <EmptyState
@@ -81,9 +72,34 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
     );
   }
 
+  // Show loading state when scanning but no services found yet
+  if (isScanning && services.length === 0) {
+    return (
+      <Card contentPadding="lg" style={style} testID={testID}>
+        <LoadingState
+          size="large"
+          message="Scanning network for services..."
+          testID={`${testID}-loading`}
+        />
+      </Card>
+    );
+  }
+
   return (
     <View style={style}>
-      {scanDuration || scannedHosts ? (
+      {/* Show progress information when scanning is ongoing */}
+      {isScanning && scanProgress ? (
+        <Card contentPadding="md" variant="outlined" style={styles.scanSummary}>
+          <View style={styles.scanSummaryContent}>
+            <Text variant="bodySmall" style={[styles.scanSummaryText, { color: theme.colors.primary }]}>
+              Scanning {scanProgress.currentService}... ({scanProgress.currentHost}/{scanProgress.totalHosts} hosts)
+            </Text>
+            <Text variant="bodySmall" style={[styles.scanSummaryText, { color: theme.colors.onSurfaceVariant }]}>
+              Found {scanProgress.servicesFound.length} services so far
+            </Text>
+          </View>
+        </Card>
+      ) : scanDuration || scannedHosts ? (
         <Card contentPadding="md" variant="outlined" style={styles.scanSummary}>
           <View style={styles.scanSummaryContent}>
             {scanDuration ? (
@@ -116,50 +132,52 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
           ) : null}
         </View>
 
-        {services.map((service) => (
-          <View key={service.id}>
-            <Card
-              contentPadding="md"
-              onPress={onServicePress ? () => onServicePress(service) : undefined}
-              variant="custom"
-              style={styles.serviceItem}
-              focusable={Boolean(onServicePress)}
-            >
-              <View style={styles.serviceContent}>
-                <Avatar.Icon
-                  size={40}
-                  icon={serviceIconMap[service.type] || 'server'}
-                  style={[styles.serviceIcon, { backgroundColor: theme.colors.primaryContainer }]}
-                  color={theme.colors.onPrimaryContainer}
-                />
+        <ScrollView style={styles.servicesScrollContainer} showsVerticalScrollIndicator={false}>
+          {services.map((service) => (
+            <View key={service.id}>
+              <Card
+                contentPadding="md"
+                onPress={onServicePress ? () => onServicePress(service) : undefined}
+                variant="custom"
+                style={styles.serviceItem}
+                focusable={Boolean(onServicePress)}
+              >
+                <View style={styles.serviceContent}>
+                  <Avatar.Icon
+                    size={40}
+                    icon={serviceIconMap[service.type] || 'server'}
+                    style={[styles.serviceIcon, { backgroundColor: theme.colors.primaryContainer }]}
+                    color={theme.colors.onPrimaryContainer}
+                  />
 
-                <View style={[styles.serviceInfo, { marginLeft: theme.custom.spacing.md }]}>
-                  <Text variant="titleMedium" style={[styles.serviceName, { color: theme.colors.onSurface }]}>
-                    {service.name}
-                  </Text>
-                  <Text variant="bodyMedium" style={[styles.serviceUrl, { color: theme.colors.onSurfaceVariant }]}>
-                    {service.url}
-                  </Text>
-                  {service.version ? (
-                    <Text variant="bodySmall" style={[styles.serviceVersion, { color: theme.colors.onSurfaceVariant }]}>
-                      Version {service.version}
+                  <View style={[styles.serviceInfo, { marginLeft: theme.custom.spacing.md }]}>
+                    <Text variant="titleMedium" style={[styles.serviceName, { color: theme.colors.onSurface }]}>
+                      {service.name}
                     </Text>
+                    <Text variant="bodyMedium" style={[styles.serviceUrl, { color: theme.colors.onSurfaceVariant }]}>
+                      {service.url}
+                    </Text>
+                    {service.version ? (
+                      <Text variant="bodySmall" style={[styles.serviceVersion, { color: theme.colors.onSurfaceVariant }]}>
+                        Version {service.version}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {onServicePress ? (
+                    <IconButton
+                      icon="plus"
+                      size={20}
+                      onPress={() => onServicePress(service)}
+                      accessibilityLabel={`Add ${service.name}`}
+                      accessibilityHint={`Add ${service.name} to your services`}
+                    />
                   ) : null}
                 </View>
-
-                {onServicePress ? (
-                  <IconButton
-                    icon="plus"
-                    size={20}
-                    onPress={() => onServicePress(service)}
-                    accessibilityLabel={`Add ${service.name}`}
-                    accessibilityHint={`Add ${service.name} to your services`}
-                  />
-                ) : null}
-              </View>
-            </Card>
-          </View>
-        ))}
+              </Card>
+            </View>
+          ))}
+        </ScrollView>
       </Card>
     </View>
   );
@@ -181,6 +199,9 @@ const styles = StyleSheet.create({
   },
   servicesCard: {
     gap: 0,
+  },
+  servicesScrollContainer: {
+    maxHeight: 400, // Limit height to make it scrollable
   },
   servicesHeader: {
     flexDirection: 'row',
