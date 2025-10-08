@@ -86,7 +86,7 @@ export interface IAuthManager {
   /**
    * Authenticate a service
    */
-  authenticate(serviceType: string, config: AuthConfig): Promise<AuthResult>;
+  authenticate(serviceId: string, serviceType: string, config: AuthConfig): Promise<AuthResult>;
 
   /**
    * Get current session for a service

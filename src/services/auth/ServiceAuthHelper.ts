@@ -32,7 +32,7 @@ export class ServiceAuthHelper {
    */
   static async authenticateService(serviceConfig: ServiceConfig): Promise<AuthResult> {
     const authConfig = this.createAuthConfig(serviceConfig);
-    return authManager.authenticate(serviceConfig.type, authConfig);
+    return authManager.authenticate(serviceConfig.id, serviceConfig.type, authConfig);
   }
 
   /**
