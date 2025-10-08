@@ -12,6 +12,7 @@ import { queryClient } from '@/config/queryClient';
 import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthService';
 import { AuthProvider, useAuth } from '@/services/auth/AuthProvider';
 import { useTheme } from '@/hooks/useTheme';
+import { defaultTheme } from '@/constants/theme';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
@@ -25,13 +26,13 @@ const RootLayout = () => {
   const clerkPublishableKey = useMemo(getClerkPublishableKey, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <SafeAreaProvider>
         <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={clerkTokenCache}>
           <ClerkLoaded>
             <AuthProvider>
               <QueryClientProvider client={queryClient}>
-                <PaperProvider theme={theme}>
+                <PaperProvider theme={theme || defaultTheme}>
                   <StatusBar style={theme.dark ? 'light' : 'dark'} />
                   <ErrorBoundary context={{ location: 'RootLayout' }}>
                     <AppContent />
@@ -72,12 +73,13 @@ const RootNavigator = () => {
 
 const AppContent = () => {
   const { isOnline } = useOfflineSync();
+  const theme = useTheme();
   useNotificationRegistration();
   useNotificationResponseHandler();
   useQuietHoursManager();
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <OfflineIndicator isVisible={!isOnline} />
       <RootNavigator />
     </View>

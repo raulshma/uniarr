@@ -34,15 +34,21 @@ export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' 
     if (trimmedKey.length !== 32) {
       issues.push(`${serviceType} API key should be 32 characters long (current: ${trimmedKey.length})`);
     }
-    
+
     // Check if it looks like a valid API key (alphanumeric)
     if (!/^[a-zA-Z0-9]+$/.test(trimmedKey)) {
       issues.push(`${serviceType} API key should only contain letters and numbers`);
     }
   }
-  
-  if (serviceType === 'qbittorrent' || serviceType === 'jellyseerr') {
-    // qBittorrent and Jellyseerr don't use API keys, they use username/password
+
+  if (serviceType === 'jellyseerr') {
+    // Jellyseerr API keys don't have a fixed length requirement
+    // Check if it looks like a valid API key (alphanumeric)
+    // no checks
+  }
+
+  if (serviceType === 'qbittorrent') {
+    // qBittorrent doesn't use API keys, it uses username/password
     issues.push(`${serviceType} uses username/password authentication, not API keys`);
   }
   
@@ -62,7 +68,7 @@ export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbitto
     case 'radarr':
       return 'Go to Radarr → Settings → General → Security → API Key';
     case 'jellyseerr':
-      return 'Jellyseerr uses username/password authentication. Use your Jellyfin credentials.';
+      return 'Go to Jellyseerr → Settings → General → API Key';
     case 'prowlarr':
       return 'Go to Prowlarr → Settings → General → API Key';
     case 'qbittorrent':
@@ -96,8 +102,8 @@ export function testApiKeyFormat(apiKey: string, serviceType: 'sonarr' | 'radarr
     'Make sure to copy the entire API key without any extra spaces or characters',
     'If the API key is correct, check if the service is running and accessible',
   ];
-  
-  if (serviceType === 'qbittorrent' || serviceType === 'jellyseerr') {
+
+  if (serviceType === 'qbittorrent') {
     suggestions.push(`${serviceType} uses username/password authentication, not API keys`);
   }
   

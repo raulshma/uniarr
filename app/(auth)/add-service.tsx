@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import {
@@ -20,15 +20,12 @@ import axios from 'axios';
 
 import { Button } from '@/components/common/Button';
 import { DebugPanel, type DebugStep } from '@/components/common/DebugPanel';
-import NetworkScanResults from '@/components/service/NetworkScanResults';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorFactory } from '@/connectors/factory/ConnectorFactory';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import type { AppTheme } from '@/constants/theme';
 import type { ServiceConfig, ServiceType } from '@/models/service.types';
-import type { DiscoveredService } from '@/services/network/NetworkScannerService';
 import { queryKeys } from '@/hooks/queryKeys';
-import { useNetworkScan } from '@/hooks/useNetworkScan';
 import { logger } from '@/services/logger/LoggerService';
 import { secureStorage } from '@/services/storage/SecureStorage';
 import { spacing } from '@/theme/spacing';
@@ -84,6 +81,7 @@ const buildServiceConfig = (values: ServiceConfigInput, id: string): ServiceConf
 
 const AddServiceScreen = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const queryClient = useQueryClient();
   const theme = useTheme<AppTheme>();
 
@@ -122,7 +120,6 @@ const AddServiceScreen = () => {
   }>({ status: 'idle', message: null });
   const urlValidationController = useRef<AbortController | null>(null);
   const [serviceTypeModalVisible, setServiceTypeModalVisible] = useState(false);
-  const [networkScanModalVisible, setNetworkScanModalVisible] = useState(false);
   const [debugSteps, setDebugSteps] = useState<DebugStep[]>([]);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
@@ -132,7 +129,6 @@ const AddServiceScreen = () => {
     console.log('🧪 [AddService] showDebugPanel changed to:', showDebugPanel);
   }, [showDebugPanel]);
 
-  const { isScanning, scanResult, error: scanError, scanNetwork, stopScan, reset: resetScan } = useNetworkScan();
 
   // Subscribe to debug logger
   useEffect(() => {
@@ -142,6 +138,7 @@ const AddServiceScreen = () => {
     });
     return unsubscribe;
   }, []);
+
 
 
   const styles = useMemo(
@@ -327,35 +324,32 @@ const AddServiceScreen = () => {
     urlValidationController.current = null;
   }, []);
 
-  const handleServiceSelect = useCallback((service: DiscoveredService) => {
-    // Close the network scan modal
-    setNetworkScanModalVisible(false);
+  // Handle service selection from network scan
+  useEffect(() => {
+    if (params.selectedService) {
+      try {
+        const selectedService = JSON.parse(params.selectedService as string);
+        reset({
+          name: selectedService.name,
+          type: selectedService.type,
+          url: selectedService.url,
+          apiKey: '',
+          username: '',
+          password: '',
+        });
+        resetDiagnostics();
 
-    // Reset form and populate with discovered service data
-    reset({
-      name: service.name,
-      type: service.type,
-      url: service.url,
-      apiKey: '',
-      username: '',
-      password: '',
-    });
+        // Clear the param to avoid re-processing
+        router.setParams({ selectedService: undefined });
+      } catch (error) {
+        console.error('Failed to parse selected service:', error);
+      }
+    }
+  }, [params.selectedService, reset, resetDiagnostics, router]);
 
-    // Clear any existing diagnostics
-    resetDiagnostics();
-
-    void logger.info('Service selected from network scan', {
-      location: 'AddServiceScreen.handleServiceSelect',
-      serviceType: service.type,
-      url: service.url,
-    });
-  }, [reset, resetDiagnostics]);
-
-  const handleScanNetwork = useCallback(async (): Promise<void> => {
-    setNetworkScanModalVisible(true);
-    resetScan();
-    await scanNetwork();
-  }, [scanNetwork, resetScan]);
+  const handleScanNetwork = useCallback((): void => {
+    router.push('/network-scan');
+  }, [router]);
 
   const runConnectionTest = useCallback(
     async (config: ServiceConfig): Promise<ConnectionResult> => {
@@ -393,10 +387,10 @@ const AddServiceScreen = () => {
         const config = buildServiceConfig(values, generateServiceId());
         
         // Validate API key format first
-        if (values.apiKey && values.type !== 'qbittorrent' && values.type !== 'jellyseerr') {
+        if (values.apiKey && values.type !== 'qbittorrent') {
           const apiKeyTest = testApiKeyFormat(values.apiKey, values.type);
           debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
-          
+
           if (!apiKeyTest.isValid) {
             setTestError(`${apiKeyTest.message}. ${apiKeyTest.suggestions.join(' ')}`);
             return;
@@ -634,47 +628,6 @@ const AddServiceScreen = () => {
                       </Modal>
                     </Portal>
 
-                    <Portal>
-                      <Modal
-                        visible={networkScanModalVisible}
-                        onDismiss={() => {
-                          setNetworkScanModalVisible(false);
-                          stopScan();
-                        }}
-                        contentContainerStyle={styles.modalContent}
-                      >
-                        <View style={styles.networkScanHeader}>
-                          <Text variant="titleMedium" style={[styles.networkScanTitle, { color: theme.colors.onSurface }]}>
-                            Network Scan Results
-                          </Text>
-                          <IconButton
-                            icon="close"
-                            size={24}
-                            onPress={() => {
-                              setNetworkScanModalVisible(false);
-                              stopScan();
-                            }}
-                            accessibilityLabel="Close network scan"
-                          />
-                        </View>
-                        <NetworkScanResults
-                          services={scanResult?.services || []}
-                          isScanning={isScanning}
-                          scanDuration={scanResult?.scanDuration}
-                          scannedHosts={scanResult?.scannedHosts}
-                          onServicePress={handleServiceSelect}
-                          onScanAgain={scanNetwork}
-                          style={styles.networkScanResults}
-                        />
-                        {scanError ? (
-                          <View style={[styles.diagnosticsCard, styles.diagnosticsError]}>
-                            <Text variant="bodySmall" style={styles.diagnosticsText}>
-                              {scanError}
-                            </Text>
-                          </View>
-                        ) : null}
-                      </Modal>
-                    </Portal>
                   </>
               )}
             />
@@ -820,7 +773,7 @@ const AddServiceScreen = () => {
             name="type"
             control={control}
             render={({ field: { value: serviceType } }: { field: { value: ServiceType } }) => {
-              if (serviceType === 'qbittorrent' || serviceType === 'jellyseerr') {
+              if (serviceType === 'qbittorrent') {
                 return (
                   <>
                     <View style={styles.formField}>

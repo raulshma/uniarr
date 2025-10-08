@@ -2,7 +2,7 @@ import { BaseAuthProvider } from './BaseAuthProvider';
 import type { AuthConfig, AuthResult, AuthSession, AuthMethod } from '../types';
 
 /**
- * Authentication provider for services that use basic HTTP authentication (Jellyseerr)
+ * Authentication provider for services that use basic HTTP authentication (qBittorrent)
  */
 export class BasicAuthProvider extends BaseAuthProvider {
   getAuthMethod(): AuthMethod {

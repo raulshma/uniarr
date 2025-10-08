@@ -21,7 +21,7 @@ export class AuthProviderFactory {
     // Register providers for each service type
     authManager.registerProvider('sonarr', new ApiKeyAuthProvider());
     authManager.registerProvider('radarr', new ApiKeyAuthProvider());
-    authManager.registerProvider('jellyseerr', new BasicAuthProvider());
+    authManager.registerProvider('jellyseerr', new ApiKeyAuthProvider());
     authManager.registerProvider('qbittorrent', new SessionAuthProvider());
     authManager.registerProvider('prowlarr', new ApiKeyAuthProvider());
 

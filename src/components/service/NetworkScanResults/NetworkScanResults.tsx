@@ -1,19 +1,22 @@
 import React, { useMemo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
-import { Avatar, IconButton, Text, useTheme } from 'react-native-paper';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Avatar, Badge, Chip, IconButton, Text, useTheme } from 'react-native-paper';
 
 import { Card } from '@/components/common/Card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
 import type { AppTheme } from '@/constants/theme';
-import type { DiscoveredService } from '@/services/network/NetworkScannerService';
+import type { DiscoveredService, ScanProgress } from '@/services/network/NetworkScannerService';
+import { sanitizeAndTruncateText, sanitizeServiceVersion } from '@/utils/validation.utils';
+import type { ServiceType } from '@/models/service.types';
 
 export type NetworkScanResultsProps = {
   services: DiscoveredService[];
   isScanning: boolean;
   scanDuration?: number;
   scannedHosts?: number;
+  scanProgress?: ScanProgress | null;
   onServicePress?: (service: DiscoveredService) => void;
   onScanAgain?: () => void;
   style?: StyleProp<ViewStyle>;
@@ -25,6 +28,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
   isScanning,
   scanDuration,
   scannedHosts,
+  scanProgress,
   onServicePress,
   onScanAgain,
   style,
@@ -43,6 +47,17 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
     [],
   );
 
+  const serviceColorMap = useMemo(
+    () => ({
+      sonarr: theme.colors.primary,
+      radarr: theme.colors.secondary,
+      jellyseerr: theme.colors.tertiary,
+      qbittorrent: theme.colors.error,
+      prowlarr: theme.colors.surfaceVariant,
+    }),
+    [theme],
+  );
+
   const formatScanDuration = (duration?: number): string => {
     if (!duration) return '';
     if (duration < 1000) return `${duration}ms`;
@@ -54,19 +69,40 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
     return `${hosts} hosts`;
   };
 
-  if (isScanning) {
-    return (
-      <Card contentPadding="lg" style={style} testID={testID}>
-        <LoadingState
-          size="large"
-          message="Scanning network for services..."
-          testID={`${testID}-loading`}
-        />
-      </Card>
-    );
-  }
+  const groupServicesByType = (services: DiscoveredService[]): Record<ServiceType, DiscoveredService[]> => {
+    return services.reduce((acc, service) => {
+      if (!acc[service.type]) {
+        acc[service.type] = [];
+      }
+      acc[service.type].push(service);
+      return acc;
+    }, {} as Record<ServiceType, DiscoveredService[]>);
+  };
 
-  if (services.length === 0) {
+  const getServiceHealthStatus = (service: DiscoveredService): 'healthy' | 'warning' | 'error' => {
+    if (service.requiresAuth) return 'warning';
+    if (service.authError) return 'error';
+    return 'healthy';
+  };
+
+  const getServiceHealthIcon = (status: 'healthy' | 'warning' | 'error'): string => {
+    switch (status) {
+      case 'healthy': return 'check-circle';
+      case 'warning': return 'alert-circle';
+      case 'error': return 'close-circle';
+    }
+  };
+
+  const getServiceHealthColor = (status: 'healthy' | 'warning' | 'error') => {
+    switch (status) {
+      case 'healthy': return theme.colors.primary;
+      case 'warning': return theme.colors.tertiary;
+      case 'error': return theme.colors.error;
+    }
+  };
+
+  // Show empty state only when not scanning and no services found
+  if (!isScanning && services.length === 0) {
     return (
       <Card contentPadding="lg" style={style} testID={testID}>
         <EmptyState
@@ -81,9 +117,34 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
     );
   }
 
+  // Show loading state when scanning but no services found yet
+  if (isScanning && services.length === 0) {
+    return (
+      <Card contentPadding="lg" style={style} testID={testID}>
+        <LoadingState
+          size="large"
+          message="Scanning network for services..."
+          testID={`${testID}-loading`}
+        />
+      </Card>
+    );
+  }
+
   return (
     <View style={style}>
-      {scanDuration || scannedHosts ? (
+      {/* Show progress information when scanning is ongoing */}
+      {isScanning && scanProgress ? (
+        <Card contentPadding="md" variant="outlined" style={styles.scanSummary}>
+          <View style={styles.scanSummaryContent}>
+            <Text variant="bodySmall" style={[styles.scanSummaryText, { color: theme.colors.primary }]}>
+              Scanning {scanProgress.currentService}... ({scanProgress.currentHost}/{scanProgress.totalHosts} hosts)
+            </Text>
+            <Text variant="bodySmall" style={[styles.scanSummaryText, { color: theme.colors.onSurfaceVariant }]}>
+              Found {scanProgress.servicesFound.length} services so far
+            </Text>
+          </View>
+        </Card>
+      ) : scanDuration || scannedHosts ? (
         <Card contentPadding="md" variant="outlined" style={styles.scanSummary}>
           <View style={styles.scanSummaryContent}>
             {scanDuration ? (
@@ -103,7 +164,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
       <Card contentPadding="none" style={styles.servicesCard}>
         <View style={styles.servicesHeader}>
           <Text variant="titleMedium" style={[styles.servicesTitle, { color: theme.colors.onSurface }]}>
-            Found Services
+            Found Services ({services.length})
           </Text>
           {onScanAgain ? (
             <IconButton
@@ -116,50 +177,128 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
           ) : null}
         </View>
 
-        {services.map((service) => (
-          <View key={service.id}>
-            <Card
-              contentPadding="md"
-              onPress={onServicePress ? () => onServicePress(service) : undefined}
-              variant="custom"
-              style={styles.serviceItem}
-              focusable={Boolean(onServicePress)}
-            >
-              <View style={styles.serviceContent}>
-                <Avatar.Icon
-                  size={40}
-                  icon={serviceIconMap[service.type] || 'server'}
-                  style={[styles.serviceIcon, { backgroundColor: theme.colors.primaryContainer }]}
-                  color={theme.colors.onPrimaryContainer}
-                />
-
-                <View style={[styles.serviceInfo, { marginLeft: theme.custom.spacing.md }]}>
-                  <Text variant="titleMedium" style={[styles.serviceName, { color: theme.colors.onSurface }]}>
-                    {service.name}
-                  </Text>
-                  <Text variant="bodyMedium" style={[styles.serviceUrl, { color: theme.colors.onSurfaceVariant }]}>
-                    {service.url}
-                  </Text>
-                  {service.version ? (
-                    <Text variant="bodySmall" style={[styles.serviceVersion, { color: theme.colors.onSurfaceVariant }]}>
-                      Version {service.version}
-                    </Text>
-                  ) : null}
-                </View>
-
-                {onServicePress ? (
-                  <IconButton
-                    icon="plus"
-                    size={20}
-                    onPress={() => onServicePress(service)}
-                    accessibilityLabel={`Add ${service.name}`}
-                    accessibilityHint={`Add ${service.name} to your services`}
+        <ScrollView style={styles.servicesScrollContainer} showsVerticalScrollIndicator={false}>
+          {Object.entries(groupServicesByType(services)).map(([serviceType, typeServices]) => (
+            <View key={serviceType}>
+              {/* Service Type Header */}
+              <View style={styles.serviceTypeHeader}>
+                <View style={styles.serviceTypeHeaderContent}>
+                  <Avatar.Icon
+                    size={24}
+                    icon={serviceIconMap[serviceType as ServiceType] || 'server'}
+                    style={[
+                      styles.serviceTypeIcon,
+                      { backgroundColor: serviceColorMap[serviceType as ServiceType] || theme.colors.primaryContainer }
+                    ]}
+                    color={theme.colors.onPrimaryContainer}
                   />
-                ) : null}
+                  <Text variant="labelLarge" style={[styles.serviceTypeTitle, { color: theme.colors.onSurface }]}>
+                    {serviceType.charAt(0).toUpperCase() + serviceType.slice(1)} ({typeServices.length})
+                  </Text>
+                </View>
+                <Badge size={20} style={{ backgroundColor: serviceColorMap[serviceType as ServiceType] }}>
+                  {typeServices.length}
+                </Badge>
               </View>
-            </Card>
-          </View>
-        ))}
+
+              {/* Services of this type */}
+              {typeServices.map((service) => {
+                const healthStatus = getServiceHealthStatus(service);
+                const healthIcon = getServiceHealthIcon(healthStatus);
+                const healthColor = getServiceHealthColor(healthStatus);
+
+                return (
+                  <Card
+                    key={service.id}
+                    contentPadding="md"
+                    onPress={onServicePress ? () => onServicePress(service) : undefined}
+                    variant="custom"
+                    style={[
+                      styles.serviceItem,
+                      { borderLeftWidth: 3, borderLeftColor: serviceColorMap[service.type] || theme.colors.primary }
+                    ]}
+                    focusable={Boolean(onServicePress)}
+                  >
+                    <View style={styles.serviceContent}>
+                      <Avatar.Icon
+                        size={40}
+                        icon={serviceIconMap[service.type] || 'server'}
+                        style={[
+                          styles.serviceIcon,
+                          { backgroundColor: theme.colors.surfaceVariant }
+                        ]}
+                        color={theme.colors.onSurfaceVariant}
+                      />
+
+                      <View style={[styles.serviceInfo, { marginLeft: theme.custom.spacing.md, flex: 1 }]}>
+                        <View style={styles.serviceHeaderRow}>
+                          <Text variant="titleMedium" style={[styles.serviceName, { color: theme.colors.onSurface }]} numberOfLines={1}>
+                            {sanitizeAndTruncateText(service.name, 35)}
+                          </Text>
+                          <View style={[styles.healthIndicator, { backgroundColor: healthColor + '20' }]}>
+                            <IconButton
+                              icon={healthIcon}
+                              size={16}
+                              iconColor={healthColor}
+                              style={styles.healthIcon}
+                            />
+                          </View>
+                        </View>
+
+                        <Text variant="bodyMedium" style={[styles.serviceUrl, { color: theme.colors.onSurfaceVariant }]} numberOfLines={1}>
+                          {sanitizeAndTruncateText(service.url, 55)}
+                        </Text>
+
+                        <View style={styles.serviceDetailsRow}>
+                          {service.version && (
+                            <Chip
+                              icon="tag"
+                              compact
+                              style={[styles.serviceChip, { backgroundColor: theme.colors.surfaceVariant }]}
+                              textStyle={[styles.serviceChipText, { color: theme.colors.onSurfaceVariant }]}
+                            >
+                              v{sanitizeServiceVersion(service.version)}
+                            </Chip>
+                          )}
+
+                          <Chip
+                            icon="lan"
+                            compact
+                            style={[styles.serviceChip, { backgroundColor: theme.colors.surfaceVariant }]}
+                            textStyle={[styles.serviceChipText, { color: theme.colors.onSurfaceVariant }]}
+                          >
+                            Port {service.port}
+                          </Chip>
+
+                          {service.requiresAuth && (
+                            <Chip
+                              icon="lock"
+                              compact
+                              style={[styles.serviceChip, { backgroundColor: theme.colors.errorContainer }]}
+                              textStyle={[styles.serviceChipText, { color: theme.colors.onErrorContainer }]}
+                            >
+                              Auth Required
+                            </Chip>
+                          )}
+                        </View>
+                      </View>
+
+                      {onServicePress ? (
+                        <IconButton
+                          icon="plus"
+                          size={20}
+                          onPress={() => onServicePress(service)}
+                          accessibilityLabel={`Add ${service.name}`}
+                          accessibilityHint={`Add ${service.name} to your services`}
+                        />
+                      ) : null}
+                    </View>
+                  </Card>
+                );
+              })}
+            </View>
+          ))}
+        </ScrollView>
       </Card>
     </View>
   );
@@ -181,6 +320,9 @@ const styles = StyleSheet.create({
   },
   servicesCard: {
     gap: 0,
+  },
+  servicesScrollContainer: {
+    height: 125, // Limit height to make it scrollable
   },
   servicesHeader: {
     flexDirection: 'row',
@@ -219,5 +361,55 @@ const styles = StyleSheet.create({
   },
   serviceVersion: {
     marginTop: 2,
+  },
+  authRequired: {
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  serviceTypeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0, 0, 0, 0.12)',
+  },
+  serviceTypeHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  serviceTypeIcon: {
+    marginRight: 0,
+  },
+  serviceTypeTitle: {
+    fontWeight: '600',
+  },
+  serviceHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  healthIndicator: {
+    borderRadius: 12,
+    padding: 2,
+  },
+  healthIcon: {
+    margin: 0,
+  },
+  serviceDetailsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  serviceChip: {
+    height: 24,
+  },
+  serviceChipText: {
+    fontSize: 11,
   },
 });

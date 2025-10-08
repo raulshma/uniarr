@@ -19,9 +19,9 @@ This document describes the comprehensive authentication system implemented for 
 
 3. **Authentication Providers** (`src/services/auth/providers/`)
    - `BaseAuthProvider.ts` - Abstract base class with common functionality
-   - `ApiKeyAuthProvider.ts` - For services using API key authentication (Sonarr, Radarr)
-   - `BasicAuthProvider.ts` - For services using HTTP basic authentication (Jellyseerr)
-   - `SessionAuthProvider.ts` - For services using session-based authentication (qBittorrent)
+   - `ApiKeyAuthProvider.ts` - For services using API key authentication (Sonarr, Radarr, Jellyseerr)
+   - `BasicAuthProvider.ts` - For services using HTTP basic authentication (qBittorrent)
+   - `SessionAuthProvider.ts` - For services using session-based authentication
 
 4. **Service Authentication Helper** (`src/services/auth/ServiceAuthHelper.ts`)
    - High-level helper for service-specific authentication operations
@@ -35,14 +35,9 @@ This document describes the comprehensive authentication system implemented for 
 ## Authentication Methods
 
 ### API Key Authentication
-- **Services**: Sonarr, Radarr, Prowlarr
+- **Services**: Sonarr, Radarr, Prowlarr, Jellyseerr
 - **Implementation**: Uses `X-Api-Key` header
 - **Provider**: `ApiKeyAuthProvider`
-
-### Basic Authentication
-- **Services**: Jellyseerr
-- **Implementation**: HTTP Basic Authentication
-- **Provider**: `BasicAuthProvider`
 
 ### Session Authentication
 - **Services**: qBittorrent
@@ -62,8 +57,7 @@ const serviceConfig = {
   name: 'My Jellyseerr',
   type: 'jellyseerr',
   url: 'http://localhost:8080',
-  username: 'admin',
-  password: 'password',
+  apiKey: 'your-32-character-api-key',
   enabled: true,
   createdAt: new Date(),
   updatedAt: new Date(),

@@ -113,7 +113,7 @@ jest.mock('@/connectors/implementations/RadarrConnector', () => ({
   })),
 }));
 
-const createTestServiceConfig = (id: string, type: 'sonarr' | 'radarr' | 'jellyseerr' | 'qbittorrent'): ServiceConfig => ({
+const createTestServiceConfig = (id: string, type: 'sonarr' | 'radarr' | 'jellyseerr' | 'qbittorrent' | 'prowlarr'): ServiceConfig => ({
   id,
   name: `Test ${type} Service`,
   type,

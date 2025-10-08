@@ -20,12 +20,13 @@ export class AuthManager implements IAuthManager {
     return this.providers.get(serviceType);
   }
 
-  async authenticate(serviceType: string, config: AuthConfig): Promise<AuthResult> {
+  async authenticate(serviceId: string, serviceType: string, config: AuthConfig): Promise<AuthResult> {
     const provider = this.getProvider(serviceType);
     
     if (!provider) {
       const error = `No authentication provider found for service type: ${serviceType}`;
       void logger.error('Authentication failed - no provider.', {
+        serviceId,
         serviceType,
         authMethod: config.method,
       });
@@ -38,6 +39,7 @@ export class AuthManager implements IAuthManager {
 
     try {
       void logger.debug('Starting authentication.', {
+        serviceId,
         serviceType,
         authMethod: config.method,
         hasCredentials: Boolean(config.credentials.username || config.credentials.apiKey || config.credentials.token),
@@ -55,9 +57,10 @@ export class AuthManager implements IAuthManager {
           retryCount: 0,
         };
         
-        this.sessions.set(serviceType, session);
+        this.sessions.set(serviceId, session);
         
         void logger.debug('Authentication successful.', {
+          serviceId,
           serviceType,
           authMethod: config.method,
           hasToken: Boolean(result.token),
@@ -66,6 +69,7 @@ export class AuthManager implements IAuthManager {
         });
       } else {
         void logger.warn('Authentication failed.', {
+          serviceId,
           serviceType,
           authMethod: config.method,
           error: result.error,
@@ -77,6 +81,7 @@ export class AuthManager implements IAuthManager {
       const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
       
       void logger.error('Authentication error.', {
+        serviceId,
         serviceType,
         authMethod: config.method,
         error: errorMessage,
@@ -110,7 +115,8 @@ export class AuthManager implements IAuthManager {
 
   getAuthHeaders(serviceId: string): Record<string, string> {
     const session = this.getSession(serviceId);
-    const provider = this.getProvider(serviceId);
+    const serviceType = this.determineServiceTypeFromId(serviceId);
+    const provider = this.getProvider(serviceType);
     
     if (!session || !session.isAuthenticated || !provider) {
       return {};
@@ -139,7 +145,8 @@ export class AuthManager implements IAuthManager {
    * Attempt to refresh authentication for a service
    */
   async refreshAuthentication(serviceId: string, config: AuthConfig): Promise<AuthResult> {
-    const provider = this.getProvider(serviceId);
+    const serviceType = this.determineServiceTypeFromId(serviceId);
+    const provider = this.getProvider(serviceType);
     const session = this.getSession(serviceId);
     
     if (!provider || !session || !provider.refresh) {
@@ -188,6 +195,17 @@ export class AuthManager implements IAuthManager {
         error: errorMessage,
       };
     }
+  }
+
+  /**
+   * Determine service type from service ID
+   * This is a temporary solution - ideally we'd store service type with the session
+   */
+  private determineServiceTypeFromId(serviceId: string): string {
+    // Try to extract service type from service ID
+    // Service IDs typically follow patterns like "jellyseerr-123", "sonarr-456", etc.
+    const parts = serviceId.split('-');
+    return parts[0] || 'unknown';
   }
 }
 
