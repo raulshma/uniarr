@@ -49,7 +49,10 @@ const IndexerListItemSkeleton = () => {
     <Animated.View
       entering={FadeInDown}
       layout={Layout}
-      style={[styles.indexerItem, { borderColor: theme.colors.outline }]}
+      style={[
+        styles.indexerItem,
+        { borderColor: theme.colors.outline, backgroundColor: theme.colors.surface },
+      ]}
     >
       <View style={styles.indexerContent}>
         <SkeletonPlaceholder style={styles.indexerIcon} />
@@ -75,7 +78,13 @@ const ProwlarrIndexerListScreen = () => {
   // State management
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<FilterValue>(FILTER_ALL);
+  const [isFilterMenuVisible, setIsFilterMenuVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleFilterChange = useCallback((value: FilterValue) => {
+    setSelectedFilter(value);
+    setIsFilterMenuVisible(false);
+  }, []);
+
 
   // Use the Prowlarr indexers hook
   const {
@@ -185,7 +194,10 @@ const ProwlarrIndexerListScreen = () => {
     <Animated.View
       entering={FadeInUp}
       layout={Layout}
-      style={[styles.indexerItem, { borderColor: theme.colors.outline }]}
+      style={[
+        styles.indexerItem,
+        { borderColor: theme.colors.outline, backgroundColor: theme.colors.surface },
+      ]}
     >
       <View style={styles.indexerContent}>
         <Icon
@@ -304,10 +316,12 @@ const ProwlarrIndexerListScreen = () => {
         />
 
         <Menu
-          visible={false}
-          onDismiss={() => {}}
+          key={`prowlarr-filter-menu-${isFilterMenuVisible}-${selectedFilter}`}
+          visible={isFilterMenuVisible}
+          onDismiss={() => setIsFilterMenuVisible(false)}
+          anchorPosition="bottom"
           anchor={
-            <TouchableRipple onPress={() => {}}>
+            <TouchableRipple borderless={false} onPress={() => setIsFilterMenuVisible(true)}>
               <View style={[styles.filterChip, { borderColor: theme.colors.outline }]}>
                 <Icon source="filter-variant" size={16} color={theme.colors.onSurface} />
                 <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
@@ -321,8 +335,9 @@ const ProwlarrIndexerListScreen = () => {
           {FILTER_OPTIONS.map((filter) => (
             <Menu.Item
               key={filter}
-              onPress={() => setSelectedFilter(filter)}
+              onPress={() => handleFilterChange(filter)}
               title={FILTER_LABELS[filter]}
+              trailingIcon={selectedFilter === filter ? 'check' : undefined}
             />
           ))}
         </Menu>
@@ -407,8 +422,7 @@ const styles = StyleSheet.create({
   indexerItem: {
     marginHorizontal: spacing.md,
     marginVertical: spacing.xs,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 24,
     elevation: 1,
   },
   indexerContent: {

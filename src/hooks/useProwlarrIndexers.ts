@@ -38,11 +38,11 @@ export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResul
       setError(null);
 
       // Load indexers
-      const applications = await (connector as any).getApplications();
-      setIndexers(applications || []);
+      const indexersData = await (connector as any).getIndexers?.() ?? (connector as any).getApplications?.();
+      setIndexers(indexersData || []);
 
       // Load statistics (stub for now)
-      const stats = await (connector as any).getApplicationStatistics();
+      const stats = await (connector as any).getIndexerStatistics?.() ?? (connector as any).getApplicationStatistics?.();
       setStatistics(stats || []);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load Prowlarr data';
@@ -61,7 +61,11 @@ export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResul
     if (!connector) return false;
 
     try {
-      await (connector as any).testApplication(indexer);
+      if ((connector as any).testIndexerConfig) {
+        await (connector as any).testIndexerConfig(indexer);
+      } else {
+        await (connector as any).testApplication(indexer);
+      }
       return true;
     } catch (err) {
       void logger.error('Failed to test indexer', { error: err, serviceId, indexerId: indexer.id });
@@ -74,7 +78,11 @@ export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResul
 
     try {
       const updatedIndexer = { ...indexer, enable: !indexer.enable };
-      await (connector as any).update(indexer.id, updatedIndexer);
+      if ((connector as any).updateIndexer) {
+        await (connector as any).updateIndexer(indexer.id, updatedIndexer);
+      } else {
+        await (connector as any).update(indexer.id, updatedIndexer);
+      }
       await loadData(); // Refresh data after update
       return true;
     } catch (err) {
@@ -87,7 +95,11 @@ export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResul
     if (!connector) return false;
 
     try {
-      await (connector as any).delete(indexerId);
+      if ((connector as any).deleteIndexer) {
+        await (connector as any).deleteIndexer(indexerId);
+      } else {
+        await (connector as any).delete(indexerId);
+      }
       await loadData(); // Refresh data after deletion
       return true;
     } catch (err) {

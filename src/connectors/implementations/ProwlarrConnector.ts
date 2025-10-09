@@ -36,158 +36,158 @@ export class ProwlarrConnector extends BaseConnector<
     }
   }
 
-  // Indexer Management Methods
+  // Indexer Management Methods (use /api/v1/indexer)
 
   /**
    * Get all applications (indexers)
    */
-  async getApplications(): Promise<ProwlarrApplicationResource[]> {
+  async getIndexers(): Promise<ProwlarrApplicationResource[]> {
     try {
-      const response = await this.client.get('/api/v1/applications');
+      const response = await this.client.get('/api/v1/indexer');
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getApplications',
+        operation: 'getIndexers',
       });
 
-      throw new Error(`Failed to get applications: ${diagnostic.message}`);
+      throw new Error(`Failed to get indexers: ${diagnostic.message}`);
     }
   }
 
   /**
    * Get a specific application (indexer) by ID
    */
-  async getApplicationById(id: number): Promise<ProwlarrApplicationResource> {
+  async getIndexerById(id: number): Promise<ProwlarrApplicationResource> {
     try {
-      const response = await this.client.get(`/api/v1/applications/${id}`);
+      const response = await this.client.get(`/api/v1/indexer/${id}`);
       return response.data;
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getApplicationById',
+        operation: 'getIndexerById',
       });
 
-      throw new Error(`Failed to get application ${id}: ${diagnostic.message}`);
+      throw new Error(`Failed to get indexer ${id}: ${diagnostic.message}`);
     }
   }
 
   /**
    * Create a new application (indexer)
    */
-  async add(application: ProwlarrApplicationResource): Promise<ProwlarrApplicationResource> {
+  async addIndexer(application: ProwlarrApplicationResource): Promise<ProwlarrApplicationResource> {
     try {
-      const response = await this.client.post('/api/v1/applications', application);
+      const response = await this.client.post('/api/v1/indexer', application);
       return response.data;
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'add',
+        operation: 'addIndexer',
       });
 
-      throw new Error(`Failed to add application: ${diagnostic.message}`);
+      throw new Error(`Failed to add indexer: ${diagnostic.message}`);
     }
   }
 
   /**
    * Update an existing application (indexer)
    */
-  async update(id: number, data: Partial<ProwlarrApplicationResource>): Promise<ProwlarrApplicationResource> {
+  async updateIndexer(id: number, data: Partial<ProwlarrApplicationResource>): Promise<ProwlarrApplicationResource> {
     try {
-      const response = await this.client.put(`/api/v1/applications/${id}`, data);
+      const response = await this.client.put(`/api/v1/indexer/${id}`, data);
       return response.data;
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'update',
+        operation: 'updateIndexer',
       });
 
-      throw new Error(`Failed to update application ${id}: ${diagnostic.message}`);
+      throw new Error(`Failed to update indexer ${id}: ${diagnostic.message}`);
     }
   }
 
   /**
    * Delete an application (indexer)
    */
-  async delete(id: number): Promise<boolean> {
+  async deleteIndexer(id: number): Promise<boolean> {
     try {
-      await this.client.delete(`/api/v1/applications/${id}`);
+      await this.client.delete(`/api/v1/indexer/${id}`);
       return true;
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'delete',
+        operation: 'deleteIndexer',
       });
 
-      throw new Error(`Failed to delete application ${id}: ${diagnostic.message}`);
+      throw new Error(`Failed to delete indexer ${id}: ${diagnostic.message}`);
     }
   }
 
   /**
    * Test a specific application (indexer)
    */
-  async testApplication(application: ProwlarrApplicationResource): Promise<ProwlarrTestResult> {
+  async testIndexerConfig(application: ProwlarrApplicationResource): Promise<ProwlarrTestResult> {
     try {
-      const response = await this.client.post('/api/v1/applications/test', application);
+      const response = await this.client.post('/api/v1/indexer/test', application);
       return response.data;
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'testApplication',
+        operation: 'testIndexerConfig',
       });
 
-      throw new Error(`Failed to test application: ${diagnostic.message}`);
+      throw new Error(`Failed to test indexer config: ${diagnostic.message}`);
     }
   }
 
   /**
    * Test all applications (indexers)
    */
-  async testAllApplications(): Promise<ProwlarrTestResult[]> {
+  async testAllIndexers(): Promise<ProwlarrTestResult[]> {
     try {
-      const response = await this.client.post('/api/v1/applications/testall');
+      const response = await this.client.post('/api/v1/indexer/testall');
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'testAllApplications',
+        operation: 'testAllIndexers',
       });
 
-      throw new Error(`Failed to test all applications: ${diagnostic.message}`);
+      throw new Error(`Failed to test all indexers: ${diagnostic.message}`);
     }
   }
 
   /**
    * Enable or disable applications (indexers)
    */
-  async bulkUpdateApplications(bulkData: ProwlarrApplicationBulkResource): Promise<ProwlarrApplicationResource[]> {
+  async bulkUpdateIndexers(bulkData: ProwlarrApplicationBulkResource): Promise<ProwlarrApplicationResource[]> {
     try {
-      const response = await this.client.put('/api/v1/applications/bulk', bulkData);
+      const response = await this.client.put('/api/v1/indexer/bulk', bulkData);
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'bulkUpdateApplications',
+        operation: 'bulkUpdateIndexers',
       });
 
-      throw new Error(`Failed to bulk update applications: ${diagnostic.message}`);
+      throw new Error(`Failed to bulk update indexers: ${diagnostic.message}`);
     }
   }
 
   /**
    * Delete multiple applications (indexers)
    */
-  async bulkDeleteApplications(ids: number[]): Promise<boolean> {
+  async bulkDeleteIndexers(ids: number[]): Promise<boolean> {
     try {
-      await this.client.delete('/api/v1/applications/bulk', {
+      await this.client.delete('/api/v1/indexer/bulk', {
         data: { ids }
       });
       return true;
@@ -195,75 +195,71 @@ export class ProwlarrConnector extends BaseConnector<
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'bulkDeleteApplications',
+        operation: 'bulkDeleteIndexers',
       });
 
-      throw new Error(`Failed to bulk delete applications: ${diagnostic.message}`);
+      throw new Error(`Failed to bulk delete indexers: ${diagnostic.message}`);
     }
   }
 
   /**
    * Get application schema (for creating/editing forms)
    */
-  async getApplicationSchema(): Promise<ProwlarrApplicationResource[]> {
+  async getIndexerSchema(): Promise<ProwlarrApplicationResource[]> {
     try {
-      const response = await this.client.get('/api/v1/applications/schema');
+      const response = await this.client.get('/api/v1/indexer/schema');
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getApplicationSchema',
+        operation: 'getIndexerSchema',
       });
 
-      throw new Error(`Failed to get application schema: ${diagnostic.message}`);
+      throw new Error(`Failed to get indexer schema: ${diagnostic.message}`);
     }
   }
 
   /**
    * Execute action on applications (e.g., sync, rescan)
    */
-  async executeApplicationAction(actionName: string, application?: ProwlarrApplicationResource): Promise<void> {
+  async executeCommand(commandName: string, payload?: Record<string, unknown>): Promise<void> {
     try {
-      await this.client.post(`/api/v1/applications/action/${actionName}`, application || {});
+      await this.client.post('/api/v1/command', { name: commandName, ...(payload ?? {}) });
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'executeApplicationAction',
+        operation: 'executeCommand',
       });
 
-      throw new Error(`Failed to execute action ${actionName}: ${diagnostic.message}`);
+      throw new Error(`Failed to execute command ${commandName}: ${diagnostic.message}`);
     }
   }
 
   /**
    * Get application statistics (indexer performance)
    */
-  async getApplicationStatistics(): Promise<ProwlarrStatistics[]> {
+  async getIndexerStatistics(): Promise<ProwlarrStatistics[]> {
     try {
-      // This might not be a real endpoint, but based on the OpenAPI spec structure
-      // We'll implement a basic version that could be extended
-      const applications = await this.getApplications();
-
-      // For now, return stub statistics - in a real implementation,
-      // this would call an actual statistics endpoint
-      return applications.map(app => ({
-        applicationId: app.id,
-        applicationName: app.name,
+      // No public statistics endpoint currently; derive minimal shape
+      const indexers = await this.getIndexers();
+      return indexers.map((idx) => ({
+        applicationId: idx.id,
+        applicationName: idx.name,
         statistics: {
           queries: 0,
           grabs: 0,
           averageResponseTime: 0,
           lastQueryTime: undefined,
           lastGrabTime: undefined,
-        }
+        },
       }));
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getApplicationStatistics',
+        operation: 'getIndexerStatistics',
       });
 
       throw new Error(`Failed to get application statistics: ${diagnostic.message}`);
@@ -275,7 +271,7 @@ export class ProwlarrConnector extends BaseConnector<
    */
   async syncIndexersToApps(): Promise<void> {
     try {
-      await this.executeApplicationAction('sync');
+      await this.executeCommand('ApplicationIndexerSync');
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
@@ -292,7 +288,7 @@ export class ProwlarrConnector extends BaseConnector<
    */
   async rescanIndexers(): Promise<void> {
     try {
-      await this.executeApplicationAction('rescan');
+      await this.executeCommand('IndexerRss');
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
@@ -316,7 +312,7 @@ export class ProwlarrConnector extends BaseConnector<
       // This would typically call a sync status endpoint
       // For now, return stub data
       return {
-        connectedApps: ['sonarr', 'radarr'], // This should be fetched from actual API
+        connectedApps: [],
         lastSyncTime: undefined,
         syncInProgress: false,
       };
@@ -329,6 +325,41 @@ export class ProwlarrConnector extends BaseConnector<
 
       throw new Error(`Failed to get sync status: ${diagnostic.message}`);
     }
+  }
+
+  // Backward-compatible method names to avoid breaking existing callers
+  async getApplications(): Promise<ProwlarrApplicationResource[]> {
+    return this.getIndexers();
+  }
+  async getApplicationById(id: number): Promise<ProwlarrApplicationResource> {
+    return this.getIndexerById(id);
+  }
+  async add(application: ProwlarrApplicationResource): Promise<ProwlarrApplicationResource> {
+    return this.addIndexer(application);
+  }
+  async update(id: number, data: Partial<ProwlarrApplicationResource>): Promise<ProwlarrApplicationResource> {
+    return this.updateIndexer(id, data);
+  }
+  async delete(id: number): Promise<boolean> {
+    return this.deleteIndexer(id);
+  }
+  async testApplication(application: ProwlarrApplicationResource): Promise<ProwlarrTestResult> {
+    return this.testIndexerConfig(application);
+  }
+  async testAllApplications(): Promise<ProwlarrTestResult[]> {
+    return this.testAllIndexers();
+  }
+  async bulkUpdateApplications(bulkData: ProwlarrApplicationBulkResource): Promise<ProwlarrApplicationResource[]> {
+    return this.bulkUpdateIndexers(bulkData);
+  }
+  async bulkDeleteApplications(ids: number[]): Promise<boolean> {
+    return this.bulkDeleteIndexers(ids);
+  }
+  async getApplicationSchema(): Promise<ProwlarrApplicationResource[]> {
+    return this.getIndexerSchema();
+  }
+  async getApplicationStatistics(): Promise<ProwlarrStatistics[]> {
+    return this.getIndexerStatistics();
   }
 
   // Search functionality for unified search integration
