@@ -329,6 +329,8 @@ const DashboardScreen = () => {
         },
         shortcutInner: {
           alignItems: "center",
+          justifyContent: "center",
+          minHeight: 96,
         },
         shortcutIcon: {
           width: 40,
@@ -712,9 +714,17 @@ const DashboardScreen = () => {
         <View style={styles.shortcutIcon}>
           <IconButton icon={icon} size={20} iconColor={theme.colors.primary} />
         </View>
-        <Text style={styles.shortcutLabel}>{label}</Text>
+        <Text style={styles.shortcutLabel} numberOfLines={1} ellipsizeMode="tail">
+          {label}
+        </Text>
         {subtitle ? (
-          <Text style={styles.shortcutSubtitle}>{subtitle}</Text>
+          <Text
+            style={styles.shortcutSubtitle}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {subtitle}
+          </Text>
         ) : null}
       </View>
     </Card>
