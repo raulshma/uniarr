@@ -49,7 +49,7 @@ export interface ServiceDetectionConfig {
   expectedResponsePattern?: string;
 }
 
-const SERVICE_DETECTION_CONFIGS: Record<ServiceType, ServiceDetectionConfig> = {
+const SERVICE_DETECTION_CONFIGS: Partial<Record<ServiceType, ServiceDetectionConfig>> = {
   sonarr: {
     type: 'sonarr',
     commonPorts: [8989],
@@ -84,16 +84,6 @@ const SERVICE_DETECTION_CONFIGS: Record<ServiceType, ServiceDetectionConfig> = {
     type: 'sabnzbd',
     commonPorts: [8080],
     detectionEndpoint: '/api',
-  },
-  nzbget: {
-    type: 'nzbget',
-    commonPorts: [6789],
-    detectionEndpoint: '/jsonrpc',
-  },
-  rtorrent: {
-    type: 'rtorrent',
-    commonPorts: [5000, 5001],
-    detectionEndpoint: '/RPC2',
   },
   prowlarr: {
     type: 'prowlarr',
@@ -399,13 +389,55 @@ export class NetworkScannerService {
           break;
 
         case 'prowlarr':
-          response = await client.get(config.detectionEndpoint);
-          version = response.data?.version;
+          try {
+            response = await client.get(config.detectionEndpoint);
+            // Only parse version for successful responses, not 401 auth errors
+            if (response.status >= 200 && response.status < 300) {
+              version = response.data?.version;
+            }
+          } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              // 401 Unauthorized means the service is present but requires authentication
+              requiresAuth = true;
+              authError = 'Authentication required - API key needed';
+              void logger.info('Service detected but requires authentication', {
+                location: 'NetworkScannerService.detectServiceAtUrl',
+                serviceType,
+                url: baseUrl,
+                status: 401,
+              });
+              // Create a mock response for 401 to continue processing
+              response = { status: 401, data: {} };
+            } else {
+              throw error; // Re-throw other errors
+            }
+          }
           break;
 
         case 'bazarr':
-          response = await client.get(config.detectionEndpoint);
-          version = response.data?.bazarrVersion || response.data?.version;
+          try {
+            response = await client.get(config.detectionEndpoint);
+            // Only parse version for successful responses, not 401 auth errors
+            if (response.status >= 200 && response.status < 300) {
+              version = response.data?.bazarrVersion || response.data?.version;
+            }
+          } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              // 401 Unauthorized means the service is present but requires authentication
+              requiresAuth = true;
+              authError = 'Authentication required - API key needed';
+              void logger.info('Service detected but requires authentication', {
+                location: 'NetworkScannerService.detectServiceAtUrl',
+                serviceType,
+                url: baseUrl,
+                status: 401,
+              });
+              // Create a mock response for 401 to continue processing
+              response = { status: 401, data: {} };
+            } else {
+              throw error; // Re-throw other errors
+            }
+          }
           break;
 
         default:
@@ -415,7 +447,7 @@ export class NetworkScannerService {
       // Check if we got a response that indicates the service exists
       if (response && typeof response.status === 'number') {
         // For services that require API keys, 401 Unauthorized means the service is present
-        const isAuthRequiredService = serviceType === 'sonarr' || serviceType === 'radarr';
+        const isAuthRequiredService = serviceType === 'sonarr' || serviceType === 'radarr' || serviceType === 'prowlarr' || serviceType === 'bazarr';
         const isValidResponse = (response.status >= 200 && response.status < 300) ||
           (isAuthRequiredService && response.status === 401);
 

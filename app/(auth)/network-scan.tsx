@@ -216,7 +216,7 @@ const NetworkScanScreen = () => {
             Scan for Services
           </Text>
           <Text variant="bodyMedium" style={styles.heroSubtitle}>
-            Automatically discover Sonarr, Radarr, Jellyseerr, qBittorrent, and Prowlarr services on your local network. Quick scan checks common IPs first, while comprehensive scan covers all IPs (1-254) in your subnet.
+            Automatically discover Sonarr, Radarr, Jellyseerr, qBittorrent, Transmission, Deluge, SABnzbd, Prowlarr, and Bazarr services on your local network. Quick scan checks common IPs first, while comprehensive scan covers all IPs (1-254) in your subnet.
           </Text>
         </View>
 
