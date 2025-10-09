@@ -12,6 +12,7 @@ import { spacing } from '@/theme/spacing';
 import type { AppTheme } from '@/constants/theme';
 import type { ChartData, AnalyticsSummary } from '@/models/analytics.types';
 import * as FileSystem from 'expo-file-system';
+import { writeAsStringAsync } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 type DateRange = '7d' | '30d' | '90d' | '1y';
@@ -163,11 +164,10 @@ const AnalyticsScreen = () => {
     try {
       const csvContent = await analyticsService.exportToCSV(analyticsData);
       const fileName = `uniarr-analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+  const docDir = (FileSystem as any).documentDirectory ?? '';
+  const fileUri = `${docDir}${fileName}`;
 
-      await FileSystem.writeAsStringAsync(fileUri, csvContent, {
-        encoding: FileSystem.EncodingType.UTF8
-      });
+  await writeAsStringAsync(fileUri, csvContent);
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
@@ -203,10 +203,8 @@ const AnalyticsScreen = () => {
           icon="chart-line"
           title="Failed to Load Analytics"
           description={error instanceof Error ? error.message : 'Unknown error occurred'}
-          action={{
-            label: 'Retry',
-            onPress: () => refetch()
-          }}
+          actionLabel="Retry"
+          onActionPress={() => refetch()}
         />
       </SafeAreaView>
     );

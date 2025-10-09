@@ -38,7 +38,7 @@ const ProwlarrStatisticsScreen = () => {
 
   // Calculate aggregate statistics
   const aggregateStats = useMemo(() => {
-    const enabledIndexers = indexers.filter(indexer => indexer.enable).length;
+    const enabledIndexers = indexers.filter(indexer => Boolean((indexer as any).enable)).length;
     const totalIndexers = indexers.length;
     const totalQueries = statistics.reduce((sum, stat) => sum + stat.statistics.queries, 0);
     const totalGrabs = statistics.reduce((sum, stat) => sum + stat.statistics.grabs, 0);

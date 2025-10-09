@@ -30,7 +30,7 @@ export class AnalyticsStubs {
     let moviesCount = 400;
 
     while (currentDate <= endDate) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+  const dateStr = currentDate.toISOString().slice(0, 10);
 
       // Add some random growth each day
       const seriesGrowth = Math.floor(Math.random() * 3); // 0-2 new series per day
@@ -64,7 +64,7 @@ export class AnalyticsStubs {
     const currentDate = new Date(startDate);
 
     while (currentDate <= endDate) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+  const dateStr = currentDate.toISOString().slice(0, 10);
 
       // Simulate realistic download patterns
       const baseCompleted = 8; // Base downloads per day
@@ -103,7 +103,7 @@ export class AnalyticsStubs {
     const currentDate = new Date(startDate);
 
     while (currentDate <= endDate) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+  const dateStr = currentDate.toISOString().slice(0, 10);
 
       // Simulate request patterns
       const pending = Math.floor(Math.random() * 8) + 2; // 2-10 pending requests

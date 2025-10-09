@@ -7,7 +7,6 @@ import {
   FAB,
   Icon,
   IconButton,
-  Menu,
   Button,
   Dialog,
   Searchbar,
@@ -19,11 +18,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/common/EmptyState';
+import BottomDrawer, { DrawerItem } from '@/components/common/BottomDrawer';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { SkeletonPlaceholder } from '@/components/common/Skeleton';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import type { ProwlarrApplicationResource } from '@/models/prowlarr.types';
+import type { ProwlarrIndexerResource } from '@/models/prowlarr.types';
 import { logger } from '@/services/logger/LoggerService';
 import { spacing } from '@/theme/spacing';
 import { useProwlarrIndexers } from '@/hooks/useProwlarrIndexers';
@@ -80,23 +80,27 @@ const ProwlarrIndexerListScreen = () => {
   // State management
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<FilterValue>(FILTER_ALL);
-  const [isFilterMenuVisible, setIsFilterMenuVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [openItemMenuId, setOpenItemMenuId] = useState<number | null>(null);
+  // Bottom drawer state replaces per-item Menu popovers. When non-null,
+  // the drawer slides up from the bottom and shows either filter options
+  // or item-specific actions.
+  const [bottomDrawer, setBottomDrawer] = useState<{ type: 'item' | 'filter'; item?: ProwlarrIndexerResource } | null>(null);
   const [isFabMenuVisible, setIsFabMenuVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const multiSelectActive = selectedIds.size > 0;
   const [isAddDialogVisible, setIsAddDialogVisible] = useState(false);
   const [isAppsDialogVisible, setIsAppsDialogVisible] = useState(false);
-  const [schemaOptions, setSchemaOptions] = useState<ProwlarrApplicationResource[]>([]);
+  const [schemaOptions, setSchemaOptions] = useState<ProwlarrIndexerResource[]>([]);
   const [isSchemaLoading, setIsSchemaLoading] = useState(false);
   const [selectedSchemaIdx, setSelectedSchemaIdx] = useState<number | null>(null);
   const [syncStatus, setSyncStatus] = useState<{ connectedApps: string[]; lastSyncTime?: string; syncInProgress: boolean } | null>(null);
   const handleFilterChange = useCallback((value: FilterValue) => {
     setSelectedFilter(value);
-    setIsFilterMenuVisible(false);
+    // Close the drawer when a filter is picked
+    setBottomDrawer(null);
   }, []);
 
+  
 
   // Use the Prowlarr indexers hook
   const {
@@ -152,19 +156,19 @@ const ProwlarrIndexerListScreen = () => {
 
     // Apply filter
     if (selectedFilter === FILTER_ENABLED) {
-      filtered = filtered.filter((indexer: ProwlarrApplicationResource) => indexer.enable);
+      filtered = filtered.filter((indexer: ProwlarrIndexerResource) => Boolean(indexer.enable));
     } else if (selectedFilter === FILTER_DISABLED) {
-      filtered = filtered.filter((indexer: ProwlarrApplicationResource) => !indexer.enable);
+      filtered = filtered.filter((indexer: ProwlarrIndexerResource) => !Boolean(indexer.enable));
     }
 
     // Apply search
     if (searchQuery) {
       const searchTerm = normalizeSearchTerm(searchQuery);
       filtered = filtered.filter(
-        (indexer: ProwlarrApplicationResource) =>
-          normalizeSearchTerm(indexer.name).includes(searchTerm) ||
-          normalizeSearchTerm(indexer.implementationName).includes(searchTerm) ||
-          normalizeSearchTerm(indexer.implementation).includes(searchTerm)
+        (indexer: ProwlarrIndexerResource) =>
+          normalizeSearchTerm(indexer.name ?? '').includes(searchTerm) ||
+          normalizeSearchTerm(indexer.implementationName ?? '').includes(searchTerm) ||
+          normalizeSearchTerm(indexer.implementation ?? '').includes(searchTerm)
       );
     }
 
@@ -172,17 +176,17 @@ const ProwlarrIndexerListScreen = () => {
   }, [indexers, selectedFilter, searchQuery]);
 
   // Handle indexer actions
-  const handleToggleIndexer = useCallback(async (indexer: ProwlarrApplicationResource) => {
+  const handleToggleIndexer = useCallback(async (indexer: ProwlarrIndexerResource) => {
     const success = await toggleIndexer(indexer);
     // Errors are surfaced via the API banner; no alert popup.
   }, [toggleIndexer]);
 
-  const handleTestIndexer = useCallback(async (indexer: ProwlarrApplicationResource) => {
+  const handleTestIndexer = useCallback(async (indexer: ProwlarrIndexerResource) => {
     // Trigger test; any success/error is shown in the API banner.
     await testIndexer(indexer);
   }, [testIndexer]);
 
-  const handleDeleteIndexer = useCallback(async (indexer: ProwlarrApplicationResource) => {
+  const handleDeleteIndexer = useCallback(async (indexer: ProwlarrIndexerResource) => {
     Alert.alert(
       'Delete Indexer',
       `Are you sure you want to delete "${indexer.name}"? This action cannot be undone.`,
@@ -221,7 +225,7 @@ const ProwlarrIndexerListScreen = () => {
   }, [rescanIndexers]);
 
   // Render indexer item
-  const renderIndexerItem = ({ item }: { item: ProwlarrApplicationResource }) => (
+  const renderIndexerItem = ({ item }: { item: ProwlarrIndexerResource }) => (
     <Pressable
       onLongPress={() => {
         const next = new Set(selectedIds);
@@ -257,59 +261,25 @@ const ProwlarrIndexerListScreen = () => {
           <Text variant="bodyMedium" style={[styles.indexerImplementation, { color: theme.colors.onSurfaceVariant }]}>
             {item.implementationName}
           </Text>
-          <Text variant="bodySmall" style={[styles.indexerPriority, { color: theme.colors.onSurfaceVariant }]}>
-            Priority: {item.priority} | Sync: {item.syncLevel}
+          <Text variant="bodySmall" style={[styles.indexerPriority, { color: theme.colors.onSurfaceVariant }]}> 
+            Priority: {item.priority ?? 'N/A'}
           </Text>
         </View>
         <View style={styles.indexerActions}>
-          <Menu
-            key={`prowlarr-item-menu-${item.id}-${openItemMenuId === item.id}`}
-            visible={openItemMenuId === item.id}
-            onDismiss={() => setOpenItemMenuId(null)}
-            anchor={
-              <View>
-                <IconButton
-                  icon="dots-vertical"
-                  size={20}
-                  onPress={() => setOpenItemMenuId(item.id)}
-                />
-              </View>
-            }
-          >
-            <Menu.Item
-              leadingIcon="pencil"
+          <View onStartShouldSetResponder={() => true}>
+            <IconButton
+              icon="dots-vertical"
+              size={20}
               onPress={() => {
-                setOpenItemMenuId(null);
-                Alert.alert('Edit', 'Edit indexer functionality coming soon');
+                // Toggle the bottom drawer for this item
+                if (bottomDrawer && bottomDrawer.type === 'item' && bottomDrawer.item?.id === item.id) {
+                  setBottomDrawer(null);
+                } else {
+                  setBottomDrawer({ type: 'item', item });
+                }
               }}
-              title="Edit"
             />
-            <Menu.Item
-              leadingIcon="test-tube"
-              onPress={async () => {
-                setOpenItemMenuId(null);
-                await handleTestIndexer(item);
-              }}
-              title="Test"
-            />
-            <Menu.Item
-              leadingIcon={item.enable ? "pause" : "play"}
-              onPress={async () => {
-                setOpenItemMenuId(null);
-                await handleToggleIndexer(item);
-              }}
-              title={item.enable ? "Disable" : "Enable"}
-            />
-            <Menu.Item
-              leadingIcon="delete"
-              onPress={() => {
-                setOpenItemMenuId(null);
-                void handleDeleteIndexer(item);
-              }}
-              title="Delete"
-              titleStyle={{ color: theme.colors.error }}
-            />
-          </Menu>
+          </View>
         </View>
         </View>
       </Animated.View>
@@ -429,32 +399,15 @@ const ProwlarrIndexerListScreen = () => {
           style={styles.searchbar}
         />
 
-        <Menu
-          key={`prowlarr-filter-menu-${isFilterMenuVisible}-${selectedFilter}`}
-          visible={isFilterMenuVisible}
-          onDismiss={() => setIsFilterMenuVisible(false)}
-          anchorPosition="bottom"
-          anchor={
-            <TouchableRipple borderless={false} onPress={() => setIsFilterMenuVisible(true)}>
-              <View style={[styles.filterChip, { borderColor: theme.colors.outline }]}>
-                <Icon source="filter-variant" size={16} color={theme.colors.onSurface} />
-                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                  {FILTER_LABELS[selectedFilter]}
-                </Text>
-                <Icon source="chevron-down" size={16} color={theme.colors.onSurfaceVariant} />
-              </View>
-            </TouchableRipple>
-          }
-        >
-          {FILTER_OPTIONS.map((filter) => (
-            <Menu.Item
-              key={filter}
-              onPress={() => handleFilterChange(filter)}
-              title={FILTER_LABELS[filter]}
-              trailingIcon={selectedFilter === filter ? 'check' : undefined}
-            />
-          ))}
-        </Menu>
+        <TouchableRipple borderless={false} onPress={() => setBottomDrawer({ type: 'filter' })}>
+          <View style={[styles.filterChip, { borderColor: theme.colors.outline }]}>
+            <Icon source="filter-variant" size={16} color={theme.colors.onSurface} />
+            <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
+              {FILTER_LABELS[selectedFilter]}
+            </Text>
+            <Icon source="chevron-down" size={16} color={theme.colors.onSurfaceVariant} />
+          </View>
+        </TouchableRipple>
       </Animated.View>
 
       {/* Indexers List */}
@@ -473,6 +426,47 @@ const ProwlarrIndexerListScreen = () => {
         }
         contentContainerStyle={filteredIndexers.length === 0 ? styles.emptyList : undefined}
       />
+
+  <BottomDrawer visible={Boolean(bottomDrawer)} onDismiss={() => setBottomDrawer(null)} title={bottomDrawer?.type === 'item' ? (bottomDrawer.item?.name ?? undefined) : 'Filter'} maxHeight={'60%'}>
+        {bottomDrawer?.type === 'filter' && (
+          <>
+            {FILTER_OPTIONS.map((filter) => (
+              <DrawerItem
+                key={filter}
+                icon="filter-variant"
+                label={FILTER_LABELS[filter]}
+                onPress={() => handleFilterChange(filter)}
+                selected={selectedFilter === filter}
+              />
+            ))}
+          </>
+        )}
+        {bottomDrawer?.type === 'item' && bottomDrawer.item && (
+          <>
+            <DrawerItem
+              icon="pencil"
+              label="Edit"
+              onPress={() => { setBottomDrawer(null); Alert.alert('Edit', 'Edit indexer functionality coming soon'); }}
+            />
+            <DrawerItem
+              icon="play-circle"
+              label="Test"
+              onPress={async () => { setBottomDrawer(null); await handleTestIndexer(bottomDrawer.item!); }}
+            />
+            <DrawerItem
+              icon={bottomDrawer.item.enable ? "pause-circle" : "play-circle"}
+              label={bottomDrawer.item.enable ? 'Disable' : 'Enable'}
+              onPress={async () => { setBottomDrawer(null); await handleToggleIndexer(bottomDrawer.item!); }}
+            />
+            <DrawerItem
+              icon="delete"
+              label="Delete"
+              onPress={() => { setBottomDrawer(null); void handleDeleteIndexer(bottomDrawer.item!); }}
+              destructive
+            />
+          </>
+        )}
+      </BottomDrawer>
 
       {/* Floating action button group (replaces Menu-anchored FAB which could be unresponsive on Android/iOS) */}
       <FAB.Group
@@ -597,7 +591,7 @@ const ProwlarrIndexerListScreen = () => {
               if (selectedSchemaIdx == null) return;
               const template = schemaOptions[selectedSchemaIdx];
               if (!template) return;
-              const payload: ProwlarrApplicationResource = {
+              const payload: ProwlarrIndexerResource = {
                 id: 0,
                 name: template.name ?? template.implementationName ?? 'Indexer',
                 implementationName: template.implementationName ?? template.implementation ?? 'Unknown',
@@ -608,7 +602,6 @@ const ProwlarrIndexerListScreen = () => {
                 fields: template.fields ?? [],
                 enable: true,
                 priority: template.priority ?? 25,
-                syncLevel: template.syncLevel ?? 'full',
               };
               const ok = await addIndexer(payload);
               if (ok) setIsAddDialogVisible(false);
@@ -746,6 +739,17 @@ const styles = StyleSheet.create({
   },
   apiMessage: {
     marginTop: 2,
+  },
+  drawerOverlayContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  drawerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   lastSyncText: {
     // Keep the last sync label compact and avoid forcing full-width

@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 
 import { logger } from '@/services/logger/LoggerService';
-import { secureStorage, type NetworkScanHistory, type RecentIP } from '@/services/storage/SecureStorage';
+import { secureStorage, type NetworkScanHistoryType, type RecentIP } from '@/services/storage/SecureStorage';
 import { useSettingsStore } from '@/store/settingsStore';
 import type { ServiceConfig } from '@/models/service.types';
 
@@ -19,7 +19,7 @@ export interface BackupData {
   metadata: BackupMetadata;
   settings: any;
   services: ServiceConfig[];
-  scanHistory: NetworkScanHistory[];
+  scanHistory: NetworkScanHistoryType[];
   recentIPs: RecentIP[];
 }
 
@@ -295,7 +295,7 @@ class BackupService {
     return imported;
   }
 
-  private async importScanHistory(history: NetworkScanHistory[]): Promise<void> {
+  private async importScanHistory(history: NetworkScanHistoryType[]): Promise<void> {
     // Clear existing history and import new one
     await secureStorage.clearNetworkScanHistory();
 
