@@ -15,6 +15,7 @@ import type {
   JellyseerrUserSummary,
 } from '@/models/jellyseerr.types';
 import { handleApiError } from '@/utils/error.utils';
+import { logger } from '@/services/logger/LoggerService';
 
 const API_PREFIX = '/api/v1';
 const REQUEST_ENDPOINT = `${API_PREFIX}/request`;
@@ -96,6 +97,24 @@ interface ApiRequest {
 interface ApiStatusResponse {
   readonly version?: string;
   readonly commitTag?: string;
+}
+
+interface ApiMediaDetails {
+  readonly id?: number;
+  readonly tmdbId?: number;
+  readonly tvdbId?: number;
+  readonly imdbId?: string;
+  readonly mediaType: 'movie' | 'tv';
+  readonly title?: string;
+  readonly originalTitle?: string;
+  readonly overview?: string;
+  readonly posterPath?: string;
+  readonly backdropPath?: string;
+  readonly releaseDate?: string;
+  readonly firstAirDate?: string;
+  readonly rating?: number;
+  readonly runtime?: number;
+  readonly genres?: { readonly name: string }[];
 }
 
 interface ApiSearchResult {
@@ -292,6 +311,28 @@ const mapPagedRequests = (data: ApiPaginatedResponse<ApiRequest>): JellyseerrReq
   };
 };
 
+const mapMediaDetails = (media: ApiMediaDetails): JellyseerrMediaSummary => {
+  const genres = media.genres?.map((genre) => genre.name).filter(Boolean);
+
+  return {
+    id: media.id,
+    tmdbId: media.tmdbId,
+    tvdbId: media.tvdbId,
+    imdbId: media.imdbId,
+    mediaType: media.mediaType,
+    title: media.title ?? media.originalTitle ?? undefined,
+    originalTitle: media.originalTitle,
+    overview: media.overview,
+    posterUrl: resolveImageUrl(media.posterPath),
+    backdropUrl: resolveImageUrl(media.backdropPath),
+    releaseDate: media.releaseDate,
+    firstAirDate: media.firstAirDate,
+    rating: media.rating,
+    runtime: media.runtime,
+    genres,
+  };
+};
+
 const mapSearchResults = (results: ApiSearchResult[]): JellyseerrSearchResult[] =>
   results
     .filter((item) => item.mediaType === 'movie' || item.mediaType === 'tv')
@@ -476,7 +517,48 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     try {
       const params = normalizeRequestQuery(options);
       const response = await this.client.get<ApiPaginatedResponse<ApiRequest>>(REQUEST_ENDPOINT, { params });
-      return mapPagedRequests(response.data);
+      let requests = mapPagedRequests(response.data);
+
+      // Fetch media details for requests that don't have title
+      const requestsToUpdate = requests.items.filter((item: JellyseerrRequest) => !item.media.title);
+      if (requestsToUpdate.length > 0) {
+        const mediaDetailsPromises = requestsToUpdate.map(async (request: JellyseerrRequest) => {
+          if (request.media.id) {
+            try {
+              const mediaDetails = await this.getMediaDetails(request.media.id, request.mediaType);
+              return { requestId: request.id, mediaDetails };
+            } catch (error) {
+              logger.warn('Failed to fetch media details', { mediaId: request.media.id, mediaType: request.mediaType, error });
+              return null;
+            }
+          }
+          return null;
+        });
+
+        const mediaDetailsResults = await Promise.all(mediaDetailsPromises);
+        const mediaDetailsMap = new Map<number, JellyseerrMediaSummary>();
+        mediaDetailsResults.forEach((result: { requestId: number; mediaDetails: JellyseerrMediaSummary } | null) => {
+          if (result) {
+            mediaDetailsMap.set(result.requestId, result.mediaDetails);
+          }
+        });
+
+        requests = {
+          ...requests,
+          items: requests.items.map((item: JellyseerrRequest) => {
+            const mediaDetails = mediaDetailsMap.get(item.id);
+            if (mediaDetails) {
+              return {
+                ...item,
+                media: mediaDetails,
+              };
+            }
+            return item;
+          }),
+        };
+      }
+
+      return requests;
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -487,18 +569,22 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     }
   }
 
-  async getRequestById(id: number): Promise<JellyseerrRequest> {
+  async getMediaDetails(mediaId: number, mediaType: 'movie' | 'tv'): Promise<JellyseerrMediaSummary> {
     await this.ensureAuthenticated();
     
     try {
-      const response = await this.client.get<ApiRequest>(`${REQUEST_ENDPOINT}/${id}`);
-      return mapRequest(response.data);
+      const endpoint = mediaType === 'movie' 
+        ? `${API_PREFIX}/movie/${mediaId}` 
+        : `${API_PREFIX}/tv/${mediaId}`;
+      
+      const response = await this.client.get<ApiMediaDetails>(endpoint);
+      return mapMediaDetails(response.data);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getRequestById',
-        endpoint: `${REQUEST_ENDPOINT}/${id}`,
+        operation: 'getMediaDetails',
+        endpoint: mediaType === 'movie' ? `${API_PREFIX}/movie/${mediaId}` : `${API_PREFIX}/tv/${mediaId}`,
       });
     }
   }

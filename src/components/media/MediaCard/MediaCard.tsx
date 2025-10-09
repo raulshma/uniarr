@@ -132,7 +132,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
           uri={posterUri}
           size="small"
           borderRadius={12}
-          showPlaceholderLabel={false}
+          showPlaceholderLabel={true}
           style={{ marginRight: theme.custom.spacing.md }}
         />
         <View style={styles.meta}>
