@@ -1,7 +1,7 @@
 /**
  * Validate API key format for different services
  */
-export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr'): {
+export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent'): {
   isValid: boolean;
   issues: string[];
 } {
@@ -47,8 +47,8 @@ export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' 
     // no checks
   }
 
-  if (serviceType === 'qbittorrent') {
-    // qBittorrent doesn't use API keys, it uses username/password
+  if (serviceType === 'qbittorrent' || serviceType === 'transmission' || serviceType === 'deluge' || serviceType === 'sabnzbd' || serviceType === 'nzbget' || serviceType === 'rtorrent') {
+    // These services don't use API keys, they use username/password
     issues.push(`${serviceType} uses username/password authentication, not API keys`);
   }
   
@@ -61,7 +61,7 @@ export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' 
 /**
  * Get API key from service settings (for testing)
  */
-export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr'): string {
+export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent'): string {
   switch (serviceType) {
     case 'sonarr':
       return 'Go to Sonarr → Settings → General → Security → API Key';
@@ -73,6 +73,16 @@ export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbitto
       return 'Go to Prowlarr → Settings → General → API Key';
     case 'qbittorrent':
       return 'qBittorrent uses username/password. Check Settings → Web UI → Authentication';
+    case 'transmission':
+      return 'Transmission uses username/password. Check Settings → Authentication';
+    case 'deluge':
+      return 'Deluge uses username/password. Check Preferences → Interface → Authentication';
+    case 'sabnzbd':
+      return 'SABnzbd uses username/password. Check Config → General → Security';
+    case 'nzbget':
+      return 'NZBGet uses username/password. Check Settings → Security';
+    case 'rtorrent':
+      return 'rTorrent uses username/password. Check configuration file or web interface settings';
     default:
       return 'Check service documentation for API key location';
   }
@@ -81,7 +91,7 @@ export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbitto
 /**
  * Test API key format and provide suggestions
  */
-export function testApiKeyFormat(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr'): {
+export function testApiKeyFormat(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent'): {
   isValid: boolean;
   message: string;
   suggestions: string[];

@@ -7,6 +7,8 @@ export type { CardProps } from './Card';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';
 
+export { default as ConfirmationDialog } from './ConfirmationDialog';
+
 export { ErrorBoundary } from './ErrorBoundary';
 
 export { ListRefreshControl } from './ListRefreshControl';

@@ -2,6 +2,176 @@ import type { MD3Theme } from 'react-native-paper';
 
 export type ThemeColors = MD3Theme['colors'];
 
+export type CustomColorScheme = {
+  primary?: string;
+  secondary?: string;
+  tertiary?: string;
+  background?: string;
+  surface?: string;
+  error?: string;
+};
+
+export const presetThemes: Record<string, CustomColorScheme> = {
+  uniarr: {
+    primary: '#8B6914',
+    secondary: '#6B5E4F',
+    tertiary: '#5A6B4A',
+    background: '#FFFCF7',
+    surface: '#FFFCF7',
+    error: '#BA1A1A',
+  },
+  netflix: {
+    primary: '#E50914',
+    secondary: '#221F1F',
+    tertiary: '#F5F5F1',
+    background: '#000000',
+    surface: '#141414',
+    error: '#E50914',
+  },
+  plex: {
+    primary: '#EBAF00',
+    secondary: '#282A2D',
+    tertiary: '#F5F6F7',
+    background: '#1F1F1F',
+    surface: '#2D2D2D',
+    error: '#CB2600',
+  },
+  jellyfin: {
+    primary: '#00A4DC',
+    secondary: '#1E1E1E',
+    tertiary: '#FFFFFF',
+    background: '#101010',
+    surface: '#1A1A1A',
+    error: '#CC0000',
+  },
+  spotify: {
+    primary: '#1DB954',
+    secondary: '#121212',
+    tertiary: '#B3B3B3',
+    background: '#121212',
+    surface: '#181818',
+    error: '#FF4444',
+  },
+  youtube: {
+    primary: '#FF0000',
+    secondary: '#0F0F0F',
+    tertiary: '#FFFFFF',
+    background: '#0F0F0F',
+    surface: '#181818',
+    error: '#CC0000',
+  },
+};
+
+/**
+ * Generate a complete MD3 color palette from a custom color scheme
+ */
+export const generateThemeColors = (scheme: CustomColorScheme, isDark: boolean = false): ThemeColors => {
+  // Generate color variations based on the primary color
+  const generateColorVariations = (baseColor: string) => {
+    // Simple color manipulation - in a real app, you'd use a proper color library
+    const hex = baseColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+
+    const primaryContainer = `rgba(${Math.min(r + 40, 255)}, ${Math.min(g + 30, 255)}, ${Math.min(b + 20, 255)}, 0.3)`;
+    const onPrimaryContainer = baseColor;
+
+    return { primaryContainer, onPrimaryContainer };
+  };
+
+  const primary = scheme.primary || '#8B6914';
+  const { primaryContainer, onPrimaryContainer } = generateColorVariations(primary);
+
+  if (isDark) {
+    return {
+      primary: primary,
+      onPrimary: '#FFFFFF',
+      primaryContainer,
+      onPrimaryContainer,
+      secondary: scheme.secondary || '#6B5E4F',
+      onSecondary: '#FFFFFF',
+      secondaryContainer: `rgba(255, 255, 255, 0.1)`,
+      onSecondaryContainer: scheme.tertiary || '#5A6B4A',
+      tertiary: scheme.tertiary || '#5A6B4A',
+      onTertiary: '#000000',
+      tertiaryContainer: `rgba(255, 255, 255, 0.15)`,
+      onTertiaryContainer: scheme.tertiary || '#5A6B4A',
+      error: scheme.error || '#BA1A1A',
+      onError: '#FFFFFF',
+      errorContainer: `rgba(${scheme.error || '#BA1A1A'}, 0.3)`,
+      onErrorContainer: scheme.error || '#BA1A1A',
+      background: scheme.background || '#FFFCF7',
+      onBackground: '#1C1B1F',
+      surface: scheme.surface || '#FFFCF7',
+      onSurface: '#1C1B1F',
+      surfaceVariant: `rgba(255, 255, 255, 0.05)`,
+      onSurfaceVariant: `rgba(255, 255, 255, 0.7)`,
+      outline: `rgba(255, 255, 255, 0.3)`,
+      outlineVariant: `rgba(255, 255, 255, 0.2)`,
+      shadow: '#000000',
+      scrim: '#000000',
+      inverseSurface: `rgba(255, 255, 255, 0.1)`,
+      inverseOnSurface: '#000000',
+      inversePrimary: primary,
+      surfaceDisabled: `rgba(255, 255, 255, 0.12)`,
+      onSurfaceDisabled: `rgba(255, 255, 255, 0.38)`,
+      backdrop: `rgba(0, 0, 0, 0.4)`,
+      elevation: {
+        level0: 'transparent',
+        level1: scheme.surface || '#FFFCF7',
+        level2: `rgba(255, 255, 255, 0.05)`,
+        level3: `rgba(255, 255, 255, 0.08)`,
+        level4: `rgba(255, 255, 255, 0.11)`,
+        level5: `rgba(255, 255, 255, 0.14)`,
+      },
+    };
+  } else {
+    return {
+      primary: primary,
+      onPrimary: '#FFFFFF',
+      primaryContainer,
+      onPrimaryContainer,
+      secondary: scheme.secondary || '#6B5E4F',
+      onSecondary: '#000000',
+      secondaryContainer: `rgba(0, 0, 0, 0.1)`,
+      onSecondaryContainer: scheme.secondary || '#6B5E4F',
+      tertiary: scheme.tertiary || '#5A6B4A',
+      onTertiary: '#000000',
+      tertiaryContainer: `rgba(0, 0, 0, 0.15)`,
+      onTertiaryContainer: scheme.tertiary || '#5A6B4A',
+      error: scheme.error || '#BA1A1A',
+      onError: '#FFFFFF',
+      errorContainer: `rgba(${scheme.error || '#BA1A1A'}, 0.3)`,
+      onErrorContainer: scheme.error || '#BA1A1A',
+      background: scheme.background || '#FFFCF7',
+      onBackground: '#000000',
+      surface: scheme.surface || '#FFFCF7',
+      onSurface: '#1C1B1F',
+      surfaceVariant: `rgba(0, 0, 0, 0.05)`,
+      onSurfaceVariant: `rgba(0, 0, 0, 0.7)`,
+      outline: `rgba(0, 0, 0, 0.3)`,
+      outlineVariant: `rgba(0, 0, 0, 0.2)`,
+      shadow: '#000000',
+      scrim: '#000000',
+      inverseSurface: `rgba(0, 0, 0, 0.1)`,
+      inverseOnSurface: '#FFFFFF',
+      inversePrimary: primary,
+      surfaceDisabled: `rgba(0, 0, 0, 0.12)`,
+      onSurfaceDisabled: `rgba(0, 0, 0, 0.38)`,
+      backdrop: `rgba(0, 0, 0, 0.4)`,
+      elevation: {
+        level0: 'transparent',
+        level1: scheme.surface || '#FFFCF7',
+        level2: `rgba(0, 0, 0, 0.05)`,
+        level3: `rgba(0, 0, 0, 0.08)`,
+        level4: `rgba(0, 0, 0, 0.11)`,
+        level5: `rgba(0, 0, 0, 0.14)`,
+      },
+    };
+  }
+};
+
 export const lightColors: ThemeColors = {
   primary: '#8B6914',
   onPrimary: '#FFFFFF',

@@ -1,7 +1,13 @@
 import { useMemo } from 'react';
 import { useColorScheme, type ColorSchemeName } from 'react-native';
 
-import { getAppTheme, defaultTheme, type AppTheme } from '@/constants/theme';
+import {
+  getAppTheme,
+  defaultTheme,
+  createCustomTheme,
+  defaultCustomThemeConfig,
+  type AppTheme
+} from '@/constants/theme';
 import { useSettingsStore } from '@/store/settingsStore';
 
 /**
@@ -12,6 +18,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 export const useTheme = (): AppTheme => {
   const systemColorScheme = useColorScheme();
   const themePreference = useSettingsStore((state) => state.theme);
+  const customThemeConfig = useSettingsStore((state) => state.customThemeConfig);
 
   return useMemo(() => {
     // Use default theme if system color scheme is not available yet
@@ -34,6 +41,13 @@ export const useTheme = (): AppTheme => {
         break;
     }
 
+    // Check if we have a custom theme configuration
+    if (customThemeConfig && customThemeConfig.preset !== 'uniarr') {
+      // Use custom theme configuration
+      return createCustomTheme(customThemeConfig, effectiveScheme === 'dark');
+    }
+
+    // Use standard theme
     return getAppTheme(effectiveScheme);
-  }, [themePreference, systemColorScheme]);
+  }, [themePreference, systemColorScheme, customThemeConfig]);
 };

@@ -8,11 +8,14 @@ import {
   createDefaultQuietHoursConfig,
   normalizeQuietHoursConfig,
 } from '@/utils/quietHours.utils';
+import { defaultCustomThemeConfig, type CustomThemeConfig } from '@/constants/theme';
+import type { CloudProvider, CloudStorageConfig } from '@/services/backup/CloudStorageService';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 type SettingsData = {
   theme: ThemePreference;
+  customThemeConfig: CustomThemeConfig;
   notificationsEnabled: boolean;
   releaseNotificationsEnabled: boolean;
   downloadNotificationsEnabled: boolean;
@@ -22,10 +25,14 @@ type SettingsData = {
   refreshIntervalMinutes: number;
   quietHours: Record<NotificationCategory, QuietHoursConfig>;
   criticalHealthAlertsBypassQuietHours: boolean;
+  cloudBackupConfigs: Record<CloudProvider, CloudStorageConfig>;
 };
 
 interface SettingsState extends SettingsData {
   setTheme: (theme: ThemePreference) => void;
+  updateCustomThemeConfig: (config: Partial<CustomThemeConfig>) => void;
+  setCustomThemeConfig: (config: CustomThemeConfig) => void;
+  resetCustomThemeConfig: () => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   setReleaseNotificationsEnabled: (enabled: boolean) => void;
   setDownloadNotificationsEnabled: (enabled: boolean) => void;
@@ -38,6 +45,8 @@ interface SettingsState extends SettingsData {
     partial: Partial<QuietHoursConfig>,
   ) => void;
   setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
+  updateCloudBackupConfig: (provider: CloudProvider, config: Partial<CloudStorageConfig>) => void;
+  setCloudBackupConfig: (provider: CloudProvider, config: CloudStorageConfig) => void;
   reset: () => void;
 }
 
@@ -61,8 +70,24 @@ const createDefaultQuietHoursState = (): Record<NotificationCategory, QuietHours
   serviceHealth: createDefaultQuietHoursConfig('everyday'),
 });
 
+const createDefaultCloudBackupConfigs = (): Record<CloudProvider, CloudStorageConfig> => ({
+  icloud: {
+    provider: 'icloud',
+    enabled: false,
+    autoBackup: false,
+    backupFrequency: 'weekly',
+  },
+  googledrive: {
+    provider: 'googledrive',
+    enabled: false,
+    autoBackup: false,
+    backupFrequency: 'weekly',
+  },
+});
+
 const createDefaultSettings = (): SettingsData => ({
   theme: 'system',
+  customThemeConfig: defaultCustomThemeConfig,
   notificationsEnabled: true,
   releaseNotificationsEnabled: false,
   downloadNotificationsEnabled: true,
@@ -72,6 +97,7 @@ const createDefaultSettings = (): SettingsData => ({
   refreshIntervalMinutes: DEFAULT_REFRESH_INTERVAL,
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
+  cloudBackupConfigs: createDefaultCloudBackupConfigs(),
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -79,6 +105,12 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       ...createDefaultSettings(),
       setTheme: (theme) => set({ theme }),
+      updateCustomThemeConfig: (config) =>
+        set((state) => ({
+          customThemeConfig: { ...state.customThemeConfig, ...config },
+        })),
+      setCustomThemeConfig: (config) => set({ customThemeConfig: config }),
+      resetCustomThemeConfig: () => set({ customThemeConfig: defaultCustomThemeConfig }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setReleaseNotificationsEnabled: (enabled) => set({ releaseNotificationsEnabled: enabled }),
       setDownloadNotificationsEnabled: (enabled) => set({ downloadNotificationsEnabled: enabled }),
@@ -101,6 +133,20 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       setCriticalHealthAlertsBypassQuietHours: (enabled) =>
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
+      updateCloudBackupConfig: (provider, config) =>
+        set((state) => ({
+          cloudBackupConfigs: {
+            ...state.cloudBackupConfigs,
+            [provider]: { ...state.cloudBackupConfigs[provider], ...config },
+          },
+        })),
+      setCloudBackupConfig: (provider, config) =>
+        set((state) => ({
+          cloudBackupConfigs: {
+            ...state.cloudBackupConfigs,
+            [provider]: config,
+          },
+        })),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -184,6 +230,7 @@ export const useSettingsStore = create<SettingsState>()(
 );
 
 export const selectThemePreference = (state: SettingsState): ThemePreference => state.theme;
+export const selectCustomThemeConfig = (state: SettingsState): CustomThemeConfig => state.customThemeConfig;
 export const selectNotificationsEnabled = (state: SettingsState): boolean => state.notificationsEnabled;
 export const selectReleaseNotificationsEnabled = (state: SettingsState): boolean =>
   state.releaseNotificationsEnabled;
@@ -207,3 +254,6 @@ export const selectQuietHoursForCategory = (
     state.quietHours[category] ?? createDefaultQuietHoursState()[category];
 export const selectCriticalHealthAlertsBypassQuietHours = (state: SettingsState): boolean =>
   state.criticalHealthAlertsBypassQuietHours;
+export const selectCloudBackupConfigs = (state: SettingsState) => state.cloudBackupConfigs;
+export const selectCloudBackupConfig = (provider: CloudProvider) =>
+  (state: SettingsState) => state.cloudBackupConfigs[provider];

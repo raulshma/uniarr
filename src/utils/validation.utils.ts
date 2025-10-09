@@ -7,6 +7,11 @@ const serviceTypeValues = [
   'radarr',
   'jellyseerr',
   'qbittorrent',
+  'transmission',
+  'deluge',
+  'sabnzbd',
+  'nzbget',
+  'rtorrent',
   'prowlarr',
 ] as const satisfies readonly ServiceType[];
 

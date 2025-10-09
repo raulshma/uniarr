@@ -97,6 +97,16 @@ export const queryKeys = {
     ] as const,
     transferInfo: (serviceId: string): QueryKeyBuilder => [...queryKeys.qbittorrent.service(serviceId), 'transferInfo'] as const,
   },
+  transmission: {
+    base: ['transmission'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['transmission', serviceId] as const,
+    torrents: (serviceId: string, filters?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.transmission.service(serviceId),
+      'torrents',
+      filters ?? {},
+    ] as const,
+    transferInfo: (serviceId: string): QueryKeyBuilder => [...queryKeys.transmission.service(serviceId), 'transferInfo'] as const,
+  },
   calendar: {
     base: ['calendar'] as const,
     releases: (currentDate: string, filters?: Record<string, unknown>): QueryKeyBuilder => [

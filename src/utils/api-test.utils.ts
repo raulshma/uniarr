@@ -295,3 +295,226 @@ export async function testJellyseerrApi(baseUrl: string, apiKey?: string, timeou
     };
   }
 }
+
+/**
+ * Test Transmission API specifically
+ */
+export async function testTransmissionApi(baseUrl: string, username?: string, password?: string, timeout: number = 15000): Promise<ApiTestResult> {
+  const fullUrl = `${baseUrl}/transmission/rpc`;
+  console.log('🧪 [ApiTest] Testing Transmission API:', fullUrl);
+  console.log('🧪 [ApiTest] Username provided:', username ? 'Yes' : 'No');
+  console.log('🧪 [ApiTest] Password provided:', password ? 'Yes' : 'No');
+
+  try {
+    // Create a mock service config for testing
+    const mockConfig = {
+      id: 'test-transmission',
+      name: 'Test Transmission',
+      type: 'transmission' as const,
+      url: baseUrl,
+      username,
+      password,
+      enabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Use the new authentication system
+    const authResult = await ServiceAuthHelper.authenticateService(mockConfig);
+
+    if (!authResult.success || !authResult.authenticated) {
+      return {
+        success: false,
+        error: authResult.error || 'Authentication failed',
+      };
+    }
+
+    // Test the actual API endpoint
+    const response = await axios.post(fullUrl, {
+      method: 'session-get',
+      arguments: {},
+    }, {
+      timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'UniArr/1.0.0',
+      },
+    });
+
+    console.log('✅ [ApiTest] Transmission API worked:', {
+      status: response.status,
+      data: response.data,
+    });
+
+    return {
+      success: true,
+      status: response.status,
+      data: response.data,
+      headers: response.headers as Record<string, string>,
+    };
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    console.log('❌ [ApiTest] Transmission API failed:', {
+      status: axiosError.response?.status,
+      message: axiosError.message,
+      code: axiosError.code,
+      data: axiosError.response?.data,
+    });
+
+    return {
+      success: false,
+      status: axiosError.response?.status,
+      error: axiosError.message,
+      data: axiosError.response?.data,
+    };
+  }
+}
+
+/**
+ * Test Deluge API specifically
+ */
+export async function testDelugeApi(baseUrl: string, username?: string, password?: string, timeout: number = 15000): Promise<ApiTestResult> {
+  const fullUrl = `${baseUrl}/json`;
+  console.log('🧪 [ApiTest] Testing Deluge API:', fullUrl);
+  console.log('🧪 [ApiTest] Username provided:', username ? 'Yes' : 'No');
+  console.log('🧪 [ApiTest] Password provided:', password ? 'Yes' : 'No');
+
+  try {
+    // Create a mock service config for testing
+    const mockConfig = {
+      id: 'test-deluge',
+      name: 'Test Deluge',
+      type: 'deluge' as const,
+      url: baseUrl,
+      username,
+      password,
+      enabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Use the new authentication system
+    const authResult = await ServiceAuthHelper.authenticateService(mockConfig);
+
+    if (!authResult.success || !authResult.authenticated) {
+      return {
+        success: false,
+        error: authResult.error || 'Authentication failed',
+      };
+    }
+
+    // Test the actual API endpoint
+    const response = await axios.post(fullUrl, {
+      method: 'web.get_version',
+      params: [],
+      id: 1,
+      jsonrpc: '2.0',
+    }, {
+      timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'UniArr/1.0.0',
+      },
+    });
+
+    console.log('✅ [ApiTest] Deluge API worked:', {
+      status: response.status,
+      data: response.data,
+    });
+
+    return {
+      success: true,
+      status: response.status,
+      data: response.data,
+      headers: response.headers as Record<string, string>,
+    };
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    console.log('❌ [ApiTest] Deluge API failed:', {
+      status: axiosError.response?.status,
+      message: axiosError.message,
+      code: axiosError.code,
+      data: axiosError.response?.data,
+    });
+
+    return {
+      success: false,
+      status: axiosError.response?.status,
+      error: axiosError.message,
+      data: axiosError.response?.data,
+    };
+  }
+}
+
+/**
+ * Test SABnzbd API specifically
+ */
+export async function testSABnzbdApi(baseUrl: string, apiKey?: string, timeout: number = 15000): Promise<ApiTestResult> {
+  const fullUrl = `${baseUrl}/api`;
+  console.log('🧪 [ApiTest] Testing SABnzbd API:', fullUrl);
+  console.log('🧪 [ApiTest] API Key provided:', apiKey ? 'Yes' : 'No');
+
+  try {
+    // Create a mock service config for testing
+    const mockConfig = {
+      id: 'test-sabnzbd',
+      name: 'Test SABnzbd',
+      type: 'sabnzbd' as const,
+      url: baseUrl,
+      apiKey,
+      enabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Use the new authentication system
+    const authResult = await ServiceAuthHelper.authenticateService(mockConfig);
+
+    if (!authResult.success || !authResult.authenticated) {
+      return {
+        success: false,
+        error: authResult.error || 'Authentication failed',
+      };
+    }
+
+    // Test the actual API endpoint
+    const response = await axios.get(fullUrl, {
+      timeout,
+      params: { apikey: apiKey },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'UniArr/1.0.0',
+      },
+    });
+
+    console.log('✅ [ApiTest] SABnzbd API worked:', {
+      status: response.status,
+      data: response.data,
+    });
+
+    return {
+      success: true,
+      status: response.status,
+      data: response.data,
+      headers: response.headers as Record<string, string>,
+    };
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    console.log('❌ [ApiTest] SABnzbd API failed:', {
+      status: axiosError.response?.status,
+      message: axiosError.message,
+      code: axiosError.code,
+      data: axiosError.response?.data,
+    });
+
+    return {
+      success: false,
+      status: axiosError.response?.status,
+      error: axiosError.message,
+      data: axiosError.response?.data,
+    };
+  }
+}

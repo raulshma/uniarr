@@ -35,13 +35,18 @@ import {
 import { testApiKeyFormat } from '@/utils/api-key-validator';
 import { debugLogger } from '@/utils/debug-logger';
 
-const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'prowlarr'];
+const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'transmission', 'deluge', 'sabnzbd', 'nzbget', 'rtorrent', 'prowlarr'];
 
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: 'Sonarr',
   radarr: 'Radarr',
   jellyseerr: 'Jellyseerr',
   qbittorrent: 'qBittorrent',
+  transmission: 'Transmission',
+  deluge: 'Deluge',
+  sabnzbd: 'SABnzbd',
+  nzbget: 'NZBGet',
+  rtorrent: 'rTorrent',
   prowlarr: 'Prowlarr',
 };
 

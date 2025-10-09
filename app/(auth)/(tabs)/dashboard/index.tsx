@@ -61,6 +61,11 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   radarr: 'Radarr',
   jellyseerr: 'Jellyseerr',
   qbittorrent: 'qBittorrent',
+  transmission: 'Transmission',
+  deluge: 'Deluge',
+  sabnzbd: 'SABnzbd',
+  nzbget: 'NZBGet',
+  rtorrent: 'rTorrent',
   prowlarr: 'Prowlarr',
 };
 

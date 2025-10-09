@@ -3,6 +3,11 @@ export type ServiceType =
   | 'radarr'
   | 'jellyseerr'
   | 'qbittorrent'
+  | 'transmission'
+  | 'deluge'
+  | 'sabnzbd'
+  | 'nzbget'
+  | 'rtorrent'
   | 'prowlarr';
 
 export interface ServiceConfig {

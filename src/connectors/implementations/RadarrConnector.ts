@@ -100,6 +100,24 @@ interface RadarrQueueResponse {
   readonly records: RadarrQueueRecord[];
 }
 
+interface RadarrTag {
+  readonly id: number;
+  readonly label: string;
+}
+
+interface RadarrMovieEditor {
+  readonly movieIds: number[];
+  readonly monitored?: boolean;
+  readonly qualityProfileId?: number;
+  readonly tags?: number[];
+}
+
+interface RadarrMoveMovieOptions {
+  readonly movieId: number;
+  readonly destinationPath: string;
+  readonly moveFiles?: boolean;
+}
+
 interface RadarrMovie {
   readonly id: number;
   readonly title: string;
@@ -303,6 +321,139 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         serviceType: this.config.type,
         operation: 'deleteMovie',
         endpoint: `${RADARR_API_PREFIX}/movie/${movieId}`,
+      });
+    }
+  }
+
+  async updateMovie(
+    movieId: number,
+    updates: Partial<Omit<RadarrMovie, 'id' | 'movieFile' | 'ratings' | 'statistics' | 'images'>>
+  ): Promise<Movie> {
+    try {
+      const response = await this.client.put<RadarrMovie>(`${RADARR_API_PREFIX}/movie/${movieId}`, updates);
+      return this.mapMovie(response.data);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'updateMovie',
+        endpoint: `${RADARR_API_PREFIX}/movie/${movieId}`,
+      });
+    }
+  }
+
+  async refreshMovie(movieId: number): Promise<void> {
+    try {
+      await this.client.post(`${RADARR_API_PREFIX}/command`, {
+        name: 'MoviesRefresh',
+        movieIds: [movieId],
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'refreshMovie',
+        endpoint: `${RADARR_API_PREFIX}/command`,
+      });
+    }
+  }
+
+  async rescanMovie(movieId: number): Promise<void> {
+    try {
+      await this.client.post(`${RADARR_API_PREFIX}/command`, {
+        name: 'MoviesRescan',
+        movieIds: [movieId],
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'rescanMovie',
+        endpoint: `${RADARR_API_PREFIX}/command`,
+      });
+    }
+  }
+
+  async moveMovie(options: RadarrMoveMovieOptions): Promise<void> {
+    try {
+      await this.client.post(`${RADARR_API_PREFIX}/command`, {
+        name: 'MoviesMove',
+        ...options,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'moveMovie',
+        endpoint: `${RADARR_API_PREFIX}/command`,
+      });
+    }
+  }
+
+  async getTags(): Promise<RadarrTag[]> {
+    try {
+      const response = await this.client.get<RadarrTag[]>(`${RADARR_API_PREFIX}/tag`);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getTags',
+        endpoint: `${RADARR_API_PREFIX}/tag`,
+      });
+    }
+  }
+
+  async createTag(label: string): Promise<RadarrTag> {
+    try {
+      const response = await this.client.post<RadarrTag>(`${RADARR_API_PREFIX}/tag`, { label });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'createTag',
+        endpoint: `${RADARR_API_PREFIX}/tag`,
+      });
+    }
+  }
+
+  async updateTag(tagId: number, label: string): Promise<RadarrTag> {
+    try {
+      const response = await this.client.put<RadarrTag>(`${RADARR_API_PREFIX}/tag/${tagId}`, { id: tagId, label });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'updateTag',
+        endpoint: `${RADARR_API_PREFIX}/tag/${tagId}`,
+      });
+    }
+  }
+
+  async deleteTag(tagId: number): Promise<void> {
+    try {
+      await this.client.delete(`${RADARR_API_PREFIX}/tag/${tagId}`);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'deleteTag',
+        endpoint: `${RADARR_API_PREFIX}/tag/${tagId}`,
+      });
+    }
+  }
+
+  async bulkUpdateMovies(editor: RadarrMovieEditor): Promise<void> {
+    try {
+      await this.client.put(`${RADARR_API_PREFIX}/movie/editor`, editor);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'bulkUpdateMovies',
+        endpoint: `${RADARR_API_PREFIX}/movie/editor`,
       });
     }
   }

@@ -45,6 +45,11 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   radarr: 'Radarr',
   jellyseerr: 'Jellyseerr',
   qbittorrent: 'qBittorrent',
+  transmission: 'Transmission',
+  deluge: 'Deluge',
+  sabnzbd: 'SABnzbd',
+  nzbget: 'NZBGet',
+  rtorrent: 'rTorrent',
   prowlarr: 'Prowlarr',
 };
 
@@ -53,6 +58,11 @@ const serviceDisplayNames: Record<ServiceType, string> = {
   radarr: 'Movie Library',
   jellyseerr: 'Request Service',
   qbittorrent: 'Torrent Client',
+  transmission: 'Torrent Client',
+  deluge: 'Torrent Client',
+  sabnzbd: 'Usenet Client',
+  nzbget: 'Usenet Client',
+  rtorrent: 'Torrent Client',
   prowlarr: 'Indexer',
 };
 
@@ -61,6 +71,11 @@ const serviceIcons: Record<ServiceType, string> = {
   radarr: 'movie-open',
   jellyseerr: 'account-search',
   qbittorrent: 'download-network',
+  transmission: 'download-network',
+  deluge: 'download-network',
+  sabnzbd: 'download-network',
+  nzbget: 'download-network',
+  rtorrent: 'download-network',
   prowlarr: 'radar',
 };
 

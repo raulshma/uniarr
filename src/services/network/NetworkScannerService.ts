@@ -70,6 +70,31 @@ const SERVICE_DETECTION_CONFIGS: Record<ServiceType, ServiceDetectionConfig> = {
     commonPorts: [8080, 8091],
     detectionEndpoint: '/api/v2/app/version',
   },
+  transmission: {
+    type: 'transmission',
+    commonPorts: [9091, 51413],
+    detectionEndpoint: '/transmission/rpc',
+  },
+  deluge: {
+    type: 'deluge',
+    commonPorts: [58846],
+    detectionEndpoint: '/json',
+  },
+  sabnzbd: {
+    type: 'sabnzbd',
+    commonPorts: [8080],
+    detectionEndpoint: '/api',
+  },
+  nzbget: {
+    type: 'nzbget',
+    commonPorts: [6789],
+    detectionEndpoint: '/jsonrpc',
+  },
+  rtorrent: {
+    type: 'rtorrent',
+    commonPorts: [5000, 5001],
+    detectionEndpoint: '/RPC2',
+  },
   prowlarr: {
     type: 'prowlarr',
     commonPorts: [9696],

@@ -17,6 +17,8 @@ import { spacing } from '@/theme/spacing';
 import { useSettingsStore } from '@/store/settingsStore';
 import type { NotificationCategory } from '@/models/notification.types';
 import { getCategoryFriendlyName } from '@/utils/quietHours.utils';
+import { BackupRestoreSection } from '@/components/settings/BackupRestoreSection';
+import { CloudBackupSettings } from '@/components/settings/CloudBackupSettings';
 
 const SettingsScreen = () => {
   const router = useRouter();
@@ -245,7 +247,7 @@ const SettingsScreen = () => {
         {/* Appearance Section */}
         <AnimatedSection style={styles.section} delay={50}>
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <AnimatedListItem index={0} totalItems={1}>
+          <AnimatedListItem index={0} totalItems={2}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -289,6 +291,25 @@ const SettingsScreen = () => {
                       System
                     </Chip>
                   </View>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={1} totalItems={2}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push('/(auth)/settings/theme-editor')}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="palette-swatch" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Customize Theme</Text>
+                  <Text style={styles.settingSubtitle}>Advanced theme customization</Text>
+                  <Text style={styles.settingValue}>Colors, fonts, density & more</Text>
                 </View>
                 <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
               </View>
@@ -413,6 +434,29 @@ const SettingsScreen = () => {
           </AnimatedListItem>
         </AnimatedSection>
 
+        {/* Voice Assistant Section */}
+        <AnimatedSection style={styles.section} delay={175}>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push('/(auth)/settings/voice-assistant')}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="microphone" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Voice Assistant</Text>
+                  <Text style={styles.settingSubtitle}>Siri Shortcuts & Google Assistant</Text>
+                  <Text style={styles.settingValue}>Manage voice commands and shortcuts</Text>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+              </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
+
         {/* Data Refresh Section */}
         <AnimatedSection style={styles.section} delay={150}>
           <AnimatedListItem index={0} totalItems={1}>
@@ -487,8 +531,14 @@ const SettingsScreen = () => {
           </AnimatedListItem>
         </AnimatedSection>
 
+        {/* Backup & Restore Section */}
+        <BackupRestoreSection delay={300} />
+
+        {/* Cloud Backup Settings Section */}
+        <CloudBackupSettings delay={350} />
+
         {/* About Section */}
-        <AnimatedSection style={styles.section} delay={300}>
+        <AnimatedSection style={styles.section} delay={350}>
           <AnimatedListItem index={0} totalItems={1}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>

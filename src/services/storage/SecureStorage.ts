@@ -205,6 +205,31 @@ class SecureStorage {
     }
   }
 
+  async getItem(key: string): Promise<string | null> {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch (error) {
+      await logger.error('Failed to get item from secure storage.', {
+        location: 'SecureStorage.getItem',
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      await logger.error('Failed to set item in secure storage.', {
+        location: 'SecureStorage.setItem',
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (this.isInitialized) {
       return;

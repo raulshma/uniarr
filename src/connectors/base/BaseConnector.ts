@@ -312,8 +312,9 @@ export abstract class BaseConnector<
    * This method now uses the centralized authentication system.
    */
   protected getAuthConfig(): { auth?: { username: string; password: string } } {
-    // For services that use basic auth (qBittorrent), we still need to provide credentials to axios
-    if (this.config.type === 'qbittorrent' && this.config.username && this.config.password) {
+    // For services that use basic auth (qBittorrent, Transmission, Deluge), we still need to provide credentials to axios
+    if ((this.config.type === 'qbittorrent' || this.config.type === 'transmission' || this.config.type === 'deluge')
+        && this.config.username && this.config.password) {
       return {
         auth: {
           username: this.config.username,
@@ -324,7 +325,7 @@ export abstract class BaseConnector<
 
     // For session-based auth (qBittorrent), we don't need to set auth here
     // as the session is managed through cookies
-    // For API key auth (Sonarr/Radarr/Jellyseerr), the API key is handled in getDefaultHeaders()
+    // For API key auth (Sonarr/Radarr/Jellyseerr/SABnzbd), the API key is handled in getDefaultHeaders()
     return {};
   }
 

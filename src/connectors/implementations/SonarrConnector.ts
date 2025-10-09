@@ -162,6 +162,29 @@ interface SonarrQualityProfile {
   readonly items: SonarrQualityProfileItem[];
 }
 
+interface SonarrTag {
+  readonly id: number;
+  readonly label: string;
+}
+
+interface SonarrSeriesEditor {
+  readonly seriesIds: number[];
+  readonly monitored?: boolean;
+  readonly qualityProfileId?: number;
+  readonly tags?: number[];
+}
+
+interface SonarrMoveSeriesOptions {
+  readonly seriesId: number;
+  readonly destinationPath: string;
+  readonly moveFiles?: boolean;
+}
+
+interface SonarrRenameSeriesOptions {
+  readonly seriesId: number;
+  readonly renameFiles?: boolean;
+}
+
 interface SonarrRootFolder {
   readonly id: number;
   readonly path: string;
@@ -352,6 +375,155 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         serviceType: this.config.type,
         operation: 'deleteSeries',
         endpoint: `/api/v3/series/${seriesId}`,
+      });
+    }
+  }
+
+  async updateSeries(
+    seriesId: number,
+    updates: Partial<Omit<SonarrSeries, 'id' | 'seasons' | 'statistics'>>
+  ): Promise<Series> {
+    try {
+      const response = await this.client.put<SonarrSeries>(`/api/v3/series/${seriesId}`, updates);
+      return this.mapSeries(response.data);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'updateSeries',
+        endpoint: `/api/v3/series/${seriesId}`,
+      });
+    }
+  }
+
+  async refreshSeries(seriesId: number): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesRefresh',
+        seriesId,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'refreshSeries',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async rescanSeries(seriesId: number): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesRescan',
+        seriesId,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'rescanSeries',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async moveSeries(options: SonarrMoveSeriesOptions): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesMove',
+        ...options,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'moveSeries',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async renameSeries(options: SonarrRenameSeriesOptions): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesRename',
+        ...options,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'renameSeries',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async getTags(): Promise<SonarrTag[]> {
+    try {
+      const response = await this.client.get<SonarrTag[]>('/api/v3/tag');
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getTags',
+        endpoint: '/api/v3/tag',
+      });
+    }
+  }
+
+  async createTag(label: string): Promise<SonarrTag> {
+    try {
+      const response = await this.client.post<SonarrTag>('/api/v3/tag', { label });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'createTag',
+        endpoint: '/api/v3/tag',
+      });
+    }
+  }
+
+  async updateTag(tagId: number, label: string): Promise<SonarrTag> {
+    try {
+      const response = await this.client.put<SonarrTag>(`/api/v3/tag/${tagId}`, { id: tagId, label });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'updateTag',
+        endpoint: `/api/v3/tag/${tagId}`,
+      });
+    }
+  }
+
+  async deleteTag(tagId: number): Promise<void> {
+    try {
+      await this.client.delete(`/api/v3/tag/${tagId}`);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'deleteTag',
+        endpoint: `/api/v3/tag/${tagId}`,
+      });
+    }
+  }
+
+  async bulkUpdateSeries(editor: SonarrSeriesEditor): Promise<void> {
+    try {
+      await this.client.put('/api/v3/series/editor', editor);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'bulkUpdateSeries',
+        endpoint: '/api/v3/series/editor',
       });
     }
   }
