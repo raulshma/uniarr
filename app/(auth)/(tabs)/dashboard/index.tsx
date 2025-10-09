@@ -15,7 +15,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { ServiceCard, ServiceCardSkeleton } from '@/components/service/ServiceCard';
 import { ListRowSkeleton, SkeletonPlaceholder } from '@/components/common/Skeleton';
-import { UnifiedSearchPanel } from '@/components/search/UnifiedSearchPanel';
+// Unified search has been moved to its own page. Navigate to the search route from the dashboard.
 import type { ServiceStatusState } from '@/components/service/ServiceStatus';
 import type { ConnectionResult } from '@/connectors/base/IConnector';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
@@ -297,6 +297,50 @@ const DashboardScreen = () => {
           marginTop: spacing.xxs,
           marginHorizontal: spacing.md,
         },
+        shortcutsWrapper: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          marginHorizontal: spacing.md,
+        },
+        shortcutTile: {
+          width: '48%',
+          backgroundColor: theme.colors.elevation.level1,
+          borderRadius: 12,
+          padding: spacing.sm,
+          marginBottom: spacing.sm,
+        },
+        shortcutInner: {
+          alignItems: 'center',
+        },
+        shortcutIcon: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: theme.colors.surfaceVariant,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: spacing.xs,
+        },
+        shortcutLabel: {
+          color: theme.colors.onSurface,
+          fontSize: theme.custom.typography.titleSmall.fontSize,
+          fontFamily: theme.custom.typography.titleSmall.fontFamily,
+          lineHeight: theme.custom.typography.titleSmall.lineHeight,
+          letterSpacing: theme.custom.typography.titleSmall.letterSpacing,
+          fontWeight: theme.custom.typography.titleSmall.fontWeight as any,
+          textAlign: 'center',
+        },
+        shortcutSubtitle: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
+          fontFamily: theme.custom.typography.bodySmall.fontFamily,
+          lineHeight: theme.custom.typography.bodySmall.lineHeight,
+          letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
+          fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
+          textAlign: 'center',
+          marginTop: spacing.xs,
+        },
         sectionTitle: {
           color: theme.colors.onBackground,
           fontSize: theme.custom.typography.titleLarge.fontSize,
@@ -519,6 +563,14 @@ const DashboardScreen = () => {
     />
   ), [handleAddService]);
 
+  const handleOpenSearch = useCallback(() => {
+    router.push('/(auth)/search');
+  }, [router]);
+
+  const handleOpenCalendar = useCallback(() => {
+    router.push('/(auth)/calendar');
+  }, [router]);
+
   const ServiceCard = React.memo(({ item }: { item: ServiceOverviewItem }) => {
     const getStatusColor = (status: ServiceStatusState) => {
       switch (status) {
@@ -571,6 +623,35 @@ const DashboardScreen = () => {
     );
   });
 
+  const ShortcutTile = ({
+    label,
+    subtitle,
+    icon,
+    onPress,
+    testID,
+  }: {
+    label: string;
+    subtitle?: string;
+    icon: string;
+    onPress: () => void;
+    testID?: string;
+  }) => (
+    <Card
+      variant="custom"
+      onPress={onPress}
+      style={styles.shortcutTile}
+      testID={testID}
+    >
+      <View style={styles.shortcutInner}>
+        <View style={styles.shortcutIcon}>
+          <IconButton icon={icon} size={20} iconColor={theme.colors.primary} />
+        </View>
+        <Text style={styles.shortcutLabel}>{label}</Text>
+        {subtitle ? <Text style={styles.shortcutSubtitle}>{subtitle}</Text> : null}
+      </View>
+    </Card>
+  );
+
   const renderServiceItem = useCallback(
     ({ item }: { item: ServiceOverviewItem }) => (
       <ServiceCard item={item} />
@@ -613,20 +694,7 @@ const DashboardScreen = () => {
             <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
           </View>
         </Card>
-        <Card variant="custom" style={styles.activityCard} onPress={() => router.push('/(auth)/calendar')}>
-          <View style={styles.activityContent}>
-            <View style={styles.activityIcon}>
-              <IconButton icon="calendar" size={24} iconColor={theme.colors.primary} />
-            </View>
-            <View style={styles.activityInfo}>
-              <Text style={styles.activityTitle}>Release Calendar</Text>
-              <Text style={styles.activitySubtitle}>
-                View upcoming media releases
-              </Text>
-            </View>
-            <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
-          </View>
-        </Card>
+        {/* Release Calendar removed from Activity section per request */}
       </>
     );
   }, [router, styles, downloadsData, recentlyAddedData, theme]);
@@ -663,7 +731,23 @@ const DashboardScreen = () => {
         case 'search':
           return (
             <View style={styles.searchWrapper}>
-              <UnifiedSearchPanel />
+              <View style={styles.shortcutsWrapper}>
+                <ShortcutTile
+                  testID="shortcut-search"
+                  label="Unified Search"
+                  subtitle="Search across services"
+                  icon="magnify"
+                  onPress={handleOpenSearch}
+                />
+                <ShortcutTile
+                  testID="shortcut-calendar"
+                  label="Release Calendar"
+                  subtitle="Upcoming releases"
+                  icon="calendar"
+                  onPress={handleOpenCalendar}
+                />
+                {/* Keep layout flexible so more shortcuts can be added easily */}
+              </View>
             </View>
           );
         case 'services':
@@ -724,7 +808,22 @@ const DashboardScreen = () => {
             }}
           />
           <View style={styles.searchWrapper}>
-            <UnifiedSearchPanel />
+            <View style={styles.shortcutsWrapper}>
+              <ShortcutTile
+                testID="shortcut-search-loading"
+                label="Unified Search"
+                subtitle="Search across services"
+                icon="magnify"
+                onPress={handleOpenSearch}
+              />
+              <ShortcutTile
+                testID="shortcut-calendar-loading"
+                label="Release Calendar"
+                subtitle="Upcoming releases"
+                icon="calendar"
+                onPress={handleOpenCalendar}
+              />
+            </View>
           </View>
           <View style={styles.section}>
             <SkeletonPlaceholder width="40%" height={28} borderRadius={10} style={{ marginBottom: spacing.md, marginHorizontal: spacing.md }} />

@@ -86,7 +86,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
           { text: 'OK' },
           {
             text: 'Go to Search',
-            onPress: () => router.push('/(auth)/(tabs)/dashboard'),
+            onPress: () => router.push('/(auth)/search'),
           },
         ]
       );
@@ -94,8 +94,8 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
     }
 
     try {
-      // Navigate to dashboard and trigger search
-      router.push('/(auth)/(tabs)/dashboard');
+  // Navigate to dedicated search page and trigger search
+  router.push('/(auth)/search');
 
       // Small delay to ensure navigation completes
       setTimeout(() => {
@@ -109,8 +109,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
               text: 'View Results',
               onPress: () => {
                 // Navigate to search results or show search UI
-                // For now, just navigate to dashboard
-                router.push('/(auth)/(tabs)/dashboard');
+                router.push('/(auth)/search');
               },
             },
           ]
@@ -174,7 +173,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
           { text: 'OK' },
           {
             text: 'Search Media',
-            onPress: () => router.push('/(auth)/(tabs)/dashboard'),
+            onPress: () => router.push('/(auth)/search'),
           },
         ]
       );
@@ -182,8 +181,8 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
     }
 
     try {
-      // Navigate to dashboard search
-      router.push('/(auth)/(tabs)/dashboard');
+  // Navigate to the dedicated search page
+  router.push('/(auth)/search');
 
       setTimeout(() => {
         Alert.alert(
@@ -195,7 +194,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
               text: 'Search Now',
               onPress: () => {
                 // This would trigger search if we had the search functionality
-                router.push('/(auth)/(tabs)/dashboard');
+                router.push('/(auth)/search');
               },
             },
           ]
