@@ -727,7 +727,7 @@ const DashboardScreen = () => {
             <UnifiedSearchPanel />
           </View>
           <View style={styles.section}>
-            <SkeletonPlaceholder width="40%" height={28} borderRadius={10} style={{ marginBottom: spacing.md, paddingHorizontal: spacing.md }} />
+            <SkeletonPlaceholder width="40%" height={28} borderRadius={10} style={{ marginBottom: spacing.md, marginHorizontal: spacing.md }} />
             {Array.from({ length: 3 }).map((_, index) => (
               <View key={index} style={{ marginBottom: spacing.sm, marginHorizontal: spacing.md }}>
                 <ServiceCardSkeleton />
@@ -735,7 +735,7 @@ const DashboardScreen = () => {
             ))}
           </View>
           <View style={styles.section}>
-            <SkeletonPlaceholder width="40%" height={28} borderRadius={10} style={{ marginBottom: spacing.md, paddingHorizontal: spacing.md }} />
+            <SkeletonPlaceholder width="40%" height={28} borderRadius={10} style={{ marginBottom: spacing.md, marginHorizontal: spacing.md }} />
             {Array.from({ length: 3 }).map((_, index) => (
               <View key={`activity-${index}`} style={{ marginBottom: spacing.sm, marginHorizontal: spacing.md }}>
                 <ListRowSkeleton showSecondaryLine={true} />
