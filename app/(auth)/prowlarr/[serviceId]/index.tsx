@@ -114,6 +114,8 @@ const ProwlarrIndexerListScreen = () => {
     addIndexer,
     bulkEnableDisable,
     bulkDelete,
+    lastApiEvent,
+    clearApiEvent,
   } = useProwlarrIndexers(serviceId);
 
   // Handle refresh
@@ -134,6 +136,8 @@ const ProwlarrIndexerListScreen = () => {
       isMounted = false;
     };
   }, [getSyncStatus]);
+
+  // The API banner is persistent until the user dismisses it via the close button.
 
   const refreshSyncStatus = useCallback(async () => {
     const status = await getSyncStatus();
@@ -170,18 +174,12 @@ const ProwlarrIndexerListScreen = () => {
   // Handle indexer actions
   const handleToggleIndexer = useCallback(async (indexer: ProwlarrApplicationResource) => {
     const success = await toggleIndexer(indexer);
-    if (!success) {
-      Alert.alert('Error', 'Failed to update indexer');
-    }
+    // Errors are surfaced via the API banner; no alert popup.
   }, [toggleIndexer]);
 
   const handleTestIndexer = useCallback(async (indexer: ProwlarrApplicationResource) => {
-    const result = await testIndexer(indexer);
-    if (result.ok) {
-      Alert.alert('Success', `Indexer "${indexer.name}" tested successfully`);
-    } else {
-      Alert.alert('Error', result.message ?? 'Failed to test indexer');
-    }
+    // Trigger test; any success/error is shown in the API banner.
+    await testIndexer(indexer);
   }, [testIndexer]);
 
   const handleDeleteIndexer = useCallback(async (indexer: ProwlarrApplicationResource) => {
@@ -194,10 +192,8 @@ const ProwlarrIndexerListScreen = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const success = await deleteIndexer(indexer.id);
-            if (!success) {
-              Alert.alert('Error', 'Failed to delete indexer');
-            }
+            // Delete and rely on API banner for any errors.
+            await deleteIndexer(indexer.id);
           },
         },
       ]
@@ -398,6 +394,33 @@ const ProwlarrIndexerListScreen = () => {
             </Text>
             <IconButton icon="refresh" size={18} onPress={refreshSyncStatus} />
           </View>
+        )}
+        {/* API Request Banner (shows last API request info / errors) */}
+        {lastApiEvent && (
+          <Animated.View
+            entering={FadeInDown}
+            exiting={FadeOut}
+            layout={Layout}
+            style={[
+              styles.apiBanner,
+              lastApiEvent.status === 'error'
+                ? { borderColor: theme.colors.error }
+                : { borderColor: theme.colors.primary },
+            ]}
+          >
+            <Icon source={lastApiEvent.status === 'error' ? 'alert-circle' : 'api'} size={16} color={lastApiEvent.status === 'error' ? theme.colors.error : theme.colors.primary} />
+            <View style={styles.syncTextContainer}>
+              <Text variant="bodySmall" numberOfLines={1} ellipsizeMode="tail" style={{ color: theme.colors.onSurfaceVariant }}>
+                {lastApiEvent.method?.toUpperCase() ?? ''} {lastApiEvent.endpoint ?? ''} — {lastApiEvent.status.toUpperCase()}
+              </Text>
+              {lastApiEvent.message && (
+                <Text variant="bodySmall" numberOfLines={2} ellipsizeMode="tail" style={[styles.apiMessage, { color: lastApiEvent.status === 'error' ? theme.colors.error : theme.colors.onSurfaceVariant }]}>
+                  {lastApiEvent.message}
+                </Text>
+              )}
+            </View>
+            <IconButton icon="close" size={18} onPress={clearApiEvent} accessibilityLabel="Dismiss API banner" />
+          </Animated.View>
         )}
         <Searchbar
           placeholder="Search indexers..."
@@ -715,6 +738,19 @@ const styles = StyleSheet.create({
     flex: 1,
     // Required for Text to shrink/wrap correctly inside a flex row on react-native
     minWidth: 0,
+  },
+  apiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+  },
+  apiMessage: {
+    marginTop: 2,
   },
   lastSyncText: {
     // Keep the last sync label compact and avoid forcing full-width
