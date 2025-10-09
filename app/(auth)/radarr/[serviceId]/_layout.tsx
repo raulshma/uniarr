@@ -22,6 +22,7 @@ export default function RadarrServiceLayout() {
         name="add"
         options={{
           title: 'Add Movie',
+          headerShown: false
         }}
       />
     </Stack>

@@ -61,14 +61,17 @@ interface RadarrQualityItem {
 
 interface RadarrQualityProfileItem {
   readonly allowed: boolean;
-  readonly quality: RadarrQualityItem;
+  readonly quality?: RadarrQualityItem;
+  readonly items?: RadarrQualityProfileItem[];
+  readonly name?: string;
+  readonly id?: number;
 }
 
 interface RadarrQualityProfile {
   readonly id: number;
   readonly name: string;
   readonly upgradeAllowed?: boolean;
-  readonly cutoff: RadarrQualityItem;
+  readonly cutoff: number;
   readonly items: RadarrQualityProfileItem[];
 }
 
@@ -459,21 +462,49 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   }
 
   async getQualityProfiles(): Promise<QualityProfile[]> {
-    try {
-      const response = await this.client.get<RadarrQualityProfile[]>(`${RADARR_API_PREFIX}/qualityprofile`);
-      return response.data.map((profile) => this.mapQualityProfile(profile));
-    } catch (error) {
-      // Provide more specific error message for quality profile issues
-      const enhancedError = new Error(
-        'Failed to load quality profiles. This may be due to corrupted custom formats in Radarr. Please check your Radarr quality profiles and custom formats, then try again.'
-      );
-      throw handleApiError(enhancedError, {
-        serviceId: this.config.id,
-        serviceType: this.config.type,
-        operation: 'getQualityProfiles',
-        endpoint: `${RADARR_API_PREFIX}/qualityprofile`,
-      });
+    const candidateEndpoints = [
+      `${RADARR_API_PREFIX}/qualityprofile`,
+      `${RADARR_API_PREFIX}/qualityProfile`,
+      `${RADARR_API_PREFIX}/qualityProfiles`,
+    ];
+
+    for (const endpoint of candidateEndpoints) {
+      try {
+        const response = await this.client.get<RadarrQualityProfile[]>(endpoint);
+        
+        // Check if response contains an error
+        if (response.data && typeof response.data === 'object' && !Array.isArray(response.data) && 'error' in response.data) {
+          throw new Error((response.data as any).error as string);
+        }
+        
+        return response.data.map((profile) => this.mapQualityProfile(profile));
+      } catch (error) {
+        const axiosError = error as any;
+        const status = axiosError?.response?.status;
+        if (status !== 404) {
+          const enhancedError = new Error(
+            'Failed to load quality profiles. This may be due to corrupted custom formats in Radarr. Please check your Radarr quality profiles and custom formats, then try again.'
+          );
+          throw handleApiError(enhancedError, {
+            serviceId: this.config.id,
+            serviceType: this.config.type,
+            operation: 'getQualityProfiles',
+            endpoint,
+          });
+        }
+        // otherwise try next candidate
+      }
     }
+
+    const enhancedError = new Error(
+      'Failed to load quality profiles. Tried several Radarr endpoints but none responded. This may be due to API changes or server configuration.'
+    );
+    throw handleApiError(enhancedError, {
+      serviceId: this.config.id,
+      serviceType: this.config.type,
+      operation: 'getQualityProfiles',
+      endpoint: candidateEndpoints.join(' | '),
+    });
   }
 
   async getRootFolders(): Promise<RootFolder[]> {
@@ -651,15 +682,54 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       id: profile.id,
       name: profile.name,
       upgradeAllowed: profile.upgradeAllowed,
-      cutoff: this.mapQualityResource(profile.cutoff),
+      cutoff: this.findQualityById(profile.items, profile.cutoff),
       items: profile.items.map((item) => this.mapQualityProfileItem(item)),
     };
   }
 
+  private findQualityById(items: RadarrQualityProfileItem[], qualityId: number): Quality {
+    // Flatten all qualities from the nested structure
+    const allQualities: RadarrQualityItem[] = [];
+    
+    const processItem = (item: RadarrQualityProfileItem) => {
+      if (item.quality) {
+        allQualities.push(item.quality);
+      }
+      if (item.items) {
+        item.items.forEach(processItem);
+      }
+    };
+    
+    items.forEach(processItem);
+    
+    const found = allQualities.find(q => q.id === qualityId);
+    if (found) {
+      return this.mapQualityResource(found);
+    }
+    
+    // Fallback: create a minimal quality object if not found
+    return {
+      id: qualityId,
+      name: `Quality ${qualityId}`,
+      source: 'unknown',
+      resolution: 0,
+      sort: 0,
+    };
+  }
+
   private mapQualityProfileItem(item: RadarrQualityProfileItem): QualityProfileItem {
+    // For groups, we need to handle differently, but for now, if no quality, use a placeholder
+    const quality = item.quality || {
+      id: item.id || 0,
+      name: item.name || 'Unknown',
+      source: 'unknown',
+      resolution: 0,
+      sort: 0,
+    };
+    
     return {
       allowed: item.allowed,
-      quality: this.mapQualityResource(item.quality),
+      quality: this.mapQualityResource(quality),
     };
   }
 

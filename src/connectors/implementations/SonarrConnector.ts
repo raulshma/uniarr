@@ -151,14 +151,17 @@ interface SonarrQualityItem {
 
 interface SonarrQualityProfileItem {
   readonly allowed: boolean;
-  readonly quality: SonarrQualityItem;
+  readonly quality?: SonarrQualityItem;
+  readonly items?: SonarrQualityProfileItem[];
+  readonly name?: string;
+  readonly id?: number;
 }
 
 interface SonarrQualityProfile {
   readonly id: number;
   readonly name: string;
   readonly upgradeAllowed?: boolean;
-  readonly cutoff: SonarrQualityItem;
+  readonly cutoff: number;
   readonly items: SonarrQualityProfileItem[];
 }
 
@@ -529,21 +532,48 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   async getQualityProfiles(): Promise<QualityProfile[]> {
-    try {
-      const response = await this.client.get<SonarrQualityProfile[]>('/api/v3/qualityprofile');
-      return response.data.map((profile: SonarrQualityProfile) => this.mapQualityProfile(profile));
-    } catch (error) {
-      // Provide more specific error message for quality profile issues
-      const enhancedError = new Error(
-        'Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.'
-      );
-      throw handleApiError(enhancedError, {
-        serviceId: this.config.id,
-        serviceType: this.config.type,
-        operation: 'getQualityProfiles',
-        endpoint: '/api/v3/qualityprofile',
-      });
+    const candidateEndpoints = ['/api/v3/qualityprofile', '/api/v3/qualityProfile', '/api/v3/qualityProfiles'];
+
+    for (const endpoint of candidateEndpoints) {
+      try {
+        // Attempt endpoint variant
+        const response = await this.client.get<SonarrQualityProfile[]>(endpoint);
+        
+        // Check if response contains an error
+        if (response.data && typeof response.data === 'object' && !Array.isArray(response.data) && 'error' in response.data) {
+          throw new Error((response.data as any).error as string);
+        }
+        
+        return response.data.map((profile: SonarrQualityProfile) => this.mapQualityProfile(profile));
+      } catch (error) {
+        // If this endpoint returned a 404, try the next candidate.
+        const axiosError = error as any;
+        const status = axiosError?.response?.status;
+        // Only continue trying on 404; for other errors, fail-fast and report diagnostics
+        if (status !== 404) {
+          const enhancedError = new Error(
+            'Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.'
+          );
+          throw handleApiError(enhancedError, {
+            serviceId: this.config.id,
+            serviceType: this.config.type,
+            operation: 'getQualityProfiles',
+            endpoint,
+          });
+        }
+        // otherwise continue to next candidate
+      }
     }
+
+    const enhancedError = new Error(
+      'Failed to load quality profiles. Tried several Sonarr endpoints but none responded. This may be due to API changes or server configuration.'
+    );
+    throw handleApiError(enhancedError, {
+      serviceId: this.config.id,
+      serviceType: this.config.type,
+      operation: 'getQualityProfiles',
+      endpoint: candidateEndpoints.join(' | '),
+    });
   }
 
   async getRootFolders(): Promise<RootFolder[]> {
@@ -753,15 +783,54 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       id: profile.id,
       name: profile.name,
       upgradeAllowed: profile.upgradeAllowed,
-      cutoff: this.mapQualityResource(profile.cutoff),
+      cutoff: this.findQualityById(profile.items, profile.cutoff),
       items: profile.items.map((item) => this.mapQualityProfileItem(item)),
     };
   }
 
+  private findQualityById(items: SonarrQualityProfileItem[], qualityId: number): Quality {
+    // Flatten all qualities from the nested structure
+    const allQualities: SonarrQualityItem[] = [];
+    
+    const processItem = (item: SonarrQualityProfileItem) => {
+      if (item.quality) {
+        allQualities.push(item.quality);
+      }
+      if (item.items) {
+        item.items.forEach(processItem);
+      }
+    };
+    
+    items.forEach(processItem);
+    
+    const found = allQualities.find(q => q.id === qualityId);
+    if (found) {
+      return this.mapQualityResource(found);
+    }
+    
+    // Fallback: create a minimal quality object if not found
+    return {
+      id: qualityId,
+      name: `Quality ${qualityId}`,
+      source: 'unknown',
+      resolution: 0,
+      sort: 0,
+    };
+  }
+
   private mapQualityProfileItem(item: SonarrQualityProfileItem): QualityProfileItem {
+    // For groups, we need to handle differently, but for now, if no quality, use a placeholder
+    const quality = item.quality || {
+      id: item.id || 0,
+      name: item.name || 'Unknown',
+      source: 'unknown',
+      resolution: 0,
+      sort: 0,
+    };
+    
     return {
       allowed: item.allowed,
-      quality: this.mapQualityResource(item.quality),
+      quality: this.mapQualityResource(quality),
     };
   }
 

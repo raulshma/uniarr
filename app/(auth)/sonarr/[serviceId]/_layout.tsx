@@ -22,6 +22,7 @@ export default function SonarrServiceLayout() {
         name="add"
         options={{
           title: 'Add Series',
+          headerShown: false
         }}
       />
     </Stack>
