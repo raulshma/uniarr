@@ -63,7 +63,7 @@ const IndexerListItemSkeleton = () => {
           <SkeletonPlaceholder style={styles.indexerImplementation} />
           <SkeletonPlaceholder style={styles.indexerPriority} />
         </View>
-        <SkeletonPlaceholder style={styles.indexerActions} />
+        <SkeletonPlaceholder style={[styles.indexerActions, { width: 20, height: 20, borderRadius: 10 }]} />
       </View>
     </Animated.View>
   );
@@ -290,6 +290,42 @@ const ProwlarrIndexerListScreen = () => {
   if (isLoading && indexers.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
+        {/* Search Container Skeleton */}
+        <View style={styles.searchContainer}>
+          {/* Sync Banner Skeleton */}
+          <View style={[styles.syncBanner, { borderColor: theme.colors.outline, backgroundColor: theme.colors.surface }]}>
+            <SkeletonPlaceholder style={{ width: 16, height: 16, borderRadius: 8 }} />
+            <View style={styles.syncTextContainer}>
+              <SkeletonPlaceholder style={{ width: '60%', height: 14, borderRadius: 7 }} />
+            </View>
+            <View style={styles.syncTextContainer}>
+              <View style={styles.summaryRow}>
+                <View style={[styles.appCountBadge, { borderColor: theme.colors.outline }]}>
+                  <SkeletonPlaceholder style={{ width: 16, height: 14, borderRadius: 7 }} />
+                </View>
+                <SkeletonPlaceholder style={{ width: 18, height: 18, borderRadius: 9 }} />
+              </View>
+            </View>
+            <SkeletonPlaceholder style={{ width: '40%', height: 14, borderRadius: 7, marginLeft: spacing.sm }} />
+            <SkeletonPlaceholder style={{ width: 18, height: 18, borderRadius: 9 }} />
+          </View>
+          {/* API Banner Skeleton */}
+          <View style={[styles.apiBanner, { borderColor: theme.colors.primary }]}>
+            <SkeletonPlaceholder style={{ width: 16, height: 16, borderRadius: 8 }} />
+            <View style={styles.syncTextContainer}>
+              <SkeletonPlaceholder style={{ width: '70%', height: 14, borderRadius: 7 }} />
+              <SkeletonPlaceholder style={{ width: '50%', height: 12, borderRadius: 6, marginTop: 2 }} />
+            </View>
+            <SkeletonPlaceholder style={{ width: 18, height: 18, borderRadius: 9 }} />
+          </View>
+          <SkeletonPlaceholder style={[styles.searchbar, { height: 48 }]} />
+          <View style={[styles.filterChip, { height: 36, borderColor: theme.colors.outline }]}>
+            <SkeletonPlaceholder style={{ width: 16, height: 16, borderRadius: 8 }} />
+            <SkeletonPlaceholder style={{ width: 80, height: 16, borderRadius: 8 }} />
+            <SkeletonPlaceholder style={{ width: 16, height: 16, borderRadius: 8 }} />
+          </View>
+        </View>
+        {/* Indexer Items Skeleton */}
         <ScrollView contentContainerStyle={styles.loadingContainer}>
           {Array.from({ length: 5 }).map((_, index) => (
             <IndexerListItemSkeleton key={index} />
@@ -642,7 +678,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loadingContainer: {
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 0,
     gap: spacing.sm,
   },
   searchContainer: {
