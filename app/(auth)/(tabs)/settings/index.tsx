@@ -17,8 +17,7 @@ import { spacing } from '@/theme/spacing';
 import { useSettingsStore } from '@/store/settingsStore';
 import type { NotificationCategory } from '@/models/notification.types';
 import { getCategoryFriendlyName } from '@/utils/quietHours.utils';
-import { BackupRestoreSection } from '@/components/settings/BackupRestoreSection';
-import { CloudBackupSettings } from '@/components/settings/CloudBackupSettings';
+// Backup & restore moved to its own settings screen
 
 const SettingsScreen = () => {
   const router = useRouter();
@@ -531,11 +530,28 @@ const SettingsScreen = () => {
           </AnimatedListItem>
         </AnimatedSection>
 
-        {/* Backup & Restore Section */}
-        <BackupRestoreSection delay={300} />
-
-        {/* Cloud Backup Settings Section */}
-        <CloudBackupSettings delay={350} />
+        {/* Backup & Restore (moved) */}
+        <AnimatedSection style={styles.section} delay={300}>
+          <Text style={styles.sectionTitle}>Backup & Restore</Text>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push('/(auth)/settings/backup-restore')}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton icon="backup-restore" size={24} iconColor={theme.colors.primary} />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Backup & Restore</Text>
+                  <Text style={styles.settingSubtitle}>Export, import and manage backups (including cloud)</Text>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+              </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
 
         {/* About Section */}
         <AnimatedSection style={styles.section} delay={350}>
