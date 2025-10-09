@@ -474,104 +474,99 @@ const ProwlarrIndexerListScreen = () => {
         contentContainerStyle={filteredIndexers.length === 0 ? styles.emptyList : undefined}
       />
 
-      {/* Action Menu FAB */}
-      <Menu
-        key={`prowlarr-fab-menu-${isFabMenuVisible}-${selectedIds.size}`}
-        visible={isFabMenuVisible}
-        onDismiss={() => setIsFabMenuVisible(false)}
-        anchor={
-          <View>
-            <FAB
-              icon="dots-vertical"
-              style={[styles.fab, { backgroundColor: theme.colors.primaryContainer }]}
-              onPress={() => setIsFabMenuVisible(true)}
-            />
-          </View>
-        }
-      >
-        <Menu.Item
-          leadingIcon="plus"
-          onPress={() => {
-            setIsFabMenuVisible(false);
-            setIsAddDialogVisible(true);
-            setIsSchemaLoading(true);
-            setSelectedSchemaIdx(null);
-            void (async () => {
-              const schema = await getIndexerSchema();
-              setSchemaOptions(schema);
-              setIsSchemaLoading(false);
-            })();
-          }}
-          title="Add Indexer"
-        />
-        {multiSelectActive && (
-          <Menu.Item
-            leadingIcon="check-circle"
-            onPress={async () => {
+      {/* Floating action button group (replaces Menu-anchored FAB which could be unresponsive on Android/iOS) */}
+      <FAB.Group
+        visible={true}
+        open={isFabMenuVisible}
+        icon={isFabMenuVisible ? 'close' : 'dots-vertical'}
+        fabStyle={{ backgroundColor: theme.colors.primaryContainer }}
+        style={styles.fab}
+        onStateChange={({ open }) => setIsFabMenuVisible(open)}
+        onPress={() => {
+          // When closed, pressing will open the group. When open, pressing main fab will close it.
+          setIsFabMenuVisible((s) => !s);
+        }}
+        actions={[
+          {
+            icon: 'plus',
+            label: 'Add Indexer',
+            onPress: () => {
               setIsFabMenuVisible(false);
-              await bulkEnableDisable(Array.from(selectedIds), true);
-              setSelectedIds(new Set());
-            }}
-            title={`Enable (${selectedIds.size})`}
-          />
-        )}
-        {multiSelectActive && (
-          <Menu.Item
-            leadingIcon="pause-circle"
-            onPress={async () => {
+              setIsAddDialogVisible(true);
+              setIsSchemaLoading(true);
+              setSelectedSchemaIdx(null);
+              void (async () => {
+                const schema = await getIndexerSchema();
+                setSchemaOptions(schema);
+                setIsSchemaLoading(false);
+              })();
+            },
+          },
+          ...(multiSelectActive
+            ? [
+                {
+                  icon: 'check-circle',
+                  label: `Enable (${selectedIds.size})`,
+                  onPress: async () => {
+                    setIsFabMenuVisible(false);
+                    await bulkEnableDisable(Array.from(selectedIds), true);
+                    setSelectedIds(new Set());
+                  },
+                },
+                {
+                  icon: 'pause-circle',
+                  label: `Disable (${selectedIds.size})`,
+                  onPress: async () => {
+                    setIsFabMenuVisible(false);
+                    await bulkEnableDisable(Array.from(selectedIds), false);
+                    setSelectedIds(new Set());
+                  },
+                },
+                {
+                  icon: 'delete',
+                  label: `Delete (${selectedIds.size})`,
+                  onPress: async () => {
+                    setIsFabMenuVisible(false);
+                    await bulkDelete(Array.from(selectedIds));
+                    setSelectedIds(new Set());
+                  },
+                },
+                {
+                  icon: 'close-circle',
+                  label: 'Clear Selection',
+                  onPress: () => {
+                    setIsFabMenuVisible(false);
+                    setSelectedIds(new Set());
+                  },
+                },
+              ]
+            : []),
+          {
+            icon: 'chart-line',
+            label: 'View Statistics',
+            onPress: () => {
               setIsFabMenuVisible(false);
-              await bulkEnableDisable(Array.from(selectedIds), false);
-              setSelectedIds(new Set());
-            }}
-            title={`Disable (${selectedIds.size})`}
-          />
-        )}
-        {multiSelectActive && (
-          <Menu.Item
-            leadingIcon="delete"
-            onPress={async () => {
+              router.push(`/prowlarr/${serviceId}/statistics`);
+            },
+          },
+          {
+            icon: 'sync',
+            label: 'Sync to Apps',
+            onPress: async () => {
               setIsFabMenuVisible(false);
-              await bulkDelete(Array.from(selectedIds));
-              setSelectedIds(new Set());
-            }}
-            title={`Delete (${selectedIds.size})`}
-          />
-        )}
-        {multiSelectActive && (
-          <Menu.Item
-            leadingIcon="close-circle"
-            onPress={() => {
+              await handleSyncIndexers();
+            },
+          },
+          {
+            icon: 'refresh',
+            label: 'Rescan Indexers',
+            onPress: async () => {
               setIsFabMenuVisible(false);
-              setSelectedIds(new Set());
-            }}
-            title="Clear Selection"
-          />
-        )}
-        <Menu.Item
-          leadingIcon="chart-line"
-          onPress={() => {
-            setIsFabMenuVisible(false);
-            router.push(`/prowlarr/${serviceId}/statistics`);
-          }}
-          title="View Statistics"
-        />
-        <Menu.Item
-          leadingIcon="sync"
-          onPress={async () => {
-            setIsFabMenuVisible(false);
-            await handleSyncIndexers();
-          }}
-          title="Sync to Apps"
-        />
-        <Menu.Item
-          leadingIcon="refresh"
-          onPress={async () => {
-            setIsFabMenuVisible(false);
-            await handleRescanIndexers();
-          }}
-          title="Rescan Indexers"
-        />
-      </Menu>
+              await handleRescanIndexers();
+            },
+          },
+        ]}
+      />
 
       {/* Add Indexer Dialog */}
       <Dialog visible={isAddDialogVisible} onDismiss={() => setIsAddDialogVisible(false)}>
