@@ -472,7 +472,7 @@ const ServicesScreen = () => {
           <AnimatedSection style={styles.section} delay={100}>
             <SkeletonPlaceholder width="50%" height={28} borderRadius={10} style={{ marginBottom: spacing.md }} />
             {Array.from({ length: 4 }).map((_, index) => (
-              <AnimatedListItem key={index} index={index} totalItems={4} style={{ marginBottom: spacing.sm }}>
+              <AnimatedListItem key={index} index={index} totalItems={4} style={{ marginBottom: spacing.sm, marginHorizontal: spacing.md }}>
                 <ServiceCardSkeleton />
               </AnimatedListItem>
             ))}

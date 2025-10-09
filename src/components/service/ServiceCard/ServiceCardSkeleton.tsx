@@ -47,6 +47,7 @@ const ServiceCardSkeleton: React.FC<ServiceCardSkeletonProps> = ({ style }) => {
       <SkeletonPlaceholder width={48} height={48} borderRadius={24} style={styles.icon} />
       <View style={styles.content}>
         <SkeletonPlaceholder width="60%" height={18} borderRadius={6} />
+        <SkeletonPlaceholder width="40%" height={14} borderRadius={6} style={{ marginTop: theme.custom.spacing.xxs, marginBottom: theme.custom.spacing.xs }} />
         <View style={styles.statusRow}>
           <SkeletonPlaceholder width={12} height={12} borderRadius={6} />
           <SkeletonPlaceholder width="35%" height={12} borderRadius={6} />
