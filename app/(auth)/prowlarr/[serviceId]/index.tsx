@@ -8,6 +8,8 @@ import {
   Icon,
   IconButton,
   Menu,
+  Button,
+  Dialog,
   Searchbar,
   Text,
   TouchableRipple,
@@ -80,6 +82,16 @@ const ProwlarrIndexerListScreen = () => {
   const [selectedFilter, setSelectedFilter] = useState<FilterValue>(FILTER_ALL);
   const [isFilterMenuVisible, setIsFilterMenuVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [openItemMenuId, setOpenItemMenuId] = useState<number | null>(null);
+  const [isFabMenuVisible, setIsFabMenuVisible] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const multiSelectActive = selectedIds.size > 0;
+  const [isAddDialogVisible, setIsAddDialogVisible] = useState(false);
+  const [isAppsDialogVisible, setIsAppsDialogVisible] = useState(false);
+  const [schemaOptions, setSchemaOptions] = useState<ProwlarrApplicationResource[]>([]);
+  const [isSchemaLoading, setIsSchemaLoading] = useState(false);
+  const [selectedSchemaIdx, setSelectedSchemaIdx] = useState<number | null>(null);
+  const [syncStatus, setSyncStatus] = useState<{ connectedApps: string[]; lastSyncTime?: string; syncInProgress: boolean } | null>(null);
   const handleFilterChange = useCallback((value: FilterValue) => {
     setSelectedFilter(value);
     setIsFilterMenuVisible(false);
@@ -98,6 +110,10 @@ const ProwlarrIndexerListScreen = () => {
     syncIndexersToApps,
     rescanIndexers,
     getSyncStatus,
+    getIndexerSchema,
+    addIndexer,
+    bulkEnableDisable,
+    bulkDelete,
   } = useProwlarrIndexers(serviceId);
 
   // Handle refresh
@@ -106,6 +122,24 @@ const ProwlarrIndexerListScreen = () => {
     await refresh();
     setIsRefreshing(false);
   }, [refresh]);
+  // Load sync status
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      const status = await getSyncStatus();
+      if (isMounted) setSyncStatus(status);
+    };
+    void load();
+    return () => {
+      isMounted = false;
+    };
+  }, [getSyncStatus]);
+
+  const refreshSyncStatus = useCallback(async () => {
+    const status = await getSyncStatus();
+    setSyncStatus(status);
+  }, [getSyncStatus]);
+
 
 
   // Filter and search indexers
@@ -142,11 +176,11 @@ const ProwlarrIndexerListScreen = () => {
   }, [toggleIndexer]);
 
   const handleTestIndexer = useCallback(async (indexer: ProwlarrApplicationResource) => {
-    const success = await testIndexer(indexer);
-    if (success) {
+    const result = await testIndexer(indexer);
+    if (result.ok) {
       Alert.alert('Success', `Indexer "${indexer.name}" tested successfully`);
     } else {
-      Alert.alert('Error', 'Failed to test indexer');
+      Alert.alert('Error', result.message ?? 'Failed to test indexer');
     }
   }, [testIndexer]);
 
@@ -175,6 +209,7 @@ const ProwlarrIndexerListScreen = () => {
     const success = await syncIndexersToApps();
     if (success) {
       Alert.alert('Success', 'Indexers synced to connected applications');
+      void refreshSyncStatus();
     } else {
       Alert.alert('Error', 'Failed to sync indexers');
     }
@@ -191,20 +226,34 @@ const ProwlarrIndexerListScreen = () => {
 
   // Render indexer item
   const renderIndexerItem = ({ item }: { item: ProwlarrApplicationResource }) => (
-    <Animated.View
+    <Pressable
+      onLongPress={() => {
+        const next = new Set(selectedIds);
+        if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+        setSelectedIds(next);
+      }}
+      onPress={() => {
+        if (multiSelectActive) {
+          const next = new Set(selectedIds);
+          if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+          setSelectedIds(next);
+        }
+      }}
+    >
+      <Animated.View
       entering={FadeInUp}
       layout={Layout}
       style={[
         styles.indexerItem,
-        { borderColor: theme.colors.outline, backgroundColor: theme.colors.surface },
+          { borderColor: theme.colors.outline, backgroundColor: theme.colors.surface },
       ]}
-    >
-      <View style={styles.indexerContent}>
-        <Icon
-          source="radar"
-          size={24}
-          color={item.enable ? theme.colors.primary : theme.colors.outline}
-        />
+      >
+        <View style={styles.indexerContent}>
+          <Icon
+            source={multiSelectActive ? (selectedIds.has(item.id) ? 'checkbox-marked' : 'checkbox-blank-outline') : 'radar'}
+            size={24}
+            color={multiSelectActive ? (selectedIds.has(item.id) ? theme.colors.primary : theme.colors.onSurfaceVariant) : (item.enable ? theme.colors.primary : theme.colors.outline)}
+          />
         <View style={styles.indexerInfo}>
           <Text variant="bodyLarge" style={styles.indexerName}>
             {item.name}
@@ -218,44 +267,57 @@ const ProwlarrIndexerListScreen = () => {
         </View>
         <View style={styles.indexerActions}>
           <Menu
-            visible={false}
-            onDismiss={() => {}}
+            key={`prowlarr-item-menu-${item.id}-${openItemMenuId === item.id}`}
+            visible={openItemMenuId === item.id}
+            onDismiss={() => setOpenItemMenuId(null)}
             anchor={
-              <IconButton
-                icon="dots-vertical"
-                size={20}
-                onPress={() => {}}
-              />
+              <View>
+                <IconButton
+                  icon="dots-vertical"
+                  size={20}
+                  onPress={() => setOpenItemMenuId(item.id)}
+                />
+              </View>
             }
           >
             <Menu.Item
               leadingIcon="pencil"
               onPress={() => {
-                // TODO: Navigate to edit screen
+                setOpenItemMenuId(null);
                 Alert.alert('Edit', 'Edit indexer functionality coming soon');
               }}
               title="Edit"
             />
             <Menu.Item
               leadingIcon="test-tube"
-              onPress={() => handleTestIndexer(item)}
+              onPress={async () => {
+                setOpenItemMenuId(null);
+                await handleTestIndexer(item);
+              }}
               title="Test"
             />
             <Menu.Item
               leadingIcon={item.enable ? "pause" : "play"}
-              onPress={() => handleToggleIndexer(item)}
+              onPress={async () => {
+                setOpenItemMenuId(null);
+                await handleToggleIndexer(item);
+              }}
               title={item.enable ? "Disable" : "Enable"}
             />
             <Menu.Item
               leadingIcon="delete"
-              onPress={() => handleDeleteIndexer(item)}
+              onPress={() => {
+                setOpenItemMenuId(null);
+                void handleDeleteIndexer(item);
+              }}
               title="Delete"
               titleStyle={{ color: theme.colors.error }}
             />
           </Menu>
         </View>
-      </View>
-    </Animated.View>
+        </View>
+      </Animated.View>
+    </Pressable>
   );
 
   // Loading state
@@ -306,8 +368,37 @@ const ProwlarrIndexerListScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Search and Filter Bar */}
+      {/* Sync Status + Search and Filter Bar */}
       <Animated.View entering={FadeIn} style={styles.searchContainer}>
+        {syncStatus && (
+          <View style={[styles.syncBanner, { borderColor: theme.colors.outline, backgroundColor: theme.colors.surface }]}>
+            <Icon source={syncStatus.syncInProgress ? 'sync' : 'check-circle'} size={16} color={theme.colors.onSurfaceVariant} />
+            <View style={styles.syncTextContainer}>
+              <Text variant="bodySmall" numberOfLines={2} ellipsizeMode="tail" style={{ color: theme.colors.onSurfaceVariant }}>
+                Connected Apps: {syncStatus.connectedApps.length > 0 ? syncStatus.connectedApps.join(', ') : 'None'}
+              </Text>
+            </View>
+            <View style={styles.syncTextContainer}>
+              <View style={styles.summaryRow}>
+                <View style={[styles.appCountBadge, { borderColor: theme.colors.outline }]}> 
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                    {syncStatus.connectedApps.length}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="information-outline"
+                  size={18}
+                  onPress={() => setIsAppsDialogVisible(true)}
+                  accessibilityLabel="Connected apps details"
+                />
+              </View>
+            </View>
+            <Text variant="bodySmall" numberOfLines={1} ellipsizeMode="tail" style={[{ color: theme.colors.onSurfaceVariant }, styles.lastSyncText]}>
+              Last Sync: {syncStatus.lastSyncTime ? new Date(syncStatus.lastSyncTime).toLocaleString() : 'N/A'}
+            </Text>
+            <IconButton icon="refresh" size={18} onPress={refreshSyncStatus} />
+          </View>
+        )}
         <Searchbar
           placeholder="Search indexers..."
           value={searchQuery}
@@ -362,35 +453,175 @@ const ProwlarrIndexerListScreen = () => {
 
       {/* Action Menu FAB */}
       <Menu
-        visible={false}
-        onDismiss={() => {}}
+        key={`prowlarr-fab-menu-${isFabMenuVisible}-${selectedIds.size}`}
+        visible={isFabMenuVisible}
+        onDismiss={() => setIsFabMenuVisible(false)}
         anchor={
-          <FAB
-            icon="dots-vertical"
-            style={[styles.fab, { backgroundColor: theme.colors.primaryContainer }]}
-            onPress={() => {}}
-          />
+          <View>
+            <FAB
+              icon="dots-vertical"
+              style={[styles.fab, { backgroundColor: theme.colors.primaryContainer }]}
+              onPress={() => setIsFabMenuVisible(true)}
+            />
+          </View>
         }
       >
         <Menu.Item
           leadingIcon="plus"
           onPress={() => {
-            // TODO: Navigate to add indexer screen
-            Alert.alert('Add Indexer', 'Add indexer functionality coming soon');
+            setIsFabMenuVisible(false);
+            setIsAddDialogVisible(true);
+            setIsSchemaLoading(true);
+            setSelectedSchemaIdx(null);
+            void (async () => {
+              const schema = await getIndexerSchema();
+              setSchemaOptions(schema);
+              setIsSchemaLoading(false);
+            })();
           }}
           title="Add Indexer"
         />
+        {multiSelectActive && (
+          <Menu.Item
+            leadingIcon="check-circle"
+            onPress={async () => {
+              setIsFabMenuVisible(false);
+              await bulkEnableDisable(Array.from(selectedIds), true);
+              setSelectedIds(new Set());
+            }}
+            title={`Enable (${selectedIds.size})`}
+          />
+        )}
+        {multiSelectActive && (
+          <Menu.Item
+            leadingIcon="pause-circle"
+            onPress={async () => {
+              setIsFabMenuVisible(false);
+              await bulkEnableDisable(Array.from(selectedIds), false);
+              setSelectedIds(new Set());
+            }}
+            title={`Disable (${selectedIds.size})`}
+          />
+        )}
+        {multiSelectActive && (
+          <Menu.Item
+            leadingIcon="delete"
+            onPress={async () => {
+              setIsFabMenuVisible(false);
+              await bulkDelete(Array.from(selectedIds));
+              setSelectedIds(new Set());
+            }}
+            title={`Delete (${selectedIds.size})`}
+          />
+        )}
+        {multiSelectActive && (
+          <Menu.Item
+            leadingIcon="close-circle"
+            onPress={() => {
+              setIsFabMenuVisible(false);
+              setSelectedIds(new Set());
+            }}
+            title="Clear Selection"
+          />
+        )}
+        <Menu.Item
+          leadingIcon="chart-line"
+          onPress={() => {
+            setIsFabMenuVisible(false);
+            router.push(`/prowlarr/${serviceId}/statistics`);
+          }}
+          title="View Statistics"
+        />
         <Menu.Item
           leadingIcon="sync"
-          onPress={handleSyncIndexers}
+          onPress={async () => {
+            setIsFabMenuVisible(false);
+            await handleSyncIndexers();
+          }}
           title="Sync to Apps"
         />
         <Menu.Item
           leadingIcon="refresh"
-          onPress={handleRescanIndexers}
+          onPress={async () => {
+            setIsFabMenuVisible(false);
+            await handleRescanIndexers();
+          }}
           title="Rescan Indexers"
         />
       </Menu>
+
+      {/* Add Indexer Dialog */}
+      <Dialog visible={isAddDialogVisible} onDismiss={() => setIsAddDialogVisible(false)}>
+        <Dialog.Title>Add Indexer</Dialog.Title>
+        <Dialog.Content>
+          {isSchemaLoading ? (
+            <Text>Loading indexer types…</Text>
+          ) : schemaOptions.length === 0 ? (
+            <Text>No indexer templates available.</Text>
+          ) : (
+            <ScrollView style={{ maxHeight: 240 }}>
+              {schemaOptions.map((opt, idx) => (
+                <TouchableRipple key={`${opt.implementation}-${idx}`} onPress={() => setSelectedSchemaIdx(idx)}>
+                  <View style={{ paddingVertical: 8 }}>
+                    <Text variant="bodyLarge" style={{ fontWeight: selectedSchemaIdx === idx ? '700' : '500' }}>{opt.name}</Text>
+                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>{opt.implementationName}</Text>
+                  </View>
+                </TouchableRipple>
+              ))}
+            </ScrollView>
+          )}
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setIsAddDialogVisible(false)}>Cancel</Button>
+          <Button
+            disabled={selectedSchemaIdx == null || isSchemaLoading}
+            onPress={async () => {
+              if (selectedSchemaIdx == null) return;
+              const template = schemaOptions[selectedSchemaIdx];
+              if (!template) return;
+              const payload: ProwlarrApplicationResource = {
+                id: 0,
+                name: template.name ?? template.implementationName ?? 'Indexer',
+                implementationName: template.implementationName ?? template.implementation ?? 'Unknown',
+                implementation: template.implementation ?? 'Unknown',
+                configContract: template.configContract ?? '',
+                infoLink: template.infoLink ?? '',
+                tags: template.tags ?? [],
+                fields: template.fields ?? [],
+                enable: true,
+                priority: template.priority ?? 25,
+                syncLevel: template.syncLevel ?? 'full',
+              };
+              const ok = await addIndexer(payload);
+              if (ok) setIsAddDialogVisible(false);
+            }}
+          >
+            Add
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+      {/* Connected Apps Dialog */}
+      <Dialog visible={isAppsDialogVisible} onDismiss={() => setIsAppsDialogVisible(false)}>
+        <Dialog.Title>Connected Applications</Dialog.Title>
+        <Dialog.Content>
+          {syncStatus?.connectedApps && syncStatus.connectedApps.length > 0 ? (
+            <ScrollView style={{ maxHeight: 280 }}>
+              {syncStatus.connectedApps.map((name, idx) => (
+                <TouchableRipple key={`${name}-${idx}`} onPress={() => {}}>
+                  <View style={{ paddingVertical: 8 }}>
+                    <Text variant="bodyMedium">{name}</Text>
+                  </View>
+                </TouchableRipple>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text>No connected applications.</Text>
+          )}
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={() => setIsAppsDialogVisible(false)}>Close</Button>
+        </Dialog.Actions>
+      </Dialog>
     </SafeAreaView>
   );
 };
@@ -407,8 +638,33 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
   },
+  syncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+    // Keep banner contents on a single row, with a horizontal scroller for apps
+    flexWrap: 'nowrap',
+  },
   searchbar: {
     elevation: 1,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  appCountBadge: {
+    minWidth: 32,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
   },
   filterChip: {
     flexDirection: 'row',
@@ -454,6 +710,15 @@ const styles = StyleSheet.create({
   },
   indexerActions: {
     justifyContent: 'center',
+  },
+  syncTextContainer: {
+    flex: 1,
+    // Required for Text to shrink/wrap correctly inside a flex row on react-native
+    minWidth: 0,
+  },
+  lastSyncText: {
+    // Keep the last sync label compact and avoid forcing full-width
+    marginLeft: spacing.sm,
   },
   emptyList: {
     flexGrow: 1,

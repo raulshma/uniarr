@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   useTheme,
+  PaperProvider,
 } from 'react-native-paper';
 import { router } from 'expo-router';
 
@@ -89,7 +90,7 @@ export default function ThemeEditorScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Card style={styles.section}>
         <Card.Title title="Theme Presets" />
         <Card.Content>
@@ -102,7 +103,10 @@ export default function ThemeEditorScreen() {
                 style={[
                   styles.presetChip,
                   {
-                    backgroundColor: config.preset === key ? theme.colors.primaryContainer : theme.colors.surface,
+                    backgroundColor:
+                      config.preset === key
+                        ? theme.colors.primaryContainer
+                        : theme.colors.surfaceVariant,
                   },
                 ]}
               >
@@ -125,7 +129,10 @@ export default function ThemeEditorScreen() {
                 <View
                   style={[
                     styles.colorPreview,
-                    { backgroundColor: config.customColors?.primary || theme.colors.primary },
+                    {
+                      backgroundColor: config.customColors?.primary || theme.colors.primary,
+                      borderColor: theme.colors.outlineVariant,
+                    },
                   ]}
                 />
               )}
@@ -138,7 +145,10 @@ export default function ThemeEditorScreen() {
                 <View
                   style={[
                     styles.colorPreview,
-                    { backgroundColor: config.customColors?.secondary || theme.colors.secondary },
+                    {
+                      backgroundColor: config.customColors?.secondary || theme.colors.secondary,
+                      borderColor: theme.colors.outlineVariant,
+                    },
                   ]}
                 />
               )}
@@ -151,7 +161,10 @@ export default function ThemeEditorScreen() {
                 <View
                   style={[
                     styles.colorPreview,
-                    { backgroundColor: config.customColors?.background || theme.colors.background },
+                    {
+                      backgroundColor: config.customColors?.background || theme.colors.background,
+                      borderColor: theme.colors.outlineVariant,
+                    },
                   ]}
                 />
               )}
@@ -202,7 +215,14 @@ export default function ThemeEditorScreen() {
                 <TextInput
                   value={config.posterStyle.borderRadius.toString()}
                   onChangeText={(text) => handlePosterStyleChange('borderRadius', parseInt(text) || 0)}
-                  style={styles.numberInput}
+                  style={[
+                    styles.numberInput,
+                    {
+                      backgroundColor: theme.colors.surfaceVariant,
+                      color: theme.colors.onSurface,
+                      borderColor: theme.colors.outlineVariant,
+                    },
+                  ]}
                   keyboardType="numeric"
                   maxLength={2}
                 />
@@ -215,7 +235,14 @@ export default function ThemeEditorScreen() {
                 <TextInput
                   value={config.posterStyle.shadowOpacity.toString()}
                   onChangeText={(text) => handlePosterStyleChange('shadowOpacity', parseFloat(text) || 0)}
-                  style={styles.numberInput}
+                  style={[
+                    styles.numberInput,
+                    {
+                      backgroundColor: theme.colors.surfaceVariant,
+                      color: theme.colors.onSurface,
+                      borderColor: theme.colors.outlineVariant,
+                    },
+                  ]}
                   keyboardType="decimal-pad"
                   maxLength={4}
                 />
@@ -228,7 +255,14 @@ export default function ThemeEditorScreen() {
                 <TextInput
                   value={config.posterStyle.shadowRadius.toString()}
                   onChangeText={(text) => handlePosterStyleChange('shadowRadius', parseInt(text) || 0)}
-                  style={styles.numberInput}
+                  style={[
+                    styles.numberInput,
+                    {
+                      backgroundColor: theme.colors.surfaceVariant,
+                      color: theme.colors.onSurface,
+                      borderColor: theme.colors.outlineVariant,
+                    },
+                  ]}
                   keyboardType="numeric"
                   maxLength={2}
                 />
@@ -241,19 +275,39 @@ export default function ThemeEditorScreen() {
       <Card style={styles.section}>
         <Card.Title title="Preview" />
         <Card.Content>
-          <View style={styles.previewContainer}>
-            <View style={[styles.previewCard, { borderRadius: config.posterStyle.borderRadius }]}>
-              <Text style={styles.previewTitle}>Sample Title</Text>
-              <Text style={styles.previewSubtitle}>Sample subtitle text</Text>
-              <Text style={styles.previewBody}>
-                This is how your content will look with the current theme settings.
-              </Text>
-            </View>
+          <View
+            style={[
+              styles.previewContainer,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outlineVariant,
+              },
+            ]}
+          >
+            <PaperProvider theme={previewTheme}>
+              <View
+                style={[
+                  styles.previewCard,
+                  {
+                    borderRadius: config.posterStyle.borderRadius,
+                    backgroundColor: previewTheme.colors.surfaceVariant,
+                  },
+                ]}
+              >
+                <Text variant="titleMedium">Sample Title</Text>
+                <Text variant="bodyMedium" style={{ opacity: 0.7, marginBottom: 12 }}>
+                  Sample subtitle text
+                </Text>
+                <Text variant="bodySmall">
+                  This is how your content will look with the current theme settings.
+                </Text>
+              </View>
+            </PaperProvider>
           </View>
         </Card.Content>
       </Card>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { borderTopColor: theme.colors.outlineVariant }]}>
         <Button mode="outlined" onPress={resetToDefaults} style={styles.actionButton}>
           Reset to Defaults
         </Button>
@@ -288,7 +342,6 @@ export default function ThemeEditorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   centered: {
     justifyContent: 'center',
@@ -315,20 +368,21 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ccc',
   },
   numberInput: {
     width: 60,
     textAlign: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 6,
   },
   previewContainer: {
     padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   previewCard: {
     padding: 16,
-    backgroundColor: '#f0f0f0',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -338,25 +392,12 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  previewTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  previewSubtitle: {
-    fontSize: 14,
-    marginBottom: 12,
-    opacity: 0.7,
-  },
-  previewBody: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
     paddingTop: 8,
+    borderTopWidth: 1,
   },
   actionButton: {
     flex: 1,

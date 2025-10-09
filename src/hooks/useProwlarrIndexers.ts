@@ -9,12 +9,17 @@ interface UseProwlarrIndexersResult {
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  testIndexer: (indexer: ProwlarrApplicationResource) => Promise<boolean>;
+  testIndexer: (indexer: ProwlarrApplicationResource) => Promise<{ ok: boolean; message?: string }>;
   toggleIndexer: (indexer: ProwlarrApplicationResource) => Promise<boolean>;
   deleteIndexer: (indexerId: number) => Promise<boolean>;
   syncIndexersToApps: () => Promise<boolean>;
   rescanIndexers: () => Promise<boolean>;
   getSyncStatus: () => Promise<{ connectedApps: string[]; lastSyncTime?: string; syncInProgress: boolean }>;
+  getIndexerSchema: () => Promise<ProwlarrApplicationResource[]>;
+  addIndexer: (application: ProwlarrApplicationResource) => Promise<boolean>;
+  updateIndexer: (indexerId: number, data: Partial<ProwlarrApplicationResource>) => Promise<boolean>;
+  bulkEnableDisable: (ids: number[], enable: boolean) => Promise<boolean>;
+  bulkDelete: (ids: number[]) => Promise<boolean>;
 }
 
 export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResult => {
@@ -57,19 +62,29 @@ export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResul
     await loadData();
   }, [loadData]);
 
-  const testIndexer = useCallback(async (indexer: ProwlarrApplicationResource): Promise<boolean> => {
-    if (!connector) return false;
+  const testIndexer = useCallback(async (indexer: ProwlarrApplicationResource): Promise<{ ok: boolean; message?: string }> => {
+    if (!connector) return { ok: false, message: 'Connector not available' };
 
     try {
-      if ((connector as any).testIndexerConfig) {
-        await (connector as any).testIndexerConfig(indexer);
-      } else {
-        await (connector as any).testApplication(indexer);
+      const result: any = (connector as any).testIndexerConfig
+        ? await (connector as any).testIndexerConfig(indexer)
+        : await (connector as any).testApplication(indexer);
+
+      // If API returned a test result object, reflect its validation status
+      if (result && typeof result === 'object') {
+        if (result.isValid === false) {
+          const details = Array.isArray(result.errors) ? result.errors.join('; ') : undefined;
+          return { ok: false, message: details ?? result.message ?? 'Indexer test failed' };
+        }
+        return { ok: true };
       }
-      return true;
-    } catch (err) {
+
+      // If no structured result, assume success
+      return { ok: true };
+    } catch (err: any) {
       void logger.error('Failed to test indexer', { error: err, serviceId, indexerId: indexer.id });
-      return false;
+      const message = err instanceof Error ? err.message : String(err ?? 'Unknown error');
+      return { ok: false, message };
     }
   }, [connector, serviceId]);
 
@@ -145,6 +160,88 @@ export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResul
     }
   }, [connector, serviceId]);
 
+  const getIndexerSchema = useCallback(async (): Promise<ProwlarrApplicationResource[]> => {
+    if (!connector) return [];
+    try {
+      if ((connector as any).getIndexerSchema) {
+        return await (connector as any).getIndexerSchema();
+      }
+      return await (connector as any).getApplicationSchema?.() ?? [];
+    } catch (err) {
+      void logger.error('Failed to get indexer schema', { error: err, serviceId });
+      return [];
+    }
+  }, [connector, serviceId]);
+
+  const addIndexer = useCallback(async (application: ProwlarrApplicationResource): Promise<boolean> => {
+    if (!connector) return false;
+    try {
+      if ((connector as any).addIndexer) {
+        await (connector as any).addIndexer(application);
+      } else {
+        await (connector as any).add(application);
+      }
+      await loadData();
+      return true;
+    } catch (err) {
+      void logger.error('Failed to add indexer', { error: err, serviceId });
+      return false;
+    }
+  }, [connector, serviceId, loadData]);
+
+  const updateIndexer = useCallback(async (indexerId: number, data: Partial<ProwlarrApplicationResource>): Promise<boolean> => {
+    if (!connector) return false;
+    try {
+      if ((connector as any).updateIndexer) {
+        await (connector as any).updateIndexer(indexerId, data);
+      } else {
+        await (connector as any).update(indexerId, data);
+      }
+      await loadData();
+      return true;
+    } catch (err) {
+      void logger.error('Failed to update indexer', { error: err, serviceId, indexerId });
+      return false;
+    }
+  }, [connector, serviceId, loadData]);
+
+  const bulkEnableDisable = useCallback(async (ids: number[], enable: boolean): Promise<boolean> => {
+    if (!connector) return false;
+    try {
+      if ((connector as any).bulkUpdateIndexers) {
+        await (connector as any).bulkUpdateIndexers({ ids, enable });
+      } else if ((connector as any).bulkUpdateApplications) {
+        await (connector as any).bulkUpdateApplications({ ids, enable });
+      } else {
+        // Fallback: update one by one
+        await Promise.all(ids.map((id) => (connector as any).update?.(id, { enable })));
+      }
+      await loadData();
+      return true;
+    } catch (err) {
+      void logger.error('Failed to bulk enable/disable indexers', { error: err, serviceId, ids, enable });
+      return false;
+    }
+  }, [connector, serviceId, loadData]);
+
+  const bulkDelete = useCallback(async (ids: number[]): Promise<boolean> => {
+    if (!connector) return false;
+    try {
+      if ((connector as any).bulkDeleteIndexers) {
+        await (connector as any).bulkDeleteIndexers(ids);
+      } else if ((connector as any).bulkDeleteApplications) {
+        await (connector as any).bulkDeleteApplications(ids);
+      } else {
+        await Promise.all(ids.map((id) => (connector as any).delete?.(id)));
+      }
+      await loadData();
+      return true;
+    } catch (err) {
+      void logger.error('Failed to bulk delete indexers', { error: err, serviceId, ids });
+      return false;
+    }
+  }, [connector, serviceId, loadData]);
+
   // Load data on mount and when serviceId changes
   useEffect(() => {
     if (serviceId) {
@@ -164,5 +261,10 @@ export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResul
     syncIndexersToApps,
     rescanIndexers,
     getSyncStatus,
+    getIndexerSchema,
+    addIndexer,
+    updateIndexer,
+    bulkEnableDisable,
+    bulkDelete,
   };
 };

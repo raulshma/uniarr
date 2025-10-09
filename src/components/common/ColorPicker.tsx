@@ -50,7 +50,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       presentationStyle="pageSheet"
     >
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: theme.colors.outlineVariant }]}>
           <Text variant="headlineSmall">Choose Color</Text>
           <Button onPress={onDismiss}>Cancel</Button>
         </View>
@@ -68,7 +68,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                   {
                     backgroundColor: color,
                     borderWidth: initialColor === color ? 3 : 1,
-                    borderColor: initialColor === color ? theme.colors.primary : '#ccc',
+                    borderColor: initialColor === color ? theme.colors.primary : theme.colors.outlineVariant,
                   },
                 ]}
                 onPress={() => handleColorSelect(color)}
@@ -95,7 +95,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               value={customColor}
               onChangeText={setCustomColor}
               placeholder="Enter hex color (e.g., FF0000)"
-              style={styles.hexInput}
+              style={[
+                styles.hexInput,
+                {
+                  backgroundColor: theme.colors.surfaceVariant,
+                  color: theme.colors.onSurface,
+                  borderColor: theme.colors.outlineVariant,
+                },
+              ]}
               maxLength={6}
               autoCapitalize="characters"
             />
@@ -105,7 +112,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
           </View>
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { borderTopColor: theme.colors.outlineVariant }]}>
           <Button mode="contained" onPress={onDismiss} style={styles.doneButton}>
             Done
           </Button>
@@ -125,7 +132,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   content: {
     flex: 1,
@@ -168,7 +174,6 @@ const styles = StyleSheet.create({
   },
   hexInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -177,7 +182,6 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
   doneButton: {
     width: '100%',

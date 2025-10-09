@@ -132,17 +132,82 @@ export class ProwlarrConnector extends BaseConnector<
    * Test a specific application (indexer)
    */
   async testIndexerConfig(application: ProwlarrApplicationResource): Promise<ProwlarrTestResult> {
+    // Prepare a minimal payload that matches the API contract; some Prowlarr builds
+    // are strict about the request body and will return 400 if extraneous or malformed
+    // values are provided.
+    const payload: any = {
+      // Basic identity
+      name: application.name,
+      implementation: application.implementation,
+      implementationName: application.implementationName,
+      configContract: application.configContract,
+      infoLink: application.infoLink,
+      // Key flags
+      enable: application.enable,
+      priority: application.priority,
+      syncLevel: application.syncLevel,
+      // Tags and fields (fields must be name/value pairs)
+      tags: application.tags ?? [],
+      fields: Array.isArray(application.fields)
+        ? application.fields.map((f) => ({ name: f.name, value: (f as any).value ?? f.value }))
+        : [],
+    };
+
     try {
-      const response = await this.client.post('/api/v1/indexer/test', application);
+      const response = await this.client.post('/api/v1/indexer/test', payload);
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
-        serviceId: this.config.id,
-        serviceType: this.config.type,
-        operation: 'testIndexerConfig',
-      });
+      // If API responds with 400, try to extract validation messages and include
+      // them in the thrown error to make debugging easier in the client.
+      const anyErr = error as any;
+      const resp = anyErr?.response;
+      if (resp && resp.status === 400 && resp.data) {
+        // Prowlarr may return a body with message, errors, or model state
+        const body = resp.data;
+        let details = '';
+        if (typeof body === 'string') {
+          details = body;
+        } else if (body.message) {
+          details = String(body.message);
+        }
+        // Collect validation details if available
+        if (body.errors && typeof body.errors === 'object') {
+          try {
+            details += '\n' + JSON.stringify(body.errors, null, 2);
+          } catch (_) {
+            details += '\n' + String(body.errors);
+          }
+        }
+        if (body.modelState) {
+          try {
+            details += '\n' + JSON.stringify(body.modelState, null, 2);
+          } catch (_) {
+            details += '\n' + String(body.modelState);
+          }
+        }
 
-      throw new Error(`Failed to test indexer config: ${diagnostic.message}`);
+        const diagnostic = handleApiError(error, {
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          operation: 'testIndexerConfig',
+        });
+
+        throw new Error(`Failed to test indexer config: ${diagnostic.message}${details ? ` - Details: ${details}` : ''}`);
+      }
+
+      // For other failures, attempt the applications/test endpoint as a fallback
+      try {
+        const fallbackResp = await this.client.post('/api/v1/applications/test', payload);
+        return fallbackResp.data;
+      } catch (fallbackErr) {
+        const diagnostic = handleApiError(fallbackErr ?? error, {
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          operation: 'testIndexerConfig',
+        });
+
+        throw new Error(`Failed to test indexer config: ${diagnostic.message}`);
+      }
     }
   }
 
@@ -309,12 +374,57 @@ export class ProwlarrConnector extends BaseConnector<
     syncInProgress: boolean;
   }> {
     try {
-      // This would typically call a sync status endpoint
-      // For now, return stub data
+      // Fetch configured applications (these represent connected apps like Sonarr/Radarr)
+      const appsResp = await this.client.get('/api/v1/applications');
+      const applications: ProwlarrApplicationResource[] = appsResp.data ?? [];
+
+      // Fetch recent commands to determine whether a sync is currently queued/started
+      // and to derive the last sync time. The /api/v1/command endpoint returns command
+      // records that include commandName and timestamp fields.
+      let commands: any[] = [];
+      try {
+        const cmdResp = await this.client.get('/api/v1/command');
+        commands = Array.isArray(cmdResp.data) ? cmdResp.data : (cmdResp.data?.records ?? []);
+      } catch (cmdErr) {
+        // Non-fatal - commands may not be available on all Prowlarr builds
+        commands = [];
+      }
+
+      let connectedApps = applications.map((a) => a.name).filter(Boolean) as string[];
+
+      // Some Prowlarr variants expose application profiles separately; try to fetch those
+      if (connectedApps.length === 0) {
+        try {
+          const profilesResp = await this.client.get('/api/v1/appprofile');
+          const profiles = profilesResp.data ?? [];
+          const profileNames = (Array.isArray(profiles) ? profiles : []).map((p: any) => p.name).filter(Boolean);
+          if (profileNames.length > 0) connectedApps = profileNames as string[];
+        } catch (profileErr) {
+          // ignore - appprofile endpoint may not be present on all versions
+        }
+      }
+
+      // Look for ApplicationIndexerSync command entries to determine status and last run
+      const syncCommands = commands.filter((c) => c.commandName === 'ApplicationIndexerSync');
+      const syncInProgress = syncCommands.some((c) => ['queued', 'started'].includes(c.status));
+
+      // Derive last sync time from the most recent completed/started command if available
+      let lastSyncTime: string | undefined;
+      if (syncCommands.length > 0) {
+        const timestamps = syncCommands
+          .map((c) => c.ended ?? c.started ?? c.queued)
+          .filter(Boolean)
+          .map((t: string) => new Date(t).getTime())
+          .filter(Boolean);
+        if (timestamps.length > 0) {
+          lastSyncTime = new Date(Math.max(...timestamps)).toISOString();
+        }
+      }
+
       return {
-        connectedApps: [],
-        lastSyncTime: undefined,
-        syncInProgress: false,
+        connectedApps,
+        lastSyncTime,
+        syncInProgress,
       };
     } catch (error) {
       const diagnostic = handleApiError(error, {
