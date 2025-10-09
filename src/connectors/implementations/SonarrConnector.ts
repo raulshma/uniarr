@@ -31,6 +31,7 @@ interface SonarrSeason {
   readonly seasonNumber: number;
   readonly monitored: boolean;
   readonly statistics?: SonarrStatistics;
+  readonly images?: SonarrImage[];
 }
 
 interface SonarrSeries {
@@ -151,15 +152,41 @@ interface SonarrQualityItem {
 
 interface SonarrQualityProfileItem {
   readonly allowed: boolean;
-  readonly quality: SonarrQualityItem;
+  readonly quality?: SonarrQualityItem;
+  readonly items?: SonarrQualityProfileItem[];
+  readonly name?: string;
+  readonly id?: number;
 }
 
 interface SonarrQualityProfile {
   readonly id: number;
   readonly name: string;
   readonly upgradeAllowed?: boolean;
-  readonly cutoff: SonarrQualityItem;
+  readonly cutoff: number;
   readonly items: SonarrQualityProfileItem[];
+}
+
+interface SonarrTag {
+  readonly id: number;
+  readonly label: string;
+}
+
+interface SonarrSeriesEditor {
+  readonly seriesIds: number[];
+  readonly monitored?: boolean;
+  readonly qualityProfileId?: number;
+  readonly tags?: number[];
+}
+
+interface SonarrMoveSeriesOptions {
+  readonly seriesId: number;
+  readonly destinationPath: string;
+  readonly moveFiles?: boolean;
+}
+
+interface SonarrRenameSeriesOptions {
+  readonly seriesId: number;
+  readonly renameFiles?: boolean;
 }
 
 interface SonarrRootFolder {
@@ -258,9 +285,11 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getById(id: number): Promise<Series> {
     try {
       const [seriesResponse, episodesResponse] = await Promise.all([
-        this.client.get<SonarrSeries>(`/api/v3/series/${id}`),
+        this.client.get<SonarrSeries>(`/api/v3/series/${id}`, {
+          params: { includeSeasonImages: true },
+        }),
         this.client.get<SonarrEpisode[]>(`/api/v3/episode`, {
-          params: { seriesId: id },
+          params: { seriesId: id, includeImages: true },
         }),
       ]);
 
@@ -356,22 +385,198 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getQualityProfiles(): Promise<QualityProfile[]> {
+  async updateSeries(
+    seriesId: number,
+    updates: Partial<Omit<SonarrSeries, 'id' | 'seasons' | 'statistics'>>
+  ): Promise<Series> {
     try {
-      const response = await this.client.get<SonarrQualityProfile[]>('/api/v3/qualityprofile');
-      return response.data.map((profile: SonarrQualityProfile) => this.mapQualityProfile(profile));
+      const response = await this.client.put<SonarrSeries>(`/api/v3/series/${seriesId}`, updates);
+      return this.mapSeries(response.data);
     } catch (error) {
-      // Provide more specific error message for quality profile issues
-      const enhancedError = new Error(
-        'Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.'
-      );
-      throw handleApiError(enhancedError, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getQualityProfiles',
-        endpoint: '/api/v3/qualityprofile',
+        operation: 'updateSeries',
+        endpoint: `/api/v3/series/${seriesId}`,
       });
     }
+  }
+
+  async refreshSeries(seriesId: number): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesRefresh',
+        seriesId,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'refreshSeries',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async rescanSeries(seriesId: number): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesRescan',
+        seriesId,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'rescanSeries',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async moveSeries(options: SonarrMoveSeriesOptions): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesMove',
+        ...options,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'moveSeries',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async renameSeries(options: SonarrRenameSeriesOptions): Promise<void> {
+    try {
+      await this.client.post('/api/v3/command', {
+        name: 'SeriesRename',
+        ...options,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'renameSeries',
+        endpoint: '/api/v3/command',
+      });
+    }
+  }
+
+  async getTags(): Promise<SonarrTag[]> {
+    try {
+      const response = await this.client.get<SonarrTag[]>('/api/v3/tag');
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getTags',
+        endpoint: '/api/v3/tag',
+      });
+    }
+  }
+
+  async createTag(label: string): Promise<SonarrTag> {
+    try {
+      const response = await this.client.post<SonarrTag>('/api/v3/tag', { label });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'createTag',
+        endpoint: '/api/v3/tag',
+      });
+    }
+  }
+
+  async updateTag(tagId: number, label: string): Promise<SonarrTag> {
+    try {
+      const response = await this.client.put<SonarrTag>(`/api/v3/tag/${tagId}`, { id: tagId, label });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'updateTag',
+        endpoint: `/api/v3/tag/${tagId}`,
+      });
+    }
+  }
+
+  async deleteTag(tagId: number): Promise<void> {
+    try {
+      await this.client.delete(`/api/v3/tag/${tagId}`);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'deleteTag',
+        endpoint: `/api/v3/tag/${tagId}`,
+      });
+    }
+  }
+
+  async bulkUpdateSeries(editor: SonarrSeriesEditor): Promise<void> {
+    try {
+      await this.client.put('/api/v3/series/editor', editor);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'bulkUpdateSeries',
+        endpoint: '/api/v3/series/editor',
+      });
+    }
+  }
+
+  async getQualityProfiles(): Promise<QualityProfile[]> {
+    const candidateEndpoints = ['/api/v3/qualityprofile', '/api/v3/qualityProfile', '/api/v3/qualityProfiles'];
+
+    for (const endpoint of candidateEndpoints) {
+      try {
+        // Attempt endpoint variant
+        const response = await this.client.get<SonarrQualityProfile[]>(endpoint);
+        
+        // Check if response contains an error
+        if (response.data && typeof response.data === 'object' && !Array.isArray(response.data) && 'error' in response.data) {
+          throw new Error((response.data as any).error as string);
+        }
+        
+        return response.data.map((profile: SonarrQualityProfile) => this.mapQualityProfile(profile));
+      } catch (error) {
+        // If this endpoint returned a 404, try the next candidate.
+        const axiosError = error as any;
+        const status = axiosError?.response?.status;
+        // Only continue trying on 404; for other errors, fail-fast and report diagnostics
+        if (status !== 404) {
+          const enhancedError = new Error(
+            'Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.'
+          );
+          throw handleApiError(enhancedError, {
+            serviceId: this.config.id,
+            serviceType: this.config.type,
+            operation: 'getQualityProfiles',
+            endpoint,
+          });
+        }
+        // otherwise continue to next candidate
+      }
+    }
+
+    const enhancedError = new Error(
+      'Failed to load quality profiles. Tried several Sonarr endpoints but none responded. This may be due to API changes or server configuration.'
+    );
+    throw handleApiError(enhancedError, {
+      serviceId: this.config.id,
+      serviceType: this.config.type,
+      operation: 'getQualityProfiles',
+      endpoint: candidateEndpoints.join(' | '),
+    });
   }
 
   async getRootFolders(): Promise<RootFolder[]> {
@@ -462,12 +667,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private mapSeason(season: SonarrSeason, seriesId?: number): Season {
+    const posterUrl = this.findImageUrl(season.images, 'poster') ?? (seriesId ? this.buildSeasonPosterUrl(seriesId, season.seasonNumber) : undefined);
+
     return {
       id: season.id,
       seasonNumber: season.seasonNumber,
       monitored: season.monitored,
       statistics: this.mapStatistics(season.statistics),
-      posterUrl: seriesId ? this.buildSeasonPosterUrl(seriesId, season.seasonNumber) : undefined,
+      posterUrl,
     };
   }
 
@@ -524,14 +731,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   private buildSeasonPosterUrl(seriesId: number, seasonNumber: number): string {
     try {
-      const url = new URL(`/api/v3/MediaCover/${seriesId}/season-${seasonNumber}.jpg`, this.config.url);
+      const url = new URL(`/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg`, this.config.url);
       if (this.config.apiKey) {
         url.searchParams.set('apikey', this.config.apiKey);
       }
       return url.toString();
     } catch (_e) {
       // Fallback to string concat if URL construction fails for any reason
-      return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}.jpg${
+      return `${this.config.url}/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg${
         this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
       }`;
     }
@@ -542,7 +749,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       // Try the episode-specific MediaCover endpoint format
       // Use 'screenshot' as the image type for episodes (most common)
       const url = new URL(
-        `/api/v3/MediaCover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
+        `/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
         this.config.url,
       );
       if (this.config.apiKey) {
@@ -550,7 +757,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       }
       return url.toString();
     } catch (_e) {
-      return `${this.config.url}/api/v3/MediaCover/${seriesId}/episode-${episodeId}-screenshot.jpg${
+      return `${this.config.url}/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg${
         this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
       }`;
     }
@@ -581,15 +788,54 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       id: profile.id,
       name: profile.name,
       upgradeAllowed: profile.upgradeAllowed,
-      cutoff: this.mapQualityResource(profile.cutoff),
+      cutoff: this.findQualityById(profile.items, profile.cutoff),
       items: profile.items.map((item) => this.mapQualityProfileItem(item)),
     };
   }
 
+  private findQualityById(items: SonarrQualityProfileItem[], qualityId: number): Quality {
+    // Flatten all qualities from the nested structure
+    const allQualities: SonarrQualityItem[] = [];
+    
+    const processItem = (item: SonarrQualityProfileItem) => {
+      if (item.quality) {
+        allQualities.push(item.quality);
+      }
+      if (item.items) {
+        item.items.forEach(processItem);
+      }
+    };
+    
+    items.forEach(processItem);
+    
+    const found = allQualities.find(q => q.id === qualityId);
+    if (found) {
+      return this.mapQualityResource(found);
+    }
+    
+    // Fallback: create a minimal quality object if not found
+    return {
+      id: qualityId,
+      name: `Quality ${qualityId}`,
+      source: 'unknown',
+      resolution: 0,
+      sort: 0,
+    };
+  }
+
   private mapQualityProfileItem(item: SonarrQualityProfileItem): QualityProfileItem {
+    // For groups, we need to handle differently, but for now, if no quality, use a placeholder
+    const quality = item.quality || {
+      id: item.id || 0,
+      name: item.name || 'Unknown',
+      source: 'unknown',
+      resolution: 0,
+      sort: 0,
+    };
+    
     return {
       allowed: item.allowed,
-      quality: this.mapQualityResource(item.quality),
+      quality: this.mapQualityResource(quality),
     };
   }
 

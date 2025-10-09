@@ -13,7 +13,7 @@ try {
 import { logger } from '@/services/logger/LoggerService';
 import type { ServiceType } from '@/models/service.types';
 import { secureStorage } from '@/services/storage/SecureStorage';
-import type { NetworkScanHistory, RecentIP } from '@/services/storage/SecureStorage';
+import type { NetworkScanHistoryType, RecentIP } from '@/services/storage/SecureStorage';
 
 export interface DiscoveredService {
   id: string;
@@ -49,7 +49,7 @@ export interface ServiceDetectionConfig {
   expectedResponsePattern?: string;
 }
 
-const SERVICE_DETECTION_CONFIGS: Record<ServiceType, ServiceDetectionConfig> = {
+export const SERVICE_DETECTION_CONFIGS: Partial<Record<ServiceType, ServiceDetectionConfig>> = {
   sonarr: {
     type: 'sonarr',
     commonPorts: [8989],
@@ -70,10 +70,30 @@ const SERVICE_DETECTION_CONFIGS: Record<ServiceType, ServiceDetectionConfig> = {
     commonPorts: [8080, 8091],
     detectionEndpoint: '/api/v2/app/version',
   },
+  transmission: {
+    type: 'transmission',
+    commonPorts: [9091, 51413],
+    detectionEndpoint: '/transmission/rpc',
+  },
+  deluge: {
+    type: 'deluge',
+    commonPorts: [58846],
+    detectionEndpoint: '/json',
+  },
+  sabnzbd: {
+    type: 'sabnzbd',
+    commonPorts: [8080],
+    detectionEndpoint: '/api',
+  },
   prowlarr: {
     type: 'prowlarr',
     commonPorts: [9696],
     detectionEndpoint: '/api/v1/system/status',
+  },
+  bazarr: {
+    type: 'bazarr',
+    commonPorts: [6767],
+    detectionEndpoint: '/api/system/status',
   },
 };
 
@@ -369,8 +389,55 @@ export class NetworkScannerService {
           break;
 
         case 'prowlarr':
-          response = await client.get(config.detectionEndpoint);
-          version = response.data?.version;
+          try {
+            response = await client.get(config.detectionEndpoint);
+            // Only parse version for successful responses, not 401 auth errors
+            if (response.status >= 200 && response.status < 300) {
+              version = response.data?.version;
+            }
+          } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              // 401 Unauthorized means the service is present but requires authentication
+              requiresAuth = true;
+              authError = 'Authentication required - API key needed';
+              void logger.info('Service detected but requires authentication', {
+                location: 'NetworkScannerService.detectServiceAtUrl',
+                serviceType,
+                url: baseUrl,
+                status: 401,
+              });
+              // Create a mock response for 401 to continue processing
+              response = { status: 401, data: {} };
+            } else {
+              throw error; // Re-throw other errors
+            }
+          }
+          break;
+
+        case 'bazarr':
+          try {
+            response = await client.get(config.detectionEndpoint);
+            // Only parse version for successful responses, not 401 auth errors
+            if (response.status >= 200 && response.status < 300) {
+              version = response.data?.bazarrVersion || response.data?.version;
+            }
+          } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              // 401 Unauthorized means the service is present but requires authentication
+              requiresAuth = true;
+              authError = 'Authentication required - API key needed';
+              void logger.info('Service detected but requires authentication', {
+                location: 'NetworkScannerService.detectServiceAtUrl',
+                serviceType,
+                url: baseUrl,
+                status: 401,
+              });
+              // Create a mock response for 401 to continue processing
+              response = { status: 401, data: {} };
+            } else {
+              throw error; // Re-throw other errors
+            }
+          }
           break;
 
         default:
@@ -380,7 +447,7 @@ export class NetworkScannerService {
       // Check if we got a response that indicates the service exists
       if (response && typeof response.status === 'number') {
         // For services that require API keys, 401 Unauthorized means the service is present
-        const isAuthRequiredService = serviceType === 'sonarr' || serviceType === 'radarr';
+        const isAuthRequiredService = serviceType === 'sonarr' || serviceType === 'radarr' || serviceType === 'prowlarr' || serviceType === 'bazarr';
         const isValidResponse = (response.status >= 200 && response.status < 300) ||
           (isAuthRequiredService && response.status === 401);
 
@@ -604,7 +671,7 @@ export class NetworkScannerService {
    */
   private async saveScanHistory(result: NetworkScanResult, subnet: string, customIpAddress?: string): Promise<void> {
     try {
-      const scanHistory: NetworkScanHistory = {
+      const scanHistory: NetworkScanHistoryType = {
         id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
         duration: result.scanDuration,
@@ -643,7 +710,7 @@ export class NetworkScannerService {
   /**
    * Get scan history from storage
    */
-  async getScanHistory(): Promise<NetworkScanHistory[]> {
+  async getScanHistory(): Promise<NetworkScanHistoryType[]> {
     try {
       return await secureStorage.getNetworkScanHistory();
     } catch (error) {

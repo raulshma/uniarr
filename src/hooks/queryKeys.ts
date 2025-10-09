@@ -97,6 +97,16 @@ export const queryKeys = {
     ] as const,
     transferInfo: (serviceId: string): QueryKeyBuilder => [...queryKeys.qbittorrent.service(serviceId), 'transferInfo'] as const,
   },
+  transmission: {
+    base: ['transmission'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['transmission', serviceId] as const,
+    torrents: (serviceId: string, filters?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.transmission.service(serviceId),
+      'torrents',
+      filters ?? {},
+    ] as const,
+    transferInfo: (serviceId: string): QueryKeyBuilder => [...queryKeys.transmission.service(serviceId), 'transferInfo'] as const,
+  },
   calendar: {
     base: ['calendar'] as const,
     releases: (currentDate: string, filters?: Record<string, unknown>): QueryKeyBuilder => [
@@ -110,6 +120,46 @@ export const queryKeys = {
       'stats',
       currentDate,
       filters ?? {},
+    ] as const,
+  },
+  bazarr: {
+    base: ['bazarr'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['bazarr', serviceId] as const,
+    moviesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'movies'] as const,
+    movieDetail: (serviceId: string, movieId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'movies',
+      movieId,
+    ] as const,
+    episodesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'episodes'] as const,
+    episodeDetail: (serviceId: string, episodeId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'episodes',
+      episodeId,
+    ] as const,
+    subtitlesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'subtitles'] as const,
+    subtitlesByMovie: (serviceId: string, movieId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'subtitles',
+      'movie',
+      movieId,
+    ] as const,
+    subtitlesByEpisode: (serviceId: string, episodeId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'subtitles',
+      'episode',
+      episodeId,
+    ] as const,
+    languages: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'languages'] as const,
+    providers: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'providers'] as const,
+    profiles: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'profiles'] as const,
+    queue: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'queue'] as const,
+    history: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'history'] as const,
+    statistics: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'statistics'] as const,
+    search: (serviceId: string, query: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'search',
+      { query, options },
     ] as const,
   },
 } as const;

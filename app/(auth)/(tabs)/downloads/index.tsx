@@ -18,6 +18,9 @@ import { TorrentCardSkeleton } from '@/components/torrents';
 import type { AppTheme } from '@/constants/theme';
 import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 import type { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
+import type { TransmissionConnector } from '@/connectors/implementations/TransmissionConnector';
+import type { DelugeConnector } from '@/connectors/implementations/DelugeConnector';
+import type { SABnzbdConnector } from '@/connectors/implementations/SABnzbdConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { Torrent } from '@/models/torrent.types';
 import type { TorrentTransferInfo } from '@/models/torrent.types';
@@ -50,12 +53,21 @@ type DownloadsOverview = {
   };
 };
 
+const DOWNLOAD_CLIENT_TYPES = ['qbittorrent', 'transmission', 'deluge', 'sabnzbd'] as const;
+
 const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
   const manager = ConnectorManager.getInstance();
   await manager.loadSavedServices();
-  const connectors = manager.getConnectorsByType('qbittorrent') as QBittorrentConnector[];
 
-  if (connectors.length === 0) {
+  // Get all download client connectors
+  const allConnectors: Array<QBittorrentConnector | TransmissionConnector | DelugeConnector | SABnzbdConnector> = [];
+
+  for (const clientType of DOWNLOAD_CLIENT_TYPES) {
+    const connectors = manager.getConnectorsByType(clientType);
+    allConnectors.push(...(connectors as any));
+  }
+
+  if (allConnectors.length === 0) {
     return {
       torrents: [],
       totals: {
@@ -74,7 +86,7 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
   let totalUploadSpeed = 0;
 
   await Promise.all(
-    connectors.map(async (connector) => {
+    allConnectors.map(async (connector) => {
       try {
         const [torrents, transferInfo] = await Promise.all([
           connector.getTorrents(),
@@ -82,7 +94,7 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
             .getTransferInfo()
             .catch((transferError) => {
               const message = transferError instanceof Error ? transferError.message : String(transferError);
-              void logger.warn('Failed to load transfer info for qBittorrent.', {
+              void logger.warn(`Failed to load transfer info for ${connector.config.type}.`, {
                 serviceId: connector.config.id,
                 message,
               });
@@ -138,7 +150,7 @@ const DownloadsScreen = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: queryKeys.qbittorrent.base,
+    queryKey: ['downloads', 'overview'],
     queryFn: fetchDownloadsOverview,
     refetchInterval: 15_000,
     refetchOnWindowFocus: false,
@@ -251,24 +263,25 @@ const DownloadsScreen = () => {
   const handleTorrentAction = useCallback(async (torrent: TorrentWithService, action: 'pause' | 'resume' | 'delete') => {
     try {
       const manager = ConnectorManager.getInstance();
-      const connector = manager.getConnector(torrent.serviceId) as QBittorrentConnector;
-      
+      const connector = manager.getConnector(torrent.serviceId);
+
       if (!connector) {
         throw new Error('Service not found');
       }
 
+      // Use the appropriate connector method based on the action
       switch (action) {
         case 'pause':
-          await connector.pauseTorrent(torrent.hash);
+          await (connector as any).pauseTorrent(torrent.hash);
           break;
         case 'resume':
-          await connector.resumeTorrent(torrent.hash);
+          await (connector as any).resumeTorrent(torrent.hash);
           break;
         case 'delete':
-          await connector.deleteTorrent(torrent.hash, true);
+          await (connector as any).deleteTorrent(torrent.hash, true);
           break;
       }
-      
+
       // Refresh data after action
       void refetch();
     } catch (error) {

@@ -19,6 +19,7 @@ import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useNotificationRegistration } from '@/hooks/useNotificationRegistration';
 import { useNotificationResponseHandler } from '@/hooks/useNotificationResponseHandler';
 import { useQuietHoursManager } from '@/hooks/useQuietHoursManager';
+import { useVoiceCommandHandler } from '@/hooks/useVoiceCommandHandler';
 
 const RootLayout = () => {
   const colorScheme = useColorScheme();
@@ -77,6 +78,7 @@ const AppContent = () => {
   useNotificationRegistration();
   useNotificationResponseHandler();
   useQuietHoursManager();
+  useVoiceCommandHandler();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>

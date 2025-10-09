@@ -1,8 +1,58 @@
 import { useMemo } from 'react';
 import { useColorScheme, type ColorSchemeName } from 'react-native';
 
-import { getAppTheme, defaultTheme, type AppTheme } from '@/constants/theme';
+import {
+  getAppTheme,
+  defaultTheme,
+  createCustomTheme,
+  defaultCustomThemeConfig,
+  type AppTheme,
+  type CustomThemeConfig,
+} from '@/constants/theme';
 import { useSettingsStore } from '@/store/settingsStore';
+
+const hasCustomColors = (config?: CustomThemeConfig['customColors']): boolean => {
+  if (!config) {
+    return false;
+  }
+
+  return Object.values(config).some(
+    (color) => typeof color === 'string' && color.trim().length > 0,
+  );
+};
+
+const hasPosterStyleOverrides = (config: CustomThemeConfig): boolean =>
+  config.posterStyle.borderRadius !== defaultCustomThemeConfig.posterStyle.borderRadius ||
+  config.posterStyle.shadowOpacity !== defaultCustomThemeConfig.posterStyle.shadowOpacity ||
+  config.posterStyle.shadowRadius !== defaultCustomThemeConfig.posterStyle.shadowRadius;
+
+const hasCustomThemeOverrides = (config?: CustomThemeConfig): config is CustomThemeConfig => {
+  if (!config) {
+    return false;
+  }
+
+  if (config.preset && config.preset !== 'uniarr') {
+    return true;
+  }
+
+  if (hasCustomColors(config.customColors)) {
+    return true;
+  }
+
+  if (config.fontScale !== defaultCustomThemeConfig.fontScale) {
+    return true;
+  }
+
+  if (config.densityMode !== defaultCustomThemeConfig.densityMode) {
+    return true;
+  }
+
+  if (hasPosterStyleOverrides(config)) {
+    return true;
+  }
+
+  return false;
+};
 
 /**
  * Custom hook that returns the appropriate app theme based on user preference and system theme.
@@ -12,6 +62,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 export const useTheme = (): AppTheme => {
   const systemColorScheme = useColorScheme();
   const themePreference = useSettingsStore((state) => state.theme);
+  const customThemeConfig = useSettingsStore((state) => state.customThemeConfig);
 
   return useMemo(() => {
     // Use default theme if system color scheme is not available yet
@@ -34,6 +85,13 @@ export const useTheme = (): AppTheme => {
         break;
     }
 
+    // Check if we have a custom theme configuration
+    if (hasCustomThemeOverrides(customThemeConfig)) {
+      // Use custom theme configuration
+      return createCustomTheme(customThemeConfig, effectiveScheme === 'dark');
+    }
+
+    // Use standard theme
     return getAppTheme(effectiveScheme);
-  }, [themePreference, systemColorScheme]);
+  }, [themePreference, systemColorScheme, customThemeConfig]);
 };

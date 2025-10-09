@@ -6,10 +6,10 @@ import { Card } from '@/components/common/Card';
 
 import { EmptyState } from '@/components/common/EmptyState';
 import type { AppTheme } from '@/constants/theme';
-import type { NetworkScanHistory, RecentIP } from '@/services/storage/SecureStorage';
+import type { NetworkScanHistoryType, RecentIP } from '@/services/storage/SecureStorage';
 
 export type NetworkScanHistoryProps = {
-  scanHistory: NetworkScanHistory[];
+  scanHistory: NetworkScanHistoryType[];
   recentIPs: RecentIP[];
   onClearHistory?: () => void;
   onIPSelect?: (ip: string) => void;

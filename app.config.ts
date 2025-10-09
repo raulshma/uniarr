@@ -23,7 +23,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
       },
+      // Siri Shortcuts Configuration
+      NSSiriUsageDescription: "UniArr uses Siri to help you manage your media library with voice commands.",
+      NSUserActivityTypes: [
+        "com.uniarr.app.search",
+        "com.uniarr.app.services",
+        "com.uniarr.app.downloads",
+        "com.uniarr.app.add",
+        "com.uniarr.app.requests"
+      ],
     },
+    associatedDomains: [
+      "applinks:uniarr.com"
+    ],
   },
   android: {
     adaptiveIcon: {
