@@ -188,19 +188,8 @@ const ServicesScreen = () => {
   const services = data ?? [];
   const isRefreshing = isFetching && !isLoading;
 
-  const listData: ServicesListItem[] = useMemo(() => {
-    if (services.length === 0) {
-      return [{ type: 'header' }];
-    }
-
-    const items: ServicesListItem[] = [{ type: 'header' }];
-
-    services.forEach((service) => {
-      items.push({ type: 'service', data: service });
-    });
-
-    return items;
-  }, [services]);
+  // We render the tab header outside of the list so it remains fixed.
+  const listData: ServiceOverviewItem[] = useMemo(() => services.slice(), [services]);
 
   const styles = useMemo(
     () =>
@@ -211,7 +200,7 @@ const ServicesScreen = () => {
         },
         content: {
           flex: 1,
-          paddingHorizontal: spacing.md,
+          paddingHorizontal: spacing.xxs,
         },
         section: {
           marginTop: spacing.lg,
@@ -374,17 +363,7 @@ const ServicesScreen = () => {
     );
   }, [selectedService, queryClient]);
 
-  const renderHeader = useCallback(() => (
-    <TabHeader
-      showBackButton={true}
-      onBackPress={handleBackPress}
-      rightAction={{
-        icon: "plus",
-        onPress: handleAddService,
-        accessibilityLabel: "Add service",
-      }}
-    />
-  ), [handleBackPress, handleAddService]);
+  // Header is rendered outside the scrollable area so it does not scroll with content.
 
   const ServiceCard = React.memo(({ item, index }: { item: ServiceOverviewItem; index: number }) => {
     const displayName = serviceDisplayNames[item.config.type] || item.config.name;
@@ -442,31 +421,15 @@ const ServicesScreen = () => {
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: ServicesListItem; index: number }) => {
-      switch (item.type) {
-        case 'header':
-          return renderHeader();
-        case 'service':
-          return renderServiceItem({ item: item.data, index });
-        default:
-          return null;
-      }
-    },
-    [renderHeader, renderServiceItem],
+    ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
+      renderServiceItem({ item, index })
+    ),
+    [renderServiceItem],
   );
 
-  const keyExtractor = useCallback((item: ServicesListItem) => {
-    switch (item.type) {
-      case 'header':
-        return 'header';
-      case 'service':
-        return `service-${item.data.config.id}`;
-      default:
-        return 'unknown';
-    }
-  }, []);
+  const keyExtractor = useCallback((item: ServiceOverviewItem) => `service-${item.config.id}`, []);
 
-  const getItemType = useCallback((item: ServicesListItem) => item.type, []);
+  const getItemType = useCallback(() => 'service', []);
 
   const listEmptyComponent = useMemo(() => {
     if (isError) {
@@ -495,16 +458,17 @@ const ServicesScreen = () => {
   if (isLoading && services.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
-        <AnimatedScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.lg }}>
-          <TabHeader
-            showBackButton={true}
-            onBackPress={handleBackPress}
-            rightAction={{
-              icon: 'plus',
-              onPress: handleAddService,
-              accessibilityLabel: 'Add service',
-            }}
-          />
+        <TabHeader
+          showBackButton={true}
+          onBackPress={handleBackPress}
+          rightAction={{
+            icon: 'plus',
+            onPress: handleAddService,
+            accessibilityLabel: 'Add service',
+          }}
+          style={{ paddingHorizontal: spacing.xxs }}
+        />
+        <AnimatedScrollView style={styles.content} contentContainerStyle={{ paddingVertical: spacing.lg, paddingBottom: spacing.xxxxl }}>
           <AnimatedSection style={styles.section} delay={100}>
             <SkeletonPlaceholder width="50%" height={28} borderRadius={10} style={{ marginBottom: spacing.md }} />
             {Array.from({ length: 4 }).map((_, index) => (
@@ -520,11 +484,27 @@ const ServicesScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TabHeader
+        showBackButton={true}
+        onBackPress={handleBackPress}
+        rightAction={{
+          icon: 'plus',
+          onPress: handleAddService,
+          accessibilityLabel: 'Add service',
+        }}
+        style={{ paddingHorizontal: spacing.md }}
+      />
       <FlashList
+        style={styles.content}
         data={listData}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        contentContainerStyle={services.length === 0 ? { flex: 1 } : undefined}
+        contentContainerStyle={
+          [
+            services.length === 0 ? { flex: 1 } : undefined,
+            { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
+          ]
+        }
         ListEmptyComponent={<AnimatedSection style={styles.emptyContainer} delay={100}>{listEmptyComponent}</AnimatedSection>}
         refreshControl={
           <ListRefreshControl
