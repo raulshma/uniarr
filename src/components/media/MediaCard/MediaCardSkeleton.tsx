@@ -55,6 +55,7 @@ const MediaCardSkeleton: React.FC<MediaCardSkeletonProps> = ({ style, showFooter
         <View style={styles.chipsRow}>
           <SkeletonPlaceholder width={82} height={24} borderRadius={12} />
           <SkeletonPlaceholder width={74} height={24} borderRadius={12} />
+          <SkeletonPlaceholder width={68} height={24} borderRadius={12} />
         </View>
         {showFooter ? (
           <View style={styles.footer}>

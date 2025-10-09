@@ -267,16 +267,21 @@ const RadarrAddMovieScreen = () => {
           flex: 1,
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.lg,
+          paddingTop: spacing.xs
         },
         header: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingVertical: spacing.md,
+          marginBottom: spacing.md,
         },
         scrollContent: {
           paddingBottom: spacing.xl,
           gap: spacing.lg,
+        },
+        title: {
+          marginBottom: spacing.sm,
+          textAlign: 'center',
         },
         searchInput: {
           marginTop: spacing.sm,
@@ -406,7 +411,7 @@ const RadarrAddMovieScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Button mode="text" onPress={() => router.back()} accessibilityLabel="Go back">
+          <Button mode="contained-tonal" onPress={() => router.back()} accessibilityLabel="Go back">
             Back
           </Button>
           {searchQuery.isFetching ? (

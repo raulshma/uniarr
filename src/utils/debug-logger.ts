@@ -107,7 +107,7 @@ class DebugLogger {
 
   addServiceTest(serviceType: string, success: boolean, version?: string, error?: string) {
     this.addStep({
-      id: 'service-test',
+      id: `service-test-${serviceType}-${Date.now()}`,
       title: `${serviceType} Service Test`,
       status: success ? 'success' : 'error',
       message: success ? `Connected successfully${version ? ` (v${version})` : ''}` : `Service test failed: ${error}`,

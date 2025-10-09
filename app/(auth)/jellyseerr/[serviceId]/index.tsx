@@ -221,6 +221,9 @@ const JellyseerrRequestsScreen = () => {
         filters: {
           marginBottom: spacing.sm,
         },
+        filtersScroll: {
+          marginBottom: spacing.sm,
+        },
         filterLabel: {
           marginBottom: spacing.xs,
           color: theme.colors.onSurfaceVariant,
@@ -238,8 +241,8 @@ const JellyseerrRequestsScreen = () => {
         },
         actionRow: {
           flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: spacing.sm,
+          justifyContent: 'flex-end',
+          gap: spacing.xs,
           marginTop: spacing.sm,
         },
         paginationRow: {
@@ -375,52 +378,56 @@ const JellyseerrRequestsScreen = () => {
       const isDeletingCurrent = pendingAction?.type === 'delete' && pendingAction.requestId === item.id && isDeleting;
 
       return (
-        <View>
-          {renderStatusChip(item.status, item.is4k)}
-          <MediaCard
-            id={item.id}
-            title={item.media.title ?? `TMDB #${item.media.tmdbId ?? item.id}`}
-            year={item.media.releaseDate ? Number.parseInt(item.media.releaseDate.slice(0, 4), 10) : undefined}
-            status={formatRequestStatusLabel(item.media.status ?? 'unknown')}
-            subtitle={`Requested by ${requesterName}`}
-            downloadStatus={downloadStatus}
-            posterUri={item.media.posterUrl}
-            type={item.media.mediaType === 'tv' ? 'series' : 'movie'}
-            footer={
-              <View style={styles.actionRow}>
-                {item.status === 'pending' ? (
-                  <Button
-                    mode="contained"
-                    onPress={() => void handleApproveRequest(item)}
-                    loading={isApprovingCurrent}
-                    disabled={isApprovingCurrent || isDecliningCurrent || isDeletingCurrent}
-                  >
-                    Approve
-                  </Button>
-                ) : null}
-                {item.status === 'pending' || item.status === 'approved' ? (
-                  <Button
-                    mode="outlined"
-                    onPress={() => void handleDeclineRequest(item)}
-                    loading={isDecliningCurrent}
-                    disabled={isApprovingCurrent || isDecliningCurrent || isDeletingCurrent}
-                  >
-                    Decline
-                  </Button>
-                ) : null}
+        <MediaCard
+          id={item.id}
+          title={item.media.title ?? item.media.originalTitle ?? `Untitled Media`}
+          year={item.media.releaseDate ? Number.parseInt(item.media.releaseDate.slice(0, 4), 10) : undefined}
+          status={formatRequestStatusLabel(item.media.status ?? 'unknown')}
+          subtitle={`Requested by ${requesterName}`}
+          downloadStatus={downloadStatus}
+          posterUri={item.media.posterUrl}
+          type={item.media.mediaType === 'tv' ? 'series' : 'movie'}
+          statusBadge={renderStatusChip(item.status, item.is4k)}
+          footer={
+            <View style={styles.actionRow}>
+              {item.status === 'pending' ? (
                 <Button
-                  mode="text"
-                  onPress={() => void handleDeleteRequest(item)}
-                  loading={isDeletingCurrent}
-                  textColor={theme.colors.error}
-                  disabled={isDeletingCurrent || isApprovingCurrent || isDecliningCurrent}
+                  mode="contained"
+                  icon="check"
+                  compact
+                  onPress={() => void handleApproveRequest(item)}
+                  loading={isApprovingCurrent}
+                  disabled={isApprovingCurrent || isDecliningCurrent || isDeletingCurrent}
                 >
-                  Delete
+                  Approve
                 </Button>
-              </View>
-            }
-          />
-        </View>
+              ) : null}
+              {item.status === 'pending' || item.status === 'approved' ? (
+                <Button
+                  mode="outlined"
+                  icon="close"
+                  compact
+                  onPress={() => void handleDeclineRequest(item)}
+                  loading={isDecliningCurrent}
+                  disabled={isApprovingCurrent || isDecliningCurrent || isDeletingCurrent}
+                >
+                  Decline
+                </Button>
+              ) : null}
+              <Button
+                mode="text"
+                icon="delete"
+                compact
+                onPress={() => void handleDeleteRequest(item)}
+                loading={isDeletingCurrent}
+                textColor={theme.colors.error}
+                disabled={isDeletingCurrent || isApprovingCurrent || isDecliningCurrent}
+              >
+                Delete
+              </Button>
+            </View>
+          }
+        />
       );
     },
     [handleApproveRequest, handleDeclineRequest, handleDeleteRequest, isApproving, isDeclining, isDeleting, pendingAction, renderStatusChip, styles.actionRow, theme.colors.error],
@@ -453,22 +460,23 @@ const JellyseerrRequestsScreen = () => {
       <Text variant="labelSmall" style={styles.filterLabel}>
         Filter by status
       </Text>
-      <SegmentedButtons
-        style={styles.filters}
-        value={filterValue}
-        onValueChange={(value) => {
-          setFilterValue(value as FilterValue);
-          setPage(1);
-        }}
-        buttons={[
-          { label: 'All', value: FILTER_ALL },
-          { label: 'Pending', value: FILTER_PENDING },
-          { label: 'Approved', value: FILTER_APPROVED },
-          { label: 'Processing', value: FILTER_PROCESSING },
-          { label: 'Available', value: FILTER_AVAILABLE },
-          { label: 'Declined', value: FILTER_DECLINED },
-        ]}
-      />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll}>
+        <SegmentedButtons
+          value={filterValue}
+          onValueChange={(value) => {
+            setFilterValue(value as FilterValue);
+            setPage(1);
+          }}
+          buttons={[
+            { label: 'All', value: FILTER_ALL },
+            { label: 'Pending', value: FILTER_PENDING },
+            { label: 'Approved', value: FILTER_APPROVED },
+            { label: 'Processing', value: FILTER_PROCESSING },
+            { label: 'Available', value: FILTER_AVAILABLE },
+            { label: 'Declined', value: FILTER_DECLINED },
+          ]}
+        />
+      </ScrollView>
       <View style={styles.paginationRow}>
         <Button mode="outlined" onPress={handleLoadPrevious} disabled={page <= 1}>
           Previous
@@ -540,10 +548,7 @@ const JellyseerrRequestsScreen = () => {
             </View>
           </View>
           {Array.from({ length: 5 }).map((_, index) => (
-            <View key={index} style={{ marginBottom: spacing.lg }}>
-              <SkeletonPlaceholder width={96} height={28} borderRadius={14} style={{ marginBottom: spacing.sm }} />
-              <MediaCardSkeleton />
-            </View>
+            <MediaCardSkeleton key={index} style={{ marginBottom: spacing.lg }} />
           ))}
         </ScrollView>
       </SafeAreaView>

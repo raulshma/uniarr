@@ -10,7 +10,9 @@ import { CalendarDayCell } from '../CalendarDayCell';
 export type CalendarMonthViewProps = {
   data: CalendarMonth;
   selectedDate?: string;
+  expandedDay?: string;
   onDateSelect?: (date: string) => void;
+  onDayLongPress?: (date: string) => void;
   onReleasePress?: (releaseId: string) => void;
   style?: StyleProp<ViewStyle>;
 };
@@ -18,7 +20,9 @@ export type CalendarMonthViewProps = {
 const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
   data,
   selectedDate,
+  expandedDay,
   onDateSelect,
+  onDayLongPress,
   onReleasePress,
   style,
 }) => {
@@ -74,13 +78,15 @@ const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     const isLastWeek = weekIndex === data.weeks.length - 1;
     
     return (
-      <View key={`week-${week.weekNumber}`} style={[styles.week, isLastWeek && styles.weekLast]}>
+      <View key={`week-${weekIndex}`} style={[styles.week, isLastWeek && styles.weekLast]}>
         {week.days.map((day) => (
           <CalendarDayCell
             key={day.date}
             day={day}
             isSelected={selectedDate === day.date}
+            isExpanded={expandedDay === day.date}
             onPress={() => handleDatePress(day.date)}
+            onLongPress={() => onDayLongPress?.(day.date)}
             onReleasePress={onReleasePress}
             style={{ flex: 1 }}
           />

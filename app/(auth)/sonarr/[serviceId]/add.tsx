@@ -277,16 +277,21 @@ const SonarrAddSeriesScreen = () => {
           flex: 1,
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.lg,
+          paddingTop: spacing.xs
         },
         header: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingVertical: spacing.md,
+          marginBottom: spacing.md,
         },
         scrollContent: {
           paddingBottom: spacing.xl,
           gap: spacing.lg,
+        },
+        title: {
+          marginBottom: spacing.sm,
+          textAlign: 'center',
         },
         searchInput: {
           marginTop: spacing.sm,
@@ -411,8 +416,8 @@ const SonarrAddSeriesScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Button mode="text" onPress={() => router.back()} accessibilityLabel="Go back">
+  <View style={styles.header}>
+          <Button mode="contained-tonal" onPress={() => router.back()} accessibilityLabel="Go back">
             Back
           </Button>
           {searchQuery.isFetching ? (
@@ -424,9 +429,6 @@ const SonarrAddSeriesScreen = () => {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View>
-            <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-              Search Sonarr
-            </Text>
             <TextInput
               mode="outlined"
               placeholder="Search for a series"

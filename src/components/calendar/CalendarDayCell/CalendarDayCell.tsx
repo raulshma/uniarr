@@ -10,7 +10,9 @@ import { MediaReleaseCard } from '../MediaReleaseCard';
 export type CalendarDayCellProps = {
   day: CalendarDay;
   isSelected?: boolean;
+  isExpanded?: boolean;
   onPress?: () => void;
+  onLongPress?: () => void;
   onReleasePress?: (releaseId: string) => void;
   style?: StyleProp<ViewStyle>;
 };
@@ -18,7 +20,9 @@ export type CalendarDayCellProps = {
 const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   day,
   isSelected = false,
+  isExpanded = false,
   onPress,
+  onLongPress,
   onReleasePress,
   style,
 }) => {
@@ -102,7 +106,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   const isToday = day.isToday;
   const isOtherMonth = !day.isCurrentMonth;
   const hasReleases = day.releases.length > 0;
-  const maxVisibleReleases = 3;
+  const maxVisibleReleases = isExpanded ? day.releases.length : 3;
   const visibleReleases = day.releases.slice(0, maxVisibleReleases);
   const hasMoreReleases = day.releases.length > maxVisibleReleases;
   const moreCount = day.releases.length - maxVisibleReleases;
@@ -122,11 +126,26 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
     return baseStyle;
   };
 
+  const getPressableStyle = ({ pressed }: { pressed: boolean }) => {
+    return [
+      styles.pressable,
+      pressed && {
+        opacity: 0.7,
+        transform: [{ scale: 0.95 }],
+      },
+    ];
+  };
+
   return (
     <View style={[getContainerStyle(), style]}>
       <Pressable
-        style={styles.pressable}
+        style={getPressableStyle}
         onPress={onPress}
+        onLongPress={onLongPress}
+        android_ripple={{
+          color: theme.colors.onSurfaceVariant,
+          borderless: false,
+        }}
         accessibilityRole="button"
         accessibilityLabel={`${day.date}${hasReleases ? `, ${day.releases.length} releases` : ''}`}
         accessibilityState={{ selected: isSelected }}

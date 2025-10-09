@@ -13,11 +13,13 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, FadingTransition, Layout, LinearTransition } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/common/EmptyState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
 import { MediaPoster } from '@/components/media/MediaPoster';
+import MediaEditor, { type MediaItem } from '@/components/media/MediaEditor';
+import { MediaSelectorProvider, MediaSelectorActions, MediaSelectableItem, type SelectableMediaItem } from '@/components/media/MediaSelector';
 import { SkeletonPlaceholder } from '@/components/common/Skeleton';
 import { SeriesListItemSkeleton } from '@/components/media/skeletons';
 import type { AppTheme } from '@/constants/theme';
@@ -57,6 +59,8 @@ const SonarrSeriesListScreen = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterValue, setFilterValue] = useState<FilterValue>(FILTER_ALL);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
+  const [editingItem, setEditingItem] = useState<Series | null>(null);
+  const [isEditorVisible, setIsEditorVisible] = useState(false);
 
   const { series, isLoading, isFetching, isError, error, refetch } = useSonarrSeries(serviceId);
 
@@ -268,7 +272,7 @@ const SonarrSeriesListScreen = () => {
   );
 
   const handleSeriesPress = useCallback(
-    (item: Series) => {
+    (item: SelectableMediaItem) => {
       if (!hasValidServiceId) {
         return;
       }
@@ -296,6 +300,25 @@ const SonarrSeriesListScreen = () => {
     });
   }, [hasValidServiceId, router, serviceId]);
 
+  const handleEditSeries = useCallback((item: Series) => {
+    setEditingItem(item);
+    setIsEditorVisible(true);
+  }, []);
+
+  const handleEditorDismiss = useCallback(() => {
+    setIsEditorVisible(false);
+    setEditingItem(null);
+  }, []);
+
+  const handleEditorSave = useCallback(async (updatedItem: MediaItem) => {
+    // The updated item is already saved via the connector in MediaEditor
+    await refetch();
+  }, [refetch]);
+
+  const handleSeriesLongPress = useCallback((item: SelectableMediaItem) => {
+    handleEditSeries(item as Series);
+  }, [handleEditSeries]);
+
   const handleClearFilters = useCallback(() => {
     setSearchTerm('');
     setFilterValue(FILTER_ALL);
@@ -315,41 +338,47 @@ const SonarrSeriesListScreen = () => {
 
       return (
         <Animated.View
-          entering={FadeInUp.delay(index * 50).springify()}
           exiting={FadeOut.springify()}
-          layout={Layout.springify()}
+          entering={FadeInUp.delay(index * 50).springify()}
+          layout={FadingTransition.build()}
         >
-          <Pressable
-            onPress={() => handleSeriesPress(item)}
-            style={({ pressed }) => [styles.seriesCard, pressed && styles.seriesCardPressed]}
+          <MediaSelectableItem
+            item={item}
+            onPress={handleSeriesPress}
+            onLongPress={handleSeriesLongPress}
+            onPressSeries={handleSeriesPress}
           >
-            <MediaPoster
-              uri={item.posterUrl}
-              size={96}
-              borderRadius={16}
-              style={styles.seriesPoster}
-            />
-            <View style={styles.seriesMeta}>
-              <Text variant="titleMedium" numberOfLines={1} style={styles.seriesTitle}>
-                {item.title}
-              </Text>
-              <Text variant="bodyMedium" numberOfLines={1} style={styles.seriesStatus}>
-                {item.status ?? 'Status unavailable'}
-              </Text>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+            <Pressable
+              style={({ pressed }) => [styles.seriesCard, pressed && styles.seriesCardPressed]}
+            >
+              <MediaPoster
+                uri={item.posterUrl}
+                size={96}
+                borderRadius={16}
+                style={styles.seriesPoster}
+              />
+              <View style={styles.seriesMeta}>
+                <Text variant="titleMedium" numberOfLines={1} style={styles.seriesTitle}>
+                  {item.title}
+                </Text>
+                <Text variant="bodyMedium" numberOfLines={1} style={styles.seriesStatus}>
+                  {item.status ?? 'Status unavailable'}
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+                </View>
+                <Text variant="bodySmall" style={styles.episodesMeta}>
+                  {totalEpisodes > 0
+                    ? `${availableEpisodes} / ${totalEpisodes} episodes`
+                    : 'Episodes unavailable'}
+                </Text>
               </View>
-              <Text variant="bodySmall" style={styles.episodesMeta}>
-                {totalEpisodes > 0
-                  ? `${availableEpisodes} / ${totalEpisodes} episodes`
-                  : 'Episodes unavailable'}
-              </Text>
-            </View>
-          </Pressable>
+            </Pressable>
+          </MediaSelectableItem>
         </Animated.View>
       );
     },
-    [handleSeriesPress, styles],
+    [handleSeriesPress, handleSeriesLongPress, styles],
   );
 
   const keyExtractor = useCallback((item: Series) => item.id.toString(), []);
@@ -534,29 +563,39 @@ const SonarrSeriesListScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Animated.View 
-        style={{ flex: 1 }}
-        entering={FadeIn.delay(100).springify()}
-        layout={Layout.springify()}
-      >
-        <FlashList
-          data={filteredSeries}
-          keyExtractor={keyExtractor}
-          renderItem={renderSeriesItem}
-          ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
-          contentContainerStyle={styles.listContent}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
-          refreshControl={
-            <ListRefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => refetch()}
-            />
-          }
+    <MediaSelectorProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <Animated.View
+          style={{ flex: 1 }}
+          entering={FadeIn.delay(100).springify()}
+          layout={Layout.springify()}
+        >
+          <FlashList
+            data={filteredSeries}
+            keyExtractor={keyExtractor}
+            renderItem={renderSeriesItem}
+            ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
+            contentContainerStyle={styles.listContent}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
+            refreshControl={
+              <ListRefreshControl
+                refreshing={isRefreshing}
+                onRefresh={() => refetch()}
+              />
+            }
+          />
+        </Animated.View>
+        <MediaSelectorActions serviceId={serviceId} onRefresh={refetch} />
+        <MediaEditor
+          visible={isEditorVisible}
+          mediaItem={editingItem}
+          onDismiss={handleEditorDismiss}
+          onSave={handleEditorSave}
+          serviceId={serviceId}
         />
-      </Animated.View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </MediaSelectorProvider>
   );
 };
 

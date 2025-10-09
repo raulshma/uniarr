@@ -7,7 +7,13 @@ const serviceTypeValues = [
   'radarr',
   'jellyseerr',
   'qbittorrent',
+  'transmission',
+  'deluge',
+  'sabnzbd',
+  'nzbget',
+  'rtorrent',
   'prowlarr',
+  'bazarr',
 ] as const satisfies readonly ServiceType[];
 
 const httpSchemeRegex = /^https?:\/\//i;

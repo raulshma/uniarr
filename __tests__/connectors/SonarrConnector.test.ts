@@ -6,24 +6,15 @@ import { ApiError, handleApiError } from '@/utils/error.utils';
 
 // Mock network utilities
 jest.mock('@/utils/network.utils', () => ({
-  testNetworkConnectivity: jest.fn().mockResolvedValue({
-    success: true,
-    latency: 50,
-  }),
+  testNetworkConnectivity: jest.fn(),
   diagnoseVpnIssues: jest.fn().mockReturnValue([]),
 }));
 
 // Mock API test utilities
 jest.mock('@/utils/api-test.utils', () => ({
-  testSonarrApi: jest.fn().mockResolvedValue({
-    success: true,
-  }),
-  testRadarrApi: jest.fn().mockResolvedValue({
-    success: true,
-  }),
-  testQBittorrentApi: jest.fn().mockResolvedValue({
-    success: true,
-  }),
+  testSonarrApi: jest.fn(),
+  testRadarrApi: jest.fn(),
+  testQBittorrentApi: jest.fn(),
 }));
 
 // Type definitions for mocks
@@ -380,5 +371,199 @@ describe('SonarrConnector', () => {
       operation: 'search',
       endpoint: '/api/v3/series/lookup',
     }));
+  });
+
+  it('includes image parameters in getById requests', async () => {
+    const connector = createConnector();
+    const seriesResponse = {
+      id: 1,
+      title: 'Test Series',
+      status: 'continuing',
+      monitored: true,
+      images: [],
+      seasons: [
+        {
+          seasonNumber: 1,
+          monitored: true,
+          images: [{ coverType: 'poster', remoteUrl: 'season-poster-url' }],
+        },
+      ],
+    };
+    const episodesResponse = [
+      {
+        id: 1,
+        seriesId: 1,
+        seasonNumber: 1,
+        episodeNumber: 1,
+        title: 'Episode 1',
+        hasFile: true,
+        monitored: true,
+        images: [{ coverType: 'screenshot', remoteUrl: 'episode-screenshot-url' }],
+      },
+    ];
+
+    mockAxiosInstance.get.mockImplementation((url: string) => {
+      if (url === '/api/v3/series/1') {
+        return Promise.resolve({ data: seriesResponse });
+      }
+      if (url === '/api/v3/episode') {
+        return Promise.resolve({ data: episodesResponse });
+      }
+      return Promise.reject(new Error('Unexpected URL'));
+    });
+
+    await connector.getById(1);
+
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/v3/series/1', {
+      params: { includeSeasonImages: true },
+    });
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/v3/episode', {
+      params: { seriesId: 1, includeImages: true },
+    });
+  });
+
+  it('prioritizes API-provided season images over constructed URLs', async () => {
+    const connector = createConnector();
+    const seriesResponse = {
+      id: 1,
+      title: 'Test Series',
+      status: 'continuing',
+      monitored: true,
+      images: [],
+      seasons: [
+        {
+          seasonNumber: 1,
+          monitored: true,
+          images: [{ coverType: 'poster', remoteUrl: 'api-season-poster-url' }],
+        },
+      ],
+    };
+    const episodesResponse: any[] = [];
+
+    mockAxiosInstance.get.mockImplementation((url: string) => {
+      if (url === '/api/v3/series/1') {
+        return Promise.resolve({ data: seriesResponse });
+      }
+      if (url === '/api/v3/episode') {
+        return Promise.resolve({ data: episodesResponse });
+      }
+      return Promise.reject(new Error('Unexpected URL'));
+    });
+
+    const result = await connector.getById(1);
+
+    expect(result.seasons?.[0]?.posterUrl).toBe('api-season-poster-url');
+  });
+
+  it('falls back to constructed season poster URL when API images unavailable', async () => {
+    const connector = createConnector();
+    const seriesResponse = {
+      id: 1,
+      title: 'Test Series',
+      status: 'continuing',
+      monitored: true,
+      images: [],
+      seasons: [
+        {
+          seasonNumber: 1,
+          monitored: true,
+          images: [], // No images from API
+        },
+      ],
+    };
+    const episodesResponse: any[] = [];
+
+    mockAxiosInstance.get.mockImplementation((url: string) => {
+      if (url === '/api/v3/series/1') {
+        return Promise.resolve({ data: seriesResponse });
+      }
+      if (url === '/api/v3/episode') {
+        return Promise.resolve({ data: episodesResponse });
+      }
+      return Promise.reject(new Error('Unexpected URL'));
+    });
+
+    const result = await connector.getById(1);
+
+    expect(result.seasons?.[0]?.posterUrl).toBe('http://sonarr.local/api/v3/mediacover/1/season-1.jpg?apikey=secret');
+  });
+
+  it('prioritizes episode screenshot images over poster images', async () => {
+    const connector = createConnector();
+    const seriesResponse = {
+      id: 1,
+      title: 'Test Series',
+      status: 'continuing',
+      monitored: true,
+      images: [],
+      seasons: [{ seasonNumber: 1, monitored: true }],
+    };
+    const episodesResponse = [
+      {
+        id: 1,
+        seriesId: 1,
+        seasonNumber: 1,
+        episodeNumber: 1,
+        title: 'Episode 1',
+        hasFile: true,
+        monitored: true,
+        images: [
+          { coverType: 'poster', remoteUrl: 'episode-poster-url' },
+          { coverType: 'screenshot', remoteUrl: 'episode-screenshot-url' },
+        ],
+      },
+    ];
+
+    mockAxiosInstance.get.mockImplementation((url: string) => {
+      if (url === '/api/v3/series/1') {
+        return Promise.resolve({ data: seriesResponse });
+      }
+      if (url === '/api/v3/episode') {
+        return Promise.resolve({ data: episodesResponse });
+      }
+      return Promise.reject(new Error('Unexpected URL'));
+    });
+
+    const result = await connector.getById(1);
+
+    expect(result.seasons?.[0]?.episodes?.[0]?.posterUrl).toBe('episode-screenshot-url');
+  });
+
+  it('constructs episode poster URL with correct casing when API images unavailable', async () => {
+    const connector = createConnector();
+    const seriesResponse = {
+      id: 1,
+      title: 'Test Series',
+      status: 'continuing',
+      monitored: true,
+      images: [],
+      seasons: [{ seasonNumber: 1, monitored: true }],
+    };
+    const episodesResponse = [
+      {
+        id: 1,
+        seriesId: 1,
+        seasonNumber: 1,
+        episodeNumber: 1,
+        title: 'Episode 1',
+        hasFile: true,
+        monitored: true,
+        images: [], // No images from API
+      },
+    ];
+
+    mockAxiosInstance.get.mockImplementation((url: string) => {
+      if (url === '/api/v3/series/1') {
+        return Promise.resolve({ data: seriesResponse });
+      }
+      if (url === '/api/v3/episode') {
+        return Promise.resolve({ data: episodesResponse });
+      }
+      return Promise.reject(new Error('Unexpected URL'));
+    });
+
+    const result = await connector.getById(1);
+
+    expect(result.seasons?.[0]?.episodes?.[0]?.posterUrl).toBe('http://sonarr.local/api/v3/mediacover/1/episode-1-screenshot.jpg?apikey=secret');
   });
 });

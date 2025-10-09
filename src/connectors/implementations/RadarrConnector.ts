@@ -61,14 +61,17 @@ interface RadarrQualityItem {
 
 interface RadarrQualityProfileItem {
   readonly allowed: boolean;
-  readonly quality: RadarrQualityItem;
+  readonly quality?: RadarrQualityItem;
+  readonly items?: RadarrQualityProfileItem[];
+  readonly name?: string;
+  readonly id?: number;
 }
 
 interface RadarrQualityProfile {
   readonly id: number;
   readonly name: string;
   readonly upgradeAllowed?: boolean;
-  readonly cutoff: RadarrQualityItem;
+  readonly cutoff: number;
   readonly items: RadarrQualityProfileItem[];
 }
 
@@ -98,6 +101,24 @@ interface RadarrQueueRecord {
 
 interface RadarrQueueResponse {
   readonly records: RadarrQueueRecord[];
+}
+
+interface RadarrTag {
+  readonly id: number;
+  readonly label: string;
+}
+
+interface RadarrMovieEditor {
+  readonly movieIds: number[];
+  readonly monitored?: boolean;
+  readonly qualityProfileId?: number;
+  readonly tags?: number[];
+}
+
+interface RadarrMoveMovieOptions {
+  readonly movieId: number;
+  readonly destinationPath: string;
+  readonly moveFiles?: boolean;
 }
 
 interface RadarrMovie {
@@ -307,22 +328,183 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getQualityProfiles(): Promise<QualityProfile[]> {
+  async updateMovie(
+    movieId: number,
+    updates: Partial<Omit<RadarrMovie, 'id' | 'movieFile' | 'ratings' | 'statistics' | 'images'>>
+  ): Promise<Movie> {
     try {
-      const response = await this.client.get<RadarrQualityProfile[]>(`${RADARR_API_PREFIX}/qualityprofile`);
-      return response.data.map((profile) => this.mapQualityProfile(profile));
+      const response = await this.client.put<RadarrMovie>(`${RADARR_API_PREFIX}/movie/${movieId}`, updates);
+      return this.mapMovie(response.data);
     } catch (error) {
-      // Provide more specific error message for quality profile issues
-      const enhancedError = new Error(
-        'Failed to load quality profiles. This may be due to corrupted custom formats in Radarr. Please check your Radarr quality profiles and custom formats, then try again.'
-      );
-      throw handleApiError(enhancedError, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getQualityProfiles',
-        endpoint: `${RADARR_API_PREFIX}/qualityprofile`,
+        operation: 'updateMovie',
+        endpoint: `${RADARR_API_PREFIX}/movie/${movieId}`,
       });
     }
+  }
+
+  async refreshMovie(movieId: number): Promise<void> {
+    try {
+      await this.client.post(`${RADARR_API_PREFIX}/command`, {
+        name: 'MoviesRefresh',
+        movieIds: [movieId],
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'refreshMovie',
+        endpoint: `${RADARR_API_PREFIX}/command`,
+      });
+    }
+  }
+
+  async rescanMovie(movieId: number): Promise<void> {
+    try {
+      await this.client.post(`${RADARR_API_PREFIX}/command`, {
+        name: 'MoviesRescan',
+        movieIds: [movieId],
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'rescanMovie',
+        endpoint: `${RADARR_API_PREFIX}/command`,
+      });
+    }
+  }
+
+  async moveMovie(options: RadarrMoveMovieOptions): Promise<void> {
+    try {
+      await this.client.post(`${RADARR_API_PREFIX}/command`, {
+        name: 'MoviesMove',
+        ...options,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'moveMovie',
+        endpoint: `${RADARR_API_PREFIX}/command`,
+      });
+    }
+  }
+
+  async getTags(): Promise<RadarrTag[]> {
+    try {
+      const response = await this.client.get<RadarrTag[]>(`${RADARR_API_PREFIX}/tag`);
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getTags',
+        endpoint: `${RADARR_API_PREFIX}/tag`,
+      });
+    }
+  }
+
+  async createTag(label: string): Promise<RadarrTag> {
+    try {
+      const response = await this.client.post<RadarrTag>(`${RADARR_API_PREFIX}/tag`, { label });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'createTag',
+        endpoint: `${RADARR_API_PREFIX}/tag`,
+      });
+    }
+  }
+
+  async updateTag(tagId: number, label: string): Promise<RadarrTag> {
+    try {
+      const response = await this.client.put<RadarrTag>(`${RADARR_API_PREFIX}/tag/${tagId}`, { id: tagId, label });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'updateTag',
+        endpoint: `${RADARR_API_PREFIX}/tag/${tagId}`,
+      });
+    }
+  }
+
+  async deleteTag(tagId: number): Promise<void> {
+    try {
+      await this.client.delete(`${RADARR_API_PREFIX}/tag/${tagId}`);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'deleteTag',
+        endpoint: `${RADARR_API_PREFIX}/tag/${tagId}`,
+      });
+    }
+  }
+
+  async bulkUpdateMovies(editor: RadarrMovieEditor): Promise<void> {
+    try {
+      await this.client.put(`${RADARR_API_PREFIX}/movie/editor`, editor);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'bulkUpdateMovies',
+        endpoint: `${RADARR_API_PREFIX}/movie/editor`,
+      });
+    }
+  }
+
+  async getQualityProfiles(): Promise<QualityProfile[]> {
+    const candidateEndpoints = [
+      `${RADARR_API_PREFIX}/qualityprofile`,
+      `${RADARR_API_PREFIX}/qualityProfile`,
+      `${RADARR_API_PREFIX}/qualityProfiles`,
+    ];
+
+    for (const endpoint of candidateEndpoints) {
+      try {
+        const response = await this.client.get<RadarrQualityProfile[]>(endpoint);
+        
+        // Check if response contains an error
+        if (response.data && typeof response.data === 'object' && !Array.isArray(response.data) && 'error' in response.data) {
+          throw new Error((response.data as any).error as string);
+        }
+        
+        return response.data.map((profile) => this.mapQualityProfile(profile));
+      } catch (error) {
+        const axiosError = error as any;
+        const status = axiosError?.response?.status;
+        if (status !== 404) {
+          const enhancedError = new Error(
+            'Failed to load quality profiles. This may be due to corrupted custom formats in Radarr. Please check your Radarr quality profiles and custom formats, then try again.'
+          );
+          throw handleApiError(enhancedError, {
+            serviceId: this.config.id,
+            serviceType: this.config.type,
+            operation: 'getQualityProfiles',
+            endpoint,
+          });
+        }
+        // otherwise try next candidate
+      }
+    }
+
+    const enhancedError = new Error(
+      'Failed to load quality profiles. Tried several Radarr endpoints but none responded. This may be due to API changes or server configuration.'
+    );
+    throw handleApiError(enhancedError, {
+      serviceId: this.config.id,
+      serviceType: this.config.type,
+      operation: 'getQualityProfiles',
+      endpoint: candidateEndpoints.join(' | '),
+    });
   }
 
   async getRootFolders(): Promise<RootFolder[]> {
@@ -500,15 +682,54 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       id: profile.id,
       name: profile.name,
       upgradeAllowed: profile.upgradeAllowed,
-      cutoff: this.mapQualityResource(profile.cutoff),
+      cutoff: this.findQualityById(profile.items, profile.cutoff),
       items: profile.items.map((item) => this.mapQualityProfileItem(item)),
     };
   }
 
+  private findQualityById(items: RadarrQualityProfileItem[], qualityId: number): Quality {
+    // Flatten all qualities from the nested structure
+    const allQualities: RadarrQualityItem[] = [];
+    
+    const processItem = (item: RadarrQualityProfileItem) => {
+      if (item.quality) {
+        allQualities.push(item.quality);
+      }
+      if (item.items) {
+        item.items.forEach(processItem);
+      }
+    };
+    
+    items.forEach(processItem);
+    
+    const found = allQualities.find(q => q.id === qualityId);
+    if (found) {
+      return this.mapQualityResource(found);
+    }
+    
+    // Fallback: create a minimal quality object if not found
+    return {
+      id: qualityId,
+      name: `Quality ${qualityId}`,
+      source: 'unknown',
+      resolution: 0,
+      sort: 0,
+    };
+  }
+
   private mapQualityProfileItem(item: RadarrQualityProfileItem): QualityProfileItem {
+    // For groups, we need to handle differently, but for now, if no quality, use a placeholder
+    const quality = item.quality || {
+      id: item.id || 0,
+      name: item.name || 'Unknown',
+      source: 'unknown',
+      resolution: 0,
+      sort: 0,
+    };
+    
     return {
       allowed: item.allowed,
-      quality: this.mapQualityResource(item.quality),
+      quality: this.mapQualityResource(quality),
     };
   }
 
