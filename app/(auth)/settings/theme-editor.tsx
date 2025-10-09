@@ -13,6 +13,7 @@ import {
   useTheme,
   PaperProvider,
 } from 'react-native-paper';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 import { useThemeEditor } from '@/hooks/useThemeEditor';
@@ -94,8 +95,17 @@ export default function ThemeEditorScreen() {
     );
   }
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: 96 + insets.bottom },
+        ]}
+      >
       <Card style={styles.section}>
         <Card.Title title="Theme Presets" />
         <Card.Content>
@@ -312,7 +322,19 @@ export default function ThemeEditorScreen() {
         </Card.Content>
       </Card>
 
-      <View style={[styles.actions, { borderTopColor: theme.colors.outlineVariant }]}>
+      </ScrollView>
+
+      <View
+        style={[
+          styles.actions,
+          styles.footer,
+          {
+            borderTopColor: theme.colors.outlineVariant,
+            backgroundColor: theme.colors.surface,
+            paddingBottom: 8 + insets.bottom,
+          },
+        ]}
+      >
         <Button mode="outlined" onPress={handleReset} style={styles.actionButton}>
           Reset to Defaults
         </Button>
@@ -340,13 +362,19 @@ export default function ThemeEditorScreen() {
           }
         />
       </Portal>
-    </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 16,
   },
   centered: {
     justifyContent: 'center',
@@ -403,6 +431,14 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 8,
     borderTopWidth: 1,
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+    elevation: 8,
   },
   actionButton: {
     flex: 1,
