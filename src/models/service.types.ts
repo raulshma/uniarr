@@ -8,7 +8,8 @@ export type ServiceType =
   | 'sabnzbd'
   | 'nzbget'
   | 'rtorrent'
-  | 'prowlarr';
+  | 'prowlarr'
+  | 'bazarr';
 
 export interface ServiceConfig {
   id: string;

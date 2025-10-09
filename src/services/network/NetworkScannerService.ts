@@ -100,6 +100,11 @@ const SERVICE_DETECTION_CONFIGS: Record<ServiceType, ServiceDetectionConfig> = {
     commonPorts: [9696],
     detectionEndpoint: '/api/v1/system/status',
   },
+  bazarr: {
+    type: 'bazarr',
+    commonPorts: [6767],
+    detectionEndpoint: '/api/system/status',
+  },
 };
 
 export class NetworkScannerService {
@@ -396,6 +401,11 @@ export class NetworkScannerService {
         case 'prowlarr':
           response = await client.get(config.detectionEndpoint);
           version = response.data?.version;
+          break;
+
+        case 'bazarr':
+          response = await client.get(config.detectionEndpoint);
+          version = response.data?.bazarrVersion || response.data?.version;
           break;
 
         default:

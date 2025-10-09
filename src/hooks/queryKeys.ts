@@ -122,6 +122,46 @@ export const queryKeys = {
       filters ?? {},
     ] as const,
   },
+  bazarr: {
+    base: ['bazarr'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['bazarr', serviceId] as const,
+    moviesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'movies'] as const,
+    movieDetail: (serviceId: string, movieId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'movies',
+      movieId,
+    ] as const,
+    episodesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'episodes'] as const,
+    episodeDetail: (serviceId: string, episodeId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'episodes',
+      episodeId,
+    ] as const,
+    subtitlesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'subtitles'] as const,
+    subtitlesByMovie: (serviceId: string, movieId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'subtitles',
+      'movie',
+      movieId,
+    ] as const,
+    subtitlesByEpisode: (serviceId: string, episodeId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'subtitles',
+      'episode',
+      episodeId,
+    ] as const,
+    languages: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'languages'] as const,
+    providers: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'providers'] as const,
+    profiles: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'profiles'] as const,
+    queue: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'queue'] as const,
+    history: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'history'] as const,
+    statistics: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'statistics'] as const,
+    search: (serviceId: string, query: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'search',
+      { query, options },
+    ] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

@@ -9,6 +9,7 @@ import { TransmissionConnector } from '@/connectors/implementations/Transmission
 import { DelugeConnector } from '@/connectors/implementations/DelugeConnector';
 import { SABnzbdConnector } from '@/connectors/implementations/SABnzbdConnector';
 import { ProwlarrConnector } from '@/connectors/implementations/ProwlarrConnector';
+import { BazarrConnector } from '@/connectors/implementations/BazarrConnector';
 
 type ConnectorConstructor<TConnector extends IConnector = IConnector> = new (
   config: ServiceConfig,
@@ -25,6 +26,7 @@ const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
   deluge: DelugeConnector as ConnectorConstructor,
   sabnzbd: SABnzbdConnector as ConnectorConstructor,
   prowlarr: ProwlarrConnector as ConnectorConstructor,
+  bazarr: BazarrConnector as ConnectorConstructor,
 };
 
 /** Factory responsible for creating connector instances based on service metadata. */

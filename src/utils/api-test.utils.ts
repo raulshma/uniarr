@@ -518,3 +518,63 @@ export async function testSABnzbdApi(baseUrl: string, apiKey?: string, timeout: 
     };
   }
 }
+
+/**
+ * Test Bazarr API connectivity and authentication
+ */
+export async function testBazarrApi(
+  baseUrl: string,
+  apiKey?: string,
+  timeout: number = 15000
+): Promise<ApiTestResult> {
+  console.log('🧪 [ApiTest] Testing Bazarr API at:', baseUrl);
+
+  if (!apiKey) {
+    console.log('⚠️ [ApiTest] No API key provided for Bazarr');
+    return {
+      success: false,
+      error: 'API key is required for Bazarr authentication',
+    };
+  }
+
+  try {
+    // Test 1: Try with X-Api-Key header (Bazarr standard)
+    console.log('🧪 [ApiTest] Testing Bazarr with X-Api-Key header...');
+    const response = await axios.get(`${baseUrl}/api/system/status`, {
+      timeout,
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    });
+
+    console.log('✅ [ApiTest] Bazarr API worked:', {
+      status: response.status,
+      dataType: typeof response.data,
+      hasData: !!response.data,
+    });
+
+    return {
+      success: true,
+      status: response.status,
+      data: response.data,
+      headers: response.headers as Record<string, string>,
+    };
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    console.log('❌ [ApiTest] Bazarr API failed:', {
+      status: axiosError.response?.status,
+      message: axiosError.message,
+      code: axiosError.code,
+      data: axiosError.response?.data,
+    });
+
+    return {
+      success: false,
+      status: axiosError.response?.status,
+      error: axiosError.message,
+      data: axiosError.response?.data,
+    };
+  }
+}

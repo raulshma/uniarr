@@ -51,6 +51,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   nzbget: 'NZBGet',
   rtorrent: 'rTorrent',
   prowlarr: 'Prowlarr',
+  bazarr: 'Bazarr',
 };
 
 const serviceDisplayNames: Record<ServiceType, string> = {
@@ -64,6 +65,7 @@ const serviceDisplayNames: Record<ServiceType, string> = {
   nzbget: 'Usenet Client',
   rtorrent: 'Torrent Client',
   prowlarr: 'Indexer',
+  bazarr: 'Subtitle Manager',
 };
 
 const serviceIcons: Record<ServiceType, string> = {
@@ -77,6 +79,7 @@ const serviceIcons: Record<ServiceType, string> = {
   nzbget: 'download-network',
   rtorrent: 'download-network',
   prowlarr: 'radar',
+  bazarr: 'subtitles',
 };
 
 const deriveStatus = (

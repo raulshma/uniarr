@@ -5,7 +5,7 @@ import type { ServiceConfig } from '@/models/service.types';
 import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
 import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
-import { testSonarrApi, testRadarrApi, testQBittorrentApi, testJellyseerrApi } from '@/utils/api-test.utils';
+import { testSonarrApi, testRadarrApi, testQBittorrentApi, testJellyseerrApi, testBazarrApi } from '@/utils/api-test.utils';
 import { debugLogger } from '@/utils/debug-logger';
 import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
 

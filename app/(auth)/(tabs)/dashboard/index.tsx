@@ -67,6 +67,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   nzbget: 'NZBGet',
   rtorrent: 'rTorrent',
   prowlarr: 'Prowlarr',
+  bazarr: 'Bazarr',
 };
 
 const serviceIcons: Partial<Record<ServiceType, string>> = {
@@ -75,6 +76,7 @@ const serviceIcons: Partial<Record<ServiceType, string>> = {
   jellyseerr: 'account-search',
   qbittorrent: 'download-network',
   prowlarr: 'radar',
+  bazarr: 'subtitles',
 };
 
 const deriveStatus = (

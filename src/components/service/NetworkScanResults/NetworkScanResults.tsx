@@ -48,6 +48,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
       nzbget: 'download',
       rtorrent: 'download',
       prowlarr: 'search-web',
+      bazarr: 'subtitles',
     }),
     [],
   );
@@ -64,6 +65,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
       nzbget: theme.colors.errorContainer,
       rtorrent: theme.colors.inversePrimary,
       prowlarr: theme.colors.surfaceVariant,
+      bazarr: theme.colors.inverseSurface,
     }),
     [theme],
   );

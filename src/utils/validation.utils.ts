@@ -13,6 +13,7 @@ const serviceTypeValues = [
   'nzbget',
   'rtorrent',
   'prowlarr',
+  'bazarr',
 ] as const satisfies readonly ServiceType[];
 
 const httpSchemeRegex = /^https?:\/\//i;
