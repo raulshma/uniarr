@@ -742,11 +742,7 @@ const DashboardScreen = () => {
 
     return (
       <>
-        <AnimatedListItem
-          style={styles.shortcutTileWrapper}
-          index={0}
-          totalItems={2}
-        >
+        <AnimatedListItem index={0} totalItems={2}>
           <Card
             variant="custom"
             style={styles.activityCard}
@@ -776,11 +772,7 @@ const DashboardScreen = () => {
             </View>
           </Card>
         </AnimatedListItem>
-        <AnimatedListItem
-          style={styles.shortcutTileWrapper}
-          index={1}
-          totalItems={2}
-        >
+        <AnimatedListItem index={1} totalItems={2}>
           <Card
             variant="custom"
             style={styles.activityCard}
