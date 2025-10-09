@@ -307,15 +307,14 @@ const ProwlarrIndexerListScreen = () => {
           visible={false}
           onDismiss={() => {}}
           anchor={
-            <TouchableRipple
-              style={[styles.filterChip, { borderColor: theme.colors.outline }]}
-              onPress={() => {}}
-            >
-              <Icon source="filter-variant" size={16} color={theme.colors.onSurface} />
-              <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                {FILTER_LABELS[selectedFilter]}
-              </Text>
-              <Icon source="chevron-down" size={16} color={theme.colors.onSurfaceVariant} />
+            <TouchableRipple onPress={() => {}}>
+              <View style={[styles.filterChip, { borderColor: theme.colors.outline }]}>
+                <Icon source="filter-variant" size={16} color={theme.colors.onSurface} />
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
+                  {FILTER_LABELS[selectedFilter]}
+                </Text>
+                <Icon source="chevron-down" size={16} color={theme.colors.onSurfaceVariant} />
+              </View>
             </TouchableRipple>
           }
         >
