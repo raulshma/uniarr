@@ -1,12 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View, ScrollView } from 'react-native';
-import { useTheme, Appbar } from 'react-native-paper';
+import { useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import BottomDrawer from '@/components/common/BottomDrawer';
+import { TabHeader } from '@/components/common/TabHeader';
 import {
   CalendarHeader,
   CalendarMonthView,
@@ -197,18 +198,20 @@ const CalendarScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="Release Calendar" />
-        <Appbar.Action
-          icon="filter"
-          onPress={() => {
+      <TabHeader
+        title="Release Calendar"
+        showTitle={true}
+        showBackButton={true}
+        onBackPress={() => router.back()}
+        rightAction={{
+          icon: "filter",
+          onPress: () => {
             // TODO: Toggle filters visibility
             console.log('Toggle filters');
-          }}
-          accessibilityLabel="Toggle filters"
-        />
-      </Appbar.Header>
+          },
+          accessibilityLabel: "Toggle filters"
+        }}
+      />
       
       <View style={styles.content}>
         <CalendarHeader
