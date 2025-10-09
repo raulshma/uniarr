@@ -13,7 +13,7 @@ try {
 import { logger } from '@/services/logger/LoggerService';
 import type { ServiceType } from '@/models/service.types';
 import { secureStorage } from '@/services/storage/SecureStorage';
-import type { NetworkScanHistory, RecentIP } from '@/services/storage/SecureStorage';
+import type { NetworkScanHistoryType, RecentIP } from '@/services/storage/SecureStorage';
 
 export interface DiscoveredService {
   id: string;
@@ -49,7 +49,7 @@ export interface ServiceDetectionConfig {
   expectedResponsePattern?: string;
 }
 
-const SERVICE_DETECTION_CONFIGS: Partial<Record<ServiceType, ServiceDetectionConfig>> = {
+export const SERVICE_DETECTION_CONFIGS: Partial<Record<ServiceType, ServiceDetectionConfig>> = {
   sonarr: {
     type: 'sonarr',
     commonPorts: [8989],
@@ -671,7 +671,7 @@ export class NetworkScannerService {
    */
   private async saveScanHistory(result: NetworkScanResult, subnet: string, customIpAddress?: string): Promise<void> {
     try {
-      const scanHistory: NetworkScanHistory = {
+      const scanHistory: NetworkScanHistoryType = {
         id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
         duration: result.scanDuration,
@@ -710,7 +710,7 @@ export class NetworkScannerService {
   /**
    * Get scan history from storage
    */
-  async getScanHistory(): Promise<NetworkScanHistory[]> {
+  async getScanHistory(): Promise<NetworkScanHistoryType[]> {
     try {
       return await secureStorage.getNetworkScanHistory();
     } catch (error) {

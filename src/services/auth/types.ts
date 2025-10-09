@@ -16,6 +16,8 @@ export interface AuthConfig {
   method: AuthMethod;
   credentials: AuthCredentials;
   baseUrl: string;
+  /** Optional service status endpoint path, e.g. from SERVICE_DETECTION_CONFIGS */
+  detectionEndpoint?: string;
   timeout?: number;
   retryAttempts?: number;
   retryDelay?: number;

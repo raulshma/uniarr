@@ -2,6 +2,7 @@ import { authManager } from './AuthManager';
 import { AuthProviderFactory } from './AuthProviderFactory';
 import type { ServiceConfig } from '@/models/service.types';
 import type { AuthConfig, AuthResult, AuthSession } from './types';
+import { SERVICE_DETECTION_CONFIGS } from '@/services/network/NetworkScannerService';
 
 /**
  * Helper class for managing service authentication
@@ -13,6 +14,8 @@ export class ServiceAuthHelper {
   static createAuthConfig(serviceConfig: ServiceConfig): AuthConfig {
     const authMethod = AuthProviderFactory.getAuthMethod(serviceConfig.type);
     
+    const detectionEndpoint = SERVICE_DETECTION_CONFIGS[serviceConfig.type]?.detectionEndpoint;
+
     return {
       method: authMethod as any,
       credentials: {
@@ -21,6 +24,7 @@ export class ServiceAuthHelper {
         apiKey: serviceConfig.apiKey,
       },
       baseUrl: serviceConfig.url,
+      detectionEndpoint,
       timeout: serviceConfig.timeout,
       retryAttempts: 3,
       retryDelay: 1000,
