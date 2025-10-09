@@ -351,10 +351,18 @@ export const MediaSelectableItem: React.FC<MediaSelectableItemProps> = ({
       // Call specific handlers if provided, otherwise use general handler
       if ('status' in item && typeof item.status === 'string') {
         // This is a Series (status is SeriesStatus which is a string)
-        onPressSeries?.(item as Series) || onPress(item);
+        if (onPressSeries) {
+          onPressSeries(item as Series);
+        } else {
+          onPress(item);
+        }
       } else {
         // This is a Movie (status might be undefined or different type)
-        onPressMovie?.(item as Movie) || onPress(item);
+        if (onPressMovie) {
+          onPressMovie(item as Movie);
+        } else {
+          onPress(item);
+        }
       }
     }
   }, [isSelectionMode, toggleSelection, item, onPress, onPressSeries, onPressMovie]);
