@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Card, Text, useTheme } from 'react-native-paper';
+import { Card, Text, useTheme, IconButton, ProgressBar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/common/EmptyState';
@@ -16,12 +16,24 @@ const StatisticsCardSkeleton = () => {
   return (
     <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
       <Card.Content style={styles.cardContent}>
-        <SkeletonPlaceholder width={150} height={20} />
+        <SkeletonPlaceholder width={200} height={24} />
         <View style={styles.statsGrid}>
-          <SkeletonPlaceholder width={60} height={40} />
-          <SkeletonPlaceholder width={60} height={40} />
-          <SkeletonPlaceholder width={60} height={40} />
-          <SkeletonPlaceholder width={60} height={40} />
+          <View style={styles.statItem}>
+            <SkeletonPlaceholder width={80} height={32} />
+            <SkeletonPlaceholder width={60} height={16} style={{ marginTop: spacing.xs }} />
+          </View>
+          <View style={styles.statItem}>
+            <SkeletonPlaceholder width={80} height={32} />
+            <SkeletonPlaceholder width={60} height={16} style={{ marginTop: spacing.xs }} />
+          </View>
+          <View style={styles.statItem}>
+            <SkeletonPlaceholder width={80} height={32} />
+            <SkeletonPlaceholder width={60} height={16} style={{ marginTop: spacing.xs }} />
+          </View>
+          <View style={styles.statItem}>
+            <SkeletonPlaceholder width={80} height={32} />
+            <SkeletonPlaceholder width={60} height={16} style={{ marginTop: spacing.xs }} />
+          </View>
         </View>
       </Card.Content>
     </Card>
@@ -108,38 +120,78 @@ const ProwlarrStatisticsScreen = () => {
         {/* Overview Card */}
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Card.Content style={styles.cardContent}>
-            <Text variant="titleLarge" style={styles.cardTitle}>
-              Indexer Overview
-            </Text>
+            <View style={styles.cardHeader}>
+              <Text variant="titleLarge" style={styles.cardTitle}>
+                Indexer Overview
+              </Text>
+              <IconButton
+                icon="chart-pie"
+                size={24}
+                iconColor={theme.colors.primary}
+                style={styles.cardIcon}
+              />
+            </View>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <Text variant="headlineMedium" style={[styles.statValue, { color: theme.colors.primary }]}>
-                  {aggregateStats.totalIndexers}
-                </Text>
+                <View style={styles.statHeader}>
+                  <IconButton
+                    icon="database"
+                    size={20}
+                    iconColor={theme.colors.primary}
+                    style={styles.statIcon}
+                  />
+                  <Text variant="headlineMedium" style={[styles.statValue, { color: theme.colors.primary }]}>
+                    {aggregateStats.totalIndexers}
+                  </Text>
+                </View>
                 <Text variant="bodyMedium" style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>
                   Total Indexers
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text variant="headlineMedium" style={[styles.statValue, { color: theme.colors.secondary }]}>
-                  {aggregateStats.enabledIndexers}
-                </Text>
+                <View style={styles.statHeader}>
+                  <IconButton
+                    icon="check-circle"
+                    size={20}
+                    iconColor={theme.colors.secondary}
+                    style={styles.statIcon}
+                  />
+                  <Text variant="headlineMedium" style={[styles.statValue, { color: theme.colors.secondary }]}>
+                    {aggregateStats.enabledIndexers}
+                  </Text>
+                </View>
                 <Text variant="bodyMedium" style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>
                   Active Indexers
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text variant="headlineMedium" style={[styles.statValue, { color: theme.colors.tertiary }]}>
-                  {aggregateStats.totalQueries.toLocaleString()}
-                </Text>
+                <View style={styles.statHeader}>
+                  <IconButton
+                    icon="magnify"
+                    size={20}
+                    iconColor={theme.colors.tertiary}
+                    style={styles.statIcon}
+                  />
+                  <Text variant="headlineMedium" style={[styles.statValue, { color: theme.colors.tertiary }]}>
+                    {aggregateStats.totalQueries.toLocaleString()}
+                  </Text>
+                </View>
                 <Text variant="bodyMedium" style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>
                   Total Queries
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text variant="headlineMedium" style={[styles.statValue, { color: theme.colors.error }]}>
-                  {aggregateStats.totalGrabs.toLocaleString()}
-                </Text>
+                <View style={styles.statHeader}>
+                  <IconButton
+                    icon="download"
+                    size={20}
+                    iconColor={theme.colors.error}
+                    style={styles.statIcon}
+                  />
+                  <Text variant="headlineMedium" style={[styles.statValue, { color: theme.colors.error }]}>
+                    {aggregateStats.totalGrabs.toLocaleString()}
+                  </Text>
+                </View>
                 <Text variant="bodyMedium" style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>
                   Total Grabs
                 </Text>
@@ -151,38 +203,83 @@ const ProwlarrStatisticsScreen = () => {
         {/* Performance Metrics Card */}
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Card.Content style={styles.cardContent}>
-            <Text variant="titleLarge" style={styles.cardTitle}>
-              Performance Metrics
-            </Text>
+            <View style={styles.cardHeader}>
+              <Text variant="titleLarge" style={styles.cardTitle}>
+                Performance Metrics
+              </Text>
+              <IconButton
+                icon="speedometer"
+                size={24}
+                iconColor={theme.colors.primary}
+                style={styles.cardIcon}
+              />
+            </View>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.primary }]}>
-                  {aggregateStats.successRate.toFixed(1)}%
-                </Text>
+                <View style={styles.statHeader}>
+                  <IconButton
+                    icon="percent"
+                    size={20}
+                    iconColor={theme.colors.primary}
+                    style={styles.statIcon}
+                  />
+                  <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.primary }]}>
+                    {aggregateStats.successRate.toFixed(1)}%
+                  </Text>
+                </View>
                 <Text variant="bodyMedium" style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>
                   Success Rate
                 </Text>
+                <ProgressBar
+                  progress={aggregateStats.successRate / 100}
+                  color={theme.colors.primary}
+                  style={styles.progressBar}
+                />
               </View>
               <View style={styles.statItem}>
-                <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.secondary }]}>
-                  {aggregateStats.avgResponseTime.toFixed(0)}ms
-                </Text>
+                <View style={styles.statHeader}>
+                  <IconButton
+                    icon="timer"
+                    size={20}
+                    iconColor={theme.colors.secondary}
+                    style={styles.statIcon}
+                  />
+                  <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.secondary }]}>
+                    {aggregateStats.avgResponseTime.toFixed(0)}ms
+                  </Text>
+                </View>
                 <Text variant="bodyMedium" style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>
                   Avg Response Time
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.tertiary }]}>
-                  {aggregateStats.enabledIndexers > 0 ? (aggregateStats.totalQueries / aggregateStats.enabledIndexers).toFixed(0) : '0'}
-                </Text>
+                <View style={styles.statHeader}>
+                  <IconButton
+                    icon="magnify-scan"
+                    size={20}
+                    iconColor={theme.colors.tertiary}
+                    style={styles.statIcon}
+                  />
+                  <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.tertiary }]}>
+                    {aggregateStats.enabledIndexers > 0 ? (aggregateStats.totalQueries / aggregateStats.enabledIndexers).toFixed(0) : '0'}
+                  </Text>
+                </View>
                 <Text variant="bodyMedium" style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>
                   Queries per Indexer
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.error }]}>
-                  {aggregateStats.enabledIndexers > 0 ? (aggregateStats.totalGrabs / aggregateStats.enabledIndexers).toFixed(0) : '0'}
-                </Text>
+                <View style={styles.statHeader}>
+                  <IconButton
+                    icon="download-multiple"
+                    size={20}
+                    iconColor={theme.colors.error}
+                    style={styles.statIcon}
+                  />
+                  <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.error }]}>
+                    {aggregateStats.enabledIndexers > 0 ? (aggregateStats.totalGrabs / aggregateStats.enabledIndexers).toFixed(0) : '0'}
+                  </Text>
+                </View>
                 <Text variant="bodyMedium" style={[styles.statLabel, { color: theme.colors.onSurfaceVariant }]}>
                   Grabs per Indexer
                 </Text>
@@ -195,9 +292,17 @@ const ProwlarrStatisticsScreen = () => {
         {topIndexers.length > 0 && (
           <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
             <Card.Content style={styles.cardContent}>
-              <Text variant="titleLarge" style={styles.cardTitle}>
-                Top Performing Indexers
-              </Text>
+              <View style={styles.cardHeader}>
+                <Text variant="titleLarge" style={styles.cardTitle}>
+                  Top Performing Indexers
+                </Text>
+                <IconButton
+                  icon="trophy"
+                  size={24}
+                  iconColor={theme.colors.primary}
+                  style={styles.cardIcon}
+                />
+              </View>
               <View style={styles.topIndexersList}>
                 {topIndexers.map((stat, index) => (
                   <View key={stat.applicationId} style={styles.topIndexerItem}>
@@ -229,9 +334,17 @@ const ProwlarrStatisticsScreen = () => {
         {/* Indexer Status Distribution */}
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Card.Content style={styles.cardContent}>
-            <Text variant="titleLarge" style={styles.cardTitle}>
-              Indexer Status Distribution
-            </Text>
+            <View style={styles.cardHeader}>
+              <Text variant="titleLarge" style={styles.cardTitle}>
+                Indexer Status Distribution
+              </Text>
+              <IconButton
+                icon="chart-pie"
+                size={24}
+                iconColor={theme.colors.primary}
+                style={styles.cardIcon}
+              />
+            </View>
             <View style={styles.statusGrid}>
               <View style={styles.statusItem}>
                 <View style={[styles.statusIndicator, { backgroundColor: theme.colors.primary }]} />
@@ -267,9 +380,16 @@ const styles = StyleSheet.create({
   cardContent: {
     gap: spacing.md,
   },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   cardTitle: {
-    width: 150,
-    height: 20,
+    flex: 1,
+  },
+  cardIcon: {
+    margin: 0,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -277,8 +397,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   statItem: {
-    width: 60,
-    height: 40,
+    flex: 1,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  statIcon: {
+    margin: 0,
   },
   statValue: {
     fontWeight: '700',
@@ -286,6 +415,11 @@ const styles = StyleSheet.create({
   statLabel: {
     textAlign: 'center',
     fontSize: 12,
+  },
+  progressBar: {
+    width: '100%',
+    height: 4,
+    marginTop: spacing.xs,
   },
   topIndexersList: {
     gap: spacing.sm,

@@ -108,3 +108,40 @@ export interface ProwlarrStatistics {
     lastGrabTime?: string;
   };
 }
+
+/**
+ * Statistics types aligned with Prowlarr OpenAPI spec
+ */
+export interface IndexerStatistics {
+  indexerId: number;
+  indexerName?: string | null;
+  averageResponseTime: number;
+  averageGrabResponseTime: number;
+  numberOfQueries: number;
+  numberOfGrabs: number;
+  numberOfRssQueries: number;
+  numberOfAuthQueries: number;
+  numberOfFailedQueries: number;
+  numberOfFailedGrabs: number;
+  numberOfFailedRssQueries: number;
+  numberOfFailedAuthQueries: number;
+}
+
+export interface UserAgentStatistics {
+  userAgent?: string | null;
+  numberOfQueries: number;
+  numberOfGrabs: number;
+}
+
+export interface HostStatistics {
+  host?: string | null;
+  numberOfQueries: number;
+  numberOfGrabs: number;
+}
+
+export interface IndexerStatsResource {
+  id: number;
+  indexers?: IndexerStatistics[] | null;
+  userAgents?: UserAgentStatistics[] | null;
+  hosts?: HostStatistics[] | null;
+}

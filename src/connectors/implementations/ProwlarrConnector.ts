@@ -5,7 +5,9 @@ import type {
   ProwlarrConnectedApplication,
   ProwlarrApplicationBulkResource,
   ProwlarrTestResult,
-  ProwlarrStatistics
+  ProwlarrStatistics,
+  IndexerStatsResource,
+  IndexerStatistics
 } from '@/models/prowlarr.types';
 import { handleApiError } from '@/utils/error.utils';
 
@@ -309,17 +311,19 @@ export class ProwlarrConnector extends BaseConnector<
    */
   async getIndexerStatistics(): Promise<ProwlarrStatistics[]> {
     try {
-      // No public statistics endpoint currently; derive minimal shape
-      const indexers = await this.getIndexers();
-      return indexers.map((idx) => ({
-        applicationId: idx.id,
-        applicationName: idx.name ?? '',
+      const response = await this.client.get('/api/v1/indexerstats');
+      const statsResource: IndexerStatsResource = response.data;
+
+      // Transform to the expected ProwlarrStatistics format
+      return (statsResource.indexers || []).map((indexerStat: IndexerStatistics) => ({
+        applicationId: indexerStat.indexerId,
+        applicationName: indexerStat.indexerName || '',
         statistics: {
-          queries: 0,
-          grabs: 0,
-          averageResponseTime: 0,
-          lastQueryTime: undefined,
-          lastGrabTime: undefined,
+          queries: indexerStat.numberOfQueries,
+          grabs: indexerStat.numberOfGrabs,
+          averageResponseTime: indexerStat.averageResponseTime,
+          lastQueryTime: undefined, // Not available in this endpoint
+          lastGrabTime: undefined, // Not available in this endpoint
         },
       }));
     } catch (error) {

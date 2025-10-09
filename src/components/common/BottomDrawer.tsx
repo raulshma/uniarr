@@ -123,7 +123,7 @@ const BottomDrawer: React.FC<Props> = ({
     }
   }, [visible]);
 
-  const backdropOpacity = theme.dark ? 0.7 : 0.5;
+  const backdropOpacity = theme.dark ? 0.2 : 0.1;
   const handleColor = theme.colors.onSurfaceVariant ?? theme.colors.onSurface;
 
   const renderBackdrop = useCallback(
