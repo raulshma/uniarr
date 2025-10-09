@@ -1,16 +1,16 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { ProgressBar, Text, useTheme, TextInput, SegmentedButtons } from 'react-native-paper';
+import { Appbar, Divider, ProgressBar, Text, useTheme, TextInput, SegmentedButtons, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/common/Button';
-import { LoadingState } from '@/components/common/LoadingState';
+import LoadingState from '@/components/common/LoadingState/LoadingState';
 import NetworkScanResults from '@/components/service/NetworkScanResults/NetworkScanResults';
 import NetworkScanHistory from '@/components/service/NetworkScanResults/NetworkScanHistory';
 import type { AppTheme } from '@/constants/theme';
 import type { DiscoveredService } from '@/services/network/NetworkScannerService';
-import type { NetworkScanHistory as ScanHistoryType, RecentIP } from '@/services/storage/SecureStorage';
+import type { NetworkScanHistoryType as ScanHistoryType, RecentIP } from '@/services/storage/SecureStorage';
 import { useNetworkScan } from '@/hooks/useNetworkScan';
 import { spacing } from '@/theme/spacing';
 import { NetworkScannerService } from '@/services/network/NetworkScannerService';
@@ -33,29 +33,26 @@ const NetworkScanScreen = () => {
       StyleSheet.create({
         safeArea: {
           flex: 1,
-          backgroundColor: theme.colors.surface,
-          paddingBottom: spacing.xxl,
+          backgroundColor: theme.colors.background,
         },
-        headerBar: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
-          backgroundColor: theme.colors.surface,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: theme.colors.outlineVariant,
+        container: {
+          flex: 1,
+          backgroundColor: theme.colors.background,
+        },
+        content: {
+          paddingBottom: spacing.xxl,
+          gap: spacing.lg,
+        },
+        sectionSurface: {
+          marginHorizontal: spacing.md,
+          borderRadius: 12,
+          backgroundColor: theme.colors.elevation.level1,
+        },
+        sectionPadding: {
+          padding: spacing.md,
         },
         headerTitle: {
           color: theme.colors.onSurface,
-          fontWeight: '600',
-        },
-        content: {
-          flex: 1,
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.lg,
-          paddingBottom: spacing.xxl,
-          gap: spacing.lg,
         },
         hero: {
           gap: spacing.xs,
@@ -85,27 +82,23 @@ const NetworkScanScreen = () => {
         },
         resultsContainer: {
           flex: 1,
-          paddingBottom: spacing.xxl,
         },
         ipInputContainer: {
           gap: spacing.sm,
         },
-        ipInput: {
-          backgroundColor: theme.colors.surfaceVariant,
-        },
         ipInputLabel: {
           color: theme.colors.onSurfaceVariant,
-        },
-        tabContainer: {
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.md,
         },
         segmentedButtons: {
           backgroundColor: theme.colors.surfaceVariant,
         },
+        tabsSurface: {
+          marginHorizontal: spacing.md,
+          borderRadius: 12,
+          backgroundColor: theme.colors.elevation.level2,
+        },
         historyContainer: {
           flex: 1,
-          paddingBottom: spacing.xxl,
         },
       }),
     [theme],
@@ -191,149 +184,138 @@ const NetworkScanScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.headerBar}>
-        <Button
-          mode="text"
-          onPress={() => router.back()}
-          icon="arrow-left"
-          accessibilityLabel="Back to add service"
-        >
-          Back
-        </Button>
-        <Text variant="headlineSmall" style={styles.headerTitle}>
-          Network Scan
-        </Text>
-        <View style={{ width: 80 }} />
-      </View>
+      <Appbar.Header mode="small" elevated>
+        <Appbar.BackAction onPress={() => router.back()} accessibilityLabel="Back" />
+        <Appbar.Content title="Network Scan" titleStyle={styles.headerTitle} />
+      </Appbar.Header>
 
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <View style={styles.hero}>
-          <Text variant="titleMedium" style={styles.heroTitle}>
-            Scan for Services
-          </Text>
-          <Text variant="bodyMedium" style={styles.heroSubtitle}>
-            Automatically discover Sonarr, Radarr, Jellyseerr, qBittorrent, Transmission, Deluge, SABnzbd, Prowlarr, and Bazarr services on your local network. Quick scan checks common IPs first, while comprehensive scan covers all IPs (1-254) in your subnet.
-          </Text>
-        </View>
-
-        <View style={styles.ipInputContainer}>
-          <Text variant="bodyMedium" style={styles.ipInputLabel}>
-            Custom IP Address (Optional)
-          </Text>
-          <TextInput
-            mode="outlined"
-            label="Enter IP address (e.g., 192.168.1.100)"
-            value={customIpAddress}
-            onChangeText={setCustomIpAddress}
-            style={styles.ipInput}
-            keyboardType="numeric"
-            placeholder="Leave empty to scan local network"
-            disabled={isScanning}
-          />
-        </View>
-
-        {isScanning && scanProgress && (
-          <View style={styles.progressContainer}>
-            <ProgressBar progress={progressPercentage} />
-            <Text variant="bodySmall" style={styles.progressText}>
-              Scanning {scanProgress.currentService}... ({scanProgress.currentHost}/{scanProgress.totalHosts} hosts)
+        <Surface style={[styles.sectionSurface, styles.sectionPadding]} elevation={1}>
+          <View style={styles.hero}>
+            <Text variant="titleMedium" style={styles.heroTitle}>
+              Scan for Services
             </Text>
-            <Text variant="bodySmall" style={styles.progressText}>
-              Found {scanProgress.servicesFound.length} services so far
+            <Text variant="bodyMedium" style={styles.heroSubtitle}>
+              Discover Sonarr, Radarr, Jellyseerr, qBittorrent, Transmission, Deluge, SABnzbd, Prowlarr, and Bazarr on your network. Quick scan checks common IPs first; full scan covers all hosts (1–254) in your subnet.
             </Text>
           </View>
-        )}
+        </Surface>
+
+        <Surface style={[styles.sectionSurface, styles.sectionPadding]} elevation={1}>
+          <View style={styles.ipInputContainer}>
+            <Text variant="bodyMedium" style={styles.ipInputLabel}>
+              Custom IP Address (optional)
+            </Text>
+            <TextInput
+              mode="outlined"
+              label="Enter IP address (e.g., 192.168.1.100)"
+              value={customIpAddress}
+              onChangeText={setCustomIpAddress}
+              keyboardType="numeric"
+              placeholder="Leave empty to scan local network"
+              disabled={isScanning}
+            />
+          </View>
+
+          {isScanning && scanProgress && (
+            <View style={[styles.progressContainer, { marginTop: spacing.md }]}>
+              <ProgressBar progress={progressPercentage} />
+              <Text variant="bodySmall" style={styles.progressText}>
+                Scanning {scanProgress.currentService}... ({scanProgress.currentHost}/{scanProgress.totalHosts} hosts)
+              </Text>
+              <Text variant="bodySmall" style={styles.progressText}>
+                Found {scanProgress.servicesFound.length} services so far
+              </Text>
+            </View>
+          )}
+
+          <View style={[styles.actions, { marginTop: spacing.md }]}>
+            {!isScanning ? (
+              <>
+                <Button
+                  mode="contained"
+                  onPress={() => handleStartScan(true)}
+                  icon="flash"
+                  fullWidth
+                >
+                  Quick Scan (Fast)
+                </Button>
+                <Button
+                  mode="outlined"
+                  onPress={() => handleStartScan(false)}
+                  icon="lan"
+                  fullWidth
+                >
+                  Full Scan (All IPs 1-254)
+                </Button>
+              </>
+            ) : (
+              <Button
+                mode="contained"
+                onPress={handleStopScan}
+                style={styles.stopButton}
+                labelStyle={styles.stopButtonLabel}
+                icon="stop"
+                fullWidth
+              >
+                Stop Scanning
+              </Button>
+            )}
+          </View>
+        </Surface>
 
         {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
+        <Surface style={[styles.tabsSurface, styles.sectionPadding]} elevation={2}>
           <SegmentedButtons
             value={activeTab}
             onValueChange={(value) => setActiveTab(value as 'scan' | 'history')}
             buttons={[
-              {
-                value: 'scan',
-                label: 'Network Scan',
-                icon: 'lan',
-              },
-              {
-                value: 'history',
-                label: 'History',
-                icon: 'history',
-              },
+              { value: 'scan', label: 'Network Scan', icon: 'lan' },
+              { value: 'history', label: 'History', icon: 'history' },
             ]}
             style={styles.segmentedButtons}
           />
-        </View>
+        </Surface>
 
         {activeTab === 'scan' ? (
           <>
-            <View style={styles.actions}>
-              {!isScanning ? (
-                <>
-                  <Button
-                    mode="contained"
-                    onPress={() => handleStartScan(true)}
-                    icon="flash"
-                    fullWidth
-                  >
-                    Quick Scan (Fast)
-                  </Button>
-                  <Button
-                    mode="outlined"
-                    onPress={() => handleStartScan(false)}
-                    icon="lan"
-                    fullWidth
-                  >
-                    Full Scan (All IPs 1-254)
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  mode="contained"
-                  onPress={handleStopScan}
-                  style={styles.stopButton}
-                  labelStyle={styles.stopButtonLabel}
-                  icon="stop"
-                  fullWidth
-                >
-                  Stop Scanning
-                </Button>
-              )}
-            </View>
-
             <View style={styles.resultsContainer}>
-              <NetworkScanResults
-                services={scanResult?.services || (scanProgress?.servicesFound || [])}
-                isScanning={isScanning}
-                scanDuration={scanResult?.scanDuration}
-                scannedHosts={scanResult?.scannedHosts}
-                scanProgress={scanProgress}
-                onServicePress={handleServiceSelect}
-                onScanAgain={handleStartScan}
-              />
+              <Surface style={[styles.sectionSurface]} elevation={1}>
+                <NetworkScanResults
+                  services={scanResult?.services || (scanProgress?.servicesFound || [])}
+                  isScanning={isScanning}
+                  scanDuration={scanResult?.scanDuration}
+                  scannedHosts={scanResult?.scannedHosts}
+                  scanProgress={scanProgress}
+                  onServicePress={handleServiceSelect}
+                  onScanAgain={handleStartScan}
+                />
+              </Surface>
             </View>
           </>
         ) : (
           <View style={styles.historyContainer}>
-            {isLoadingHistory ? (
-              <LoadingState message="Loading scan history..." />
-            ) : (
-              <NetworkScanHistory
-                scanHistory={scanHistory}
-                recentIPs={recentIPs}
-                onClearHistory={handleClearHistory}
-                onIPSelect={handleIPSelect}
-              />
-            )}
+            <Surface style={[styles.sectionSurface]} elevation={1}>
+              {isLoadingHistory ? (
+                <LoadingState message="Loading scan history..." />
+              ) : (
+                <NetworkScanHistory
+                  scanHistory={scanHistory}
+                  recentIPs={recentIPs}
+                  onClearHistory={handleClearHistory}
+                  onIPSelect={handleIPSelect}
+                />
+              )}
+            </Surface>
           </View>
         )}
 
         {scanError && (
-          <View style={{ marginTop: spacing.md }}>
+          <View style={{ marginTop: spacing.md, marginHorizontal: spacing.md }}>
             <Text variant="bodySmall" style={{ color: theme.colors.error }}>
               {scanError}
             </Text>

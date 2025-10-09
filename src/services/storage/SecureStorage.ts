@@ -13,7 +13,7 @@ type StoredServiceConfig = Omit<ServiceConfig, 'createdAt' | 'updatedAt'> & {
   updatedAt: string;
 };
 
-export interface NetworkScanHistory {
+export interface NetworkScanHistoryType {
   id: string;
   timestamp: string;
   duration: number;
@@ -105,7 +105,7 @@ class SecureStorage {
     this.cache.clear();
   }
 
-  async saveNetworkScanHistory(history: NetworkScanHistory): Promise<void> {
+  async saveNetworkScanHistory(history: NetworkScanHistoryType): Promise<void> {
     try {
       const existingHistory = await this.getNetworkScanHistory();
       const updatedHistory = [history, ...existingHistory.slice(0, 19)]; // Keep only last 20 scans
@@ -119,14 +119,14 @@ class SecureStorage {
     }
   }
 
-  async getNetworkScanHistory(): Promise<NetworkScanHistory[]> {
+  async getNetworkScanHistory(): Promise<NetworkScanHistoryType[]> {
     try {
       const serialized = await SecureStore.getItemAsync(SCAN_HISTORY_KEY);
       if (!serialized) {
         return [];
       }
 
-      return JSON.parse(serialized) as NetworkScanHistory[];
+      return JSON.parse(serialized) as NetworkScanHistoryType[];
     } catch (error) {
       await logger.error('Failed to read network scan history.', {
         location: 'SecureStorage.getNetworkScanHistory',

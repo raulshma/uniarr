@@ -174,7 +174,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
       ) : null}
 
       <Card contentPadding="none" style={styles.servicesCard}>
-        <View style={styles.servicesHeader}>
+        <View style={[styles.servicesHeader, { borderBottomColor: theme.colors.outlineVariant }] }>
           <Text variant="titleMedium" style={[styles.servicesTitle, { color: theme.colors.onSurface }]}>
             Found Services ({services.length})
           </Text>
@@ -189,11 +189,11 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
           ) : null}
         </View>
 
-        <ScrollView style={styles.servicesScrollContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.servicesScrollContainer}>
           {Object.entries(groupServicesByType(services)).map(([serviceType, typeServices]) => (
             <View key={serviceType}>
               {/* Service Type Header */}
-              <View style={styles.serviceTypeHeader}>
+              <View style={[styles.serviceTypeHeader, { backgroundColor: theme.colors.elevation.level1, borderBottomColor: theme.colors.outlineVariant }]}>
                 <View style={styles.serviceTypeHeaderContent}>
                   <Avatar.Icon
                     size={24}
@@ -310,7 +310,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
               })}
             </View>
           ))}
-        </ScrollView>
+        </View>
       </Card>
     </View>
   );
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   servicesScrollContainer: {
-    height: 125, // Limit height to make it scrollable
+    // Allow content to expand fully; parent screen scrolls
   },
   servicesHeader: {
     flexDirection: 'row',
@@ -357,13 +357,15 @@ const styles = StyleSheet.create({
   },
   serviceContent: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
   },
   serviceIcon: {
     marginRight: 0,
   },
   serviceInfo: {
     flex: 1,
+    flexShrink: 1,
   },
   serviceName: {
     fontWeight: '500',
@@ -419,7 +421,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   serviceChip: {
-    height: 24,
+    // Allow chip to size itself to content to avoid clipping on Android
   },
   serviceChipText: {
     fontSize: 11,
