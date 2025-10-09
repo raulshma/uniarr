@@ -13,7 +13,7 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, FadingTransition, Layout, LinearTransition } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/common/EmptyState';
 import { ListRefreshControl } from '@/components/common/ListRefreshControl';
@@ -338,9 +338,9 @@ const SonarrSeriesListScreen = () => {
 
       return (
         <Animated.View
-          entering={FadeInUp.delay(index * 50).springify()}
           exiting={FadeOut.springify()}
-          layout={Layout.springify()}
+          entering={FadeInUp.delay(index * 50).springify()}
+          layout={FadingTransition.build()}
         >
           <MediaSelectableItem
             item={item}
