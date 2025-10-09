@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View, ScrollView } from 'react-native';
 import { useTheme, Appbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { EmptyState } from '@/components/common/EmptyState';
 import { LoadingState } from '@/components/common/LoadingState';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import BottomDrawer from '@/components/common/BottomDrawer';
 import {
   CalendarHeader,
   CalendarMonthView,
@@ -14,6 +15,7 @@ import {
   CalendarListView,
   CalendarStats,
   CalendarFilters as CalendarFiltersComponent,
+  MediaReleaseCard,
 } from '@/components/calendar';
 import { useCalendar } from '@/hooks/useCalendar';
 import type { AppTheme } from '@/constants/theme';
@@ -34,6 +36,9 @@ const CalendarScreen = () => {
     clearFilters,
   } = useCalendar();
 
+  const [expandedDay, setExpandedDay] = useState<string | undefined>(undefined);
+  const [detailsDay, setDetailsDay] = useState<string | undefined>(undefined);
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -49,11 +54,20 @@ const CalendarScreen = () => {
 
   const handleDateSelect = useCallback((date: string) => {
     setSelectedDate(date);
-  }, [setSelectedDate]);
+    setExpandedDay(expandedDay === date ? undefined : date); // Toggle expansion
+  }, [setSelectedDate, expandedDay]);
 
   const handleReleasePress = useCallback((releaseId: string) => {
     // TODO: Navigate to release details
     console.log('Release pressed:', releaseId);
+  }, []);
+
+  const handleDayLongPress = useCallback((date: string) => {
+    setDetailsDay(date);
+  }, []);
+
+  const handleCloseDetails = useCallback(() => {
+    setDetailsDay(undefined);
   }, []);
 
   const handleRetry = useCallback(() => {
@@ -69,9 +83,28 @@ const CalendarScreen = () => {
     setFilters(filters);
   }, [setFilters]);
 
-  const handleClearFilters = useCallback(() => {
-    clearFilters();
-  }, [clearFilters]);
+  const detailsReleases = useMemo(() => {
+    if (!detailsDay || !calendarData) return [];
+    // Find the day in calendarData
+    if ('weeks' in calendarData) {
+      for (const week of calendarData.weeks) {
+        const day = week.days.find(d => d.date === detailsDay);
+        if (day) return day.releases;
+      }
+    }
+    return [];
+  }, [detailsDay, calendarData]);
+
+  const detailsTitle = useMemo(() => {
+    if (!detailsDay) return '';
+    const date = new Date(detailsDay);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long',
+      month: 'long', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }, [detailsDay]);
 
   const renderCalendarContent = () => {
     if (state.isLoading) {
@@ -110,7 +143,7 @@ const CalendarScreen = () => {
           title="No releases found"
           description="Try adjusting your filters or check back later for new releases."
           actionLabel="Clear Filters"
-          onActionPress={handleClearFilters}
+          onActionPress={clearFilters}
         />
       );
     }
@@ -121,7 +154,9 @@ const CalendarScreen = () => {
           <CalendarMonthView
             data={calendarData as CalendarMonth}
             selectedDate={state.selectedDate}
+            expandedDay={expandedDay}
             onDateSelect={handleDateSelect}
+            onDayLongPress={handleDayLongPress}
             onReleasePress={handleReleasePress}
           />
         );
@@ -192,7 +227,7 @@ const CalendarScreen = () => {
           <CalendarFiltersComponent
             filters={state.filters}
             onFiltersChange={handleFiltersChange}
-            onClearFilters={handleClearFilters}
+            onClearFilters={clearFilters}
           />
 
           <ErrorBoundary>
@@ -200,6 +235,23 @@ const CalendarScreen = () => {
           </ErrorBoundary>
         </ScrollView>
       </View>
+
+      <BottomDrawer
+        visible={!!detailsDay}
+        onDismiss={handleCloseDetails}
+        title={detailsTitle}
+        maxHeight="70%"
+      >
+        <View style={{ gap: theme.custom.spacing.sm }}>
+          {detailsReleases.map((release) => (
+            <MediaReleaseCard
+              key={release.id}
+              release={release}
+              onPress={() => handleReleasePress(release.id)}
+            />
+          ))}
+        </View>
+      </BottomDrawer>
     </SafeAreaView>
   );
 };
