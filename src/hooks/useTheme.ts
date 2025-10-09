@@ -6,9 +6,53 @@ import {
   defaultTheme,
   createCustomTheme,
   defaultCustomThemeConfig,
-  type AppTheme
+  type AppTheme,
+  type CustomThemeConfig,
 } from '@/constants/theme';
 import { useSettingsStore } from '@/store/settingsStore';
+
+const hasCustomColors = (config?: CustomThemeConfig['customColors']): boolean => {
+  if (!config) {
+    return false;
+  }
+
+  return Object.values(config).some(
+    (color) => typeof color === 'string' && color.trim().length > 0,
+  );
+};
+
+const hasPosterStyleOverrides = (config: CustomThemeConfig): boolean =>
+  config.posterStyle.borderRadius !== defaultCustomThemeConfig.posterStyle.borderRadius ||
+  config.posterStyle.shadowOpacity !== defaultCustomThemeConfig.posterStyle.shadowOpacity ||
+  config.posterStyle.shadowRadius !== defaultCustomThemeConfig.posterStyle.shadowRadius;
+
+const hasCustomThemeOverrides = (config?: CustomThemeConfig): config is CustomThemeConfig => {
+  if (!config) {
+    return false;
+  }
+
+  if (config.preset && config.preset !== 'uniarr') {
+    return true;
+  }
+
+  if (hasCustomColors(config.customColors)) {
+    return true;
+  }
+
+  if (config.fontScale !== defaultCustomThemeConfig.fontScale) {
+    return true;
+  }
+
+  if (config.densityMode !== defaultCustomThemeConfig.densityMode) {
+    return true;
+  }
+
+  if (hasPosterStyleOverrides(config)) {
+    return true;
+  }
+
+  return false;
+};
 
 /**
  * Custom hook that returns the appropriate app theme based on user preference and system theme.
@@ -42,7 +86,7 @@ export const useTheme = (): AppTheme => {
     }
 
     // Check if we have a custom theme configuration
-    if (customThemeConfig && customThemeConfig.preset !== 'uniarr') {
+    if (hasCustomThemeOverrides(customThemeConfig)) {
       // Use custom theme configuration
       return createCustomTheme(customThemeConfig, effectiveScheme === 'dark');
     }

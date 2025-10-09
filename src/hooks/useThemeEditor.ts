@@ -1,82 +1,105 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useColorScheme } from 'react-native';
 
 import {
   createCustomTheme,
   defaultCustomThemeConfig,
-  type CustomThemeConfig,
   type AppTheme,
+  type CustomThemeConfig,
 } from '@/constants/theme';
 import { useSettingsStore } from '@/store/settingsStore';
-import { logger } from '@/services/logger/LoggerService';
+import type { CustomColorScheme } from '@/theme/colors';
 
-const THEME_CONFIG_STORAGE_KEY = 'CustomThemeConfig:v1';
+const hasColorOverrides = (
+  colors?: Partial<CustomColorScheme>,
+): colors is Partial<CustomColorScheme> =>
+  !!colors && Object.values(colors).some((value) => typeof value === 'string' && value.trim().length > 0);
+
+const mergeThemeConfig = (
+  base: CustomThemeConfig,
+  updates: Partial<CustomThemeConfig>,
+): CustomThemeConfig => {
+  const hasCustomColorsUpdate = Object.prototype.hasOwnProperty.call(updates, 'customColors');
+  const hasPosterStyleUpdate = Object.prototype.hasOwnProperty.call(updates, 'posterStyle');
+
+  let nextCustomColors = base.customColors;
+  if (hasCustomColorsUpdate) {
+    const updateColors = updates.customColors;
+    if (hasColorOverrides(updateColors)) {
+      const baseColors = base.customColors ?? {};
+      nextCustomColors = { ...baseColors, ...updateColors };
+    } else {
+      nextCustomColors = undefined;
+    }
+  }
+
+  const nextPosterStyle = hasPosterStyleUpdate
+    ? { ...base.posterStyle, ...updates.posterStyle }
+    : base.posterStyle;
+
+  return {
+    ...base,
+    ...updates,
+    customColors: nextCustomColors,
+    posterStyle: nextPosterStyle,
+  } satisfies CustomThemeConfig;
+};
 
 export const useThemeEditor = () => {
-  const [config, setConfig] = useState<CustomThemeConfig>(defaultCustomThemeConfig);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(useSettingsStore.persist.hasHydrated());
 
-  // Load theme configuration from storage
-  const loadThemeConfig = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const stored = await AsyncStorage.getItem(THEME_CONFIG_STORAGE_KEY);
-      if (stored) {
-        const parsedConfig = JSON.parse(stored) as CustomThemeConfig;
-        setConfig(parsedConfig);
-      } else {
-        setConfig(defaultCustomThemeConfig);
-      }
-    } catch (error) {
-      await logger.error('Failed to load theme configuration', {
-        location: 'useThemeEditor.loadThemeConfig',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      setConfig(defaultCustomThemeConfig);
-    } finally {
-      setIsLoading(false);
+  const customThemeConfig = useSettingsStore((state) => state.customThemeConfig);
+  const resetCustomThemeConfig = useSettingsStore((state) => state.resetCustomThemeConfig);
+  const themePreference = useSettingsStore((state) => state.theme);
+  const systemColorScheme = useColorScheme();
+
+  useEffect(() => {
+    if (isHydrated) {
+      return;
     }
+
+    const unsubscribe = useSettingsStore.persist.onFinishHydration(() => {
+      setIsHydrated(true);
+    });
+
+    return unsubscribe;
+  }, [isHydrated]);
+
+  const updateConfig = useCallback((updates: Partial<CustomThemeConfig>) => {
+    useSettingsStore.setState((state) => ({
+      customThemeConfig: mergeThemeConfig(
+        state.customThemeConfig ?? defaultCustomThemeConfig,
+        updates,
+      ),
+    }));
   }, []);
 
-  // Save theme configuration to storage
-  const saveThemeConfig = useCallback(async (newConfig: CustomThemeConfig): Promise<boolean> => {
-    try {
-      await AsyncStorage.setItem(THEME_CONFIG_STORAGE_KEY, JSON.stringify(newConfig));
-      setConfig(newConfig);
+  const resetToDefaults = useCallback(() => {
+    resetCustomThemeConfig();
+  }, [resetCustomThemeConfig]);
+
+  const saveTheme = useCallback(async () => {
+    // Theme updates are persisted via the settings store, so saving succeeds immediately.
+    return true;
+  }, []);
+
+  const config = isHydrated ? customThemeConfig : defaultCustomThemeConfig;
+
+  const isDarkMode = useMemo(() => {
+    if (themePreference === 'dark') {
       return true;
-    } catch (error) {
-      await logger.error('Failed to save theme configuration', {
-        location: 'useThemeEditor.saveThemeConfig',
-        error: error instanceof Error ? error.message : String(error),
-      });
+    }
+
+    if (themePreference === 'light') {
       return false;
     }
-  }, []);
 
-  // Update configuration
-  const updateConfig = useCallback((updates: Partial<CustomThemeConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }));
-  }, []);
+    return systemColorScheme !== 'light';
+  }, [themePreference, systemColorScheme]);
 
-  // Reset to default configuration
-  const resetToDefaults = useCallback(() => {
-    setConfig(defaultCustomThemeConfig);
-  }, []);
-
-  // Generate preview theme
-  const previewTheme = useMemo((): AppTheme => {
-    return createCustomTheme(config, false); // Light theme for preview
-  }, [config]);
-
-  // Save theme (this would typically trigger a theme change in the app)
-  const saveTheme = useCallback(async (): Promise<boolean> => {
-    return await saveThemeConfig(config);
-  }, [config, saveThemeConfig]);
-
-  // Load configuration on mount
-  React.useEffect(() => {
-    loadThemeConfig();
-  }, [loadThemeConfig]);
+  const previewTheme = useMemo<AppTheme>(() => {
+    return createCustomTheme(config, isDarkMode);
+  }, [config, isDarkMode]);
 
   return {
     config,
@@ -84,6 +107,6 @@ export const useThemeEditor = () => {
     resetToDefaults,
     previewTheme,
     saveTheme,
-    isLoading,
+    isLoading: !isHydrated,
   };
 };

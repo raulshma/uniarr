@@ -6,7 +6,8 @@ import {
   lightColors,
   generateThemeColors,
   type CustomColorScheme,
-  presetThemes
+  presetThemes,
+  type ThemePreset,
 } from '@/theme/colors';
 import { generateSpacingScale, type DensityMode } from '@/theme/spacing';
 import { generateTypographyScale, type FontScale, typography } from '@/theme/typography';
@@ -49,14 +50,17 @@ export const createCustomTheme = (
   isDark: boolean = false
 ): AppTheme => {
   // Determine color scheme
-  const baseScheme = config.preset ? presetThemes[config.preset] : presetThemes.uniarr;
+  const resolvedPresetKey = config.preset ?? 'uniarr';
+  const basePreset = (
+    presetThemes[resolvedPresetKey as keyof typeof presetThemes] ?? presetThemes.uniarr
+  ) as ThemePreset;
   const colorScheme: CustomColorScheme = {
-    ...baseScheme,
+    ...basePreset.common,
     ...config.customColors,
   };
 
   // Generate theme colors
-  const colors = generateThemeColors(colorScheme, isDark);
+  const colors = generateThemeColors(colorScheme, isDark, isDark ? basePreset.modes.dark : basePreset.modes.light);
 
   // Generate typography and spacing scales
   const typographyScale = generateTypographyScale(config.fontScale);

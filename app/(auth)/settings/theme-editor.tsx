@@ -44,7 +44,7 @@ export default function ThemeEditorScreen() {
   const [showColorPicker, setShowColorPicker] = useState<string | null>(null);
 
   const handlePresetChange = (preset: keyof typeof presetThemes) => {
-    updateConfig({ preset });
+    updateConfig({ preset, customColors: undefined });
   };
 
   const handleFontScaleChange = (fontScale: FontScale) => {
@@ -71,6 +71,11 @@ export default function ThemeEditorScreen() {
         [key]: value,
       },
     });
+  };
+
+  const handleReset = () => {
+    setShowColorPicker(null);
+    resetToDefaults();
   };
 
   const handleSave = async () => {
@@ -308,7 +313,7 @@ export default function ThemeEditorScreen() {
       </Card>
 
       <View style={[styles.actions, { borderTopColor: theme.colors.outlineVariant }]}>
-        <Button mode="outlined" onPress={resetToDefaults} style={styles.actionButton}>
+        <Button mode="outlined" onPress={handleReset} style={styles.actionButton}>
           Reset to Defaults
         </Button>
         <Button mode="contained" onPress={handleSave} style={styles.actionButton}>
