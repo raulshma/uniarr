@@ -31,6 +31,7 @@ interface SonarrSeason {
   readonly seasonNumber: number;
   readonly monitored: boolean;
   readonly statistics?: SonarrStatistics;
+  readonly images?: SonarrImage[];
 }
 
 interface SonarrSeries {
@@ -284,9 +285,11 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getById(id: number): Promise<Series> {
     try {
       const [seriesResponse, episodesResponse] = await Promise.all([
-        this.client.get<SonarrSeries>(`/api/v3/series/${id}`),
+        this.client.get<SonarrSeries>(`/api/v3/series/${id}`, {
+          params: { includeSeasonImages: true },
+        }),
         this.client.get<SonarrEpisode[]>(`/api/v3/episode`, {
-          params: { seriesId: id },
+          params: { seriesId: id, includeImages: true },
         }),
       ]);
 
@@ -664,12 +667,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private mapSeason(season: SonarrSeason, seriesId?: number): Season {
+    const posterUrl = this.findImageUrl(season.images, 'poster') ?? (seriesId ? this.buildSeasonPosterUrl(seriesId, season.seasonNumber) : undefined);
+
     return {
       id: season.id,
       seasonNumber: season.seasonNumber,
       monitored: season.monitored,
       statistics: this.mapStatistics(season.statistics),
-      posterUrl: seriesId ? this.buildSeasonPosterUrl(seriesId, season.seasonNumber) : undefined,
+      posterUrl,
     };
   }
 
@@ -726,14 +731,14 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   private buildSeasonPosterUrl(seriesId: number, seasonNumber: number): string {
     try {
-      const url = new URL(`/api/v3/MediaCover/${seriesId}/season-${seasonNumber}.jpg`, this.config.url);
+      const url = new URL(`/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg`, this.config.url);
       if (this.config.apiKey) {
         url.searchParams.set('apikey', this.config.apiKey);
       }
       return url.toString();
     } catch (_e) {
       // Fallback to string concat if URL construction fails for any reason
-      return `${this.config.url}/api/v3/MediaCover/${seriesId}/season-${seasonNumber}.jpg${
+      return `${this.config.url}/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg${
         this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
       }`;
     }
@@ -744,7 +749,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       // Try the episode-specific MediaCover endpoint format
       // Use 'screenshot' as the image type for episodes (most common)
       const url = new URL(
-        `/api/v3/MediaCover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
+        `/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
         this.config.url,
       );
       if (this.config.apiKey) {
@@ -752,7 +757,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       }
       return url.toString();
     } catch (_e) {
-      return `${this.config.url}/api/v3/MediaCover/${seriesId}/episode-${episodeId}-screenshot.jpg${
+      return `${this.config.url}/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg${
         this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
       }`;
     }
