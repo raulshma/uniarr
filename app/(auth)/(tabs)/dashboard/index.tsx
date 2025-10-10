@@ -976,7 +976,11 @@ const DashboardScreen = () => {
           </AnimatedHeader>
           <View style={styles.searchWrapper}>
             <AnimatedSection style={styles.shortcutsWrapper} delay={40}>
-              <AnimatedListItem index={0} totalItems={3}>
+              <AnimatedListItem
+                style={styles.shortcutTileWrapper}
+                index={0}
+                totalItems={3}
+              >
                 <ShortcutTile
                   testID="shortcut-discover-loading"
                   label="Discover"
@@ -985,7 +989,11 @@ const DashboardScreen = () => {
                   onPress={handleOpenDiscover}
                 />
               </AnimatedListItem>
-              <AnimatedListItem index={1} totalItems={3}>
+              <AnimatedListItem
+                style={styles.shortcutTileWrapper}
+                index={1}
+                totalItems={3}
+              >
                 <ShortcutTile
                   testID="shortcut-search-loading"
                   label="Unified Search"
@@ -994,7 +1002,11 @@ const DashboardScreen = () => {
                   onPress={handleOpenSearch}
                 />
               </AnimatedListItem>
-              <AnimatedListItem index={2} totalItems={3}>
+              <AnimatedListItem
+                style={styles.shortcutTileWrapper}
+                index={2}
+                totalItems={3}
+              >
                 <ShortcutTile
                   testID="shortcut-calendar-loading"
                   label="Release Calendar"
