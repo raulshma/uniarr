@@ -16,6 +16,7 @@ import type { AppTheme } from '@/constants/theme';
 import type { Series } from '@/models/media.types';
 import type { Movie } from '@/models/movie.types';
 import { spacing } from '@/theme/spacing';
+import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
 
 export type SelectableMediaItem = Series | Movie;
 
@@ -142,7 +143,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
-              const connector = await import('@/connectors/manager/ConnectorManager').then(m => m.ConnectorManager.getInstance().getConnector(serviceId));
+              const connector = ConnectorManager.getInstance().getConnector(serviceId);
               if (!connector) return;
 
               if (connector.config.type === 'sonarr') {
@@ -177,7 +178,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
     if (selectedItems.length === 0) return;
 
     try {
-      const connector = await import('@/connectors/manager/ConnectorManager').then(m => m.ConnectorManager.getInstance().getConnector(serviceId));
+      const connector = ConnectorManager.getInstance().getConnector(serviceId);
       if (!connector) return;
 
       if (connector.config.type === 'sonarr') {
@@ -206,7 +207,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
     if (selectedItems.length === 0) return;
 
     try {
-      const connector = await import('@/connectors/manager/ConnectorManager').then(m => m.ConnectorManager.getInstance().getConnector(serviceId));
+      const connector = ConnectorManager.getInstance().getConnector(serviceId);
       if (!connector) return;
 
       if (connector.config.type === 'sonarr') {
