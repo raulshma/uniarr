@@ -15,6 +15,7 @@ import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaDetails } from "@/components/media/MediaDetails";
 import { MovieDetailsSkeleton } from "@/components/media/skeletons";
+import DetailHero from "@/components/media/DetailHero/DetailHero";
 import type { AppTheme } from "@/constants/theme";
 import { useRadarrMovieDetails } from "@/hooks/useRadarrMovieDetails";
 import { spacing } from "@/theme/spacing";
@@ -57,8 +58,8 @@ const RadarrMovieDetailsScreen = () => {
         },
         container: {
           flex: 1,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.lg,
+          paddingHorizontal: spacing.none,
+          paddingBottom: spacing.lg,
         },
         header: {
           flexDirection: "row",
@@ -132,55 +133,66 @@ const RadarrMovieDetailsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <View style={styles.container}>
-        <Animated.View
-          style={styles.header}
-          entering={FadeInDown.delay(200).springify()}
-          layout={Layout.springify()}
-        >
-          <Button
-            mode="text"
-            onPress={handleClose}
-            accessibilityLabel="Go back"
+        {!movie ? (
+          <Animated.View
+            style={styles.header}
+            entering={FadeInDown.delay(200).springify()}
+            layout={Layout.springify()}
           >
-            Back
-          </Button>
-          {isFetching ? (
-            <Text
-              variant="labelMedium"
-              style={{ color: theme.colors.onSurfaceVariant }}
+            <Button
+              mode="text"
+              onPress={handleClose}
+              accessibilityLabel="Go back"
             >
-              Refreshing…
-            </Text>
-          ) : null}
-        </Animated.View>
+              Back
+            </Button>
+            {isFetching ? (
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Refreshing…
+              </Text>
+            ) : null}
+          </Animated.View>
+        ) : null}
 
         {isLoading && !movie ? (
           <MovieDetailsSkeleton />
         ) : movie ? (
-          <MediaDetails
-            title={movie.title}
-            year={movie.year}
-            status={movie.status}
-            overview={movie.overview}
-            genres={movie.genres}
-            runtimeMinutes={movie.runtime}
-            network={movie.studio}
+          <DetailHero
             posterUri={movie.posterUrl}
             backdropUri={movie.backdropUrl}
-            monitored={movie.monitored}
-            hasFile={movie.hasFile}
-            movieFile={movie.movieFile}
-            type="movie"
-            rating={movie.ratings?.value}
-            onToggleMonitor={handleToggleMonitor}
-            onSearchPress={handleTriggerSearch}
-            onDeletePress={handleDeleteMovie}
-            isUpdatingMonitor={isTogglingMonitor}
-            isSearching={isTriggeringSearch}
-            isDeleting={isDeleting}
-          />
+            onBack={handleClose}
+            isFetching={isFetching}
+          >
+            <MediaDetails
+              title={movie.title}
+              year={movie.year}
+              status={movie.status}
+              overview={movie.overview}
+              genres={movie.genres}
+              runtimeMinutes={movie.runtime}
+              network={movie.studio}
+              posterUri={movie.posterUrl}
+              backdropUri={movie.backdropUrl}
+              monitored={movie.monitored}
+              hasFile={movie.hasFile}
+              movieFile={movie.movieFile}
+              type="movie"
+              rating={movie.ratings?.value}
+              onToggleMonitor={handleToggleMonitor}
+              onSearchPress={handleTriggerSearch}
+              onDeletePress={handleDeleteMovie}
+              isUpdatingMonitor={isTogglingMonitor}
+              isSearching={isTriggeringSearch}
+              isDeleting={isDeleting}
+              showPoster={false}
+              disableScroll={true}
+            />
+          </DetailHero>
         ) : (
           <View style={{ flex: 1, justifyContent: "center" }}>
             <EmptyState
