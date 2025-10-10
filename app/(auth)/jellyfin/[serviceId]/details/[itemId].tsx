@@ -14,6 +14,8 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -220,7 +222,7 @@ const JellyfinItemDetailsScreen = () => {
   }, [connector, detailsQuery, item]);
 
   const renderCastMember = useCallback(
-    ({ item: person }: { item: (typeof cast)[number] }) => {
+  ({ item: person }: { item: (typeof cast)[number] }) => {
       const avatarUri =
         person?.Id &&
         connector?.getPersonImageUrl(person.Id, person.PrimaryImageTag, {
@@ -231,11 +233,18 @@ const JellyfinItemDetailsScreen = () => {
         <View style={styles.castCard}>
           <View style={styles.castAvatarShell}>
             {avatarUri ? (
-              <Image
-                source={{ uri: avatarUri }}
-                style={styles.castAvatar}
-                cachePolicy="memory-disk"
-              />
+              <>
+                <Image
+                  source={{ uri: avatarUri }}
+                  style={styles.castAvatar}
+                  cachePolicy="memory-disk"
+                />
+                <BlurView
+                  intensity={50}
+                  tint={theme.dark ? "dark" : "light"}
+                  style={styles.castAvatarBlur}
+                />
+              </>
             ) : (
               <View style={[styles.castAvatar, styles.castAvatarPlaceholder]}>
                 <Text variant="titleMedium" style={styles.castAvatarInitial}>
@@ -255,7 +264,7 @@ const JellyfinItemDetailsScreen = () => {
         </View>
       );
     },
-    [connector, styles]
+    [connector, styles, theme]
   );
 
   if (!serviceId || !itemId) {
@@ -318,7 +327,12 @@ const JellyfinItemDetailsScreen = () => {
               cachePolicy="memory-disk"
             />
           ) : null}
-          <View style={[StyleSheet.absoluteFill, styles.heroOverlay]} />
+          <LinearGradient
+            colors={["transparent", theme.colors.background]}
+            start={[0, 0.5]}
+            end={[0, 1]}
+            style={[StyleSheet.absoluteFill, styles.heroGradient]}
+          />
           <View style={styles.heroActions}>
             <IconButton
               icon="arrow-left"
@@ -380,12 +394,20 @@ const JellyfinItemDetailsScreen = () => {
             </View>
 
             <Surface style={styles.syncCard} elevation={1}>
-              <Text variant="titleMedium" style={styles.syncTitle}>
-                Sync Status
-              </Text>
-              <Text variant="bodySmall" style={styles.syncDescription}>
-                {syncStatus ?? providerSummary}
-              </Text>
+              <LinearGradient
+                colors={[theme.colors.surfaceVariant, theme.colors.surface]}
+                start={[0, 0.5]}
+                end={[1, 1]}
+                style={styles.syncGradient}
+              />
+              <View style={styles.syncCardContent}>
+                <Text variant="titleMedium" style={styles.syncTitle}>
+                  Sync Status
+                </Text>
+                <Text variant="bodySmall" style={styles.syncDescription}>
+                  {syncStatus ?? providerSummary}
+                </Text>
+              </View>
             </Surface>
 
             <View style={styles.sectionHeader}>
@@ -459,6 +481,9 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.backdrop,
       opacity: 0.4,
     },
+    heroGradient: {
+      ...StyleSheet.absoluteFillObject,
+    },
     heroActions: {
       position: "absolute",
       top: spacing.md,
@@ -504,9 +529,20 @@ const createStyles = (theme: AppTheme) =>
       flexWrap: "wrap",
     },
     syncCard: {
+      padding: 0,
+      borderRadius: 20,
+      backgroundColor: "transparent",
+      overflow: "hidden",
+    },
+    syncGradient: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 20,
+    },
+    syncCardContent: {
       padding: spacing.md,
       borderRadius: 20,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: "transparent",
+      zIndex: 1,
     },
     syncTitle: {
       color: theme.colors.onSurface,
@@ -545,6 +581,10 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surfaceVariant,
       alignItems: "center",
       justifyContent: "center",
+    },
+    castAvatarBlur: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 48,
     },
     castAvatar: {
       width: "100%",
