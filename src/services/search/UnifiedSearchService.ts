@@ -18,6 +18,7 @@ import type {
   UnifiedSearchResult,
 } from '@/models/search.types';
 import { logger } from '@/services/logger/LoggerService';
+import { isApiError } from '@/utils/error.utils';
 
 const HISTORY_STORAGE_KEY = 'UnifiedSearch_history';
 const HISTORY_LIMIT = 12;
@@ -257,12 +258,27 @@ export class UnifiedSearchService {
       return { results: mapped.slice(0, limit) };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown search error.';
-      await logger.warn('Unified search connector failed.', {
-        location: 'UnifiedSearchService.searchConnector',
-        serviceId: connector.config.id,
-        serviceType: connector.config.type,
-        error: message,
-      });
+
+      // Avoid double-logging and reduce noise for expected API errors
+      // (for example, a 400 when a search term is too short). For ApiError
+      // instances we record debug-level info here because the error utils
+      // already emits an appropriate log entry with the correct severity.
+      if (isApiError(error)) {
+        await logger.debug('Unified search connector encountered API error.', {
+          location: 'UnifiedSearchService.searchConnector',
+          serviceId: connector.config.id,
+          serviceType: connector.config.type,
+          error: message,
+        });
+      } else {
+        await logger.warn('Unified search connector failed.', {
+          location: 'UnifiedSearchService.searchConnector',
+          serviceId: connector.config.id,
+          serviceType: connector.config.type,
+          error: message,
+        });
+      }
+
       return {
         results: [],
         error: {

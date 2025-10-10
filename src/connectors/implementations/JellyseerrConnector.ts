@@ -14,7 +14,7 @@ import type {
   JellyseerrSeasonRequestStatus,
   JellyseerrUserSummary,
 } from '@/models/jellyseerr.types';
-import { handleApiError } from '@/utils/error.utils';
+import { handleApiError, ApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
 
 const API_PREFIX = '/api/v1';
@@ -663,6 +663,16 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   async search(query: string, options?: SearchOptions): Promise<JellyseerrSearchResult[]> {
     await this.ensureAuthenticated();
     
+    // Jellyseerr's search endpoint returns 400 for certain invalid
+    // input (for example, very short search terms). Validate early so
+    // we can return a clearer message and avoid noisy error logs.
+    if (!query || query.trim().length < 3) {
+      throw new ApiError({
+        message: 'Search term must be at least 3 characters for Jellyseerr.',
+        details: { providedQuery: query },
+      });
+    }
+
     try {
       const params: Record<string, unknown> = {
         query,
