@@ -30,6 +30,7 @@ import Animated, {
   runOnJS,
   interpolate,
   Extrapolate,
+  Extrapolation,
 } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
@@ -166,6 +167,17 @@ const JellyfinItemDetailsScreen = () => {
       Extrapolate.CLAMP
     );
     return { opacity: blurOpacity } as any;
+  });
+
+  // Animate the hero area's height so the background image shrinks while the
+  // poster moves into its final (pinned) position. The final hero height is
+  // chosen so the poster will be nicely contained when pinned under the
+  // status bar.
+  const heroAnimatedStyle = useAnimatedStyle(() => {
+    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
+    const finalHeroHeight = finalTopWithoutHeader + POSTER_SIZE * 1.25;
+    const height = interpolate(progress, [0, 1], [HERO_HEIGHT, finalHeroHeight], Extrapolation.CLAMP);
+    return { height } as any;
   });
   const router = useRouter();
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
@@ -429,7 +441,7 @@ const JellyfinItemDetailsScreen = () => {
   return (
     <>
       <View style={styles.scaffold}>
-        <View style={styles.heroArea}>
+    <Animated.View style={[styles.heroArea, heroAnimatedStyle]}>
           {heroUri ? (
             <View style={styles.heroImage}>
               <Image
@@ -473,7 +485,7 @@ const JellyfinItemDetailsScreen = () => {
             />
           </Animated.View>
           {/* heroPoster has been moved out so it can be pinned independent of the scrollable content */}
-        </View>
+        </Animated.View>
         {/* Overlay poster so it can be translated to the top of the screen and remain visible
             while the scroll content moves beneath it. */}
         <Animated.View
@@ -624,6 +636,7 @@ const createStyles = (theme: AppTheme) =>
     heroArea: {
       height: HERO_HEIGHT,
       position: "relative",
+      overflow: "hidden",
     },
     heroImage: {
       ...StyleSheet.absoluteFillObject,
