@@ -31,6 +31,7 @@ export interface AuthResult {
   refreshToken?: string;
   expiresAt?: Date;
   headers?: Record<string, string>;
+  context?: Record<string, unknown>;
 }
 
 export interface AuthSession {
@@ -40,6 +41,7 @@ export interface AuthSession {
   expiresAt?: Date;
   lastAuthenticated?: Date;
   retryCount: number;
+  context?: Record<string, unknown>;
 }
 
 export interface IAuthProvider {

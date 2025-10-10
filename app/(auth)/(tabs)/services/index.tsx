@@ -44,6 +44,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: 'Sonarr',
   radarr: 'Radarr',
   jellyseerr: 'Jellyseerr',
+  jellyfin: 'Jellyfin',
   qbittorrent: 'qBittorrent',
   transmission: 'Transmission',
   deluge: 'Deluge',
@@ -58,6 +59,7 @@ const serviceDisplayNames: Record<ServiceType, string> = {
   sonarr: 'TV Shows',
   radarr: 'Movie Library',
   jellyseerr: 'Request Service',
+  jellyfin: 'Media Server',
   qbittorrent: 'Torrent Client',
   transmission: 'Torrent Client',
   deluge: 'Torrent Client',
@@ -72,6 +74,7 @@ const serviceIcons: Record<ServiceType, string> = {
   sonarr: 'television-classic',
   radarr: 'movie-open',
   jellyseerr: 'account-search',
+  jellyfin: 'play-circle',
   qbittorrent: 'download-network',
   transmission: 'download-network',
   deluge: 'download-network',
@@ -292,6 +295,9 @@ const ServicesScreen = () => {
           break;
         case 'jellyseerr':
           router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: service.config.id } });
+          break;
+        case 'jellyfin':
+          router.push({ pathname: '/(auth)/jellyfin/[serviceId]', params: { serviceId: service.config.id } });
           break;
         case 'qbittorrent':
           router.push({ pathname: '/(auth)/qbittorrent/[serviceId]', params: { serviceId: service.config.id } });

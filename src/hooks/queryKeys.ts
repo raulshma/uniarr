@@ -93,6 +93,27 @@ export const queryKeys = {
       { term, params },
     ] as const,
   },
+  jellyfin: {
+    base: ['jellyfin'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['jellyfin', serviceId] as const,
+    libraries: (serviceId: string): QueryKeyBuilder => [...queryKeys.jellyfin.service(serviceId), 'libraries'] as const,
+    resume: (serviceId: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'resume',
+      options ?? {},
+    ] as const,
+    latest: (serviceId: string, libraryId: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'latest',
+      libraryId,
+      options ?? {},
+    ] as const,
+    search: (serviceId: string, term: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'search',
+      { term, options },
+    ] as const,
+  },
   qbittorrent: {
     base: ['qbittorrent'] as const,
     service: (serviceId: string): QueryKeyBuilder => ['qbittorrent', serviceId] as const,

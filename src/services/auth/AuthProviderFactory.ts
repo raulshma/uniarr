@@ -2,6 +2,7 @@ import { authManager } from './AuthManager';
 import { ApiKeyAuthProvider } from './providers/ApiKeyAuthProvider';
 import { BasicAuthProvider } from './providers/BasicAuthProvider';
 import { SessionAuthProvider } from './providers/SessionAuthProvider';
+import { JellyfinAuthProvider } from './providers/JellyfinAuthProvider';
 import type { ServiceType } from '@/models/service.types';
 
 /**
@@ -22,6 +23,7 @@ export class AuthProviderFactory {
     authManager.registerProvider('sonarr', new ApiKeyAuthProvider());
     authManager.registerProvider('radarr', new ApiKeyAuthProvider());
     authManager.registerProvider('jellyseerr', new ApiKeyAuthProvider());
+  authManager.registerProvider('jellyfin', new JellyfinAuthProvider());
     authManager.registerProvider('qbittorrent', new SessionAuthProvider());
     authManager.registerProvider('prowlarr', new ApiKeyAuthProvider());
 
