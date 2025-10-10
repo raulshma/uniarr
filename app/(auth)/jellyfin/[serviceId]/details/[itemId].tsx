@@ -1,7 +1,14 @@
 import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, Share, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Linking,
+  Share,
+  ScrollView,
+  StyleSheet,
+  View,
+  Dimensions,
+} from "react-native";
 import {
   ActivityIndicator,
   Button,
@@ -12,7 +19,17 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  interpolate,
+  Extrapolate,
+} from "react-native-reanimated";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,8 +42,14 @@ import type { JellyfinConnector } from "@/connectors/implementations/JellyfinCon
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { spacing } from "@/theme/spacing";
 
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 // Size used for the hero poster so layout calculations remain consistent
-const POSTER_SIZE = 200;
+const POSTER_SIZE = 160;
+// Height of the hero area (kept in sync with styles.heroArea)
+const HERO_HEIGHT = 320;
+// Height for the action/header row. Used so the poster pins directly below it
+// with no extra gap when scrolled.
+const ACTION_BAR_HEIGHT = 48;
 
 const formatRuntimeMinutes = (ticks?: number): number | undefined => {
   if (!ticks || ticks <= 0) {
@@ -64,6 +87,59 @@ const JellyfinItemDetailsScreen = () => {
   const itemId = typeof rawItemId === "string" ? rawItemId : undefined;
   const theme = useTheme<AppTheme>();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();
+  const windowWidth = Dimensions.get("window").width;
+
+  // Shared scroll position used to animate hero elements
+  const scrollY = useSharedValue(0);
+
+  const onScroll = useAnimatedScrollHandler((ev) => {
+    scrollY.value = ev.contentOffset.y;
+  });
+
+  // Calculate translation deltas so poster moves from left-floating position
+  // into a centered, top-aligned position as the user scrolls.
+  const initialLeft = spacing.lg;
+  const finalLeft = (windowWidth - POSTER_SIZE) / 2;
+  const deltaX = finalLeft - initialLeft;
+  // Start with 75% of the poster inside the hero area (25% projecting
+  // into the content card) for the desired visual overlap.
+  const initialTop = HERO_HEIGHT - POSTER_SIZE * 0.75;
+  // Pin directly under the header/action row so there is no extra gap.
+  const finalTop = insets.top + ACTION_BAR_HEIGHT;
+  const deltaY = finalTop - initialTop;
+  const threshold = Math.max(1, HERO_HEIGHT - finalTop);
+
+  const posterAnimatedStyle = useAnimatedStyle(() => {
+    const progress = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+    // Animated scale value (1 -> finalScale)
+    const finalScale = 0.75;
+    const scale = interpolate(progress, [0, 1], [1, finalScale]);
+    const translateX = interpolate(progress, [0, 1], [0, deltaX]);
+    // Compute base translateY and compensate for the change in height due to scaling
+    // so the poster's top aligns exactly with the target finalTop when pinned.
+    const translateYBase = interpolate(progress, [0, 1], [0, deltaY]);
+    const translateY = translateYBase + (POSTER_SIZE * (scale - 1)) / 2;
+    return {
+      transform: [{ translateX }, { translateY }, { scale }],
+    } as any;
+  });
+
+  // Animate a blur overlay on the hero image instead of fully hiding it.
+  const blurAnimatedStyle = useAnimatedStyle(() => {
+    const blurOpacity = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+    return { opacity: blurOpacity } as any;
+  });
   const router = useRouter();
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
 
@@ -225,7 +301,7 @@ const JellyfinItemDetailsScreen = () => {
   }, [connector, detailsQuery, item]);
 
   const renderCastMember = useCallback(
-  ({ item: person }: { item: (typeof cast)[number] }) => {
+    ({ item: person }: { item: (typeof cast)[number] }) => {
       const avatarUri =
         person?.Id &&
         connector?.getPersonImageUrl(person.Id, person.PrimaryImageTag, {
@@ -320,23 +396,37 @@ const JellyfinItemDetailsScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <>
       <View style={styles.scaffold}>
         <View style={styles.heroArea}>
           {heroUri ? (
-            <Image
-              source={{ uri: heroUri }}
-              style={styles.heroImage}
-              cachePolicy="memory-disk"
-            />
+            <View style={styles.heroImage}>
+              <Image
+                source={{ uri: heroUri }}
+                style={StyleSheet.absoluteFill}
+                cachePolicy="memory-disk"
+              />
+              {/* Animated blur overlays the image. Gradient sits on top so the
+                  blur only affects the backdrop, not the gradient that helps
+                  blend into the background color. */}
+              <Animated.View
+                style={[StyleSheet.absoluteFill, blurAnimatedStyle]}
+              >
+                <BlurView
+                  intensity={80}
+                  tint={theme.dark ? "dark" : "light"}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
+              <LinearGradient
+                colors={["transparent", theme.colors.background]}
+                start={[0, 0.5]}
+                end={[0, 1]}
+                style={[StyleSheet.absoluteFill, styles.heroGradient]}
+              />
+            </View>
           ) : null}
-          <LinearGradient
-            colors={["transparent", theme.colors.background]}
-            start={[0, 0.5]}
-            end={[0, 1]}
-            style={[StyleSheet.absoluteFill, styles.heroGradient]}
-          />
-          <View style={styles.heroActions}>
+          <View style={[styles.heroActions, { top: insets.top }]}>
             <IconButton
               icon="arrow-left"
               accessibilityLabel="Go back"
@@ -348,11 +438,21 @@ const JellyfinItemDetailsScreen = () => {
               onPress={handleShare}
             />
           </View>
-          <View style={styles.heroPoster}>
-            <MediaPoster uri={posterUri} size={200} />
-          </View>
+          {/* heroPoster has been moved out so it can be pinned independent of the scrollable content */}
         </View>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Overlay poster so it can be translated to the top of the screen and remain visible
+            while the scroll content moves beneath it. */}
+        <Animated.View
+          pointerEvents="box-none"
+          style={[styles.heroPoster, posterAnimatedStyle]}
+        >
+          <MediaPoster uri={posterUri} size={POSTER_SIZE} />
+        </Animated.View>
+        <AnimatedScrollView
+          contentContainerStyle={styles.scrollContent}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+        >
           <View style={styles.detailsContent}>
             <Text variant="headlineSmall" style={styles.title}>
               {item.Name ?? "Untitled"}
@@ -453,12 +553,12 @@ const JellyfinItemDetailsScreen = () => {
             )}
           </View>
           <View style={{ height: spacing.xxl }} />
-        </ScrollView>
+        </AnimatedScrollView>
       </View>
       <HelperText type="info" visible={Boolean(syncStatus)}>
         {syncStatus ?? ""}
       </HelperText>
-    </SafeAreaView>
+    </>
   );
 };
 
@@ -473,10 +573,11 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.background,
     },
     heroArea: {
-      height: 320,
+      height: HERO_HEIGHT,
       position: "relative",
     },
     heroImage: {
+      ...StyleSheet.absoluteFillObject,
       width: "100%",
       height: "100%",
     },
@@ -492,13 +593,16 @@ const createStyles = (theme: AppTheme) =>
       top: spacing.md,
       left: spacing.md,
       right: spacing.md,
+      height: ACTION_BAR_HEIGHT,
+      zIndex: 30,
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
     },
     heroPoster: {
       position: "absolute",
-      bottom: -POSTER_SIZE / 2,
+      // start visually overlapping the bottom of the hero area
+      top: HERO_HEIGHT - POSTER_SIZE * 0.75,
       left: spacing.lg,
       shadowColor: theme.colors.shadow,
       shadowOpacity: 0.45,
@@ -512,7 +616,8 @@ const createStyles = (theme: AppTheme) =>
     },
     detailsContent: {
       // Add extra top padding so content does not overlap the floating poster
-      paddingTop: spacing.xxxl + POSTER_SIZE / 2,
+      // only 25% of the poster projects into the content card
+      paddingTop: spacing.xxxl + POSTER_SIZE * 0.5,
       paddingHorizontal: spacing.lg,
       gap: spacing.lg,
     },
