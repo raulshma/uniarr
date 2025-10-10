@@ -1,5 +1,5 @@
 import React, { JSX, useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Chip,
@@ -119,6 +119,7 @@ export const UnifiedSearchPanel: React.FC = () => {
     () =>
       StyleSheet.create({
         container: {
+          flex: 1,
           padding: spacing.xs,
           backgroundColor: theme.colors.elevation.level1,
           borderRadius: 12,
@@ -152,7 +153,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           marginBottom: spacing.md,
         },
         resultContainer: {
-          gap: spacing.sm,
+          flex: 1,
         },
         resultCard: {
           borderRadius: 8,
@@ -386,7 +387,7 @@ export const UnifiedSearchPanel: React.FC = () => {
       }
 
       return (
-        <Card key={item.id} variant="custom" style={styles.resultCard}>
+        <Card variant="custom" style={styles.resultCard}>
           <View style={styles.resultHeader}>
             <Text style={styles.resultTitle} numberOfLines={2}>
               {item.title}
@@ -456,7 +457,7 @@ export const UnifiedSearchPanel: React.FC = () => {
   }, [errors, serviceNameById, styles.errorText]);
 
   return (
-    <Card variant="custom" style={styles.container}>
+  <Card variant="custom" style={styles.container} contentStyle={{ flex: 1 }}>
       <View style={styles.searchRow}>
         <View style={styles.searchInputContainer}>
           <TextInput
@@ -598,12 +599,25 @@ export const UnifiedSearchPanel: React.FC = () => {
 
       {hasActiveQuery ? (
         <View style={styles.resultContainer}>
-          {isBusy ? <ActivityIndicator animating /> : null}
-          {renderErrorHelper}
           {!isBusy && results.length === 0 ? (
             <HelperText type="info">No results found. Try adjusting filters or a different term.</HelperText>
           ) : null}
-          {results.map(renderResult)}
+          <FlatList
+            data={results}
+            renderItem={({ item }) => renderResult(item)}
+            keyExtractor={(item) => item.id}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ gap: spacing.sm }}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={!isBusy ? <HelperText type="info">No results found. Try adjusting filters or a different term.</HelperText> : null}
+            ListHeaderComponent={
+              <>
+                {isBusy ? <ActivityIndicator animating /> : null}
+                {renderErrorHelper}
+              </>
+            }
+            // footer moved out of FlatList into outer card
+          />
           {results.length > 0 ? (
             <View style={styles.footerRow}>
               <Text style={{ color: theme.colors.onSurfaceVariant }}>

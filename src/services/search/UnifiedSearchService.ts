@@ -18,7 +18,8 @@ import type {
   UnifiedSearchResult,
 } from '@/models/search.types';
 import { logger } from '@/services/logger/LoggerService';
-import { isApiError } from '@/utils/error.utils';
+import { isApiError, type ApiError } from '@/utils/error.utils';
+import { getOpenApiOperationHint, hasOpenApiForService } from '@/connectors/openapi/OpenApiHelper';
 
 const HISTORY_STORAGE_KEY = 'UnifiedSearch_history';
 const HISTORY_LIMIT = 12;
@@ -264,6 +265,37 @@ export class UnifiedSearchService {
       // instances we record debug-level info here because the error utils
       // already emits an appropriate log entry with the correct severity.
       if (isApiError(error)) {
+        // Try to enrich API errors with a short, actionable hint from any
+        // bundled OpenAPI spec we have for the connector type. This helps
+        // surface validation expectations (for example minimum search
+        // term lengths) to the user without requiring them to inspect logs.
+        const apiErr = error as ApiError;
+        const ctx = apiErr.details?.context as Record<string, unknown> | undefined;
+        try {
+          const endpoint = ctx?.endpoint as string | undefined;
+          const operation = ctx?.operation as string | undefined;
+          const serviceType = ctx?.serviceType as string | undefined;
+          if (endpoint && operation && serviceType && hasOpenApiForService(serviceType)) {
+            const hint = getOpenApiOperationHint(serviceType, endpoint, operation);
+            if (hint) {
+              apiErr.details = { ...(apiErr.details ?? {}), openApiHint: hint };
+              // Keep the original message short but append a compact hint so
+              // UI layers and logs can surface a helpful suggestion.
+              apiErr.message = `${apiErr.message} ${hint}`;
+            }
+          }
+        } catch (e) {
+          // If anything goes wrong while enriching the error we don't want
+          // to hide the original error; record the enrichment failure at
+          // debug level and continue.
+          void logger.debug('OpenAPI hint enrichment failed.', {
+            location: 'UnifiedSearchService.searchConnector',
+            serviceId: connector.config.id,
+            serviceType: connector.config.type,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
         await logger.debug('Unified search connector encountered API error.', {
           location: 'UnifiedSearchService.searchConnector',
           serviceId: connector.config.id,

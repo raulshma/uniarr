@@ -736,12 +736,32 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         },
       };
     } catch (error) {
-      throw handleApiError(error, {
+      const apiError = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'getTrending',
         endpoint: TRENDING_ENDPOINT,
       });
+
+      // For server-side failures (5xx) we prefer to degrade gracefully and
+      // return an empty result set instead of bubbling the exception. The
+      // caller will still receive a logged warning from handleApiError.
+      if (apiError.statusCode && apiError.statusCode >= 500) {
+        void logger.warn('Failed to load trending titles from jellyseerr; returning empty result due to server error.', {
+          location: 'JellyseerrConnector.getTrending',
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          statusCode: apiError.statusCode,
+        });
+
+        return {
+          items: [],
+          total: 0,
+          pageInfo: { page: options?.page ?? 1, pages: 0, results: 0 },
+        };
+      }
+
+      throw apiError;
     }
   }
 }
