@@ -617,7 +617,7 @@ const JellyfinLibraryScreen = () => {
             keyExtractor={(item) => item.Id}
             renderItem={renderLatestItem}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.latestList}
+            ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
           />
         ) : (
           <View style={styles.emptyStateInline}>
@@ -730,11 +730,9 @@ const createStyles = (theme: AppTheme) =>
     listContent: {
       paddingBottom: spacing.xxl,
       paddingHorizontal: spacing.lg,
-      paddingTop: spacing.xl,
     },
     headerContainer: {
       gap: spacing.lg,
-      paddingTop: spacing.xl,
       paddingBottom: spacing.lg,
     },
     toolbar: {
@@ -813,16 +811,14 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.primary,
       borderRadius: 3,
     },
-    latestList: {
-      gap: spacing.sm,
+    listSeparator: {
+      height: spacing.sm,
     },
     latestCard: {
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.md,
-      padding: spacing.sm,
-      borderRadius: 16,
-      backgroundColor: theme.colors.surface,
+      padding: spacing.sm
     },
     latestMeta: {
       flex: 1,

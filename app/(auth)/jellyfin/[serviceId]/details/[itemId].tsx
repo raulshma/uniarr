@@ -26,6 +26,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedScrollHandler,
+  useAnimatedReaction,
+  runOnJS,
   interpolate,
   Extrapolate,
 } from "react-native-reanimated";
@@ -107,27 +109,53 @@ const JellyfinItemDetailsScreen = () => {
   // Pin directly under the header/action row so there is no extra gap.
   const finalTop = insets.top + ACTION_BAR_HEIGHT;
   const deltaY = finalTop - initialTop;
+  // Also compute target translateY when the header is hidden so the poster
+  // can pin directly under the status bar. We'll animate the poster to this
+  // value in the same progress curve so the header can hide while the poster
+  // moves into the center/aligned position.
+  const finalTopWithoutHeader = insets.top;
+  const deltaYHidden = finalTopWithoutHeader - initialTop;
   const threshold = Math.max(1, HERO_HEIGHT - finalTop);
 
   const posterAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(
-      scrollY.value,
-      [0, threshold],
-      [0, 1],
-      Extrapolate.CLAMP
-    );
+    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolate.CLAMP);
     // Animated scale value (1 -> finalScale)
     const finalScale = 0.75;
     const scale = interpolate(progress, [0, 1], [1, finalScale]);
     const translateX = interpolate(progress, [0, 1], [0, deltaX]);
     // Compute base translateY and compensate for the change in height due to scaling
     // so the poster's top aligns exactly with the target finalTop when pinned.
-    const translateYBase = interpolate(progress, [0, 1], [0, deltaY]);
+    // Target the hidden-header delta so the poster will end up flush under
+    // the status bar once the header has been removed.
+    const translateYBase = interpolate(progress, [0, 1], [0, deltaYHidden]);
     const translateY = translateYBase + (POSTER_SIZE * (scale - 1)) / 2;
     return {
       transform: [{ translateX }, { translateY }, { scale }],
     } as any;
   });
+
+  // Animate the header to fade out and slide away as the poster moves. When
+  // the scroll progress passes the threshold we also toggle a React state so
+  // the header stops intercepting pointer events (clearing its interactive
+  // space).
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolate.CLAMP);
+    const opacity = interpolate(progress, [0, 0.6, 1], [1, 0, 0], Extrapolate.CLAMP);
+    const translateY = interpolate(progress, [0, 1], [0, -ACTION_BAR_HEIGHT], Extrapolate.CLAMP);
+    const height = interpolate(progress, [0, 1], [ACTION_BAR_HEIGHT, 0], Extrapolate.CLAMP);
+    return { opacity, transform: [{ translateY }], height } as any;
+  });
+
+  useAnimatedReaction(
+    () => (scrollY.value >= threshold ? 1 : 0),
+    (state, prev) => {
+      if (state !== prev) {
+        runOnJS(setIsHeaderCollapsed)(state === 1);
+      }
+    }
+  );
 
   // Animate a blur overlay on the hero image instead of fully hiding it.
   const blurAnimatedStyle = useAnimatedStyle(() => {
@@ -429,7 +457,10 @@ const JellyfinItemDetailsScreen = () => {
               />
             </View>
           ) : null}
-          <View style={[styles.heroActions, { top: insets.top }]}>
+          <Animated.View
+            pointerEvents={isHeaderCollapsed ? 'none' : 'auto'}
+            style={[styles.heroActions, { top: insets.top }, headerAnimatedStyle]}
+          >
             <IconButton
               icon="arrow-left"
               accessibilityLabel="Go back"
@@ -440,7 +471,7 @@ const JellyfinItemDetailsScreen = () => {
               accessibilityLabel="Share item"
               onPress={handleShare}
             />
-          </View>
+          </Animated.View>
           {/* heroPoster has been moved out so it can be pinned independent of the scrollable content */}
         </View>
         {/* Overlay poster so it can be translated to the top of the screen and remain visible
