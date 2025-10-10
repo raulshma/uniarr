@@ -1,9 +1,16 @@
 import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  Animated,
+  Easing,
+} from "react-native";
+import {
   Chip,
   HelperText,
   IconButton,
@@ -13,15 +20,7 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  FadingTransition,
-  Layout,
-  LinearTransition,
-} from "react-native-reanimated";
+// Animations removed: using plain Views instead of reanimated Animated.Views
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { SeriesListItemSkeleton } from "@/components/media/skeletons";
@@ -320,6 +319,60 @@ const JellyfinLibraryScreen = () => {
       librariesQuery.isFetching) &&
     !isInitialLoad;
 
+  // Animation: cross-fade skeleton -> content
+  const [showSkeletonLayer, setShowSkeletonLayer] = useState(isInitialLoad);
+  const [contentInteractive, setContentInteractive] = useState(!isInitialLoad);
+
+  const skeletonOpacity = useRef(
+    new Animated.Value(isInitialLoad ? 1 : 0)
+  ).current;
+  const contentOpacity = useRef(
+    new Animated.Value(isInitialLoad ? 0 : 1)
+  ).current;
+
+  useEffect(() => {
+    if (isInitialLoad) {
+      // Ensure skeleton is present while animating in
+      setShowSkeletonLayer(true);
+      setContentInteractive(false);
+
+      Animated.parallel([
+        Animated.timing(skeletonOpacity, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentOpacity, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
+    // Fade skeleton out and fade content in, then remove skeleton layer from tree.
+    Animated.parallel([
+      Animated.timing(skeletonOpacity, {
+        toValue: 0,
+        duration: 320,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 360,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowSkeletonLayer(false);
+      setContentInteractive(true);
+    });
+  }, [isInitialLoad, skeletonOpacity, contentOpacity]);
+
   const aggregatedError =
     librariesQuery.error ??
     libraryItemsQuery.error ??
@@ -399,13 +452,9 @@ const JellyfinLibraryScreen = () => {
               1
             )
           : undefined;
-  
+
       return (
-        <Animated.View
-          exiting={FadeOut.springify()}
-          entering={FadeInUp.delay(index * 50)}
-          layout={FadingTransition.build()}
-        >
+        <View>
           <Pressable
             style={({ pressed }) => [
               styles.resumeCard,
@@ -447,7 +496,7 @@ const JellyfinLibraryScreen = () => {
               ) : null}
             </View>
           </Pressable>
-        </Animated.View>
+        </View>
       );
     },
     [connector, handleOpenItem, styles]
@@ -461,13 +510,9 @@ const JellyfinLibraryScreen = () => {
           ? item.SeriesName
           : deriveSubtitle(item, activeSegment);
       const status = formatEpisodeLabel(item);
-  
+
       return (
-        <Animated.View
-          exiting={FadeOut.springify()}
-          entering={FadeInUp.delay(index * 50)}
-          layout={FadingTransition.build()}
-        >
+        <View>
           <Pressable
             style={({ pressed }) => [
               styles.latestCard,
@@ -504,7 +549,7 @@ const JellyfinLibraryScreen = () => {
               ) : null}
             </View>
           </Pressable>
-        </Animated.View>
+        </View>
       );
     },
     [activeSegment, connector, handleOpenItem, styles]
@@ -516,22 +561,20 @@ const JellyfinLibraryScreen = () => {
       const subtitle = deriveSubtitle(item, activeSegment);
       const positionStyle =
         index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight;
-  
+
       // Column sizing: account for FlashList padding and inter-column gaps so poster fits inside card.
       const contentHorizontalPadding = spacing.lg * 2; // listContent applies paddingHorizontal: spacing.lg
       const totalGaps = spacing.xl; // space between columns (gridCardLeft/right use spacing.md)
       const effectiveColumnWidth = Math.max(
         0,
-        Math.floor((windowWidth - contentHorizontalPadding - totalGaps) / numColumns)
+        Math.floor(
+          (windowWidth - contentHorizontalPadding - totalGaps) / numColumns
+        )
       );
       const posterSize = Math.max(80, effectiveColumnWidth - spacing.md * 2); // leave room for internal card padding
-  
+
       return (
-        <Animated.View
-          exiting={FadeOut.springify()}
-          entering={FadeInUp.delay(index * 50)}
-          layout={FadingTransition.build()}
-        >
+        <View>
           <Pressable
             style={({ pressed }) => [
               styles.gridCard,
@@ -541,7 +584,11 @@ const JellyfinLibraryScreen = () => {
             onPress={() => handleOpenItem(item.Id)}
           >
             <MediaPoster uri={posterUri} size={posterSize} />
-            <Text variant="bodyMedium" numberOfLines={2} style={styles.gridTitle}>
+            <Text
+              variant="bodyMedium"
+              numberOfLines={2}
+              style={styles.gridTitle}
+            >
               {item.Name ?? "Untitled"}
             </Text>
             {subtitle ? (
@@ -554,7 +601,7 @@ const JellyfinLibraryScreen = () => {
               </Text>
             ) : null}
           </Pressable>
-        </Animated.View>
+        </View>
       );
     },
     [activeSegment, connector, handleOpenItem, styles, windowWidth]
@@ -562,16 +609,8 @@ const JellyfinLibraryScreen = () => {
 
   const listHeader = useMemo(() => {
     return (
-      <Animated.View
-        style={styles.headerContainer}
-        entering={FadeInDown}
-        layout={FadingTransition.build()}
-      >
-        <Animated.View
-          style={styles.toolbar}
-          entering={FadeInDown.delay(100)}
-          layout={FadingTransition.build()}
-        >
+      <View style={styles.headerContainer}>
+        <View style={styles.toolbar}>
           <IconButton
             icon="arrow-left"
             accessibilityLabel="Go back"
@@ -585,7 +624,7 @@ const JellyfinLibraryScreen = () => {
               {serviceName}
             </Text>
           </View>
-          <Animated.View entering={FadeInDown.delay(200)}>
+          <View>
             <View style={styles.toolbarActions}>
               <IconButton
                 icon="play-circle-outline"
@@ -598,9 +637,9 @@ const JellyfinLibraryScreen = () => {
                 onPress={handleOpenSettings}
               />
             </View>
-          </Animated.View>
-        </Animated.View>
-        <Animated.View entering={FadeInDown.delay(300)}>
+          </View>
+        </View>
+        <View>
           <Searchbar
             placeholder="Search for movies, shows, or music"
             value={searchTerm}
@@ -609,8 +648,8 @@ const JellyfinLibraryScreen = () => {
             inputStyle={styles.searchInput}
             accessibilityLabel="Search library"
           />
-        </Animated.View>
-        <Animated.View entering={FadeInDown.delay(400)}>
+        </View>
+        <View>
           <SegmentedButtons
             value={activeSegment}
             onValueChange={(value) =>
@@ -624,9 +663,9 @@ const JellyfinLibraryScreen = () => {
             density="medium"
             style={styles.segmentedControl}
           />
-        </Animated.View>
+        </View>
         {librariesForActiveSegment.length > 1 ? (
-          <Animated.View entering={FadeInDown.delay(500)}>
+          <View>
             <View style={styles.libraryChipsRow}>
               {librariesForActiveSegment.map((library) => (
                 <Chip
@@ -640,10 +679,10 @@ const JellyfinLibraryScreen = () => {
                 </Chip>
               ))}
             </View>
-          </Animated.View>
+          </View>
         ) : null}
-  
-        <Animated.View entering={FadeInDown.delay(600)}>
+
+        <View>
           <View style={styles.sectionHeader}>
             <Text variant="titleMedium" style={styles.sectionTitle}>
               Continue Watching
@@ -655,7 +694,7 @@ const JellyfinLibraryScreen = () => {
               onPress={() => void resumeQuery.refetch()}
             />
           </View>
-        </Animated.View>
+        </View>
         {resumeQuery.data && resumeQuery.data.length > 0 ? (
           <FlashList
             data={resumeQuery.data}
@@ -673,8 +712,8 @@ const JellyfinLibraryScreen = () => {
             />
           </View>
         )}
-  
-        <Animated.View entering={FadeInDown.delay(700)}>
+
+        <View>
           <View style={styles.sectionHeader}>
             <Text variant="titleMedium" style={styles.sectionTitle}>
               Latest Additions
@@ -686,7 +725,7 @@ const JellyfinLibraryScreen = () => {
               onPress={() => void latestQuery.refetch()}
             />
           </View>
-        </Animated.View>
+        </View>
         {latestQuery.data && latestQuery.data.length > 0 ? (
           <FlashList
             data={latestQuery.data}
@@ -703,7 +742,7 @@ const JellyfinLibraryScreen = () => {
             />
           </View>
         )}
-      </Animated.View>
+      </View>
     );
   }, [
     activeSegment,
@@ -760,39 +799,11 @@ const JellyfinLibraryScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {isInitialLoad ? (
-        <SafeAreaView style={styles.safeArea}>
-          <ScrollView
-            contentContainerStyle={{
-              paddingHorizontal: spacing.lg,
-              paddingBottom: spacing.xxl,
-            }}
-          >
-            <View style={styles.headerContainer}>
-              <View style={styles.toolbar}>
-                <View>
-                  <SkeletonPlaceholder width={32} height={32} borderRadius={16} />
-                </View>
-                <SkeletonPlaceholder width="40%" height={28} borderRadius={10} />
-                <SkeletonPlaceholder width={44} height={44} borderRadius={22} />
-              </View>
-              <SkeletonPlaceholder
-                width="100%"
-                height={48}
-                borderRadius={24}
-                style={{ marginBottom: spacing.md }}
-              />
-              <SkeletonPlaceholder width="55%" height={36} borderRadius={18} />
-            </View>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <View key={index} style={{ marginBottom: spacing.md }}>
-                <SeriesListItemSkeleton />
-              </View>
-            ))}
-          </ScrollView>
-        </SafeAreaView>
-      ) : null}
-      {!isInitialLoad ? (
+      {/* Content layer: always rendered but faded in when ready */}
+      <Animated.View
+        style={[styles.contentLayer, { opacity: contentOpacity }]}
+        pointerEvents={contentInteractive ? "auto" : "none"}
+      >
         <FlashList
           data={items}
           keyExtractor={(item) => item.Id}
@@ -808,6 +819,61 @@ const JellyfinLibraryScreen = () => {
             />
           }
         />
+      </Animated.View>
+
+      {/* Skeleton overlay: mounted while visible and cross-fades out */}
+      {showSkeletonLayer ? (
+        <Animated.View
+          style={[styles.overlay, { opacity: skeletonOpacity }]}
+          pointerEvents={showSkeletonLayer ? "auto" : "none"}
+        >
+          <SafeAreaView style={styles.safeArea}>
+            <ScrollView
+              contentContainerStyle={{
+                paddingHorizontal: spacing.lg,
+                paddingBottom: spacing.xxl,
+              }}
+            >
+              <View style={styles.headerContainer}>
+                <View style={styles.toolbar}>
+                  <View>
+                    <SkeletonPlaceholder
+                      width={32}
+                      height={32}
+                      borderRadius={16}
+                    />
+                  </View>
+                  <SkeletonPlaceholder
+                    width="40%"
+                    height={28}
+                    borderRadius={10}
+                  />
+                  <SkeletonPlaceholder
+                    width={44}
+                    height={44}
+                    borderRadius={22}
+                  />
+                </View>
+                <SkeletonPlaceholder
+                  width="100%"
+                  height={48}
+                  borderRadius={24}
+                  style={{ marginBottom: spacing.md }}
+                />
+                <SkeletonPlaceholder
+                  width="55%"
+                  height={36}
+                  borderRadius={18}
+                />
+              </View>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <View key={index} style={{ marginBottom: spacing.md }}>
+                  <SeriesListItemSkeleton />
+                </View>
+              ))}
+            </ScrollView>
+          </SafeAreaView>
+        </Animated.View>
       ) : null}
       {errorMessage ? (
         <HelperText type="error" visible>
@@ -969,6 +1035,17 @@ const createStyles = (theme: AppTheme) =>
     },
     cardPressed: {
       opacity: 0.9,
+    },
+    overlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 10,
+    },
+    contentLayer: {
+      flex: 1,
     },
   });
 
