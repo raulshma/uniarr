@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { JellyfinConnector } from '@/connectors/implementations/JellyfinConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
+import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { JellyfinItem } from '@/models/jellyfin.types';
 
@@ -17,8 +18,8 @@ interface UseJellyfinLibraryItemsOptions {
   readonly limit?: number;
 }
 
-const ensureConnector = (manager: ConnectorManager, serviceId: string): JellyfinConnector => {
-  const connector = manager.getConnector(serviceId);
+const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): JellyfinConnector => {
+  const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== 'jellyfin') {
     throw new Error(`Jellyfin connector not registered for service ${serviceId}.`);
@@ -37,7 +38,7 @@ export const useJellyfinLibraryItems = ({
   sortOrder,
   limit,
 }: UseJellyfinLibraryItemsOptions) => {
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
+  const { getConnector } = useConnectorsStore();
 
   const enabled = Boolean(serviceId && libraryId);
   const normalizedSearch = searchTerm?.trim() ?? '';
@@ -63,7 +64,7 @@ export const useJellyfinLibraryItems = ({
         return [];
       }
 
-      const connector = ensureConnector(manager, serviceId);
+      const connector = ensureConnector(getConnector, serviceId);
       return connector.getLibraryItems(libraryId, {
         searchTerm: normalizedSearch,
         includeItemTypes,

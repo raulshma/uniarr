@@ -440,7 +440,7 @@ const JellyfinLibraryScreen = () => {
         item.Type === "Episode"
           ? item.Name ?? undefined
           : deriveSubtitle(item, "movies");
-      const posterUri = buildPosterUri(connector, item, 360);
+      const posterUri = buildPosterUri(connector, item, 240);
       const progress =
         typeof item.UserData?.PlaybackPositionTicks === "number" &&
         typeof item.RunTimeTicks === "number"
@@ -464,13 +464,13 @@ const JellyfinLibraryScreen = () => {
           >
             <MediaPoster
               uri={posterUri}
-              size={116}
+              size={80}
               accessibilityLabel={`Continue watching ${title}`}
             />
             <View style={styles.resumeMeta}>
               <Text
                 variant="bodyMedium"
-                numberOfLines={1}
+                numberOfLines={2}
                 style={styles.resumeTitle}
               >
                 {title}
@@ -478,20 +478,25 @@ const JellyfinLibraryScreen = () => {
               {subtitle ? (
                 <Text
                   variant="bodySmall"
-                  numberOfLines={2}
+                  numberOfLines={1}
                   style={styles.resumeSubtitle}
                 >
                   {subtitle}
                 </Text>
               ) : null}
               {typeof progress === "number" ? (
-                <View style={styles.progressRail}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.round(progress * 100)}%` },
-                    ]}
-                  />
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressRail}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${Math.round(progress * 100)}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text variant="bodySmall" style={styles.progressText}>
+                    {Math.round(progress * 100)}%
+                  </Text>
                 </View>
               ) : null}
             </View>
@@ -953,16 +958,25 @@ const createStyles = (theme: AppTheme) =>
     },
     resumeList: {
       marginTop: spacing.sm,
-      gap: spacing.md,
+      gap: spacing.lg,
+      paddingHorizontal: spacing.md,
     },
     resumeCard: {
-      width: 200,
-      gap: spacing.sm,
-      padding: spacing.sm,
-      borderRadius: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      width: 280,
+      gap: spacing.md,
+      padding: spacing.md,
+      borderRadius: 16,
       backgroundColor: theme.colors.surfaceVariant,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
     },
     resumeMeta: {
+      flex: 1,
       gap: spacing.xs,
     },
     resumeTitle: {
@@ -972,16 +986,29 @@ const createStyles = (theme: AppTheme) =>
     resumeSubtitle: {
       color: theme.colors.onSurfaceVariant,
     },
+    progressContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      marginTop: spacing.xs,
+    },
     progressRail: {
-      height: 6,
-      borderRadius: 3,
+      flex: 1,
+      height: 4,
+      borderRadius: 2,
       backgroundColor: theme.colors.surfaceVariant,
       overflow: "hidden",
     },
     progressFill: {
       height: "100%",
       backgroundColor: theme.colors.primary,
-      borderRadius: 3,
+      borderRadius: 2,
+    },
+    progressText: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 12,
+      minWidth: 32,
+      textAlign: "right",
     },
     listSeparator: {
       height: spacing.sm,

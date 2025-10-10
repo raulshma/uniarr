@@ -9,8 +9,9 @@ import {
 
 import type { AddSeriesRequest, Series } from '@/models/media.types';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
+import { IConnector } from '@/connectors/base/IConnector';
 
 interface UseSonarrSeriesResult {
   series: Series[] | undefined;
@@ -28,10 +29,10 @@ interface UseSonarrSeriesResult {
 const SONARR_SERVICE_TYPE = 'sonarr';
 
 const ensureSonarrConnector = (
-  manager: ConnectorManager,
+  getConnector: (id: string) => IConnector | undefined,
   serviceId: string,
 ): SonarrConnector => {
-  const connector = manager.getConnector(serviceId);
+  const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== SONARR_SERVICE_TYPE) {
     throw new Error(`Sonarr connector not registered for service ${serviceId}.`);
   }
@@ -41,10 +42,11 @@ const ensureSonarrConnector = (
 
 export const useSonarrSeries = (serviceId: string): UseSonarrSeriesResult => {
   const queryClient = useQueryClient();
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
-  const hasConnector = manager.getConnector(serviceId)?.config.type === SONARR_SERVICE_TYPE;
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId);
+  const hasConnector = connector?.config.type === SONARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureSonarrConnector(manager, serviceId), [manager, serviceId]);
+  const resolveConnector = useCallback(() => ensureSonarrConnector(getConnector, serviceId), [getConnector, serviceId]);
 
   const seriesQuery = useQuery({
     queryKey: queryKeys.sonarr.seriesList(serviceId),

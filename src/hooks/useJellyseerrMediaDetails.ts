@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { JellyseerrMediaSummary } from '@/models/jellyseerr.types';
 
@@ -13,8 +13,8 @@ export const useJellyseerrMediaDetails = (
   mediaType: JellyseerrMediaType,
   mediaId: number,
 ): UseQueryResult<JellyseerrMediaSummary, Error> => {
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
-  const connector = manager.getConnector(serviceId) as JellyseerrConnector | undefined;
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId) as JellyseerrConnector | undefined;
   const enabled = Boolean(connector && connector.config.type === 'jellyseerr' && mediaId && mediaType);
 
   return useQuery<JellyseerrMediaSummary, Error>({

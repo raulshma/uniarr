@@ -4,7 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import type { IConnector } from '@/connectors/base/IConnector';
+import type { ServiceType } from '@/models/service.types';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { DiscoverMediaItem, DiscoverSection, UnifiedDiscoverPayload, UnifiedDiscoverServices } from '@/models/discover.types';
 import type { JellyseerrSearchResult } from '@/models/jellyseerr.types';
@@ -47,13 +49,11 @@ const mapTrendingResult = (result: JellyseerrSearchResult, mediaType: DiscoverMe
   source: 'jellyseerr',
 });
 
-const fetchUnifiedDiscover = async (): Promise<UnifiedDiscoverPayload> => {
-  const manager = ConnectorManager.getInstance();
-  await manager.loadSavedServices();
+const fetchUnifiedDiscover = async (getConnectorsByType: (type: ServiceType) => IConnector[]): Promise<UnifiedDiscoverPayload> => {
 
-  const jellyConnectors = manager.getConnectorsByType('jellyseerr') as JellyseerrConnector[];
-  const sonarrConnectors = manager.getConnectorsByType('sonarr') as SonarrConnector[];
-  const radarrConnectors = manager.getConnectorsByType('radarr') as RadarrConnector[];
+  const jellyConnectors = getConnectorsByType('jellyseerr') as JellyseerrConnector[];
+  const sonarrConnectors = getConnectorsByType('sonarr') as SonarrConnector[];
+  const radarrConnectors = getConnectorsByType('radarr') as RadarrConnector[];
 
   const services: UnifiedDiscoverServices = {
     sonarr: mapServiceSummaries(sonarrConnectors.map((connector) => connector.config)),
@@ -130,9 +130,10 @@ const fetchUnifiedDiscover = async (): Promise<UnifiedDiscoverPayload> => {
 };
 
 export const useUnifiedDiscover = () => {
+  const { getConnectorsByType } = useConnectorsStore();
   const query = useQuery<UnifiedDiscoverPayload>({
     queryKey: queryKeys.discover.unified,
-    queryFn: fetchUnifiedDiscover,
+    queryFn: () => fetchUnifiedDiscover(getConnectorsByType),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,

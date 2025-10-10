@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import type { ProwlarrIndexerResource, ProwlarrStatistics } from '@/models/prowlarr.types';
 import { logger } from '@/services/logger/LoggerService';
 
@@ -43,7 +43,8 @@ export const useProwlarrIndexers = (serviceId: string): UseProwlarrIndexersResul
   const [lastApiEvent, setLastApiEvent] = useState<ApiEvent | null>(null);
 
   // Get connector instance
-  const connector = ConnectorManager.getInstance().getConnector(serviceId);
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId);
 
   const loadData = useCallback(async () => {
     if (!connector) {

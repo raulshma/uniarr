@@ -17,7 +17,8 @@ import type {
   BazarrDownloadRequest,
 } from '@/models/bazarr.types';
 import type { BazarrConnector } from '@/connectors/implementations/BazarrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
+import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 
 interface UseBazarrSubtitlesResult {
@@ -44,10 +45,10 @@ interface UseBazarrSubtitlesResult {
 const BAZARR_SERVICE_TYPE = 'bazarr';
 
 const ensureBazarrConnector = (
-  manager: ConnectorManager,
+  getConnector: (id: string) => IConnector | undefined,
   serviceId: string,
 ): BazarrConnector => {
-  const connector = manager.getConnector(serviceId);
+  const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== BAZARR_SERVICE_TYPE) {
     throw new Error(`Bazarr connector not registered for service ${serviceId}.`);
   }
@@ -57,10 +58,11 @@ const ensureBazarrConnector = (
 
 export const useBazarrSubtitles = (serviceId: string): UseBazarrSubtitlesResult => {
   const queryClient = useQueryClient();
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
-  const hasConnector = manager.getConnector(serviceId)?.config.type === BAZARR_SERVICE_TYPE;
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId);
+  const hasConnector = connector?.config.type === BAZARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureBazarrConnector(manager, serviceId), [manager, serviceId]);
+  const resolveConnector = useCallback(() => ensureBazarrConnector(getConnector, serviceId), [getConnector, serviceId]);
 
   // Movies query
   const moviesQuery = useQuery({

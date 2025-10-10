@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MediaPoster } from './MediaPoster';
 import type { AppTheme } from '@/constants/theme';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import type { Series } from '@/models/media.types';
 import type { Movie } from '@/models/movie.types';
 import type { QualityProfile } from '@/models/media.types';
@@ -45,14 +45,14 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
   serviceId,
 }) => {
   const theme = useTheme<AppTheme>();
+  const { getConnector } = useConnectorsStore();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [qualityProfiles, setQualityProfiles] = useState<QualityProfile[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [editedItem, setEditedItem] = useState<MediaItem | null>(null);
 
-  const manager = ConnectorManager.getInstance();
-  const connector = manager.getConnector(serviceId);
+  const connector = getConnector(serviceId);
 
   useEffect(() => {
     if (visible && mediaItem) {

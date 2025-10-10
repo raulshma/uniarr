@@ -16,7 +16,7 @@ import type { AppTheme } from '@/constants/theme';
 import type { Series } from '@/models/media.types';
 import type { Movie } from '@/models/movie.types';
 import { spacing } from '@/theme/spacing';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 
 export type SelectableMediaItem = Series | Movie;
 
@@ -125,6 +125,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
   onRefresh,
 }) => {
   const theme = useTheme<AppTheme>();
+  const { getConnector } = useConnectorsStore();
   const { selectedItems, isSelectionMode, exitSelectionMode } = useMediaSelector();
   const [menuVisible, setMenuVisible] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
@@ -143,7 +144,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
           style: 'destructive',
           onPress: async () => {
             try {
-              const connector = ConnectorManager.getInstance().getConnector(serviceId);
+              const connector = getConnector(serviceId);
               if (!connector) return;
 
               if (connector.config.type === 'sonarr') {
@@ -178,7 +179,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
     if (selectedItems.length === 0) return;
 
     try {
-      const connector = ConnectorManager.getInstance().getConnector(serviceId);
+      const connector = getConnector(serviceId);
       if (!connector) return;
 
       if (connector.config.type === 'sonarr') {
@@ -207,7 +208,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
     if (selectedItems.length === 0) return;
 
     try {
-      const connector = ConnectorManager.getInstance().getConnector(serviceId);
+      const connector = getConnector(serviceId);
       if (!connector) return;
 
       if (connector.config.type === 'sonarr') {

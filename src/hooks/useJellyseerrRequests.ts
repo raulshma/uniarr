@@ -9,7 +9,8 @@ import {
 } from '@tanstack/react-query';
 
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
+import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type {
   CreateJellyseerrRequest,
@@ -39,8 +40,8 @@ type DeleteVariables = {
 
 type CreateVariables = CreateJellyseerrRequest;
 
-const ensureConnector = (manager: ConnectorManager, serviceId: string): JellyseerrConnector => {
-  const connector = manager.getConnector(serviceId);
+const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): JellyseerrConnector => {
+  const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== JELLYSEERR_SERVICE_TYPE) {
     throw new Error(`Jellyseerr connector not registered for service ${serviceId}.`);
@@ -117,8 +118,9 @@ export const useJellyseerrRequests = (
   options?: JellyseerrRequestQueryOptions,
 ): UseJellyseerrRequestsResult => {
   const queryClient = useQueryClient();
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
-  const hasConnector = manager.getConnector(serviceId)?.config.type === JELLYSEERR_SERVICE_TYPE;
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId);
+  const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
   const previousRequestIdsRef = useRef<Set<number>>(new Set());
   const hasHydratedRef = useRef(false);
 
@@ -136,7 +138,7 @@ export const useJellyseerrRequests = (
     [normalizedOptions],
   );
 
-  const resolveConnector = useCallback(() => ensureConnector(manager, serviceId), [manager, serviceId]);
+  const resolveConnector = useCallback(() => ensureConnector(getConnector, serviceId), [getConnector, serviceId]);
 
   const requestsQuery = useQuery<JellyseerrRequestList, Error>({
     queryKey: queryKeys.jellyseerr.requestsList(serviceId, queryKeyParams),
@@ -205,7 +207,7 @@ export const useJellyseerrRequests = (
       return;
     }
 
-    const connector = manager.getConnector(serviceId) as JellyseerrConnector | undefined;
+    const connector = getConnector(serviceId) as JellyseerrConnector | undefined;
     const serviceName = connector?.config.name ?? 'Jellyseerr';
     const previousIds = previousRequestIdsRef.current;
     const hasHydrated = hasHydratedRef.current;
@@ -229,7 +231,7 @@ export const useJellyseerrRequests = (
 
     previousRequestIdsRef.current = nextIds;
     hasHydratedRef.current = true;
-  }, [hasConnector, items, manager, serviceId]);
+  }, [hasConnector, items, getConnector, serviceId]);
 
   return {
     requests: items,

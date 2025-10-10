@@ -7,8 +7,9 @@ import {
   type RefetchOptions,
 } from '@tanstack/react-query';
 
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
+import type { IConnector } from '@/connectors/base/IConnector';
 import type { Movie } from '@/models/movie.types';
 import { queryKeys } from '@/hooks/queryKeys';
 
@@ -41,10 +42,10 @@ export interface UseRadarrMovieDetailsResult {
 const RADARR_SERVICE_TYPE = 'radarr';
 
 const ensureRadarrConnector = (
-  manager: ConnectorManager,
+  getConnector: (id: string) => IConnector | undefined,
   serviceId: string,
 ): RadarrConnector => {
-  const connector = manager.getConnector(serviceId);
+  const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== RADARR_SERVICE_TYPE) {
     throw new Error(`Radarr connector not registered for service ${serviceId}.`);
   }
@@ -57,10 +58,11 @@ export const useRadarrMovieDetails = ({
   movieId,
 }: UseRadarrMovieDetailsParams): UseRadarrMovieDetailsResult => {
   const queryClient = useQueryClient();
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
-  const hasConnector = manager.getConnector(serviceId)?.config.type === RADARR_SERVICE_TYPE;
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId);
+  const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureRadarrConnector(manager, serviceId), [manager, serviceId]);
+  const resolveConnector = useCallback(() => ensureRadarrConnector(getConnector, serviceId), [getConnector, serviceId]);
 
   const detailsQuery = useQuery({
     queryKey: queryKeys.radarr.movieDetail(serviceId, movieId),

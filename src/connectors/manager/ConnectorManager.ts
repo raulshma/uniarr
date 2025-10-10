@@ -15,6 +15,8 @@ export class ConnectorManager {
 
   private readonly connectors = new Map<string, IConnector>();
 
+  private updateStore?: (connectors: Map<string, IConnector>) => void;
+
   private constructor() {}
 
   static getInstance(): ConnectorManager {
@@ -23,6 +25,10 @@ export class ConnectorManager {
     }
 
     return ConnectorManager.instance;
+  }
+
+  setUpdateStore(updateStore: (connectors: Map<string, IConnector>) => void) {
+    this.updateStore = updateStore;
   }
 
   /** Load previously saved service configurations and bootstrap connectors for enabled entries. */
@@ -64,6 +70,7 @@ export class ConnectorManager {
     const connector = ConnectorFactory.create(config);
     logger.debug('[ConnectorManager] Connector created, adding to map', { serviceId: config.id });
     this.connectors.set(config.id, connector);
+    this.updateStore?.(this.connectors);
 
     if (options.persist !== false) {
       await secureStorage.saveServiceConfig(config);
@@ -106,6 +113,7 @@ export class ConnectorManager {
 
     connector.dispose();
     this.connectors.delete(id);
+    this.updateStore?.(this.connectors);
 
     if (persist) {
       await secureStorage.removeServiceConfig(id);
@@ -146,5 +154,6 @@ export class ConnectorManager {
       connector.dispose();
     }
     this.connectors.clear();
+    this.updateStore?.(this.connectors);
   }
 }

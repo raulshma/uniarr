@@ -7,12 +7,13 @@ import {
   type RefetchOptions,
 } from '@tanstack/react-query';
 
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import type { TransmissionConnector } from '@/connectors/implementations/TransmissionConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { Torrent, TorrentTransferInfo } from '@/models/torrent.types';
 import { isTorrentCompleted } from '@/utils/torrent.utils';
 import { notificationEventService } from '@/services/notifications/NotificationEventService';
+import { IConnector } from '@/connectors/base/IConnector';
 
 const TRANSMISSION_SERVICE_TYPE = 'transmission';
 
@@ -56,8 +57,8 @@ export interface UseTransmissionResult {
   transferError: unknown;
 }
 
-const ensureConnector = (manager: ConnectorManager, serviceId: string): TransmissionConnector => {
-  const connector = manager.getConnector(serviceId);
+const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): TransmissionConnector => {
+  const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== TRANSMISSION_SERVICE_TYPE) {
     throw new Error(`Transmission connector not registered for service ${serviceId}.`);
@@ -71,12 +72,13 @@ export const useTransmissionTorrents = (
   options: UseTransmissionOptions = {},
 ): UseTransmissionResult => {
   const queryClient = useQueryClient();
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
-  const hasConnector = manager.getConnector(serviceId)?.config.type === TRANSMISSION_SERVICE_TYPE;
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId);
+  const hasConnector = connector?.config.type === TRANSMISSION_SERVICE_TYPE;
   const previousTorrentsRef = useRef<Map<string, { progress: number; state: Torrent['state'] }>>(new Map());
   const hasHydratedRef = useRef(false);
 
-  const resolveConnector = useCallback(() => ensureConnector(manager, serviceId), [manager, serviceId]);
+  const resolveConnector = useCallback(() => ensureConnector(getConnector, serviceId), [getConnector, serviceId]);
 
   const torrentsQuery = useQuery({
     queryKey: queryKeys.transmission.torrents(serviceId, options.filters),
@@ -162,7 +164,7 @@ export const useTransmissionTorrents = (
       return;
     }
 
-    const connector = manager.getConnector(serviceId) as TransmissionConnector | undefined;
+    const connector = getConnector(serviceId) as TransmissionConnector | undefined;
     const serviceName = connector?.config.name ?? 'Transmission';
     const previous = previousTorrentsRef.current;
     const hasHydrated = hasHydratedRef.current;
@@ -197,7 +199,7 @@ export const useTransmissionTorrents = (
 
     previousTorrentsRef.current = nextState;
     hasHydratedRef.current = true;
-  }, [hasConnector, manager, serviceId, torrents]);
+  }, [hasConnector, getConnector, serviceId, torrents]);
 
   return {
     torrents,
