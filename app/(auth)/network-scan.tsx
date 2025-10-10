@@ -1,30 +1,50 @@
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { Appbar, Divider, ProgressBar, Text, useTheme, TextInput, SegmentedButtons, Surface } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Appbar,
+  Divider,
+  ProgressBar,
+  Text,
+  useTheme,
+  TextInput,
+  SegmentedButtons,
+  Surface,
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Button } from '@/components/common/Button';
-import LoadingState from '@/components/common/LoadingState/LoadingState';
-import NetworkScanResults from '@/components/service/NetworkScanResults/NetworkScanResults';
-import NetworkScanHistory from '@/components/service/NetworkScanResults/NetworkScanHistory';
-import type { AppTheme } from '@/constants/theme';
-import type { DiscoveredService } from '@/services/network/NetworkScannerService';
-import type { NetworkScanHistoryType as ScanHistoryType, RecentIP } from '@/services/storage/SecureStorage';
-import { useNetworkScan } from '@/hooks/useNetworkScan';
-import { spacing } from '@/theme/spacing';
-import { NetworkScannerService } from '@/services/network/NetworkScannerService';
+import { Button } from "@/components/common/Button";
+import LoadingState from "@/components/common/LoadingState/LoadingState";
+import NetworkScanResults from "@/components/service/NetworkScanResults/NetworkScanResults";
+import NetworkScanHistory from "@/components/service/NetworkScanResults/NetworkScanHistory";
+import type { AppTheme } from "@/constants/theme";
+import type { DiscoveredService } from "@/services/network/NetworkScannerService";
+import type {
+  NetworkScanHistoryType as ScanHistoryType,
+  RecentIP,
+} from "@/services/storage/SecureStorage";
+import { useNetworkScan } from "@/hooks/useNetworkScan";
+import { spacing } from "@/theme/spacing";
+import { NetworkScannerService } from "@/services/network/NetworkScannerService";
 
 const NetworkScanScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
-  const [customIpAddress, setCustomIpAddress] = useState('');
-  const [activeTab, setActiveTab] = useState<'scan' | 'history'>('scan');
+  const [customIpAddress, setCustomIpAddress] = useState("");
+  const [activeTab, setActiveTab] = useState<"scan" | "history">("scan");
   const [scanHistory, setScanHistory] = useState<ScanHistoryType[]>([]);
   const [recentIPs, setRecentIPs] = useState<RecentIP[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  const { isScanning, scanResult, error: scanError, scanProgress, scanNetwork, stopScan, reset: resetScan } = useNetworkScan();
+  const {
+    isScanning,
+    scanResult,
+    error: scanError,
+    scanProgress,
+    scanNetwork,
+    stopScan,
+    reset: resetScan,
+  } = useNetworkScan();
 
   const scannerService = useMemo(() => new NetworkScannerService(), []);
 
@@ -59,7 +79,7 @@ const NetworkScanScreen = () => {
         },
         heroTitle: {
           color: theme.colors.onSurface,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         heroSubtitle: {
           color: theme.colors.onSurfaceVariant,
@@ -69,7 +89,7 @@ const NetworkScanScreen = () => {
         },
         progressText: {
           color: theme.colors.onSurfaceVariant,
-          textAlign: 'center',
+          textAlign: "center",
         },
         actions: {
           gap: spacing.md,
@@ -101,27 +121,33 @@ const NetworkScanScreen = () => {
           flex: 1,
         },
       }),
-    [theme],
+    [theme]
   );
 
-  const handleServiceSelect = useCallback((service: DiscoveredService) => {
-    // Navigate back to add-service with the selected service data as search params
-    router.replace({
-      pathname: '/add-service',
-      params: {
-        selectedService: JSON.stringify({
-          type: service.type,
-          name: service.name,
-          url: service.url,
-        }),
-      },
-    });
-  }, [router]);
+  const handleServiceSelect = useCallback(
+    (service: DiscoveredService) => {
+      // Navigate back to add-service with the selected service data as search params
+      router.replace({
+        pathname: "/add-service",
+        params: {
+          selectedService: JSON.stringify({
+            type: service.type,
+            name: service.name,
+            url: service.url,
+          }),
+        },
+      });
+    },
+    [router]
+  );
 
-  const handleStartScan = useCallback(async (fastScan: boolean = true) => {
-    resetScan();
-    await scanNetwork(undefined, fastScan, customIpAddress || undefined);
-  }, [scanNetwork, resetScan, customIpAddress]);
+  const handleStartScan = useCallback(
+    async (fastScan: boolean = true) => {
+      resetScan();
+      await scanNetwork(undefined, fastScan, customIpAddress || undefined);
+    },
+    [scanNetwork, resetScan, customIpAddress]
+  );
 
   const handleStopScan = useCallback(() => {
     stopScan();
@@ -142,7 +168,7 @@ const NetworkScanScreen = () => {
       setScanHistory(history);
       setRecentIPs(ips);
     } catch (error) {
-      console.warn('Failed to load scan history:', error);
+      console.warn("Failed to load scan history:", error);
     } finally {
       setIsLoadingHistory(false);
     }
@@ -150,20 +176,20 @@ const NetworkScanScreen = () => {
 
   const handleClearHistory = useCallback(async () => {
     Alert.alert(
-      'Clear History',
-      'Are you sure you want to clear all scan history and recent IP addresses?',
+      "Clear History",
+      "Are you sure you want to clear all scan history and recent IP addresses?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Clear',
-          style: 'destructive',
+          text: "Clear",
+          style: "destructive",
           onPress: async () => {
             try {
               await scannerService.clearScanHistory();
               setScanHistory([]);
               setRecentIPs([]);
             } catch (error) {
-              console.warn('Failed to clear scan history:', error);
+              console.warn("Failed to clear scan history:", error);
             }
           },
         },
@@ -173,11 +199,11 @@ const NetworkScanScreen = () => {
 
   const handleIPSelect = useCallback((ip: string) => {
     setCustomIpAddress(ip);
-    setActiveTab('scan');
+    setActiveTab("scan");
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'history') {
+    if (activeTab === "history") {
       loadScanHistory();
     }
   }, [activeTab, loadScanHistory]);
@@ -185,7 +211,10 @@ const NetworkScanScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Appbar.Header mode="small" elevated>
-        <Appbar.BackAction onPress={() => router.back()} accessibilityLabel="Back" />
+        <Appbar.BackAction
+          onPress={() => router.back()}
+          accessibilityLabel="Back"
+        />
         <Appbar.Content title="Network Scan" titleStyle={styles.headerTitle} />
       </Appbar.Header>
 
@@ -194,18 +223,27 @@ const NetworkScanScreen = () => {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <Surface style={[styles.sectionSurface, styles.sectionPadding]} elevation={1}>
+        <Surface
+          style={[styles.sectionSurface, styles.sectionPadding]}
+          elevation={1}
+        >
           <View style={styles.hero}>
             <Text variant="titleMedium" style={styles.heroTitle}>
               Scan for Services
             </Text>
             <Text variant="bodyMedium" style={styles.heroSubtitle}>
-              Discover Sonarr, Radarr, Jellyseerr, qBittorrent, Transmission, Deluge, SABnzbd, Prowlarr, and Bazarr on your network. Quick scan checks common IPs first; full scan covers all hosts (1–254) in your subnet.
+              Discover Sonarr, Radarr, Jellyseerr, qBittorrent, Transmission,
+              Deluge, SABnzbd, Prowlarr, and Bazarr on your network. Quick scan
+              checks common IPs first; full scan covers all hosts (1–254) in
+              your subnet.
             </Text>
           </View>
         </Surface>
 
-        <Surface style={[styles.sectionSurface, styles.sectionPadding]} elevation={1}>
+        <Surface
+          style={[styles.sectionSurface, styles.sectionPadding]}
+          elevation={1}
+        >
           <View style={styles.ipInputContainer}>
             <Text variant="bodyMedium" style={styles.ipInputLabel}>
               Custom IP Address (optional)
@@ -225,7 +263,8 @@ const NetworkScanScreen = () => {
             <View style={[styles.progressContainer, { marginTop: spacing.md }]}>
               <ProgressBar progress={progressPercentage} />
               <Text variant="bodySmall" style={styles.progressText}>
-                Scanning {scanProgress.currentService}... ({scanProgress.currentHost}/{scanProgress.totalHosts} hosts)
+                Scanning {scanProgress.currentService}... (
+                {scanProgress.currentHost}/{scanProgress.totalHosts} hosts)
               </Text>
               <Text variant="bodySmall" style={styles.progressText}>
                 Found {scanProgress.servicesFound.length} services so far
@@ -269,24 +308,29 @@ const NetworkScanScreen = () => {
         </Surface>
 
         {/* Tab Navigation */}
-        <Surface style={[styles.tabsSurface, styles.sectionPadding]} elevation={2}>
+        <Surface
+          style={[styles.tabsSurface, styles.sectionPadding]}
+          elevation={2}
+        >
           <SegmentedButtons
             value={activeTab}
-            onValueChange={(value) => setActiveTab(value as 'scan' | 'history')}
+            onValueChange={(value) => setActiveTab(value as "scan" | "history")}
             buttons={[
-              { value: 'scan', label: 'Network Scan', icon: 'lan' },
-              { value: 'history', label: 'History', icon: 'history' },
+              { value: "scan", label: "Network Scan", icon: "lan" },
+              { value: "history", label: "History", icon: "history" },
             ]}
             style={styles.segmentedButtons}
           />
         </Surface>
 
-        {activeTab === 'scan' ? (
+        {activeTab === "scan" ? (
           <>
             <View style={styles.resultsContainer}>
               <Surface style={[styles.sectionSurface]} elevation={1}>
                 <NetworkScanResults
-                  services={scanResult?.services || (scanProgress?.servicesFound || [])}
+                  services={
+                    scanResult?.services || scanProgress?.servicesFound || []
+                  }
                   isScanning={isScanning}
                   scanDuration={scanResult?.scanDuration}
                   scannedHosts={scanResult?.scannedHosts}

@@ -1,31 +1,43 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { IconButton, Text, useTheme, Portal, Modal, List, Divider } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { FlashList } from '@shopify/flash-list';
+import React, { useCallback, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import {
+  IconButton,
+  Text,
+  useTheme,
+  Portal,
+  Modal,
+  List,
+  Divider,
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { FlashList } from "@shopify/flash-list";
 
-import { TabHeader } from '@/components/common/TabHeader';
+import { TabHeader } from "@/components/common/TabHeader";
 
-import { Button } from '@/components/common/Button';
-import { Card } from '@/components/common/Card';
-import { EmptyState } from '@/components/common/EmptyState';
-import { ListRefreshControl } from '@/components/common/ListRefreshControl';
-import { AnimatedListItem, AnimatedSection, AnimatedScrollView } from '@/components/common/AnimatedComponents';
-import { ServiceStatus } from '@/components/service/ServiceStatus';
-import type { ServiceStatusState } from '@/components/service/ServiceStatus';
-import { ServiceCardSkeleton } from '@/components/service/ServiceCard';
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
-import type { ConnectionResult } from '@/connectors/base/IConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import { queryKeys } from '@/hooks/queryKeys';
-import type { AppTheme } from '@/constants/theme';
-import type { ServiceConfig, ServiceType } from '@/models/service.types';
-import { logger } from '@/services/logger/LoggerService';
-import { secureStorage } from '@/services/storage/SecureStorage';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { Card } from "@/components/common/Card";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ListRefreshControl } from "@/components/common/ListRefreshControl";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+  AnimatedScrollView,
+} from "@/components/common/AnimatedComponents";
+import { ServiceStatus } from "@/components/service/ServiceStatus";
+import type { ServiceStatusState } from "@/components/service/ServiceStatus";
+import { ServiceCardSkeleton } from "@/components/service/ServiceCard";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import type { ConnectionResult } from "@/connectors/base/IConnector";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { queryKeys } from "@/hooks/queryKeys";
+import type { AppTheme } from "@/constants/theme";
+import type { ServiceConfig, ServiceType } from "@/models/service.types";
+import { logger } from "@/services/logger/LoggerService";
+import { secureStorage } from "@/services/storage/SecureStorage";
+import { spacing } from "@/theme/spacing";
 
 type ServiceOverviewItem = {
   config: ServiceConfig;
@@ -37,96 +49,100 @@ type ServiceOverviewItem = {
 };
 
 type ServicesListItem =
-  | { type: 'header' }
-  | { type: 'service'; data: ServiceOverviewItem };
+  | { type: "header" }
+  | { type: "service"; data: ServiceOverviewItem };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
-  sonarr: 'Sonarr',
-  radarr: 'Radarr',
-  jellyseerr: 'Jellyseerr',
-  jellyfin: 'Jellyfin',
-  qbittorrent: 'qBittorrent',
-  transmission: 'Transmission',
-  deluge: 'Deluge',
-  sabnzbd: 'SABnzbd',
-  nzbget: 'NZBGet',
-  rtorrent: 'rTorrent',
-  prowlarr: 'Prowlarr',
-  bazarr: 'Bazarr',
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+  jellyseerr: "Jellyseerr",
+  jellyfin: "Jellyfin",
+  qbittorrent: "qBittorrent",
+  transmission: "Transmission",
+  deluge: "Deluge",
+  sabnzbd: "SABnzbd",
+  nzbget: "NZBGet",
+  rtorrent: "rTorrent",
+  prowlarr: "Prowlarr",
+  bazarr: "Bazarr",
 };
 
 const serviceDisplayNames: Record<ServiceType, string> = {
-  sonarr: 'TV Shows',
-  radarr: 'Movie Library',
-  jellyseerr: 'Request Service',
-  jellyfin: 'Media Server',
-  qbittorrent: 'Torrent Client',
-  transmission: 'Torrent Client',
-  deluge: 'Torrent Client',
-  sabnzbd: 'Usenet Client',
-  nzbget: 'Usenet Client',
-  rtorrent: 'Torrent Client',
-  prowlarr: 'Indexer',
-  bazarr: 'Subtitle Manager',
+  sonarr: "TV Shows",
+  radarr: "Movie Library",
+  jellyseerr: "Request Service",
+  jellyfin: "Media Server",
+  qbittorrent: "Torrent Client",
+  transmission: "Torrent Client",
+  deluge: "Torrent Client",
+  sabnzbd: "Usenet Client",
+  nzbget: "Usenet Client",
+  rtorrent: "Torrent Client",
+  prowlarr: "Indexer",
+  bazarr: "Subtitle Manager",
 };
 
 const serviceIcons: Record<ServiceType, string> = {
-  sonarr: 'television-classic',
-  radarr: 'movie-open',
-  jellyseerr: 'account-search',
-  jellyfin: 'play-circle',
-  qbittorrent: 'download-network',
-  transmission: 'download-network',
-  deluge: 'download-network',
-  sabnzbd: 'download-network',
-  nzbget: 'download-network',
-  rtorrent: 'download-network',
-  prowlarr: 'radar',
-  bazarr: 'subtitles',
+  sonarr: "television-classic",
+  radarr: "movie-open",
+  jellyseerr: "account-search",
+  jellyfin: "play-circle",
+  qbittorrent: "download-network",
+  transmission: "download-network",
+  deluge: "download-network",
+  sabnzbd: "download-network",
+  nzbget: "download-network",
+  rtorrent: "download-network",
+  prowlarr: "radar",
+  bazarr: "subtitles",
 };
 
 const deriveStatus = (
   config: ServiceConfig,
   result: ConnectionResult | undefined,
-  checkedAt: Date,
-): Pick<ServiceOverviewItem, 'status' | 'statusDescription' | 'lastCheckedAt' | 'latency' | 'version'> => {
+  checkedAt: Date
+): Pick<
+  ServiceOverviewItem,
+  "status" | "statusDescription" | "lastCheckedAt" | "latency" | "version"
+> => {
   if (!config.enabled) {
     return {
-      status: 'offline',
-      statusDescription: 'Service disabled',
+      status: "offline",
+      statusDescription: "Service disabled",
     };
   }
 
   if (!result) {
     return {
-      status: 'offline',
-      statusDescription: 'Status unavailable',
+      status: "offline",
+      statusDescription: "Status unavailable",
       lastCheckedAt: checkedAt,
     };
   }
 
   const latency = result.latency ?? undefined;
   const version = result.version ?? undefined;
-  const isHighLatency = typeof latency === 'number' && latency > 2000;
+  const isHighLatency = typeof latency === "number" && latency > 2000;
 
   const status: ServiceStatusState = result.success
     ? isHighLatency
-      ? 'degraded'
-      : 'online'
-    : 'offline';
+      ? "degraded"
+      : "online"
+    : "offline";
 
   const descriptionParts: string[] = [];
   if (result.message) {
     descriptionParts.push(result.message);
   }
-  if (typeof latency === 'number') {
+  if (typeof latency === "number") {
     descriptionParts.push(`Latency ${latency}ms`);
   }
   if (version) {
     descriptionParts.push(`Version ${version}`);
   }
 
-  const statusDescription = descriptionParts.length > 0 ? descriptionParts.join(' • ') : undefined;
+  const statusDescription =
+    descriptionParts.length > 0 ? descriptionParts.join(" • ") : undefined;
 
   return {
     status,
@@ -166,16 +182,10 @@ const ServicesScreen = () => {
   const queryClient = useQueryClient();
 
   const [serviceMenuVisible, setServiceMenuVisible] = useState(false);
-  const [selectedService, setSelectedService] = useState<ServiceOverviewItem | null>(null);
+  const [selectedService, setSelectedService] =
+    useState<ServiceOverviewItem | null>(null);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.services.overview,
     queryFn: fetchServicesOverview,
     refetchInterval: 60000,
@@ -185,20 +195,23 @@ const ServicesScreen = () => {
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch]),
+    }, [refetch])
   );
 
   const services = data ?? [];
   const isRefreshing = isFetching && !isLoading;
 
   // We render the tab header outside of the list so it remains fixed.
-  const listData: ServiceOverviewItem[] = useMemo(() => services.slice(), [services]);
+  const listData: ServiceOverviewItem[] = useMemo(
+    () => services.slice(),
+    [services]
+  );
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
-    container: {
-      flex: 1,
+        container: {
+          flex: 1,
           backgroundColor: theme.colors.background,
         },
         content: {
@@ -225,16 +238,16 @@ const ServicesScreen = () => {
           padding: spacing.md,
         },
         serviceContent: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
         },
         serviceIcon: {
           width: 48,
           height: 48,
           borderRadius: 24,
           backgroundColor: theme.colors.surfaceVariant,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           marginRight: spacing.md,
         },
         serviceInfo: {
@@ -259,8 +272,8 @@ const ServicesScreen = () => {
           marginBottom: spacing.xs,
         },
         serviceStatus: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
         },
         serviceMenu: {
           color: theme.colors.outline,
@@ -273,7 +286,7 @@ const ServicesScreen = () => {
           paddingTop: spacing.xl,
         },
       }),
-    [theme],
+    [theme]
   );
 
   const handleBackPress = useCallback(() => {
@@ -281,51 +294,69 @@ const ServicesScreen = () => {
   }, [router]);
 
   const handleAddService = useCallback(() => {
-    router.push('/(auth)/add-service');
+    router.push("/(auth)/add-service");
   }, [router]);
 
   const handleServicePress = useCallback(
     (service: ServiceOverviewItem) => {
       switch (service.config.type) {
-        case 'sonarr':
-          router.push({ pathname: '/(auth)/sonarr/[serviceId]', params: { serviceId: service.config.id } });
+        case "sonarr":
+          router.push({
+            pathname: "/(auth)/sonarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
           break;
-        case 'radarr':
-          router.push({ pathname: '/(auth)/radarr/[serviceId]', params: { serviceId: service.config.id } });
+        case "radarr":
+          router.push({
+            pathname: "/(auth)/radarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
           break;
-        case 'jellyseerr':
-          router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: service.config.id } });
+        case "jellyseerr":
+          router.push({
+            pathname: "/(auth)/jellyseerr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
           break;
-        case 'jellyfin':
-          router.push({ pathname: '/(auth)/jellyfin/[serviceId]', params: { serviceId: service.config.id } });
+        case "jellyfin":
+          router.push({
+            pathname: "/(auth)/jellyfin/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
           break;
-        case 'qbittorrent':
-          router.push({ pathname: '/(auth)/qbittorrent/[serviceId]', params: { serviceId: service.config.id } });
+        case "qbittorrent":
+          router.push({
+            pathname: "/(auth)/qbittorrent/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
           break;
-        case 'prowlarr':
-          router.push({ pathname: '/(auth)/prowlarr/[serviceId]', params: { serviceId: service.config.id } });
+        case "prowlarr":
+          router.push({
+            pathname: "/(auth)/prowlarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
           break;
         default:
           // For now, just show a message for unsupported services
           break;
       }
     },
-    [router],
+    [router]
   );
 
-  const handleServiceMenuPress = useCallback(
-    (service: ServiceOverviewItem) => {
-      setSelectedService(service);
-      setServiceMenuVisible(true);
-    },
-    [],
-  );
+  const handleServiceMenuPress = useCallback((service: ServiceOverviewItem) => {
+    setSelectedService(service);
+    setServiceMenuVisible(true);
+  }, []);
 
   const handleEditService = useCallback(() => {
     if (!selectedService) return;
 
     setServiceMenuVisible(false);
-    router.push({ pathname: '/(auth)/edit-service', params: { serviceId: selectedService.config.id } });
+    router.push({
+      pathname: "/(auth)/edit-service",
+      params: { serviceId: selectedService.config.id },
+    });
   }, [selectedService, router]);
 
   const handleDeleteService = useCallback(async () => {
@@ -334,30 +365,38 @@ const ServicesScreen = () => {
     setServiceMenuVisible(false);
 
     Alert.alert(
-      'Delete Service',
+      "Delete Service",
       `Are you sure you want to delete "${selectedService.config.name}"? This action cannot be undone.`,
       [
         {
-          text: 'Cancel',
-          style: 'cancel',
+          text: "Cancel",
+          style: "cancel",
         },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               const manager = ConnectorManager.getInstance();
               await manager.removeConnector(selectedService.config.id);
 
-              await queryClient.invalidateQueries({ queryKey: queryKeys.services.overview });
+              await queryClient.invalidateQueries({
+                queryKey: queryKeys.services.overview,
+              });
 
-              Alert.alert('Service Deleted', `${selectedService.config.name} has been removed.`);
+              Alert.alert(
+                "Service Deleted",
+                `${selectedService.config.name} has been removed.`
+              );
             } catch (error) {
-              const message = error instanceof Error ? error.message : 'Failed to delete service.';
-              Alert.alert('Error', message);
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Failed to delete service.";
+              Alert.alert("Error", message);
 
-              void logger.error('Failed to delete service.', {
-                location: 'ServicesScreen.handleDeleteService',
+              void logger.error("Failed to delete service.", {
+                location: "ServicesScreen.handleDeleteService",
                 serviceId: selectedService.config.id,
                 serviceType: selectedService.config.type,
                 message,
@@ -365,81 +404,100 @@ const ServicesScreen = () => {
             }
           },
         },
-      ],
+      ]
     );
   }, [selectedService, queryClient]);
 
   // Header is rendered outside the scrollable area so it does not scroll with content.
 
-  const ServiceCard = React.memo(({ item, index }: { item: ServiceOverviewItem; index: number }) => {
-    const displayName = serviceDisplayNames[item.config.type] || item.config.name;
-    const serviceType = serviceTypeLabels[item.config.type];
-    const iconName = serviceIcons[item.config.type];
+  const ServiceCard = React.memo(
+    ({ item, index }: { item: ServiceOverviewItem; index: number }) => {
+      const displayName =
+        serviceDisplayNames[item.config.type] || item.config.name;
+      const serviceType = serviceTypeLabels[item.config.type];
+      const iconName = serviceIcons[item.config.type];
 
-    return (
-      <AnimatedListItem index={index} totalItems={services.length}>
-        <Card variant="custom" style={styles.serviceCard} onPress={() => handleServicePress(item)}>
-          <View style={styles.serviceContent}>
-            <View style={styles.serviceIcon}>
-              <IconButton icon={iconName} size={24} iconColor={theme.colors.primary} />
-            </View>
-            <View style={styles.serviceInfo}>
-              <Text style={styles.serviceName}>{displayName}</Text>
-              <Text style={styles.serviceType}>{serviceType}</Text>
-              <View style={styles.serviceStatus}>
-                <ServiceStatus
-                  status={item.status}
-                  showLabel={false}
-                  size="sm"
+      return (
+        <AnimatedListItem index={index} totalItems={services.length}>
+          <Card
+            variant="custom"
+            style={styles.serviceCard}
+            onPress={() => handleServicePress(item)}
+          >
+            <View style={styles.serviceContent}>
+              <View style={styles.serviceIcon}>
+                <IconButton
+                  icon={iconName}
+                  size={24}
+                  iconColor={theme.colors.primary}
                 />
-                <Text
-                  style={{
-                    color: item.status === 'online'
-                      ? theme.colors.primary
-                      : item.status === 'offline'
-                      ? theme.colors.error
-                      : theme.colors.tertiary,
-                    fontSize: 14,
-                    marginLeft: 4,
-                  }}
-                >
-                  {item.status === 'online' ? 'Connected' : item.status === 'offline' ? 'Offline' : 'Degraded'}
-                </Text>
               </View>
+              <View style={styles.serviceInfo}>
+                <Text style={styles.serviceName}>{displayName}</Text>
+                <Text style={styles.serviceType}>{serviceType}</Text>
+                <View style={styles.serviceStatus}>
+                  <ServiceStatus
+                    status={item.status}
+                    showLabel={false}
+                    size="sm"
+                  />
+                  <Text
+                    style={{
+                      color:
+                        item.status === "online"
+                          ? theme.colors.primary
+                          : item.status === "offline"
+                          ? theme.colors.error
+                          : theme.colors.tertiary,
+                      fontSize: 14,
+                      marginLeft: 4,
+                    }}
+                  >
+                    {item.status === "online"
+                      ? "Connected"
+                      : item.status === "offline"
+                      ? "Offline"
+                      : "Degraded"}
+                  </Text>
+                </View>
+              </View>
+              <IconButton
+                icon="dots-vertical"
+                size={20}
+                iconColor={theme.colors.outline}
+                onPress={() => handleServiceMenuPress(item)}
+              />
             </View>
-            <IconButton
-              icon="dots-vertical"
-              size={20}
-              iconColor={theme.colors.outline}
-              onPress={() => handleServiceMenuPress(item)}
-            />
-          </View>
-        </Card>
-      </AnimatedListItem>
-    );
-  });
+          </Card>
+        </AnimatedListItem>
+      );
+    }
+  );
 
   const renderServiceItem = useCallback(
     ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
       <ServiceCard item={item} index={index} />
     ),
-    [],
+    []
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
-      renderServiceItem({ item, index })
-    ),
-    [renderServiceItem],
+    ({ item, index }: { item: ServiceOverviewItem; index: number }) =>
+      renderServiceItem({ item, index }),
+    [renderServiceItem]
   );
 
-  const keyExtractor = useCallback((item: ServiceOverviewItem) => `service-${item.config.id}`, []);
+  const keyExtractor = useCallback(
+    (item: ServiceOverviewItem) => `service-${item.config.id}`,
+    []
+  );
 
-  const getItemType = useCallback(() => 'service', []);
+  const getItemType = useCallback(() => "service", []);
 
   const listEmptyComponent = useMemo(() => {
     if (isError) {
-      const message = error instanceof Error ? error.message : 'Unable to load services.';
+      const message =
+        error instanceof Error ? error.message : "Unable to load services.";
 
       return (
         <EmptyState
@@ -468,17 +526,36 @@ const ServicesScreen = () => {
           showBackButton={true}
           onBackPress={handleBackPress}
           rightAction={{
-            icon: 'plus',
+            icon: "plus",
             onPress: handleAddService,
-            accessibilityLabel: 'Add service',
+            accessibilityLabel: "Add service",
           }}
           style={{ paddingHorizontal: spacing.xxs }}
         />
-        <AnimatedScrollView style={styles.content} contentContainerStyle={{ paddingVertical: spacing.lg, paddingBottom: spacing.xxxxl }}>
+        <AnimatedScrollView
+          style={styles.content}
+          contentContainerStyle={{
+            paddingVertical: spacing.lg,
+            paddingBottom: spacing.xxxxl,
+          }}
+        >
           <AnimatedSection style={styles.section} delay={100}>
-            <SkeletonPlaceholder width="50%" height={28} borderRadius={10} style={{ marginBottom: spacing.md }} />
+            <SkeletonPlaceholder
+              width="50%"
+              height={28}
+              borderRadius={10}
+              style={{ marginBottom: spacing.md }}
+            />
             {Array.from({ length: 4 }).map((_, index) => (
-              <AnimatedListItem key={index} index={index} totalItems={4} style={{ marginBottom: spacing.sm, marginHorizontal: spacing.md }}>
+              <AnimatedListItem
+                key={index}
+                index={index}
+                totalItems={4}
+                style={{
+                  marginBottom: spacing.sm,
+                  marginHorizontal: spacing.md,
+                }}
+              >
                 <ServiceCardSkeleton />
               </AnimatedListItem>
             ))}
@@ -494,9 +571,9 @@ const ServicesScreen = () => {
         showBackButton={true}
         onBackPress={handleBackPress}
         rightAction={{
-          icon: 'plus',
+          icon: "plus",
           onPress: handleAddService,
-          accessibilityLabel: 'Add service',
+          accessibilityLabel: "Add service",
         }}
         style={{ paddingHorizontal: spacing.md }}
       />
@@ -505,13 +582,15 @@ const ServicesScreen = () => {
         data={listData}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        contentContainerStyle={
-          [
-            services.length === 0 ? { flex: 1 } : undefined,
-            { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
-          ]
+        contentContainerStyle={[
+          services.length === 0 ? { flex: 1 } : undefined,
+          { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
+        ]}
+        ListEmptyComponent={
+          <AnimatedSection style={styles.emptyContainer} delay={100}>
+            {listEmptyComponent}
+          </AnimatedSection>
         }
-        ListEmptyComponent={<AnimatedSection style={styles.emptyContainer} delay={100}>{listEmptyComponent}</AnimatedSection>}
         refreshControl={
           <ListRefreshControl
             refreshing={isRefreshing}
@@ -543,7 +622,13 @@ const ServicesScreen = () => {
             <List.Item
               title="Delete Service"
               titleStyle={{ color: theme.colors.error }}
-              left={(props) => <List.Icon {...props} icon="delete" color={theme.colors.error} />}
+              left={(props) => (
+                <List.Icon
+                  {...props}
+                  icon="delete"
+                  color={theme.colors.error}
+                />
+              )}
               onPress={handleDeleteService}
             />
           </AnimatedSection>

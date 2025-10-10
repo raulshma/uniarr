@@ -1,25 +1,34 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useMemo } from "react";
+import { Alert, StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  Layout,
+} from "react-native-reanimated";
 
-import { Button } from '@/components/common/Button';
-import { EmptyState } from '@/components/common/EmptyState';
-import { MediaDetails } from '@/components/media/MediaDetails';
-import { MovieDetailsSkeleton } from '@/components/media/skeletons';
-import type { AppTheme } from '@/constants/theme';
-import { useRadarrMovieDetails } from '@/hooks/useRadarrMovieDetails';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { MediaDetails } from "@/components/media/MediaDetails";
+import { MovieDetailsSkeleton } from "@/components/media/skeletons";
+import type { AppTheme } from "@/constants/theme";
+import { useRadarrMovieDetails } from "@/hooks/useRadarrMovieDetails";
+import { spacing } from "@/theme/spacing";
 
 const RadarrMovieDetailsScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
-  const { serviceId, id } = useLocalSearchParams<{ serviceId?: string; id?: string }>();
+  const { serviceId, id } = useLocalSearchParams<{
+    serviceId?: string;
+    id?: string;
+  }>();
   const numericMovieId = Number(id);
   const isMovieIdValid = Number.isFinite(numericMovieId);
-  const serviceKey = serviceId ?? '';
+  const serviceKey = serviceId ?? "";
 
   const {
     movie,
@@ -52,20 +61,20 @@ const RadarrMovieDetailsScreen = () => {
           paddingVertical: spacing.lg,
         },
         header: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: spacing.md,
         },
       }),
-    [theme],
+    [theme]
   );
 
   const handleToggleMonitor = useCallback(
     (nextState: boolean) => {
       toggleMonitor(nextState);
     },
-    [toggleMonitor],
+    [toggleMonitor]
   );
 
   const handleTriggerSearch = useCallback(() => {
@@ -74,36 +83,39 @@ const RadarrMovieDetailsScreen = () => {
 
   const handleDeleteMovie = useCallback(() => {
     Alert.alert(
-      'Remove Movie',
-      'Are you sure you want to remove this movie from Radarr? Existing files will be kept.',
+      "Remove Movie",
+      "Are you sure you want to remove this movie from Radarr? Existing files will be kept.",
       [
         {
-          text: 'Cancel',
-          style: 'cancel',
+          text: "Cancel",
+          style: "cancel",
         },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: () => {
             void deleteMovieAsync()
               .then(() => {
                 router.back();
               })
               .catch((err) => {
-                const message = err instanceof Error ? err.message : 'Unable to delete movie.';
-                Alert.alert('Delete Failed', message);
+                const message =
+                  err instanceof Error
+                    ? err.message
+                    : "Unable to delete movie.";
+                Alert.alert("Delete Failed", message);
               });
           },
         },
       ],
-      { cancelable: true },
+      { cancelable: true }
     );
   }, [deleteMovieAsync, router]);
 
   // Handle error states outside of sheet for immediate feedback
   if (!serviceId || !isMovieIdValid) {
     return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
+      <View style={[styles.container, { justifyContent: "center" }]}>
         <EmptyState
           title="Missing movie information"
           description="We couldn't find the service or movie identifier. Please navigate from the Radarr library again."
@@ -122,15 +134,26 @@ const RadarrMovieDetailsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <Animated.View 
+        <Animated.View
           style={styles.header}
           entering={FadeInDown.delay(200).springify()}
           layout={Layout.springify()}
         >
-          <Button mode="text" onPress={handleClose} accessibilityLabel="Go back">
+          <Button
+            mode="text"
+            onPress={handleClose}
+            accessibilityLabel="Go back"
+          >
             Back
           </Button>
-          {isFetching ? <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>Refreshing…</Text> : null}
+          {isFetching ? (
+            <Text
+              variant="labelMedium"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              Refreshing…
+            </Text>
+          ) : null}
         </Animated.View>
 
         {isLoading && !movie ? (
@@ -159,7 +182,7 @@ const RadarrMovieDetailsScreen = () => {
             isDeleting={isDeleting}
           />
         ) : (
-          <View style={{ flex: 1, justifyContent: 'center' }}>
+          <View style={{ flex: 1, justifyContent: "center" }}>
             <EmptyState
               title="No movie data"
               description="We couldn't load details for this movie."

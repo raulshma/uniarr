@@ -1,13 +1,13 @@
-import React, { useMemo } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StyleSheet, View } from 'react-native';
-import { useTheme } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import React, { useMemo } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, View } from "react-native";
+import { useTheme } from "react-native-paper";
+import { useRouter } from "expo-router";
 
-import { TabHeader } from '@/components/common/TabHeader';
-import { UnifiedSearchPanel } from '@/components/search/UnifiedSearchPanel';
-import type { AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
+import { TabHeader } from "@/components/common/TabHeader";
+import { UnifiedSearchPanel } from "@/components/search/UnifiedSearchPanel";
+import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
 
 const UnifiedSearchScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -26,7 +26,7 @@ const UnifiedSearchScreen = () => {
           marginHorizontal: spacing.md,
         },
       }),
-    [theme],
+    [theme]
   );
 
   return (

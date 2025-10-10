@@ -68,18 +68,18 @@ type DashboardListItem =
   | { type: "empty" };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
-  sonarr: 'Sonarr',
-  radarr: 'Radarr',
-  jellyseerr: 'Jellyseerr',
-  jellyfin: 'Jellyfin',
-  qbittorrent: 'qBittorrent',
-  transmission: 'Transmission',
-  deluge: 'Deluge',
-  sabnzbd: 'SABnzbd',
-  nzbget: 'NZBGet',
-  rtorrent: 'rTorrent',
-  prowlarr: 'Prowlarr',
-  bazarr: 'Bazarr',
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+  jellyseerr: "Jellyseerr",
+  jellyfin: "Jellyfin",
+  qbittorrent: "qBittorrent",
+  transmission: "Transmission",
+  deluge: "Deluge",
+  sabnzbd: "SABnzbd",
+  nzbget: "NZBGet",
+  rtorrent: "rTorrent",
+  prowlarr: "Prowlarr",
+  bazarr: "Bazarr",
 };
 
 const serviceIcons: Partial<Record<ServiceType, string>> = {
@@ -719,7 +719,11 @@ const DashboardScreen = () => {
         <View style={styles.shortcutIcon}>
           <IconButton icon={icon} size={20} iconColor={theme.colors.primary} />
         </View>
-        <Text style={styles.shortcutLabel} numberOfLines={1} ellipsizeMode="tail">
+        <Text
+          style={styles.shortcutLabel}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {label}
         </Text>
         {subtitle ? (

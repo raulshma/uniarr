@@ -1,9 +1,9 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { useTheme } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import CustomCurvedTabBar from '@/components/CustomCurvedTabBar';
-import type { AppTheme } from '@/constants/theme';
+import React from "react";
+import { Tabs } from "expo-router";
+import { useTheme } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import CustomCurvedTabBar from "@/components/CustomCurvedTabBar";
+import type { AppTheme } from "@/constants/theme";
 
 export default function TabsLayout() {
   const theme = useTheme<AppTheme>();
@@ -32,7 +32,11 @@ export default function TabsLayout() {
         options={{
           title: "Recently Added",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="clock-outline" color={color} size={size} />
+            <MaterialCommunityIcons
+              name="clock-outline"
+              color={color}
+              size={size}
+            />
           ),
         }}
       />
@@ -41,7 +45,11 @@ export default function TabsLayout() {
         options={{
           title: "Dashboard",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="view-dashboard" color={color} size={size} />
+            <MaterialCommunityIcons
+              name="view-dashboard"
+              color={color}
+              size={size}
+            />
           ),
         }}
       />

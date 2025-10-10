@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack } from "expo-router";
 
 const JellyfinServiceLayout = () => {
   return (
@@ -8,16 +8,16 @@ const JellyfinServiceLayout = () => {
         name="details/[itemId]"
         options={{
           headerShown: false,
-          presentation: 'modal',
-          contentStyle: { backgroundColor: 'transparent' },
+          presentation: "modal",
+          contentStyle: { backgroundColor: "transparent" },
         }}
       />
       <Stack.Screen
         name="now-playing"
         options={{
           headerShown: false,
-          presentation: 'modal',
-          animation: 'fade',
+          presentation: "modal",
+          animation: "fade",
         }}
       />
     </Stack>

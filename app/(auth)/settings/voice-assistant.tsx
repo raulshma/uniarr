@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, ScrollView, Alert, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState } from "react";
+import { View, ScrollView, Alert, Platform } from "react-native";
+import { useRouter } from "expo-router";
 import {
   Card,
   Text,
@@ -13,10 +13,10 @@ import {
   TextInput,
   SegmentedButtons,
   IconButton,
-} from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import useVoiceAssistant from '../../../src/hooks/useVoiceAssistant';
-import type { VoiceShortcut } from '../../../src/services/voice/VoiceAssistantService';
+} from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import useVoiceAssistant from "../../../src/hooks/useVoiceAssistant";
+import type { VoiceShortcut } from "../../../src/services/voice/VoiceAssistantService";
 
 const VoiceAssistantScreen: React.FC = () => {
   const router = useRouter();
@@ -36,51 +36,51 @@ const VoiceAssistantScreen: React.FC = () => {
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newShortcut, setNewShortcut] = useState<Partial<VoiceShortcut>>({
-    title: '',
-    subtitle: '',
-    phrase: '',
-    action: '',
-    platform: Platform.OS === 'ios' ? 'ios' : 'android',
+    title: "",
+    subtitle: "",
+    phrase: "",
+    action: "",
+    platform: Platform.OS === "ios" ? "ios" : "android",
   });
 
   const handleEnableToggle = async (enabled: boolean) => {
     try {
       await setEnabled(enabled);
     } catch (error) {
-      Alert.alert('Error', 'Failed to update voice assistant settings');
+      Alert.alert("Error", "Failed to update voice assistant settings");
     }
   };
 
   const handleAddShortcut = async () => {
     if (!newShortcut.title || !newShortcut.phrase || !newShortcut.action) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      Alert.alert("Error", "Please fill in all required fields");
       return;
     }
 
     try {
-      await addShortcut(newShortcut as Omit<VoiceShortcut, 'id'>);
+      await addShortcut(newShortcut as Omit<VoiceShortcut, "id">);
       setShowAddDialog(false);
       setNewShortcut({
-        title: '',
-        subtitle: '',
-        phrase: '',
-        action: '',
-        platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        title: "",
+        subtitle: "",
+        phrase: "",
+        action: "",
+        platform: Platform.OS === "ios" ? "ios" : "android",
       });
     } catch (error) {
-      Alert.alert('Error', 'Failed to add voice shortcut');
+      Alert.alert("Error", "Failed to add voice shortcut");
     }
   };
 
   const handleRemoveShortcut = (id: string) => {
     Alert.alert(
-      'Remove Shortcut',
-      'Are you sure you want to remove this voice shortcut?',
+      "Remove Shortcut",
+      "Are you sure you want to remove this voice shortcut?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "Remove",
+          style: "destructive",
           onPress: () => removeShortcut(id),
         },
       ]
@@ -91,34 +91,34 @@ const VoiceAssistantScreen: React.FC = () => {
     try {
       await updateShortcut(id, { enabled });
     } catch (error) {
-      Alert.alert('Error', 'Failed to update shortcut');
+      Alert.alert("Error", "Failed to update shortcut");
     }
   };
 
   const getActionDescription = (action: string): string => {
-    const command = availableCommands.find(cmd => cmd.action === action);
+    const command = availableCommands.find((cmd) => cmd.action === action);
     return command?.description || action;
   };
 
   const getPlatformIcon = (platform: string) => {
     switch (platform) {
-      case 'ios':
-        return 'apple';
-      case 'android':
-        return 'android';
+      case "ios":
+        return "apple";
+      case "android":
+        return "android";
       default:
-        return 'cellphone';
+        return "cellphone";
     }
   };
 
   const getPlatformName = (platform: string) => {
     switch (platform) {
-      case 'ios':
-        return 'iOS (Siri)';
-      case 'android':
-        return 'Android (Assistant)';
+      case "ios":
+        return "iOS (Siri)";
+      case "android":
+        return "Android (Assistant)";
       default:
-        return 'Both Platforms';
+        return "Both Platforms";
     }
   };
 
@@ -138,7 +138,13 @@ const VoiceAssistantScreen: React.FC = () => {
         {/* Enable/Disable Toggle */}
         <Card style={{ marginBottom: 16 }}>
           <Card.Content>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <View style={{ flex: 1 }}>
                 <Text variant="titleMedium">Enable Voice Assistant</Text>
                 <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
@@ -158,22 +164,26 @@ const VoiceAssistantScreen: React.FC = () => {
         <Card style={{ marginBottom: 16 }}>
           <Card.Title title="Platform Support" />
           <Card.Content>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               <Chip
-                icon={platformCapabilities.siriShortcuts ? 'check' : 'close'}
-                mode={platformCapabilities.siriShortcuts ? 'flat' : 'outlined'}
+                icon={platformCapabilities.siriShortcuts ? "check" : "close"}
+                mode={platformCapabilities.siriShortcuts ? "flat" : "outlined"}
               >
                 Siri Shortcuts
               </Chip>
               <Chip
-                icon={platformCapabilities.googleAssistant ? 'check' : 'close'}
-                mode={platformCapabilities.googleAssistant ? 'flat' : 'outlined'}
+                icon={platformCapabilities.googleAssistant ? "check" : "close"}
+                mode={
+                  platformCapabilities.googleAssistant ? "flat" : "outlined"
+                }
               >
                 Google Assistant
               </Chip>
               <Chip
-                icon={platformCapabilities.voiceRecognition ? 'check' : 'close'}
-                mode={platformCapabilities.voiceRecognition ? 'flat' : 'outlined'}
+                icon={platformCapabilities.voiceRecognition ? "check" : "close"}
+                mode={
+                  platformCapabilities.voiceRecognition ? "flat" : "outlined"
+                }
               >
                 Voice Recognition
               </Chip>
@@ -190,7 +200,7 @@ const VoiceAssistantScreen: React.FC = () => {
                 key={index}
                 title={command.phrase}
                 description={command.description}
-                left={props => <List.Icon {...props} icon="microphone" />}
+                left={(props) => <List.Icon {...props} icon="microphone" />}
               />
             ))}
           </Card.Content>
@@ -200,7 +210,7 @@ const VoiceAssistantScreen: React.FC = () => {
         <Card style={{ marginBottom: 16 }}>
           <Card.Title
             title="Custom Shortcuts"
-            right={props => (
+            right={(props) => (
               <IconButton
                 {...props}
                 icon="plus"
@@ -210,7 +220,10 @@ const VoiceAssistantScreen: React.FC = () => {
           />
           <Card.Content>
             {shortcuts.length === 0 ? (
-              <Text variant="bodyMedium" style={{ textAlign: 'center', opacity: 0.7 }}>
+              <Text
+                variant="bodyMedium"
+                style={{ textAlign: "center", opacity: 0.7 }}
+              >
                 No custom shortcuts configured
               </Text>
             ) : (
@@ -218,21 +231,27 @@ const VoiceAssistantScreen: React.FC = () => {
                 <List.Item
                   key={shortcut.id}
                   title={shortcut.title}
-                  description={`${shortcut.phrase} • ${getActionDescription(shortcut.action)}`}
-                  left={props => (
+                  description={`${shortcut.phrase} • ${getActionDescription(
+                    shortcut.action
+                  )}`}
+                  left={(props) => (
                     <List.Icon
                       {...props}
                       icon={getPlatformIcon(shortcut.platform)}
                     />
                   )}
-                  right={props => (
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  right={(props) => (
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
                       <Text variant="bodySmall" style={{ marginRight: 8 }}>
                         {getPlatformName(shortcut.platform)}
                       </Text>
                       <Switch
                         value={shortcut.enabled}
-                        onValueChange={(enabled) => handleToggleShortcut(shortcut.id, enabled)}
+                        onValueChange={(enabled) =>
+                          handleToggleShortcut(shortcut.id, enabled)
+                        }
                       />
                       <IconButton
                         {...props}
@@ -251,7 +270,14 @@ const VoiceAssistantScreen: React.FC = () => {
         <Card style={{ marginBottom: 16 }}>
           <Card.Title title="Settings" />
           <Card.Content>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
               <View>
                 <Text variant="titleMedium">Natural Language Processing</Text>
                 <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
@@ -262,12 +288,18 @@ const VoiceAssistantScreen: React.FC = () => {
                 value={config.naturalLanguageEnabled}
                 onValueChange={(enabled) => {
                   // This would update the config in the service
-                  console.log('NLP setting:', enabled);
+                  console.log("NLP setting:", enabled);
                 }}
               />
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <View>
                 <Text variant="titleMedium">Voice Feedback</Text>
                 <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
@@ -278,7 +310,7 @@ const VoiceAssistantScreen: React.FC = () => {
                 value={config.voiceFeedback}
                 onValueChange={(enabled) => {
                   // This would update the config in the service
-                  console.log('Voice feedback setting:', enabled);
+                  console.log("Voice feedback setting:", enabled);
                 }}
               />
             </View>
@@ -290,10 +322,11 @@ const VoiceAssistantScreen: React.FC = () => {
           <Card.Title title="Implementation Notes" />
           <Card.Content>
             <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
-              • Siri Shortcuts require iOS 12+ and may need native iOS code for full functionality{'\n'}
-              • Google Assistant integration requires Android App Actions configuration{'\n'}
-              • Voice recognition may require additional native modules for real-time processing{'\n'}
-              • Custom shortcuts are registered with the platform when enabled
+              • Siri Shortcuts require iOS 12+ and may need native iOS code for
+              full functionality{"\n"}• Google Assistant integration requires
+              Android App Actions configuration{"\n"}• Voice recognition may
+              require additional native modules for real-time processing{"\n"}•
+              Custom shortcuts are registered with the platform when enabled
             </Text>
           </Card.Content>
         </Card>
@@ -301,36 +334,59 @@ const VoiceAssistantScreen: React.FC = () => {
 
       {/* Add Shortcut Dialog */}
       <Portal>
-        <Dialog visible={showAddDialog} onDismiss={() => setShowAddDialog(false)}>
+        <Dialog
+          visible={showAddDialog}
+          onDismiss={() => setShowAddDialog(false)}
+        >
           <Dialog.Title>Add Custom Shortcut</Dialog.Title>
           <Dialog.Content>
             <TextInput
               label="Title"
               value={newShortcut.title}
-              onChangeText={(text) => setNewShortcut((prev: Partial<VoiceShortcut>) => ({ ...prev, title: text }))}
+              onChangeText={(text) =>
+                setNewShortcut((prev: Partial<VoiceShortcut>) => ({
+                  ...prev,
+                  title: text,
+                }))
+              }
               style={{ marginBottom: 16 }}
             />
             <TextInput
               label="Subtitle (Optional)"
               value={newShortcut.subtitle}
-              onChangeText={(text) => setNewShortcut((prev: Partial<VoiceShortcut>) => ({ ...prev, subtitle: text }))}
+              onChangeText={(text) =>
+                setNewShortcut((prev: Partial<VoiceShortcut>) => ({
+                  ...prev,
+                  subtitle: text,
+                }))
+              }
               style={{ marginBottom: 16 }}
             />
             <TextInput
               label="Voice Phrase"
               value={newShortcut.phrase}
-              onChangeText={(text) => setNewShortcut((prev: Partial<VoiceShortcut>) => ({ ...prev, phrase: text }))}
+              onChangeText={(text) =>
+                setNewShortcut((prev: Partial<VoiceShortcut>) => ({
+                  ...prev,
+                  phrase: text,
+                }))
+              }
               placeholder="e.g., 'Search for Breaking Bad'"
               style={{ marginBottom: 16 }}
             />
 
             <SegmentedButtons
-              value={newShortcut.platform || 'both'}
-              onValueChange={(value) => setNewShortcut((prev: Partial<VoiceShortcut>) => ({ ...prev, platform: value as any }))}
+              value={newShortcut.platform || "both"}
+              onValueChange={(value) =>
+                setNewShortcut((prev: Partial<VoiceShortcut>) => ({
+                  ...prev,
+                  platform: value as any,
+                }))
+              }
               buttons={[
-                { value: 'ios', label: 'iOS' },
-                { value: 'android', label: 'Android' },
-                { value: 'both', label: 'Both' },
+                { value: "ios", label: "iOS" },
+                { value: "android", label: "Android" },
+                { value: "both", label: "Both" },
               ]}
               style={{ marginBottom: 16 }}
             />
@@ -341,8 +397,17 @@ const VoiceAssistantScreen: React.FC = () => {
             {availableCommands.map((command) => (
               <Button
                 key={command.action}
-                mode={newShortcut.action === command.action ? 'contained' : 'outlined'}
-                onPress={() => setNewShortcut((prev: Partial<VoiceShortcut>) => ({ ...prev, action: command.action }))}
+                mode={
+                  newShortcut.action === command.action
+                    ? "contained"
+                    : "outlined"
+                }
+                onPress={() =>
+                  setNewShortcut((prev: Partial<VoiceShortcut>) => ({
+                    ...prev,
+                    action: command.action,
+                  }))
+                }
                 style={{ marginBottom: 8 }}
               >
                 {command.phrase}

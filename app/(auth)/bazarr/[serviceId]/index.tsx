@@ -1,8 +1,8 @@
-import { FlashList } from '@shopify/flash-list';
-import { useFocusEffect } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlashList } from "@shopify/flash-list";
+import { useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
   FAB,
   Icon,
@@ -13,37 +13,57 @@ import {
   Text,
   TouchableRipple,
   useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  Layout,
+} from "react-native-reanimated";
 
-import { EmptyState } from '@/components/common/EmptyState';
-import { ListRefreshControl } from '@/components/common/ListRefreshControl';
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
-import type { AppTheme } from '@/constants/theme';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import type { BazarrMovie, BazarrEpisode, BazarrMissingSubtitle } from '@/models/bazarr.types';
-import { logger } from '@/services/logger/LoggerService';
-import { spacing } from '@/theme/spacing';
-import { useBazarrSubtitles } from '@/hooks/useBazarrSubtitles';
+import { EmptyState } from "@/components/common/EmptyState";
+import { ListRefreshControl } from "@/components/common/ListRefreshControl";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import type { AppTheme } from "@/constants/theme";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import type {
+  BazarrMovie,
+  BazarrEpisode,
+  BazarrMissingSubtitle,
+} from "@/models/bazarr.types";
+import { logger } from "@/services/logger/LoggerService";
+import { spacing } from "@/theme/spacing";
+import { useBazarrSubtitles } from "@/hooks/useBazarrSubtitles";
 
-const FILTER_ALL = 'all';
-const FILTER_MOVIES = 'movies';
-const FILTER_EPISODES = 'episodes';
-const FILTER_MISSING = 'missing';
+const FILTER_ALL = "all";
+const FILTER_MOVIES = "movies";
+const FILTER_EPISODES = "episodes";
+const FILTER_MISSING = "missing";
 
-type FilterValue = typeof FILTER_ALL | typeof FILTER_MOVIES | typeof FILTER_EPISODES | typeof FILTER_MISSING;
+type FilterValue =
+  | typeof FILTER_ALL
+  | typeof FILTER_MOVIES
+  | typeof FILTER_EPISODES
+  | typeof FILTER_MISSING;
 
-const FILTER_OPTIONS: FilterValue[] = [FILTER_ALL, FILTER_MOVIES, FILTER_EPISODES, FILTER_MISSING];
+const FILTER_OPTIONS: FilterValue[] = [
+  FILTER_ALL,
+  FILTER_MOVIES,
+  FILTER_EPISODES,
+  FILTER_MISSING,
+];
 
 const FILTER_LABELS: Record<FilterValue, string> = {
-  [FILTER_ALL]: 'All Items',
-  [FILTER_MOVIES]: 'Movies',
-  [FILTER_EPISODES]: 'Episodes',
-  [FILTER_MISSING]: 'Missing Subs',
+  [FILTER_ALL]: "All Items",
+  [FILTER_MOVIES]: "Movies",
+  [FILTER_EPISODES]: "Episodes",
+  [FILTER_MISSING]: "Missing Subs",
 };
 
-const normalizeSearchTerm = (input: string): string => input.trim().toLowerCase();
+const normalizeSearchTerm = (input: string): string =>
+  input.trim().toLowerCase();
 
 const MediaItemSkeleton = () => {
   const theme = useTheme<AppTheme>();
@@ -78,8 +98,12 @@ const MediaItem = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
-  const isMovie = 'tmdbId' in item;
-  const title = isMovie ? item.title : `${item.title} - S${'season' in item ? item.season : 0}E${'episode' in item ? item.episode : 0}`;
+  const isMovie = "tmdbId" in item;
+  const title = isMovie
+    ? item.title
+    : `${item.title} - S${"season" in item ? item.season : 0}E${
+        "episode" in item ? item.episode : 0
+      }`;
   const subtitleCount = item.subtitles?.length || 0;
   const missingCount = item.missingSubtitles?.length || 0;
 
@@ -92,16 +116,27 @@ const MediaItem = ({
       <TouchableRipple onPress={onPress} style={styles.mediaContent}>
         <>
           <View style={styles.mediaPoster}>
-            <Icon source="movie" size={32} color={theme.colors.onSurfaceVariant} />
+            <Icon
+              source="movie"
+              size={32}
+              color={theme.colors.onSurfaceVariant}
+            />
           </View>
           <View style={styles.mediaInfo}>
             <Text variant="titleMedium" numberOfLines={1}>
               {title}
             </Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              {isMovie ? `Movie` : `Episode`} • {item.monitored ? 'Monitored' : 'Unmonitored'}
+            <Text
+              variant="bodySmall"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              {isMovie ? `Movie` : `Episode`} •{" "}
+              {item.monitored ? "Monitored" : "Unmonitored"}
             </Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+            <Text
+              variant="bodySmall"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
               {subtitleCount} subtitles • {missingCount} missing
             </Text>
           </View>
@@ -143,8 +178,12 @@ const MissingSubtitleItem = ({
             <Text variant="bodyMedium" numberOfLines={1}>
               {item.language.name} subtitles missing
             </Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              {item.type === 'movie' ? 'Movie' : 'Episode'} • {item.hi ? 'HI' : 'Regular'}
+            <Text
+              variant="bodySmall"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              {item.type === "movie" ? "Movie" : "Episode"} •{" "}
+              {item.hi ? "HI" : "Regular"}
             </Text>
           </View>
         </>
@@ -154,15 +193,17 @@ const MissingSubtitleItem = ({
 };
 
 const BazarrSubtitlesScreen = () => {
-  const { serviceId: rawServiceId } = useLocalSearchParams<{ serviceId?: string }>();
-  const serviceId = typeof rawServiceId === 'string' ? rawServiceId : '';
+  const { serviceId: rawServiceId } = useLocalSearchParams<{
+    serviceId?: string;
+  }>();
+  const serviceId = typeof rawServiceId === "string" ? rawServiceId : "";
   const hasValidServiceId = serviceId.length > 0;
 
   const router = useRouter();
   const theme = useTheme<AppTheme>();
 
   // State management
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<FilterValue>(FILTER_ALL);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -199,11 +240,8 @@ const BazarrSubtitlesScreen = () => {
   const filteredItems = useMemo(() => {
     if (!movies || !episodes || !missingSubtitles) return [];
 
-    const allItems: Array<BazarrMovie | BazarrEpisode | BazarrMissingSubtitle> = [
-      ...movies,
-      ...episodes,
-      ...missingSubtitles,
-    ];
+    const allItems: Array<BazarrMovie | BazarrEpisode | BazarrMissingSubtitle> =
+      [...movies, ...episodes, ...missingSubtitles];
 
     // Apply filter
     let filtered = allItems;
@@ -226,10 +264,10 @@ const BazarrSubtitlesScreen = () => {
     if (searchQuery) {
       const searchTerm = normalizeSearchTerm(searchQuery);
       filtered = filtered.filter((item) => {
-        if ('title' in item) {
+        if ("title" in item) {
           return normalizeSearchTerm(item.title).includes(searchTerm);
         }
-        if ('name' in item) {
+        if ("name" in item) {
           return normalizeSearchTerm(item.language.name).includes(searchTerm);
         }
         return false;
@@ -240,35 +278,56 @@ const BazarrSubtitlesScreen = () => {
   }, [movies, episodes, missingSubtitles, selectedFilter, searchQuery]);
 
   // Handle search subtitles
-  const handleSearchSubtitles = useCallback((item: BazarrMovie | BazarrEpisode) => {
-    if (item.missingSubtitles && item.missingSubtitles.length > 0) {
-      const missingSub = item.missingSubtitles?.[0];
-      if (missingSub) {
-        const searchRequest = {
-          id: 'radarrId' in item ? item.radarrId! : ('sonarrEpisodeId' in item ? item.sonarrEpisodeId! : 0),
-          language: missingSub.language.code2,
-          forced: missingSub.forced,
-          hi: missingSub.hi,
-        };
-        searchSubtitles(searchRequest);
+  const handleSearchSubtitles = useCallback(
+    (item: BazarrMovie | BazarrEpisode) => {
+      if (item.missingSubtitles && item.missingSubtitles.length > 0) {
+        const missingSub = item.missingSubtitles?.[0];
+        if (missingSub) {
+          const searchRequest = {
+            id:
+              "radarrId" in item
+                ? item.radarrId!
+                : "sonarrEpisodeId" in item
+                ? item.sonarrEpisodeId!
+                : 0,
+            language: missingSub.language.code2,
+            forced: missingSub.forced,
+            hi: missingSub.hi,
+          };
+          searchSubtitles(searchRequest);
+        }
       }
-    }
-  }, [searchSubtitles]);
+    },
+    [searchSubtitles]
+  );
 
   // Handle item press
-  const handleItemPress = useCallback((item: BazarrMovie | BazarrEpisode | BazarrMissingSubtitle) => {
-    // For now, just show item details in alert
-    // In the future, this could navigate to a detail screen
-    Alert.alert(
-      'title' in item ? item.title : item.language.name,
-      `Type: ${'radarrId' in item ? 'Movie' : 'Episode'}\nMonitored: ${'monitored' in item ? item.monitored : 'Unknown'}`,
-    );
-  }, []);
+  const handleItemPress = useCallback(
+    (item: BazarrMovie | BazarrEpisode | BazarrMissingSubtitle) => {
+      // For now, just show item details in alert
+      // In the future, this could navigate to a detail screen
+      Alert.alert(
+        "title" in item ? item.title : item.language.name,
+        `Type: ${"radarrId" in item ? "Movie" : "Episode"}\nMonitored: ${
+          "monitored" in item ? item.monitored : "Unknown"
+        }`
+      );
+    },
+    []
+  );
 
   // Render item based on type
   const renderItem = useCallback(
-    ({ item }: { item: BazarrMovie | BazarrEpisode | BazarrMissingSubtitle }) => {
-      if ('language' in item && 'code2' in item.language && 'movieFileId' in item) {
+    ({
+      item,
+    }: {
+      item: BazarrMovie | BazarrEpisode | BazarrMissingSubtitle;
+    }) => {
+      if (
+        "language" in item &&
+        "code2" in item.language &&
+        "movieFileId" in item
+      ) {
         // This is a missing subtitle
         return (
           <MissingSubtitleItem
@@ -283,7 +342,9 @@ const BazarrSubtitlesScreen = () => {
         <MediaItem
           item={item as BazarrMovie | BazarrEpisode}
           onPress={() => handleItemPress(item)}
-          onSearchSubtitles={() => handleSearchSubtitles(item as BazarrMovie | BazarrEpisode)}
+          onSearchSubtitles={() =>
+            handleSearchSubtitles(item as BazarrMovie | BazarrEpisode)
+          }
         />
       );
     },
@@ -293,12 +354,16 @@ const BazarrSubtitlesScreen = () => {
   // Show error state
   if (error && !isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+      >
         <View style={styles.errorContainer}>
           <EmptyState
             icon="alert-circle"
             title="Connection Error"
-            description={`Failed to connect to Bazarr service: ${error instanceof Error ? error.message : 'Unknown error'}`}
+            description={`Failed to connect to Bazarr service: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`}
             actionLabel="Retry"
             onActionPress={() => refetch()}
           />
@@ -310,11 +375,18 @@ const BazarrSubtitlesScreen = () => {
   // Show loading state
   if (isLoading && !movies && !episodes) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+      >
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<ListRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
+          refreshControl={
+            <ListRefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+            />
+          }
         >
           {Array.from({ length: 5 }).map((_, index) => (
             <MediaItemSkeleton key={index} />
@@ -327,11 +399,18 @@ const BazarrSubtitlesScreen = () => {
   // Show empty state
   if (filteredItems.length === 0) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+      >
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
-          refreshControl={<ListRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
+          refreshControl={
+            <ListRefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+            />
+          }
         >
           <EmptyState
             icon="subtitles"
@@ -340,18 +419,12 @@ const BazarrSubtitlesScreen = () => {
               searchQuery
                 ? `No items match "${searchQuery}"`
                 : selectedFilter === FILTER_MISSING
-                ? 'No missing subtitles found. All items have subtitles!'
-                : 'No movies or episodes found. Check your Bazarr configuration.'
+                ? "No missing subtitles found. All items have subtitles!"
+                : "No movies or episodes found. Check your Bazarr configuration."
             }
-            actionLabel={
-              searchQuery
-                ? 'Clear Search'
-                : 'Refresh'
-            }
+            actionLabel={searchQuery ? "Clear Search" : "Refresh"}
             onActionPress={
-              searchQuery
-                ? () => setSearchQuery('')
-                : handleRefresh
+              searchQuery ? () => setSearchQuery("") : handleRefresh
             }
           />
         </ScrollView>
@@ -360,9 +433,16 @@ const BazarrSubtitlesScreen = () => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       {/* Header with search and filter */}
-      <View style={[styles.header, { backgroundColor: theme.colors.elevation.level2 }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: theme.colors.elevation.level2 },
+        ]}
+      >
         <Searchbar
           placeholder="Search movies, episodes, or languages..."
           value={searchQuery}
@@ -374,10 +454,10 @@ const BazarrSubtitlesScreen = () => {
           value={selectedFilter}
           onValueChange={setSelectedFilter}
           buttons={[
-            { value: FILTER_ALL, label: 'All' },
-            { value: FILTER_MOVIES, label: 'Movies' },
-            { value: FILTER_EPISODES, label: 'Episodes' },
-            { value: FILTER_MISSING, label: 'Missing' },
+            { value: FILTER_ALL, label: "All" },
+            { value: FILTER_MOVIES, label: "Movies" },
+            { value: FILTER_EPISODES, label: "Episodes" },
+            { value: FILTER_MISSING, label: "Missing" },
           ]}
           style={styles.filterButtons}
         />
@@ -385,9 +465,18 @@ const BazarrSubtitlesScreen = () => {
 
       {/* Statistics summary */}
       {statistics && (
-        <View style={[styles.statsContainer, { backgroundColor: theme.colors.elevation.level1 }]}>
-          <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            {statistics.moviesTotal} movies • {statistics.episodesTotal} episodes • {statistics.missingSubtitles} missing subtitles
+        <View
+          style={[
+            styles.statsContainer,
+            { backgroundColor: theme.colors.elevation.level1 },
+          ]}
+        >
+          <Text
+            variant="labelSmall"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            {statistics.moviesTotal} movies • {statistics.episodesTotal}{" "}
+            episodes • {statistics.missingSubtitles} missing subtitles
           </Text>
         </View>
       )}
@@ -397,7 +486,7 @@ const BazarrSubtitlesScreen = () => {
         data={filteredItems}
         renderItem={renderItem}
         keyExtractor={(item) => {
-          if ('id' in item && 'language' in item) {
+          if ("id" in item && "language" in item) {
             // Missing subtitle
             return `missing-${item.id}`;
           }
@@ -405,7 +494,12 @@ const BazarrSubtitlesScreen = () => {
           return `media-${item.id}`;
         }}
         // estimatedItemSize={80} // Note: This property may not be available in all FlashList versions
-        refreshControl={<ListRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
+        refreshControl={
+          <ListRefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+          />
+        }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
@@ -415,7 +509,10 @@ const BazarrSubtitlesScreen = () => {
         icon="magnify"
         onPress={() => {
           // TODO: Open manual search dialog
-          Alert.alert('Manual Search', 'Manual search functionality will be implemented in a future update.');
+          Alert.alert(
+            "Manual Search",
+            "Manual search functionality will be implemented in a future update."
+          );
         }}
         style={[styles.fab, { backgroundColor: theme.colors.primaryContainer }]}
       />
@@ -436,7 +533,7 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: spacing.md,
   },
   header: {
@@ -461,20 +558,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     marginBottom: spacing.sm,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   mediaContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: spacing.md,
   },
   mediaPoster: {
     width: 48,
     height: 48,
     borderRadius: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: spacing.md,
   },
   mediaInfo: {
@@ -493,17 +590,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   mediaActions: {
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   missingItem: {
     borderWidth: 1,
     borderRadius: 8,
     marginBottom: spacing.sm,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   missingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: spacing.md,
   },
   missingIcon: {
@@ -513,7 +610,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fab: {
-    position: 'absolute',
+    position: "absolute",
     margin: spacing.md,
     right: 0,
     bottom: 0,

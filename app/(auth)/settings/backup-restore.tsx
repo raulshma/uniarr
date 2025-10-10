@@ -1,13 +1,13 @@
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
-import { TabHeader } from '@/components/common/TabHeader';
-import { BackupRestoreSection } from '@/components/settings/BackupRestoreSection';
-import { CloudBackupSettings } from '@/components/settings/CloudBackupSettings';
-import type { AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
+import { TabHeader } from "@/components/common/TabHeader";
+import { BackupRestoreSection } from "@/components/settings/BackupRestoreSection";
+import { CloudBackupSettings } from "@/components/settings/CloudBackupSettings";
+import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
 
 const BackupRestoreScreen = () => {
   const router = useRouter();

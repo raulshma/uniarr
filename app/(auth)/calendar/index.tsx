@@ -1,13 +1,13 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { EmptyState } from '@/components/common/EmptyState';
-import { LoadingState } from '@/components/common/LoadingState';
-import { ErrorBoundary } from '@/components/common/ErrorBoundary';
-import BottomDrawer from '@/components/common/BottomDrawer';
-import { TabHeader } from '@/components/common/TabHeader';
+import React, { useCallback, useMemo, useState } from "react";
+import { StyleSheet, View, ScrollView } from "react-native";
+import { useTheme } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { EmptyState } from "@/components/common/EmptyState";
+import { LoadingState } from "@/components/common/LoadingState";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import BottomDrawer from "@/components/common/BottomDrawer";
+import { TabHeader } from "@/components/common/TabHeader";
 import {
   CalendarHeader,
   CalendarMonthView,
@@ -17,11 +17,16 @@ import {
   CalendarStats,
   CalendarFilters as CalendarFiltersComponent,
   MediaReleaseCard,
-} from '@/components/calendar';
-import { useCalendar } from '@/hooks/useCalendar';
-import type { AppTheme } from '@/constants/theme';
-import type { CalendarView, CalendarMonth, CalendarWeek, CalendarDay } from '@/models/calendar.types';
-import type { CalendarFilters } from '@/models/calendar.types';
+} from "@/components/calendar";
+import { useCalendar } from "@/hooks/useCalendar";
+import type { AppTheme } from "@/constants/theme";
+import type {
+  CalendarView,
+  CalendarMonth,
+  CalendarWeek,
+  CalendarDay,
+} from "@/models/calendar.types";
+import type { CalendarFilters } from "@/models/calendar.types";
 
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -53,14 +58,17 @@ const CalendarScreen = () => {
     },
   });
 
-  const handleDateSelect = useCallback((date: string) => {
-    setSelectedDate(date);
-    setExpandedDay(expandedDay === date ? undefined : date); // Toggle expansion
-  }, [setSelectedDate, expandedDay]);
+  const handleDateSelect = useCallback(
+    (date: string) => {
+      setSelectedDate(date);
+      setExpandedDay(expandedDay === date ? undefined : date); // Toggle expansion
+    },
+    [setSelectedDate, expandedDay]
+  );
 
   const handleReleasePress = useCallback((releaseId: string) => {
     // TODO: Navigate to release details
-    console.log('Release pressed:', releaseId);
+    console.log("Release pressed:", releaseId);
   }, []);
 
   const handleDayLongPress = useCallback((date: string) => {
@@ -76,20 +84,26 @@ const CalendarScreen = () => {
     window.location.reload();
   }, []);
 
-  const handleViewChange = useCallback((view: CalendarView) => {
-    setView(view);
-  }, [setView]);
+  const handleViewChange = useCallback(
+    (view: CalendarView) => {
+      setView(view);
+    },
+    [setView]
+  );
 
-  const handleFiltersChange = useCallback((filters: Partial<CalendarFilters>) => {
-    setFilters(filters);
-  }, [setFilters]);
+  const handleFiltersChange = useCallback(
+    (filters: Partial<CalendarFilters>) => {
+      setFilters(filters);
+    },
+    [setFilters]
+  );
 
   const detailsReleases = useMemo(() => {
     if (!detailsDay || !calendarData) return [];
     // Find the day in calendarData
-    if ('weeks' in calendarData) {
+    if ("weeks" in calendarData) {
       for (const week of calendarData.weeks) {
-        const day = week.days.find(d => d.date === detailsDay);
+        const day = week.days.find((d) => d.date === detailsDay);
         if (day) return day.releases;
       }
     }
@@ -97,13 +111,13 @@ const CalendarScreen = () => {
   }, [detailsDay, calendarData]);
 
   const detailsTitle = useMemo(() => {
-    if (!detailsDay) return '';
+    if (!detailsDay) return "";
     const date = new Date(detailsDay);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
-      month: 'long', 
-      day: 'numeric',
-      year: 'numeric'
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
     });
   }, [detailsDay]);
 
@@ -134,9 +148,10 @@ const CalendarScreen = () => {
       );
     }
 
-    const hasReleases = 'totalReleases' in calendarData 
-      ? calendarData.totalReleases > 0 
-      : 'releases' in calendarData && calendarData.releases?.length > 0;
+    const hasReleases =
+      "totalReleases" in calendarData
+        ? calendarData.totalReleases > 0
+        : "releases" in calendarData && calendarData.releases?.length > 0;
 
     if (!hasReleases) {
       return (
@@ -150,7 +165,7 @@ const CalendarScreen = () => {
     }
 
     switch (state.view) {
-      case 'month':
+      case "month":
         return (
           <CalendarMonthView
             data={calendarData as CalendarMonth}
@@ -161,7 +176,7 @@ const CalendarScreen = () => {
             onReleasePress={handleReleasePress}
           />
         );
-      case 'week':
+      case "week":
         return (
           <CalendarWeekView
             data={calendarData as CalendarWeek}
@@ -170,17 +185,17 @@ const CalendarScreen = () => {
             onReleasePress={handleReleasePress}
           />
         );
-      case 'day':
+      case "day":
         return (
           <CalendarDayView
             data={calendarData as CalendarDay}
             onReleasePress={handleReleasePress}
           />
         );
-      case 'list':
+      case "list":
         return (
           <CalendarListView
-            releases={'releases' in calendarData ? calendarData.releases : []}
+            releases={"releases" in calendarData ? calendarData.releases : []}
             onReleasePress={handleReleasePress}
           />
         );
@@ -207,12 +222,12 @@ const CalendarScreen = () => {
           icon: "filter",
           onPress: () => {
             // TODO: Toggle filters visibility
-            console.log('Toggle filters');
+            console.log("Toggle filters");
           },
-          accessibilityLabel: "Toggle filters"
+          accessibilityLabel: "Toggle filters",
         }}
       />
-      
+
       <View style={styles.content}>
         <CalendarHeader
           navigation={navigation}
@@ -226,16 +241,14 @@ const CalendarScreen = () => {
           showsVerticalScrollIndicator={false}
         >
           <CalendarStats stats={stats} />
-          
+
           <CalendarFiltersComponent
             filters={state.filters}
             onFiltersChange={handleFiltersChange}
             onClearFilters={clearFilters}
           />
 
-          <ErrorBoundary>
-            {renderCalendarContent()}
-          </ErrorBoundary>
+          <ErrorBoundary>{renderCalendarContent()}</ErrorBoundary>
         </ScrollView>
       </View>
 

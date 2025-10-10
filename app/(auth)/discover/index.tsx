@@ -1,18 +1,33 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconButton, Portal, Dialog, Button as PaperButton, RadioButton, Text, useTheme } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  IconButton,
+  Portal,
+  Dialog,
+  Button as PaperButton,
+  RadioButton,
+  Text,
+  useTheme,
+} from "react-native-paper";
+import { useRouter } from "expo-router";
 
-import { EmptyState } from '@/components/common/EmptyState';
-import { TabHeader } from '@/components/common/TabHeader';
-import MediaPoster from '@/components/media/MediaPoster/MediaPoster';
-import type { AppTheme } from '@/constants/theme';
-import { useUnifiedDiscover } from '@/hooks/useUnifiedDiscover';
-import type { DiscoverMediaItem } from '@/models/discover.types';
-import { spacing } from '@/theme/spacing';
+import { EmptyState } from "@/components/common/EmptyState";
+import { TabHeader } from "@/components/common/TabHeader";
+import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
+import type { AppTheme } from "@/constants/theme";
+import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
+import type { DiscoverMediaItem } from "@/models/discover.types";
+import { spacing } from "@/theme/spacing";
 
-const placeholderText = 'Search for movies, shows, and more';
+const placeholderText = "Search for movies, shows, and more";
 
 const DiscoverCard = ({
   item,
@@ -44,20 +59,24 @@ const DiscoverCard = ({
           fontWeight: theme.custom.typography.titleSmall.fontWeight as any,
         },
         addButton: {
-          position: 'absolute',
+          position: "absolute",
           top: spacing.xs,
           right: spacing.xs,
           backgroundColor: theme.colors.primary,
         },
       }),
-    [theme],
+    [theme]
   );
 
   return (
-    <Pressable onPress={() => onPress(item)} style={styles.container} accessibilityRole="button">
+    <Pressable
+      onPress={() => onPress(item)}
+      style={styles.container}
+      accessibilityRole="button"
+    >
       <View style={styles.posterWrapper}>
         <MediaPoster uri={item.posterUrl} size={152} />
-          <IconButton
+        <IconButton
           icon="plus"
           size={20}
           mode="contained"
@@ -78,11 +97,14 @@ const DiscoverScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
 
-  const { sections, services, isLoading, isFetching, isError, error, refetch } = useUnifiedDiscover();
+  const { sections, services, isLoading, isFetching, isError, error, refetch } =
+    useUnifiedDiscover();
 
   const [dialogVisible, setDialogVisible] = useState(false);
-  const [dialogItem, setDialogItem] = useState<DiscoverMediaItem | undefined>(undefined);
-  const [selectedServiceId, setSelectedServiceId] = useState<string>('');
+  const [dialogItem, setDialogItem] = useState<DiscoverMediaItem | undefined>(
+    undefined
+  );
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
 
   const styles = useMemo(
     () =>
@@ -97,8 +119,8 @@ const DiscoverScreen = () => {
           gap: spacing.lg,
         },
         searchBar: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           backgroundColor: theme.colors.elevation.level2,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
@@ -118,9 +140,9 @@ const DiscoverScreen = () => {
           marginBottom: spacing.lg,
         },
         sectionHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: spacing.sm,
         },
         sectionTitle: {
@@ -147,24 +169,30 @@ const DiscoverScreen = () => {
           marginTop: spacing.xl,
         },
       }),
-    [theme],
+    [theme]
   );
 
   const isRefreshing = isFetching && !isLoading;
 
   const openUnifiedSearch = useCallback(() => {
-    router.push('/(auth)/search');
+    router.push("/(auth)/search");
   }, [router]);
 
   const openSettings = useCallback(() => {
-    router.push('/(auth)/(tabs)/settings');
+    router.push("/(auth)/(tabs)/settings");
   }, [router]);
 
   const openServicePicker = useCallback(
     (item: DiscoverMediaItem) => {
-      const options = item.mediaType === 'series' ? services.sonarr : services.radarr;
+      const options =
+        item.mediaType === "series" ? services.sonarr : services.radarr;
       if (!options.length) {
-        Alert.alert('No services available', `Add a ${item.mediaType === 'series' ? 'Sonarr' : 'Radarr'} service first to request this title.`);
+        Alert.alert(
+          "No services available",
+          `Add a ${
+            item.mediaType === "series" ? "Sonarr" : "Radarr"
+          } service first to request this title.`
+        );
         return;
       }
 
@@ -173,28 +201,31 @@ const DiscoverScreen = () => {
         if (current && options.some((service) => service.id === current)) {
           return current;
         }
-        return options[0]?.id ?? '';
+        return options[0]?.id ?? "";
       });
       setDialogVisible(true);
     },
-    [services],
+    [services]
   );
 
-  const handleCardPress = useCallback((item: DiscoverMediaItem) => {
-    // Navigate to unified search and prefill with the selected item's title/ids
-    const params: Record<string, string> = { query: item.title };
-    if (item.tmdbId) {
-      params.tmdbId = String(item.tmdbId);
-    }
-    if (item.tvdbId) {
-      params.tvdbId = String(item.tvdbId);
-    }
-    if (item.mediaType) {
-      params.mediaType = item.mediaType;
-    }
+  const handleCardPress = useCallback(
+    (item: DiscoverMediaItem) => {
+      // Navigate to unified search and prefill with the selected item's title/ids
+      const params: Record<string, string> = { query: item.title };
+      if (item.tmdbId) {
+        params.tmdbId = String(item.tmdbId);
+      }
+      if (item.tvdbId) {
+        params.tvdbId = String(item.tvdbId);
+      }
+      if (item.mediaType) {
+        params.mediaType = item.mediaType;
+      }
 
-    router.push({ pathname: '/(auth)/search', params });
-  }, [router]);
+      router.push({ pathname: "/(auth)/search", params });
+    },
+    [router]
+  );
 
   const handleDialogDismiss = useCallback(() => {
     setDialogVisible(false);
@@ -220,40 +251,64 @@ const DiscoverScreen = () => {
       params.tvdbId = String(dialogItem.tvdbId);
     }
 
-    if (dialogItem.mediaType === 'series') {
-      router.push({ pathname: '/(auth)/sonarr/[serviceId]/add', params });
+    if (dialogItem.mediaType === "series") {
+      router.push({ pathname: "/(auth)/sonarr/[serviceId]/add", params });
     } else {
-      router.push({ pathname: '/(auth)/radarr/[serviceId]/add', params });
+      router.push({ pathname: "/(auth)/radarr/[serviceId]/add", params });
     }
 
     handleDialogDismiss();
   }, [dialogItem, handleDialogDismiss, router, selectedServiceId]);
 
   const renderSection = useCallback(
-    (sectionTitle: string, subtitle: string | undefined, items: DiscoverMediaItem[]) => (
+    (
+      sectionTitle: string,
+      subtitle: string | undefined,
+      items: DiscoverMediaItem[]
+    ) => (
       <View>
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>{sectionTitle}</Text>
-            {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+            {subtitle ? (
+              <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+            ) : null}
           </View>
-          <PaperButton mode="text" compact onPress={openUnifiedSearch} textColor={theme.colors.primary}>
+          <PaperButton
+            mode="text"
+            compact
+            onPress={openUnifiedSearch}
+            textColor={theme.colors.primary}
+          >
             View all
           </PaperButton>
         </View>
-          <FlatList
+        <FlatList
           data={items}
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
-            <DiscoverCard item={item} onPress={handleCardPress} onAdd={openServicePicker} />
+            <DiscoverCard
+              item={item}
+              onPress={handleCardPress}
+              onAdd={openServicePicker}
+            />
           )}
         />
       </View>
     ),
-    [handleCardPress, openServicePicker, openUnifiedSearch, styles.listContent, styles.sectionHeader, styles.sectionSubtitle, styles.sectionTitle, theme.colors.primary],
+    [
+      handleCardPress,
+      openServicePicker,
+      openUnifiedSearch,
+      styles.listContent,
+      styles.sectionHeader,
+      styles.sectionSubtitle,
+      styles.sectionTitle,
+      theme.colors.primary,
+    ]
   );
 
   return (
@@ -261,18 +316,33 @@ const DiscoverScreen = () => {
       <TabHeader
         title="Discover"
         showTitle={true}
-        rightAction={{ icon: 'cog', onPress: openSettings, accessibilityLabel: 'Open settings' }}
+        rightAction={{
+          icon: "cog",
+          onPress: openSettings,
+          accessibilityLabel: "Open settings",
+        }}
       />
 
       <FlatList
         data={sections}
         keyExtractor={(section) => section.id}
-        renderItem={({ item }) => renderSection(item.title, item.subtitle, item.items)}
+        renderItem={({ item }) =>
+          renderSection(item.title, item.subtitle, item.items)
+        }
         contentContainerStyle={[styles.content, styles.sectionsContainer]}
         ListHeaderComponent={
           <View style={styles.searchBarWrapper}>
-            <Pressable style={styles.searchBar} onPress={openUnifiedSearch} accessibilityRole="button">
-              <IconButton icon="magnify" size={24} onPress={openUnifiedSearch} accessibilityLabel="Open search" />
+            <Pressable
+              style={styles.searchBar}
+              onPress={openUnifiedSearch}
+              accessibilityRole="button"
+            >
+              <IconButton
+                icon="magnify"
+                size={24}
+                onPress={openUnifiedSearch}
+                accessibilityLabel="Open search"
+              />
               <Text style={styles.searchPlaceholder}>{placeholderText}</Text>
             </Pressable>
           </View>
@@ -287,7 +357,11 @@ const DiscoverScreen = () => {
             ) : isError ? (
               <EmptyState
                 title="Unable to load recommendations"
-                description={error instanceof Error ? error.message : 'Try refreshing to retry the request.'}
+                description={
+                  error instanceof Error
+                    ? error.message
+                    : "Try refreshing to retry the request."
+                }
                 actionLabel="Retry"
                 onActionPress={() => void refetch()}
               />
@@ -316,10 +390,17 @@ const DiscoverScreen = () => {
           <Dialog.Title>Add to service</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={{ marginBottom: spacing.sm }}>
-              Choose where to add <Text style={{ fontWeight: '600' }}>{dialogItem?.title}</Text>
+              Choose where to add{" "}
+              <Text style={{ fontWeight: "600" }}>{dialogItem?.title}</Text>
             </Text>
-            <RadioButton.Group onValueChange={(value) => setSelectedServiceId(value)} value={selectedServiceId}>
-              {(dialogItem?.mediaType === 'series' ? services.sonarr : services.radarr).map((service) => (
+            <RadioButton.Group
+              onValueChange={(value) => setSelectedServiceId(value)}
+              value={selectedServiceId}
+            >
+              {(dialogItem?.mediaType === "series"
+                ? services.sonarr
+                : services.radarr
+              ).map((service) => (
                 <RadioButton.Item
                   key={service.id}
                   value={service.id}
@@ -331,7 +412,10 @@ const DiscoverScreen = () => {
           </Dialog.Content>
           <Dialog.Actions>
             <PaperButton onPress={handleDialogDismiss}>Cancel</PaperButton>
-            <PaperButton onPress={handleConfirmAdd} disabled={!selectedServiceId}>
+            <PaperButton
+              onPress={handleConfirmAdd}
+              disabled={!selectedServiceId}
+            >
               Add
             </PaperButton>
           </Dialog.Actions>
