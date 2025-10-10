@@ -79,19 +79,19 @@ export class DelugeConnector extends BaseConnector<Torrent> {
   }
 
   async initialize(): Promise<void> {
-    console.log('🔧 [DelugeConnector] Initializing...');
+    logger.debug('[DelugeConnector] Initializing', { serviceId: this.config.id });
     // Deluge doesn't require explicit initialization beyond auth
-    console.log('🔧 [DelugeConnector] Initialization completed');
+    logger.debug('[DelugeConnector] Initialization completed', { serviceId: this.config.id });
   }
 
   async getVersion(): Promise<string> {
-    console.log('🔧 [DelugeConnector] Getting version...');
+    logger.debug('[DelugeConnector] Getting version', { serviceId: this.config.id });
 
     try {
       const response = await this.rpcRequest<DelugeSessionResponse>('web.get_version');
       return response.result.version;
     } catch (error) {
-      console.error('🔧 [DelugeConnector] Version request failed:', error);
+      logger.error('[DelugeConnector] Version request failed', { serviceId: this.config.id, error });
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,

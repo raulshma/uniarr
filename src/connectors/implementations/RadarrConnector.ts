@@ -10,6 +10,7 @@ import type {
   RadarrQueueItem,
 } from '@/models/movie.types';
 import { handleApiError } from '@/utils/error.utils';
+import { logger } from '@/services/logger/LoggerService';
 
 interface RadarrSystemStatus {
   readonly version?: string;
@@ -157,44 +158,41 @@ const RADARR_API_PREFIX = '/api/v3';
 
 export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async initialize(): Promise<void> {
-    console.log('🔧 [RadarrConnector] Initializing...');
+    logger.debug('[RadarrConnector] Initializing', { serviceId: this.config.id });
     await this.getVersion();
-    console.log('🔧 [RadarrConnector] Initialization completed');
+    logger.debug('[RadarrConnector] Initialization completed', { serviceId: this.config.id });
   }
 
   async getVersion(): Promise<string> {
     try {
       const fullUrl = `${this.config.url}${RADARR_API_PREFIX}/system/status`;
-      console.log('🔧 [RadarrConnector] Getting version from:', fullUrl);
-      console.log('🔧 [RadarrConnector] Config details:', {
+      logger.debug('[RadarrConnector] Getting version', { serviceId: this.config.id, url: fullUrl });
+      logger.debug('[RadarrConnector] Config details', {
+        serviceId: this.config.id,
         url: this.config.url,
         apiKey: this.config.apiKey ? '***' : 'missing',
-        timeout: this.config.timeout
+        timeout: this.config.timeout,
       });
-      
+
       const response = await this.client.get<RadarrSystemStatus>(`${RADARR_API_PREFIX}/system/status`);
       const version = response.data.version ?? 'unknown';
-      console.log('🔧 [RadarrConnector] Version retrieved successfully:', version);
-      console.log('🔧 [RadarrConnector] Response status:', response.status);
-      console.log('🔧 [RadarrConnector] Response headers:', response.headers);
+      logger.debug('[RadarrConnector] Version retrieved', { serviceId: this.config.id, version, status: response.status });
       return version;
     } catch (error) {
-      console.error('🔧 [RadarrConnector] Version request failed:', error);
+      logger.error('[RadarrConnector] Version request failed', { serviceId: this.config.id, error });
       const axiosError = error as any;
-      console.error('🔧 [RadarrConnector] Error details:', {
-        message: axiosError.message,
-        code: axiosError.code,
-        status: axiosError.response?.status,
-        statusText: axiosError.response?.statusText,
-        data: axiosError.response?.data
+      logger.debug('[RadarrConnector] Error details', {
+        serviceId: this.config.id,
+        message: axiosError?.message,
+        code: axiosError?.code,
+        status: axiosError?.response?.status,
+        statusText: axiosError?.response?.statusText,
       });
-      
-      // Check if it's a network connectivity issue
-      if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ENOTFOUND' || axiosError.code === 'ETIMEDOUT') {
-        console.error('🔧 [RadarrConnector] Network connectivity issue detected');
-        console.error('🔧 [RadarrConnector] This might be a VPN or firewall issue');
+
+      if (axiosError?.code === 'ECONNREFUSED' || axiosError?.code === 'ENOTFOUND' || axiosError?.code === 'ETIMEDOUT') {
+        logger.debug('[RadarrConnector] Network connectivity issue detected', { serviceId: this.config.id, code: axiosError.code });
       }
-      
+
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,

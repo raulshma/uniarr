@@ -7,6 +7,10 @@ import type { IAuthManager, IAuthProvider, AuthConfig, AuthResult, AuthSession }
 export class AuthManager implements IAuthManager {
   private providers = new Map<string, IAuthProvider>();
   private sessions = new Map<string, AuthSession>();
+  // Keep an explicit mapping from serviceId to serviceType so we can
+  // resolve providers reliably when service IDs do not follow the
+  // "type-id" naming convention.
+  private serviceTypes = new Map<string, string>();
 
   registerProvider(serviceType: string, provider: IAuthProvider): void {
     this.providers.set(serviceType, provider);
@@ -22,6 +26,8 @@ export class AuthManager implements IAuthManager {
 
   async authenticate(serviceId: string, serviceType: string, config: AuthConfig): Promise<AuthResult> {
     const provider = this.getProvider(serviceType);
+    // Remember the mapping for later header resolution
+    this.serviceTypes.set(serviceId, serviceType);
     
     if (!provider) {
       const error = `No authentication provider found for service type: ${serviceType}`;
@@ -116,7 +122,9 @@ export class AuthManager implements IAuthManager {
 
   getAuthHeaders(serviceId: string): Record<string, string> {
     const session = this.getSession(serviceId);
-    const serviceType = this.determineServiceTypeFromId(serviceId);
+    // Prefer explicitly recorded service type. If not available, fall back
+    // to the temporary heuristic for backwards-compatibility.
+    const serviceType = this.serviceTypes.get(serviceId) ?? this.determineServiceTypeFromId(serviceId);
     const provider = this.getProvider(serviceType);
     
     if (!session || !session.isAuthenticated || !provider) {

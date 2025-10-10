@@ -10,12 +10,28 @@ import type {
   JellyfinServerInfo,
   JellyfinUserProfile,
   JellyfinImageOptions,
+  JellyfinSession,
 } from '@/models/jellyfin.types';
 import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
 import { logger } from '@/services/logger/LoggerService';
 
 const DEFAULT_RESUME_TYPES = ['Movie', 'Episode'];
 const DEFAULT_SEARCH_TYPES = ['Movie', 'Series', 'Episode'];
+const DEFAULT_ITEM_FIELDS = [
+  'PrimaryImageAspectRatio',
+  'Overview',
+  'ParentId',
+  'SeriesInfo',
+  'ProviderIds',
+  'Genres',
+  'Taglines',
+  'People',
+  'Studios',
+  'RunTimeTicks',
+  'PremiereDate',
+  'ProductionYear',
+  'OfficialRating',
+].join(',');
 
 export class JellyfinConnector extends BaseConnector<JellyfinItem> {
   private userId?: string;
@@ -120,6 +136,86 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     }
   }
 
+  async getLibraryItems(
+    libraryId: string,
+    options: {
+      readonly searchTerm?: string;
+      readonly includeItemTypes?: readonly string[];
+      readonly mediaTypes?: readonly string[];
+      readonly sortBy?: string;
+      readonly sortOrder?: 'Ascending' | 'Descending';
+      readonly limit?: number;
+      readonly startIndex?: number;
+    } = {},
+  ): Promise<JellyfinItem[]> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    const params: Record<string, unknown> = {
+      ParentId: libraryId,
+      Recursive: true,
+      EnableImages: true,
+      Fields: DEFAULT_ITEM_FIELDS,
+      SortBy: options.sortBy ?? 'SortName',
+      SortOrder: options.sortOrder ?? 'Ascending',
+      IncludeItemTypes: options.includeItemTypes?.length ? options.includeItemTypes.join(',') : undefined,
+      MediaTypes: options.mediaTypes?.length ? options.mediaTypes.join(',') : undefined,
+      SearchTerm: options.searchTerm?.trim().length ? options.searchTerm.trim() : undefined,
+      Limit: options.limit,
+      StartIndex: options.startIndex,
+    };
+
+    Object.keys(params).forEach((key) => {
+      if (params[key] === undefined) {
+        delete params[key];
+      }
+    });
+
+    try {
+      const response = await this.client.get<JellyfinItemsResponse>(`/Users/${userId}/Items`, { params });
+      return Array.isArray(response.data?.Items) ? [...response.data.Items] : [];
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  async getItem(itemId: string): Promise<JellyfinItem> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    try {
+      const response = await this.client.get<JellyfinItem>(`/Users/${userId}/Items/${itemId}`, {
+        params: {
+          Fields: DEFAULT_ITEM_FIELDS,
+          EnableImages: true,
+        },
+      });
+
+      if (!response.data) {
+        throw new Error('Jellyfin did not return item details.');
+      }
+
+      return response.data;
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  async refreshItemMetadata(itemId: string, replaceAllMetadata = false): Promise<void> {
+    await this.ensureAuthenticated();
+
+    try {
+      await this.client.post(`/Items/${itemId}/Refresh`, undefined, {
+        params: {
+          ReplaceAllMetadata: replaceAllMetadata,
+          ReplaceImages: false,
+        },
+      });
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
+  }
+
   async search(query: string, options?: SearchOptions): Promise<JellyfinItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
@@ -164,6 +260,89 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
 
     const query = params.toString();
     return `${base}/Items/${itemId}/Images/${imageType}${query.length ? `?${query}` : ''}`;
+  }
+
+  getPersonImageUrl(personId: string, tag?: string, options: JellyfinImageOptions = {}): string {
+    // The OpenAPI spec exposes person images at: /Persons/{name}/Images/{imageType}
+    // Clients may supply a person name or identifier. Ensure the identifier
+    // is URL-encoded so names with spaces or special characters are valid.
+    const base = this.getBaseUrl();
+    const params = new URLSearchParams();
+
+    if (tag) params.append('tag', tag);
+    if (options.width) params.append('width', String(options.width));
+    if (options.height) params.append('height', String(options.height));
+    if (options.quality) params.append('quality', String(options.quality));
+    if (options.fillWidth) params.append('fillWidth', String(options.fillWidth));
+    if (options.fillHeight) params.append('fillHeight', String(options.fillHeight));
+    if (options.blur) params.append('blur', String(options.blur));
+
+    const query = params.toString();
+    const encodedPerson = encodeURIComponent(personId);
+    return `${base}/Persons/${encodedPerson}/Images/Primary${query.length ? `?${query}` : ''}`;
+  }
+
+  async getNowPlayingSessions(): Promise<JellyfinSession[]> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    try {
+      const response = await this.client.get<readonly JellyfinSession[]>('/Sessions', {
+        params: {
+          ControllableByUserId: userId,
+          ActiveWithinSeconds: 600,
+          EnableImages: true,
+          Fields: DEFAULT_ITEM_FIELDS,
+        },
+      });
+
+      if (!Array.isArray(response.data)) {
+        return [];
+      }
+
+      return response.data.map((session) => ({ ...session }));
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  async sendPlaystateCommand(
+    sessionId: string,
+    command: 'Stop' | 'Pause' | 'Unpause' | 'NextTrack' | 'PreviousTrack' | 'Seek' | 'Rewind' | 'FastForward' | 'PlayPause',
+    options: { readonly seekPositionTicks?: number; readonly controllingUserId?: string } = {},
+  ): Promise<void> {
+    await this.ensureAuthenticated();
+
+    const params: Record<string, unknown> = {};
+    if (options.seekPositionTicks !== undefined) {
+      params.seekPositionTicks = options.seekPositionTicks;
+    }
+    if (options.controllingUserId) {
+      params.controllingUserId = options.controllingUserId;
+    }
+
+    try {
+      await this.client.post(`/Sessions/${sessionId}/Playing/${command}`, undefined, { params });
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  async setVolume(sessionId: string, volumePercent: number): Promise<void> {
+    await this.ensureAuthenticated();
+
+    const clamped = Math.max(0, Math.min(100, Math.round(volumePercent)));
+
+    try {
+      await this.client.post(`/Sessions/${sessionId}/Command`, {
+        Name: 'SetVolume',
+        Arguments: {
+          Volume: String(clamped),
+        },
+      });
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
   }
 
   getUserDisplayName(): string | undefined {
@@ -243,6 +422,7 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
 
   protected override getDefaultHeaders(): Record<string, string> {
     const headers = super.getDefaultHeaders();
+    delete headers['X-Api-Key'];
     const authHeaders = ServiceAuthHelper.getServiceAuthHeaders(this.config);
     return {
       ...headers,

@@ -32,6 +32,34 @@ export interface JellyfinImageTags {
   readonly Backdrop?: string;
 }
 
+export interface JellyfinPerson {
+  readonly Id: string;
+  readonly Name?: string;
+  readonly Type?: string;
+  readonly Role?: string;
+  readonly PrimaryImageTag?: string;
+}
+
+export interface JellyfinMediaStream {
+  readonly Index?: number;
+  readonly Type?: string;
+  readonly Codec?: string;
+  readonly Language?: string;
+  readonly IsDefault?: boolean;
+  readonly IsForced?: boolean;
+  readonly DisplayTitle?: string;
+  readonly ChannelLayout?: string;
+  readonly BitRate?: number;
+}
+
+export interface JellyfinMediaSource {
+  readonly Id?: string;
+  readonly Protocol?: string;
+  readonly MediaStreams?: readonly JellyfinMediaStream[];
+  readonly RunTimeTicks?: number;
+  readonly Container?: string;
+}
+
 export interface JellyfinLibraryView {
   readonly Id: string;
   readonly Name: string;
@@ -77,8 +105,10 @@ export interface JellyfinItem {
   readonly SeriesId?: string;
   readonly SeasonId?: string;
   readonly ChannelId?: string;
-  readonly MediaSources?: Array<{ readonly Id?: string; readonly Protocol?: string }>;
+  readonly MediaSources?: readonly JellyfinMediaSource[];
   readonly ProviderIds?: Record<string, string>;
+  readonly Taglines?: readonly string[];
+  readonly People?: readonly JellyfinPerson[];
 }
 
 export interface JellyfinItemsResponse<TItem = JellyfinItem> {
@@ -98,4 +128,23 @@ export interface JellyfinImageOptions {
   readonly fillWidth?: number;
   readonly fillHeight?: number;
   readonly blur?: number;
+}
+
+export interface JellyfinSessionPlayState {
+  readonly PositionTicks?: number;
+  readonly RunTimeTicks?: number;
+  readonly VolumeLevel?: number;
+  readonly IsPaused?: boolean;
+  readonly RepeatMode?: string;
+}
+
+export interface JellyfinSession {
+  readonly Id: string;
+  readonly DeviceName?: string;
+  readonly Client?: string;
+  readonly UserId?: string;
+  readonly UserName?: string;
+  readonly PlayState?: JellyfinSessionPlayState;
+  readonly NowPlayingItem?: JellyfinItem;
+  readonly AdditionalUsers?: readonly { readonly UserId?: string; readonly UserName?: string }[];
 }

@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack } from "expo-router";
 
 export default function SonarrServiceLayout() {
   return (
@@ -12,17 +12,17 @@ export default function SonarrServiceLayout() {
       <Stack.Screen
         name="series/[id]"
         options={{
-          presentation: 'transparentModal',
-          contentStyle: { backgroundColor: 'transparent' },
-          animation: 'none', // Disable default animation since we're using custom sheet transitions
+          presentation: "transparentModal",
+          contentStyle: { backgroundColor: "transparent" },
+          animation: "none", // Disable default animation since we're using custom sheet transitions
           headerShown: false, // Hide the header completely
         }}
       />
       <Stack.Screen
         name="add"
         options={{
-          title: 'Add Series',
-          headerShown: false
+          title: "Add Series",
+          headerShown: false,
         }}
       />
     </Stack>

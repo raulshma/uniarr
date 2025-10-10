@@ -14,8 +14,16 @@ class DebugLogger {
       details: step.details,
       timestamp: new Date(),
     };
-    
-    this.steps.push(newStep);
+    // If a step with the same id already exists, replace it instead of
+    // appending a duplicate. This keeps the debug log concise and makes
+    // it possible to update running steps (start -> success/error) without
+    // spamming the UI with repeated entries.
+    const existingIndex = this.steps.findIndex(s => s.id === newStep.id);
+    if (existingIndex !== -1) {
+      this.steps[existingIndex] = newStep;
+    } else {
+      this.steps.push(newStep);
+    }
     console.log('🧪 [DebugLogger] Total steps now:', this.steps.length);
     this.notifyListeners();
   }

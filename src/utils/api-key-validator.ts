@@ -1,7 +1,7 @@
 /**
  * Validate API key format for different services
  */
-export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr'): {
+export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'jellyfin' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr'): {
   isValid: boolean;
   issues: string[];
 } {
@@ -61,7 +61,7 @@ export function validateApiKey(apiKey: string, serviceType: 'sonarr' | 'radarr' 
 /**
  * Get API key from service settings (for testing)
  */
-export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr'): string {
+export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'jellyfin' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr'): string {
   switch (serviceType) {
     case 'sonarr':
       return 'Go to Sonarr → Settings → General → Security → API Key';
@@ -69,6 +69,8 @@ export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbitto
       return 'Go to Radarr → Settings → General → Security → API Key';
     case 'jellyseerr':
       return 'Go to Jellyseerr → Settings → General → API Key';
+    case 'jellyfin':
+      return 'Go to Jellyfin Dashboard → API Keys → Add API Key';
     case 'prowlarr':
       return 'Go to Prowlarr → Settings → General → API Key';
     case 'qbittorrent':
@@ -93,7 +95,7 @@ export function getApiKeyInstructions(serviceType: 'sonarr' | 'radarr' | 'qbitto
 /**
  * Test API key format and provide suggestions
  */
-export function testApiKeyFormat(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr'): {
+export function testApiKeyFormat(apiKey: string, serviceType: 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'jellyfin' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr'): {
   isValid: boolean;
   message: string;
   suggestions: string[];

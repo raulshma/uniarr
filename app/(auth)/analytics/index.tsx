@@ -1,25 +1,34 @@
-import React, { useState, useMemo } from 'react';
-import { ScrollView, StyleSheet, View, RefreshControl } from 'react-native';
-import { Text, useTheme, Card, Button, ActivityIndicator, Chip, Portal, Modal } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
-import { format, subDays } from 'date-fns';
+import React, { useState, useMemo } from "react";
+import { ScrollView, StyleSheet, View, RefreshControl } from "react-native";
+import {
+  Text,
+  useTheme,
+  Card,
+  Button,
+  ActivityIndicator,
+  Chip,
+  Portal,
+  Modal,
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
+import { format, subDays } from "date-fns";
 
-import { AnalyticsChart } from '@/components/analytics/AnalyticsChart';
-import { EmptyState } from '@/components/common/EmptyState';
-import { AnalyticsService } from '@/services/analytics/AnalyticsService';
-import { spacing } from '@/theme/spacing';
-import type { AppTheme } from '@/constants/theme';
-import type { ChartData, AnalyticsSummary } from '@/models/analytics.types';
-import * as FileSystem from 'expo-file-system';
-import { writeAsStringAsync } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { AnalyticsChart } from "@/components/analytics/AnalyticsChart";
+import { EmptyState } from "@/components/common/EmptyState";
+import { AnalyticsService } from "@/services/analytics/AnalyticsService";
+import { spacing } from "@/theme/spacing";
+import type { AppTheme } from "@/constants/theme";
+import type { ChartData, AnalyticsSummary } from "@/models/analytics.types";
+import * as FileSystem from "expo-file-system";
+import { writeAsStringAsync } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 
-type DateRange = '7d' | '30d' | '90d' | '1y';
+type DateRange = "7d" | "30d" | "90d" | "1y";
 
 const AnalyticsScreen = () => {
   const theme = useTheme<AppTheme>();
-  const [selectedRange, setSelectedRange] = useState<DateRange>('30d');
+  const [selectedRange, setSelectedRange] = useState<DateRange>("30d");
   const [isExporting, setIsExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
@@ -31,13 +40,13 @@ const AnalyticsScreen = () => {
     let startDate: Date;
 
     switch (selectedRange) {
-      case '7d':
+      case "7d":
         startDate = subDays(endDate, 7);
         break;
-      case '90d':
+      case "90d":
         startDate = subDays(endDate, 90);
         break;
-      case '1y':
+      case "1y":
         startDate = subDays(endDate, 365);
         break;
       default:
@@ -53,10 +62,14 @@ const AnalyticsScreen = () => {
     isLoading,
     error,
     refetch,
-    isRefetching
+    isRefetching,
   } = useQuery({
-    queryKey: ['analytics', selectedRange],
-    queryFn: () => analyticsService.generateAnalyticsSummary(dateRange.startDate, dateRange.endDate),
+    queryKey: ["analytics", selectedRange],
+    queryFn: () =>
+      analyticsService.generateAnalyticsSummary(
+        dateRange.startDate,
+        dateRange.endDate
+      ),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
   });
@@ -70,14 +83,14 @@ const AnalyticsScreen = () => {
     const recentData = analyticsData.libraryGrowth.slice(-14); // Last 14 days for better readability
 
     return {
-      labels: recentData.map(item => format(new Date(item.date), 'MMM dd')),
+      labels: recentData.map((item) => format(new Date(item.date), "MMM dd")),
       datasets: [
         {
-          data: recentData.map(item => item.totalMedia),
+          data: recentData.map((item) => item.totalMedia),
           color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
           strokeWidth: 2,
-        }
-      ]
+        },
+      ],
     };
   }, [analyticsData?.libraryGrowth]);
 
@@ -90,14 +103,14 @@ const AnalyticsScreen = () => {
     const recentData = analyticsData.downloadStats.slice(-14);
 
     return {
-      labels: recentData.map(item => format(new Date(item.date), 'MMM dd')),
+      labels: recentData.map((item) => format(new Date(item.date), "MMM dd")),
       datasets: [
         {
-          data: recentData.map(item => item.completed),
+          data: recentData.map((item) => item.completed),
           color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
           strokeWidth: 2,
-        }
-      ]
+        },
+      ],
     };
   }, [analyticsData?.downloadStats]);
 
@@ -108,14 +121,16 @@ const AnalyticsScreen = () => {
     }
 
     return {
-      labels: analyticsData.qualityDistribution.map(item => item.qualityProfile),
+      labels: analyticsData.qualityDistribution.map(
+        (item) => item.qualityProfile
+      ),
       datasets: [
         {
-          data: analyticsData.qualityDistribution.map(item => item.count),
+          data: analyticsData.qualityDistribution.map((item) => item.count),
           color: (opacity = 1) => `rgba(255, 193, 7, ${opacity})`,
           strokeWidth: 2,
-        }
-      ]
+        },
+      ],
     };
   }, [analyticsData?.qualityDistribution]);
 
@@ -126,14 +141,16 @@ const AnalyticsScreen = () => {
     }
 
     return {
-      labels: analyticsData.indexerPerformance.map(item => item.indexerName),
+      labels: analyticsData.indexerPerformance.map((item) => item.indexerName),
       datasets: [
         {
-          data: analyticsData.indexerPerformance.map(item => item.successRate),
+          data: analyticsData.indexerPerformance.map(
+            (item) => item.successRate
+          ),
           color: (opacity = 1) => `rgba(156, 39, 176, ${opacity})`,
           strokeWidth: 2,
-        }
-      ]
+        },
+      ],
     };
   }, [analyticsData?.indexerPerformance]);
 
@@ -144,16 +161,18 @@ const AnalyticsScreen = () => {
     }
 
     return {
-      labels: analyticsData.activityTimes.map(item =>
-        `${item.hour.toString().padStart(2, '0')}:00`
+      labels: analyticsData.activityTimes.map(
+        (item) => `${item.hour.toString().padStart(2, "0")}:00`
       ),
       datasets: [
         {
-          data: analyticsData.activityTimes.map(item => item.downloads + item.requests),
+          data: analyticsData.activityTimes.map(
+            (item) => item.downloads + item.requests
+          ),
           color: (opacity = 1) => `rgba(255, 87, 34, ${opacity})`,
           strokeWidth: 2,
-        }
-      ]
+        },
+      ],
     };
   }, [analyticsData?.activityTimes]);
 
@@ -163,20 +182,23 @@ const AnalyticsScreen = () => {
     setIsExporting(true);
     try {
       const csvContent = await analyticsService.exportToCSV(analyticsData);
-      const fileName = `uniarr-analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-  const docDir = (FileSystem as any).documentDirectory ?? '';
-  const fileUri = `${docDir}${fileName}`;
+      const fileName = `uniarr-analytics-${format(
+        new Date(),
+        "yyyy-MM-dd"
+      )}.csv`;
+      const docDir = (FileSystem as any).documentDirectory ?? "";
+      const fileUri = `${docDir}${fileName}`;
 
-  await writeAsStringAsync(fileUri, csvContent);
+      await writeAsStringAsync(fileUri, csvContent);
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
-          mimeType: 'text/csv',
-          dialogTitle: 'Export Analytics Data'
+          mimeType: "text/csv",
+          dialogTitle: "Export Analytics Data",
         });
       }
     } catch (error) {
-      console.error('Failed to export CSV:', error);
+      console.error("Failed to export CSV:", error);
     } finally {
       setIsExporting(false);
       setShowExportModal(false);
@@ -188,7 +210,10 @@ const AnalyticsScreen = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, marginTop: 16 }}>
+          <Text
+            variant="bodyLarge"
+            style={{ color: theme.colors.onSurface, marginTop: 16 }}
+          >
             Loading Analytics...
           </Text>
         </View>
@@ -202,7 +227,9 @@ const AnalyticsScreen = () => {
         <EmptyState
           icon="chart-line"
           title="Failed to Load Analytics"
-          description={error instanceof Error ? error.message : 'Unknown error occurred'}
+          description={
+            error instanceof Error ? error.message : "Unknown error occurred"
+          }
           actionLabel="Retry"
           onActionPress={() => refetch()}
         />
@@ -223,7 +250,9 @@ const AnalyticsScreen = () => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -236,10 +265,16 @@ const AnalyticsScreen = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text variant="headlineMedium" style={[styles.title, { color: theme.colors.onBackground }]}>
+          <Text
+            variant="headlineMedium"
+            style={[styles.title, { color: theme.colors.onBackground }]}
+          >
             Analytics Dashboard
           </Text>
-          <Text variant="bodyMedium" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
+          <Text
+            variant="bodyMedium"
+            style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}
+          >
             Insights from your media management setup
           </Text>
         </View>
@@ -247,23 +282,32 @@ const AnalyticsScreen = () => {
         {/* Date Range Selector */}
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Card.Content style={styles.cardContent}>
-            <Text variant="titleMedium" style={[styles.cardTitle, { color: theme.colors.onSurface }]}>
+            <Text
+              variant="titleMedium"
+              style={[styles.cardTitle, { color: theme.colors.onSurface }]}
+            >
               Time Range
             </Text>
             <View style={styles.rangeSelector}>
-              {(['7d', '30d', '90d', '1y'] as DateRange[]).map((range) => (
+              {(["7d", "30d", "90d", "1y"] as DateRange[]).map((range) => (
                 <Chip
                   key={range}
                   selected={selectedRange === range}
                   onPress={() => setSelectedRange(range)}
                   style={[
                     styles.rangeChip,
-                    selectedRange === range && { backgroundColor: theme.colors.primaryContainer }
+                    selectedRange === range && {
+                      backgroundColor: theme.colors.primaryContainer,
+                    },
                   ]}
                 >
-                  {range === '7d' ? '7 Days' :
-                   range === '30d' ? '30 Days' :
-                   range === '90d' ? '90 Days' : '1 Year'}
+                  {range === "7d"
+                    ? "7 Days"
+                    : range === "30d"
+                    ? "30 Days"
+                    : range === "90d"
+                    ? "90 Days"
+                    : "1 Year"}
                 </Chip>
               ))}
             </View>
@@ -272,34 +316,81 @@ const AnalyticsScreen = () => {
 
         {/* Summary Cards */}
         <View style={styles.summaryCards}>
-          <Card style={[styles.summaryCard, { backgroundColor: theme.colors.surface }]}>
+          <Card
+            style={[
+              styles.summaryCard,
+              { backgroundColor: theme.colors.surface },
+            ]}
+          >
             <Card.Content style={styles.summaryContent}>
-              <Text variant="titleSmall" style={[styles.summaryLabel, { color: theme.colors.onSurfaceVariant }]}>
+              <Text
+                variant="titleSmall"
+                style={[
+                  styles.summaryLabel,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
                 Total Media
               </Text>
-              <Text variant="headlineMedium" style={[styles.summaryValue, { color: theme.colors.primary }]}>
-                {analyticsData.libraryGrowth[analyticsData.libraryGrowth.length - 1]?.totalMedia || 0}
+              <Text
+                variant="headlineMedium"
+                style={[styles.summaryValue, { color: theme.colors.primary }]}
+              >
+                {analyticsData.libraryGrowth[
+                  analyticsData.libraryGrowth.length - 1
+                ]?.totalMedia || 0}
               </Text>
             </Card.Content>
           </Card>
 
-          <Card style={[styles.summaryCard, { backgroundColor: theme.colors.surface }]}>
+          <Card
+            style={[
+              styles.summaryCard,
+              { backgroundColor: theme.colors.surface },
+            ]}
+          >
             <Card.Content style={styles.summaryContent}>
-              <Text variant="titleSmall" style={[styles.summaryLabel, { color: theme.colors.onSurfaceVariant }]}>
+              <Text
+                variant="titleSmall"
+                style={[
+                  styles.summaryLabel,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
                 Downloads (30d)
               </Text>
-              <Text variant="headlineMedium" style={[styles.summaryValue, { color: theme.colors.secondary }]}>
-                {analyticsData.downloadStats.reduce((sum, stat) => sum + stat.completed, 0)}
+              <Text
+                variant="headlineMedium"
+                style={[styles.summaryValue, { color: theme.colors.secondary }]}
+              >
+                {analyticsData.downloadStats.reduce(
+                  (sum, stat) => sum + stat.completed,
+                  0
+                )}
               </Text>
             </Card.Content>
           </Card>
 
-          <Card style={[styles.summaryCard, { backgroundColor: theme.colors.surface }]}>
+          <Card
+            style={[
+              styles.summaryCard,
+              { backgroundColor: theme.colors.surface },
+            ]}
+          >
             <Card.Content style={styles.summaryContent}>
-              <Text variant="titleSmall" style={[styles.summaryLabel, { color: theme.colors.onSurfaceVariant }]}>
+              <Text
+                variant="titleSmall"
+                style={[
+                  styles.summaryLabel,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
                 Active Indexers
               </Text>
-              <Text variant="headlineMedium" style={[styles.summaryValue, { color: theme.colors.tertiary }]}>
+              <Text
+                variant="headlineMedium"
+                style={[styles.summaryValue, { color: theme.colors.tertiary }]}
+              >
                 {analyticsData.indexerPerformance.length}
               </Text>
             </Card.Content>
@@ -345,10 +436,19 @@ const AnalyticsScreen = () => {
         {/* Export Section */}
         <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
           <Card.Content style={styles.cardContent}>
-            <Text variant="titleMedium" style={[styles.cardTitle, { color: theme.colors.onSurface }]}>
+            <Text
+              variant="titleMedium"
+              style={[styles.cardTitle, { color: theme.colors.onSurface }]}
+            >
               Export Data
             </Text>
-            <Text variant="bodyMedium" style={[styles.cardSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+            <Text
+              variant="bodyMedium"
+              style={[
+                styles.cardSubtitle,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
+            >
               Export your analytics data as a CSV file for further analysis.
             </Text>
             <Button
@@ -370,14 +470,21 @@ const AnalyticsScreen = () => {
           onDismiss={() => setShowExportModal(false)}
           contentContainerStyle={[
             styles.modal,
-            { backgroundColor: theme.colors.surface }
+            { backgroundColor: theme.colors.surface },
           ]}
         >
-          <Text variant="titleMedium" style={[styles.modalTitle, { color: theme.colors.onSurface }]}>
+          <Text
+            variant="titleMedium"
+            style={[styles.modalTitle, { color: theme.colors.onSurface }]}
+          >
             Export Analytics Data
           </Text>
-          <Text variant="bodyMedium" style={[styles.modalText, { color: theme.colors.onSurfaceVariant }]}>
-            This will export all analytics data including library growth, download statistics, and indexer performance to a CSV file.
+          <Text
+            variant="bodyMedium"
+            style={[styles.modalText, { color: theme.colors.onSurfaceVariant }]}
+          >
+            This will export all analytics data including library growth,
+            download statistics, and indexer performance to a CSV file.
           </Text>
           <View style={styles.modalButtons}>
             <Button
@@ -412,14 +519,14 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     marginBottom: spacing.md,
   },
   title: {
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: spacing.xs,
   },
   subtitle: {
@@ -432,21 +539,21 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   cardTitle: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
   cardSubtitle: {
     fontSize: 14,
   },
   rangeSelector: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
   rangeChip: {
     margin: 0,
   },
   summaryCards: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
   },
   summaryCard: {
@@ -454,15 +561,15 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   summaryContent: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.xs,
   },
   summaryLabel: {
-    textAlign: 'center',
+    textAlign: "center",
   },
   summaryValue: {
-    fontWeight: '700',
-    textAlign: 'center',
+    fontWeight: "700",
+    textAlign: "center",
   },
   exportButton: {
     marginTop: spacing.sm,
@@ -473,18 +580,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   modalTitle: {
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: spacing.md,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalText: {
     marginBottom: spacing.lg,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.md,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   modalButton: {
     flex: 1,

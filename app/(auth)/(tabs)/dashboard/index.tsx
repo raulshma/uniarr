@@ -68,24 +68,25 @@ type DashboardListItem =
   | { type: "empty" };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
-  sonarr: 'Sonarr',
-  radarr: 'Radarr',
-  jellyseerr: 'Jellyseerr',
-  jellyfin: 'Jellyfin',
-  qbittorrent: 'qBittorrent',
-  transmission: 'Transmission',
-  deluge: 'Deluge',
-  sabnzbd: 'SABnzbd',
-  nzbget: 'NZBGet',
-  rtorrent: 'rTorrent',
-  prowlarr: 'Prowlarr',
-  bazarr: 'Bazarr',
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+  jellyseerr: "Jellyseerr",
+  jellyfin: "Jellyfin",
+  qbittorrent: "qBittorrent",
+  transmission: "Transmission",
+  deluge: "Deluge",
+  sabnzbd: "SABnzbd",
+  nzbget: "NZBGet",
+  rtorrent: "rTorrent",
+  prowlarr: "Prowlarr",
+  bazarr: "Bazarr",
 };
 
 const serviceIcons: Partial<Record<ServiceType, string>> = {
   sonarr: "television-classic",
   radarr: "movie-open",
   jellyseerr: "account-search",
+  jellyfin: "television-classic",
   qbittorrent: "download-network",
   prowlarr: "radar",
   bazarr: "subtitles",
@@ -580,6 +581,12 @@ const DashboardScreen = () => {
             params: { serviceId: service.config.id },
           });
           break;
+        case "jellyfin":
+          router.push({
+            pathname: "/(auth)/jellyfin/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
         case "prowlarr":
           router.push({
             pathname: "/(auth)/prowlarr/[serviceId]",
@@ -648,6 +655,8 @@ const DashboardScreen = () => {
           return "movie-open";
         case "jellyseerr":
           return "account-search";
+        case "jellyfin":
+          return "television-classic";
         case "qbittorrent":
           return "download-network";
         case "prowlarr":
@@ -719,7 +728,11 @@ const DashboardScreen = () => {
         <View style={styles.shortcutIcon}>
           <IconButton icon={icon} size={20} iconColor={theme.colors.primary} />
         </View>
-        <Text style={styles.shortcutLabel} numberOfLines={1} ellipsizeMode="tail">
+        <Text
+          style={styles.shortcutLabel}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {label}
         </Text>
         {subtitle ? (
@@ -972,7 +985,11 @@ const DashboardScreen = () => {
           </AnimatedHeader>
           <View style={styles.searchWrapper}>
             <AnimatedSection style={styles.shortcutsWrapper} delay={40}>
-              <AnimatedListItem index={0} totalItems={3}>
+              <AnimatedListItem
+                style={styles.shortcutTileWrapper}
+                index={0}
+                totalItems={3}
+              >
                 <ShortcutTile
                   testID="shortcut-discover-loading"
                   label="Discover"
@@ -981,7 +998,11 @@ const DashboardScreen = () => {
                   onPress={handleOpenDiscover}
                 />
               </AnimatedListItem>
-              <AnimatedListItem index={1} totalItems={3}>
+              <AnimatedListItem
+                style={styles.shortcutTileWrapper}
+                index={1}
+                totalItems={3}
+              >
                 <ShortcutTile
                   testID="shortcut-search-loading"
                   label="Unified Search"
@@ -990,7 +1011,11 @@ const DashboardScreen = () => {
                   onPress={handleOpenSearch}
                 />
               </AnimatedListItem>
-              <AnimatedListItem index={2} totalItems={3}>
+              <AnimatedListItem
+                style={styles.shortcutTileWrapper}
+                index={2}
+                totalItems={3}
+              >
                 <ShortcutTile
                   testID="shortcut-calendar-loading"
                   label="Release Calendar"

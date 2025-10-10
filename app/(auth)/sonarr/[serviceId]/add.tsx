@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   HelperText,
@@ -10,28 +10,37 @@ import {
   Text,
   TextInput,
   useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
-import { Controller, useForm, type ControllerRenderProps } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
+import {
+  Controller,
+  useForm,
+  type ControllerRenderProps,
+} from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-import { Button } from '@/components/common/Button';
-import { EmptyState } from '@/components/common/EmptyState';
-import { MediaCard } from '@/components/media/MediaCard';
-import type { AppTheme } from '@/constants/theme';
-import type { AddSeriesRequest, QualityProfile, RootFolder, Series } from '@/models/media.types';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import { queryKeys } from '@/hooks/queryKeys';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { MediaCard } from "@/components/media/MediaCard";
+import type { AppTheme } from "@/constants/theme";
+import type {
+  AddSeriesRequest,
+  QualityProfile,
+  RootFolder,
+  Series,
+} from "@/models/media.types";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
+import { queryKeys } from "@/hooks/queryKeys";
+import { spacing } from "@/theme/spacing";
 
 const searchDebounceMs = 400;
 
 const addSeriesSchema = z.object({
-  qualityProfileId: z.number().int().min(1, 'Select a quality profile'),
-  rootFolderPath: z.string().min(1, 'Select a root folder'),
+  qualityProfileId: z.number().int().min(1, "Select a quality profile"),
+  rootFolderPath: z.string().min(1, "Select a root folder"),
   monitored: z.boolean(),
   searchForMissingEpisodes: z.boolean(),
   seasonFolder: z.boolean(),
@@ -44,7 +53,7 @@ const formatByteSize = (bytes?: number): string | undefined => {
     return undefined;
   }
 
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const units = ["B", "KB", "MB", "GB", "TB"];
   let value = bytes;
   let unitIndex = 0;
 
@@ -59,13 +68,13 @@ const formatByteSize = (bytes?: number): string | undefined => {
 const rootFolderDescription = (folder: RootFolder): string | undefined => {
   const parts: string[] = [];
   if (folder.accessible !== undefined) {
-    parts.push(folder.accessible ? 'Accessible' : 'Unavailable');
+    parts.push(folder.accessible ? "Accessible" : "Unavailable");
   }
   const sizeLabel = formatByteSize(folder.freeSpace);
   if (sizeLabel) {
     parts.push(`${sizeLabel} free`);
   }
-  return parts.length ? parts.join(' • ') : undefined;
+  return parts.length ? parts.join(" • ") : undefined;
 };
 
 const buildTitleSlug = (series: Series): string | undefined => {
@@ -75,17 +84,27 @@ const buildTitleSlug = (series: Series): string | undefined => {
   if (series.cleanTitle) {
     return series.cleanTitle;
   }
-  return series.title.replace(/\s+/g, '-').toLowerCase();
+  return series.title.replace(/\s+/g, "-").toLowerCase();
 };
 
 const SonarrAddSeriesScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const queryClient = useQueryClient();
-  const { serviceId, query: initialQueryParam, tmdbId: tmdbIdParam, tvdbId: tvdbIdParam } =
-    useLocalSearchParams<{ serviceId?: string; query?: string; tmdbId?: string; tvdbId?: string }>();
-  const serviceKey = serviceId ?? '';
-  const initialQuery = typeof initialQueryParam === 'string' ? initialQueryParam.trim() : '';
+  const {
+    serviceId,
+    query: initialQueryParam,
+    tmdbId: tmdbIdParam,
+    tvdbId: tvdbIdParam,
+  } = useLocalSearchParams<{
+    serviceId?: string;
+    query?: string;
+    tmdbId?: string;
+    tvdbId?: string;
+  }>();
+  const serviceKey = serviceId ?? "";
+  const initialQuery =
+    typeof initialQueryParam === "string" ? initialQueryParam.trim() : "";
 
   const parseNumberParam = (value?: string): number | undefined => {
     if (!value) {
@@ -101,7 +120,7 @@ const SonarrAddSeriesScreen = () => {
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
   const connector = useMemo(() => {
     const instance = manager.getConnector(serviceKey);
-    if (!instance || instance.config.type !== 'sonarr') {
+    if (!instance || instance.config.type !== "sonarr") {
       return undefined;
     }
     return instance as SonarrConnector;
@@ -109,14 +128,18 @@ const SonarrAddSeriesScreen = () => {
 
   const ensureConnector = useCallback(() => {
     if (!connector) {
-      throw new Error(`Sonarr connector not registered for service ${serviceKey}.`);
+      throw new Error(
+        `Sonarr connector not registered for service ${serviceKey}.`
+      );
     }
     return connector;
   }, [connector, serviceKey]);
 
   const [searchTerm, setSearchTerm] = useState(initialQuery);
   const [debouncedTerm, setDebouncedTerm] = useState(initialQuery);
-  const [selectedSeries, setSelectedSeries] = useState<Series | undefined>(undefined);
+  const [selectedSeries, setSelectedSeries] = useState<Series | undefined>(
+    undefined
+  );
   const prefillAppliedRef = useRef(false);
 
   useEffect(() => {
@@ -124,8 +147,12 @@ const SonarrAddSeriesScreen = () => {
       return;
     }
 
-    setSearchTerm((current) => (current.trim().length === 0 ? initialQuery : current));
-    setDebouncedTerm((current) => (current.trim().length === 0 ? initialQuery : current));
+    setSearchTerm((current) =>
+      current.trim().length === 0 ? initialQuery : current
+    );
+    setDebouncedTerm((current) =>
+      current.trim().length === 0 ? initialQuery : current
+    );
   }, [initialQuery]);
 
   const {
@@ -138,16 +165,16 @@ const SonarrAddSeriesScreen = () => {
     resolver: zodResolver(addSeriesSchema),
     defaultValues: {
       qualityProfileId: undefined,
-      rootFolderPath: '',
+      rootFolderPath: "",
       monitored: true,
       searchForMissingEpisodes: true,
       seasonFolder: true,
     },
-    mode: 'onChange',
+    mode: "onChange",
   });
 
-  const watchedQualityProfileId = watch('qualityProfileId');
-  const watchedRootFolderPath = watch('rootFolderPath');
+  const watchedQualityProfileId = watch("qualityProfileId");
+  const watchedRootFolderPath = watch("rootFolderPath");
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -224,20 +251,27 @@ const SonarrAddSeriesScreen = () => {
     if (!selectedSeries) {
       return;
     }
-    setValue('monitored', selectedSeries.monitored ?? true);
-    setValue('seasonFolder', selectedSeries.seasonFolder ?? true);
+    setValue("monitored", selectedSeries.monitored ?? true);
+    setValue("seasonFolder", selectedSeries.seasonFolder ?? true);
   }, [selectedSeries, setValue]);
 
   useEffect(() => {
     if (!qualityProfiles.length) {
       return;
     }
-    if (selectedSeries?.qualityProfileId && selectedSeries.qualityProfileId !== watchedQualityProfileId) {
-      setValue('qualityProfileId', selectedSeries.qualityProfileId, { shouldValidate: true });
+    if (
+      selectedSeries?.qualityProfileId &&
+      selectedSeries.qualityProfileId !== watchedQualityProfileId
+    ) {
+      setValue("qualityProfileId", selectedSeries.qualityProfileId, {
+        shouldValidate: true,
+      });
       return;
     }
     if (!watchedQualityProfileId) {
-      setValue('qualityProfileId', qualityProfiles[0]!.id, { shouldValidate: true });
+      setValue("qualityProfileId", qualityProfiles[0]!.id, {
+        shouldValidate: true,
+      });
     }
   }, [qualityProfiles, selectedSeries, setValue, watchedQualityProfileId]);
 
@@ -246,7 +280,9 @@ const SonarrAddSeriesScreen = () => {
       return;
     }
     if (!watchedRootFolderPath) {
-      setValue('rootFolderPath', rootFolders[0]!.path, { shouldValidate: true });
+      setValue("rootFolderPath", rootFolders[0]!.path, {
+        shouldValidate: true,
+      });
     }
   }, [rootFolders, setValue, watchedRootFolderPath]);
 
@@ -258,13 +294,20 @@ const SonarrAddSeriesScreen = () => {
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.seriesList(serviceKey) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.queue(serviceKey) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceKey),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceKey),
+        }),
       ]);
     },
   });
 
-  const canSubmit = Boolean(selectedSeries) && Boolean(watchedQualityProfileId) && Boolean(watchedRootFolderPath);
+  const canSubmit =
+    Boolean(selectedSeries) &&
+    Boolean(watchedQualityProfileId) &&
+    Boolean(watchedRootFolderPath);
 
   const styles = useMemo(
     () =>
@@ -277,12 +320,12 @@ const SonarrAddSeriesScreen = () => {
           flex: 1,
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.lg,
-          paddingTop: spacing.xs
+          paddingTop: spacing.xs,
         },
         header: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: spacing.md,
         },
         scrollContent: {
@@ -291,7 +334,7 @@ const SonarrAddSeriesScreen = () => {
         },
         title: {
           marginBottom: spacing.sm,
-          textAlign: 'center',
+          textAlign: "center",
         },
         searchInput: {
           marginTop: spacing.sm,
@@ -325,7 +368,12 @@ const SonarrAddSeriesScreen = () => {
           color: theme.colors.error,
         },
       }),
-    [theme.colors.background, theme.colors.error, theme.colors.onSurface, theme.colors.primary],
+    [
+      theme.colors.background,
+      theme.colors.error,
+      theme.colors.onSurface,
+      theme.colors.primary,
+    ]
   );
 
   const handleSelectSeries = useCallback((series: Series) => {
@@ -335,7 +383,10 @@ const SonarrAddSeriesScreen = () => {
   const onSubmit = useCallback(
     async (values: AddSeriesFormValues) => {
       if (!selectedSeries) {
-        Alert.alert('Select a series', 'Choose a series from the search results before adding.');
+        Alert.alert(
+          "Select a series",
+          "Choose a series from the search results before adding."
+        );
         return;
       }
 
@@ -352,31 +403,42 @@ const SonarrAddSeriesScreen = () => {
         searchNow: values.searchForMissingEpisodes,
         addOptions: {
           searchForMissingEpisodes: values.searchForMissingEpisodes,
-          monitor: values.monitored ? 'all' : 'none',
+          monitor: values.monitored ? "all" : "none",
         },
       };
 
       try {
         const createdSeries = await addSeriesMutation.mutateAsync(payload);
         router.replace({
-          pathname: '/(auth)/sonarr/[serviceId]/series/[id]',
+          pathname: "/(auth)/sonarr/[serviceId]/series/[id]",
           params: {
             serviceId: serviceKey,
             id: String(createdSeries.id),
           },
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unable to add series at this time.';
-        Alert.alert('Add series failed', message);
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to add series at this time.";
+        Alert.alert("Add series failed", message);
       }
     },
-    [addSeriesMutation, router, selectedSeries, serviceKey],
+    [addSeriesMutation, router, selectedSeries, serviceKey]
   );
 
   if (!serviceId) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: theme.colors.background }}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            paddingHorizontal: spacing.lg,
+          }}
+        >
           <EmptyState
             title="Missing service information"
             description="We could not determine which Sonarr service to use. Return to the Sonarr library and try again."
@@ -391,8 +453,16 @@ const SonarrAddSeriesScreen = () => {
 
   if (!connector) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: theme.colors.background }}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            paddingHorizontal: spacing.lg,
+          }}
+        >
           <EmptyState
             title="Sonarr service unavailable"
             description="We couldn't find a configured Sonarr connector for this service. Add the service again from settings."
@@ -405,29 +475,41 @@ const SonarrAddSeriesScreen = () => {
     );
   }
 
-  const searchHelperMessage = debouncedTerm.length < 2
-    ? 'Enter at least 2 characters to search Sonarr.'
-    : undefined;
+  const searchHelperMessage =
+    debouncedTerm.length < 2
+      ? "Enter at least 2 characters to search Sonarr."
+      : undefined;
 
-  const addErrorMessage = addSeriesMutation.error instanceof Error
-    ? addSeriesMutation.error.message
-    : undefined;
+  const addErrorMessage =
+    addSeriesMutation.error instanceof Error
+      ? addSeriesMutation.error.message
+      : undefined;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-  <View style={styles.header}>
-          <Button mode="contained-tonal" onPress={() => router.back()} accessibilityLabel="Go back">
+        <View style={styles.header}>
+          <Button
+            mode="contained-tonal"
+            onPress={() => router.back()}
+            accessibilityLabel="Go back"
+          >
             Back
           </Button>
           {searchQuery.isFetching ? (
-            <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+            <Text
+              variant="labelMedium"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
               Searching…
             </Text>
           ) : null}
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View>
             <TextInput
               mode="outlined"
@@ -436,7 +518,14 @@ const SonarrAddSeriesScreen = () => {
               onChangeText={setSearchTerm}
               style={styles.searchInput}
               autoCorrect={false}
-              right={searchTerm ? <TextInput.Icon icon="close" onPress={() => setSearchTerm('')} /> : undefined}
+              right={
+                searchTerm ? (
+                  <TextInput.Icon
+                    icon="close"
+                    onPress={() => setSearchTerm("")}
+                  />
+                ) : undefined
+              }
             />
             {searchHelperMessage ? (
               <HelperText type="info" style={styles.helperText}>
@@ -444,7 +533,10 @@ const SonarrAddSeriesScreen = () => {
               </HelperText>
             ) : null}
             {searchQuery.isError ? (
-              <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
+              <HelperText
+                type="error"
+                style={[styles.helperText, styles.errorHelper]}
+              >
                 Unable to search Sonarr right now. Please try again.
               </HelperText>
             ) : null}
@@ -454,7 +546,10 @@ const SonarrAddSeriesScreen = () => {
             {searchQuery.isLoading ? (
               <ActivityIndicator animating color={theme.colors.primary} />
             ) : null}
-            {!searchQuery.isLoading && !searchQuery.isFetching && debouncedTerm.length >= 2 && !searchResults.length ? (
+            {!searchQuery.isLoading &&
+            !searchQuery.isFetching &&
+            debouncedTerm.length >= 2 &&
+            !searchResults.length ? (
               <HelperText type="info" style={styles.helperText}>
                 No series found for your search.
               </HelperText>
@@ -472,7 +567,10 @@ const SonarrAddSeriesScreen = () => {
                   monitored={series.monitored}
                   type="series"
                   onPress={() => handleSelectSeries(series)}
-                  style={[styles.resultCard, isSelected ? styles.selectedResult : null]}
+                  style={[
+                    styles.resultCard,
+                    isSelected ? styles.selectedResult : null,
+                  ]}
                 />
               );
             })}
@@ -502,17 +600,31 @@ const SonarrAddSeriesScreen = () => {
             {qualityProfilesQuery.isLoading ? (
               <ActivityIndicator animating color={theme.colors.primary} />
             ) : qualityProfilesQuery.isError ? (
-              <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
-                Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.
+              <HelperText
+                type="error"
+                style={[styles.helperText, styles.errorHelper]}
+              >
+                Failed to load quality profiles. This may be due to corrupted
+                custom formats in Sonarr. Please check your Sonarr quality
+                profiles and custom formats, then try again.
               </HelperText>
             ) : qualityProfiles.length ? (
-              <Controller<AddSeriesFormValues, 'qualityProfileId'>
+              <Controller<AddSeriesFormValues, "qualityProfileId">
                 control={control}
                 name="qualityProfileId"
-                render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'qualityProfileId'> }) => (
+                render={({
+                  field,
+                }: {
+                  field: ControllerRenderProps<
+                    AddSeriesFormValues,
+                    "qualityProfileId"
+                  >;
+                }) => (
                   <RadioButton.Group
-                    onValueChange={(value: string) => field.onChange(Number(value))}
-                    value={field.value ? String(field.value) : ''}
+                    onValueChange={(value: string) =>
+                      field.onChange(Number(value))
+                    }
+                    value={field.value ? String(field.value) : ""}
                   >
                     <List.Section>
                       {qualityProfiles.map((profile: QualityProfile) => (
@@ -521,7 +633,9 @@ const SonarrAddSeriesScreen = () => {
                           value={String(profile.id)}
                           label={profile.name}
                           style={styles.radioItem}
-                          status={field.value === profile.id ? 'checked' : 'unchecked'}
+                          status={
+                            field.value === profile.id ? "checked" : "unchecked"
+                          }
                         />
                       ))}
                     </List.Section>
@@ -529,12 +643,19 @@ const SonarrAddSeriesScreen = () => {
                 )}
               />
             ) : (
-              <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
-                No quality profiles found. Add at least one quality profile in Sonarr.
+              <HelperText
+                type="error"
+                style={[styles.helperText, styles.errorHelper]}
+              >
+                No quality profiles found. Add at least one quality profile in
+                Sonarr.
               </HelperText>
             )}
             {errors.qualityProfileId ? (
-              <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
+              <HelperText
+                type="error"
+                style={[styles.helperText, styles.errorHelper]}
+              >
                 {errors.qualityProfileId.message}
               </HelperText>
             ) : null}
@@ -547,11 +668,21 @@ const SonarrAddSeriesScreen = () => {
             {rootFoldersQuery.isLoading ? (
               <ActivityIndicator animating color={theme.colors.primary} />
             ) : rootFolders.length ? (
-              <Controller<AddSeriesFormValues, 'rootFolderPath'>
+              <Controller<AddSeriesFormValues, "rootFolderPath">
                 control={control}
                 name="rootFolderPath"
-                render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'rootFolderPath'> }) => (
-                  <RadioButton.Group onValueChange={(value: string) => field.onChange(value)} value={field.value}>
+                render={({
+                  field,
+                }: {
+                  field: ControllerRenderProps<
+                    AddSeriesFormValues,
+                    "rootFolderPath"
+                  >;
+                }) => (
+                  <RadioButton.Group
+                    onValueChange={(value: string) => field.onChange(value)}
+                    value={field.value}
+                  >
                     <List.Section>
                       {rootFolders.map((folder: RootFolder) => (
                         <RadioButton.Item
@@ -559,7 +690,11 @@ const SonarrAddSeriesScreen = () => {
                           value={folder.path}
                           label={folder.path}
                           style={styles.radioItem}
-                          status={field.value === folder.path ? 'checked' : 'unchecked'}
+                          status={
+                            field.value === folder.path
+                              ? "checked"
+                              : "unchecked"
+                          }
                         />
                       ))}
                     </List.Section>
@@ -567,12 +702,19 @@ const SonarrAddSeriesScreen = () => {
                 )}
               />
             ) : (
-              <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
-                No root folders found. Configure at least one root folder in Sonarr.
+              <HelperText
+                type="error"
+                style={[styles.helperText, styles.errorHelper]}
+              >
+                No root folders found. Configure at least one root folder in
+                Sonarr.
               </HelperText>
             )}
             {errors.rootFolderPath ? (
-              <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
+              <HelperText
+                type="error"
+                style={[styles.helperText, styles.errorHelper]}
+              >
                 {errors.rootFolderPath.message}
               </HelperText>
             ) : null}
@@ -582,41 +724,71 @@ const SonarrAddSeriesScreen = () => {
             <Text variant="titleMedium" style={styles.sectionTitle}>
               Options
             </Text>
-            <Controller<AddSeriesFormValues, 'monitored'>
+            <Controller<AddSeriesFormValues, "monitored">
               control={control}
               name="monitored"
-              render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'monitored'> }) => (
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<AddSeriesFormValues, "monitored">;
+              }) => (
                 <List.Item
                   title="Monitor series"
                   description="Keep the series monitored for new or missing episodes."
                   right={() => (
-                    <Switch value={field.value} onValueChange={field.onChange} accessibilityLabel="Toggle monitored" />
+                    <Switch
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      accessibilityLabel="Toggle monitored"
+                    />
                   )}
                 />
               )}
             />
-            <Controller<AddSeriesFormValues, 'seasonFolder'>
+            <Controller<AddSeriesFormValues, "seasonFolder">
               control={control}
               name="seasonFolder"
-              render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'seasonFolder'> }) => (
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  AddSeriesFormValues,
+                  "seasonFolder"
+                >;
+              }) => (
                 <List.Item
                   title="Create season folders"
                   description="Organise episodes into season-specific folders."
                   right={() => (
-                    <Switch value={field.value} onValueChange={field.onChange} accessibilityLabel="Toggle season folders" />
+                    <Switch
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      accessibilityLabel="Toggle season folders"
+                    />
                   )}
                 />
               )}
             />
-            <Controller<AddSeriesFormValues, 'searchForMissingEpisodes'>
+            <Controller<AddSeriesFormValues, "searchForMissingEpisodes">
               control={control}
               name="searchForMissingEpisodes"
-              render={({ field }: { field: ControllerRenderProps<AddSeriesFormValues, 'searchForMissingEpisodes'> }) => (
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  AddSeriesFormValues,
+                  "searchForMissingEpisodes"
+                >;
+              }) => (
                 <List.Item
                   title="Search immediately"
                   description="Start searching for missing episodes right after adding."
                   right={() => (
-                    <Switch value={field.value} onValueChange={field.onChange} accessibilityLabel="Toggle search immediately" />
+                    <Switch
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      accessibilityLabel="Toggle search immediately"
+                    />
                   )}
                 />
               )}
@@ -624,7 +796,10 @@ const SonarrAddSeriesScreen = () => {
           </View>
 
           {addErrorMessage ? (
-            <HelperText type="error" style={[styles.helperText, styles.errorHelper]}>
+            <HelperText
+              type="error"
+              style={[styles.helperText, styles.errorHelper]}
+            >
               {addErrorMessage}
             </HelperText>
           ) : null}

@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
   Button,
   Chip,
@@ -10,45 +10,63 @@ import {
   Switch,
   Text,
   useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Card } from '@/components/common/Card';
-import { TabHeader } from '@/components/common/TabHeader';
-import type { AppTheme } from '@/constants/theme';
-import type { NotificationCategory, QuietHoursDay, QuietHoursPreset } from '@/models/notification.types';
-import { useSettingsStore } from '@/store/settingsStore';
+import { Card } from "@/components/common/Card";
+import { TabHeader } from "@/components/common/TabHeader";
+import type { AppTheme } from "@/constants/theme";
+import type {
+  NotificationCategory,
+  QuietHoursDay,
+  QuietHoursPreset,
+} from "@/models/notification.types";
+import { useSettingsStore } from "@/store/settingsStore";
 import {
   QUIET_HOURS_DAY_LABELS,
   QUIET_HOURS_DAYS,
   formatQuietHoursRange,
   getCategoryFriendlyName,
   getPresetDays,
-} from '@/utils/quietHours.utils';
-import { spacing } from '@/theme/spacing';
+} from "@/utils/quietHours.utils";
+import { spacing } from "@/theme/spacing";
 
 const presetOptions: { value: QuietHoursPreset; label: string }[] = [
-  { value: 'weeknights', label: 'Weeknights' },
-  { value: 'weekends', label: 'Weekends' },
-  { value: 'everyday', label: 'Every day' },
-  { value: 'custom', label: 'Custom' },
+  { value: "weeknights", label: "Weeknights" },
+  { value: "weekends", label: "Weekends" },
+  { value: "everyday", label: "Every day" },
+  { value: "custom", label: "Custom" },
 ];
 
-const categoryCards: { id: NotificationCategory; icon: string; subtitle: string }[] = [
-  { id: 'downloads', icon: 'download', subtitle: 'Completed downloads' },
-  { id: 'failures', icon: 'alert-circle-outline', subtitle: 'Failed downloads' },
-  { id: 'requests', icon: 'account-plus', subtitle: 'New requests' },
-  { id: 'serviceHealth', icon: 'server-network', subtitle: 'Service health events' },
+const categoryCards: {
+  id: NotificationCategory;
+  icon: string;
+  subtitle: string;
+}[] = [
+  { id: "downloads", icon: "download", subtitle: "Completed downloads" },
+  {
+    id: "failures",
+    icon: "alert-circle-outline",
+    subtitle: "Failed downloads",
+  },
+  { id: "requests", icon: "account-plus", subtitle: "New requests" },
+  {
+    id: "serviceHealth",
+    icon: "server-network",
+    subtitle: "Service health events",
+  },
 ];
 
-type TimeField = 'start' | 'end';
+type TimeField = "start" | "end";
 
 const buildTimeOptions = (): string[] => {
   const options: string[] = [];
   for (let minutes = 0; minutes < 24 * 60; minutes += 30) {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    const label = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    const label = `${hours.toString().padStart(2, "0")}:${mins
+      .toString()
+      .padStart(2, "0")}`;
     options.push(label);
   }
   return options;
@@ -58,12 +76,14 @@ const QuietHoursScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const quietHours = useSettingsStore((state) => state.quietHours);
-  const updateQuietHoursConfig = useSettingsStore((state) => state.updateQuietHoursConfig);
+  const updateQuietHoursConfig = useSettingsStore(
+    (state) => state.updateQuietHoursConfig
+  );
   const criticalBypass = useSettingsStore(
-    (state) => state.criticalHealthAlertsBypassQuietHours,
+    (state) => state.criticalHealthAlertsBypassQuietHours
   );
   const setCriticalBypass = useSettingsStore(
-    (state) => state.setCriticalHealthAlertsBypassQuietHours,
+    (state) => state.setCriticalHealthAlertsBypassQuietHours
   );
 
   const [timeDialog, setTimeDialog] = useState<{
@@ -92,9 +112,9 @@ const QuietHoursScreen = () => {
       padding: spacing.md,
     },
     headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       marginBottom: spacing.sm,
     },
     title: {
@@ -114,13 +134,13 @@ const QuietHoursScreen = () => {
       marginBottom: spacing.sm,
     },
     chipRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+      flexDirection: "row",
+      flexWrap: "wrap",
       gap: spacing.xs,
       marginBottom: spacing.sm,
     },
     timeRow: {
-      flexDirection: 'row',
+      flexDirection: "row",
       gap: spacing.xs,
       marginBottom: spacing.md,
     },
@@ -132,8 +152,8 @@ const QuietHoursScreen = () => {
       fontSize: theme.custom.typography.titleSmall.fontSize,
     },
     presetRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+      flexDirection: "row",
+      flexWrap: "wrap",
       gap: spacing.xs,
       marginBottom: spacing.md,
     },
@@ -148,9 +168,9 @@ const QuietHoursScreen = () => {
       padding: spacing.md,
     },
     footerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
     },
     footerText: {
       color: theme.colors.onSurface,
@@ -174,7 +194,10 @@ const QuietHoursScreen = () => {
     },
   });
 
-  const handleDayToggle = (category: NotificationCategory, day: QuietHoursDay) => {
+  const handleDayToggle = (
+    category: NotificationCategory,
+    day: QuietHoursDay
+  ) => {
     const config = quietHours[category];
     const nextDays = config.days.includes(day)
       ? config.days.filter((existing) => existing !== day)
@@ -182,14 +205,18 @@ const QuietHoursScreen = () => {
 
     updateQuietHoursConfig(category, {
       days: nextDays,
-      preset: 'custom',
+      preset: "custom",
     });
   };
 
-  const handlePresetSelect = (category: NotificationCategory, preset: QuietHoursPreset) => {
+  const handlePresetSelect = (
+    category: NotificationCategory,
+    preset: QuietHoursPreset
+  ) => {
     updateQuietHoursConfig(category, {
       preset,
-      days: preset === 'custom' ? quietHours[category].days : getPresetDays(preset),
+      days:
+        preset === "custom" ? quietHours[category].days : getPresetDays(preset),
     });
   };
 
@@ -225,8 +252,9 @@ const QuietHoursScreen = () => {
 
         <View style={styles.section}>
           <Text style={styles.subtitle}>
-            Configure quiet hours per notification type. Notifications that arrive during quiet
-            hours are bundled into a summary once the window ends.
+            Configure quiet hours per notification type. Notifications that
+            arrive during quiet hours are bundled into a summary once the window
+            ends.
           </Text>
         </View>
 
@@ -238,16 +266,30 @@ const QuietHoursScreen = () => {
             return (
               <Card key={id} variant="custom" style={styles.card}>
                 <View style={styles.headerRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                    <IconButton icon={icon} size={24} iconColor={theme.colors.primary} />
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing.xs,
+                    }}
+                  >
+                    <IconButton
+                      icon={icon}
+                      size={24}
+                      iconColor={theme.colors.primary}
+                    />
                     <View>
-                      <Text style={styles.title}>{getCategoryFriendlyName(id)}</Text>
+                      <Text style={styles.title}>
+                        {getCategoryFriendlyName(id)}
+                      </Text>
                       <Text style={styles.subtitle}>{subtitle}</Text>
                     </View>
                   </View>
                   <Switch
                     value={config.enabled}
-                    onValueChange={(value) => updateQuietHoursConfig(id, { enabled: value })}
+                    onValueChange={(value) =>
+                      updateQuietHoursConfig(id, { enabled: value })
+                    }
                     color={theme.colors.primary}
                   />
                 </View>
@@ -258,7 +300,7 @@ const QuietHoursScreen = () => {
                     icon="clock-outline"
                     style={styles.timeButton}
                     textColor={theme.colors.onSurface}
-                    onPress={() => openTimeDialog(id, 'start')}
+                    onPress={() => openTimeDialog(id, "start")}
                   >
                     {`Start • ${config.start}`}
                   </Button>
@@ -267,7 +309,7 @@ const QuietHoursScreen = () => {
                     icon="clock-outline"
                     style={styles.timeButton}
                     textColor={theme.colors.onSurface}
-                    onPress={() => openTimeDialog(id, 'end')}
+                    onPress={() => openTimeDialog(id, "end")}
                   >
                     {`End • ${config.end}`}
                   </Button>
@@ -282,7 +324,7 @@ const QuietHoursScreen = () => {
                         key={day}
                         selected={isSelected}
                         onPress={() => handleDayToggle(id, day)}
-                        mode={isSelected ? 'flat' : 'outlined'}
+                        mode={isSelected ? "flat" : "outlined"}
                         style={styles.presetChip}
                       >
                         {QUIET_HOURS_DAY_LABELS[day]}
@@ -298,7 +340,9 @@ const QuietHoursScreen = () => {
                       key={preset.value}
                       selected={config.preset === preset.value}
                       onPress={() => handlePresetSelect(id, preset.value)}
-                      mode={config.preset === preset.value ? 'flat' : 'outlined'}
+                      mode={
+                        config.preset === preset.value ? "flat" : "outlined"
+                      }
                       style={styles.presetChip}
                     >
                       {preset.label}
@@ -306,7 +350,9 @@ const QuietHoursScreen = () => {
                   ))}
                 </View>
 
-                <Text style={styles.subtitle}>{`Current window • ${rangeLabel}`}</Text>
+                <Text
+                  style={styles.subtitle}
+                >{`Current window • ${rangeLabel}`}</Text>
               </Card>
             );
           })}
@@ -315,9 +361,12 @@ const QuietHoursScreen = () => {
         <View style={styles.footerCard}>
           <View style={styles.footerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.footerText}>Allow critical health alerts</Text>
+              <Text style={styles.footerText}>
+                Allow critical health alerts
+              </Text>
               <Text style={styles.footerDescription}>
-                Offline service alerts bypass quiet hours so you can react quickly.
+                Offline service alerts bypass quiet hours so you can react
+                quickly.
               </Text>
             </View>
             <Switch
@@ -333,7 +382,10 @@ const QuietHoursScreen = () => {
         <Dialog
           visible={Boolean(timeDialog)}
           onDismiss={() => setTimeDialog(null)}
-          style={{ borderRadius: 12, backgroundColor: theme.colors.elevation.level1 }}
+          style={{
+            borderRadius: 12,
+            backgroundColor: theme.colors.elevation.level1,
+          }}
         >
           <Dialog.Title>Select time</Dialog.Title>
           <Dialog.Content>
@@ -341,7 +393,7 @@ const QuietHoursScreen = () => {
               {timeOptions.map((time) => (
                 <Button
                   key={time}
-                  mode={currentDialogValue === time ? 'contained' : 'outlined'}
+                  mode={currentDialogValue === time ? "contained" : "outlined"}
                   onPress={() => handleTimeSelect(time)}
                   style={styles.dialogButton}
                 >

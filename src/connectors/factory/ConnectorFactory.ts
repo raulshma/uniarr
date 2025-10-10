@@ -11,6 +11,7 @@ import { DelugeConnector } from '@/connectors/implementations/DelugeConnector';
 import { SABnzbdConnector } from '@/connectors/implementations/SABnzbdConnector';
 import { ProwlarrConnector } from '@/connectors/implementations/ProwlarrConnector';
 import { BazarrConnector } from '@/connectors/implementations/BazarrConnector';
+import { logger } from '@/services/logger/LoggerService';
 
 type ConnectorConstructor<TConnector extends IConnector = IConnector> = new (
   config: ServiceConfig,
@@ -35,17 +36,17 @@ const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
 export class ConnectorFactory {
   /** Instantiate a connector for the provided service configuration. */
   static create(config: ServiceConfig): IConnector {
-    console.log('🏭 [ConnectorFactory] Creating connector for type:', config.type);
+    logger.debug('[ConnectorFactory] Creating connector for type', { serviceType: config.type });
     const constructor = connectorRegistry[config.type];
 
     if (!constructor) {
-      console.error('🏭 [ConnectorFactory] Unsupported service type:', config.type);
+      logger.error('[ConnectorFactory] Unsupported service type', { serviceType: config.type });
       throw new Error(`Unsupported service type: ${config.type}`);
     }
 
-    console.log('🏭 [ConnectorFactory] Constructor found, creating instance...');
+    logger.debug('[ConnectorFactory] Constructor found, creating instance', { serviceType: config.type });
     const connector = new constructor(config);
-    console.log('🏭 [ConnectorFactory] Connector instance created');
+    logger.debug('[ConnectorFactory] Connector instance created', { serviceId: config.id, serviceType: config.type });
     return connector;
   }
 

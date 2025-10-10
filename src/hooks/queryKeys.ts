@@ -108,6 +108,18 @@ export const queryKeys = {
       libraryId,
       options ?? {},
     ] as const,
+    libraryItems: (serviceId: string, libraryId: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'libraryItems',
+      libraryId,
+      options ?? {},
+    ] as const,
+    item: (serviceId: string, itemId: string): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'item',
+      itemId,
+    ] as const,
+    nowPlaying: (serviceId: string): QueryKeyBuilder => [...queryKeys.jellyfin.service(serviceId), 'nowPlaying'] as const,
     search: (serviceId: string, term: string, options?: Record<string, unknown>): QueryKeyBuilder => [
       ...queryKeys.jellyfin.service(serviceId),
       'search',

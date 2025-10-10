@@ -110,13 +110,13 @@ const SABNZBD_STATUS_MAP: Record<string, TorrentState> = {
  */
 export class SABnzbdConnector extends BaseConnector<Torrent> {
   async initialize(): Promise<void> {
-    console.log('🔧 [SABnzbdConnector] Initializing...');
+    logger.debug('[SABnzbdConnector] Initializing', { serviceId: this.config.id });
     // SABnzbd doesn't require explicit initialization beyond auth
-    console.log('🔧 [SABnzbdConnector] Initialization completed');
+    logger.debug('[SABnzbdConnector] Initialization completed', { serviceId: this.config.id });
   }
 
   async getVersion(): Promise<string> {
-    console.log('🔧 [SABnzbdConnector] Getting version...');
+    logger.debug('[SABnzbdConnector] Getting version', { serviceId: this.config.id });
 
     try {
       const response = await this.client.get<SABnzbdVersionResponse>('version', {
@@ -125,7 +125,7 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
 
       return response.data.version || 'unknown';
     } catch (error) {
-      console.error('🔧 [SABnzbdConnector] Version request failed:', error);
+      logger.error('[SABnzbdConnector] Version request failed', { serviceId: this.config.id, error });
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,

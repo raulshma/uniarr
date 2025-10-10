@@ -1,4 +1,5 @@
 import { BaseConnector } from '@/connectors/base/BaseConnector';
+import { logger } from '@/services/logger/LoggerService';
 import type {
   AddSeriesRequest,
   Episode,
@@ -198,44 +199,43 @@ interface SonarrRootFolder {
 
 export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async initialize(): Promise<void> {
-    console.log('🔧 [SonarrConnector] Initializing...');
+    logger.debug('[SonarrConnector] Initializing', { serviceId: this.config.id });
     await this.getVersion();
-    console.log('🔧 [SonarrConnector] Initialization completed');
+    logger.debug('[SonarrConnector] Initialization completed', { serviceId: this.config.id });
   }
 
   async getVersion(): Promise<string> {
     try {
       const fullUrl = `${this.config.url}/api/v3/system/status`;
-      console.log('🔧 [SonarrConnector] Getting version from:', fullUrl);
-      console.log('🔧 [SonarrConnector] Config details:', {
+      logger.debug('[SonarrConnector] Getting version', { serviceId: this.config.id, url: fullUrl });
+
+      logger.debug('[SonarrConnector] Config details', {
+        serviceId: this.config.id,
         url: this.config.url,
         apiKey: this.config.apiKey ? '***' : 'missing',
-        timeout: this.config.timeout
+        timeout: this.config.timeout,
       });
-      
+
       const response = await this.client.get<SonarrSystemStatus>('/api/v3/system/status');
       const version = response.data.version ?? 'unknown';
-      console.log('🔧 [SonarrConnector] Version retrieved successfully:', version);
-      console.log('🔧 [SonarrConnector] Response status:', response.status);
-      console.log('🔧 [SonarrConnector] Response headers:', response.headers);
+      logger.debug('[SonarrConnector] Version retrieved', { serviceId: this.config.id, version, status: response.status });
       return version;
     } catch (error) {
-      console.error('🔧 [SonarrConnector] Version request failed:', error);
+      logger.error('[SonarrConnector] Version request failed', { serviceId: this.config.id, error });
       const axiosError = error as any;
-      console.error('🔧 [SonarrConnector] Error details:', {
-        message: axiosError.message,
-        code: axiosError.code,
-        status: axiosError.response?.status,
-        statusText: axiosError.response?.statusText,
-        data: axiosError.response?.data
+      logger.debug('[SonarrConnector] Error details', {
+        serviceId: this.config.id,
+        message: axiosError?.message,
+        code: axiosError?.code,
+        status: axiosError?.response?.status,
+        statusText: axiosError?.response?.statusText,
       });
-      
-      // Check if it's a network connectivity issue
-      if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ENOTFOUND' || axiosError.code === 'ETIMEDOUT') {
-        console.error('🔧 [SonarrConnector] Network connectivity issue detected');
-        console.error('🔧 [SonarrConnector] This might be a VPN or firewall issue');
+
+      // Check for network connectivity issues and log at debug level
+      if (axiosError?.code === 'ECONNREFUSED' || axiosError?.code === 'ENOTFOUND' || axiosError?.code === 'ETIMEDOUT') {
+        logger.debug('[SonarrConnector] Network connectivity issue detected', { serviceId: this.config.id, code: axiosError.code });
       }
-      
+
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
