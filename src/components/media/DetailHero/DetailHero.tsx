@@ -14,6 +14,7 @@ import Animated, {
   runOnJS,
   interpolate,
   Extrapolate,
+  Extrapolation,
 } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
@@ -73,7 +74,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   const threshold = Math.max(1, heroHeight - finalTop);
 
   const posterAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolate.CLAMP);
+    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
     // scale down a bit
     const finalScale = 0.75;
     const scale = interpolate(progress, [0, 1], [1, finalScale]);
@@ -89,10 +90,10 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   // Header collapse state & animation (fades out / slides up)
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const headerAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolate.CLAMP);
-    const opacity = interpolate(progress, [0, 0.6, 1], [1, 0, 0], Extrapolate.CLAMP);
-    const translateY = interpolate(progress, [0, 1], [0, -actionBarHeight], Extrapolate.CLAMP);
-    const height = interpolate(progress, [0, 1], [actionBarHeight, 0], Extrapolate.CLAMP);
+    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
+    const opacity = interpolate(progress, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP);
+    const translateY = interpolate(progress, [0, 1], [0, -actionBarHeight], Extrapolation.CLAMP);
+    const height = interpolate(progress, [0, 1], [actionBarHeight, 0], Extrapolation.CLAMP);
     return { opacity, transform: [{ translateY }], height } as any;
   });
 
@@ -106,14 +107,14 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   );
 
   const blurAnimatedStyle = useAnimatedStyle(() => {
-    const blurOpacity = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolate.CLAMP);
+    const blurOpacity = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
     return { opacity: blurOpacity } as any;
   });
 
   const heroAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolate.CLAMP);
+    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
     const finalHeroHeight = finalTopWithoutHeader + posterSize * 1.25;
-    const height = interpolate(progress, [0, 1], [heroHeight, finalHeroHeight], Extrapolate.CLAMP);
+    const height = interpolate(progress, [0, 1], [heroHeight, finalHeroHeight], Extrapolation.CLAMP);
     return { height } as any;
   });
 
