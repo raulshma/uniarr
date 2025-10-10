@@ -21,7 +21,7 @@ const DiscoverCard = ({
 }: {
   item: DiscoverMediaItem;
   onAdd: (media: DiscoverMediaItem) => void;
-  onPress: () => void;
+  onPress: (media: DiscoverMediaItem) => void;
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -54,10 +54,10 @@ const DiscoverCard = ({
   );
 
   return (
-    <Pressable onPress={onPress} style={styles.container} accessibilityRole="button">
+    <Pressable onPress={() => onPress(item)} style={styles.container} accessibilityRole="button">
       <View style={styles.posterWrapper}>
         <MediaPoster uri={item.posterUrl} size={152} />
-        <IconButton
+          <IconButton
           icon="plus"
           size={20}
           mode="contained"
@@ -180,9 +180,21 @@ const DiscoverScreen = () => {
     [services],
   );
 
-  const handleCardPress = useCallback(() => {
-    openUnifiedSearch();
-  }, [openUnifiedSearch]);
+  const handleCardPress = useCallback((item: DiscoverMediaItem) => {
+    // Navigate to unified search and prefill with the selected item's title/ids
+    const params: Record<string, string> = { query: item.title };
+    if (item.tmdbId) {
+      params.tmdbId = String(item.tmdbId);
+    }
+    if (item.tvdbId) {
+      params.tvdbId = String(item.tvdbId);
+    }
+    if (item.mediaType) {
+      params.mediaType = item.mediaType;
+    }
+
+    router.push({ pathname: '/(auth)/search', params });
+  }, [router]);
 
   const handleDialogDismiss = useCallback(() => {
     setDialogVisible(false);
@@ -229,7 +241,7 @@ const DiscoverScreen = () => {
             View all
           </PaperButton>
         </View>
-        <FlatList
+          <FlatList
           data={items}
           horizontal
           showsHorizontalScrollIndicator={false}

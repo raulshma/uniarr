@@ -1,4 +1,4 @@
-import React, { JSX, useCallback, useMemo, useState } from 'react';
+import React, { JSX, useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
@@ -9,7 +9,7 @@ import {
   TextInput,
   useTheme,
 } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { Card } from '@/components/common/Card';
 import { AnimatedSection } from '@/components/common/AnimatedComponents';
@@ -72,6 +72,13 @@ const buildIdentifier = (entry: SearchHistoryEntry): string => {
 export const UnifiedSearchPanel: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    query?: string;
+    tmdbId?: string;
+    tvdbId?: string;
+    serviceId?: string;
+    mediaType?: string;
+  }>();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceFilters, setServiceFilters] = useState<string[]>([]);
@@ -239,6 +246,21 @@ export const UnifiedSearchPanel: React.FC = () => {
   const clearMediaFilters = useCallback(() => {
     setMediaFilters([]);
   }, []);
+
+  // If the route provides search params (e.g. from Discover card), prefill the search
+  useEffect(() => {
+    if (params.query && params.query !== searchTerm) {
+      setSearchTerm(params.query as string);
+    }
+
+    if (params.serviceId) {
+      setServiceFilters([params.serviceId as string]);
+    }
+
+    if (params.mediaType && mediaFilterOptions.includes(params.mediaType as UnifiedSearchMediaType)) {
+      setMediaFilters([params.mediaType as UnifiedSearchMediaType]);
+    }
+  }, [params.query, params.serviceId, params.mediaType]);
 
   const handleHistorySelect = useCallback(
     (entry: SearchHistoryEntry) => {
