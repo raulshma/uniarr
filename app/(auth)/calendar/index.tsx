@@ -259,7 +259,7 @@ const CalendarScreen = () => {
       const aDate = parseISO(a.releaseDate);
       const bDate = parseISO(b.releaseDate);
       if (aDate.getTime() !== bDate.getTime()) {
-        return aDate.getTime() - bDate.getTime();
+        return bDate.getTime() - aDate.getTime();
       }
       return a.title.localeCompare(b.title);
     },

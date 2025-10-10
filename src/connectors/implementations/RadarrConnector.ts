@@ -519,6 +519,25 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
+  async getCalendar(start?: string, end?: string, unmonitored?: boolean): Promise<RadarrMovie[]> {
+    try {
+      const params: Record<string, unknown> = {};
+      if (start) params.start = start;
+      if (end) params.end = end;
+      if (unmonitored !== undefined) params.unmonitored = unmonitored;
+
+      const response = await this.client.get<RadarrMovie[]>(`${RADARR_API_PREFIX}/calendar`, { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getCalendar',
+        endpoint: `${RADARR_API_PREFIX}/calendar`,
+      });
+    }
+  }
+
   async getQueue(): Promise<RadarrQueueItem[]> {
     try {
       const response = await this.client.get<RadarrQueueResponse>(`${RADARR_API_PREFIX}/queue`);

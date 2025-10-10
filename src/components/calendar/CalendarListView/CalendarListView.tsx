@@ -76,7 +76,7 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
 
     // Sort dates
     const sortedDates = Object.keys(grouped).sort((a, b) => 
-      new Date(a).getTime() - new Date(b).getTime()
+      new Date(b).getTime() - new Date(a).getTime()
     );
 
     return sortedDates.map(date => ({

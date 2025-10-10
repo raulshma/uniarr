@@ -89,6 +89,7 @@ interface SonarrEpisode {
   };
   readonly relativePath?: string;
   readonly images?: SonarrImage[];
+  readonly series?: SonarrSeries;
 }
 
 interface SonarrSystemStatus {
@@ -589,6 +590,27 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         serviceType: this.config.type,
         operation: 'getRootFolders',
         endpoint: '/api/v3/rootfolder',
+      });
+    }
+  }
+
+  async getCalendar(start?: string, end?: string, unmonitored?: boolean): Promise<SonarrEpisode[]> {
+    try {
+      const params: Record<string, unknown> = {
+        includeSeries: true,
+      };
+      if (start) params.start = start;
+      if (end) params.end = end;
+      if (unmonitored !== undefined) params.unmonitored = unmonitored;
+
+      const response = await this.client.get<SonarrEpisode[]>('/api/v3/calendar', { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getCalendar',
+        endpoint: '/api/v3/calendar',
       });
     }
   }
