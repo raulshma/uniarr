@@ -4,8 +4,6 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 
 import { TabHeader } from "@/components/common/TabHeader";
-import { BackupRestoreSection } from "@/components/settings/BackupRestoreSection";
-import { CloudBackupSettings } from "@/components/settings/CloudBackupSettings";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 
@@ -35,6 +33,16 @@ const BackupRestoreScreen = () => {
       marginBottom: spacing.md,
       paddingHorizontal: spacing.xs,
     },
+    placeholderText: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: theme.custom.typography.bodyLarge.fontSize,
+      fontFamily: theme.custom.typography.bodyLarge.fontFamily,
+      lineHeight: theme.custom.typography.bodyLarge.lineHeight,
+      letterSpacing: theme.custom.typography.bodyLarge.letterSpacing,
+      fontWeight: theme.custom.typography.bodyLarge.fontWeight as any,
+      textAlign: 'center',
+      marginTop: spacing.xl,
+    },
   });
 
   return (
@@ -48,11 +56,9 @@ const BackupRestoreScreen = () => {
         />
 
         <View style={styles.section}>
-          <BackupRestoreSection delay={50} />
-        </View>
-
-        <View style={styles.section}>
-          <CloudBackupSettings delay={100} />
+          <Text style={styles.placeholderText}>
+            Backup and restore functionality has been removed.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
