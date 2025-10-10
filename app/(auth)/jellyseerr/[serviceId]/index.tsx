@@ -73,8 +73,9 @@ const formatRequestStatusLabel = (status: string): string => {
 const normalizeSearchTerm = (input: string): string => input.trim().toLowerCase();
 
 const JellyseerrRequestsScreen = () => {
-  const { serviceId: rawServiceId } = useLocalSearchParams<{ serviceId?: string }>();
+  const { serviceId: rawServiceId, query: rawQuery } = useLocalSearchParams<{ serviceId?: string; query?: string }>();
   const serviceId = typeof rawServiceId === 'string' ? rawServiceId : '';
+  const initialQuery = typeof rawQuery === 'string' ? rawQuery : '';
   const hasValidServiceId = serviceId.length > 0;
 
   const router = useRouter();
@@ -96,6 +97,13 @@ const JellyseerrRequestsScreen = () => {
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // If the route provides a query param (e.g. from UnifiedSearchPanel), prefill the search term
+  useEffect(() => {
+    if (initialQuery && initialQuery !== searchTerm) {
+      setSearchTerm(initialQuery);
+    }
+  }, [initialQuery]);
 
   useEffect(() => {
     let isCancelled = false;
