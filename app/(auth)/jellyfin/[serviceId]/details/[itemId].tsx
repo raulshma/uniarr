@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Button,
   Chip,
-  HelperText,
   IconButton,
   Surface,
   Text,
@@ -302,9 +301,13 @@ const JellyfinItemDetailsScreen = () => {
 
   const renderCastMember = useCallback(
     ({ item: person }: { item: (typeof cast)[number] }) => {
+      // Use person name (preferred by Jellyfin OpenAPI) so paths like
+      // /Persons/{name}/Images/Primary are correctly resolved. Fall back
+      // to Id if name is not available.
+      const personIdentifier = person?.Name || person?.Id;
       const avatarUri =
-        person?.Id &&
-        connector?.getPersonImageUrl(person.Id, person.PrimaryImageTag, {
+        personIdentifier &&
+        connector?.getPersonImageUrl(personIdentifier, person.PrimaryImageTag, {
           width: 320,
         });
 
@@ -482,36 +485,7 @@ const JellyfinItemDetailsScreen = () => {
               </Text>
             ) : null}
 
-            <View style={styles.actionRow}>
-              <Button mode="contained" icon="play" onPress={handlePlay}>
-                Play on Jellyfin
-              </Button>
-              <Button
-                mode="outlined"
-                icon="sync"
-                loading={isSyncing}
-                onPress={handleSyncMetadata}
-              >
-                Update
-              </Button>
-            </View>
-
-            <Surface style={styles.syncCard} elevation={1}>
-              <LinearGradient
-                colors={[theme.colors.surfaceVariant, theme.colors.surface]}
-                start={[0, 0.5]}
-                end={[1, 1]}
-                style={styles.syncGradient}
-              />
-              <View style={styles.syncCardContent}>
-                <Text variant="titleMedium" style={styles.syncTitle}>
-                  Sync Status
-                </Text>
-                <Text variant="bodySmall" style={styles.syncDescription}>
-                  {syncStatus ?? providerSummary}
-                </Text>
-              </View>
-            </Surface>
+            {/* Cast section */}
 
             <View style={styles.sectionHeader}>
               <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -541,7 +515,12 @@ const JellyfinItemDetailsScreen = () => {
             {genres.length > 0 ? (
               <View style={styles.genreRow}>
                 {genres.map((genre) => (
-                  <Chip key={genre} mode="flat" style={styles.genreChip}>
+                  <Chip
+                    key={genre}
+                    mode="flat"
+                    style={styles.genreChip}
+                    textStyle={styles.genreChipText}
+                  >
                     {genre}
                   </Chip>
                 ))}
@@ -551,13 +530,52 @@ const JellyfinItemDetailsScreen = () => {
                 No genres available for this item.
               </Text>
             )}
+
+            {/* Prominent full-width play button per design */}
+            <Button
+              mode="contained"
+              icon="play"
+              onPress={handlePlay}
+              style={styles.playButton}
+              contentStyle={styles.playButtonContent}
+              labelStyle={styles.playButtonLabel}
+            >
+              Play on Jellyfin
+            </Button>
+
+            {/* Sync card with inline Update button on the right */}
+            <Surface style={styles.syncCard} elevation={1}>
+              <LinearGradient
+                colors={[theme.colors.surfaceVariant, theme.colors.surface]}
+                start={[0, 0.5]}
+                end={[1, 1]}
+                style={styles.syncGradient}
+              />
+              <View style={styles.syncCardContentRow}>
+                <View style={styles.syncCardText}>
+                  <Text variant="titleMedium" style={styles.syncTitle}>
+                    Sync Status
+                  </Text>
+                  <Text variant="bodySmall" style={styles.syncDescription}>
+                    {syncStatus ?? providerSummary}
+                  </Text>
+                </View>
+                <Button
+                  mode="contained"
+                  onPress={handleSyncMetadata}
+                  loading={isSyncing}
+                  compact
+                  style={styles.syncUpdateButton}
+                  labelStyle={styles.syncUpdateLabel}
+                >
+                  Update
+                </Button>
+              </View>
+            </Surface>
           </View>
           <View style={{ height: spacing.xxl }} />
         </AnimatedScrollView>
       </View>
-      <HelperText type="info" visible={Boolean(syncStatus)}>
-        {syncStatus ?? ""}
-      </HelperText>
     </>
   );
 };
@@ -724,6 +742,54 @@ const createStyles = (theme: AppTheme) =>
     },
     genreChip: {
       borderRadius: 16,
+      backgroundColor: theme.colors.surfaceVariant,
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+    },
+    genreChipText: {
+      color: theme.colors.onSurface,
+      fontWeight: "600",
+    },
+    playButton: {
+      width: "100%",
+      borderRadius: 28,
+      marginTop: spacing.md,
+      marginBottom: spacing.sm,
+      backgroundColor: theme.colors.primary,
+    },
+    playButtonContent: {
+      height: 56,
+      justifyContent: "center",
+    },
+    playButtonLabel: {
+      color: theme.colors.onPrimary,
+      fontWeight: "700",
+    },
+    syncCardContentRow: {
+      padding: spacing.md,
+      borderRadius: 20,
+      backgroundColor: "transparent",
+      zIndex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    syncCardText: {
+      flex: 1,
+      paddingRight: spacing.md,
+    },
+    syncUpdateButton: {
+      borderRadius: 16,
+      minWidth: 96,
+      height: 40,
+      justifyContent: "center",
+      backgroundColor: theme.colors.primary,
+    },
+    syncUpdateLabel: {
+      color: theme.colors.onPrimary,
+      fontWeight: "600",
     },
     loadingContainer: {
       flex: 1,

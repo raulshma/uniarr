@@ -263,6 +263,9 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
   }
 
   getPersonImageUrl(personId: string, tag?: string, options: JellyfinImageOptions = {}): string {
+    // The OpenAPI spec exposes person images at: /Persons/{name}/Images/{imageType}
+    // Clients may supply a person name or identifier. Ensure the identifier
+    // is URL-encoded so names with spaces or special characters are valid.
     const base = this.getBaseUrl();
     const params = new URLSearchParams();
 
@@ -275,7 +278,8 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     if (options.blur) params.append('blur', String(options.blur));
 
     const query = params.toString();
-    return `${base}/Persons/${personId}/Images/Primary${query.length ? `?${query}` : ''}`;
+    const encodedPerson = encodeURIComponent(personId);
+    return `${base}/Persons/${encodedPerson}/Images/Primary${query.length ? `?${query}` : ''}`;
   }
 
   async getNowPlayingSessions(): Promise<JellyfinSession[]> {
