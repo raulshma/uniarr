@@ -699,7 +699,7 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
 
     try {
       const params: Record<string, string | number> = {
-        query: trimmedQuery,
+        query: encodeURIComponent(trimmedQuery),
       };
 
       // Only add page if it's a valid positive number
