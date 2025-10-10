@@ -27,11 +27,19 @@ import { presetThemes } from "@/theme/colors";
 
 const PRESET_NAMES = {
   uniarr: "UniArr",
-  netflix: "Netflix",
-  plex: "Plex",
-  jellyfin: "Jellyfin",
-  spotify: "Spotify",
-  youtube: "YouTube",
+  cinematicRed: "Cinematic",
+  goldenHour: "Golden Hour",
+  oceanic: "Oceanic",
+  forest: "Forest",
+  vividRed: "Vivid Red",
+  velvet: "Velvet",
+  wonder: "Wonder",
+  azure: "Azure",
+  fresh: "Fresh",
+  ember: "Ember",
+  tracker: "Tracker",
+  cobalt: "Cobalt",
+  modern: "Modern",
 };
 
 export default function ThemeEditorScreen() {

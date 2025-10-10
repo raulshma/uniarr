@@ -7,6 +7,7 @@ import {
   generateThemeColors,
   type CustomColorScheme,
   presetThemes,
+  presetKeyAliases,
   type ThemePreset,
 } from '@/theme/colors';
 import { generateSpacingScale, type DensityMode } from '@/theme/spacing';
@@ -50,7 +51,9 @@ export const createCustomTheme = (
   isDark: boolean = false
 ): AppTheme => {
   // Determine color scheme
-  const resolvedPresetKey = config.preset ?? 'uniarr';
+  const requestedPreset = config.preset ?? 'uniarr';
+  // Support legacy brand-based keys by mapping them to neutral keys
+  const resolvedPresetKey = (presetKeyAliases[requestedPreset as string] as keyof typeof presetThemes) ?? requestedPreset;
   const basePreset = (
     presetThemes[resolvedPresetKey as keyof typeof presetThemes] ?? presetThemes.uniarr
   ) as ThemePreset;
