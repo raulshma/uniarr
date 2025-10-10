@@ -25,6 +25,9 @@ import type { JellyfinConnector } from "@/connectors/implementations/JellyfinCon
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { spacing } from "@/theme/spacing";
 
+// Size used for the hero poster so layout calculations remain consistent
+const POSTER_SIZE = 200;
+
 const formatRuntimeMinutes = (ticks?: number): number | undefined => {
   if (!ticks || ticks <= 0) {
     return undefined;
@@ -495,19 +498,21 @@ const createStyles = (theme: AppTheme) =>
     },
     heroPoster: {
       position: "absolute",
-      bottom: -100,
+      bottom: -POSTER_SIZE / 2,
       left: spacing.lg,
       shadowColor: theme.colors.shadow,
-      shadowOpacity: 0.4,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 6,
+      shadowOpacity: 0.45,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 12,
+      zIndex: 20,
     },
     scrollContent: {
       paddingBottom: spacing.xxl,
     },
     detailsContent: {
-      paddingTop: spacing.xxxl,
+      // Add extra top padding so content does not overlap the floating poster
+      paddingTop: spacing.xxxl + POSTER_SIZE / 2,
       paddingHorizontal: spacing.lg,
       gap: spacing.lg,
     },
