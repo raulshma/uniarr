@@ -14,12 +14,13 @@ import type {
   JellyseerrSeasonRequestStatus,
   JellyseerrUserSummary,
 } from '@/models/jellyseerr.types';
-import { handleApiError } from '@/utils/error.utils';
+import { handleApiError, ApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
 
 const API_PREFIX = '/api/v1';
 const REQUEST_ENDPOINT = `${API_PREFIX}/request`;
 const SEARCH_ENDPOINT = `${API_PREFIX}/search`;
+const TRENDING_ENDPOINT = `${API_PREFIX}/discover/trending`;
 const STATUS_ENDPOINT = `${API_PREFIX}/status`;
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
@@ -393,9 +394,10 @@ const normalizeRequestQuery = (
     params.includePending4k = options.includePending4k;
   }
 
-  if (options.search && options.search.trim().length > 0) {
-    params.search = options.search.trim();
-  }
+  // Note: The Jellyseerr /request endpoint does not accept a free-text
+  // `search` query parameter according to the bundled OpenAPI spec.
+  // Free-text searches should use the dedicated /search endpoint. Do not
+  // include `search` here to avoid server-side validation 400 responses.
 
   return params;
 };
@@ -490,6 +492,15 @@ const buildDeclineBody = (options?: JellyseerrDeclineOptions): DeclineRequestBod
 };
 
 export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, CreateJellyseerrRequest> {
+  /**
+   * Returns the direct Jellyseerr media detail page URL for a given mediaId and type.
+   * Example: /movie/123 or /tv/456
+   * If you need the full URL, prepend the Jellyseerr base URL from config.
+   */
+  getMediaDetailUrl(mediaId: number, mediaType: 'movie' | 'tv'): string {
+    if (!mediaId || !mediaType) return '';
+    return `/${mediaType}/${mediaId}`;
+  }
   async initialize(): Promise<void> {
     await this.ensureAuthenticated();
     await this.getVersion();
@@ -662,34 +673,187 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
   async search(query: string, options?: SearchOptions): Promise<JellyseerrSearchResult[]> {
     await this.ensureAuthenticated();
     
+    // Jellyseerr's search endpoint returns 400 for certain invalid
+    // input (for example, very short search terms). Validate early so
+    // we can return a clearer message and avoid noisy error logs.
+    if (!query || query.trim().length < 3) {
+      throw new ApiError({
+        message: 'Search term must be at least 3 characters for Jellyseerr.',
+        details: { providedQuery: query },
+      });
+    }
+
+    let trimmedQuery = query.trim();
+    
+    // Additional validation for special characters that might cause issues
+    if (trimmedQuery.length === 0) {
+      throw new ApiError({
+        message: 'Search term cannot be empty after trimming.',
+        details: { providedQuery: query },
+      });
+    }
+
+    // Check for potential problematic characters
+    const hasOnlyWhitespace = /^\s*$/.test(trimmedQuery);
+    if (hasOnlyWhitespace) {
+      throw new ApiError({
+        message: 'Search term cannot contain only whitespace.',
+        details: { providedQuery: query },
+      });
+    }
+
+    // Sanitize query to avoid potential API issues
+    // Remove excessive whitespace and limit to reasonable length
+    trimmedQuery = trimmedQuery.replace(/\s+/g, ' ').substring(0, 100);
+
     try {
-      const params: Record<string, unknown> = {
-        query,
+      const params: Record<string, string | number> = {
+        query: encodeURIComponent(trimmedQuery),
       };
 
+      // Only add page if it's a valid positive number
       const page = options?.pagination?.page;
       if (typeof page === 'number' && page > 0) {
         params.page = page;
       }
 
+      // Only add language if it's a valid non-empty string
       const filters = options?.filters ?? {};
       const languageValue = (filters as Record<string, unknown>).language;
       if (typeof languageValue === 'string' && languageValue.trim().length > 0) {
         params.language = languageValue.trim();
       }
 
-      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(SEARCH_ENDPOINT, {
+      logger.debug('Jellyseerr search request', {
+        location: 'JellyseerrConnector.search',
+        serviceId: this.config.id,
         params,
+        endpoint: SEARCH_ENDPOINT,
       });
 
-      return mapSearchResults(response.data.results);
+      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(SEARCH_ENDPOINT, {
+        params,
+        // Use standard axios parameter serialization
+        timeout: 10000, // 10 second timeout for search requests
+      });
+
+      const results = mapSearchResults(response.data.results);
+      
+      logger.debug('Jellyseerr search response', {
+        location: 'JellyseerrConnector.search',
+        serviceId: this.config.id,
+        resultCount: results.length,
+        totalResults: response.data.totalResults,
+      });
+
+      return results;
     } catch (error) {
-      throw handleApiError(error, {
+      // Add more context to the error for debugging
+      const contextualError = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'search',
         endpoint: SEARCH_ENDPOINT,
       });
+      
+      // Add search context to error details
+      if (contextualError.details) {
+        contextualError.details.searchQuery = trimmedQuery;
+        contextualError.details.originalQuery = query;
+        contextualError.details.hasOptions = Boolean(options);
+        contextualError.details.optionsKeys = options ? Object.keys(options) : [];
+      }
+
+      // Provide more helpful error messages for common issues
+      if (contextualError.statusCode === 400) {
+        let helpfulMessage = 'Jellyseerr search failed with a bad request error.';
+        
+        // Check for common issues
+        if (trimmedQuery.length < 3) {
+          helpfulMessage += ' Search term too short (minimum 3 characters required).';
+        } else if (trimmedQuery.length > 100) {
+          helpfulMessage += ' Search term too long (maximum 100 characters).';
+        } else if (/[^\w\s\-'".!?]/.test(trimmedQuery)) {
+          helpfulMessage += ' Search term contains special characters that may not be supported.';
+        } else {
+          helpfulMessage += ' This could be due to server validation rules, rate limiting, or API compatibility issues.';
+        }
+        
+        helpfulMessage += ` Original error: ${contextualError.message}`;
+        contextualError.message = helpfulMessage;
+      }
+      
+      logger.error('Jellyseerr search failed', {
+        location: 'JellyseerrConnector.search',
+        serviceId: this.config.id,
+        query: trimmedQuery,
+        originalQuery: query,
+        error: contextualError.message,
+        statusCode: contextualError.statusCode,
+      });
+      
+      throw contextualError;
+    }
+  }
+
+  async getTrending(options?: { page?: number; language?: string }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+    await this.ensureAuthenticated();
+
+    try {
+      const params: Record<string, unknown> = {};
+
+      if (typeof options?.page === 'number' && options.page > 0) {
+        params.page = options.page;
+      }
+
+      if (options?.language) {
+        params.language = options.language;
+      }
+
+      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(TRENDING_ENDPOINT, {
+        params,
+      });
+
+      const items = mapSearchResults(response.data.results);
+      const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
+
+      return {
+        items,
+        total: totalResults,
+        pageInfo: {
+          page: response.data.page ?? response.data.pageInfo?.page,
+          pages: response.data.totalPages ?? response.data.pageInfo?.pages,
+          results: totalResults,
+          totalResults,
+        },
+      };
+    } catch (error) {
+      const apiError = handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getTrending',
+        endpoint: TRENDING_ENDPOINT,
+      });
+
+      // For server-side failures (5xx) we prefer to degrade gracefully and
+      // return an empty result set instead of bubbling the exception. The
+      // caller will still receive a logged warning from handleApiError.
+      if (apiError.statusCode && apiError.statusCode >= 500) {
+        void logger.warn('Failed to load trending titles from jellyseerr; returning empty result due to server error.', {
+          location: 'JellyseerrConnector.getTrending',
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          statusCode: apiError.statusCode,
+        });
+
+        return {
+          items: [],
+          total: 0,
+          pageInfo: { page: options?.page ?? 1, pages: 0, results: 0 },
+        };
+      }
+
+      throw apiError;
     }
   }
 }

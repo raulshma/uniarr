@@ -1,5 +1,5 @@
-import React, { JSX, useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { JSX, useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Linking, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Chip,
@@ -9,7 +9,7 @@ import {
   TextInput,
   useTheme,
 } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { Card } from '@/components/common/Card';
 import { AnimatedSection } from '@/components/common/AnimatedComponents';
@@ -18,6 +18,8 @@ import type { AppTheme } from '@/constants/theme';
 import { spacing } from '@/theme/spacing';
 import { useUnifiedSearch } from '@/hooks/useUnifiedSearch';
 import type { SearchHistoryEntry, UnifiedSearchMediaType, UnifiedSearchResult } from '@/models/search.types';
+import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 
 const mediaTypeLabels: Record<UnifiedSearchMediaType, string> = {
   series: 'Series',
@@ -72,6 +74,14 @@ const buildIdentifier = (entry: SearchHistoryEntry): string => {
 export const UnifiedSearchPanel: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
+  const connectorManager = useMemo(() => ConnectorManager.getInstance(), []);
+  const params = useLocalSearchParams<{
+    query?: string;
+    tmdbId?: string;
+    tvdbId?: string;
+    serviceId?: string;
+    mediaType?: string;
+  }>();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceFilters, setServiceFilters] = useState<string[]>([]);
@@ -112,6 +122,7 @@ export const UnifiedSearchPanel: React.FC = () => {
     () =>
       StyleSheet.create({
         container: {
+          flex: 1,
           padding: spacing.xs,
           backgroundColor: theme.colors.elevation.level1,
           borderRadius: 12,
@@ -145,7 +156,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           marginBottom: spacing.md,
         },
         resultContainer: {
-          gap: spacing.sm,
+          flex: 1,
         },
         resultCard: {
           borderRadius: 8,
@@ -240,6 +251,47 @@ export const UnifiedSearchPanel: React.FC = () => {
     setMediaFilters([]);
   }, []);
 
+  // Attempt to open a specific Jellyseerr media detail page in the browser
+  const openJellyseerrMediaDetail = useCallback(async (item: UnifiedSearchResult): Promise<boolean> => {
+    try {
+      // Validate basics
+      if (item.serviceType !== 'jellyseerr') return false;
+      const connector = connectorManager.getConnector(item.serviceId) as JellyseerrConnector | undefined;
+      if (!connector || connector.config.type !== 'jellyseerr') return false;
+
+      // Prefer TMDB id for Jellyseerr routes; fallback to service native id
+      const tmdbId = item.externalIds?.tmdbId ?? item.externalIds?.serviceNativeId;
+      if (!tmdbId) return false;
+
+      const mediaPathType: 'movie' | 'tv' = item.mediaType === 'series' ? 'tv' : 'movie';
+      const path = connector.getMediaDetailUrl(Number(tmdbId), mediaPathType);
+      if (!path) return false;
+
+      // Join base URL and path safely
+      const base = connector.config.url.replace(/\/$/, '');
+      const fullUrl = `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+      await Linking.openURL(fullUrl);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [connectorManager]);
+
+  // If the route provides search params (e.g. from Discover card), prefill the search
+  useEffect(() => {
+    if (params.query && params.query !== searchTerm) {
+      setSearchTerm(params.query as string);
+    }
+
+    if (params.serviceId) {
+      setServiceFilters([params.serviceId as string]);
+    }
+
+    if (params.mediaType && mediaFilterOptions.includes(params.mediaType as UnifiedSearchMediaType)) {
+      setMediaFilters([params.mediaType as UnifiedSearchMediaType]);
+    }
+  }, [params.query, params.serviceId, params.mediaType]);
+
   const handleHistorySelect = useCallback(
     (entry: SearchHistoryEntry) => {
       setSearchTerm(entry.term);
@@ -252,31 +304,38 @@ export const UnifiedSearchPanel: React.FC = () => {
 
   const handlePrimaryAction = useCallback(
     async (item: UnifiedSearchResult) => {
-      const params: Record<string, string> = {
-        serviceId: item.serviceId,
-      };
+      if (item.serviceType === 'jellyseerr') {
+        // Main button: open Jellyseerr media detail page in-app
+        const mediaType = item.mediaType === 'series' ? 'series' : 'movie';
+        const mediaId = item.externalIds?.tmdbId ?? item.externalIds?.serviceNativeId;
+        if (mediaId) {
+          router.push({
+            pathname: '/(auth)/jellyseerr/[serviceId]/[mediaType]/[mediaId]',
+            params: {
+              serviceId: item.serviceId,
+              mediaType,
+              mediaId: String(mediaId),
+            },
+          });
+        } else {
+          router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: item.serviceId } });
+        }
+      } else {
+        const params: Record<string, string> = { serviceId: item.serviceId };
+        if (item.externalIds?.tmdbId) params.tmdbId = String(item.externalIds.tmdbId);
+        if (item.externalIds?.tvdbId) params.tvdbId = String(item.externalIds.tvdbId);
+        params.query = item.title;
 
-      if (item.externalIds?.tmdbId) {
-        params.tmdbId = String(item.externalIds.tmdbId);
-      }
-      if (item.externalIds?.tvdbId) {
-        params.tvdbId = String(item.externalIds.tvdbId);
-      }
-
-      params.query = item.title;
-
-      switch (item.serviceType) {
-        case 'sonarr':
-          router.push({ pathname: '/(auth)/sonarr/[serviceId]/add', params });
-          break;
-        case 'radarr':
-          router.push({ pathname: '/(auth)/radarr/[serviceId]/add', params });
-          break;
-        case 'jellyseerr':
-          router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params });
-          break;
-        default:
-          break;
+        switch (item.serviceType) {
+          case 'sonarr':
+            router.push({ pathname: '/(auth)/sonarr/[serviceId]/add', params });
+            break;
+          case 'radarr':
+            router.push({ pathname: '/(auth)/radarr/[serviceId]/add', params });
+            break;
+          default:
+            break;
+        }
       }
 
       await recordSearch(item.title, {
@@ -284,11 +343,17 @@ export const UnifiedSearchPanel: React.FC = () => {
         mediaTypes: [item.mediaType],
       });
     },
-    [recordSearch, router],
+    [openJellyseerrMediaDetail, recordSearch, router],
   );
 
   const handleOpenService = useCallback(
     (item: UnifiedSearchResult) => {
+      if (item.serviceType === 'jellyseerr') {
+        // Icon button: open Jellyseerr media detail page in browser (web app)
+        void openJellyseerrMediaDetail(item);
+        return;
+      }
+
       switch (item.serviceType) {
         case 'sonarr':
           router.push({ pathname: '/(auth)/sonarr/[serviceId]', params: { serviceId: item.serviceId } });
@@ -296,14 +361,11 @@ export const UnifiedSearchPanel: React.FC = () => {
         case 'radarr':
           router.push({ pathname: '/(auth)/radarr/[serviceId]', params: { serviceId: item.serviceId } });
           break;
-        case 'jellyseerr':
-          router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: item.serviceId } });
-          break;
         default:
           break;
       }
     },
-    [router],
+    [openJellyseerrMediaDetail, router],
   );
 
   const renderResult = useCallback(
@@ -364,7 +426,7 @@ export const UnifiedSearchPanel: React.FC = () => {
       }
 
       return (
-        <Card key={item.id} variant="custom" style={styles.resultCard}>
+        <Card variant="custom" style={styles.resultCard}>
           <View style={styles.resultHeader}>
             <Text style={styles.resultTitle} numberOfLines={2}>
               {item.title}
@@ -401,7 +463,7 @@ export const UnifiedSearchPanel: React.FC = () => {
                 fontFamily: theme.custom.typography.labelLarge.fontFamily,
               }}
             >
-              {item.serviceType === 'jellyseerr' ? 'View in Jellyseerr' : `Add via ${serviceTypeLabels[item.serviceType] ?? 'Service'}`}
+              {item.serviceType === 'jellyseerr' ? 'View' : `Add via ${serviceTypeLabels[item.serviceType] ?? 'Service'}`}
             </Button>
             <IconButton
               icon="open-in-new"
@@ -434,7 +496,7 @@ export const UnifiedSearchPanel: React.FC = () => {
   }, [errors, serviceNameById, styles.errorText]);
 
   return (
-    <Card variant="custom" style={styles.container}>
+  <Card variant="custom" style={styles.container} contentStyle={{ flex: 1 }}>
       <View style={styles.searchRow}>
         <View style={styles.searchInputContainer}>
           <TextInput
@@ -576,12 +638,25 @@ export const UnifiedSearchPanel: React.FC = () => {
 
       {hasActiveQuery ? (
         <View style={styles.resultContainer}>
-          {isBusy ? <ActivityIndicator animating /> : null}
-          {renderErrorHelper}
           {!isBusy && results.length === 0 ? (
             <HelperText type="info">No results found. Try adjusting filters or a different term.</HelperText>
           ) : null}
-          {results.map(renderResult)}
+          <FlatList
+            data={results}
+            renderItem={({ item }) => renderResult(item)}
+            keyExtractor={(item) => item.id}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ gap: spacing.sm }}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={!isBusy ? <HelperText type="info">No results found. Try adjusting filters or a different term.</HelperText> : null}
+            ListHeaderComponent={
+              <>
+                {isBusy ? <ActivityIndicator animating /> : null}
+                {renderErrorHelper}
+              </>
+            }
+            // footer moved out of FlatList into outer card
+          />
           {results.length > 0 ? (
             <View style={styles.footerRow}>
               <Text style={{ color: theme.colors.onSurfaceVariant }}>

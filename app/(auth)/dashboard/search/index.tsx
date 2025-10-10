@@ -21,6 +21,7 @@ const UnifiedSearchScreen = () => {
           backgroundColor: theme.colors.background,
         },
         content: {
+          flex: 1,
           marginTop: spacing.xs,
           marginHorizontal: spacing.md,
         },

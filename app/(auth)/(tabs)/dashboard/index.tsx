@@ -621,6 +621,10 @@ const DashboardScreen = () => {
     router.push("/(auth)/calendar");
   }, [router]);
 
+  const handleOpenDiscover = useCallback(() => {
+    router.push("/(auth)/discover");
+  }, [router]);
+
   const ServiceCard = React.memo(({ item }: { item: ServiceOverviewItem }) => {
     const getStatusColor = (status: ServiceStatusState) => {
       switch (status) {
@@ -842,9 +846,22 @@ const DashboardScreen = () => {
             <View style={styles.searchWrapper}>
               <AnimatedSection style={styles.shortcutsWrapper} delay={40}>
                 <AnimatedListItem
-                  style={styles.shortcutTileWrapper}
                   index={0}
-                  totalItems={2}
+                  totalItems={3}
+                  style={styles.shortcutTileWrapper}
+                >
+                  <ShortcutTile
+                    testID="shortcut-discover"
+                    label="Discover"
+                    subtitle="Trending picks"
+                    icon="compass-outline"
+                    onPress={handleOpenDiscover}
+                  />
+                </AnimatedListItem>
+                <AnimatedListItem
+                  style={styles.shortcutTileWrapper}
+                  index={1}
+                  totalItems={3}
                 >
                   <ShortcutTile
                     testID="shortcut-search"
@@ -856,8 +873,8 @@ const DashboardScreen = () => {
                 </AnimatedListItem>
                 <AnimatedListItem
                   style={styles.shortcutTileWrapper}
-                  index={1}
-                  totalItems={2}
+                  index={2}
+                  totalItems={3}
                 >
                   <ShortcutTile
                     testID="shortcut-calendar"
@@ -954,7 +971,16 @@ const DashboardScreen = () => {
           </AnimatedHeader>
           <View style={styles.searchWrapper}>
             <AnimatedSection style={styles.shortcutsWrapper} delay={40}>
-              <AnimatedListItem index={0} totalItems={2}>
+              <AnimatedListItem index={0} totalItems={3}>
+                <ShortcutTile
+                  testID="shortcut-discover-loading"
+                  label="Discover"
+                  subtitle="Trending picks"
+                  icon="compass-outline"
+                  onPress={handleOpenDiscover}
+                />
+              </AnimatedListItem>
+              <AnimatedListItem index={1} totalItems={3}>
                 <ShortcutTile
                   testID="shortcut-search-loading"
                   label="Unified Search"
@@ -963,7 +989,7 @@ const DashboardScreen = () => {
                   onPress={handleOpenSearch}
                 />
               </AnimatedListItem>
-              <AnimatedListItem index={1} totalItems={2}>
+              <AnimatedListItem index={2} totalItems={3}>
                 <ShortcutTile
                   testID="shortcut-calendar-loading"
                   label="Release Calendar"
