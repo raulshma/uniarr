@@ -40,6 +40,29 @@ const deserializeEntries = (serialized: string | null): LogEntry[] => {
   }
 };
 
+/**
+ * Creates a shallow copy of the provided context and renames commonly
+ * recognized Error-like properties so Metro's HMR logging doesn't treat
+ * the object as an Error. We intentionally avoid deep cloning to keep
+ * performance reasonable for logging.
+ */
+const sanitizeConsoleContext = (context: Record<string, unknown>): Record<string, unknown> => {
+  const copy: Record<string, unknown> = { ...context };
+
+  if (Object.prototype.hasOwnProperty.call(copy, 'message')) {
+    // Preserve original message under a non-conflicting key.
+    copy.contextMessage = copy.message;
+    delete copy.message;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(copy, 'stack')) {
+    copy.contextStack = copy.stack;
+    delete copy.stack;
+  }
+
+  return copy;
+};
+
 class LoggerService {
   private static instance: LoggerService | null = null;
 
@@ -106,14 +129,18 @@ class LoggerService {
 
     if (isDevelopment) {
       const consoleMethod = this.getConsoleMethod(level);
-      if (context) {
-        consoleMethod(`[${level}] ${message}`, context);
+      // Sanitize context before sending to console to avoid Metro / HMR
+      // interpreting objects with top-level `message` or `stack` properties
+      // as Error-like and producing a redbox or stack trace.
+      const sanitizedContext = context ? sanitizeConsoleContext(context) : undefined;
+
+      if (sanitizedContext) {
+        consoleMethod(`[${level}] ${message}`, sanitizedContext);
       } else {
         consoleMethod(`[${level}] ${message}`);
       }
     }
   }
-
   async debug(message: string, context?: Record<string, unknown>): Promise<void> {
     await this.log(LogLevel.DEBUG, message, context);
   }

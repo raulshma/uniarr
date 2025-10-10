@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { IConnector } from '@/connectors/base/IConnector';
+import type { IConnector, SearchOptions } from '@/connectors/base/IConnector';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
@@ -18,6 +18,8 @@ import type {
   UnifiedSearchResult,
 } from '@/models/search.types';
 import { logger } from '@/services/logger/LoggerService';
+import { isApiError, type ApiError } from '@/utils/error.utils';
+import { getOpenApiOperationHint, hasOpenApiForService } from '@/connectors/openapi/OpenApiHelper';
 
 const HISTORY_STORAGE_KEY = 'UnifiedSearch_history';
 const HISTORY_LIMIT = 12;
@@ -251,18 +253,87 @@ export class UnifiedSearchService {
     }
 
     try {
-      const rawResults = await this.withTimeout(searchFn(term), SEARCH_TIMEOUT_MS);
+      // Create SearchOptions from UnifiedSearchOptions for the connector
+      const searchOptions: SearchOptions = {
+        ...(options.limitPerService && {
+          pagination: {
+            pageSize: options.limitPerService,
+          },
+        }),
+        ...(options.mediaTypes && options.mediaTypes.length > 0 && {
+          filters: {
+            mediaTypes: options.mediaTypes,
+          },
+        }),
+      };
+      
+      const rawResults = await this.withTimeout(
+        searchFn(term, Object.keys(searchOptions).length > 0 ? searchOptions : undefined), 
+        SEARCH_TIMEOUT_MS
+      );
       const mapped = this.mapResults(rawResults, connector, options.mediaTypes);
       const limit = options.limitPerService ?? 25;
       return { results: mapped.slice(0, limit) };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown search error.';
-      await logger.warn('Unified search connector failed.', {
-        location: 'UnifiedSearchService.searchConnector',
-        serviceId: connector.config.id,
-        serviceType: connector.config.type,
-        error: message,
-      });
+
+      // Avoid double-logging and reduce noise for expected API errors
+      // (for example, a 400 when a search term is too short). For ApiError
+      // instances we record debug-level info here because the error utils
+      // already emits an appropriate log entry with the correct severity.
+      if (isApiError(error)) {
+        // Try to enrich API errors with a short, actionable hint from any
+        // bundled OpenAPI spec we have for the connector type. This helps
+        // surface validation expectations (for example minimum search
+        // term lengths) to the user without requiring them to inspect logs.
+        const apiErr = error as ApiError;
+        const ctx = apiErr.details?.context as Record<string, unknown> | undefined;
+        try {
+          const endpoint = ctx?.endpoint as string | undefined;
+          const operation = ctx?.operation as string | undefined;
+          const serviceType = ctx?.serviceType as string | undefined;
+          if (endpoint && operation && serviceType && hasOpenApiForService(serviceType)) {
+            const hint = getOpenApiOperationHint(serviceType, endpoint, operation);
+            if (hint) {
+              apiErr.details = { ...(apiErr.details ?? {}), openApiHint: hint };
+              // Keep the original message short but append a compact hint so
+              // UI layers and logs can surface a helpful suggestion.
+              apiErr.message = `${apiErr.message} ${hint}`;
+            }
+          }
+        } catch (e) {
+          // If anything goes wrong while enriching the error we don't want
+          // to hide the original error; record the enrichment failure at
+          // debug level and continue.
+          void logger.debug('OpenAPI hint enrichment failed.', {
+            location: 'UnifiedSearchService.searchConnector',
+            serviceId: connector.config.id,
+            serviceType: connector.config.type,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
+        // For jellyseerr search errors, provide specific troubleshooting hints
+        if (connector.config.type === 'jellyseerr' && apiErr.statusCode === 400) {
+          const originalMessage = apiErr.message;
+          apiErr.message = `${originalMessage} Try using a different search term or check your Jellyseerr configuration.`;
+        }
+
+        await logger.debug('Unified search connector encountered API error.', {
+          location: 'UnifiedSearchService.searchConnector',
+          serviceId: connector.config.id,
+          serviceType: connector.config.type,
+          error: message,
+        });
+      } else {
+        await logger.warn('Unified search connector failed.', {
+          location: 'UnifiedSearchService.searchConnector',
+          serviceId: connector.config.id,
+          serviceType: connector.config.type,
+          error: message,
+        });
+      }
+
       return {
         results: [],
         error: {
