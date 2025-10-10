@@ -86,6 +86,7 @@ const serviceIcons: Partial<Record<ServiceType, string>> = {
   sonarr: "television-classic",
   radarr: "movie-open",
   jellyseerr: "account-search",
+  jellyfin: "television-classic",
   qbittorrent: "download-network",
   prowlarr: "radar",
   bazarr: "subtitles",
@@ -580,6 +581,12 @@ const DashboardScreen = () => {
             params: { serviceId: service.config.id },
           });
           break;
+        case "jellyfin":
+          router.push({
+            pathname: "/(auth)/jellyfin/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
         case "prowlarr":
           router.push({
             pathname: "/(auth)/prowlarr/[serviceId]",
@@ -648,6 +655,8 @@ const DashboardScreen = () => {
           return "movie-open";
         case "jellyseerr":
           return "account-search";
+        case "jellyfin":
+          return "television-classic";
         case "qbittorrent":
           return "download-network";
         case "prowlarr":
