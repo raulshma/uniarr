@@ -394,9 +394,10 @@ const normalizeRequestQuery = (
     params.includePending4k = options.includePending4k;
   }
 
-  if (options.search && options.search.trim().length > 0) {
-    params.search = options.search.trim();
-  }
+  // Note: The Jellyseerr /request endpoint does not accept a free-text
+  // `search` query parameter according to the bundled OpenAPI spec.
+  // Free-text searches should use the dedicated /search endpoint. Do not
+  // include `search` here to avoid server-side validation 400 responses.
 
   return params;
 };
@@ -673,34 +674,116 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
       });
     }
 
+    let trimmedQuery = query.trim();
+    
+    // Additional validation for special characters that might cause issues
+    if (trimmedQuery.length === 0) {
+      throw new ApiError({
+        message: 'Search term cannot be empty after trimming.',
+        details: { providedQuery: query },
+      });
+    }
+
+    // Check for potential problematic characters
+    const hasOnlyWhitespace = /^\s*$/.test(trimmedQuery);
+    if (hasOnlyWhitespace) {
+      throw new ApiError({
+        message: 'Search term cannot contain only whitespace.',
+        details: { providedQuery: query },
+      });
+    }
+
+    // Sanitize query to avoid potential API issues
+    // Remove excessive whitespace and limit to reasonable length
+    trimmedQuery = trimmedQuery.replace(/\s+/g, ' ').substring(0, 100);
+
     try {
-      const params: Record<string, unknown> = {
-        query,
+      const params: Record<string, string | number> = {
+        query: trimmedQuery,
       };
 
+      // Only add page if it's a valid positive number
       const page = options?.pagination?.page;
       if (typeof page === 'number' && page > 0) {
         params.page = page;
       }
 
+      // Only add language if it's a valid non-empty string
       const filters = options?.filters ?? {};
       const languageValue = (filters as Record<string, unknown>).language;
       if (typeof languageValue === 'string' && languageValue.trim().length > 0) {
         params.language = languageValue.trim();
       }
 
-      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(SEARCH_ENDPOINT, {
+      logger.debug('Jellyseerr search request', {
+        location: 'JellyseerrConnector.search',
+        serviceId: this.config.id,
         params,
+        endpoint: SEARCH_ENDPOINT,
       });
 
-      return mapSearchResults(response.data.results);
+      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(SEARCH_ENDPOINT, {
+        params,
+        // Use standard axios parameter serialization
+        timeout: 10000, // 10 second timeout for search requests
+      });
+
+      const results = mapSearchResults(response.data.results);
+      
+      logger.debug('Jellyseerr search response', {
+        location: 'JellyseerrConnector.search',
+        serviceId: this.config.id,
+        resultCount: results.length,
+        totalResults: response.data.totalResults,
+      });
+
+      return results;
     } catch (error) {
-      throw handleApiError(error, {
+      // Add more context to the error for debugging
+      const contextualError = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'search',
         endpoint: SEARCH_ENDPOINT,
       });
+      
+      // Add search context to error details
+      if (contextualError.details) {
+        contextualError.details.searchQuery = trimmedQuery;
+        contextualError.details.originalQuery = query;
+        contextualError.details.hasOptions = Boolean(options);
+        contextualError.details.optionsKeys = options ? Object.keys(options) : [];
+      }
+
+      // Provide more helpful error messages for common issues
+      if (contextualError.statusCode === 400) {
+        let helpfulMessage = 'Jellyseerr search failed with a bad request error.';
+        
+        // Check for common issues
+        if (trimmedQuery.length < 3) {
+          helpfulMessage += ' Search term too short (minimum 3 characters required).';
+        } else if (trimmedQuery.length > 100) {
+          helpfulMessage += ' Search term too long (maximum 100 characters).';
+        } else if (/[^\w\s\-'".!?]/.test(trimmedQuery)) {
+          helpfulMessage += ' Search term contains special characters that may not be supported.';
+        } else {
+          helpfulMessage += ' This could be due to server validation rules, rate limiting, or API compatibility issues.';
+        }
+        
+        helpfulMessage += ` Original error: ${contextualError.message}`;
+        contextualError.message = helpfulMessage;
+      }
+      
+      logger.error('Jellyseerr search failed', {
+        location: 'JellyseerrConnector.search',
+        serviceId: this.config.id,
+        query: trimmedQuery,
+        originalQuery: query,
+        error: contextualError.message,
+        statusCode: contextualError.statusCode,
+      });
+      
+      throw contextualError;
     }
   }
 

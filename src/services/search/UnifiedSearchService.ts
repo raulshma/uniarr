@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { IConnector } from '@/connectors/base/IConnector';
+import type { IConnector, SearchOptions } from '@/connectors/base/IConnector';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
@@ -253,7 +253,24 @@ export class UnifiedSearchService {
     }
 
     try {
-      const rawResults = await this.withTimeout(searchFn(term), SEARCH_TIMEOUT_MS);
+      // Create SearchOptions from UnifiedSearchOptions for the connector
+      const searchOptions: SearchOptions = {
+        ...(options.limitPerService && {
+          pagination: {
+            pageSize: options.limitPerService,
+          },
+        }),
+        ...(options.mediaTypes && options.mediaTypes.length > 0 && {
+          filters: {
+            mediaTypes: options.mediaTypes,
+          },
+        }),
+      };
+      
+      const rawResults = await this.withTimeout(
+        searchFn(term, Object.keys(searchOptions).length > 0 ? searchOptions : undefined), 
+        SEARCH_TIMEOUT_MS
+      );
       const mapped = this.mapResults(rawResults, connector, options.mediaTypes);
       const limit = options.limitPerService ?? 25;
       return { results: mapped.slice(0, limit) };
@@ -294,6 +311,12 @@ export class UnifiedSearchService {
             serviceType: connector.config.type,
             error: e instanceof Error ? e.message : String(e),
           });
+        }
+
+        // For jellyseerr search errors, provide specific troubleshooting hints
+        if (connector.config.type === 'jellyseerr' && apiErr.statusCode === 400) {
+          const originalMessage = apiErr.message;
+          apiErr.message = `${originalMessage} Try using a different search term or check your Jellyseerr configuration.`;
         }
 
         await logger.debug('Unified search connector encountered API error.', {
