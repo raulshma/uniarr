@@ -1,5 +1,5 @@
 import React, { JSX, useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, Linking, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Chip,
@@ -18,6 +18,8 @@ import type { AppTheme } from '@/constants/theme';
 import { spacing } from '@/theme/spacing';
 import { useUnifiedSearch } from '@/hooks/useUnifiedSearch';
 import type { SearchHistoryEntry, UnifiedSearchMediaType, UnifiedSearchResult } from '@/models/search.types';
+import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 
 const mediaTypeLabels: Record<UnifiedSearchMediaType, string> = {
   series: 'Series',
@@ -72,6 +74,7 @@ const buildIdentifier = (entry: SearchHistoryEntry): string => {
 export const UnifiedSearchPanel: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
+  const connectorManager = useMemo(() => ConnectorManager.getInstance(), []);
   const params = useLocalSearchParams<{
     query?: string;
     tmdbId?: string;
@@ -248,6 +251,32 @@ export const UnifiedSearchPanel: React.FC = () => {
     setMediaFilters([]);
   }, []);
 
+  // Attempt to open a specific Jellyseerr media detail page in the browser
+  const openJellyseerrMediaDetail = useCallback(async (item: UnifiedSearchResult): Promise<boolean> => {
+    try {
+      // Validate basics
+      if (item.serviceType !== 'jellyseerr') return false;
+      const connector = connectorManager.getConnector(item.serviceId) as JellyseerrConnector | undefined;
+      if (!connector || connector.config.type !== 'jellyseerr') return false;
+
+      // Prefer TMDB id for Jellyseerr routes; fallback to service native id
+      const tmdbId = item.externalIds?.tmdbId ?? item.externalIds?.serviceNativeId;
+      if (!tmdbId) return false;
+
+      const mediaPathType: 'movie' | 'tv' = item.mediaType === 'series' ? 'tv' : 'movie';
+      const path = connector.getMediaDetailUrl(Number(tmdbId), mediaPathType);
+      if (!path) return false;
+
+      // Join base URL and path safely
+      const base = connector.config.url.replace(/\/$/, '');
+      const fullUrl = `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+      await Linking.openURL(fullUrl);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [connectorManager]);
+
   // If the route provides search params (e.g. from Discover card), prefill the search
   useEffect(() => {
     if (params.query && params.query !== searchTerm) {
@@ -275,31 +304,29 @@ export const UnifiedSearchPanel: React.FC = () => {
 
   const handlePrimaryAction = useCallback(
     async (item: UnifiedSearchResult) => {
-      const params: Record<string, string> = {
-        serviceId: item.serviceId,
-      };
+      // For Jellyseerr, open the specific media detail page directly
+      if (item.serviceType === 'jellyseerr') {
+        const opened = await openJellyseerrMediaDetail(item);
+        if (!opened) {
+          // Fallback to service landing if URL could not be constructed
+          router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: item.serviceId } });
+        }
+      } else {
+        const params: Record<string, string> = { serviceId: item.serviceId };
+        if (item.externalIds?.tmdbId) params.tmdbId = String(item.externalIds.tmdbId);
+        if (item.externalIds?.tvdbId) params.tvdbId = String(item.externalIds.tvdbId);
+        params.query = item.title;
 
-      if (item.externalIds?.tmdbId) {
-        params.tmdbId = String(item.externalIds.tmdbId);
-      }
-      if (item.externalIds?.tvdbId) {
-        params.tvdbId = String(item.externalIds.tvdbId);
-      }
-
-      params.query = item.title;
-
-      switch (item.serviceType) {
-        case 'sonarr':
-          router.push({ pathname: '/(auth)/sonarr/[serviceId]/add', params });
-          break;
-        case 'radarr':
-          router.push({ pathname: '/(auth)/radarr/[serviceId]/add', params });
-          break;
-        case 'jellyseerr':
-          router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params });
-          break;
-        default:
-          break;
+        switch (item.serviceType) {
+          case 'sonarr':
+            router.push({ pathname: '/(auth)/sonarr/[serviceId]/add', params });
+            break;
+          case 'radarr':
+            router.push({ pathname: '/(auth)/radarr/[serviceId]/add', params });
+            break;
+          default:
+            break;
+        }
       }
 
       await recordSearch(item.title, {
@@ -307,11 +334,20 @@ export const UnifiedSearchPanel: React.FC = () => {
         mediaTypes: [item.mediaType],
       });
     },
-    [recordSearch, router],
+    [openJellyseerrMediaDetail, recordSearch, router],
   );
 
   const handleOpenService = useCallback(
     (item: UnifiedSearchResult) => {
+      if (item.serviceType === 'jellyseerr') {
+        void openJellyseerrMediaDetail(item).then((opened) => {
+          if (!opened) {
+            router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: item.serviceId } });
+          }
+        });
+        return;
+      }
+
       switch (item.serviceType) {
         case 'sonarr':
           router.push({ pathname: '/(auth)/sonarr/[serviceId]', params: { serviceId: item.serviceId } });
@@ -319,14 +355,11 @@ export const UnifiedSearchPanel: React.FC = () => {
         case 'radarr':
           router.push({ pathname: '/(auth)/radarr/[serviceId]', params: { serviceId: item.serviceId } });
           break;
-        case 'jellyseerr':
-          router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: item.serviceId } });
-          break;
         default:
           break;
       }
     },
-    [router],
+    [openJellyseerrMediaDetail, router],
   );
 
   const renderResult = useCallback(

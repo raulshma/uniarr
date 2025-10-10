@@ -492,6 +492,15 @@ const buildDeclineBody = (options?: JellyseerrDeclineOptions): DeclineRequestBod
 };
 
 export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, CreateJellyseerrRequest> {
+  /**
+   * Returns the direct Jellyseerr media detail page URL for a given mediaId and type.
+   * Example: /movie/123 or /tv/456
+   * If you need the full URL, prepend the Jellyseerr base URL from config.
+   */
+  getMediaDetailUrl(mediaId: number, mediaType: 'movie' | 'tv'): string {
+    if (!mediaId || !mediaType) return '';
+    return `/${mediaType}/${mediaId}`;
+  }
   async initialize(): Promise<void> {
     await this.ensureAuthenticated();
     await this.getVersion();
