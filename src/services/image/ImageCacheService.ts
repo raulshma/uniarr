@@ -218,6 +218,30 @@ class ImageCacheService {
     return `${value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
   }
 
+  // Create a short hash for a URI to use in generating cache filenames.
+  static hashUri(uri: string): string {
+    let hash = 5381;
+    for (let i = 0; i < uri.length; i++) {
+      // djb2
+      hash = ((hash << 5) + hash) + uri.charCodeAt(i);
+      hash = hash & hash; // keep in 32-bit
+    }
+    return (hash >>> 0).toString(36);
+  }
+
+  // Attempt to preserve a reasonable file extension from the original URI.
+  static extractExt(uri: string): string {
+    try {
+      const m = uri.match(/\.(jpg|jpeg|png|webp|gif|bmp)(?:\?|$)/i);
+      if (m && m[1]) {
+        return `.${m[1].toLowerCase()}`;
+      }
+    } catch {
+      // ignore
+    }
+    return '.img';
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (this.isInitialized) {
       return;
@@ -296,11 +320,49 @@ class ImageCacheService {
       }
 
       const success = await Image.prefetch(fetchUri, { cachePolicy: 'disk' });
+
+      void logger.debug('ImageCacheService: prefetch result.', { uri, fetchUri, success });
+
       if (!success) {
+        // Prefetch via expo-image failed — attempt a robust fallback by downloading
+        // the image directly into the app cache and returning that path. This
+        // helps on platforms or cases where the native image cache doesn't
+        // expose a disk path via Image.getCachePathAsync.
+        try {
+          const ext = ImageCacheService.extractExt(uri);
+          const filename = `image-${ImageCacheService.hashUri(uri)}${ext}`;
+          const dest = `${FileSystem.cacheDirectory}${filename}`;
+          void logger.debug('ImageCacheService: attempting fallback download.', { uri, dest });
+          const download = await FileSystem.downloadAsync(fetchUri, dest);
+          // downloadAsync returns an object with status on some platforms
+          if (download && (download.status === 200 || download.status === 0 || download.uri)) {
+            // Make sure file exists
+            const info = await FileSystem.getInfoAsync(dest);
+            if (info.exists && !info.isDirectory) {
+              return dest;
+            }
+          }
+        } catch (downloadError) {
+          void logger.warn('ImageCacheService: fallback download failed.', {
+            uri: fetchUri,
+            error: this.stringifyError(downloadError),
+          });
+        }
+
         return null;
       }
 
-      const cachedPath = await this.getCachedPath(uri);
+      // If prefetch succeeded, attempt to resolve the cached path. Some image
+      // cache implementations may not expose a path for the original URI; if
+      // that happens, try to resolve by checking the fetchUri as well.
+      let cachedPath = await this.getCachedPath(uri);
+      if (!cachedPath && fetchUri !== uri) {
+        cachedPath = await this.getCachedPath(fetchUri);
+      }
+      if (!cachedPath) {
+        void logger.debug('ImageCacheService: prefetch succeeded but cache path missing.', { uri, fetchUri });
+      }
+
       return cachedPath;
     })();
 
