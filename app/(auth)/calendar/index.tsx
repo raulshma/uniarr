@@ -41,12 +41,6 @@ const ALL_MEDIA_TYPES: MediaType[] = ["movie", "series", "episode"];
 const DEFAULT_STATUSES: ReleaseStatus[] = ["upcoming", "released"];
 const SERVICE_TYPES: CalendarServiceType[] = ["sonarr", "radarr"];
 
-const VIEW_SEGMENTS: Array<{ label: string; value: Extract<CalendarView, "day" | "week" | "month"> }> = [
-  { label: "Day", value: "day" },
-  { label: "Week", value: "week" },
-  { label: "Month", value: "month" },
-];
-
 type DateField = "start" | "end";
 
 const cloneFilters = (filters: CalendarFilters): CalendarFilters => ({
@@ -64,11 +58,20 @@ const CalendarScreen = () => {
     state,
     calendarData,
     navigation,
+    releases,
     setView,
+    setCurrentDate,
     setFilters,
     clearFilters,
     goToToday,
   } = useCalendar();
+
+  const VIEW_SEGMENTS: Array<{ label: string; value: Extract<CalendarView, "day" | "week" | "month" | "custom"> }> = useMemo(() => [
+    { label: "Day", value: "day" },
+    { label: "Week", value: "week" },
+    { label: "Month", value: "month" },
+    ...(state.filters.dateRange ? [{ label: "Custom", value: "custom" as const }] : []),
+  ], [state.filters.dateRange]);
 
   const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<CalendarFilters>(() =>
@@ -292,12 +295,17 @@ const CalendarScreen = () => {
       return [...flattened].sort(sortByDateThenTitle);
     }
 
+    if (state.view === "custom") {
+      // For custom view, show all releases in the dateRange, which are already filtered
+      return [...releases].sort(sortByDateThenTitle);
+    }
+
     if ("releases" in calendarData && calendarData.releases) {
       return [...calendarData.releases].sort(sortByDateThenTitle);
     }
 
     return [] as MediaRelease[];
-  }, [calendarData, sortByDateThenTitle, state.view]);
+  }, [calendarData, sortByDateThenTitle, state.view, releases]);
 
   const headingLabel = useMemo(() => {
     if (!calendarData) return "";
@@ -331,8 +339,14 @@ const CalendarScreen = () => {
       return format(monthDate, "MMMM yyyy");
     }
 
+    if (state.view === "custom" && state.filters.dateRange) {
+      const start = format(parseISO(state.filters.dateRange.start), "MMM d, yyyy");
+      const end = format(parseISO(state.filters.dateRange.end), "MMM d, yyyy");
+      return `Custom: ${start} - ${end}`;
+    }
+
     return navigation.currentPeriod;
-  }, [calendarData, navigation.currentPeriod, state.currentDate, state.view]);
+  }, [calendarData, navigation.currentPeriod, state.currentDate, state.view, state.filters.dateRange]);
 
   const subheadingLabel = useMemo(() => {
     if (releasesForView.length === 0) {
@@ -488,8 +502,12 @@ const CalendarScreen = () => {
         : undefined,
     };
     setFilters(normalized);
+    if (normalized.dateRange?.start) {
+      setCurrentDate(normalized.dateRange.start);
+      setView('custom');
+    }
     closeFilters();
-  }, [pendingFilters, setFilters, closeFilters]);
+  }, [pendingFilters, setFilters, setCurrentDate, setView, closeFilters]);
 
   const resetFilters = useCallback(() => {
     clearFilters();
@@ -503,7 +521,10 @@ const CalendarScreen = () => {
       dateRange: undefined,
       searchQuery: undefined,
     }));
-  }, [clearFilters]);
+    if (state.view === 'custom') {
+      setView('month');
+    }
+  }, [clearFilters, state.view, setView]);
 
   const renderContent = () => {
     if (state.isLoading) {

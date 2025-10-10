@@ -6,7 +6,7 @@ export type MediaType = 'movie' | 'series' | 'episode';
 
 export type ReleaseStatus = 'upcoming' | 'released' | 'delayed' | 'cancelled';
 
-export type CalendarView = 'month' | 'week' | 'day' | 'list';
+export type CalendarView = 'month' | 'week' | 'day' | 'list' | 'custom';
 
 export type CalendarServiceType = 'sonarr' | 'radarr' | 'jellyseerr';
 

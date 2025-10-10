@@ -30,6 +30,7 @@ export interface UseCalendarReturn {
   calendarData: CalendarMonth | CalendarWeek | CalendarDay;
   stats: CalendarStats;
   navigation: CalendarNavigation;
+  releases: MediaRelease[];
   setView: (view: CalendarView) => void;
   setCurrentDate: (date: string) => void;
   setSelectedDate: (date?: string) => void;
@@ -283,6 +284,7 @@ export const useCalendar = (): UseCalendarReturn => {
     calendarData,
     stats,
     navigation,
+    releases,
     
     // Actions
     setView,
@@ -309,6 +311,9 @@ function generateCalendarData(currentDate: string, view: CalendarView, releases:
       return generateWeekData(current, releases);
     case 'day':
       return generateDayData(current, releases);
+    case 'custom':
+      // For custom, return a dummy month data, but releasesForView will handle it specially
+      return generateMonthData(current, releases);
     default:
       return generateMonthData(current, releases);
   }
