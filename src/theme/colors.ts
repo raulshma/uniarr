@@ -418,8 +418,29 @@ const getRelativeLuminance = (color: string): number => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
-const getAccessibleOnColor = (background: string): string =>
-  getRelativeLuminance(background) < 0.45 ? '#FFFFFF' : '#000000';
+const getContrastRatio = (colorA: string, colorB: string): number => {
+  const lA = getRelativeLuminance(colorA);
+  const lB = getRelativeLuminance(colorB);
+  const lighter = Math.max(lA, lB);
+  const darker = Math.min(lA, lB);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+const getAccessibleOnColor = (background: string): string => {
+  // Fallback quick-path
+  const normalized = normalizeHex(background);
+  if (!normalized) return '#000000';
+
+  const contrastWhite = getContrastRatio(normalized, '#FFFFFF');
+  const contrastBlack = getContrastRatio(normalized, '#000000');
+
+  // Prefer a color that meets the 4.5:1 contrast requirement for normal text.
+  if (contrastWhite >= 4.5) return '#FFFFFF';
+  if (contrastBlack >= 4.5) return '#000000';
+
+  // Otherwise choose the color with the higher contrast ratio.
+  return contrastWhite >= contrastBlack ? '#FFFFFF' : '#000000';
+};
 
 const ensureDarkSurface = (color?: string, fallback: string = FALLBACK_DARK_SURFACE): string => {
   const normalized = normalizeHex(color);
