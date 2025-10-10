@@ -8,6 +8,10 @@ export type ReleaseStatus = 'upcoming' | 'released' | 'delayed' | 'cancelled';
 
 export type CalendarView = 'month' | 'week' | 'day' | 'list';
 
+export type CalendarServiceType = 'sonarr' | 'radarr' | 'jellyseerr';
+
+export type CalendarMonitoredFilter = 'all' | 'monitored' | 'unmonitored';
+
 export interface MediaRelease {
   readonly id: string;
   readonly title: string;
@@ -33,7 +37,7 @@ export interface MediaRelease {
   readonly monitored?: boolean;
   readonly downloadStatus?: 'missing' | 'queued' | 'downloading' | 'available' | 'unknown';
   readonly serviceId?: string;
-  readonly serviceType?: 'sonarr' | 'radarr' | 'jellyseerr';
+  readonly serviceType?: CalendarServiceType;
 }
 
 export interface CalendarDay {
@@ -61,6 +65,8 @@ export interface CalendarFilters {
   readonly mediaTypes: MediaType[];
   readonly statuses: ReleaseStatus[];
   readonly services: string[];
+  readonly serviceTypes: CalendarServiceType[];
+  readonly monitoredStatus: CalendarMonitoredFilter;
   readonly dateRange?: {
     readonly start: string;
     readonly end: string;

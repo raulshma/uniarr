@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet, View, Pressable } from 'react-native';
-import { Text, Chip, useTheme } from 'react-native-paper';
+import { Icon, Text, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
 import type { MediaRelease } from '@/models/calendar.types';
@@ -21,240 +21,148 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
   style,
 }) => {
   const theme = useTheme<AppTheme>();
+  const [isPressed, setIsPressed] = useState(false);
 
   const styles = StyleSheet.create({
     container: {
-      backgroundColor: theme.colors.surfaceVariant,
-      borderRadius: compact ? 6 : 8,
-      padding: compact ? theme.custom.spacing.xs : theme.custom.spacing.sm,
-      marginBottom: compact ? 0 : theme.custom.spacing.xs,
+      backgroundColor: compact ? theme.colors.surfaceVariant : theme.colors.surface,
+      borderRadius: compact ? 12 : 18,
+      paddingVertical: compact ? theme.custom.spacing.xs : theme.custom.spacing.sm,
+      paddingHorizontal: compact ? theme.custom.spacing.sm : theme.custom.spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: compact ? theme.custom.spacing.xs : theme.custom.spacing.md,
+      borderWidth: compact ? StyleSheet.hairlineWidth : 0,
+      borderColor: compact ? theme.colors.outlineVariant : 'transparent',
+      marginBottom: compact ? 0 : theme.custom.spacing.sm,
     },
     pressable: {
       flex: 1,
     },
     content: {
-      flexDirection: compact ? 'row' : 'column',
-      alignItems: compact ? 'center' : 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      gap: compact ? theme.custom.spacing.xs : theme.custom.spacing.md,
     },
     posterContainer: {
-      marginRight: compact ? theme.custom.spacing.xs : 0,
-      marginBottom: compact ? 0 : theme.custom.spacing.xs,
+      width: compact ? 56 : 80,
     },
     info: {
       flex: 1,
-      minWidth: 0, // Allow text to wrap
+      minWidth: 0,
     },
     title: {
-      fontSize: compact 
-        ? theme.custom.typography.bodySmall.fontSize 
-        : theme.custom.typography.bodyMedium.fontSize,
-      fontFamily: compact 
-        ? theme.custom.typography.bodySmall.fontFamily 
-        : theme.custom.typography.bodyMedium.fontFamily,
-      fontWeight: compact 
-        ? theme.custom.typography.bodySmall.fontWeight as any
-        : theme.custom.typography.bodyMedium.fontWeight as any,
-      lineHeight: compact 
-        ? theme.custom.typography.bodySmall.lineHeight 
-        : theme.custom.typography.bodyMedium.lineHeight,
-      letterSpacing: compact 
-        ? theme.custom.typography.bodySmall.letterSpacing 
-        : theme.custom.typography.bodyMedium.letterSpacing,
-      color: theme.colors.onSurfaceVariant,
+      fontSize: compact
+        ? theme.custom.typography.titleSmall.fontSize
+        : theme.custom.typography.titleMedium.fontSize,
+      fontFamily: compact
+        ? theme.custom.typography.titleSmall.fontFamily
+        : theme.custom.typography.titleMedium.fontFamily,
+      fontWeight: compact
+        ? theme.custom.typography.titleSmall.fontWeight as any
+        : theme.custom.typography.titleMedium.fontWeight as any,
+      lineHeight: compact
+        ? theme.custom.typography.titleSmall.lineHeight
+        : theme.custom.typography.titleMedium.lineHeight,
+      letterSpacing: compact
+        ? theme.custom.typography.titleSmall.letterSpacing
+        : theme.custom.typography.titleMedium.letterSpacing,
+      color: theme.colors.onSurface,
     },
     subtitle: {
-      fontSize: theme.custom.typography.labelSmall.fontSize,
-      fontFamily: theme.custom.typography.labelSmall.fontFamily,
-      fontWeight: theme.custom.typography.labelSmall.fontWeight as any,
-      lineHeight: theme.custom.typography.labelSmall.lineHeight,
-      letterSpacing: theme.custom.typography.labelSmall.letterSpacing,
+      fontSize: theme.custom.typography.bodySmall.fontSize,
+      fontFamily: theme.custom.typography.bodySmall.fontFamily,
+      fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
+      lineHeight: theme.custom.typography.bodySmall.lineHeight,
+      letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      opacity: 0.7,
-      marginTop: compact ? 0 : theme.custom.spacing.xxs,
+      marginTop: theme.custom.spacing.xxs,
     },
-    badges: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginTop: compact ? 0 : theme.custom.spacing.xs,
+    trailing: {
+      width: compact ? 32 : 40,
+      height: compact ? 32 : 40,
+      borderRadius: compact ? 16 : 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceVariant,
     },
-    chip: {
-      marginRight: theme.custom.spacing.xxs,
-      marginBottom: theme.custom.spacing.xxs,
+    trailingSelected: {
+      backgroundColor: theme.colors.primaryContainer,
     },
   });
-
-  const statusConfig = useMemo(() => {
-    switch (release.status) {
-      case 'upcoming':
-        return { label: 'Upcoming', tone: 'primary' as const };
-      case 'released':
-        return { label: 'Released', tone: 'secondary' as const };
-      case 'delayed':
-        return { label: 'Delayed', tone: 'error' as const };
-      case 'cancelled':
-        return { label: 'Cancelled', tone: 'outline' as const };
-      default:
-        return { label: 'Unknown', tone: 'outline' as const };
-    }
-  }, [release.status]);
 
   const typeConfig = useMemo(() => {
     switch (release.type) {
       case 'movie':
         return { label: 'Movie', icon: 'movie-open' };
       case 'series':
-        return { label: 'Series', icon: 'television-classic' };
+        return { label: 'TV Show', icon: 'television-classic' };
       case 'episode':
-        return { label: 'Episode', icon: 'play-circle' };
+        return { label: 'TV Show', icon: 'play-circle' };
       default:
         return { label: 'Media', icon: 'play' };
     }
   }, [release.type]);
 
-  const downloadStatusConfig = useMemo(() => {
-    if (!release.downloadStatus) return null;
-    
-    switch (release.downloadStatus) {
-      case 'available':
-        return { label: 'Available', tone: 'secondary' as const };
-      case 'downloading':
-        return { label: 'Downloading', tone: 'primary' as const };
-      case 'queued':
-        return { label: 'Queued', tone: 'tertiary' as const };
-      case 'missing':
-        return { label: 'Missing', tone: 'error' as const };
-      case 'unknown':
-        return { label: 'Unknown', tone: 'outline' as const };
-      default:
-        return null;
-    }
-  }, [release.downloadStatus]);
-
-  const getChipStyle = (tone: string) => {
-    const toneColorMap: Record<string, { background: string; text: string }> = {
-      primary: { background: theme.colors.primaryContainer, text: theme.colors.onPrimaryContainer },
-      secondary: { background: theme.colors.secondaryContainer, text: theme.colors.onSecondaryContainer },
-      tertiary: { background: theme.colors.tertiaryContainer, text: theme.colors.onTertiaryContainer },
-      error: { background: theme.colors.errorContainer, text: theme.colors.onErrorContainer },
-      outline: { background: theme.colors.surfaceVariant, text: theme.colors.onSurfaceVariant },
-    };
-
-    const colors = toneColorMap[tone] || toneColorMap.outline;
-    return {
-      backgroundColor: colors?.background || theme.colors.surfaceVariant,
-      textColor: colors?.text || theme.colors.onSurfaceVariant,
-    };
-  };
-
-  const formatReleaseDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = date.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Tomorrow';
-    if (diffDays === -1) return 'Yesterday';
-    if (diffDays > 0) return `In ${diffDays} days`;
-    if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
-    
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const getSubtitle = () => {
+  const subtitle = useMemo(() => {
     const parts: string[] = [];
-    
-    if (release.type === 'episode' && release.seriesTitle) {
-      parts.push(release.seriesTitle);
-      if (release.seasonNumber && release.episodeNumber) {
-        parts.push(`S${release.seasonNumber}E${release.episodeNumber}`);
-      }
-    } else if (release.year) {
-      parts.push(String(release.year));
-    }
-    
-    if (release.network) {
-      parts.push(release.network);
-    }
-    
-    return parts.join(' • ');
-  };
 
-  const statusChipStyle = getChipStyle(statusConfig.tone);
-  const downloadChipStyle = downloadStatusConfig ? getChipStyle(downloadStatusConfig.tone) : null;
+    parts.push(typeConfig.label);
+
+    if (release.type === 'episode') {
+      if (release.seasonNumber && release.episodeNumber) {
+        const season = String(release.seasonNumber).padStart(2, '0');
+        const episode = String(release.episodeNumber).padStart(2, '0');
+        parts.push(`S${season}E${episode}`);
+      } else if (release.seriesTitle) {
+        parts.push(release.seriesTitle);
+      }
+    }
+
+    const releaseDate = release.releaseDate ? release.releaseDate : undefined;
+    if (releaseDate) {
+      parts.push(releaseDate);
+    }
+
+    return parts.join(' • ');
+  }, [release, typeConfig.label]);
+
+  const monitored = release.monitored ?? false;
+  const statusIcon = monitored ? 'check-circle' : 'bookmark-outline';
+  const statusColor = monitored ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant;
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, isPressed && !compact ? { opacity: 0.9 } : null, style]}>
       <Pressable
         style={styles.pressable}
         onPress={onPress}
+        onPressIn={() => setIsPressed(true)}
+        onPressOut={() => setIsPressed(false)}
         accessibilityRole="button"
-        accessibilityLabel={`${release.title}, ${typeConfig.label}, ${statusConfig.label}`}
+        accessibilityLabel={`${release.title}, ${typeConfig.label}`}
       >
         <View style={styles.content}>
-          {!compact && release.posterUrl && (
-            <View style={styles.posterContainer}>
-              <MediaPoster
-                uri={release.posterUrl}
-                size="small"
-                borderRadius={6}
-                showPlaceholderLabel={false}
-              />
-            </View>
-          )}
+          <View style={styles.posterContainer}>
+            <MediaPoster
+              uri={release.posterUrl}
+              size={compact ? 56 : 80}
+              borderRadius={14}
+              showPlaceholderLabel={false}
+            />
+          </View>
 
           <View style={styles.info}>
             <Text style={styles.title} numberOfLines={compact ? 1 : 2}>
               {release.title}
             </Text>
-            
             <Text style={styles.subtitle} numberOfLines={1}>
-              {getSubtitle()}
+              {subtitle}
             </Text>
+          </View>
 
-            {!compact && (
-              <View style={styles.badges}>
-                <Chip
-                  compact
-                  mode="flat"
-                  style={[styles.chip, { backgroundColor: statusChipStyle.backgroundColor }]}
-                  textStyle={{ color: statusChipStyle.textColor }}
-                >
-                  {statusConfig.label}
-                </Chip>
-
-                <Chip
-                  compact
-                  mode="flat"
-                  style={[styles.chip, { backgroundColor: theme.colors.surfaceVariant }]}
-                  textStyle={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {typeConfig.label}
-                </Chip>
-
-                {downloadChipStyle && (
-                  <Chip
-                    compact
-                    mode="flat"
-                    style={[styles.chip, { backgroundColor: downloadChipStyle.backgroundColor }]}
-                    textStyle={{ color: downloadChipStyle.textColor }}
-                  >
-                    {downloadStatusConfig!.label}
-                  </Chip>
-                )}
-
-                {release.monitored && (
-                  <Chip
-                    compact
-                    mode="flat"
-                    style={[styles.chip, { backgroundColor: theme.colors.primaryContainer }]}
-                    textStyle={{ color: theme.colors.onPrimaryContainer }}
-                  >
-                    Monitored
-                  </Chip>
-                )}
-              </View>
-            )}
+          <View style={[styles.trailing, monitored && styles.trailingSelected]}>
+            <Icon source={statusIcon} size={20} color={statusColor} />
           </View>
         </View>
       </Pressable>

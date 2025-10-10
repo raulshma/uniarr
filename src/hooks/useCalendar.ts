@@ -44,12 +44,14 @@ const DEFAULT_FILTERS: CalendarFilters = {
   mediaTypes: ['movie', 'series', 'episode'],
   statuses: ['upcoming', 'released'],
   services: [],
+  serviceTypes: [],
+  monitoredStatus: 'all',
 };
 
 const DEFAULT_STATE: CalendarState = {
   currentDate: new Date().toISOString().split('T')[0]!,
   view: 'month',
-  filters: DEFAULT_FILTERS,
+  filters: { ...DEFAULT_FILTERS },
   isLoading: false,
 };
 
@@ -97,13 +99,13 @@ export const useCalendar = (): UseCalendarReturn => {
   }, [updateState]);
 
   const setFilters = useCallback((filters: Partial<CalendarFilters>) => {
-    updateState({ 
-      filters: { ...state.filters, ...filters }
+    updateState({
+      filters: { ...state.filters, ...filters },
     });
   }, [state.filters, updateState]);
 
   const clearFilters = useCallback(() => {
-    updateState({ filters: DEFAULT_FILTERS });
+    updateState({ filters: { ...DEFAULT_FILTERS } });
   }, [updateState]);
 
   const goToToday = useCallback(() => {

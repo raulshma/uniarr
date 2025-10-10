@@ -34,31 +34,38 @@ export class CalendarService {
       
       const releases: MediaRelease[] = [];
       
-      // Fetch from Sonarr services
-      const sonarrConfigs = configs.filter(config => 
-        config.type === 'sonarr' && config.enabled
-      );
-      
-      for (const config of sonarrConfigs) {
-        try {
-          const sonarrReleases = await this.getSonarrReleases(config.id, filters);
-          releases.push(...sonarrReleases);
-        } catch (error) {
-          console.warn(`Failed to fetch releases from Sonarr ${config.name}:`, error);
+  const allowedTypes = new Set(filters.serviceTypes ?? []);
+      const fetchAllTypes = allowedTypes.size === 0;
+
+      // Fetch from Sonarr services when allowed
+      if (fetchAllTypes || allowedTypes.has('sonarr')) {
+        const sonarrConfigs = configs.filter(config =>
+          config.type === 'sonarr' && config.enabled
+        );
+
+        for (const config of sonarrConfigs) {
+          try {
+            const sonarrReleases = await this.getSonarrReleases(config.id, filters);
+            releases.push(...sonarrReleases);
+          } catch (error) {
+            console.warn(`Failed to fetch releases from Sonarr ${config.name}:`, error);
+          }
         }
       }
-      
-      // Fetch from Radarr services
-      const radarrConfigs = configs.filter(config => 
-        config.type === 'radarr' && config.enabled
-      );
-      
-      for (const config of radarrConfigs) {
-        try {
-          const radarrReleases = await this.getRadarrReleases(config.id, filters);
-          releases.push(...radarrReleases);
-        } catch (error) {
-          console.warn(`Failed to fetch releases from Radarr ${config.name}:`, error);
+
+      // Fetch from Radarr services when allowed
+      if (fetchAllTypes || allowedTypes.has('radarr')) {
+        const radarrConfigs = configs.filter(config =>
+          config.type === 'radarr' && config.enabled
+        );
+
+        for (const config of radarrConfigs) {
+          try {
+            const radarrReleases = await this.getRadarrReleases(config.id, filters);
+            releases.push(...radarrReleases);
+          } catch (error) {
+            console.warn(`Failed to fetch releases from Radarr ${config.name}:`, error);
+          }
         }
       }
       
@@ -213,6 +220,20 @@ export class CalendarService {
       
       // Filter by service
       if (filters.services.length > 0 && release.serviceId && !filters.services.includes(release.serviceId)) {
+        return false;
+      }
+
+      // Filter by service type
+  if ((filters.serviceTypes?.length ?? 0) > 0 && release.serviceType && !filters.serviceTypes.includes(release.serviceType)) {
+        return false;
+      }
+
+      // Filter by monitored status
+      if (filters.monitoredStatus === 'monitored' && !release.monitored) {
+        return false;
+      }
+
+      if (filters.monitoredStatus === 'unmonitored' && release.monitored) {
         return false;
       }
       
