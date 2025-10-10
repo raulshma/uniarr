@@ -37,10 +37,11 @@ import { testApiKeyFormat } from '@/utils/api-key-validator';
 import { debugLogger } from '@/utils/debug-logger';
 
 const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'jellyfin', 'qbittorrent', 'transmission', 'deluge', 'sabnzbd', 'nzbget', 'rtorrent', 'prowlarr', 'bazarr'];
-const apiKeyServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'prowlarr', 'bazarr'];
-type ApiKeyServiceType = 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr';
+const apiKeyServiceTypes = ['sonarr', 'radarr', 'jellyseerr', 'jellyfin', 'prowlarr', 'bazarr'] as const;
+type ApiKeyServiceType = (typeof apiKeyServiceTypes)[number];
 
-const isApiKeyService = (type: ServiceType): type is ApiKeyServiceType => apiKeyServiceTypes.includes(type);
+const isApiKeyService = (type: ServiceType): type is ApiKeyServiceType =>
+  (apiKeyServiceTypes as readonly ServiceType[]).includes(type);
 
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: 'Sonarr',
@@ -75,15 +76,23 @@ const normalizeSensitiveValue = (value?: string): string | undefined => {
 const buildServiceConfig = (values: ServiceConfigInput, id: string): ServiceConfig => {
   const now = new Date();
   const cleanedUrl = values.url.trim().replace(/\/+$/, '');
+  const apiKey = normalizeSensitiveValue(values.apiKey);
+  let username = normalizeSensitiveValue(values.username);
+  let password = normalizeSensitiveValue(values.password);
+
+  if (values.type === 'jellyfin') {
+    username = undefined;
+    password = undefined;
+  }
 
   return {
     id,
     name: values.name.trim(),
     type: values.type,
     url: cleanedUrl,
-    apiKey: normalizeSensitiveValue(values.apiKey),
-    username: normalizeSensitiveValue(values.username),
-    password: normalizeSensitiveValue(values.password),
+    apiKey,
+    username,
+    password,
     enabled: true,
     createdAt: now,
     updatedAt: now,
@@ -786,7 +795,7 @@ const AddServiceScreen = () => {
             control={control}
             render={({ field: { value: serviceType } }: { field: { value: ServiceType } }) => {
               // Services that use username/password authentication instead of API keys
-              if (serviceType === 'qbittorrent' || serviceType === 'transmission' || serviceType === 'deluge' || serviceType === 'jellyfin') {
+              if (serviceType === 'qbittorrent' || serviceType === 'transmission' || serviceType === 'deluge') {
                 return (
                   <>
                     <View style={styles.formField}>

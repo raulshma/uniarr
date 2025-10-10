@@ -193,25 +193,20 @@ export abstract class BaseConnector<
 
     instance.interceptors.request.use(
       (requestConfig) => {
-        console.log('📤 [BaseConnector] Outgoing request:', {
+        void logger.debug('Outgoing connector request.', {
+          serviceId: this.config.id,
+          serviceType: this.config.type,
           method: requestConfig.method?.toUpperCase(),
           url: requestConfig.url,
           fullUrl: `${this.config.url}${requestConfig.url}`,
           headers: requestConfig.headers,
           timeout: requestConfig.timeout,
         });
-        
-        void logger.debug('Outgoing connector request.', {
-          serviceId: this.config.id,
-          serviceType: this.config.type,
-          method: requestConfig.method?.toUpperCase(),
-          url: requestConfig.url,
-        });
 
         return requestConfig;
       },
       (error) => {
-        console.error('📤 [BaseConnector] Request setup error:', error);
+        void logger.error('Connector request setup error.', { serviceId: this.config.id, error });
         this.logRequestError(error);
         return Promise.reject(error);
       },
@@ -219,35 +214,29 @@ export abstract class BaseConnector<
 
     instance.interceptors.response.use(
       (response) => {
-        console.log('📥 [BaseConnector] Response received:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: response.config.url,
-          headers: response.headers,
-          dataType: typeof response.data,
-          dataLength: response.data ? JSON.stringify(response.data).length : 0,
-        });
-        
         void logger.debug('Connector response received.', {
           serviceId: this.config.id,
           serviceType: this.config.type,
           status: response.status,
           url: response.config.url,
+          statusText: response.statusText,
+          headers: response.headers,
+          dataType: typeof response.data,
+          dataLength: response.data ? JSON.stringify(response.data).length : 0,
         });
 
         return response;
       },
       (error) => {
-        console.error('📥 [BaseConnector] Response error:', {
-          message: error.message,
-          code: error.code,
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          url: error.config?.url,
-          headers: error.response?.headers,
-          data: error.response?.data,
+        void logger.error('Connector response error.', {
+          serviceId: this.config.id,
+          message: error?.message,
+          code: error?.code,
+          status: error?.response?.status,
+          statusText: error?.response?.statusText,
+          url: error?.config?.url,
         });
-        
+
         this.handleHttpError(error);
         return Promise.reject(error);
       },

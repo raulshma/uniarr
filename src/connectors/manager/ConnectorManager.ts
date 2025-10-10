@@ -51,24 +51,23 @@ export class ConnectorManager {
     config: ServiceConfig,
     options: AddConnectorOptions = {},
   ): Promise<IConnector> {
-    console.log('🏭 [ConnectorManager] Adding connector:', config.type, config.id);
+    logger.debug('[ConnectorManager] Adding connector', { serviceType: config.type, serviceId: config.id });
     
     const existing = this.connectors.get(config.id);
     if (existing) {
-      console.log('🏭 [ConnectorManager] Disposing existing connector');
+      logger.debug('[ConnectorManager] Disposing existing connector', { serviceId: config.id });
       existing.dispose();
       this.connectors.delete(config.id);
     }
 
-    console.log('🏭 [ConnectorManager] Creating connector via factory...');
+    logger.debug('[ConnectorManager] Creating connector via factory');
     const connector = ConnectorFactory.create(config);
-    console.log('🏭 [ConnectorManager] Connector created, adding to map...');
+    logger.debug('[ConnectorManager] Connector created, adding to map', { serviceId: config.id });
     this.connectors.set(config.id, connector);
 
     if (options.persist !== false) {
-      console.log('🏭 [ConnectorManager] Persisting config to storage...');
       await secureStorage.saveServiceConfig(config);
-      console.log('🏭 [ConnectorManager] Config persisted');
+      logger.debug('[ConnectorManager] Persisted config to storage', { serviceId: config.id });
     }
 
     void logger.info('Connector registered.', {
@@ -76,7 +75,7 @@ export class ConnectorManager {
       serviceType: config.type,
     });
 
-    console.log('🏭 [ConnectorManager] Connector registration completed');
+    logger.debug('[ConnectorManager] Connector registration completed', { serviceId: config.id });
     return connector;
   }
 

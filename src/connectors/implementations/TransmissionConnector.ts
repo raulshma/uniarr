@@ -112,19 +112,19 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
   }
 
   async initialize(): Promise<void> {
-    console.log('🔧 [TransmissionConnector] Initializing...');
+    logger.debug('[TransmissionConnector] Initializing', { serviceId: this.config.id });
     await this.getSessionId();
-    console.log('🔧 [TransmissionConnector] Initialization completed');
+    logger.debug('[TransmissionConnector] Initialization completed', { serviceId: this.config.id });
   }
 
   async getVersion(): Promise<string> {
-    console.log('🔧 [TransmissionConnector] Getting version...');
+    logger.debug('[TransmissionConnector] Getting version', { serviceId: this.config.id });
 
     try {
       const response = await this.rpcRequest<TransmissionSessionResponse>('session-get');
       return response.arguments.version;
     } catch (error) {
-      console.error('🔧 [TransmissionConnector] Version request failed:', error);
+      logger.error('[TransmissionConnector] Version request failed', { serviceId: this.config.id, error });
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
@@ -274,7 +274,7 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
       const sessionId = (error as AxiosError)?.response?.headers?.['x-transmission-session-id'];
       if (sessionId) {
         this.sessionId = sessionId;
-        console.log('🔧 [TransmissionConnector] Session ID obtained:', sessionId);
+        logger.debug('[TransmissionConnector] Session ID obtained', { serviceId: this.config.id, sessionId });
       }
     }
   }

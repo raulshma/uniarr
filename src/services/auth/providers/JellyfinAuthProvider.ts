@@ -3,29 +3,21 @@ import axios, { AxiosError } from 'axios';
 import { BaseAuthProvider } from './BaseAuthProvider';
 import type { AuthConfig, AuthResult, AuthSession, AuthMethod } from '../types';
 import { logger } from '@/services/logger/LoggerService';
+import type { JellyfinUserProfile } from '@/models/jellyfin.types';
 
 const CLIENT_NAME = 'UniArr';
 const DEVICE_NAME = 'UniArr Mobile';
 const CLIENT_VERSION = '1.0.0';
 
-interface JellyfinLoginResponse {
-  readonly AccessToken?: string;
-  readonly User?: {
-    readonly Id?: string;
-    readonly Name?: string;
-  };
-  readonly SessionInfo?: {
-    readonly PlaySessionId?: string;
-    readonly DeviceId?: string;
-  };
-}
-
-const sanitizeToken = (token: string | undefined): string | undefined =>
+const sanitizeApiKey = (token: string | undefined): string | undefined =>
   token && token.trim().length > 0 ? token.trim() : undefined;
+
+const normalizeName = (value: string | undefined): string | undefined =>
+  value && value.trim().length > 0 ? value.trim().toLowerCase() : undefined;
 
 export class JellyfinAuthProvider extends BaseAuthProvider {
   getAuthMethod(): AuthMethod {
-    return 'session';
+    return 'api-key';
   }
 
   async authenticate(config: AuthConfig): Promise<AuthResult> {
@@ -38,45 +30,46 @@ export class JellyfinAuthProvider extends BaseAuthProvider {
       };
     }
 
+    const apiKey = sanitizeApiKey(config.credentials.apiKey);
+    if (!apiKey) {
+      return {
+        success: false,
+        authenticated: false,
+        error: 'API key is required for Jellyfin authentication.',
+      };
+    }
+
     const deviceId = this.buildDeviceId(config);
-    const url = this.buildLoginUrl(config.baseUrl);
-    const headers = this.buildAuthorizationHeaders(deviceId);
+    const baseUrl = this.normalizeBaseUrl(config.baseUrl);
+    const initialHeaders = this.buildAuthorizationHeaders(apiKey, deviceId);
 
     try {
-      const response = await axios.post<JellyfinLoginResponse>(
-        url,
-        {
-          Username: config.credentials.username,
-          Pw: config.credentials.password,
-        },
-        {
-          timeout: config.timeout ?? this.timeout,
-          headers,
-        },
+      const profile = await this.fetchUserProfile(
+        baseUrl,
+        initialHeaders,
+        config.timeout ?? this.timeout,
+        config.credentials.username,
       );
 
-      const accessToken = sanitizeToken(response.data?.AccessToken);
-      const userId = response.data?.User?.Id;
-
-      if (!accessToken) {
+      if (!profile) {
         return {
           success: false,
           authenticated: false,
-          error: 'Jellyfin did not return an access token. Verify the credentials and try again.',
+          error: 'Unable to resolve Jellyfin user context. Provide a username or create a user-bound API key.',
         };
       }
+
+      const finalHeaders = this.buildAuthorizationHeaders(apiKey, deviceId, profile.Id, profile.Name);
 
       return {
         success: true,
         authenticated: true,
-        token: accessToken,
-        headers: {
-          'X-MediaBrowser-Token': accessToken,
-        },
+        token: apiKey,
+        headers: finalHeaders,
         context: {
-          userId,
+          userId: profile?.Id,
+          userName: profile?.Name,
           deviceId,
-          userName: response.data?.User?.Name,
         },
       };
     } catch (error) {
@@ -85,7 +78,7 @@ export class JellyfinAuthProvider extends BaseAuthProvider {
 
       const message = this.normalizeErrorMessage(axiosError);
       void logger.error('Jellyfin authentication failed.', {
-        url,
+        url: `${baseUrl}/Users/Me`,
         status,
         message,
       });
@@ -99,7 +92,7 @@ export class JellyfinAuthProvider extends BaseAuthProvider {
   }
 
   override async refresh(config: AuthConfig, _session: AuthSession): Promise<AuthResult> {
-    // Re-run the authentication flow with the existing credentials
+    // API keys do not expire, but we re-validate to ensure the key still works.
     return this.authenticate(config);
   }
 
@@ -109,38 +102,68 @@ export class JellyfinAuthProvider extends BaseAuthProvider {
     }
 
     const deviceId = this.extractDeviceId(session);
+    const userId = typeof session.context?.userId === 'string' ? session.context.userId : undefined;
+    const userName = typeof session.context?.userName === 'string' ? session.context.userName : undefined;
 
-    return {
-      'X-MediaBrowser-Token': session.token,
-      'X-Emby-Authorization': this.buildAuthorizationValue(deviceId),
-      Accept: 'application/json',
-    };
+    return this.buildAuthorizationHeaders(session.token, deviceId, userId, userName);
   }
 
   override isSessionValid(session: AuthSession): boolean {
     return Boolean(session.isAuthenticated && session.token);
   }
 
-  private buildLoginUrl(baseUrl: string): string {
-    const trimmed = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    return `${trimmed}/Users/AuthenticateByName`;
+  private async fetchUserProfile(
+    baseUrl: string,
+    headers: Record<string, string>,
+    timeout: number,
+    preferredUsername?: string,
+  ): Promise<JellyfinUserProfile | undefined> {
+    const url = `${baseUrl}/Users/Me`;
+    try {
+      const response = await axios.get<JellyfinUserProfile>(url, {
+        timeout,
+        headers,
+        params: {
+          Fields: 'PrimaryImageAspectRatio',
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      const axiosError = error as AxiosError<{ Message?: string }>;
+      if (axiosError.response?.status === 400) {
+        return this.resolveUserFromApiKey(baseUrl, headers, timeout, preferredUsername);
+      }
+
+      throw error;
+    }
   }
 
-  private buildAuthorizationHeaders(deviceId: string): Record<string, string> {
+  private normalizeBaseUrl(baseUrl: string): string {
+    return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  }
+
+  private buildAuthorizationHeaders(apiKey: string, deviceId: string, userId?: string, userName?: string): Record<string, string> {
     return {
-      'Content-Type': 'application/json',
       Accept: 'application/json',
-      'X-Emby-Authorization': this.buildAuthorizationValue(deviceId),
+      'Content-Type': 'application/json',
+      'X-MediaBrowser-Token': apiKey,
+      'X-Emby-Token': apiKey,
+      ...(userId ? { 'X-Emby-User-Id': userId } : {}),
+      'X-Emby-Authorization': this.buildAuthorizationValue(deviceId, apiKey, userId, userName),
     };
   }
 
-  private buildAuthorizationValue(deviceId: string): string {
+  private buildAuthorizationValue(deviceId: string, token?: string, userId?: string, userName?: string): string {
     const safeDeviceId = deviceId || 'uniarr-device';
-    return `MediaBrowser Client="${CLIENT_NAME}", Device="${DEVICE_NAME}", DeviceId="${safeDeviceId}", Version="${CLIENT_VERSION}"`;
+    const tokenSegment = token ? `, Token="${token}"` : '';
+    const userIdSegment = userId ? `, UserId="${userId}"` : '';
+    const userNameSegment = userName ? `, UserName="${userName}"` : '';
+    return `MediaBrowser Client="${CLIENT_NAME}", Device="${DEVICE_NAME}", DeviceId="${safeDeviceId}", Version="${CLIENT_VERSION}"${tokenSegment}${userIdSegment}${userNameSegment}`;
   }
 
   private buildDeviceId(config: AuthConfig): string {
-    const username = config.credentials.username?.trim().toLowerCase() ?? 'user';
+    const fallbackUser = config.credentials.username?.trim().toLowerCase() || 'api';
     let host = 'service';
     try {
       const parsed = new URL(config.baseUrl);
@@ -149,7 +172,7 @@ export class JellyfinAuthProvider extends BaseAuthProvider {
       host = config.baseUrl.replace(/[^a-z0-9-]/gi, '') || host;
     }
 
-    return `uniarr-${host}-${username}`.slice(0, 50);
+    return `uniarr-${host}-${fallbackUser}`.slice(0, 50);
   }
 
   private extractDeviceId(session: AuthSession): string {
@@ -157,14 +180,62 @@ export class JellyfinAuthProvider extends BaseAuthProvider {
     return contextDeviceId ?? 'uniarr-device';
   }
 
+  private async resolveUserFromApiKey(
+    baseUrl: string,
+    headers: Record<string, string>,
+    timeout: number,
+    preferredUsername?: string,
+  ): Promise<JellyfinUserProfile | undefined> {
+    try {
+      const response = await axios.get<ReadonlyArray<Partial<JellyfinUserProfile> & { readonly Username?: string; readonly IsDisabled?: boolean }>>(
+        `${baseUrl}/Users`,
+        {
+          timeout,
+          headers,
+        },
+      );
+
+      const users = Array.isArray(response.data) ? response.data : [];
+      if (!users.length) {
+        return undefined;
+      }
+
+      const normalized = normalizeName(preferredUsername);
+      const match = normalized
+        ? users.find((user) => normalizeName(user.Name) === normalized || normalizeName(user.Username) === normalized)
+        : undefined;
+
+      const activeUser = match ?? users.find((user) => user.IsDisabled !== true) ?? users[0];
+
+      if (!activeUser?.Id) {
+        return undefined;
+      }
+
+      void logger.debug('Resolved Jellyfin user via fallback lookup.', {
+        userId: activeUser.Id,
+        userName: activeUser.Name ?? activeUser.Username,
+      });
+
+      return {
+        Id: activeUser.Id,
+        Name: activeUser.Name ?? activeUser.Username,
+      };
+    } catch (error) {
+      void logger.debug('Failed to resolve Jellyfin user via fallback lookup.', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
   private normalizeErrorMessage(error: AxiosError<{ Message?: string }>): string {
     if (error.response?.status === 401) {
       const serverMessage = error.response.data?.Message;
-      return serverMessage ? `Authentication failed: ${serverMessage}` : 'Authentication failed. Check your credentials.';
+      return serverMessage ? `Authentication failed: ${serverMessage}` : 'Authentication failed. Check your API key.';
     }
 
     if (error.response?.status === 403) {
-      return 'Authentication is forbidden. Verify the Jellyfin account permissions.';
+      return 'Authentication is forbidden. Verify the Jellyfin API key permissions.';
     }
 
     if (error.code === 'ECONNABORTED') {

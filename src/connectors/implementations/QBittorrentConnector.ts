@@ -93,17 +93,17 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
   }
 
   async initialize(): Promise<void> {
-    console.log('🔧 [QBittorrentConnector] Initializing...');
+    logger.debug('[QBittorrentConnector] Initializing', { serviceId: this.config.id });
     await this.ensureAuthenticated();
-    console.log('🔧 [QBittorrentConnector] Initialization completed');
+    logger.debug('[QBittorrentConnector] Initialization completed', { serviceId: this.config.id });
   }
 
   async getVersion(): Promise<string> {
-    console.log('🔧 [QBittorrentConnector] Getting version...');
+    logger.debug('[QBittorrentConnector] Getting version', { serviceId: this.config.id });
     await this.ensureAuthenticated();
 
     try {
-      console.log('🔧 [QBittorrentConnector] Making version request to:', `${this.config.url}${QB_API_PREFIX}/app/version`);
+      logger.debug('[QBittorrentConnector] Making version request', { serviceId: this.config.id, url: `${this.config.url}${QB_API_PREFIX}/app/version` });
       const response = await this.client.get<string>(`${QB_API_PREFIX}/app/version`, {
         responseType: 'text',
         transformResponse: (value) => value,
@@ -111,10 +111,10 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
 
       const version = typeof response.data === 'string' ? response.data.trim() : undefined;
       const finalVersion = version && version.length > 0 ? version : 'unknown';
-      console.log('🔧 [QBittorrentConnector] Version retrieved:', finalVersion);
+      logger.debug('[QBittorrentConnector] Version retrieved', { serviceId: this.config.id, version: finalVersion });
       return finalVersion;
     } catch (error) {
-      console.error('🔧 [QBittorrentConnector] Version request failed:', error);
+      logger.error('[QBittorrentConnector] Version request failed', { serviceId: this.config.id, error });
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
