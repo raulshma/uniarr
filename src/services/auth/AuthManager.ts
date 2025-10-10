@@ -55,6 +55,7 @@ export class AuthManager implements IAuthManager {
           expiresAt: result.expiresAt,
           lastAuthenticated: new Date(),
           retryCount: 0,
+          context: result.context,
         };
         
         this.sessions.set(serviceId, session);
@@ -168,6 +169,7 @@ export class AuthManager implements IAuthManager {
           expiresAt: result.expiresAt || session.expiresAt,
           lastAuthenticated: new Date(),
           retryCount: 0,
+          context: result.context ?? session.context,
         };
         
         this.updateSession(serviceId, updatedSession);
@@ -176,6 +178,7 @@ export class AuthManager implements IAuthManager {
         const updatedSession: AuthSession = {
           ...session,
           retryCount: session.retryCount + 1,
+          context: session.context,
         };
         this.updateSession(serviceId, updatedSession);
       }

@@ -6,6 +6,7 @@ const serviceTypeValues = [
   'sonarr',
   'radarr',
   'jellyseerr',
+  'jellyfin',
   'qbittorrent',
   'transmission',
   'deluge',
@@ -33,6 +34,26 @@ export const serviceConfigSchema = z
     password: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.type === 'jellyfin') {
+      if (!data.username || data.username.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['username'],
+          message: 'Username is required for Jellyfin',
+        });
+      }
+
+      if (!data.password || data.password.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['password'],
+          message: 'Password is required for Jellyfin',
+        });
+      }
+
+      return;
+    }
+
     if (data.type === 'qbittorrent') {
       if (!data.username || data.username.trim().length === 0) {
         ctx.addIssue({

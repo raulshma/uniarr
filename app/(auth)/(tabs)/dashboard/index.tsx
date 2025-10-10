@@ -68,17 +68,18 @@ type DashboardListItem =
   | { type: "empty" };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
-  sonarr: "Sonarr",
-  radarr: "Radarr",
-  jellyseerr: "Jellyseerr",
-  qbittorrent: "qBittorrent",
-  transmission: "Transmission",
-  deluge: "Deluge",
-  sabnzbd: "SABnzbd",
-  nzbget: "NZBGet",
-  rtorrent: "rTorrent",
-  prowlarr: "Prowlarr",
-  bazarr: "Bazarr",
+  sonarr: 'Sonarr',
+  radarr: 'Radarr',
+  jellyseerr: 'Jellyseerr',
+  jellyfin: 'Jellyfin',
+  qbittorrent: 'qBittorrent',
+  transmission: 'Transmission',
+  deluge: 'Deluge',
+  sabnzbd: 'SABnzbd',
+  nzbget: 'NZBGet',
+  rtorrent: 'rTorrent',
+  prowlarr: 'Prowlarr',
+  bazarr: 'Bazarr',
 };
 
 const serviceIcons: Partial<Record<ServiceType, string>> = {

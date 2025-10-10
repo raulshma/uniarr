@@ -36,12 +36,17 @@ import {
 import { testApiKeyFormat } from '@/utils/api-key-validator';
 import { debugLogger } from '@/utils/debug-logger';
 
-const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'transmission', 'deluge', 'sabnzbd', 'nzbget', 'rtorrent', 'prowlarr', 'bazarr'];
+const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'jellyfin', 'qbittorrent', 'transmission', 'deluge', 'sabnzbd', 'nzbget', 'rtorrent', 'prowlarr', 'bazarr'];
+const apiKeyServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'prowlarr', 'bazarr'];
+type ApiKeyServiceType = 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr';
+
+const isApiKeyService = (type: ServiceType): type is ApiKeyServiceType => apiKeyServiceTypes.includes(type);
 
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: 'Sonarr',
   radarr: 'Radarr',
   jellyseerr: 'Jellyseerr',
+  jellyfin: 'Jellyfin',
   qbittorrent: 'qBittorrent',
   transmission: 'Transmission',
   deluge: 'Deluge',
@@ -393,8 +398,9 @@ const AddServiceScreen = () => {
         const config = buildServiceConfig(values, generateServiceId());
         
         // Validate API key format first (skip for download clients that use username/password)
-        if (values.apiKey && !['qbittorrent', 'transmission', 'deluge'].includes(values.type)) {
-          const apiKeyTest = testApiKeyFormat(values.apiKey, values.type as 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr');
+        if (values.apiKey && isApiKeyService(values.type)) {
+          const serviceType = values.type as ApiKeyServiceType;
+          const apiKeyTest = testApiKeyFormat(values.apiKey, serviceType);
           debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
 
           if (!apiKeyTest.isValid) {
@@ -779,8 +785,8 @@ const AddServiceScreen = () => {
             name="type"
             control={control}
             render={({ field: { value: serviceType } }: { field: { value: ServiceType } }) => {
-              // Download clients that use username/password authentication
-              if (serviceType === 'qbittorrent' || serviceType === 'transmission' || serviceType === 'deluge') {
+              // Services that use username/password authentication instead of API keys
+              if (serviceType === 'qbittorrent' || serviceType === 'transmission' || serviceType === 'deluge' || serviceType === 'jellyfin') {
                 return (
                   <>
                     <View style={styles.formField}>

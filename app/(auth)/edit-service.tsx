@@ -35,12 +35,17 @@ import {
 import { testApiKeyFormat } from '@/utils/api-key-validator';
 import { debugLogger } from '@/utils/debug-logger';
 
-const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'transmission', 'deluge', 'sabnzbd', 'nzbget', 'rtorrent', 'prowlarr', 'bazarr'];
+const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'jellyfin', 'qbittorrent', 'transmission', 'deluge', 'sabnzbd', 'nzbget', 'rtorrent', 'prowlarr', 'bazarr'];
+const apiKeyServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'prowlarr', 'bazarr'];
+type ApiKeyServiceType = 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr';
+
+const isApiKeyService = (type: ServiceType): type is ApiKeyServiceType => apiKeyServiceTypes.includes(type);
 
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: 'Sonarr',
   radarr: 'Radarr',
   jellyseerr: 'Jellyseerr',
+  jellyfin: 'Jellyfin',
   qbittorrent: 'qBittorrent',
   transmission: 'Transmission',
   deluge: 'Deluge',
@@ -355,8 +360,9 @@ const EditServiceScreen = () => {
         const config = buildServiceConfig(values, existingConfig);
         
         // Validate API key format first
-        if (values.apiKey && values.type !== 'qbittorrent') {
-          const apiKeyTest = testApiKeyFormat(values.apiKey, values.type as 'sonarr' | 'radarr' | 'qbittorrent' | 'jellyseerr' | 'prowlarr' | 'transmission' | 'deluge' | 'sabnzbd' | 'nzbget' | 'rtorrent' | 'bazarr');
+        if (values.apiKey && isApiKeyService(values.type)) {
+          const serviceType = values.type as ApiKeyServiceType;
+          const apiKeyTest = testApiKeyFormat(values.apiKey, serviceType);
           debugLogger.addApiKeyValidation(apiKeyTest.isValid, apiKeyTest.message, apiKeyTest.suggestions);
 
           if (!apiKeyTest.isValid) {
@@ -769,7 +775,7 @@ const EditServiceScreen = () => {
             name="type"
             control={control}
             render={({ field: { value: serviceType } }) => {
-              if (serviceType === 'qbittorrent') {
+              if (serviceType === 'qbittorrent' || serviceType === 'transmission' || serviceType === 'deluge' || serviceType === 'jellyfin') {
                 return (
                   <>
                     <View style={styles.formField}>

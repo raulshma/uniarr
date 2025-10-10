@@ -65,6 +65,11 @@ export const SERVICE_DETECTION_CONFIGS: Partial<Record<ServiceType, ServiceDetec
     commonPorts: [5055],
     detectionEndpoint: '/api/v1/status',
   },
+  jellyfin: {
+    type: 'jellyfin',
+    commonPorts: [8096, 8920],
+    detectionEndpoint: '/System/Info/Public',
+  },
   qbittorrent: {
     type: 'qbittorrent',
     commonPorts: [8080, 8091],
@@ -368,6 +373,11 @@ export class NetworkScannerService {
         case 'jellyseerr':
           response = await client.get(config.detectionEndpoint);
           version = response.data?.version || response.data?.commitTag;
+          break;
+
+        case 'jellyfin':
+          response = await client.get(config.detectionEndpoint);
+          version = response.data?.Version || response.data?.ProductVersion || response.data?.ServerVersion;
           break;
 
         case 'qbittorrent':

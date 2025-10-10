@@ -33,6 +33,7 @@ const serviceTypeLabels: Record<string, string> = {
   sonarr: 'Sonarr',
   radarr: 'Radarr',
   jellyseerr: 'Jellyseerr',
+  jellyfin: 'Jellyfin',
   qbittorrent: 'qBittorrent',
   prowlarr: 'Prowlarr',
 };
