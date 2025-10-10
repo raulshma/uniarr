@@ -304,11 +304,20 @@ export const UnifiedSearchPanel: React.FC = () => {
 
   const handlePrimaryAction = useCallback(
     async (item: UnifiedSearchResult) => {
-      // For Jellyseerr, open the specific media detail page directly
       if (item.serviceType === 'jellyseerr') {
-        const opened = await openJellyseerrMediaDetail(item);
-        if (!opened) {
-          // Fallback to service landing if URL could not be constructed
+        // Main button: open Jellyseerr media detail page in-app
+        const mediaType = item.mediaType === 'series' ? 'series' : 'movie';
+        const mediaId = item.externalIds?.tmdbId ?? item.externalIds?.serviceNativeId;
+        if (mediaId) {
+          router.push({
+            pathname: '/(auth)/jellyseerr/[serviceId]/[mediaType]/[mediaId]',
+            params: {
+              serviceId: item.serviceId,
+              mediaType,
+              mediaId: String(mediaId),
+            },
+          });
+        } else {
           router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: item.serviceId } });
         }
       } else {
@@ -340,11 +349,8 @@ export const UnifiedSearchPanel: React.FC = () => {
   const handleOpenService = useCallback(
     (item: UnifiedSearchResult) => {
       if (item.serviceType === 'jellyseerr') {
-        void openJellyseerrMediaDetail(item).then((opened) => {
-          if (!opened) {
-            router.push({ pathname: '/(auth)/jellyseerr/[serviceId]', params: { serviceId: item.serviceId } });
-          }
-        });
+        // Icon button: open Jellyseerr media detail page in browser (web app)
+        void openJellyseerrMediaDetail(item);
         return;
       }
 
@@ -457,7 +463,7 @@ export const UnifiedSearchPanel: React.FC = () => {
                 fontFamily: theme.custom.typography.labelLarge.fontFamily,
               }}
             >
-              {item.serviceType === 'jellyseerr' ? 'View in Jellyseerr' : `Add via ${serviceTypeLabels[item.serviceType] ?? 'Service'}`}
+              {item.serviceType === 'jellyseerr' ? 'View' : `Add via ${serviceTypeLabels[item.serviceType] ?? 'Service'}`}
             </Button>
             <IconButton
               icon="open-in-new"
