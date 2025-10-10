@@ -5,6 +5,7 @@ import { Icon, Text, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
 import type { MediaRelease } from '@/models/calendar.types';
+import { formatTimeToRelease } from '@/utils/calendar.utils';
 import { MediaPoster } from '@/components/media/MediaPoster';
 
 export type MediaReleaseCardProps = {
@@ -122,7 +123,7 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
 
     const releaseDate = release.releaseDate ? release.releaseDate : undefined;
     if (releaseDate) {
-      parts.push(releaseDate);
+      parts.push(formatTimeToRelease(releaseDate));
     }
 
     return parts.join(' • ');

@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { logger } from '@/services/logger/LoggerService';
 import type { NotificationCategory, QuietHoursConfig } from '@/models/notification.types';
+import type { CalendarView } from '@/models/calendar.types';
 import {
   createDefaultQuietHoursConfig,
   normalizeQuietHoursConfig,
@@ -26,6 +27,8 @@ type SettingsData = {
   quietHours: Record<NotificationCategory, QuietHoursConfig>;
   criticalHealthAlertsBypassQuietHours: boolean;
   cloudBackupConfigs: Record<CloudProvider, CloudStorageConfig>;
+  // Remember last selected calendar view (week/day/month/list)
+  lastCalendarView: CalendarView;
 };
 
 interface SettingsState extends SettingsData {
@@ -48,6 +51,7 @@ interface SettingsState extends SettingsData {
   updateCloudBackupConfig: (provider: CloudProvider, config: Partial<CloudStorageConfig>) => void;
   setCloudBackupConfig: (provider: CloudProvider, config: CloudStorageConfig) => void;
   reset: () => void;
+  setLastCalendarView: (view: CalendarView) => void;
 }
 
 const STORAGE_KEY = 'SettingsStore:v1';
@@ -98,6 +102,7 @@ const createDefaultSettings = (): SettingsData => ({
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
   cloudBackupConfigs: createDefaultCloudBackupConfigs(),
+  lastCalendarView: 'week',
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -147,7 +152,8 @@ export const useSettingsStore = create<SettingsState>()(
             [provider]: config,
           },
         })),
-      reset: () => set(createDefaultSettings()),
+  setLastCalendarView: (view: CalendarView) => set({ lastCalendarView: view }),
+  reset: () => set(createDefaultSettings()),
     }),
     {
       name: STORAGE_KEY,
@@ -257,3 +263,5 @@ export const selectCriticalHealthAlertsBypassQuietHours = (state: SettingsState)
 export const selectCloudBackupConfigs = (state: SettingsState) => state.cloudBackupConfigs;
 export const selectCloudBackupConfig = (provider: CloudProvider) =>
   (state: SettingsState) => state.cloudBackupConfigs[provider];
+
+export const selectLastCalendarView = (state: SettingsState) => state.lastCalendarView;

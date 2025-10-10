@@ -15,6 +15,7 @@ import type {
 } from '@/models/calendar.types';
 
 import { queryKeys } from '@/hooks/queryKeys';
+import { useSettingsStore, selectLastCalendarView, } from '@/store/settingsStore';
 import { 
   formatDate, 
   getDateRangeForView, 
@@ -50,7 +51,7 @@ const DEFAULT_FILTERS: CalendarFilters = {
 
 const DEFAULT_STATE: CalendarState = {
   currentDate: new Date().toISOString().split('T')[0]!,
-  view: 'month',
+  view: 'week',
   filters: { ...DEFAULT_FILTERS },
   isLoading: false,
 };
@@ -59,7 +60,13 @@ const DEFAULT_STATE: CalendarState = {
  * Hook for managing calendar state and data
  */
 export const useCalendar = (): UseCalendarReturn => {
-  const [state, setState] = useState<CalendarState>(DEFAULT_STATE);
+  const lastCalendarView = useSettingsStore(selectLastCalendarView);
+  const setLastCalendarView = useSettingsStore((s) => s.setLastCalendarView);
+
+  const [state, setState] = useState<CalendarState>(() => ({
+    ...DEFAULT_STATE,
+    view: lastCalendarView ?? DEFAULT_STATE.view,
+  }));
 
   // Fetch releases from calendar service
   const { data: releases = [], isLoading, error } = useQuery({
@@ -80,7 +87,15 @@ export const useCalendar = (): UseCalendarReturn => {
 
   const setView = useCallback((view: CalendarView) => {
     updateState({ view });
-  }, [updateState]);
+    // Persist last selected view so next time the calendar opens it honors user's choice
+    try {
+      setLastCalendarView(view);
+    } catch (err) {
+      // Fail silently - persistence shouldn't break the UI
+      // eslint-disable-next-line no-console
+      console.warn('Failed to persist last calendar view', err);
+    }
+  }, [updateState, setLastCalendarView]);
 
   const setCurrentDate = useCallback((date: string) => {
     if (!validateDateString(date)) {

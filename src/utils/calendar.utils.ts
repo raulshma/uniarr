@@ -183,3 +183,38 @@ export const getDateRangeForView = (currentDate: string, view: 'month' | 'week' 
       };
   }
 };
+
+/**
+ * Format a release date into a short, easy-to-read "time to release" string.
+ * Examples: "Today", "Tomorrow", "In 3 days", "3 days ago", "Mar 10"
+ */
+export const formatTimeToRelease = (date: Date | string): string => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const now = new Date();
+  const diffMs = dateObj.getTime() - now.getTime();
+  const absMs = Math.abs(diffMs);
+
+  const minute = 1000 * 60;
+  const hour = minute * 60;
+  const day = hour * 24;
+
+  if (absMs < hour) {
+    const mins = Math.max(1, Math.round(absMs / minute));
+    if (diffMs >= 0) return `In ${mins} min${mins === 1 ? '' : 's'}`;
+    return `${mins} min${mins === 1 ? '' : 's'} ago`;
+  }
+
+  if (absMs < day) {
+    const hrs = Math.max(1, Math.round(absMs / hour));
+    if (diffMs >= 0) return `In ${hrs} hr${hrs === 1 ? '' : 's'}`;
+    return `${hrs} hr${hrs === 1 ? '' : 's'} ago`;
+  }
+
+  const days = Math.ceil(Math.abs(diffMs) / day);
+  if (days === 0) return 'Today';
+  if (days === 1) return diffMs >= 0 ? 'Tomorrow' : 'Yesterday';
+  if (days < 7) return diffMs >= 0 ? `In ${days} days` : `${days} days ago`;
+
+  // For dates a week away or more show a short date
+  return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
