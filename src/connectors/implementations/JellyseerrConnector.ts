@@ -20,6 +20,7 @@ import { logger } from '@/services/logger/LoggerService';
 const API_PREFIX = '/api/v1';
 const REQUEST_ENDPOINT = `${API_PREFIX}/request`;
 const SEARCH_ENDPOINT = `${API_PREFIX}/search`;
+const TRENDING_ENDPOINT = `${API_PREFIX}/discover/trending`;
 const STATUS_ENDPOINT = `${API_PREFIX}/status`;
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
@@ -689,6 +690,47 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         serviceType: this.config.type,
         operation: 'search',
         endpoint: SEARCH_ENDPOINT,
+      });
+    }
+  }
+
+  async getTrending(options?: { page?: number; language?: string }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+    await this.ensureAuthenticated();
+
+    try {
+      const params: Record<string, unknown> = {};
+
+      if (typeof options?.page === 'number' && options.page > 0) {
+        params.page = options.page;
+      }
+
+      if (options?.language) {
+        params.language = options.language;
+      }
+
+      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(TRENDING_ENDPOINT, {
+        params,
+      });
+
+      const items = mapSearchResults(response.data.results);
+      const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
+
+      return {
+        items,
+        total: totalResults,
+        pageInfo: {
+          page: response.data.page ?? response.data.pageInfo?.page,
+          pages: response.data.totalPages ?? response.data.pageInfo?.pages,
+          results: totalResults,
+          totalResults,
+        },
+      };
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getTrending',
+        endpoint: TRENDING_ENDPOINT,
       });
     }
   }

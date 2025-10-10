@@ -1,0 +1,153 @@
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+
+import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
+import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
+import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
+import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { queryKeys } from '@/hooks/queryKeys';
+import type { DiscoverMediaItem, DiscoverSection, UnifiedDiscoverPayload, UnifiedDiscoverServices } from '@/models/discover.types';
+import type { JellyseerrSearchResult } from '@/models/jellyseerr.types';
+import type { ServiceConfig } from '@/models/service.types';
+
+const emptyServices: UnifiedDiscoverServices = {
+  sonarr: [],
+  radarr: [],
+  jellyseerr: [],
+};
+
+const mapServiceSummaries = (configs: ServiceConfig[]) =>
+  configs.map((config) => ({
+    id: config.id,
+    name: config.name,
+    type: config.type,
+  }));
+
+const mapTrendingResult = (result: JellyseerrSearchResult, mediaType: DiscoverMediaItem['mediaType']): DiscoverMediaItem => ({
+  id: `${mediaType}-${result.tmdbId ?? result.tvdbId ?? result.id}`,
+  title: result.title,
+  mediaType,
+  overview: result.overview,
+  posterUrl: result.posterUrl,
+  backdropUrl: result.backdropUrl,
+  rating: result.rating,
+  popularity: result.popularity,
+  releaseDate: result.mediaType === 'tv' ? result.firstAirDate ?? result.releaseDate : result.releaseDate,
+  year: (() => {
+    const dateString = result.mediaType === 'tv' ? result.firstAirDate : result.releaseDate;
+    if (!dateString) {
+      return undefined;
+    }
+    const parsed = Number.parseInt(dateString.slice(0, 4), 10);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  })(),
+  tmdbId: result.tmdbId,
+  tvdbId: result.tvdbId,
+  imdbId: result.imdbId,
+  source: 'jellyseerr',
+});
+
+const fetchUnifiedDiscover = async (): Promise<UnifiedDiscoverPayload> => {
+  const manager = ConnectorManager.getInstance();
+  await manager.loadSavedServices();
+
+  const jellyConnectors = manager.getConnectorsByType('jellyseerr') as JellyseerrConnector[];
+  const sonarrConnectors = manager.getConnectorsByType('sonarr') as SonarrConnector[];
+  const radarrConnectors = manager.getConnectorsByType('radarr') as RadarrConnector[];
+
+  const services: UnifiedDiscoverServices = {
+    sonarr: mapServiceSummaries(sonarrConnectors.map((connector) => connector.config)),
+    radarr: mapServiceSummaries(radarrConnectors.map((connector) => connector.config)),
+    jellyseerr: mapServiceSummaries(jellyConnectors.map((connector) => connector.config)),
+  };
+
+  const trendingBatches = await Promise.all(
+    jellyConnectors.map(async (connector) => {
+      try {
+        const response = await connector.getTrending({ page: 1 });
+        return response.items;
+      } catch (error) {
+        console.warn(`Failed to load trending titles from ${connector.config.name}:`, error);
+        return [] as JellyseerrSearchResult[];
+      }
+    }),
+  );
+
+  const trendingItems = trendingBatches.flat();
+
+  if (trendingItems.length === 0) {
+    return {
+      sections: [],
+      services,
+    };
+  }
+
+  const deduped = new Map<string, JellyseerrSearchResult>();
+  for (const item of trendingItems) {
+    const key = item.tmdbId ? `tmdb-${item.tmdbId}` : `${item.mediaType}-${item.id}`;
+    if (!deduped.has(key)) {
+      deduped.set(key, item);
+    }
+  }
+
+  const tvResults: DiscoverMediaItem[] = [];
+  const movieResults: DiscoverMediaItem[] = [];
+
+  deduped.forEach((value) => {
+    if (value.mediaType === 'tv') {
+      tvResults.push(mapTrendingResult(value, 'series'));
+    } else if (value.mediaType === 'movie') {
+      movieResults.push(mapTrendingResult(value, 'movie'));
+    }
+  });
+
+  const sections: DiscoverSection[] = [];
+
+  if (tvResults.length) {
+    sections.push({
+      id: 'popular-tv',
+      title: 'Popular TV Shows',
+      mediaType: 'series',
+      source: 'jellyseerr',
+      items: tvResults.slice(0, 12),
+    });
+  }
+
+  if (movieResults.length) {
+    sections.push({
+      id: 'trending-movies',
+      title: 'Trending Movies',
+      mediaType: 'movie',
+      source: 'jellyseerr',
+      items: movieResults.slice(0, 12),
+    });
+  }
+
+  return {
+    sections,
+    services,
+  };
+};
+
+export const useUnifiedDiscover = () => {
+  const query = useQuery<UnifiedDiscoverPayload>({
+    queryKey: queryKeys.discover.unified,
+    queryFn: fetchUnifiedDiscover,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const services = useMemo(() => query.data?.services ?? emptyServices, [query.data?.services]);
+  const sections = useMemo(() => query.data?.sections ?? [], [query.data?.sections]);
+
+  return {
+    sections,
+    services,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+  };
+};

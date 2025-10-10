@@ -122,6 +122,10 @@ export const queryKeys = {
       filters ?? {},
     ] as const,
   },
+  discover: {
+    base: ['discover'] as const,
+    unified: ['discover', 'unified'] as const,
+  },
   bazarr: {
     base: ['bazarr'] as const,
     service: (serviceId: string): QueryKeyBuilder => ['bazarr', serviceId] as const,
