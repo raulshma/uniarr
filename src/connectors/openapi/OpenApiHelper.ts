@@ -6,6 +6,7 @@
  * can read them synchronously.
  */
 import jellyseerrSpec from '@/connectors/openapi-specs/jellyseerr-openapi.json';
+import jellyfinSpec from '@/connectors/openapi-specs/jellyfin-openapi.json';
 import sonarrSpec from '@/connectors/openapi-specs/sonarr-openapi.json';
 import radarrSpec from '@/connectors/openapi-specs/radarr-openapi.json';
 import prowlarrSpec from '@/connectors/openapi-specs/prowlarr-openapi.json';
@@ -19,6 +20,7 @@ const SPEC_MAP: Record<string, OpenApiSpec> = {
   radarr: radarrSpec as OpenApiSpec,
   prowlarr: prowlarrSpec as OpenApiSpec,
   bazarr: bazarrSpec as OpenApiSpec,
+  jellyfin: jellyfinSpec as OpenApiSpec,
 };
 
 const tryGetOperation = (pathObj: Record<string, any> | undefined, operationName: string) => {
