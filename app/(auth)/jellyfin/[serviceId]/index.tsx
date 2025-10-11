@@ -7,8 +7,6 @@ import {
   StyleSheet,
   View,
   useWindowDimensions,
-  Animated,
-  Easing,
 } from "react-native";
 import {
   Chip,
@@ -380,59 +378,20 @@ const JellyfinLibraryScreen = () => {
       nowPlayingQuery.isFetching) &&
     !isInitialLoad;
 
-  // Animation: cross-fade skeleton -> content
+  // Simplified: show skeleton overlay while initial load. No animated
+  // cross-fade; toggling happens synchronously to keep UI snappy.
   const [showSkeletonLayer, setShowSkeletonLayer] = useState(isInitialLoad);
   const [contentInteractive, setContentInteractive] = useState(!isInitialLoad);
 
-  const skeletonOpacity = useRef(
-    new Animated.Value(isInitialLoad ? 1 : 0)
-  ).current;
-  const contentOpacity = useRef(
-    new Animated.Value(isInitialLoad ? 0 : 1)
-  ).current;
-
   useEffect(() => {
     if (isInitialLoad) {
-      // Ensure skeleton is present while animating in
       setShowSkeletonLayer(true);
       setContentInteractive(false);
-
-      Animated.parallel([
-        Animated.timing(skeletonOpacity, {
-          toValue: 1,
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(contentOpacity, {
-          toValue: 0,
-          duration: 200,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]).start();
-      return;
-    }
-
-    // Fade skeleton out and fade content in, then remove skeleton layer from tree.
-    Animated.parallel([
-      Animated.timing(skeletonOpacity, {
-        toValue: 0,
-        duration: 320,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(contentOpacity, {
-        toValue: 1,
-        duration: 360,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    } else {
       setShowSkeletonLayer(false);
       setContentInteractive(true);
-    });
-  }, [isInitialLoad, skeletonOpacity, contentOpacity]);
+    }
+  }, [isInitialLoad]);
 
   const aggregatedError =
     librariesQuery.error ??
@@ -1062,8 +1021,8 @@ const JellyfinLibraryScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Content layer: always rendered but faded in when ready */}
-      <Animated.View
-        style={[styles.contentLayer, { opacity: contentOpacity }]}
+      <View
+        style={[styles.contentLayer, { opacity: contentInteractive ? 1 : 0 }]}
         pointerEvents={contentInteractive ? "auto" : "none"}
       >
         <FlashList
@@ -1081,12 +1040,12 @@ const JellyfinLibraryScreen = () => {
             />
           }
         />
-      </Animated.View>
+  </View>
 
       {/* Skeleton overlay: mounted while visible and cross-fades out */}
       {showSkeletonLayer ? (
-        <Animated.View
-          style={[styles.overlay, { opacity: skeletonOpacity }]}
+        <View
+          style={[styles.overlay]}
           pointerEvents={showSkeletonLayer ? "auto" : "none"}
         >
           <SafeAreaView style={styles.safeArea}>
@@ -1135,7 +1094,7 @@ const JellyfinLibraryScreen = () => {
               ))}
             </ScrollView>
           </SafeAreaView>
-        </Animated.View>
+  </View>
       ) : null}
       {errorMessage ? (
         <HelperText type="error" visible>

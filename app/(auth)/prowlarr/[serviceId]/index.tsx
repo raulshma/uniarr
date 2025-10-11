@@ -16,13 +16,7 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  Layout,
-} from "react-native-reanimated";
+// Reanimated entering/exiting animations removed for snappy UX on list pages.
 
 import { EmptyState } from "@/components/common/EmptyState";
 import BottomDrawer, { DrawerItem } from "@/components/common/BottomDrawer";
@@ -63,9 +57,7 @@ const IndexerListItemSkeleton = () => {
   const theme = useTheme<AppTheme>();
 
   return (
-    <Animated.View
-      entering={FadeInDown}
-      layout={Layout}
+    <View
       style={[
         styles.indexerItem,
         {
@@ -88,7 +80,7 @@ const IndexerListItemSkeleton = () => {
           ]}
         />
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -289,9 +281,7 @@ const ProwlarrIndexerListScreen = () => {
         }
       }}
     >
-      <Animated.View
-        entering={FadeInUp}
-        layout={Layout}
+      <View
         style={[
           styles.indexerItem,
           {
@@ -364,7 +354,7 @@ const ProwlarrIndexerListScreen = () => {
             </View>
           </View>
         </View>
-      </Animated.View>
+  </View>
     </Pressable>
   );
 
@@ -509,7 +499,7 @@ const ProwlarrIndexerListScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Sync Status + Search and Filter Bar */}
-      <Animated.View entering={FadeIn} style={styles.searchContainer}>
+      <View style={styles.searchContainer}>
         {syncStatus && (
           <View
             style={[
@@ -580,10 +570,7 @@ const ProwlarrIndexerListScreen = () => {
         )}
         {/* API Request Banner (shows last API request info / errors) */}
         {lastApiEvent && (
-          <Animated.View
-            entering={FadeInDown}
-            exiting={FadeOut}
-            layout={Layout}
+          <View
             style={[
               styles.apiBanner,
               lastApiEvent.status === "error"
@@ -636,7 +623,7 @@ const ProwlarrIndexerListScreen = () => {
               onPress={clearApiEvent}
               accessibilityLabel="Dismiss API banner"
             />
-          </Animated.View>
+          </View>
         )}
         <Searchbar
           placeholder="Search indexers..."
@@ -670,7 +657,7 @@ const ProwlarrIndexerListScreen = () => {
             />
           </View>
         </TouchableRipple>
-      </Animated.View>
+      </View>
 
       {/* Indexers List */}
       <FlashList

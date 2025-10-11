@@ -3,16 +3,10 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import { Chip, Searchbar, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  Layout,
-} from "react-native-reanimated";
+// Animations disabled on this list page for snappy UX. Detail pages keep animations.
 
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -328,10 +322,7 @@ const RadarrMoviesListScreen = () => {
 
   const handleAddMovie = useCallback(() => {
     if (!hasValidServiceId) {
-  alert(
-        "Invalid service",
-        "The selected service identifier is not valid."
-      );
+      alert("Invalid service", "The selected service identifier is not valid.");
       return;
     }
 
@@ -349,11 +340,7 @@ const RadarrMoviesListScreen = () => {
   const renderMovieItem = useCallback(
     ({ item, index }: { item: Movie; index: number }) => {
       return (
-        <Animated.View
-          entering={FadeInUp.delay(index * 50).springify()}
-          exiting={FadeOut.springify()}
-          layout={Layout.springify()}
-        >
+        <View>
           <MovieListItem
             id={item.id}
             title={item.title}
@@ -370,7 +357,7 @@ const RadarrMoviesListScreen = () => {
             statistics={item.statistics}
             onPress={() => handleMoviePress(item)}
           />
-        </Animated.View>
+        </View>
       );
     },
     [handleMoviePress]
@@ -378,18 +365,11 @@ const RadarrMoviesListScreen = () => {
 
   const keyExtractor = useCallback((item: Movie) => item.id.toString(), []);
 
+  // Header used as the FlashList ListHeaderComponent
   const listHeader = useMemo(
     () => (
-      <Animated.View
-        style={styles.listHeader}
-        entering={FadeInDown.springify()}
-        layout={Layout.springify()}
-      >
-        <Animated.View
-          style={styles.headerRow}
-          entering={FadeInDown.delay(100).springify()}
-          layout={Layout.springify()}
-        >
+      <View style={styles.listHeader}>
+        <View style={styles.headerRow}>
           <View>
             <Text variant="headlineSmall" style={styles.headerTitle}>
               Movies
@@ -398,13 +378,11 @@ const RadarrMoviesListScreen = () => {
               Showing {filteredMovies.length} of {totalMovies} movies
             </Text>
           </View>
-          <Animated.View entering={FadeInDown.delay(200).springify()}>
-            <Button mode="contained" onPress={handleAddMovie}>
-              Add Movie
-            </Button>
-          </Animated.View>
-        </Animated.View>
-        <Animated.View entering={FadeInDown.delay(300).springify()}>
+          <Button mode="contained" onPress={handleAddMovie}>
+            Add Movie
+          </Button>
+        </View>
+        <View>
           <Searchbar
             placeholder="Search movies"
             value={searchTerm}
@@ -412,8 +390,8 @@ const RadarrMoviesListScreen = () => {
             style={styles.searchBar}
             accessibilityLabel="Search movies"
           />
-        </Animated.View>
-        <Animated.View entering={FadeInDown.delay(400).springify()}>
+        </View>
+        <View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -427,12 +405,8 @@ const RadarrMoviesListScreen = () => {
               { label: "Downloading", value: FILTER_DOWNLOADING },
               { label: "Monitored", value: FILTER_MONITORED },
               { label: "Unmonitored", value: FILTER_UNMONITORED },
-            ].map((filter, index) => (
-              <Animated.View
-                key={filter.value}
-                entering={FadeInDown.delay(500 + index * 50).springify()}
-                layout={Layout.springify()}
-              >
+            ].map((filter) => (
+              <View key={filter.value}>
                 <Chip
                   mode="flat"
                   onPress={() => setFilterValue(filter.value as FilterValue)}
@@ -442,51 +416,49 @@ const RadarrMoviesListScreen = () => {
                   ]}
                   textStyle={[
                     styles.filterChipText,
-                    filterValue === filter.value &&
-                      styles.filterChipTextSelected,
+                    filterValue === filter.value && styles.filterChipTextSelected,
                   ]}
                 >
                   {filter.label}
                 </Chip>
-              </Animated.View>
+              </View>
             ))}
           </ScrollView>
-        </Animated.View>
-      </Animated.View>
+        </View>
+      </View>
     ),
     [
       filteredMovies.length,
-      filterValue,
-      handleAddMovie,
-      searchTerm,
-      styles,
       totalMovies,
-    ]
+      handleAddMovie,
+      handleClearFilters,
+      searchTerm,
+      filterValue,
+      styles,
+    ],
   );
 
   const listEmptyComponent = useMemo(() => {
     if (filteredMovies.length === 0 && totalMovies > 0) {
       return (
-        <Animated.View entering={FadeIn.delay(200).springify()}>
+        <View>
           <EmptyState
             title="No movies match your filters"
             description="Try a different search query or reset the filters."
             actionLabel="Clear filters"
             onActionPress={handleClearFilters}
           />
-        </Animated.View>
+        </View>
       );
     }
 
     return (
-      <Animated.View entering={FadeIn.delay(200).springify()}>
-        <EmptyState
-          title="No movies available"
-          description="Add a movie in Radarr or adjust your filters to see it here."
-          actionLabel="Add Movie"
-          onActionPress={handleAddMovie}
-        />
-      </Animated.View>
+      <EmptyState
+        title="No movies available"
+        description="Add a movie in Radarr or adjust your filters to see it here."
+        actionLabel="Add Movie"
+        onActionPress={handleAddMovie}
+      />
     );
   }, [filteredMovies.length, handleAddMovie, handleClearFilters, totalMovies]);
 
@@ -575,10 +547,18 @@ const RadarrMoviesListScreen = () => {
   }
 
   if (isError) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to load movies from Radarr.";
+    const message = (() => {
+      if (error instanceof Error) return error.message;
+      try {
+        // If the error is a fetch-like response with a message payload
+        const maybe = (error as any) ?? {};
+        if (typeof maybe === 'string') return maybe;
+        if (typeof maybe?.message === 'string') return maybe.message;
+      } catch {
+        // fallthrough
+      }
+      return "Unable to load movies from Radarr.";
+    })();
 
     return (
       <SafeAreaView
@@ -596,11 +576,7 @@ const RadarrMoviesListScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Animated.View
-        style={{ flex: 1 }}
-        entering={FadeIn.delay(100).springify()}
-        layout={Layout.springify()}
-      >
+      <View style={{ flex: 1 }}>
         <FlashList
           data={filteredMovies}
           keyExtractor={keyExtractor}
@@ -618,7 +594,7 @@ const RadarrMoviesListScreen = () => {
             />
           }
         />
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 };

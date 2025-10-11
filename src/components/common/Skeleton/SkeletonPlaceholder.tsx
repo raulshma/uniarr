@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { Animated, Easing, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
@@ -66,49 +66,8 @@ const SkeletonPlaceholder: React.FC<SkeletonPlaceholderProps> = ({
   testID,
 }) => {
   const theme = useTheme<AppTheme>();
-  const progress = useRef(new Animated.Value(0)).current;
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
-
   const baseColor = theme.colors.surfaceVariant;
-  const highlightColor = useMemo(() => lightenHexColor(baseColor, 0.1), [baseColor]);
-
-  useEffect(() => {
-    animationRef.current = Animated.loop(
-      Animated.sequence([
-        Animated.timing(progress, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
-        Animated.timing(progress, {
-          toValue: 0,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
-      ]),
-    );
-
-    animationRef.current.start();
-
-    return () => {
-      if (animationRef.current) {
-        animationRef.current.stop();
-      }
-      progress.stopAnimation();
-    };
-  }, [progress]);
-
-  const animatedStyle = useMemo(
-    () => ({
-      backgroundColor: progress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [baseColor, highlightColor],
-      }),
-    }),
-    [baseColor, highlightColor, progress],
-  );
+  const animatedStyle = useMemo(() => ({ backgroundColor: baseColor }), [baseColor]);
 
   const dimensionStyle = useMemo(
     () => ({ width, height, borderRadius }),
@@ -116,7 +75,7 @@ const SkeletonPlaceholder: React.FC<SkeletonPlaceholderProps> = ({
   );
 
   return (
-    <Animated.View
+    <View
       pointerEvents="none"
       style={[styles.base, dimensionStyle, animatedStyle, style]}
       accessibilityRole="progressbar"

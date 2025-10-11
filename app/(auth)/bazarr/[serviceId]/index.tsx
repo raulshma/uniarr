@@ -16,13 +16,7 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  Layout,
-} from "react-native-reanimated";
+// Reanimated entering animations removed for list pages to improve snappiness.
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
@@ -70,11 +64,7 @@ const MediaItemSkeleton = () => {
   const theme = useTheme<AppTheme>();
 
   return (
-    <Animated.View
-      entering={FadeInDown}
-      layout={Layout}
-      style={[styles.mediaItem, { borderColor: theme.colors.outline }]}
-    >
+    <View style={[styles.mediaItem, { borderColor: theme.colors.outline }]}>
       <View style={styles.mediaContent}>
         <SkeletonPlaceholder style={styles.mediaPoster} />
         <View style={styles.mediaInfo}>
@@ -84,7 +74,7 @@ const MediaItemSkeleton = () => {
         </View>
         <SkeletonPlaceholder style={styles.mediaActions} />
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -109,11 +99,7 @@ const MediaItem = ({
   const missingCount = item.missingSubtitles?.length || 0;
 
   return (
-    <Animated.View
-      entering={FadeInDown}
-      layout={Layout}
-      style={[styles.mediaItem, { borderColor: theme.colors.outline }]}
-    >
+    <View style={[styles.mediaItem, { borderColor: theme.colors.outline }]}>
       <TouchableRipple onPress={onPress} style={styles.mediaContent}>
         <>
           <View style={styles.mediaPoster}>
@@ -151,7 +137,7 @@ const MediaItem = ({
           </View>
         </>
       </TouchableRipple>
-    </Animated.View>
+  </View>
   );
 };
 
@@ -165,11 +151,7 @@ const MissingSubtitleItem = ({
   const theme = useTheme<AppTheme>();
 
   return (
-    <Animated.View
-      entering={FadeInDown}
-      layout={Layout}
-      style={[styles.missingItem, { borderColor: theme.colors.outline }]}
-    >
+    <View style={[styles.missingItem, { borderColor: theme.colors.outline }]}>
       <TouchableRipple onPress={onPress} style={styles.missingContent}>
         <>
           <View style={styles.missingIcon}>
@@ -189,7 +171,7 @@ const MissingSubtitleItem = ({
           </View>
         </>
       </TouchableRipple>
-    </Animated.View>
+  </View>
   );
 };
 
