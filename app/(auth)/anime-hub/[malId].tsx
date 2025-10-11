@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useJikanAnimeDetails } from "@/hooks/useJikanAnimeDetails";
+import type { JikanTrailer } from "@/models/jikan.types";
 
 const AnimeHubDetailScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
@@ -107,11 +108,9 @@ const AnimeHubDetailScreen: React.FC = () => {
     anime?.images?.jpg?.image_url ??
     undefined;
   const backdropUri = (() => {
-    const trailer = anime?.trailer;
+    const trailer = anime?.trailer as JikanTrailer | undefined;
     if (!trailer) return undefined;
-    // Some responses include a nested `images` object on the trailer, others don't.
-    // Narrow at runtime and safely read the fields if present.
-    const images = (trailer as any).images;
+    const images = trailer.images;
     if (images && typeof images === "object") {
       return images.maximum_image_url ?? images.large_image_url ?? undefined;
     }
