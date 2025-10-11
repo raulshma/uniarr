@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   JikanAnime,
+  JikanAnimeFull,
   JikanAnimeSearchResponse,
   JikanRecommendationsQuery,
   JikanRecommendationResponse,
@@ -68,6 +69,13 @@ export const JikanClient = {
       { params }
     );
     return response.data;
+  },
+
+  async getAnimeFullById(malId: number) {
+    const response = await client.get<{ data: JikanAnimeFull }>(
+      `/anime/${malId}/full`
+    );
+    return response.data.data;
   },
 
   async searchAnime(query: string, page = 1, limit = 20) {
