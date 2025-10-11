@@ -42,6 +42,32 @@ import type {
   JellyfinResumeItem,
   JellyfinSession,
 } from "@/models/jellyfin.types";
+
+// Safely extract a Primary image tag from either a top-level PrimaryImageTag
+// property or an ImageTags.Primary entry without using `as any`.
+const extractPrimaryImageTag = (obj?: unknown): string | undefined => {
+  if (!obj || typeof obj !== "object") return undefined;
+  const r = obj as Record<string, unknown>;
+  const direct = r["PrimaryImageTag"];
+  if (typeof direct === "string") return direct;
+  const imageTags = r["ImageTags"];
+  if (imageTags && typeof imageTags === "object") {
+    const it = imageTags as Record<string, unknown>;
+    const primary = it["Primary"];
+    if (typeof primary === "string") return primary;
+  }
+  return undefined;
+};
+
+const getInternalStringField = (
+  obj?: unknown,
+  key?: string
+): string | undefined => {
+  if (!obj || typeof obj !== "object" || !key) return undefined;
+  const r = obj as Record<string, unknown>;
+  const v = r[key];
+  return typeof v === "string" ? v : undefined;
+};
 import { spacing } from "@/theme/spacing";
 
 type CollectionSegmentKey = "movies" | "tv" | "music";
@@ -177,7 +203,7 @@ const buildPosterUri = (
     return undefined;
   }
 
-  const tag = (item as any).PrimaryImageTag ?? item.ImageTags?.Primary;
+  const tag = extractPrimaryImageTag(item) ?? undefined;
   if (!tag) {
     return undefined;
   }
@@ -450,8 +476,7 @@ const JellyfinLibraryScreen = () => {
           ...it,
           Name: it.SeriesName ?? it.Name,
           Type: "Series",
-          PrimaryImageTag:
-            (it as any).PrimaryImageTag ?? (it as any).ImageTags?.Primary,
+          PrimaryImageTag: extractPrimaryImageTag(it),
           __navigationId: it.SeriesId ?? it.ParentId ?? it.Id,
           __posterSourceId: it.Id,
         } as JellyfinItem & {
@@ -473,8 +498,8 @@ const JellyfinLibraryScreen = () => {
     if (activeSegment !== "tv") return [] as string[];
     const ids = new Set<string>();
     for (const it of displayItems) {
-      if ((it as any).__navigationId)
-        ids.add((it as any).__navigationId as string);
+      const maybeNav = getInternalStringField(it, "__navigationId");
+      if (maybeNav) ids.add(maybeNav);
       else if (it.Type === "Series" && it.Id) ids.add(it.Id as string);
     }
     return Array.from(ids);
@@ -523,18 +548,22 @@ const JellyfinLibraryScreen = () => {
   const displayItemsEnriched = useMemo(() => {
     if (activeSegment !== "tv") return displayItems;
     return displayItems.map((it) => {
-      const navId = (it as any).__navigationId ?? it.Id;
+      const navId = getInternalStringField(it, "__navigationId") ?? it.Id;
       const meta = navId ? seriesMetaMap.get(navId) : undefined;
       if (!meta) return it;
       return {
         ...it,
         // Use the series item's id for poster requests when possible
-        __posterSourceId: meta.Id ?? (it as any).__posterSourceId,
+        __posterSourceId:
+          meta.Id ?? getInternalStringField(it, "__posterSourceId"),
         // Prefer series-level title if available
         Name: meta.Name ?? it.Name,
         PrimaryImageTag:
-          (meta as any).PrimaryImageTag ?? (it as any).PrimaryImageTag,
-        ImageTags: (meta as any).ImageTags ?? (it as any).ImageTags,
+          extractPrimaryImageTag(meta) ?? extractPrimaryImageTag(it),
+        ImageTags:
+          (meta as unknown as { ImageTags?: Record<string, string> })
+            ?.ImageTags ??
+          (it as unknown as { ImageTags?: Record<string, string> })?.ImageTags,
       } as JellyfinItem & { __posterSourceId?: string };
     });
   }, [displayItems, seriesMetaMap, activeSegment]);
@@ -760,7 +789,11 @@ const JellyfinLibraryScreen = () => {
             onPress={() => handleOpenItem(item.Id)}
           >
             <View style={styles.posterFrame}>
-              <MediaPoster uri={posterUri} size={posterSize} borderRadius={14} />
+              <MediaPoster
+                uri={posterUri}
+                size={posterSize}
+                borderRadius={14}
+              />
             </View>
             <Text
               variant="bodyMedium"
@@ -827,7 +860,11 @@ const JellyfinLibraryScreen = () => {
             }
           >
             <View style={styles.posterFrame}>
-              <MediaPoster uri={posterUri} size={innerPosterSize} borderRadius={12} />
+              <MediaPoster
+                uri={posterUri}
+                size={innerPosterSize}
+                borderRadius={12}
+              />
             </View>
             <Text
               variant="bodyMedium"

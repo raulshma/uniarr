@@ -119,7 +119,12 @@ const JellyfinItemDetailsScreen = () => {
   const threshold = Math.max(1, HERO_HEIGHT - finalTop);
 
   const posterAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolate.CLAMP);
+    const progress = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
     // Animated scale value (1 -> finalScale)
     const finalScale = 0.75;
     const scale = interpolate(progress, [0, 1], [1, finalScale]);
@@ -142,10 +147,30 @@ const JellyfinItemDetailsScreen = () => {
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
   const headerAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolate.CLAMP);
-    const opacity = interpolate(progress, [0, 0.6, 1], [1, 0, 0], Extrapolate.CLAMP);
-    const translateY = interpolate(progress, [0, 1], [0, -ACTION_BAR_HEIGHT], Extrapolate.CLAMP);
-    const height = interpolate(progress, [0, 1], [ACTION_BAR_HEIGHT, 0], Extrapolate.CLAMP);
+    const progress = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+    const opacity = interpolate(
+      progress,
+      [0, 0.6, 1],
+      [1, 0, 0],
+      Extrapolate.CLAMP
+    );
+    const translateY = interpolate(
+      progress,
+      [0, 1],
+      [0, -ACTION_BAR_HEIGHT],
+      Extrapolate.CLAMP
+    );
+    const height = interpolate(
+      progress,
+      [0, 1],
+      [ACTION_BAR_HEIGHT, 0],
+      Extrapolate.CLAMP
+    );
     return { opacity, transform: [{ translateY }], height } as any;
   });
 
@@ -174,9 +199,19 @@ const JellyfinItemDetailsScreen = () => {
   // chosen so the poster will be nicely contained when pinned under the
   // status bar.
   const heroAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
+    const progress = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
     const finalHeroHeight = finalTopWithoutHeader + POSTER_SIZE * 1.25;
-    const height = interpolate(progress, [0, 1], [HERO_HEIGHT, finalHeroHeight], Extrapolation.CLAMP);
+    const height = interpolate(
+      progress,
+      [0, 1],
+      [HERO_HEIGHT, finalHeroHeight],
+      Extrapolation.CLAMP
+    );
     return { height } as any;
   });
   const router = useRouter();
@@ -238,7 +273,11 @@ const JellyfinItemDetailsScreen = () => {
     [item?.RunTimeTicks]
   );
   const releaseYear = useMemo(
-    () => deriveYear(item?.PremiereDate ?? undefined, item?.ProductionYear ?? undefined),
+    () =>
+      deriveYear(
+        item?.PremiereDate ?? undefined,
+        item?.ProductionYear ?? undefined
+      ),
     [item?.PremiereDate, item?.ProductionYear]
   );
   const ratingLabel =
@@ -255,7 +294,9 @@ const JellyfinItemDetailsScreen = () => {
   const posterUri =
     item?.Id && connector
       ? connector.getImageUrl(item.Id, "Primary", {
-          tag: (item as any).PrimaryImageTag ?? item.ImageTags?.Primary,
+          tag: (typeof item === "object" && item !== null
+            ? (item as any).PrimaryImageTag ?? item.ImageTags?.Primary
+            : undefined) as string | undefined,
           width: 720,
         })
       : undefined;
@@ -326,7 +367,7 @@ const JellyfinItemDetailsScreen = () => {
     try {
       setIsSyncing(true);
       if (!item.Id) {
-        setSyncStatus('Unable to refresh metadata: missing item id.');
+        setSyncStatus("Unable to refresh metadata: missing item id.");
       } else {
         await connector.refreshItemMetadata(item.Id, false);
       }
@@ -349,15 +390,16 @@ const JellyfinItemDetailsScreen = () => {
       // /Persons/{name}/Images/Primary are correctly resolved. Fall back
       // to Id if name is not available.
       const personIdentifier = person?.Name || person?.Id;
+      const personPrimaryTag =
+        person && typeof person === "object"
+          ? (person as any).PrimaryImageTag ??
+            (person as any).ImageTags?.Primary
+          : undefined;
       const avatarUri =
         personIdentifier &&
-          connector?.getPersonImageUrl(
-            personIdentifier,
-            (person as any).PrimaryImageTag ?? (person as any).ImageTags?.Primary,
-            {
-              width: 320,
-            }
-          );
+        connector?.getPersonImageUrl(personIdentifier, personPrimaryTag, {
+          width: 320,
+        });
 
       return (
         <View style={styles.castCard}>
@@ -449,7 +491,7 @@ const JellyfinItemDetailsScreen = () => {
   return (
     <>
       <View style={styles.scaffold}>
-    <Animated.View style={[styles.heroArea, heroAnimatedStyle]}>
+        <Animated.View style={[styles.heroArea, heroAnimatedStyle]}>
           {heroUri ? (
             <View style={styles.heroImage}>
               <Image
@@ -478,8 +520,12 @@ const JellyfinItemDetailsScreen = () => {
             </View>
           ) : null}
           <Animated.View
-            pointerEvents={isHeaderCollapsed ? 'none' : 'auto'}
-            style={[styles.heroActions, { top: insets.top }, headerAnimatedStyle]}
+            pointerEvents={isHeaderCollapsed ? "none" : "auto"}
+            style={[
+              styles.heroActions,
+              { top: insets.top },
+              headerAnimatedStyle,
+            ]}
           >
             <IconButton
               icon="arrow-left"
@@ -545,13 +591,13 @@ const JellyfinItemDetailsScreen = () => {
             </View>
             {cast.length > 0 ? (
               <FlashList
-                  data={cast}
-                  keyExtractor={(person) => person.Id ?? person.Name ?? ''}
-                  renderItem={renderCastMember}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.castList}
-                />
+                data={cast}
+                keyExtractor={(person) => person.Id ?? person.Name ?? ""}
+                renderItem={renderCastMember}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.castList}
+              />
             ) : (
               <Text variant="bodySmall" style={styles.sectionEmptyText}>
                 Cast information is not available.
