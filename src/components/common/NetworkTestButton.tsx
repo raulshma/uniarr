@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { alert } from '@/services/dialogService';
 import { Button, Text, useTheme } from 'react-native-paper';
 import { testServiceAccessibility } from '@/utils/network.utils';
 
@@ -28,18 +29,18 @@ export const NetworkTestButton: React.FC<NetworkTestButtonProps> = ({
       if (result.success) {
         const message = `${serviceType} is accessible! Latency: ${result.latency}ms`;
         console.log(`✅ [NetworkTestButton] ${message}`);
-        Alert.alert('Network Test', message);
+  alert('Network Test', message);
         onResult?.({ success: true, message });
       } else {
         const message = `${serviceType} is not accessible: ${result.error}`;
         console.error(`❌ [NetworkTestButton] ${message}`);
-        Alert.alert('Network Test Failed', message);
+  alert('Network Test Failed', message);
         onResult?.({ success: false, message });
       }
     } catch (error) {
       const message = `Network test failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
       console.error(`❌ [NetworkTestButton] ${message}`);
-      Alert.alert('Network Test Error', message);
+  alert('Network Test Error', message);
       onResult?.({ success: false, message });
     } finally {
       setIsTesting(false);

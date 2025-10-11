@@ -2,7 +2,8 @@ import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   Chip,
   Searchbar,
@@ -299,7 +300,7 @@ const JellyseerrRequestsScreen = () => {
           actionError instanceof Error
             ? actionError.message
             : "Unable to approve request.";
-        Alert.alert("Approve failed", message);
+  alert("Approve failed", message);
       } finally {
         setPendingAction(null);
       }
@@ -309,7 +310,7 @@ const JellyseerrRequestsScreen = () => {
 
   const handleDeclineRequest = useCallback(
     async (request: JellyseerrRequest) => {
-      Alert.alert(
+  alert(
         "Decline request",
         "Are you sure you want to decline this request?",
         [
@@ -326,7 +327,7 @@ const JellyseerrRequestsScreen = () => {
                   actionError instanceof Error
                     ? actionError.message
                     : "Unable to decline request.";
-                Alert.alert("Decline failed", message);
+                alert("Decline failed", message);
               } finally {
                 setPendingAction(null);
               }
@@ -340,7 +341,7 @@ const JellyseerrRequestsScreen = () => {
 
   const handleDeleteRequest = useCallback(
     async (request: JellyseerrRequest) => {
-      Alert.alert(
+  alert(
         "Delete request",
         "Deleting a request cannot be undone. Continue?",
         [
@@ -357,7 +358,7 @@ const JellyseerrRequestsScreen = () => {
                   actionError instanceof Error
                     ? actionError.message
                     : "Unable to delete request.";
-                Alert.alert("Delete failed", message);
+                alert("Delete failed", message);
               } finally {
                 setPendingAction(null);
               }

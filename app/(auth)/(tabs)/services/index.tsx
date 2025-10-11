@@ -2,7 +2,8 @@ import React, { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   IconButton,
   Text,
@@ -364,7 +365,7 @@ const ServicesScreen = () => {
 
     setServiceMenuVisible(false);
 
-    Alert.alert(
+  alert(
       "Delete Service",
       `Are you sure you want to delete "${selectedService.config.name}"? This action cannot be undone.`,
       [
@@ -384,7 +385,7 @@ const ServicesScreen = () => {
                 queryKey: queryKeys.services.overview,
               });
 
-              Alert.alert(
+              alert(
                 "Service Deleted",
                 `${selectedService.config.name} has been removed.`
               );
@@ -393,7 +394,7 @@ const ServicesScreen = () => {
                 error instanceof Error
                   ? error.message
                   : "Failed to delete service.";
-              Alert.alert("Error", message);
+              alert("Error", message);
 
               void logger.error("Failed to delete service.", {
                 location: "ServicesScreen.handleDeleteService",

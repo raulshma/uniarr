@@ -2,7 +2,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View, Pressable } from "react-native";
+import { ScrollView, StyleSheet, View, Pressable } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   HelperText,
   Text,
@@ -571,7 +572,7 @@ const AddServiceScreen = () => {
         console.log("✅ Queries invalidated");
 
         console.log("🎉 Service saved successfully, showing alert...");
-        Alert.alert(
+  alert(
           "Service added",
           `${serviceTypeLabels[config.type]} has been connected successfully.`,
           [

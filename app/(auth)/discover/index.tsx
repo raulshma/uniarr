@@ -1,12 +1,12 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   View,
 } from "react-native";
+import { alert } from '@/services/dialogService';
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   IconButton,
@@ -187,7 +187,7 @@ const DiscoverScreen = () => {
       const options =
         item.mediaType === "series" ? services.sonarr : services.radarr;
       if (!options.length) {
-        Alert.alert(
+        alert(
           "No services available",
           `Add a ${
             item.mediaType === "series" ? "Sonarr" : "Radarr"

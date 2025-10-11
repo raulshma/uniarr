@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { alert } from '@/services/dialogService';
 import {
   Button,
   FAB,
@@ -134,7 +135,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
   const handleBulkDelete = useCallback(async () => {
     if (selectedItems.length === 0) return;
 
-    Alert.alert(
+  alert(
       'Delete Media',
       `Are you sure you want to delete ${selectedItems.length} item(s)? This action cannot be undone.`,
       [
@@ -167,7 +168,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
               onRefresh?.();
             } catch (error) {
               console.error('Bulk delete failed:', error);
-              Alert.alert('Error', 'Failed to delete selected items.');
+              alert('Error', 'Failed to delete selected items.');
             }
           },
         },
@@ -199,8 +200,8 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
       exitSelectionMode();
       onRefresh?.();
     } catch (error) {
-      console.error('Bulk monitor toggle failed:', error);
-      Alert.alert('Error', `Failed to ${monitored ? 'monitor' : 'unmonitor'} selected items.`);
+  console.error('Bulk monitor toggle failed:', error);
+  alert('Error', `Failed to ${monitored ? 'monitor' : 'unmonitor'} selected items.`);
     }
   }, [selectedItems, serviceId, exitSelectionMode, onRefresh]);
 
@@ -225,8 +226,8 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
       setSnackbarVisible(true);
       exitSelectionMode();
     } catch (error) {
-      console.error('Bulk search failed:', error);
-      Alert.alert('Error', 'Failed to start search for selected items.');
+  console.error('Bulk search failed:', error);
+  alert('Error', 'Failed to start search for selected items.');
     }
   }, [selectedItems, serviceId, exitSelectionMode]);
 

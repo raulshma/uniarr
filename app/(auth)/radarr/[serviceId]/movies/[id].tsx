@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
@@ -83,7 +84,7 @@ const RadarrMovieDetailsScreen = () => {
   }, [triggerSearch]);
 
   const handleDeleteMovie = useCallback(() => {
-    Alert.alert(
+  alert(
       "Remove Movie",
       "Are you sure you want to remove this movie from Radarr? Existing files will be kept.",
       [
@@ -104,7 +105,7 @@ const RadarrMovieDetailsScreen = () => {
                   err instanceof Error
                     ? err.message
                     : "Unable to delete movie.";
-                Alert.alert("Delete Failed", message);
+                alert("Delete Failed", message);
               });
           },
         },

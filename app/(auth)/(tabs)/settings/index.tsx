@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
-import { Alert, StyleSheet, View, ScrollView } from "react-native";
+import { StyleSheet, View, ScrollView } from "react-native";
+import { alert } from '@/services/dialogService';
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Text,
@@ -11,7 +12,7 @@ import {
   Portal,
   Dialog,
 } from "react-native-paper";
-import ConfirmDialog from "@/components/common/ConfirmDialog/ConfirmDialog";
+import { CustomConfirm } from "@/components/common";
 import { Card } from "@/components/common/Card";
 import {
   AnimatedListItem,
@@ -167,7 +168,7 @@ const SettingsScreen = () => {
       void logger.error("SettingsScreen: failed to load image cache usage.", {
         error: message,
       });
-      Alert.alert("Unable to load cache usage", message);
+  alert("Unable to load cache usage", message);
     } finally {
       setIsFetchingCacheUsage(false);
     }
@@ -182,7 +183,7 @@ const SettingsScreen = () => {
     try {
       await imageCacheService.clearCache();
       await loadImageCacheUsage();
-      Alert.alert(
+  alert(
         "Image cache cleared",
         "Poster images will be refreshed on next load."
       );
@@ -191,7 +192,7 @@ const SettingsScreen = () => {
       void logger.error("SettingsScreen: failed to clear image cache.", {
         error: message,
       });
-      Alert.alert("Unable to clear image cache", message);
+  alert("Unable to clear image cache", message);
     } finally {
       setIsClearingImageCache(false);
     }
@@ -207,7 +208,7 @@ const SettingsScreen = () => {
           ? signOutError.message
           : "Unable to sign out. Please try again.";
 
-      Alert.alert("Sign out failed", message);
+  alert("Sign out failed", message);
     }
   };
 
@@ -762,7 +763,7 @@ const SettingsScreen = () => {
           </Button>
         </AnimatedListItem>
 
-        <ConfirmDialog
+        <CustomConfirm
           visible={confirmVisible}
           title="Sign out"
           message="Are you sure you want to sign out?"

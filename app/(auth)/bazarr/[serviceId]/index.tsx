@@ -2,7 +2,8 @@ import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   FAB,
   Icon,
@@ -306,7 +307,7 @@ const BazarrSubtitlesScreen = () => {
     (item: BazarrMovie | BazarrEpisode | BazarrMissingSubtitle) => {
       // For now, just show item details in alert
       // In the future, this could navigate to a detail screen
-      Alert.alert(
+  alert(
         "title" in item ? item.title : item.language.name,
         `Type: ${"radarrId" in item ? "Movie" : "Episode"}\nMonitored: ${
           "monitored" in item ? item.monitored : "Unknown"
@@ -509,7 +510,7 @@ const BazarrSubtitlesScreen = () => {
         icon="magnify"
         onPress={() => {
           // TODO: Open manual search dialog
-          Alert.alert(
+          alert(
             "Manual Search",
             "Manual search functionality will be implemented in a future update."
           );

@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   ActivityIndicator,
   HelperText,
@@ -383,7 +384,7 @@ const SonarrAddSeriesScreen = () => {
   const onSubmit = useCallback(
     async (values: AddSeriesFormValues) => {
       if (!selectedSeries) {
-        Alert.alert(
+  alert(
           "Select a series",
           "Choose a series from the search results before adding."
         );
@@ -421,7 +422,7 @@ const SonarrAddSeriesScreen = () => {
           error instanceof Error
             ? error.message
             : "Unable to add series at this time.";
-        Alert.alert("Add series failed", message);
+  alert("Add series failed", message);
       }
     },
     [addSeriesMutation, router, selectedSeries, serviceKey]

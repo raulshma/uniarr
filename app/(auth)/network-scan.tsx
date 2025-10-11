@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   Appbar,
   Divider,
@@ -175,7 +176,7 @@ const NetworkScanScreen = () => {
   }, [scannerService]);
 
   const handleClearHistory = useCallback(async () => {
-    Alert.alert(
+  alert(
       "Clear History",
       "Are you sure you want to clear all scan history and recent IP addresses?",
       [

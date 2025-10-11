@@ -2,7 +2,8 @@ import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   IconButton,
   ProgressBar,
@@ -175,7 +176,7 @@ const QBittorrentServiceScreen = () => {
       serviceId,
       message,
     });
-    Alert.alert("Action failed", message);
+  alert("Action failed", message);
   }, [combinedError, serviceId]);
 
   const filteredTorrents = useMemo(() => {
@@ -369,7 +370,7 @@ const QBittorrentServiceScreen = () => {
         return;
       }
 
-      Alert.alert(
+  alert(
         "Remove torrent",
         `Do you want to remove "${torrent.name}" from qBittorrent?`,
         [

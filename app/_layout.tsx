@@ -13,7 +13,7 @@ import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthSer
 import { AuthProvider, useAuth } from '@/services/auth/AuthProvider';
 import { useTheme } from '@/hooks/useTheme';
 import { defaultTheme } from '@/constants/theme';
-import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { ErrorBoundary, DialogProvider } from '@/components/common';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useNotificationRegistration } from '@/hooks/useNotificationRegistration';
@@ -34,11 +34,13 @@ const RootLayout = () => {
             <AuthProvider>
               <QueryClientProvider client={queryClient}>
                 <PaperProvider theme={theme || defaultTheme}>
-                  <StatusBar style={theme.dark ? 'light' : 'dark'} />
-                  <ErrorBoundary context={{ location: 'RootLayout' }}>
-                    <AppContent />
-                  </ErrorBoundary>
-                  <QueryDevtools />
+                  <DialogProvider>
+                    <StatusBar style={theme.dark ? 'light' : 'dark'} />
+                    <ErrorBoundary context={{ location: 'RootLayout' }}>
+                      <AppContent />
+                    </ErrorBoundary>
+                    <QueryDevtools />
+                  </DialogProvider>
                 </PaperProvider>
               </QueryClientProvider>
             </AuthProvider>
