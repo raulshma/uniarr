@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { useConnectorsStore } from '@/store/connectorsStore';
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
 import type {
@@ -80,16 +81,12 @@ const JellyfinNowPlayingScreen = () => {
   const theme = useTheme<AppTheme>();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
+  const connector = useConnectorsStore((s) =>
+    serviceId ? (s.getConnector(serviceId) as JellyfinConnector | undefined) : undefined,
+  );
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const connector = useMemo(() => {
-    if (!serviceId) {
-      return undefined;
-    }
-    return manager.getConnector(serviceId) as JellyfinConnector | undefined;
-  }, [manager, serviceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,11 +203,9 @@ const JellyfinNowPlayingScreen = () => {
 
   const ensureControlsReady = useCallback(() => {
     if (!connector) {
-      setStatusMessage("Playback controls are unavailable.");
       return false;
     }
     if (!activeSession) {
-      setStatusMessage("No active Jellyfin session detected.");
       return false;
     }
     return true;
@@ -222,13 +217,26 @@ const JellyfinNowPlayingScreen = () => {
     }
 
     try {
-      if (!activeSession.Id) throw new Error("Session id missing");
-      await connector.sendPlaystateCommand(activeSession.Id, "PlayPause");
+      if (!activeSession.Id) throw new Error('Session id missing');
+      await connector.sendPlaystateCommand(activeSession.Id, 'PlayPause');
+      // Optimistically toggle paused state so UI remains responsive until refetch
+      try {
+        setCachedActiveSession((prev) => {
+          if (!prev) return prev;
+          const existing = (prev.PlayState ?? {}) as JellyfinSessionPlayState;
+          const newPlayState: JellyfinSessionPlayState = {
+            ...existing,
+            IsPaused: !(existing.IsPaused ?? false),
+          };
+          return { ...prev, PlayState: newPlayState } as JellyfinSession;
+        });
+      } catch {
+        // ignore optimistic update failures
+      }
+
       void nowPlayingQuery.refetch();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to toggle playback.";
-      setStatusMessage(message);
+      // swallow errors silently per request
     }
   }, [activeSession, connector, ensureControlsReady, nowPlayingQuery]);
 
@@ -239,13 +247,24 @@ const JellyfinNowPlayingScreen = () => {
       }
 
       try {
-        if (!activeSession.Id) throw new Error("Session id missing");
+        if (!activeSession.Id) throw new Error('Session id missing');
         await connector.sendPlaystateCommand(activeSession.Id, direction);
+        // Optimistically reset position and mark unpaused so subsequent commands
+        // can operate against the expected state until the server responds.
+        setCachedActiveSession((prev) => {
+          if (!prev) return prev;
+          const existing = (prev.PlayState ?? {}) as JellyfinSessionPlayState;
+          const newPlayState: JellyfinSessionPlayState = {
+            ...existing,
+            PositionTicks: 0,
+            IsPaused: false,
+          };
+          return { ...prev, PlayState: newPlayState } as JellyfinSession;
+        });
+
         void nowPlayingQuery.refetch();
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unable to change track.";
-        setStatusMessage(message);
+        // swallow errors silently per request
       }
     },
     [activeSession, connector, ensureControlsReady, nowPlayingQuery]
@@ -264,17 +283,24 @@ const JellyfinNowPlayingScreen = () => {
       );
 
       try {
-        if (!activeSession.Id) throw new Error("Session id missing");
-        await connector.sendPlaystateCommand(activeSession.Id, "Seek", {
+        if (!activeSession.Id) throw new Error('Session id missing');
+        await connector.sendPlaystateCommand(activeSession.Id, 'Seek', {
           seekPositionTicks: Math.round(target),
         });
+        // Optimistically update position
+        setCachedActiveSession((prev) => {
+          if (!prev) return prev;
+          const existing = (prev.PlayState ?? {}) as JellyfinSessionPlayState;
+          const newPlayState: JellyfinSessionPlayState = {
+            ...existing,
+            PositionTicks: Math.round(target),
+          };
+          return { ...prev, PlayState: newPlayState } as JellyfinSession;
+        });
+
         void nowPlayingQuery.refetch();
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to seek to the requested position.";
-        setStatusMessage(message);
+        // swallow errors silently per request
       }
     },
     [
@@ -292,20 +318,24 @@ const JellyfinNowPlayingScreen = () => {
         return;
       }
 
-      const nextVolume = Math.min(
-        100,
-        Math.max(0, Math.round(volumeLevel + delta))
-      );
+      const nextVolume = Math.min(100, Math.max(0, Math.round(volumeLevel + delta)));
       try {
-        if (!activeSession.Id) throw new Error("Session id missing");
+        if (!activeSession.Id) throw new Error('Session id missing');
         await connector.setVolume(activeSession.Id, nextVolume);
+        // Optimistically update volume so repeated presses use updated value
+        setCachedActiveSession((prev) => {
+          if (!prev) return prev;
+          const existing = (prev.PlayState ?? {}) as JellyfinSessionPlayState;
+          const newPlayState: JellyfinSessionPlayState = {
+            ...existing,
+            VolumeLevel: nextVolume,
+          };
+          return { ...prev, PlayState: newPlayState } as JellyfinSession;
+        });
+
         void nowPlayingQuery.refetch();
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to adjust the volume.";
-        setStatusMessage(message);
+        // swallow errors silently per request
       }
     },
     [
@@ -434,31 +464,42 @@ const JellyfinNowPlayingScreen = () => {
             <IconButton
               icon="skip-previous"
               onPress={() => void handleSkip("PreviousTrack")}
+              disabled={!connector}
+              accessibilityState={{ disabled: !connector }}
             />
             <IconButton
               icon="rewind-10"
               onPress={() => void handleSeekRelative(-10)}
+              disabled={!connector}
+              accessibilityState={{ disabled: !connector }}
             />
             <Button
               mode="contained"
               icon={activeSession.PlayState?.IsPaused ? "play" : "pause"}
               onPress={handleTogglePlay}
+              disabled={!connector}
             >
               {activeSession.PlayState?.IsPaused ? "Play" : "Pause"}
             </Button>
             <IconButton
               icon="fast-forward-10"
               onPress={() => void handleSeekRelative(10)}
+              disabled={!connector}
+              accessibilityState={{ disabled: !connector }}
             />
             <IconButton
               icon="skip-next"
               onPress={() => void handleSkip("NextTrack")}
+              disabled={!connector}
+              accessibilityState={{ disabled: !connector }}
             />
           </View>
           <View style={styles.volumeRow}>
             <IconButton
               icon="volume-minus"
               onPress={() => void handleAdjustVolume(-5)}
+              disabled={!connector}
+              accessibilityState={{ disabled: !connector }}
             />
             <View style={styles.volumeRail}>
               <View
@@ -471,13 +512,19 @@ const JellyfinNowPlayingScreen = () => {
             <IconButton
               icon="volume-plus"
               onPress={() => void handleAdjustVolume(5)}
+              disabled={!connector}
+              accessibilityState={{ disabled: !connector }}
             />
           </View>
+
+          {!connector ? (
+            <HelperText type="info" visible>
+              Playback controls unavailable while the connector is initializing.
+            </HelperText>
+          ) : null}
         </View>
       </View>
-      <HelperText type="info" visible={Boolean(statusMessage)}>
-        {statusMessage ?? ""}
-      </HelperText>
+      {/* status messages removed per request */}
     </SafeAreaView>
   );
 };
