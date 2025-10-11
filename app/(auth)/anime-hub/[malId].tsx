@@ -106,10 +106,17 @@ const AnimeHubDetailScreen: React.FC = () => {
     anime?.images?.jpg?.large_image_url ??
     anime?.images?.jpg?.image_url ??
     undefined;
-  const backdropUri =
-    anime?.trailer?.images?.maximum_image_url ??
-    anime?.trailer?.images?.large_image_url ??
-    undefined;
+  const backdropUri = (() => {
+    const trailer = anime?.trailer;
+    if (!trailer) return undefined;
+    // Some responses include a nested `images` object on the trailer, others don't.
+    // Narrow at runtime and safely read the fields if present.
+    const images = (trailer as any).images;
+    if (images && typeof images === "object") {
+      return images.maximum_image_url ?? images.large_image_url ?? undefined;
+    }
+    return undefined;
+  })();
   const genres = (anime?.genres ?? []).map((genre) => genre.name).filter(Boolean);
   const themes = (anime?.themes ?? []).map((themeItem) => themeItem.name).filter(Boolean);
   const demographics = (anime?.demographics ?? [])
