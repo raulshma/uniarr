@@ -61,7 +61,12 @@ const SettingsScreen = () => {
     setRequestNotificationsEnabled,
     setServiceHealthNotificationsEnabled,
     setRefreshIntervalMinutes,
+    useNativeTabs,
+    setUseNativeTabs,
+    jellyseerrRetryAttempts,
+    setJellyseerrRetryAttempts,
   } = useSettingsStore();
+  const [jellyseerrRetriesVisible, setJellyseerrRetriesVisible] = useState(false);
   const [imageCacheUsage, setImageCacheUsage] = useState<ImageCacheUsage>({
     size: 0,
     fileCount: 0,
@@ -273,7 +278,7 @@ const SettingsScreen = () => {
         {/* Appearance Section */}
         <AnimatedSection style={styles.section} delay={50}>
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <AnimatedListItem index={0} totalItems={2}>
+          <AnimatedListItem index={0} totalItems={3}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -345,7 +350,7 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
+          <AnimatedListItem index={1} totalItems={3}>
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -372,6 +377,33 @@ const SettingsScreen = () => {
                   icon="chevron-right"
                   size={20}
                   iconColor={theme.colors.outline}
+                />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={2} totalItems={3}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="tab"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Navigation Style</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Use Expo Router native tabs
+                  </Text>
+                  <Text style={styles.settingValue}>
+                    {useNativeTabs ? "Native tabs enabled" : "Custom curved tabs"}
+                  </Text>
+                </View>
+                <Switch
+                  value={useNativeTabs}
+                  onValueChange={setUseNativeTabs}
+                  color={theme.colors.primary}
                 />
               </View>
             </Card>
@@ -656,7 +688,7 @@ const SettingsScreen = () => {
 
         {/* Services Section */}
         <AnimatedSection style={styles.section} delay={250}>
-          <AnimatedListItem index={0} totalItems={1}>
+          <AnimatedListItem index={0} totalItems={2}>
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -681,6 +713,31 @@ const SettingsScreen = () => {
                   size={20}
                   iconColor={theme.colors.outline}
                 />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={1} totalItems={2}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="repeat-variant"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Jellyseerr Retries</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Number of retry attempts for Jellyseerr server errors (5xx)
+                  </Text>
+                  <Text style={styles.settingValue}>
+                    {jellyseerrRetryAttempts} {jellyseerrRetryAttempts !== 1 ? 'retries' : 'retry'}
+                  </Text>
+                </View>
+                <Button mode="contained-tonal" compact onPress={() => setJellyseerrRetriesVisible(true)}>
+                  Set
+                </Button>
               </View>
             </Card>
           </AnimatedListItem>
@@ -856,6 +913,47 @@ const SettingsScreen = () => {
                 mode="outlined"
                 onPress={() => setRefreshIntervalVisible(false)}
               >
+                Cancel
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+        {/* Jellyseerr Retries Selection Dialog */}
+        <Portal>
+          <Dialog
+            visible={jellyseerrRetriesVisible}
+            onDismiss={() => setJellyseerrRetriesVisible(false)}
+            style={{
+              borderRadius: 12,
+              backgroundColor: theme.colors.elevation.level1,
+            }}
+          >
+            <Dialog.Title style={styles.sectionTitle}>Jellyseerr Retries</Dialog.Title>
+            <Dialog.Content>
+              <Text style={{ ...styles.settingValue, marginBottom: spacing.md }}>
+                Choose how many retry attempts to perform when Jellyseerr
+                returns a server error (5xx). Setting to 0 disables retries.
+              </Text>
+              <View style={{ gap: spacing.xs }}>
+                {[0, 1, 2, 3, 4, 5].map((attempts) => (
+                  <Button
+                    key={attempts}
+                    mode={
+                      jellyseerrRetryAttempts === attempts ? 'contained' : 'outlined'
+                    }
+                    onPress={() => {
+                      setJellyseerrRetryAttempts(attempts);
+                      setJellyseerrRetriesVisible(false);
+                    }}
+                    style={{ marginVertical: 0 }}
+                  >
+                    {attempts} attempt{attempts !== 1 ? 's' : ''}
+                  </Button>
+                ))}
+              </View>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button mode="outlined" onPress={() => setJellyseerrRetriesVisible(false)}>
                 Cancel
               </Button>
             </Dialog.Actions>

@@ -25,10 +25,9 @@ import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useJellyseerrRequests } from "@/hooks/useJellyseerrRequests";
-import type {
-  JellyseerrRequest,
-  JellyseerrRequestQueryOptions,
-} from "@/models/jellyseerr.types";
+import type { components, paths } from '@/connectors/client-schemas/jellyseerr-openapi';
+type JellyseerrRequest = components['schemas']['MediaRequest'];
+type JellyseerrRequestQueryOptions = paths['/request']['get']['parameters']['query'];
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
 
@@ -53,33 +52,34 @@ type PendingAction = {
 };
 
 const deriveDownloadStatus = (
-  status: string | undefined
+  status: number | undefined
 ): MediaDownloadStatus => {
+  // OpenAPI numeric codes: 1=pending,2=approved,3=declined,4=processing,5=available
   switch (status) {
-    case "available":
+    case 5:
       return "available";
-    case "processing":
+    case 4:
       return "downloading";
-    case "pending":
+    case 1:
       return "queued";
-    case "declined":
+    case 3:
       return "missing";
     default:
       return "unknown";
   }
 };
 
-const formatRequestStatusLabel = (status: string): string => {
+const formatRequestStatusLabel = (status: number | undefined): string => {
   switch (status) {
-    case "pending":
+    case 1:
       return "Pending";
-    case "approved":
+    case 2:
       return "Approved";
-    case "declined":
+    case 3:
       return "Declined";
-    case "processing":
+    case 4:
       return "Processing";
-    case "available":
+    case 5:
       return "Available";
     default:
       return "Unknown";
@@ -179,8 +179,7 @@ const JellyseerrRequestsScreen = () => {
       take,
       skip,
       filter: filterValue === FILTER_ALL ? undefined : filterValue,
-      search: debouncedSearch.length > 0 ? debouncedSearch : undefined,
-    };
+    } as any;
 
     return options;
   }, [debouncedSearch, filterValue, hasValidServiceId, page]);
@@ -201,6 +200,25 @@ const JellyseerrRequestsScreen = () => {
     isDeclining,
     isDeleting,
   } = useJellyseerrRequests(serviceId, queryOptions);
+
+  // Apply client-side search filtering because the Jellyseerr API /request
+  // endpoint does not accept a free-text search parameter in the OpenAPI spec.
+  const toRecord = (v: unknown): Record<string, unknown> | null =>
+    v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+
+  const getMediaTitle = (m: JellyseerrRequest['media'] | undefined): string => {
+    if (!m) return '';
+    const r = toRecord(m);
+    const t = r?.title ?? r?.originalTitle ?? r?.name ?? (r?.mediaInfo && (r.mediaInfo as any)?.title) ?? (r?.mediaInfo && (r.mediaInfo as any)?.name) ?? undefined;
+    return typeof t === 'string' ? t : '';
+  };
+
+  const filteredRequests = (requests ?? []).filter((r) => {
+    if (!debouncedSearch) return true;
+    const term = debouncedSearch.toLowerCase();
+    const title = getMediaTitle(r.media);
+    return title.toLowerCase().includes(term);
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -383,7 +401,7 @@ const JellyseerrRequestsScreen = () => {
   }, [page]);
 
   const renderStatusChip = useCallback(
-    (status: string, is4k: boolean | undefined) => {
+    (status: number | string | undefined, is4k: boolean | undefined) => {
       const toneMap: Record<string, { background: string; text: string }> = {
         pending: {
           background: theme.colors.surfaceVariant,
@@ -411,12 +429,16 @@ const JellyseerrRequestsScreen = () => {
         },
       };
 
-      const toneCandidate = toneMap[status];
+      const statusKey =
+        typeof status === 'number' ? formatRequestStatusLabel(status).toLowerCase() : (status ?? '').toString().toLowerCase();
+      const toneCandidate = toneMap[statusKey];
       const selectedTone = toneCandidate ?? toneMap.unknown;
       if (!selectedTone) {
         return null;
       }
-      const label = formatRequestStatusLabel(status) + (is4k ? " • 4K" : "");
+      const label =
+        (typeof status === 'number' ? formatRequestStatusLabel(status) : (status ?? 'Unknown')) +
+        (is4k ? ' • 4K' : '');
 
       return (
         <Chip
@@ -437,10 +459,10 @@ const JellyseerrRequestsScreen = () => {
 
   const renderRequestItem = useCallback(
     ({ item }: { item: JellyseerrRequest }) => {
-      const downloadStatus = deriveDownloadStatus(item.media.status);
+  const downloadStatus = deriveDownloadStatus(item.media?.status as number | undefined);
       const requesterName =
-        item.requestedBy?.displayName ??
         item.requestedBy?.username ??
+        item.requestedBy?.email ??
         item.requestedBy?.plexUsername ??
         item.requestedBy?.email ??
         "Unknown requester";
@@ -462,22 +484,36 @@ const JellyseerrRequestsScreen = () => {
         <MediaCard
           id={item.id}
           title={
-            item.media.title ?? item.media.originalTitle ?? `Untitled Media`
+            (getMediaTitle(item.media) || `Untitled Media`)
           }
           year={
-            item.media.releaseDate
-              ? Number.parseInt(item.media.releaseDate.slice(0, 4), 10)
-              : undefined
+            (() => {
+              const r = toRecord(item.media);
+              const release = r?.releaseDate ?? r?.firstAirDate ?? undefined;
+              if (typeof release === 'string' && release.length >= 4) {
+                const parsed = Number.parseInt(release.slice(0, 4), 10);
+                return Number.isFinite(parsed) ? parsed : undefined;
+              }
+              return undefined;
+            })()
           }
-          status={formatRequestStatusLabel(item.media.status ?? "unknown")}
+          status={formatRequestStatusLabel(item.status ?? 0)}
           subtitle={`Requested by ${requesterName}`}
           downloadStatus={downloadStatus}
-          posterUri={item.media.posterUrl}
-          type={item.media.mediaType === "tv" ? "series" : "movie"}
-          statusBadge={renderStatusChip(item.status, item.is4k)}
+          posterUri={(() => {
+            const r = toRecord(item.media);
+            const p = r?.posterPath ?? (r?.mediaInfo && (r.mediaInfo as any)?.posterPath) ?? undefined;
+            return typeof p === 'string' ? `https://image.tmdb.org/t/p/original${p}` : undefined;
+          })()}
+          type={(() => {
+            const r = toRecord(item.media);
+            const mt = r?.mediaType ?? undefined;
+            return mt === 'tv' ? 'series' : 'movie';
+          })()}
+          statusBadge={renderStatusChip(item.status as number | undefined, item.is4k)}
           footer={
             <View style={styles.actionRow}>
-              {item.status === "pending" ? (
+              {item.status === 1 ? (
                 <Button
                   mode="contained"
                   icon="check"
@@ -493,7 +529,7 @@ const JellyseerrRequestsScreen = () => {
                   Approve
                 </Button>
               ) : null}
-              {item.status === "pending" || item.status === "approved" ? (
+              {item.status === 1 || item.status === 2 ? (
                 <Button
                   mode="outlined"
                   icon="close"

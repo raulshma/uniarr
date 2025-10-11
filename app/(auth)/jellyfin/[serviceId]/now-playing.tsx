@@ -19,23 +19,30 @@ import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
-import type { JellyfinItem, JellyfinSession } from "@/models/jellyfin.types";
+import type {
+  JellyfinItem,
+  JellyfinSession,
+  JellyfinSessionPlayState,
+} from "@/models/jellyfin.types";
 import { spacing } from "@/theme/spacing";
 
 const TICKS_PER_SECOND = 10_000_000;
 
+const hasRunTimeTicks = (
+  obj: unknown
+): obj is { RunTimeTicks?: number | null } =>
+  typeof obj === "object" && obj !== null && "RunTimeTicks" in obj;
+
 const computeProgress = (session: JellyfinSession | undefined): number => {
-  if (!session?.PlayState) {
-    return 0;
-  }
+  const playState = session?.PlayState as JellyfinSessionPlayState | undefined;
+  if (!playState) return 0;
 
-  const runtime =
-    session.PlayState.RunTimeTicks ?? session.NowPlayingItem?.RunTimeTicks ?? 0;
-  const position = session.PlayState.PositionTicks ?? 0;
+  const runtime = hasRunTimeTicks(playState)
+    ? playState.RunTimeTicks ?? session?.NowPlayingItem?.RunTimeTicks ?? 0
+    : session?.NowPlayingItem?.RunTimeTicks ?? 0;
+  const position = playState.PositionTicks ?? 0;
 
-  if (runtime <= 0) {
-    return 0;
-  }
+  if (runtime <= 0) return 0;
 
   return Math.min(Math.max(position / runtime, 0), 1);
 };
@@ -118,15 +125,34 @@ const JellyfinNowPlayingScreen = () => {
     refetchInterval: 10_000,
   });
   const sessions = nowPlayingQuery.data ?? [];
-  const activeSession = sessions[0];
+  // Preserve the last known non-empty sessions list to avoid transient "nothing is playing"
+  // while the query is refetching after issuing playback commands.
+  const [cachedSessions, setCachedSessions] = useState<typeof sessions | null>(
+    sessions.length ? sessions : null
+  );
+
+  useEffect(() => {
+    if (sessions.length) {
+      setCachedSessions(sessions);
+    }
+  }, [sessions]);
+
+  const sessionsToShow = sessions.length ? sessions : cachedSessions ?? [];
+  // Use the preserved sessions list for rendering to avoid flicker
+  const activeSession = sessionsToShow[0];
   const item = activeSession?.NowPlayingItem;
   const progress = computeProgress(activeSession);
-  const positionTicks = activeSession?.PlayState?.PositionTicks ?? 0;
-  const runtimeTicks =
-    activeSession?.PlayState?.RunTimeTicks ?? item?.RunTimeTicks ?? 0;
-  const volumeLevel = activeSession?.PlayState?.VolumeLevel ?? 0;
+  const activePlayState = activeSession?.PlayState as
+    | JellyfinSessionPlayState
+    | undefined;
+  const positionTicks = activePlayState?.PositionTicks ?? 0;
+  const runtimeTicks = hasRunTimeTicks(activePlayState)
+    ? activePlayState?.RunTimeTicks ?? item?.RunTimeTicks ?? 0
+    : item?.RunTimeTicks ?? 0;
+  const volumeLevel = activePlayState?.VolumeLevel ?? 0;
 
-  const isLoading = isBootstrapping || nowPlayingQuery.isLoading;
+  // Consider loading only if we're bootstrapping or the query is loading and we have no cached sessions.
+  const isLoading = isBootstrapping || (nowPlayingQuery.isLoading && sessions.length === 0);
   const errorMessage =
     nowPlayingQuery.error instanceof Error
       ? nowPlayingQuery.error.message
@@ -134,16 +160,20 @@ const JellyfinNowPlayingScreen = () => {
       ? "Unable to load playback status."
       : null;
 
+  const primaryImageTag =
+    (item as unknown as { PrimaryImageTag?: string })?.PrimaryImageTag ??
+    item?.ImageTags?.Primary;
+
   const posterUri =
-    item && connector
+    item && connector && item.Id
       ? connector.getImageUrl(item.Id, "Primary", {
-          tag: item.PrimaryImageTag ?? item.ImageTags?.Primary,
+          tag: primaryImageTag,
           width: 720,
         })
       : undefined;
   const backdropTag = item?.BackdropImageTags?.[0] ?? item?.ImageTags?.Backdrop;
   const backdropUri =
-    item && connector && backdropTag
+    item && connector && backdropTag && item.Id
       ? connector.getImageUrl(item.Id, "Backdrop", {
           tag: backdropTag,
           width: 1280,
@@ -176,6 +206,7 @@ const JellyfinNowPlayingScreen = () => {
     }
 
     try {
+      if (!activeSession.Id) throw new Error("Session id missing");
       await connector.sendPlaystateCommand(activeSession.Id, "PlayPause");
       void nowPlayingQuery.refetch();
     } catch (error) {
@@ -192,6 +223,7 @@ const JellyfinNowPlayingScreen = () => {
       }
 
       try {
+        if (!activeSession.Id) throw new Error("Session id missing");
         await connector.sendPlaystateCommand(activeSession.Id, direction);
         void nowPlayingQuery.refetch();
       } catch (error) {
@@ -216,6 +248,7 @@ const JellyfinNowPlayingScreen = () => {
       );
 
       try {
+        if (!activeSession.Id) throw new Error("Session id missing");
         await connector.sendPlaystateCommand(activeSession.Id, "Seek", {
           seekPositionTicks: Math.round(target),
         });
@@ -248,6 +281,7 @@ const JellyfinNowPlayingScreen = () => {
         Math.max(0, Math.round(volumeLevel + delta))
       );
       try {
+        if (!activeSession.Id) throw new Error("Session id missing");
         await connector.setVolume(activeSession.Id, nextVolume);
         void nowPlayingQuery.refetch();
       } catch (error) {

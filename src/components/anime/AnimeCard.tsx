@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Text, useTheme, Icon, Chip } from 'react-native-paper';
-import type { AppTheme } from '@/constants/theme';
-import { MediaPoster } from '@/components/media/MediaPoster';
+import React, { useMemo } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text, useTheme, Chip } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import type { AppTheme } from "@/constants/theme";
+import { MediaPoster } from "@/components/media/MediaPoster";
 
 export type AnimeCardProps = {
   id: number;
@@ -36,13 +37,13 @@ const AnimeCard: React.FC<AnimeCardProps> = ({
           marginRight: theme.custom.spacing.md,
         },
         posterContainer: {
-          position: 'relative',
+          position: "relative",
           borderRadius: 12,
-          overflow: 'hidden',
+          overflow: "hidden",
           marginBottom: theme.custom.spacing.xs,
         },
         badge: {
-          position: 'absolute',
+          position: "absolute",
           top: 8,
           left: 8,
           zIndex: 10,
@@ -55,24 +56,24 @@ const AnimeCard: React.FC<AnimeCardProps> = ({
           fontSize: 10,
           lineHeight: 12,
           color: theme.colors.onPrimary,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         ratingContainer: {
-          position: 'absolute',
+          position: "absolute",
           bottom: 8,
           right: 8,
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: "rgba(0, 0, 0, 0.7)",
           paddingHorizontal: 6,
           paddingVertical: 3,
           borderRadius: 6,
           zIndex: 10,
         },
         ratingText: {
-          color: '#FFD700',
+          color: "#FFD700",
           fontSize: 12,
-          fontWeight: 'bold',
+          fontWeight: "bold",
           marginLeft: 2,
         },
         title: {
@@ -89,7 +90,7 @@ const AnimeCard: React.FC<AnimeCardProps> = ({
       style={styles.container}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${title}${rating ? `, rated ${rating}` : ''}`}
+      accessibilityLabel={`${title}${rating ? `, rated ${rating}` : ""}`}
     >
       <View style={styles.posterContainer}>
         <MediaPoster
@@ -102,23 +103,26 @@ const AnimeCard: React.FC<AnimeCardProps> = ({
 
         {isWatchlisted && (
           <View style={styles.badge}>
-            <Chip compact style={styles.chip} textStyle={styles.chipText}>
-              Watchlist
+            <Chip compact style={styles.chip}>
+              <Text style={styles.chipText}>Watchlist</Text>
             </Chip>
           </View>
         )}
 
         {isTracked && !isWatchlisted && (
           <View style={styles.badge}>
-            <Chip compact style={[styles.chip, { backgroundColor: theme.colors.tertiary }]} textStyle={styles.chipText}>
-              Tracked
+            <Chip
+              compact
+              style={[styles.chip, { backgroundColor: theme.colors.tertiary }]}
+            >
+              <Text style={styles.chipText}>Tracked</Text>
             </Chip>
           </View>
         )}
 
-        {rating && (
+        {typeof rating === "number" && (
           <View style={styles.ratingContainer}>
-            <Icon source="star" size={14} color="#FFD700" />
+            <MaterialCommunityIcons name="star" size={14} color="#FFD700" />
             <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
           </View>
         )}

@@ -4,7 +4,15 @@ import type { AppTheme } from '@/constants/theme';
 
 const PublicLayout = () => {
   const theme = useTheme<AppTheme>();
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }} />;
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: theme.colors.background },
+  animation: 'none',
+      }}
+    />
+  );
 };
 
 export default PublicLayout;

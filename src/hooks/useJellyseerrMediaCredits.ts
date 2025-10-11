@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 import { useConnectorsStore } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
-import type { JellyseerrCreditPerson } from '@/models/jellyseerr.types';
+import type { components } from '@/connectors/client-schemas/jellyseerr-openapi';
+type JellyseerrCreditPerson = components['schemas']['Cast'];
 
 export const useJellyseerrMediaCredits = (
   serviceId: string,

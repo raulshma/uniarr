@@ -22,6 +22,13 @@ import { spacing } from "@/theme/spacing";
 import { useJellyseerrMediaDetails } from "@/hooks/useJellyseerrMediaDetails";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import type { components } from '@/connectors/client-schemas/jellyseerr-openapi';
+type MovieDetails = components['schemas']['MovieDetails'];
+type TvDetails = components['schemas']['TvDetails'];
+type JellyDetails = MovieDetails | TvDetails;
+
+const isMovieDetails = (d?: JellyDetails): d is MovieDetails => Boolean(d && 'title' in d);
+const isTvDetails = (d?: JellyDetails): d is TvDetails => Boolean(d && 'name' in d);
 
 const JellyseerrMediaDetailScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
@@ -52,6 +59,90 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     mediaType ?? "movie",
     mediaId
   );
+  // Typed accessors for the generated MovieDetails | TvDetails union
+  const getTitle = (d?: JellyDetails) => {
+    if (!d) return "Unknown Title";
+    if ('title' in d && d.title) return d.title;
+    if ('name' in d && d.name) return d.name;
+    return "Unknown Title";
+  };
+
+  const toRecord = (v: unknown): Record<string, unknown> | null =>
+    v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+
+  const getOriginalTitle = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const val = r?.originalTitle ?? undefined;
+    return typeof val === 'string' ? val : undefined;
+  };
+
+  const getPosterPath = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const p = r?.posterPath ?? (r?.mediaInfo && (r.mediaInfo as any)?.posterPath) ?? undefined;
+    return typeof p === 'string' ? p : undefined;
+  };
+
+  const getBackdropPath = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const p = r?.backdropPath ?? (r?.mediaInfo && (r.mediaInfo as any)?.backdropPath) ?? undefined;
+    return typeof p === 'string' ? p : undefined;
+  };
+
+  const getExternalUrl = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const v = r?.externalUrl ?? (r?.mediaInfo && (r.mediaInfo as any)?.externalUrl) ?? undefined;
+    return typeof v === 'string' ? v : undefined;
+  };
+
+  const getTagline = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const v = r?.tagline ?? undefined;
+    return typeof v === 'string' ? v : undefined;
+  };
+  const getReleaseDate = (d?: JellyDetails) => {
+    if (!d) return undefined;
+    if (isMovieDetails(d) && d.releaseDate) return d.releaseDate;
+    if (isTvDetails(d) && d.firstAirDate) return d.firstAirDate;
+    return undefined;
+  };
+
+  // Local convenience values used in render
+  const posterPath = getPosterPath(data);
+  const backdropPath = getBackdropPath(data);
+  const title = getTitle(data);
+  const originalTitle = getOriginalTitle(data);
+  const tagline = getTagline(data);
+  const releaseDate = getReleaseDate(data);
+  const isMovie = isMovieDetails(data);
+  const isTv = isTvDetails(data);
+  const runtime = isMovie ? data?.runtime : isTv ? (data.episodeRunTime?.[0] ?? undefined) : undefined;
+  const rating = data?.voteAverage;
+  const voteCount = data?.voteCount;
+  const popularity = data?.popularity;
+  const networkName = isTv ? data.networks?.[0]?.name ?? data.productionCompanies?.[0]?.name : isMovie ? data.productionCompanies?.[0]?.name : undefined;
+  const certification = undefined; // not reliably present in generated schema
+  const studios = (isMovie ? data.productionCompanies?.map((s) => s.name).filter(Boolean) : isTv ? data.networks?.map((n) => n.name).filter(Boolean) : []) ?? [];
+  const getGenres = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const g = r?.genres ?? (r?.mediaInfo && (r.mediaInfo as any)?.genres) ?? undefined;
+    return Array.isArray(g) ? (g as (string | { id?: number; name?: string })[]) : [];
+  };
+
+  const getAlternateTitles = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const a = r?.alternateTitles ?? undefined;
+    return Array.isArray(a) ? (a as string[]) : [];
+  };
+
+  const getSeasons = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const s = r?.seasons ?? undefined;
+    return Array.isArray(s) ? (s as any[]) : [];
+  };
+
+  const genres = getGenres(data);
+  const alternateTitles = getAlternateTitles(data);
+  const seasons = isTv ? getSeasons(data) : [];
 
   const connector = useMemo(() => {
     const c = ConnectorManager.getInstance().getConnector(serviceId) as
@@ -131,8 +222,9 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
   };
 
   const openExternalUrl = async () => {
-    if (data?.externalUrl) {
-      await Linking.openURL(data.externalUrl);
+    const url = getExternalUrl(data);
+    if (url) {
+      await Linking.openURL(url);
     }
   };
 
@@ -197,7 +289,11 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
             style={styles.posterContainer}
             entering={FadeIn.delay(400)}
           >
-            <MediaPoster uri={data.posterUrl} size="large" borderRadius={12} />
+            <MediaPoster
+              uri={posterPath ? `https://image.tmdb.org/t/p/original${posterPath}` : undefined}
+              size="large"
+              borderRadius={12}
+            />
           </Animated.View>
 
           {/* Title and Basic Info */}
@@ -205,17 +301,17 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
             style={styles.titleContainer}
             entering={FadeIn.delay(500)}
           >
-            <Text
-              variant="headlineLarge"
-              style={{
-                color: theme.colors.onSurface,
-                fontWeight: "bold",
-                textAlign: "center",
-              }}
-            >
-              {data.title ?? "Unknown Title"}
-            </Text>
-            {data.originalTitle && data.originalTitle !== data.title ? (
+              <Text
+                variant="headlineLarge"
+                style={{
+                  color: theme.colors.onSurface,
+                  fontWeight: "bold",
+                  textAlign: "center",
+                }}
+              >
+                {title}
+              </Text>
+            {(originalTitle && originalTitle !== title) ? (
               <Text
                 variant="titleMedium"
                 style={{
@@ -223,10 +319,10 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   textAlign: "center",
                 }}
               >
-                {data.originalTitle}
+                {originalTitle}
               </Text>
             ) : null}
-            {data.tagline ? (
+            {tagline ? (
               <Text
                 variant="bodyLarge"
                 style={{
@@ -236,13 +332,13 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   marginTop: spacing.xs,
                 }}
               >
-                "{data.tagline}"
+                "{tagline}"
               </Text>
             ) : null}
           </Animated.View>
 
           {/* Overview */}
-          {data.overview ? (
+          {data?.overview ? (
             <Animated.View entering={FadeIn.delay(600)}>
               <Card style={styles.card}>
                 <Card.Content style={styles.cardContent}>
@@ -272,86 +368,77 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                     {mediaType === "movie" ? "Movie" : "TV Series"}
                   </Text>
                 </View>
-                {data.releaseDate ? (
+                {releaseDate ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
-                      Release Date
+                      {mediaType === 'movie' ? 'Release Date' : 'First Air Date'}
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {new Date(data.releaseDate).getFullYear()}
-                    </Text>
-                  </View>
-                ) : data.firstAirDate ? (
-                  <View style={styles.detailRow}>
-                    <Text variant="labelMedium" style={styles.label}>
-                      First Air Date
-                    </Text>
-                    <Text variant="bodyLarge" style={styles.value}>
-                      {new Date(data.firstAirDate).getFullYear()}
+                      {new Date(releaseDate).getFullYear()}
                     </Text>
                   </View>
                 ) : null}
-                {data.runtime ? (
+                {runtime ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Runtime
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {data.runtime} min
+                      {runtime} min
                     </Text>
                   </View>
                 ) : null}
-                {data.rating ? (
+                {rating ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Rating
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {data.rating.toFixed(1)}/10
+                      {rating?.toFixed?.(1) ?? ''}/10
                     </Text>
                   </View>
                 ) : null}
-                {data.voteCount ? (
+                {voteCount ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Votes
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {data.voteCount.toLocaleString()}
+                      {voteCount?.toLocaleString?.() ?? ''}
                     </Text>
                   </View>
                 ) : null}
-                {data.popularity ? (
+                {popularity ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Popularity
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {data.popularity.toFixed(1)}
+                      {popularity?.toFixed?.(1) ?? ''}
                     </Text>
                   </View>
                 ) : null}
-                {data.network ? (
+                {networkName ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Network
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {data.network}
+                      {networkName}
                     </Text>
                   </View>
                 ) : null}
-                {data.certification ? (
+                {certification ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Certification
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {data.certification}
+                      {certification}
                     </Text>
                   </View>
                 ) : null}
-                {data.status ? (
+                {data?.status ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Status
@@ -364,13 +451,13 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                     </Chip>
                   </View>
                 ) : null}
-                {data.studios?.length ? (
+                {(studios.length) ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Studios
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {data.studios.join(", ")}
+                      {studios.join(", ")}
                     </Text>
                   </View>
                 ) : null}
@@ -379,7 +466,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
           </Animated.View>
 
           {/* Genres */}
-          {data.genres?.length ? (
+          {(genres.length) ? (
             <Animated.View entering={FadeIn.delay(800)}>
               <Card style={styles.card}>
                 <Card.Content style={styles.cardContent}>
@@ -393,15 +480,14 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                     Genres
                   </Text>
                   <View style={styles.genresContainer}>
-                    {data.genres.map((genre) => (
-                      <Chip
-                        key={genre}
-                        mode="outlined"
-                        style={{ borderColor: theme.colors.outline }}
-                      >
-                        {genre}
-                      </Chip>
-                    ))}
+                    {genres.map((genreOrObj) => {
+                      const name = typeof genreOrObj === 'string' ? genreOrObj : genreOrObj?.name ?? String(genreOrObj?.id ?? '');
+                      return (
+                        <Chip key={name} mode="outlined" style={{ borderColor: theme.colors.outline }}>
+                          {name}
+                        </Chip>
+                      );
+                    })}
                   </View>
                 </Card.Content>
               </Card>
@@ -409,7 +495,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
           ) : null}
 
           {/* Alternate Titles */}
-          {data.alternateTitles?.length ? (
+          {(alternateTitles ?? []).length ? (
             <Animated.View entering={FadeIn.delay(900)}>
               <Card style={styles.card}>
                 <Card.Content style={styles.cardContent}>
@@ -422,7 +508,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   >
                     Also Known As
                   </Text>
-                  {data.alternateTitles.map((title, index) => (
+                  {(alternateTitles ?? []).map((title: string, index: number) => (
                     <Text
                       key={index}
                       variant="bodyMedium"
@@ -437,7 +523,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
           ) : null}
 
           {/* Seasons for TV */}
-          {mediaType === "tv" && data.seasons?.length ? (
+          {mediaType === "tv" && (seasons ?? []).length ? (
             <Animated.View entering={FadeIn.delay(1000)}>
               <Card style={styles.card}>
                 <Card.Content style={styles.cardContent}>
@@ -454,8 +540,8 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                     variant="bodyMedium"
                     style={{ color: theme.colors.onSurfaceVariant }}
                   >
-                    {data.seasons.length} season
-                    {data.seasons.length !== 1 ? "s" : ""}
+                    {(seasons ?? []).length} season
+                    {(seasons ?? []).length !== 1 ? "s" : ""}
                   </Text>
                 </Card.Content>
               </Card>
@@ -474,7 +560,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
             >
               Open in Jellyseerr
             </Button>
-            {data.externalUrl ? (
+            {getExternalUrl(data) ? (
               <Button
                 mode="outlined"
                 onPress={openExternalUrl}

@@ -1,32 +1,5 @@
 import React from 'react';
-import { ViewStyle } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeInLeft,
-  FadeInRight,
-  FadeOut,
-  FadeOutDown,
-  FadeOutUp,
-  FadeOutLeft,
-  FadeOutRight,
-  Layout,
-  SlideInDown,
-  SlideInUp,
-  SlideInLeft,
-  SlideInRight,
-  SlideOutDown,
-  SlideOutUp,
-  SlideOutLeft,
-  SlideOutRight,
-  LinearTransition,
-  SequencedTransition,
-  FadingTransition,
-  JumpingTransition,
-  CurvedTransition,
-  EntryExitTransition,
-} from 'react-native-reanimated';
+import { View, ScrollView, Pressable, ViewStyle, ScrollViewProps, PressableProps } from 'react-native';
 
 interface AnimatedViewProps {
   children: React.ReactNode;
@@ -39,20 +12,12 @@ interface AnimatedViewProps {
 export const AnimatedView: React.FC<AnimatedViewProps> = ({
   children,
   style,
-  entering = FadeIn,
-  exiting = FadeOut,
-  layout = Layout,
+  // kept for compatibility but intentionally ignored to remove animations
+  entering,
+  exiting,
+  layout,
 }) => {
-  return (
-    <Animated.View
-      style={style}
-      entering={entering}
-      exiting={exiting}
-      layout={layout}
-    >
-      {children}
-    </Animated.View>
-  );
+  return <View style={style}>{children}</View>;
 };
 
 interface AnimatedCardProps {
@@ -66,16 +31,8 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   style,
   delay = 0,
 }) => {
-  return (
-    <Animated.View
-      style={style}
-      entering={FadeInUp.delay(delay).springify()}
-      exiting={FadeOutDown.springify()}
-      layout={Layout.springify()}
-    >
-      {children}
-    </Animated.View>
-  );
+  // Intentionally render plain view to remove entrance/exit animations
+  return <View style={style}>{children}</View>;
 };
 
 interface AnimatedHeaderProps {
@@ -87,16 +44,7 @@ export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   children,
   style,
 }) => {
-  return (
-    <Animated.View
-      style={style}
-      entering={SlideInDown.springify()}
-      exiting={SlideOutUp.springify()}
-      layout={Layout.springify()}
-    >
-      {children}
-    </Animated.View>
-  );
+  return <View style={style}>{children}</View>;
 };
 
 interface AnimatedListProps {
@@ -108,16 +56,7 @@ export const AnimatedList: React.FC<AnimatedListProps> = ({
   children,
   style,
 }) => {
-  return (
-    <Animated.View
-      style={style}
-      entering={FadeIn.delay(200).springify()}
-      exiting={FadeOut.springify()}
-      layout={Layout.springify()}
-    >
-      {children}
-    </Animated.View>
-  );
+  return <View style={style}>{children}</View>;
 };
 
 interface AnimatedFilterProps {
@@ -131,16 +70,7 @@ export const AnimatedFilter: React.FC<AnimatedFilterProps> = ({
   style,
   delay = 0,
 }) => {
-  return (
-    <Animated.View
-      style={style}
-      entering={FadeInDown.delay(delay).springify()}
-      exiting={FadeOutUp.springify()}
-      layout={Layout.springify()}
-    >
-      {children}
-    </Animated.View>
-  );
+  return <View style={style}>{children}</View>;
 };
 
 // Staggered animation for list items
@@ -157,19 +87,8 @@ export const AnimatedListItem: React.FC<AnimatedListItemProps> = ({
   index = 0,
   totalItems = 1,
 }) => {
-  // Calculate delay based on index for staggered animation
-  const delay = Math.min(index * 50, 300); // Max 300ms delay
-
-  return (
-    <Animated.View
-      style={style}
-      entering={FadeInUp.delay(delay).springify()}
-      exiting={FadeOutDown.springify()}
-      layout={Layout.springify()}
-    >
-      {children}
-    </Animated.View>
-  );
+  // Preserve API but render without animation so list renders instantly
+  return <View style={style}>{children}</View>;
 };
 
 // Section animation for grouped content
@@ -184,16 +103,7 @@ export const AnimatedSection: React.FC<AnimatedSectionProps> = ({
   style,
   delay = 0,
 }) => {
-  return (
-    <Animated.View
-      style={style}
-      entering={FadeInDown.delay(delay).springify()}
-      exiting={FadeOutUp.springify()}
-      layout={Layout.springify()}
-    >
-      {children}
-    </Animated.View>
-  );
+  return <View style={style}>{children}</View>;
 };
 
 // Progress bar animation
@@ -206,15 +116,7 @@ export const AnimatedProgress: React.FC<AnimatedProgressProps> = ({
   children,
   style,
 }) => {
-  return (
-    <Animated.View
-      style={style}
-      entering={FadeIn.delay(200).springify()}
-      layout={Layout.springify()}
-    >
-      {children}
-    </Animated.View>
-  );
+  return <View style={style}>{children}</View>;
 };
 
 // Status indicator animation
@@ -227,16 +129,7 @@ export const AnimatedStatus: React.FC<AnimatedStatusProps> = ({
   children,
   style,
 }) => {
-  return (
-    <Animated.View
-      style={style}
-      entering={FadeInRight.springify()}
-      exiting={FadeOutLeft.springify()}
-      layout={Layout.springify()}
-    >
-      {children}
-    </Animated.View>
-  );
+  return <View style={style}>{children}</View>;
 };
 
 // Button press animation
@@ -252,18 +145,9 @@ export const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   onPress,
 }) => {
   return (
-    <Animated.View
-      style={style}
-      entering={FadeIn.springify()}
-      layout={Layout.springify()}
-    >
-      <Animated.View
-        entering={FadeInUp.springify()}
-        layout={Layout.springify()}
-      >
-        {children}
-      </Animated.View>
-    </Animated.View>
+    <Pressable style={style as any} onPress={onPress}>
+      {children}
+    </Pressable>
   );
 };
 
@@ -280,13 +164,8 @@ export const AnimatedScrollView: React.FC<AnimatedScrollViewProps> = ({
   contentContainerStyle,
 }) => {
   return (
-    <Animated.ScrollView
-      style={style}
-      contentContainerStyle={contentContainerStyle}
-      entering={FadeIn.delay(100).springify()}
-      layout={Layout.springify()}
-    >
+    <ScrollView style={style as any} contentContainerStyle={contentContainerStyle as any}>
       {children}
-    </Animated.ScrollView>
+    </ScrollView>
   );
 };

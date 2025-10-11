@@ -1,12 +1,13 @@
 import React, { forwardRef, useMemo, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet, View, Pressable } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { Card as PaperCard, type CardProps as PaperCardProps, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// Use native Pressable rather than an animated wrapper — keep behavior
+// but remove entrance/interaction animations for snappier UI.
+const AnimatedPressable = Pressable;
 
 const BASE_RADIUS = 16;
 const CUSTOM_RADIUS = 12;
@@ -70,7 +71,7 @@ const Card = forwardRef<PaperCardRef, CardProps>(
   const isDisabled = Boolean(disabled);
   const resolvedAccessibilityRole = onPress ? 'button' : accessibilityRoleProp;
 
-    const baseFocusRingStyle = useMemo<ViewStyle>(
+    const baseFocusRingStyle = useMemo<any>(
       () => ({
         borderColor: theme.colors.primary,
         borderWidth: 2,
@@ -79,7 +80,7 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       [theme.colors.primary],
     );
 
-    const customFocusRingStyle = useMemo<ViewStyle>(
+    const customFocusRingStyle = useMemo<any>(
       () => ({
         borderColor: theme.colors.primary,
         borderWidth: 2,

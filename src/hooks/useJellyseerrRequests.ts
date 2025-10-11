@@ -12,14 +12,13 @@ import type { JellyseerrConnector } from '@/connectors/implementations/Jellyseer
 import { useConnectorsStore } from '@/store/connectorsStore';
 import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
-import type {
-  CreateJellyseerrRequest,
-  JellyseerrApprovalOptions,
-  JellyseerrDeclineOptions,
-  JellyseerrRequest,
-  JellyseerrRequestList,
-  JellyseerrRequestQueryOptions,
-} from '@/models/jellyseerr.types';
+import type { components, paths } from '@/connectors/client-schemas/jellyseerr-openapi';
+type CreateJellyseerrRequest = paths['/request']['post']['requestBody']['content']['application/json'];
+type JellyseerrApprovalOptions = paths['/request/{requestId}']['put']['requestBody']['content']['application/json'];
+type JellyseerrDeclineOptions = JellyseerrApprovalOptions;
+type JellyseerrRequest = components['schemas']['MediaRequest'];
+type JellyseerrRequestList = { items: JellyseerrRequest[]; total: number; pageInfo?: components['schemas']['PageInfo'] };
+type JellyseerrRequestQueryOptions = paths['/request']['get']['parameters']['query'];
 import { notificationEventService } from '@/services/notifications/NotificationEventService';
 
 const JELLYSEERR_SERVICE_TYPE = 'jellyseerr';
@@ -59,29 +58,15 @@ const sanitizeQueryOptions = (
 
   const sanitized: JellyseerrRequestQueryOptions = {};
 
-  if (typeof options.take === 'number') {
-    sanitized.take = options.take;
-  }
-
-  if (typeof options.skip === 'number') {
-    sanitized.skip = options.skip;
-  }
-
-  if (options.filter && options.filter !== 'all') {
-    sanitized.filter = options.filter;
-  }
-
-  if (typeof options.is4k === 'boolean') {
-    sanitized.is4k = options.is4k;
-  }
-
-  if (typeof options.includePending4k === 'boolean') {
-    sanitized.includePending4k = options.includePending4k;
-  }
-
-  if (options.search && options.search.trim().length > 0) {
-    sanitized.search = options.search.trim();
-  }
+  // Only include query parameters that are present in the OpenAPI spec for
+  // the /request endpoint.
+  if (typeof options.take === 'number') sanitized.take = options.take;
+  if (typeof options.skip === 'number') sanitized.skip = options.skip;
+  if (options.filter && options.filter !== 'all') sanitized.filter = options.filter;
+  if (options.sort) sanitized.sort = options.sort;
+  if (options.sortDirection) sanitized.sortDirection = options.sortDirection;
+  if (typeof options.requestedBy === 'number') sanitized.requestedBy = options.requestedBy;
+  if (options.mediaType) sanitized.mediaType = options.mediaType;
 
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 };
@@ -128,9 +113,10 @@ export const useJellyseerrRequests = (
     options?.take,
     options?.skip,
     options?.filter,
-    options?.is4k,
-    options?.includePending4k,
-    options?.search,
+    options?.sort,
+    options?.sortDirection,
+    options?.requestedBy,
+    options?.mediaType,
   ]);
 
   const queryKeyParams = useMemo(
@@ -220,7 +206,8 @@ export const useJellyseerrRequests = (
         continue;
       }
 
-      if (!previousIds.has(request.id) && request.status === 'pending') {
+      // In the OpenAPI types request.status is numeric: 1 == pending
+      if (!previousIds.has(request.id) && request.status === 1) {
         void notificationEventService.notifyNewRequest({
           serviceId,
           serviceName,

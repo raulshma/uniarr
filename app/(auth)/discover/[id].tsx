@@ -228,7 +228,7 @@ const DiscoverItemDetails = () => {
 
 export default DiscoverItemDetails;
 
-const CastRow: React.FC<{ item: import("@/models/discover.types").DiscoverMediaItem }> = ({ item }) => {
+  const CastRow: React.FC<{ item: import("@/models/discover.types").DiscoverMediaItem }> = ({ item }) => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
 
@@ -295,7 +295,7 @@ const CastRow: React.FC<{ item: import("@/models/discover.types").DiscoverMediaI
             style={{ marginLeft: idx === 0 ? 0 : -OVERLAP, zIndex: idx + 1 }}
           >
             <MediaPoster
-              uri={person.profileUrl}
+              uri={person.profilePath ? `https://image.tmdb.org/t/p/original${person.profilePath}` : undefined}
               size={AVATAR_SIZE}
               aspectRatio={1}
               borderRadius={AVATAR_SIZE / 2}

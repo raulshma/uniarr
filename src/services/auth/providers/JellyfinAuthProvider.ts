@@ -59,7 +59,12 @@ export class JellyfinAuthProvider extends BaseAuthProvider {
         };
       }
 
-      const finalHeaders = this.buildAuthorizationHeaders(apiKey, deviceId, profile.Id, profile.Name);
+      const finalHeaders = this.buildAuthorizationHeaders(
+        apiKey,
+        deviceId,
+        typeof profile.Id === 'string' ? profile.Id : undefined,
+        typeof profile.Name === 'string' ? profile.Name : undefined
+      );
 
       return {
         success: true,

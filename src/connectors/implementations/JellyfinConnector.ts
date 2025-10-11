@@ -378,7 +378,7 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
       this.userId = context.userId;
     }
 
-    if (typeof context.userName === 'string') {
+    if (typeof context.userName === 'string' && context.userName.length > 0) {
       this.userName = context.userName;
     }
 
@@ -386,15 +386,19 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
       const profile = await this.fetchCurrentUser();
       if (profile?.Id) {
         this.userId = profile.Id;
-        this.userName = profile.Name;
+        if (typeof profile.Name === 'string' && profile.Name.length > 0) {
+          this.userName = profile.Name;
+        }
       }
     }
   }
 
   private async fetchServerInfo(): Promise<void> {
     try {
-      const response = await this.client.get<JellyfinServerInfo>('/System/Info/Public');
-      this.serverVersion = response.data?.Version ?? response.data?.ProductVersion ?? this.serverVersion;
+  const response = await this.client.get<JellyfinServerInfo>('/System/Info/Public');
+  // ProductVersion may be present under different keys depending on server; coerce nulls to undefined
+  const productVersion = (response.data as any)?.ProductVersion ?? undefined;
+  this.serverVersion = response.data?.Version ?? productVersion ?? this.serverVersion;
       this.serverName = response.data?.ServerName ?? response.data?.ProductName ?? this.serverName;
     } catch (error) {
       void logger.debug('Failed to fetch Jellyfin server info.', {

@@ -14,15 +14,7 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  FadingTransition,
-  Layout,
-  LinearTransition,
-} from "react-native-reanimated";
+// Animations disabled on this list page for snappy UX. Detail pages retain their animations.
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
@@ -378,11 +370,7 @@ const SonarrSeriesListScreen = () => {
         totalEpisodes > 0 ? Math.min(availableEpisodes / totalEpisodes, 1) : 0;
 
       return (
-        <Animated.View
-          exiting={FadeOut.springify()}
-          entering={FadeInUp.delay(index * 50).springify()}
-          layout={FadingTransition.build()}
-        >
+        <View>
           <MediaSelectableItem
             item={item}
             onPress={handleSeriesPress}
@@ -432,7 +420,7 @@ const SonarrSeriesListScreen = () => {
               </View>
             </Pressable>
           </MediaSelectableItem>
-        </Animated.View>
+  </View>
       );
     },
     [handleSeriesPress, handleSeriesLongPress, styles]
@@ -442,34 +430,24 @@ const SonarrSeriesListScreen = () => {
 
   const listHeader = useMemo(
     () => (
-      <Animated.View
-        style={styles.listHeader}
-        entering={FadeInDown.springify()}
-        layout={Layout.springify()}
-      >
-        <Animated.View
-          style={styles.topBar}
-          entering={FadeInDown.delay(100).springify()}
-          layout={Layout.springify()}
-        >
+      <View style={styles.listHeader}>
+          <View style={styles.topBar}>
           <View style={styles.topBarSpacer} />
           <Text variant="headlineSmall" style={styles.topBarTitle}>
             TV Series
           </Text>
-          <Animated.View entering={FadeInDown.delay(200).springify()}>
-            <IconButton
-              icon="plus"
-              size={24}
-              mode="contained"
-              style={styles.topBarAction}
-              containerColor={theme.colors.primary}
-              iconColor={theme.colors.onPrimary}
-              accessibilityLabel="Add series"
-              onPress={handleAddSeries}
-            />
-          </Animated.View>
-        </Animated.View>
-        <Animated.View entering={FadeInDown.delay(300).springify()}>
+          <IconButton
+            icon="plus"
+            size={24}
+            mode="contained"
+            style={styles.topBarAction}
+            containerColor={theme.colors.primary}
+            iconColor={theme.colors.onPrimary}
+            accessibilityLabel="Add series"
+            onPress={handleAddSeries}
+          />
+  </View>
+        <View>
           <Searchbar
             placeholder="Search TV Series"
             value={searchTerm}
@@ -480,8 +458,8 @@ const SonarrSeriesListScreen = () => {
             placeholderTextColor={theme.colors.onSurfaceVariant}
             accessibilityLabel="Search series"
           />
-        </Animated.View>
-        <Animated.View entering={FadeInDown.delay(400).springify()}>
+        </View>
+        <View>
           <View style={styles.filterRow}>
             <Menu
               key={`status-menu-${statusMenuVisible}-${filterValue}`}
@@ -520,8 +498,8 @@ const SonarrSeriesListScreen = () => {
               ))}
             </Menu>
           </View>
-        </Animated.View>
-      </Animated.View>
+  </View>
+  </View>
     ),
     [
       filterValue,
@@ -537,26 +515,22 @@ const SonarrSeriesListScreen = () => {
   const listEmptyComponent = useMemo(() => {
     if (filteredSeries.length === 0 && totalSeries > 0) {
       return (
-        <Animated.View entering={FadeIn.delay(200).springify()}>
-          <EmptyState
-            title="No series match your filters"
-            description="Try a different search query or reset the filters."
-            actionLabel="Clear filters"
-            onActionPress={handleClearFilters}
-          />
-        </Animated.View>
+        <EmptyState
+          title="No series match your filters"
+          description="Try a different search query or reset the filters."
+          actionLabel="Clear filters"
+          onActionPress={handleClearFilters}
+        />
       );
     }
 
     return (
-      <Animated.View entering={FadeIn.delay(200).springify()}>
-        <EmptyState
-          title="No series available"
-          description="Add a series in Sonarr or adjust your filters to see it here."
-          actionLabel="Add Series"
-          onActionPress={handleAddSeries}
-        />
-      </Animated.View>
+      <EmptyState
+        title="No series available"
+        description="Add a series in Sonarr or adjust your filters to see it here."
+        actionLabel="Add Series"
+        onActionPress={handleAddSeries}
+      />
     );
   }, [filteredSeries.length, handleAddSeries, handleClearFilters, totalSeries]);
 
@@ -648,11 +622,7 @@ const SonarrSeriesListScreen = () => {
   return (
     <MediaSelectorProvider>
       <SafeAreaView style={styles.safeArea}>
-        <Animated.View
-          style={{ flex: 1 }}
-          entering={FadeIn.delay(100).springify()}
-          layout={Layout.springify()}
-        >
+        <View style={{ flex: 1 }}>
           <FlashList
             data={filteredSeries}
             keyExtractor={keyExtractor}
@@ -670,7 +640,7 @@ const SonarrSeriesListScreen = () => {
               />
             }
           />
-        </Animated.View>
+        </View>
         <MediaSelectorActions serviceId={serviceId} onRefresh={refetch} />
         <MediaEditor
           visible={isEditorVisible}

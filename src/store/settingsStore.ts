@@ -27,6 +27,11 @@ type SettingsData = {
   criticalHealthAlertsBypassQuietHours: boolean;
   // Remember last selected calendar view (week/day/month/list)
   lastCalendarView: CalendarView;
+  useNativeTabs: boolean;
+  // Number of retry attempts to perform for Jellyseerr requests when the server
+  // returns 5xx errors. This value represents the number of retry attempts
+  // after the initial request. Default: 3
+  jellyseerrRetryAttempts: number;
 };
 
 interface SettingsState extends SettingsData {
@@ -48,12 +53,22 @@ interface SettingsState extends SettingsData {
   setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
   reset: () => void;
   setLastCalendarView: (view: CalendarView) => void;
+  setUseNativeTabs: (enabled: boolean) => void;
+  setJellyseerrRetryAttempts: (attempts: number) => void;
 }
 
 const STORAGE_KEY = 'SettingsStore:v1';
 const MIN_REFRESH_INTERVAL = 5;
 const MAX_REFRESH_INTERVAL = 120;
 const DEFAULT_REFRESH_INTERVAL = 15;
+const DEFAULT_JELLYSEERR_RETRY_ATTEMPTS = 3;
+const MIN_JELLYSEERR_RETRY_ATTEMPTS = 0;
+const MAX_JELLYSEERR_RETRY_ATTEMPTS = 10;
+
+const clampRetryAttempts = (value: number): number => {
+  if (Number.isNaN(value)) return DEFAULT_JELLYSEERR_RETRY_ATTEMPTS;
+  return Math.min(Math.max(Math.round(value), MIN_JELLYSEERR_RETRY_ATTEMPTS), MAX_JELLYSEERR_RETRY_ATTEMPTS);
+};
 
 const clampRefreshInterval = (minutes: number): number => {
   if (Number.isNaN(minutes)) {
@@ -83,6 +98,8 @@ const createDefaultSettings = (): SettingsData => ({
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
   lastCalendarView: 'week',
+  useNativeTabs: false,
+  jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -119,11 +136,15 @@ export const useSettingsStore = create<SettingsState>()(
       setCriticalHealthAlertsBypassQuietHours: (enabled) =>
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
   setLastCalendarView: (view: CalendarView) => set({ lastCalendarView: view }),
+  setUseNativeTabs: (enabled: boolean) => set({ useNativeTabs: enabled }),
+      setJellyseerrRetryAttempts: (attempts: number) =>
+        set({ jellyseerrRetryAttempts: clampRetryAttempts(attempts) }),
   reset: () => set(createDefaultSettings()),
     }),
     {
       name: STORAGE_KEY,
-      version: 2,
+      // Bump version since we're adding a new persisted field
+      version: 3,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -141,6 +162,16 @@ export const useSettingsStore = create<SettingsState>()(
         const normalizedInterval = clampRefreshInterval(state.refreshIntervalMinutes);
         if (normalizedInterval !== state.refreshIntervalMinutes) {
           state.refreshIntervalMinutes = normalizedInterval;
+        }
+
+        // Normalize jellyseerr retry attempts
+        if (typeof state.jellyseerrRetryAttempts === 'undefined') {
+          state.jellyseerrRetryAttempts = DEFAULT_JELLYSEERR_RETRY_ATTEMPTS;
+        } else {
+          const normalizedRetries = clampRetryAttempts(state.jellyseerrRetryAttempts);
+          if (normalizedRetries !== state.jellyseerrRetryAttempts) {
+            state.jellyseerrRetryAttempts = normalizedRetries;
+          }
         }
 
         const quietHoursEntries = Object.entries(state.quietHours ?? {}) as [
@@ -191,10 +222,14 @@ export const useSettingsStore = create<SettingsState>()(
           refreshIntervalMinutes: clampRefreshInterval(
             partial.refreshIntervalMinutes ?? baseDefaults.refreshIntervalMinutes,
           ),
+          jellyseerrRetryAttempts: clampRetryAttempts(
+            partial.jellyseerrRetryAttempts ?? baseDefaults.jellyseerrRetryAttempts,
+          ),
           quietHours,
           criticalHealthAlertsBypassQuietHours:
             partial.criticalHealthAlertsBypassQuietHours ??
             baseDefaults.criticalHealthAlertsBypassQuietHours,
+          useNativeTabs: partial.useNativeTabs ?? baseDefaults.useNativeTabs,
         } satisfies SettingsData;
       },
     },
@@ -216,6 +251,8 @@ export const selectServiceHealthNotificationsEnabled = (state: SettingsState): b
   state.serviceHealthNotificationsEnabled;
 export const selectRefreshIntervalMinutes = (state: SettingsState): number =>
   state.refreshIntervalMinutes;
+export const selectJellyseerrRetryAttempts = (state: SettingsState): number =>
+  state.jellyseerrRetryAttempts;
 export const selectQuietHours = (
   state: SettingsState,
 ): Record<NotificationCategory, QuietHoursConfig> => state.quietHours;
@@ -228,3 +265,4 @@ export const selectCriticalHealthAlertsBypassQuietHours = (state: SettingsState)
   state.criticalHealthAlertsBypassQuietHours;
 
 export const selectLastCalendarView = (state: SettingsState) => state.lastCalendarView;
+export const selectUseNativeTabs = (state: SettingsState) => state.useNativeTabs;

@@ -7,8 +7,6 @@ import {
   StyleSheet,
   View,
   useWindowDimensions,
-  Animated,
-  Easing,
 } from "react-native";
 import {
   Chip,
@@ -33,8 +31,8 @@ import type { JellyfinConnector } from "@/connectors/implementations/JellyfinCon
 import { useJellyfinLatestItems } from "@/hooks/useJellyfinLatestItems";
 import { useJellyfinLibraries } from "@/hooks/useJellyfinLibraries";
 import { useJellyfinLibraryItems } from "@/hooks/useJellyfinLibraryItems";
-import { useQuery, useQueries } from '@tanstack/react-query';
-import { queryKeys } from '@/hooks/queryKeys';
+import { useQuery, useQueries } from "@tanstack/react-query";
+import { queryKeys } from "@/hooks/queryKeys";
 import { useJellyfinResume } from "@/hooks/useJellyfinResume";
 import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
 import type {
@@ -44,6 +42,32 @@ import type {
   JellyfinResumeItem,
   JellyfinSession,
 } from "@/models/jellyfin.types";
+
+// Safely extract a Primary image tag from either a top-level PrimaryImageTag
+// property or an ImageTags.Primary entry without using `as any`.
+const extractPrimaryImageTag = (obj?: unknown): string | undefined => {
+  if (!obj || typeof obj !== "object") return undefined;
+  const r = obj as Record<string, unknown>;
+  const direct = r["PrimaryImageTag"];
+  if (typeof direct === "string") return direct;
+  const imageTags = r["ImageTags"];
+  if (imageTags && typeof imageTags === "object") {
+    const it = imageTags as Record<string, unknown>;
+    const primary = it["Primary"];
+    if (typeof primary === "string") return primary;
+  }
+  return undefined;
+};
+
+const getInternalStringField = (
+  obj?: unknown,
+  key?: string
+): string | undefined => {
+  if (!obj || typeof obj !== "object" || !key) return undefined;
+  const r = obj as Record<string, unknown>;
+  const v = r[key];
+  return typeof v === "string" ? v : undefined;
+};
 import { spacing } from "@/theme/spacing";
 
 type CollectionSegmentKey = "movies" | "tv" | "music";
@@ -99,12 +123,13 @@ const formatEpisodeLabel = (item: JellyfinItem): string | undefined => {
   return `${season}${episode}`.trim();
 };
 
-const formatRuntimeMinutes = (ticks?: number): number | undefined => {
-  if (!ticks || ticks <= 0) {
+const formatRuntimeMinutes = (ticks?: number | null): number | undefined => {
+  const normalized = ticks ?? undefined;
+  if (!normalized || normalized <= 0) {
     return undefined;
   }
 
-  const minutes = Math.round(ticks / 600_000_000);
+  const minutes = Math.round(normalized / 600_000_000);
   return minutes > 0 ? minutes : undefined;
 };
 
@@ -139,10 +164,12 @@ const deriveSubtitle = (
     // For series-level items prefer showing the production/premiere year as
     // the subtitle so the title (series name) doesn't repeat itself beneath
     // the poster. For episodes, show the parent series name.
-    if (item.Type === 'Series') {
+    if (item.Type === "Series") {
       const year =
         item.ProductionYear ??
-        (item.PremiereDate ? new Date(item.PremiereDate).getFullYear() : undefined);
+        (item.PremiereDate
+          ? new Date(item.PremiereDate).getFullYear()
+          : undefined);
       return year ? `${year}` : undefined;
     }
 
@@ -152,7 +179,9 @@ const deriveSubtitle = (
 
     const year =
       item.ProductionYear ??
-      (item.PremiereDate ? new Date(item.PremiereDate).getFullYear() : undefined);
+      (item.PremiereDate
+        ? new Date(item.PremiereDate).getFullYear()
+        : undefined);
     return year ? `${year}` : undefined;
   }
 
@@ -174,12 +203,13 @@ const buildPosterUri = (
     return undefined;
   }
 
-  const tag = item.PrimaryImageTag ?? item.ImageTags?.Primary;
+  const tag = extractPrimaryImageTag(item) ?? undefined;
   if (!tag) {
     return undefined;
   }
 
-  const idToUse = imageItemIdOverride ?? item.Id;
+  const idToUse = imageItemIdOverride ?? item.Id ?? "";
+  if (!idToUse) return undefined;
   return connector.getImageUrl(idToUse, "Primary", {
     tag,
     width: fallbackWidth,
@@ -261,7 +291,7 @@ const JellyfinLibraryScreen = () => {
     };
 
     (librariesQuery.data ?? []).forEach((library) => {
-      const type = (library.CollectionType ?? "").toLowerCase();
+      const type = ((library as any)?.CollectionType ?? "").toLowerCase();
       const segment = collectionSegments.find((candidate) =>
         candidate.types.includes(type)
       );
@@ -286,7 +316,7 @@ const JellyfinLibraryScreen = () => {
 
     if (groupedLibraries[activeSegment].length > 0) {
       const libraryIds = groupedLibraries[activeSegment].map(
-        (library) => library.Id
+        (library) => library?.Id ?? ""
       );
       if (!selectedLibraryId || !libraryIds.includes(selectedLibraryId)) {
         setSelectedLibraryId(groupedLibraries[activeSegment][0]?.Id ?? null);
@@ -329,7 +359,9 @@ const JellyfinLibraryScreen = () => {
   const fallbackLibraryItemsQuery = useQuery<JellyfinItem[]>({
     queryKey:
       serviceId && selectedLibraryId
-        ? queryKeys.jellyfin.libraryItems(serviceId, selectedLibraryId, { search: debouncedSearch.toLowerCase() })
+        ? queryKeys.jellyfin.libraryItems(serviceId, selectedLibraryId, {
+            search: debouncedSearch.toLowerCase(),
+          })
         : queryKeys.jellyfin.base,
     enabled: Boolean(
       serviceId &&
@@ -343,10 +375,14 @@ const JellyfinLibraryScreen = () => {
     queryFn: async () => {
       if (!serviceId || !selectedLibraryId) return [] as JellyfinItem[];
 
-      let connector = manager.getConnector(serviceId) as JellyfinConnector | undefined;
+      let connector = manager.getConnector(serviceId) as
+        | JellyfinConnector
+        | undefined;
       if (!connector) {
         await manager.loadSavedServices();
-        connector = manager.getConnector(serviceId) as JellyfinConnector | undefined;
+        connector = manager.getConnector(serviceId) as
+          | JellyfinConnector
+          | undefined;
       }
 
       if (!connector) return [] as JellyfinItem[];
@@ -355,8 +391,8 @@ const JellyfinLibraryScreen = () => {
         searchTerm: debouncedSearch,
         // intentionally omit includeItemTypes to widen results
         mediaTypes: activeSegmentConfig.mediaTypes,
-        sortBy: 'SortName',
-        sortOrder: 'Ascending',
+        sortBy: "SortName",
+        sortOrder: "Ascending",
         limit: 60,
       });
     },
@@ -380,59 +416,20 @@ const JellyfinLibraryScreen = () => {
       nowPlayingQuery.isFetching) &&
     !isInitialLoad;
 
-  // Animation: cross-fade skeleton -> content
+  // Simplified: show skeleton overlay while initial load. No animated
+  // cross-fade; toggling happens synchronously to keep UI snappy.
   const [showSkeletonLayer, setShowSkeletonLayer] = useState(isInitialLoad);
   const [contentInteractive, setContentInteractive] = useState(!isInitialLoad);
 
-  const skeletonOpacity = useRef(
-    new Animated.Value(isInitialLoad ? 1 : 0)
-  ).current;
-  const contentOpacity = useRef(
-    new Animated.Value(isInitialLoad ? 0 : 1)
-  ).current;
-
   useEffect(() => {
     if (isInitialLoad) {
-      // Ensure skeleton is present while animating in
       setShowSkeletonLayer(true);
       setContentInteractive(false);
-
-      Animated.parallel([
-        Animated.timing(skeletonOpacity, {
-          toValue: 1,
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(contentOpacity, {
-          toValue: 0,
-          duration: 200,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]).start();
-      return;
-    }
-
-    // Fade skeleton out and fade content in, then remove skeleton layer from tree.
-    Animated.parallel([
-      Animated.timing(skeletonOpacity, {
-        toValue: 0,
-        duration: 320,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(contentOpacity, {
-        toValue: 1,
-        duration: 360,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    } else {
       setShowSkeletonLayer(false);
       setContentInteractive(true);
-    });
-  }, [isInitialLoad, skeletonOpacity, contentOpacity]);
+    }
+  }, [isInitialLoad]);
 
   const aggregatedError =
     librariesQuery.error ??
@@ -458,26 +455,34 @@ const JellyfinLibraryScreen = () => {
   // episodes by SeriesId/SeriesName and create representative entries so the
   // UI shows series-level cards instead of individual episodes.
   const displayItems = useMemo(() => {
-    if (activeSegment !== 'tv') return items;
+    if (activeSegment !== "tv") return items;
 
-    const seriesItems = items.filter((it) => it.Type === 'Series');
+    const seriesItems = items.filter((it) => it.Type === "Series");
     if (seriesItems.length > 0) return seriesItems;
 
-    const grouped = new Map<string, JellyfinItem & { __navigationId?: string; __posterSourceId?: string }>();
+    const grouped = new Map<
+      string,
+      JellyfinItem & { __navigationId?: string; __posterSourceId?: string }
+    >();
 
     for (const it of items) {
-      const seriesKey = it.SeriesId ?? it.ParentId ?? it.SeriesName ?? it.Id;
+      const seriesKey = String(
+        it.SeriesId ?? it.ParentId ?? it.SeriesName ?? it.Id ?? ""
+      );
       if (!grouped.has(seriesKey)) {
         // Create a representative item (shallow copy) and attach metadata
         // for navigation (series id) and poster source (episode id).
         const rep = {
           ...it,
           Name: it.SeriesName ?? it.Name,
-          Type: 'Series',
-          PrimaryImageTag: it.PrimaryImageTag ?? it.ImageTags?.Primary,
+          Type: "Series",
+          PrimaryImageTag: extractPrimaryImageTag(it),
           __navigationId: it.SeriesId ?? it.ParentId ?? it.Id,
           __posterSourceId: it.Id,
-        } as JellyfinItem & { __navigationId?: string; __posterSourceId?: string };
+        } as JellyfinItem & {
+          __navigationId?: string;
+          __posterSourceId?: string;
+        };
         grouped.set(seriesKey, rep);
       }
     }
@@ -490,27 +495,32 @@ const JellyfinLibraryScreen = () => {
   // background so we can replace episode posters with proper series
   // artwork when available.
   const seriesIds = useMemo(() => {
-    if (activeSegment !== 'tv') return [] as string[];
+    if (activeSegment !== "tv") return [] as string[];
     const ids = new Set<string>();
     for (const it of displayItems) {
-      if ((it as any).__navigationId) ids.add((it as any).__navigationId as string);
-      else if (it.Type === 'Series' && it.Id) ids.add(it.Id);
+      const maybeNav = getInternalStringField(it, "__navigationId");
+      if (maybeNav) ids.add(maybeNav);
+      else if (it.Type === "Series" && it.Id) ids.add(it.Id as string);
     }
     return Array.from(ids);
   }, [displayItems, activeSegment]);
 
   const seriesQueries = useQueries({
     queries: seriesIds.map((seriesId) => ({
-      queryKey: queryKeys.jellyfin.item(serviceId ?? 'unknown', seriesId),
+      queryKey: queryKeys.jellyfin.item(serviceId ?? "unknown", seriesId),
       enabled: Boolean(serviceId && seriesId),
       staleTime: 1000 * 60 * 60, // 1 hour
       refetchOnWindowFocus: false,
       queryFn: async () => {
         if (!serviceId) return null;
-        let connector = manager.getConnector(serviceId) as JellyfinConnector | undefined;
+        let connector = manager.getConnector(serviceId) as
+          | JellyfinConnector
+          | undefined;
         if (!connector) {
           await manager.loadSavedServices();
-          connector = manager.getConnector(serviceId) as JellyfinConnector | undefined;
+          connector = manager.getConnector(serviceId) as
+            | JellyfinConnector
+            | undefined;
         }
         if (!connector) return null;
         try {
@@ -536,19 +546,24 @@ const JellyfinLibraryScreen = () => {
   }, [seriesIds, seriesQueries]);
 
   const displayItemsEnriched = useMemo(() => {
-    if (activeSegment !== 'tv') return displayItems;
+    if (activeSegment !== "tv") return displayItems;
     return displayItems.map((it) => {
-      const navId = (it as any).__navigationId ?? it.Id;
+      const navId = getInternalStringField(it, "__navigationId") ?? it.Id;
       const meta = navId ? seriesMetaMap.get(navId) : undefined;
       if (!meta) return it;
       return {
         ...it,
         // Use the series item's id for poster requests when possible
-        __posterSourceId: meta.Id ?? (it as any).__posterSourceId,
+        __posterSourceId:
+          meta.Id ?? getInternalStringField(it, "__posterSourceId"),
         // Prefer series-level title if available
         Name: meta.Name ?? it.Name,
-        PrimaryImageTag: meta.PrimaryImageTag ?? it.PrimaryImageTag,
-        ImageTags: meta.ImageTags ?? it.ImageTags,
+        PrimaryImageTag:
+          extractPrimaryImageTag(meta) ?? extractPrimaryImageTag(it),
+        ImageTags:
+          (meta as unknown as { ImageTags?: Record<string, string> })
+            ?.ImageTags ??
+          (it as unknown as { ImageTags?: Record<string, string> })?.ImageTags,
       } as JellyfinItem & { __posterSourceId?: string };
     });
   }, [displayItems, seriesMetaMap, activeSegment]);
@@ -577,10 +592,11 @@ const JellyfinLibraryScreen = () => {
   }, [router, serviceId]);
 
   const handleOpenItem = useCallback(
-    (itemId: string) => {
+    (itemId?: string) => {
       if (!serviceId) {
         return;
       }
+      if (!itemId) return;
 
       router.push({
         pathname: "/(auth)/jellyfin/[serviceId]/details/[itemId]",
@@ -606,7 +622,15 @@ const JellyfinLibraryScreen = () => {
     nowPlayingQuery,
   ]);
 
-  const nowPlayingSessions = nowPlayingQuery.data ?? [];
+  // Filter sessions to only those that actually have a NowPlayingItem. Some
+  // connectors may return sessions without an active NowPlayingItem; avoid
+  // showing the Now Playing section for those.
+  const nowPlayingSessionsRaw = nowPlayingQuery.data ?? [];
+  const nowPlayingSessions = useMemo(
+    () => nowPlayingSessionsRaw.filter((s) => Boolean(s.NowPlayingItem)),
+    [nowPlayingSessionsRaw]
+  );
+
   const nowPlayingItemIds = useMemo(
     () =>
       new Set(
@@ -619,7 +643,9 @@ const JellyfinLibraryScreen = () => {
 
   const continueWatchingItems = useMemo(
     () =>
-      (resumeQuery.data ?? []).filter((it) => !nowPlayingItemIds.has(it.Id)),
+      (resumeQuery.data ?? []).filter((it) =>
+        it.Id ? !nowPlayingItemIds.has(it.Id) : true
+      ),
     [resumeQuery.data, nowPlayingItemIds]
   );
 
@@ -745,6 +771,13 @@ const JellyfinLibraryScreen = () => {
           ? item.SeriesName
           : deriveSubtitle(item, activeSegment);
       const status = formatEpisodeLabel(item);
+
+      // Compute responsive poster size so the image dominates the card
+      const cardWidth = Math.max(
+        120,
+        Math.floor((windowWidth - spacing.lg * 2 - spacing.md) / numColumns)
+      );
+      const posterSize = Math.max(160, cardWidth - spacing.md);
       return (
         <View>
           <Pressable
@@ -756,7 +789,11 @@ const JellyfinLibraryScreen = () => {
             onPress={() => handleOpenItem(item.Id)}
           >
             <View style={styles.posterFrame}>
-              <MediaPoster uri={posterUri} size={220} borderRadius={18} />
+              <MediaPoster
+                uri={posterUri}
+                size={posterSize}
+                borderRadius={14}
+              />
             </View>
             <Text
               variant="bodyMedium"
@@ -798,7 +835,7 @@ const JellyfinLibraryScreen = () => {
       const positionStyle =
         index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight;
 
-      // Column sizing: account for FlashList padding and inter-column gaps so poster fits inside card.
+      // Column sizing: compute card/poster size so image is the focus
       const contentHorizontalPadding = spacing.lg * 2; // listContent applies paddingHorizontal: spacing.lg
       const totalGaps = spacing.xl; // space between columns (gridCardLeft/right use spacing.md)
       const effectiveColumnWidth = Math.max(
@@ -807,10 +844,8 @@ const JellyfinLibraryScreen = () => {
           (windowWidth - contentHorizontalPadding - totalGaps) / numColumns
         )
       );
-      const posterSize = Math.max(80, effectiveColumnWidth - spacing.md * 2); // leave room for internal card padding
-
-      const framePadding = spacing.md;
-      const innerPosterSize = Math.max(80, posterSize - framePadding * 2);
+      const posterSize = Math.max(140, effectiveColumnWidth - spacing.md * 2);
+      const innerPosterSize = posterSize;
 
       return (
         <View>
@@ -890,12 +925,12 @@ const JellyfinLibraryScreen = () => {
         {librariesForActiveSegment.length > 1 ? (
           <View>
             <View style={styles.libraryChipsRow}>
-              {librariesForActiveSegment.map((library) => (
+              {librariesForActiveSegment.map((library, i) => (
                 <Chip
-                  key={library.Id}
+                  key={library.Id ?? String(i)}
                   mode={selectedLibraryId === library.Id ? "flat" : "outlined"}
                   selected={selectedLibraryId === library.Id}
-                  onPress={() => setSelectedLibraryId(library.Id)}
+                  onPress={() => setSelectedLibraryId(library.Id ?? null)}
                   style={styles.libraryChip}
                 >
                   {library.Name}
@@ -921,7 +956,7 @@ const JellyfinLibraryScreen = () => {
 
             <FlashList
               data={continueWatchingItems}
-              keyExtractor={(item) => item.Id}
+              keyExtractor={(item) => item.Id ?? item.Name ?? ""}
               renderItem={renderResumeItem}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1062,13 +1097,13 @@ const JellyfinLibraryScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Content layer: always rendered but faded in when ready */}
-      <Animated.View
-        style={[styles.contentLayer, { opacity: contentOpacity }]}
+      <View
+        style={[styles.contentLayer, { opacity: contentInteractive ? 1 : 0 }]}
         pointerEvents={contentInteractive ? "auto" : "none"}
       >
         <FlashList
           data={displayItemsEnriched}
-          keyExtractor={(item) => item.Id}
+          keyExtractor={(item) => item.Id ?? item.Name ?? ""}
           renderItem={renderLibraryItem}
           numColumns={2}
           contentContainerStyle={styles.listContent}
@@ -1081,12 +1116,12 @@ const JellyfinLibraryScreen = () => {
             />
           }
         />
-      </Animated.View>
+      </View>
 
       {/* Skeleton overlay: mounted while visible and cross-fades out */}
       {showSkeletonLayer ? (
-        <Animated.View
-          style={[styles.overlay, { opacity: skeletonOpacity }]}
+        <View
+          style={[styles.overlay]}
           pointerEvents={showSkeletonLayer ? "auto" : "none"}
         >
           <SafeAreaView style={styles.safeArea}>
@@ -1135,7 +1170,7 @@ const JellyfinLibraryScreen = () => {
               ))}
             </ScrollView>
           </SafeAreaView>
-        </Animated.View>
+        </View>
       ) : null}
       {errorMessage ? (
         <HelperText type="error" visible>
@@ -1371,16 +1406,17 @@ const createStyles = (theme: AppTheme) =>
     },
     gridCard: {
       flex: 1,
-      gap: spacing.sm,
-      marginBottom: spacing.lg,
-      padding: spacing.md,
-      borderRadius: 18,
-      backgroundColor: theme.colors.surfaceVariant,
-      overflow: "hidden",
+      gap: spacing.xs,
+      marginBottom: spacing.md,
+      padding: spacing.sm,
+      borderRadius: 12,
+      backgroundColor: "transparent",
+      overflow: "visible",
     },
     posterFrame: {
-      padding: spacing.sm,
-      borderRadius: 18,
+      // Make poster the dominant element; minimal frame chrome
+      padding: 0,
+      borderRadius: 12,
       alignItems: "center",
     },
     gridCardLeft: {
@@ -1392,9 +1428,12 @@ const createStyles = (theme: AppTheme) =>
     gridTitle: {
       color: theme.colors.onSurface,
       fontWeight: "600",
+      textAlign: "center",
+      marginTop: spacing.xs,
     },
     gridSubtitle: {
       color: theme.colors.onSurfaceVariant,
+      textAlign: "center",
     },
     nowPlayingList: {
       marginTop: spacing.sm,
@@ -1403,9 +1442,9 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.md,
-      padding: spacing.md,
-      borderRadius: 14,
-      backgroundColor: theme.colors.surfaceVariant,
+      padding: spacing.sm,
+      borderRadius: 10,
+      backgroundColor: "transparent",
     },
     nowPlayingMeta: {
       flex: 1,
