@@ -42,6 +42,7 @@ const SettingsScreen = () => {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
   const theme = useTheme<AppTheme>();
+  const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
 
   // Settings store
   const {
@@ -745,6 +746,43 @@ const SettingsScreen = () => {
             </Card>
           </AnimatedListItem>
         </AnimatedSection>
+
+        {/* Developer Tools (dev only) */}
+        {isDev && (
+          <AnimatedSection style={styles.section} delay={375}>
+            <AnimatedListItem index={0} totalItems={1}>
+              <Card
+                variant="custom"
+                style={styles.settingCard}
+                onPress={() => router.push("/(auth)/dev")}
+              >
+                <View style={styles.settingContent}>
+                  <View style={styles.settingIcon}>
+                    <IconButton
+                      icon="bug"
+                      size={24}
+                      iconColor={theme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>Developer Tools</Text>
+                    <Text style={styles.settingSubtitle}>
+                      Dev-only tools and component playground
+                    </Text>
+                    <Text style={styles.settingValue}>
+                      Visible in development builds
+                    </Text>
+                  </View>
+                  <IconButton
+                    icon="chevron-right"
+                    size={20}
+                    iconColor={theme.colors.outline}
+                  />
+                </View>
+              </Card>
+            </AnimatedListItem>
+          </AnimatedSection>
+        )}
 
         {/* Sign Out Button */}
         <AnimatedListItem
