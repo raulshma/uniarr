@@ -125,21 +125,34 @@ const JellyfinNowPlayingScreen = () => {
     refetchInterval: 10_000,
   });
   const sessions = nowPlayingQuery.data ?? [];
-  // Preserve the last known non-empty sessions list to avoid transient "nothing is playing"
-  // while the query is refetching after issuing playback commands.
-  const [cachedSessions, setCachedSessions] = useState<typeof sessions | null>(
-    sessions.length ? sessions : null
-  );
+
+  // Preserve the last-known active session that contains a NowPlayingItem. Some
+  // Jellyfin session responses (for paused / transitioning states) may omit
+  // the NowPlayingItem while still returning a session object. In that case we
+  // want to keep showing the last-known item rather than replacing it with an
+  // empty/partial response which causes a transient "Nothing is playing" UI.
+  const [cachedActiveSession, setCachedActiveSession] = useState<
+    (typeof sessions)[number] | null
+  >(sessions.length && sessions[0]?.NowPlayingItem ? sessions[0] : null);
 
   useEffect(() => {
-    if (sessions.length) {
-      setCachedSessions(sessions);
+    if (!sessions.length) return;
+
+    const incoming = sessions[0];
+    // Only update the cached active session when the incoming session includes
+    // a NowPlayingItem. If it's missing, keep the previous cached value.
+    if (incoming?.NowPlayingItem) {
+      setCachedActiveSession(incoming);
     }
   }, [sessions]);
 
-  const sessionsToShow = sessions.length ? sessions : cachedSessions ?? [];
-  // Use the preserved sessions list for rendering to avoid flicker
-  const activeSession = sessionsToShow[0];
+  // Determine which session to render. Prefer a current session that includes
+  // a NowPlayingItem; otherwise fall back to the cached active session.
+  const activeSession =
+    (sessions.length && sessions[0]?.NowPlayingItem && sessions[0]) ||
+    cachedActiveSession ||
+    sessions[0];
+
   const item = activeSession?.NowPlayingItem;
   const progress = computeProgress(activeSession);
   const activePlayState = activeSession?.PlayState as
@@ -151,8 +164,11 @@ const JellyfinNowPlayingScreen = () => {
     : item?.RunTimeTicks ?? 0;
   const volumeLevel = activePlayState?.VolumeLevel ?? 0;
 
-  // Consider loading only if we're bootstrapping or the query is loading and we have no cached sessions.
-  const isLoading = isBootstrapping || (nowPlayingQuery.isLoading && sessions.length === 0);
+  // Consider loading only if we're bootstrapping or the query is loading and we
+  // have no cached active session to show. If we have a cached active session
+  // prefer showing that instead of the loading spinner / empty state.
+  const isLoading =
+    isBootstrapping || (nowPlayingQuery.isLoading && sessions.length === 0 && !cachedActiveSession);
   const errorMessage =
     nowPlayingQuery.error instanceof Error
       ? nowPlayingQuery.error.message
