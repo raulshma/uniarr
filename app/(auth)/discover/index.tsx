@@ -1,12 +1,12 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   View,
 } from "react-native";
+import { alert } from '@/services/dialogService';
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   IconButton,
@@ -187,7 +187,7 @@ const DiscoverScreen = () => {
       const options =
         item.mediaType === "series" ? services.sonarr : services.radarr;
       if (!options.length) {
-        Alert.alert(
+        alert(
           "No services available",
           `Add a ${
             item.mediaType === "series" ? "Sonarr" : "Radarr"
@@ -210,19 +210,9 @@ const DiscoverScreen = () => {
 
   const handleCardPress = useCallback(
     (item: DiscoverMediaItem) => {
-      // Navigate to unified search and prefill with the selected item's title/ids
-      const params: Record<string, string> = { query: item.title };
-      if (item.tmdbId) {
-        params.tmdbId = String(item.tmdbId);
-      }
-      if (item.tvdbId) {
-        params.tvdbId = String(item.tvdbId);
-      }
-      if (item.mediaType) {
-        params.mediaType = item.mediaType;
-      }
-
-      router.push({ pathname: "/(auth)/search", params });
+      // Navigate to a unified discover details page for this item
+      // Use the discover item id so the details screen can resolve it
+      router.push({ pathname: `/(auth)/discover/${item.id}` });
     },
     [router]
   );

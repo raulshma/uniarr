@@ -1,9 +1,16 @@
 import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshControl, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  Animated,
+  Easing,
+} from "react-native";
+import {
   Chip,
   HelperText,
   IconButton,
@@ -13,6 +20,10 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+// Animations removed: using plain Views instead of reanimated Animated.Views
+import { ListRefreshControl } from "@/components/common/ListRefreshControl";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { SeriesListItemSkeleton } from "@/components/media/skeletons";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -170,6 +181,8 @@ const JellyfinLibraryScreen = () => {
   const theme = useTheme<AppTheme>();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
+  const { width: windowWidth } = useWindowDimensions();
+  const numColumns = 2;
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [activeSegment, setActiveSegment] =
@@ -300,10 +313,65 @@ const JellyfinLibraryScreen = () => {
     resumeQuery.isLoading ||
     latestQuery.isLoading;
   const isRefreshing =
-    libraryItemsQuery.isFetching ||
-    resumeQuery.isFetching ||
-    latestQuery.isFetching ||
-    librariesQuery.isFetching;
+    (libraryItemsQuery.isFetching ||
+      resumeQuery.isFetching ||
+      latestQuery.isFetching ||
+      librariesQuery.isFetching) &&
+    !isInitialLoad;
+
+  // Animation: cross-fade skeleton -> content
+  const [showSkeletonLayer, setShowSkeletonLayer] = useState(isInitialLoad);
+  const [contentInteractive, setContentInteractive] = useState(!isInitialLoad);
+
+  const skeletonOpacity = useRef(
+    new Animated.Value(isInitialLoad ? 1 : 0)
+  ).current;
+  const contentOpacity = useRef(
+    new Animated.Value(isInitialLoad ? 0 : 1)
+  ).current;
+
+  useEffect(() => {
+    if (isInitialLoad) {
+      // Ensure skeleton is present while animating in
+      setShowSkeletonLayer(true);
+      setContentInteractive(false);
+
+      Animated.parallel([
+        Animated.timing(skeletonOpacity, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentOpacity, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
+    // Fade skeleton out and fade content in, then remove skeleton layer from tree.
+    Animated.parallel([
+      Animated.timing(skeletonOpacity, {
+        toValue: 0,
+        duration: 320,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 360,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowSkeletonLayer(false);
+      setContentInteractive(true);
+    });
+  }, [isInitialLoad, skeletonOpacity, contentOpacity]);
 
   const aggregatedError =
     librariesQuery.error ??
@@ -366,13 +434,13 @@ const JellyfinLibraryScreen = () => {
   }, [latestQuery, librariesQuery, libraryItemsQuery, resumeQuery]);
 
   const renderResumeItem = useCallback(
-    ({ item }: { item: JellyfinResumeItem }) => {
+    ({ item, index }: { item: JellyfinResumeItem; index: number }) => {
       const title = item.SeriesName ?? item.Name ?? "Untitled";
       const subtitle =
         item.Type === "Episode"
           ? item.Name ?? undefined
           : deriveSubtitle(item, "movies");
-      const posterUri = buildPosterUri(connector, item, 360);
+      const posterUri = buildPosterUri(connector, item, 240);
       const progress =
         typeof item.UserData?.PlaybackPositionTicks === "number" &&
         typeof item.RunTimeTicks === "number"
@@ -386,41 +454,53 @@ const JellyfinLibraryScreen = () => {
           : undefined;
 
       return (
-        <View style={styles.resumeCard}>
-          <MediaPoster
-            uri={posterUri}
-            size={116}
-            accessibilityLabel={`Continue watching ${title}`}
+        <View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.resumeCard,
+              pressed && styles.cardPressed,
+            ]}
             onPress={() => handleOpenItem(item.Id)}
-          />
-          <View style={styles.resumeMeta}>
-            <Text
-              variant="bodyMedium"
-              numberOfLines={1}
-              style={styles.resumeTitle}
-            >
-              {title}
-            </Text>
-            {subtitle ? (
+          >
+            <MediaPoster
+              uri={posterUri}
+              size={80}
+              accessibilityLabel={`Continue watching ${title}`}
+            />
+            <View style={styles.resumeMeta}>
               <Text
-                variant="bodySmall"
+                variant="bodyMedium"
                 numberOfLines={2}
-                style={styles.resumeSubtitle}
+                style={styles.resumeTitle}
               >
-                {subtitle}
+                {title}
               </Text>
-            ) : null}
-            {typeof progress === "number" ? (
-              <View style={styles.progressRail}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${Math.round(progress * 100)}%` },
-                  ]}
-                />
-              </View>
-            ) : null}
-          </View>
+              {subtitle ? (
+                <Text
+                  variant="bodySmall"
+                  numberOfLines={1}
+                  style={styles.resumeSubtitle}
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
+              {typeof progress === "number" ? (
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressRail}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${Math.round(progress * 100)}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text variant="bodySmall" style={styles.progressText}>
+                    {Math.round(progress * 100)}%
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
         </View>
       );
     },
@@ -428,7 +508,7 @@ const JellyfinLibraryScreen = () => {
   );
 
   const renderLatestItem = useCallback(
-    ({ item }: { item: JellyfinLatestItem }) => {
+    ({ item, index }: { item: JellyfinLatestItem; index: number }) => {
       const posterUri = buildPosterUri(connector, item, 420);
       const subtitle =
         item.Type === "Episode"
@@ -437,35 +517,43 @@ const JellyfinLibraryScreen = () => {
       const status = formatEpisodeLabel(item);
 
       return (
-        <View style={styles.latestCard}>
-          <MediaPoster
-            uri={posterUri}
-            size={96}
+        <View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.latestCard,
+              pressed && styles.cardPressed,
+            ]}
             onPress={() => handleOpenItem(item.Id)}
-          />
-          <View style={styles.latestMeta}>
-            <Text
-              variant="titleSmall"
-              numberOfLines={1}
-              style={styles.latestTitle}
-            >
-              {item.Name ?? "Untitled"}
-            </Text>
-            {subtitle ? (
+          >
+            <MediaPoster
+              uri={posterUri}
+              size={96}
+              onPress={() => handleOpenItem(item.Id)}
+            />
+            <View style={styles.latestMeta}>
               <Text
-                variant="bodySmall"
+                variant="titleSmall"
                 numberOfLines={1}
-                style={styles.latestSubtitle}
+                style={styles.latestTitle}
               >
-                {subtitle}
+                {item.Name ?? "Untitled"}
               </Text>
-            ) : null}
-            {status ? (
-              <Chip compact mode="outlined" style={styles.episodeChip}>
-                {status}
-              </Chip>
-            ) : null}
-          </View>
+              {subtitle ? (
+                <Text
+                  variant="bodySmall"
+                  numberOfLines={1}
+                  style={styles.latestSubtitle}
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
+              {status ? (
+                <Chip compact mode="outlined" style={styles.episodeChip}>
+                  {status}
+                </Chip>
+              ) : null}
+            </View>
+          </Pressable>
         </View>
       );
     },
@@ -479,29 +567,49 @@ const JellyfinLibraryScreen = () => {
       const positionStyle =
         index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight;
 
+      // Column sizing: account for FlashList padding and inter-column gaps so poster fits inside card.
+      const contentHorizontalPadding = spacing.lg * 2; // listContent applies paddingHorizontal: spacing.lg
+      const totalGaps = spacing.xl; // space between columns (gridCardLeft/right use spacing.md)
+      const effectiveColumnWidth = Math.max(
+        0,
+        Math.floor(
+          (windowWidth - contentHorizontalPadding - totalGaps) / numColumns
+        )
+      );
+      const posterSize = Math.max(80, effectiveColumnWidth - spacing.md * 2); // leave room for internal card padding
+
       return (
-        <View style={[styles.gridCard, positionStyle]}>
-          <MediaPoster
-            uri={posterUri}
-            size={168}
+        <View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.gridCard,
+              positionStyle,
+              pressed && styles.cardPressed,
+            ]}
             onPress={() => handleOpenItem(item.Id)}
-          />
-          <Text variant="bodyMedium" numberOfLines={2} style={styles.gridTitle}>
-            {item.Name ?? "Untitled"}
-          </Text>
-          {subtitle ? (
+          >
+            <MediaPoster uri={posterUri} size={posterSize} />
             <Text
-              variant="bodySmall"
-              numberOfLines={1}
-              style={styles.gridSubtitle}
+              variant="bodyMedium"
+              numberOfLines={2}
+              style={styles.gridTitle}
             >
-              {subtitle}
+              {item.Name ?? "Untitled"}
             </Text>
-          ) : null}
+            {subtitle ? (
+              <Text
+                variant="bodySmall"
+                numberOfLines={1}
+                style={styles.gridSubtitle}
+              >
+                {subtitle}
+              </Text>
+            ) : null}
+          </Pressable>
         </View>
       );
     },
-    [activeSegment, connector, handleOpenItem, styles]
+    [activeSegment, connector, handleOpenItem, styles, windowWidth]
   );
 
   const listHeader = useMemo(() => {
@@ -521,66 +629,76 @@ const JellyfinLibraryScreen = () => {
               {serviceName}
             </Text>
           </View>
-          <View style={styles.toolbarActions}>
-            <IconButton
-              icon="play-circle-outline"
-              accessibilityLabel="Open now playing"
-              onPress={handleOpenNowPlaying}
-            />
-            <IconButton
-              icon="cog"
-              accessibilityLabel="Edit service"
-              onPress={handleOpenSettings}
-            />
+          <View>
+            <View style={styles.toolbarActions}>
+              <IconButton
+                icon="play-circle-outline"
+                accessibilityLabel="Open now playing"
+                onPress={handleOpenNowPlaying}
+              />
+              <IconButton
+                icon="cog"
+                accessibilityLabel="Edit service"
+                onPress={handleOpenSettings}
+              />
+            </View>
           </View>
         </View>
-        <Searchbar
-          placeholder="Search for movies, shows, or music"
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          style={styles.searchBar}
-          inputStyle={styles.searchInput}
-          accessibilityLabel="Search library"
-        />
-        <SegmentedButtons
-          value={activeSegment}
-          onValueChange={(value) =>
-            setActiveSegment(value as CollectionSegmentKey)
-          }
-          buttons={collectionSegments.map((segment) => ({
-            value: segment.key,
-            label: segment.label,
-            disabled: groupedLibraries[segment.key].length === 0,
-          }))}
-          density="medium"
-          style={styles.segmentedControl}
-        />
+        <View>
+          <Searchbar
+            placeholder="Search for movies, shows, or music"
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            style={styles.searchBar}
+            inputStyle={styles.searchInput}
+            accessibilityLabel="Search library"
+          />
+        </View>
+        <View>
+          <SegmentedButtons
+            value={activeSegment}
+            onValueChange={(value) =>
+              setActiveSegment(value as CollectionSegmentKey)
+            }
+            buttons={collectionSegments.map((segment) => ({
+              value: segment.key,
+              label: segment.label,
+              disabled: groupedLibraries[segment.key].length === 0,
+            }))}
+            density="medium"
+            style={styles.segmentedControl}
+          />
+        </View>
         {librariesForActiveSegment.length > 1 ? (
-          <View style={styles.libraryChipsRow}>
-            {librariesForActiveSegment.map((library) => (
-              <Chip
-                key={library.Id}
-                mode={selectedLibraryId === library.Id ? "flat" : "outlined"}
-                selected={selectedLibraryId === library.Id}
-                onPress={() => setSelectedLibraryId(library.Id)}
-                style={styles.libraryChip}
-              >
-                {library.Name}
-              </Chip>
-            ))}
+          <View>
+            <View style={styles.libraryChipsRow}>
+              {librariesForActiveSegment.map((library) => (
+                <Chip
+                  key={library.Id}
+                  mode={selectedLibraryId === library.Id ? "flat" : "outlined"}
+                  selected={selectedLibraryId === library.Id}
+                  onPress={() => setSelectedLibraryId(library.Id)}
+                  style={styles.libraryChip}
+                >
+                  {library.Name}
+                </Chip>
+              ))}
+            </View>
           </View>
         ) : null}
 
-        <View style={styles.sectionHeader}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            Continue Watching
-          </Text>
-          <IconButton
-            icon="refresh"
-            size={20}
-            accessibilityLabel="Refresh continue watching"
-            onPress={() => void resumeQuery.refetch()}
-          />
+        <View>
+          <View style={styles.sectionHeader}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Continue Watching
+            </Text>
+            <IconButton
+              icon="refresh"
+              size={20}
+              accessibilityLabel="Refresh continue watching"
+              onPress={() => void resumeQuery.refetch()}
+            />
+          </View>
         </View>
         {resumeQuery.data && resumeQuery.data.length > 0 ? (
           <FlashList
@@ -600,16 +718,18 @@ const JellyfinLibraryScreen = () => {
           </View>
         )}
 
-        <View style={styles.sectionHeader}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            Latest Additions
-          </Text>
-          <IconButton
-            icon="refresh"
-            size={20}
-            accessibilityLabel="Refresh latest additions"
-            onPress={() => void latestQuery.refetch()}
-          />
+        <View>
+          <View style={styles.sectionHeader}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Latest Additions
+            </Text>
+            <IconButton
+              icon="refresh"
+              size={20}
+              accessibilityLabel="Refresh latest additions"
+              onPress={() => void latestQuery.refetch()}
+            />
+          </View>
         </View>
         {latestQuery.data && latestQuery.data.length > 0 ? (
           <FlashList
@@ -684,12 +804,11 @@ const JellyfinLibraryScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {isInitialLoad ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator animating size="large" />
-        </View>
-      ) : null}
-      {!isInitialLoad ? (
+      {/* Content layer: always rendered but faded in when ready */}
+      <Animated.View
+        style={[styles.contentLayer, { opacity: contentOpacity }]}
+        pointerEvents={contentInteractive ? "auto" : "none"}
+      >
         <FlashList
           data={items}
           keyExtractor={(item) => item.Id}
@@ -699,12 +818,67 @@ const JellyfinLibraryScreen = () => {
           ListHeaderComponent={listHeader}
           ListEmptyComponent={listEmptyComponent}
           refreshControl={
-            <RefreshControl
+            <ListRefreshControl
               refreshing={isRefreshing}
               onRefresh={() => void handleRefresh()}
             />
           }
         />
+      </Animated.View>
+
+      {/* Skeleton overlay: mounted while visible and cross-fades out */}
+      {showSkeletonLayer ? (
+        <Animated.View
+          style={[styles.overlay, { opacity: skeletonOpacity }]}
+          pointerEvents={showSkeletonLayer ? "auto" : "none"}
+        >
+          <SafeAreaView style={styles.safeArea}>
+            <ScrollView
+              contentContainerStyle={{
+                paddingHorizontal: spacing.lg,
+                paddingBottom: spacing.xxl,
+              }}
+            >
+              <View style={styles.headerContainer}>
+                <View style={styles.toolbar}>
+                  <View>
+                    <SkeletonPlaceholder
+                      width={32}
+                      height={32}
+                      borderRadius={16}
+                    />
+                  </View>
+                  <SkeletonPlaceholder
+                    width="40%"
+                    height={28}
+                    borderRadius={10}
+                  />
+                  <SkeletonPlaceholder
+                    width={44}
+                    height={44}
+                    borderRadius={22}
+                  />
+                </View>
+                <SkeletonPlaceholder
+                  width="100%"
+                  height={48}
+                  borderRadius={24}
+                  style={{ marginBottom: spacing.md }}
+                />
+                <SkeletonPlaceholder
+                  width="55%"
+                  height={36}
+                  borderRadius={18}
+                />
+              </View>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <View key={index} style={{ marginBottom: spacing.md }}>
+                  <SeriesListItemSkeleton />
+                </View>
+              ))}
+            </ScrollView>
+          </SafeAreaView>
+        </Animated.View>
       ) : null}
       {errorMessage ? (
         <HelperText type="error" visible>
@@ -784,13 +958,25 @@ const createStyles = (theme: AppTheme) =>
     },
     resumeList: {
       marginTop: spacing.sm,
-      gap: spacing.md,
+      gap: spacing.lg,
+      paddingHorizontal: spacing.md,
     },
     resumeCard: {
-      width: 200,
-      gap: spacing.sm,
+      flexDirection: "row",
+      alignItems: "center",
+      width: 280,
+      gap: spacing.md,
+      padding: spacing.md,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surfaceVariant,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
     },
     resumeMeta: {
+      flex: 1,
       gap: spacing.xs,
     },
     resumeTitle: {
@@ -800,16 +986,29 @@ const createStyles = (theme: AppTheme) =>
     resumeSubtitle: {
       color: theme.colors.onSurfaceVariant,
     },
+    progressContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      marginTop: spacing.xs,
+    },
     progressRail: {
-      height: 6,
-      borderRadius: 3,
+      flex: 1,
+      height: 4,
+      borderRadius: 2,
       backgroundColor: theme.colors.surfaceVariant,
       overflow: "hidden",
     },
     progressFill: {
       height: "100%",
       backgroundColor: theme.colors.primary,
-      borderRadius: 3,
+      borderRadius: 2,
+    },
+    progressText: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 12,
+      minWidth: 32,
+      textAlign: "right",
     },
     listSeparator: {
       height: spacing.sm,
@@ -818,7 +1017,9 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.md,
-      padding: spacing.sm
+      padding: spacing.sm,
+      borderRadius: 14,
+      backgroundColor: theme.colors.surfaceVariant,
     },
     latestMeta: {
       flex: 1,
@@ -841,6 +1042,10 @@ const createStyles = (theme: AppTheme) =>
       flex: 1,
       gap: spacing.sm,
       marginBottom: spacing.lg,
+      padding: spacing.md,
+      borderRadius: 18,
+      backgroundColor: theme.colors.surfaceVariant,
+      overflow: "hidden",
     },
     gridCardLeft: {
       marginRight: spacing.md,
@@ -854,6 +1059,20 @@ const createStyles = (theme: AppTheme) =>
     },
     gridSubtitle: {
       color: theme.colors.onSurfaceVariant,
+    },
+    cardPressed: {
+      opacity: 0.9,
+    },
+    overlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 10,
+    },
+    contentLayer: {
+      flex: 1,
     },
   });
 

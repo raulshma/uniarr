@@ -136,6 +136,11 @@ export interface JellyfinSessionPlayState {
   readonly VolumeLevel?: number;
   readonly IsPaused?: boolean;
   readonly RepeatMode?: string;
+  // Playback-specific identifiers exposed by some clients/servers. These may
+  // be necessary when issuing playstate commands if the session 'Id' is
+  // unavailable or different from the immediate playback identifier.
+  readonly PlaySessionId?: string;
+  readonly LiveStreamId?: string;
 }
 
 export interface JellyfinSession {
@@ -146,5 +151,11 @@ export interface JellyfinSession {
   readonly UserName?: string;
   readonly PlayState?: JellyfinSessionPlayState;
   readonly NowPlayingItem?: JellyfinItem;
+  // Some Jellyfin server responses include a NowViewingItem when the client
+  // reports viewing state rather than playing state. Include it so callers
+  // can fall back to this field when NowPlayingItem is not populated.
+  readonly NowViewingItem?: JellyfinItem;
+  // Whether the session is currently considered active by the server.
+  readonly IsActive?: boolean;
   readonly AdditionalUsers?: readonly { readonly UserId?: string; readonly UserName?: string }[];
 }

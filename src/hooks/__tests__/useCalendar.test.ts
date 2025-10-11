@@ -42,7 +42,7 @@ describe('useCalendar', () => {
     });
 
     expect(result.current.state.currentDate).toBeDefined();
-    expect(result.current.state.view).toBe('month');
+  expect(result.current.state.view).toBe('week');
     expect(result.current.state.filters.mediaTypes).toEqual(['movie', 'series', 'episode']);
   });
 

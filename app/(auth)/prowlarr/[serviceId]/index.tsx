@@ -2,7 +2,8 @@ import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   FAB,
   Icon,
@@ -231,7 +232,7 @@ const ProwlarrIndexerListScreen = () => {
 
   const handleDeleteIndexer = useCallback(
     async (indexer: ProwlarrIndexerResource) => {
-      Alert.alert(
+  alert(
         "Delete Indexer",
         `Are you sure you want to delete "${indexer.name}"? This action cannot be undone.`,
         [
@@ -254,19 +255,19 @@ const ProwlarrIndexerListScreen = () => {
   const handleSyncIndexers = useCallback(async () => {
     const success = await syncIndexersToApps();
     if (success) {
-      Alert.alert("Success", "Indexers synced to connected applications");
+  alert("Success", "Indexers synced to connected applications");
       void refreshSyncStatus();
     } else {
-      Alert.alert("Error", "Failed to sync indexers");
+  alert("Error", "Failed to sync indexers");
     }
   }, [syncIndexersToApps]);
 
   const handleRescanIndexers = useCallback(async () => {
     const success = await rescanIndexers();
     if (success) {
-      Alert.alert("Success", "Indexers rescanned successfully");
+  alert("Success", "Indexers rescanned successfully");
     } else {
-      Alert.alert("Error", "Failed to rescan indexers");
+  alert("Error", "Failed to rescan indexers");
     }
   }, [rescanIndexers]);
 
@@ -498,7 +499,7 @@ const ProwlarrIndexerListScreen = () => {
           actionLabel="Add Indexer"
           onActionPress={() => {
             // TODO: Navigate to add indexer screen
-            Alert.alert("Add Indexer", "Add indexer functionality coming soon");
+            alert("Add Indexer", "Add indexer functionality coming soon");
           }}
         />
       </SafeAreaView>
@@ -723,7 +724,7 @@ const ProwlarrIndexerListScreen = () => {
               label="Edit"
               onPress={() => {
                 setBottomDrawer(null);
-                Alert.alert("Edit", "Edit indexer functionality coming soon");
+                alert("Edit", "Edit indexer functionality coming soon");
               }}
             />
             <DrawerItem

@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   ActivityIndicator,
   HelperText,
@@ -366,7 +367,7 @@ const RadarrAddMovieScreen = () => {
   const onSubmit = useCallback(
     async (values: AddMovieFormValues) => {
       if (!selectedMovie) {
-        Alert.alert(
+  alert(
           "Select a movie",
           "Choose a movie from the search results before adding."
         );
@@ -374,7 +375,7 @@ const RadarrAddMovieScreen = () => {
       }
 
       if (!selectedMovie.tmdbId) {
-        Alert.alert(
+        alert(
           "Missing TMDb ID",
           "The selected movie is missing a TMDb identifier and cannot be added automatically."
         );
@@ -411,7 +412,7 @@ const RadarrAddMovieScreen = () => {
           error instanceof Error
             ? error.message
             : "Unable to add movie at this time.";
-        Alert.alert("Add movie failed", message);
+  alert("Add movie failed", message);
       }
     },
     [addMovieMutation, router, selectedMovie, serviceKey]

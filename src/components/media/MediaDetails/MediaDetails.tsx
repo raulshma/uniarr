@@ -1,12 +1,23 @@
-import React, { useCallback, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { Chip, Text, useTheme, Card, Surface, Portal, Dialog, TouchableRipple, Button, Switch } from 'react-native-paper';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import React, { useCallback, useState } from "react";
+import { ScrollView, View } from "react-native";
+import {
+  Chip,
+  Text,
+  useTheme,
+  Card,
+  Surface,
+  Portal,
+  Dialog,
+  TouchableRipple,
+  Button,
+  Switch,
+} from "react-native-paper";
+import Animated, { FadeIn } from "react-native-reanimated";
 
-import type { AppTheme } from '@/constants/theme';
-import type { Season } from '@/models/media.types';
-import { MediaPoster } from '@/components/media/MediaPoster';
-import type { MediaKind } from '@/components/media/MediaCard';
+import type { AppTheme } from "@/constants/theme";
+import type { Season } from "@/models/media.types";
+import { MediaPoster } from "@/components/media/MediaPoster";
+import type { MediaKind } from "@/components/media/MediaCard";
 
 export type MediaDetailsProps = {
   title: string;
@@ -37,6 +48,22 @@ export type MediaDetailsProps = {
   isUpdatingMonitor?: boolean;
   isSearching?: boolean;
   isDeleting?: boolean;
+  /**
+   * When rendered inside a page-level hero (DetailHero) the poster and
+   * scroll container are provided by the hero. Set showPoster=false to
+   * avoid rendering the internal poster.
+   */
+  showPoster?: boolean;
+  /**
+   * When rendered inside an outer scroll container, the parent can reserve
+   * top space for pinned posters by passing contentInsetTop.
+   */
+  contentInsetTop?: number;
+  /**
+   * When true, render non-scrollable content (suitable for being a child
+   * of a scroll container provided by a wrapper like DetailHero).
+   */
+  disableScroll?: boolean;
   testID?: string;
 };
 
@@ -49,15 +76,14 @@ const formatRuntime = (runtimeMinutes?: number): string | undefined => {
   const minutes = runtimeMinutes % 60;
 
   if (hours > 0) {
-    return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+    return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
   }
 
   return `${minutes}m`;
 };
 
-
 const formatFileSize = (sizeInMB?: number): string => {
-  if (!sizeInMB) return '';
+  if (!sizeInMB) return "";
 
   if (sizeInMB >= 1024) {
     return `${(sizeInMB / 1024).toFixed(1)}GB`;
@@ -88,7 +114,10 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   isUpdatingMonitor = false,
   isSearching = false,
   isDeleting = false,
-  testID = 'media-details',
+  showPoster = true,
+  contentInsetTop = 0,
+  disableScroll = false,
+  testID = "media-details",
 }) => {
   const theme = useTheme<AppTheme>();
   const [episodesModalVisible, setEpisodesModalVisible] = useState(false);
@@ -110,13 +139,12 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
     setSelectedSeason(null);
   }, []);
 
-
-  const showSeasons = type === 'series' && seasons?.length;
+  const showSeasons = type === "series" && seasons?.length;
   const showEpisodes = showSeasons && (selectedSeason || seasons?.length === 1);
 
   // Format file size for display
   const formatFileSize = (sizeInBytes?: number): string => {
-    if (!sizeInBytes) return '';
+    if (!sizeInBytes) return "";
 
     const sizeInGB = sizeInBytes / (1024 * 1024 * 1024);
     if (sizeInGB >= 1) {
@@ -129,40 +157,41 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
   // Get quality from movie file or default
   const getQuality = (): string => {
-    return movieFile?.quality?.quality?.name || 'Unknown';
+    return movieFile?.quality?.quality?.name || "Unknown";
   };
 
   // Get file size from movie file
   const getFileSize = (): string => {
-    if (!movieFile?.size) return 'Unknown';
+    if (!movieFile?.size) return "Unknown";
     return formatFileSize(movieFile.size);
   };
 
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
-      contentContainerStyle={{ paddingBottom: 32 }}
-      testID={testID}
-    >
+  const content = (
+    <>
       {/* Movie Poster */}
-      <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-        <MediaPoster
-          uri={posterUri}
-          size={280}
-          borderRadius={16}
-          accessibilityLabel={`${title} poster`}
-          showPlaceholderLabel
-        />
-      </View>
+      {showPoster ? (
+        <View style={{ alignItems: "center", paddingVertical: 20 }}>
+          <MediaPoster
+            uri={posterUri}
+            size={280}
+            borderRadius={16}
+            accessibilityLabel={`${title} poster`}
+            showPlaceholderLabel
+          />
+        </View>
+      ) : null}
 
       {/* Movie Title */}
       <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-        <Text variant="headlineLarge" style={{
-          color: theme.colors.onSurface,
-          fontWeight: 'bold',
-          textAlign: 'center',
-          marginBottom: 12
-        }}>
+        <Text
+          variant="headlineLarge"
+          style={{
+            color: theme.colors.onSurface,
+            fontWeight: "bold",
+            textAlign: "center",
+            marginBottom: 12,
+          }}
+        >
           {title}
         </Text>
       </View>
@@ -170,11 +199,14 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
       {/* Synopsis */}
       {overview ? (
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text variant="bodyLarge" style={{
-            color: theme.colors.onSurfaceVariant,
-            lineHeight: 24,
-            textAlign: 'center'
-          }}>
+          <Text
+            variant="bodyLarge"
+            style={{
+              color: theme.colors.onSurfaceVariant,
+              lineHeight: 24,
+              textAlign: "center",
+            }}
+          >
             {overview}
           </Text>
         </View>
@@ -182,39 +214,73 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
       {/* Movie Details Card */}
       <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-        <Card style={{ backgroundColor: theme.colors.elevation.level1, borderRadius: 12 }}>
+        <Card
+          style={{
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: 12,
+          }}
+        >
           <Card.Content style={{ padding: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 Release Year
               </Text>
-              <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, fontWeight: '600' }}>
-                {year || 'N/A'}
+              <Text
+                variant="bodyLarge"
+                style={{ color: theme.colors.onSurface, fontWeight: "600" }}
+              >
+                {year || "N/A"}
               </Text>
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 Studio
               </Text>
-              <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, fontWeight: '600' }}>
-                {network || 'N/A'}
+              <Text
+                variant="bodyLarge"
+                style={{ color: theme.colors.onSurface, fontWeight: "600" }}
+              >
+                {network || "N/A"}
               </Text>
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 File Status
               </Text>
               <Chip
                 mode="flat"
                 style={{
                   backgroundColor: theme.colors.primary,
-                  borderRadius: 16
+                  borderRadius: 16,
                 }}
-                textStyle={{ color: theme.colors.onPrimary, fontWeight: '600' }}
+                textStyle={{ color: theme.colors.onPrimary, fontWeight: "600" }}
               >
-                {hasFile ? 'Owned' : 'Missing'}
+                {hasFile ? "Owned" : "Missing"}
               </Chip>
             </View>
           </Card.Content>
@@ -223,30 +289,58 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
       {/* File Information */}
       <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
-        <Text variant="titleLarge" style={{
-          color: theme.colors.onSurface,
-          fontWeight: 'bold',
-          marginBottom: 16
-        }}>
+        <Text
+          variant="titleLarge"
+          style={{
+            color: theme.colors.onSurface,
+            fontWeight: "bold",
+            marginBottom: 16,
+          }}
+        >
           File Information
         </Text>
 
-        <Card style={{ backgroundColor: theme.colors.elevation.level1, borderRadius: 12 }}>
+        <Card
+          style={{
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: 12,
+          }}
+        >
           <Card.Content style={{ padding: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 Quality
               </Text>
-              <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, fontWeight: '600' }}>
+              <Text
+                variant="bodyLarge"
+                style={{ color: theme.colors.onSurface, fontWeight: "600" }}
+              >
                 {getQuality()}
               </Text>
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 Size
               </Text>
-              <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, fontWeight: '600' }}>
+              <Text
+                variant="bodyLarge"
+                style={{ color: theme.colors.onSurface, fontWeight: "600" }}
+              >
                 {getFileSize()}
               </Text>
             </View>
@@ -256,7 +350,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
       {/* Action Buttons */}
       <View style={{ paddingHorizontal: 20 }}>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flexDirection: "row", gap: 12 }}>
           {onSearchPress ? (
             <Button
               mode="contained"
@@ -269,7 +363,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                 flex: 1,
                 borderRadius: 8,
               }}
-              labelStyle={{ fontWeight: '600' }}
+              labelStyle={{ fontWeight: "600" }}
             >
               Search
             </Button>
@@ -286,7 +380,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
               flex: 1,
               borderRadius: 8,
             }}
-            labelStyle={{ fontWeight: '600' }}
+            labelStyle={{ fontWeight: "600" }}
           >
             Upgrade
           </Button>
@@ -296,18 +390,25 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
       {/* Seasons - Only show for series */}
       {showSeasons ? (
         <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
-          <Text variant="titleLarge" style={{
-            color: theme.colors.onSurface,
-            marginBottom: 16,
-            fontWeight: 'bold'
-          }}>
+          <Text
+            variant="titleLarge"
+            style={{
+              color: theme.colors.onSurface,
+              marginBottom: 16,
+              fontWeight: "bold",
+            }}
+          >
             Seasons
           </Text>
           <View style={{ gap: 12 }}>
             {seasons?.map((season) => {
-              const totalEpisodes = season.statistics?.episodeCount ?? season.episodes?.length ?? 0;
-              const downloadedEpisodes = season.statistics?.episodeFileCount ??
-                (season.episodes ? season.episodes.filter((episode) => episode.hasFile).length : 0);
+              const totalEpisodes =
+                season.statistics?.episodeCount ?? season.episodes?.length ?? 0;
+              const downloadedEpisodes =
+                season.statistics?.episodeFileCount ??
+                (season.episodes
+                  ? season.episodes.filter((episode) => episode.hasFile).length
+                  : 0);
 
               return (
                 <Animated.View
@@ -315,7 +416,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                   entering={FadeIn.delay(100).duration(300)}
                   style={{
                     borderRadius: 16,
-                    overflow: 'hidden',
+                    overflow: "hidden",
                     backgroundColor: theme.colors.elevation.level1,
                     shadowColor: theme.colors.shadow,
                     shadowOffset: { width: 0, height: 2 },
@@ -331,10 +432,12 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                     }}
                     borderless={false}
                   >
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                      }}
+                    >
                       <MediaPoster
                         uri={season.posterUrl}
                         size={80}
@@ -344,24 +447,32 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                         style={{ marginRight: 16 }}
                       />
                       <View style={{ flex: 1 }}>
-                        <Text variant="titleMedium" style={{
-                          color: theme.colors.onSurface,
-                          fontWeight: '600',
-                          marginBottom: 4
-                        }}>
+                        <Text
+                          variant="titleMedium"
+                          style={{
+                            color: theme.colors.onSurface,
+                            fontWeight: "600",
+                            marginBottom: 4,
+                          }}
+                        >
                           Season {season.seasonNumber}
                         </Text>
-                        <Text variant="bodyMedium" style={{
-                          color: theme.colors.onSurfaceVariant,
-                        }}>
-                          {totalEpisodes} Episodes • {downloadedEpisodes} Downloaded
+                        <Text
+                          variant="bodyMedium"
+                          style={{ color: theme.colors.onSurfaceVariant }}
+                        >
+                          {totalEpisodes} Episodes • {downloadedEpisodes}{" "}
+                          Downloaded
                         </Text>
                       </View>
                       <Switch
                         value={season.monitored ?? true}
                         onValueChange={() => {
                           // TODO: Handle season monitoring toggle
-                          console.log('Toggle season monitoring for season', season.seasonNumber);
+                          console.log(
+                            "Toggle season monitoring for season",
+                            season.seasonNumber
+                          );
                         }}
                         color={theme.colors.primary}
                         trackColor={{
@@ -381,7 +492,13 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
       {/* Episodes Section */}
       {showEpisodes ? (
         <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 16,
+            }}
+          >
             {seasons && seasons.length > 1 && selectedSeason && (
               <Button
                 mode="text"
@@ -392,99 +509,138 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                 ← Seasons
               </Button>
             )}
-            <Text variant="titleLarge" style={{
-              color: theme.colors.onSurface,
-              fontWeight: 'bold',
-              flex: 1
-            }}>
-              {selectedSeason ? `Season ${selectedSeason.seasonNumber} Episodes` : 'Episodes'}
+            <Text
+              variant="titleLarge"
+              style={{
+                color: theme.colors.onSurface,
+                fontWeight: "bold",
+                flex: 1,
+              }}
+            >
+              {selectedSeason
+                ? `Season ${selectedSeason.seasonNumber} Episodes`
+                : "Episodes"}
             </Text>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
-            {(selectedSeason || seasons?.[0])?.episodes?.map((episode, index) => (
-              <View
-                key={episode.id ?? `${(selectedSeason || seasons?.[0])?.seasonNumber}-${episode.episodeNumber}`}
-                style={{
-                  width: '48%',
-                  backgroundColor: theme.colors.elevation.level1,
-                  borderRadius: 12,
-                  padding: 12,
-                  borderWidth: 1,
-                  borderColor: episode.hasFile ? theme.colors.outlineVariant : theme.colors.error,
-                }}
-              >
-                <View style={{
-                  alignItems: 'center',
-                  marginBottom: 12,
-                }}>
-                  <MediaPoster
-                    uri={episode.posterUrl}
-                    size={80}
-                    borderRadius={8}
-                    accessibilityLabel={`Episode ${episode.episodeNumber} poster`}
-                    showPlaceholderLabel
-                  />
-                </View>
-
-                <Text
-                  variant="bodyMedium"
-                  numberOfLines={2}
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 12,
+              marginBottom: 20,
+            }}
+          >
+            {(selectedSeason || seasons?.[0])?.episodes?.map(
+              (episode, index) => (
+                <View
+                  key={
+                    episode.id ??
+                    `${(selectedSeason || seasons?.[0])?.seasonNumber}-${
+                      episode.episodeNumber
+                    }`
+                  }
                   style={{
-                    color: theme.colors.onSurface,
-                    fontWeight: '600',
-                    marginBottom: 8,
-                    textAlign: 'center',
+                    width: "48%",
+                    backgroundColor: theme.colors.elevation.level1,
+                    borderRadius: 12,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: episode.hasFile
+                      ? theme.colors.outlineVariant
+                      : theme.colors.error,
                   }}
                 >
-                  Chapter {episode.episodeNumber}: {episode.title}
-                </Text>
+                  <View style={{ alignItems: "center", marginBottom: 12 }}>
+                    <MediaPoster
+                      uri={episode.posterUrl}
+                      size={80}
+                      borderRadius={8}
+                      accessibilityLabel={`Episode ${episode.episodeNumber} poster`}
+                      showPlaceholderLabel
+                    />
+                  </View>
 
-                <View style={{
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: episode.hasFile ? theme.colors.primary : theme.colors.error,
-                  marginBottom: 8,
-                }} />
-
-                <View style={{
-                  backgroundColor: episode.hasFile ? theme.colors.primaryContainer : theme.colors.errorContainer,
-                  borderRadius: 8,
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  alignItems: 'center',
-                }}>
-                  <Text variant="labelSmall" style={{
-                    color: episode.hasFile ? theme.colors.onPrimaryContainer : theme.colors.onErrorContainer,
-                    fontWeight: '600',
-                  }}>
-                    {episode.hasFile ? 'Downloaded • 42m' : 'Missing • 35m'}
+                  <Text
+                    variant="bodyMedium"
+                    numberOfLines={2}
+                    style={{
+                      color: theme.colors.onSurface,
+                      fontWeight: "600",
+                      marginBottom: 8,
+                      textAlign: "center",
+                    }}
+                  >
+                    Chapter {episode.episodeNumber}: {episode.title}
                   </Text>
+
+                  <View
+                    style={{
+                      height: 4,
+                      borderRadius: 2,
+                      backgroundColor: episode.hasFile
+                        ? theme.colors.primary
+                        : theme.colors.error,
+                      marginBottom: 8,
+                    }}
+                  />
+
+                  <View
+                    style={{
+                      backgroundColor: episode.hasFile
+                        ? theme.colors.primaryContainer
+                        : theme.colors.errorContainer,
+                      borderRadius: 8,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      variant="labelSmall"
+                      style={{
+                        color: episode.hasFile
+                          ? theme.colors.onPrimaryContainer
+                          : theme.colors.onErrorContainer,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {episode.hasFile ? "Downloaded • 42m" : "Missing • 35m"}
+                    </Text>
+                  </View>
+
+                  {episode.hasFile && episode.sizeInMB && (
+                    <Text
+                      variant="bodySmall"
+                      style={{
+                        color: theme.colors.onSurfaceVariant,
+                        marginTop: 4,
+                        textAlign: "center",
+                        fontWeight: "500",
+                      }}
+                    >
+                      {formatFileSize(episode.sizeInMB)}
+                    </Text>
+                  )}
                 </View>
-
-                {episode.hasFile && episode.sizeInMB && (
-                  <Text variant="bodySmall" style={{
+              )
+            ) || (
+              <View
+                style={{
+                  width: "100%",
+                  backgroundColor: theme.colors.elevation.level1,
+                  borderRadius: 12,
+                  padding: 20,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  variant="bodyMedium"
+                  style={{
                     color: theme.colors.onSurfaceVariant,
-                    marginTop: 4,
-                    textAlign: 'center',
-                    fontWeight: '500',
-                  }}>
-                    {formatFileSize(episode.sizeInMB)}
-                  </Text>
-                )}
-              </View>
-            )) || (
-              <View style={{
-                width: '100%',
-                backgroundColor: theme.colors.elevation.level1,
-                borderRadius: 12,
-                padding: 20,
-                alignItems: 'center',
-              }}>
-                <Text variant="bodyMedium" style={{
-                  color: theme.colors.onSurfaceVariant,
-                  textAlign: 'center',
-                }}>
+                    textAlign: "center",
+                  }}
+                >
                   No episodes available for this season
                 </Text>
               </View>
@@ -492,20 +648,16 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
           </View>
 
           {/* Action Buttons for Episodes */}
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
             <Button
               mode="contained"
               onPress={() => {
-                // TODO: Handle search missing episodes
-                console.log('Search missing episodes');
+                console.log("Search missing episodes");
               }}
               buttonColor={theme.colors.primary}
               textColor={theme.colors.onPrimary}
-              style={{
-                flex: 1,
-                borderRadius: 8,
-              }}
-              labelStyle={{ fontWeight: '600' }}
+              style={{ flex: 1, borderRadius: 8 }}
+              labelStyle={{ fontWeight: "600" }}
             >
               Search Missing
             </Button>
@@ -513,22 +665,42 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             <Button
               mode="outlined"
               onPress={() => {
-                // TODO: Handle unmonitor all episodes
-                console.log('Unmonitor all episodes');
+                console.log("Unmonitor all episodes");
               }}
               textColor={theme.colors.onSurfaceVariant}
-              style={{
-                flex: 1,
-                borderRadius: 8,
-              }}
-              labelStyle={{ fontWeight: '600' }}
+              style={{ flex: 1, borderRadius: 8 }}
+              labelStyle={{ fontWeight: "600" }}
             >
               Unmonitor All
             </Button>
           </View>
         </View>
       ) : null}
+    </>
+  );
 
+  if (disableScroll) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: theme.colors.background,
+          paddingTop: contentInsetTop,
+        }}
+        testID={testID}
+      >
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
+      contentContainerStyle={{ paddingBottom: 32, paddingTop: contentInsetTop }}
+      testID={testID}
+    >
+      {content}
     </ScrollView>
   );
 };
@@ -536,4 +708,3 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 export default MediaDetails;
 
 // Styles are defined inline using the theme object to avoid static theme references
-

@@ -2,7 +2,8 @@ import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   Icon,
   IconButton,
@@ -318,7 +319,7 @@ const SonarrSeriesListScreen = () => {
 
   const handleAddSeries = useCallback(() => {
     if (!hasValidServiceId) {
-      Alert.alert(
+  alert(
         "Invalid service",
         "The selected service identifier is not valid."
       );

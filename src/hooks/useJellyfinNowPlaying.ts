@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { JellyfinConnector } from '@/connectors/implementations/JellyfinConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
+import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { JellyfinSession } from '@/models/jellyfin.types';
 
@@ -11,8 +12,8 @@ interface UseJellyfinNowPlayingOptions {
   readonly refetchInterval?: number;
 }
 
-const ensureConnector = (manager: ConnectorManager, serviceId: string): JellyfinConnector => {
-  const connector = manager.getConnector(serviceId);
+const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): JellyfinConnector => {
+  const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== 'jellyfin') {
     throw new Error(`Jellyfin connector not registered for service ${serviceId}.`);
@@ -22,7 +23,7 @@ const ensureConnector = (manager: ConnectorManager, serviceId: string): Jellyfin
 };
 
 export const useJellyfinNowPlaying = ({ serviceId, refetchInterval = 10_000 }: UseJellyfinNowPlayingOptions) => {
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
+  const { getConnector } = useConnectorsStore();
   const enabled = Boolean(serviceId);
 
   return useQuery<JellyfinSession[]>({
@@ -36,7 +37,7 @@ export const useJellyfinNowPlaying = ({ serviceId, refetchInterval = 10_000 }: U
         return [];
       }
 
-      const connector = ensureConnector(manager, serviceId);
+      const connector = ensureConnector(getConnector, serviceId);
       return connector.getNowPlayingSessions();
     },
   });

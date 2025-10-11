@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
@@ -15,6 +16,7 @@ import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaDetails } from "@/components/media/MediaDetails";
 import { MediaDetailsSkeleton } from "@/components/media/skeletons";
+import DetailHero from "@/components/media/DetailHero/DetailHero";
 import type { AppTheme } from "@/constants/theme";
 import type { Series } from "@/models/media.types";
 import { useSonarrSeriesDetails } from "@/hooks/useSonarrSeriesDetails";
@@ -77,8 +79,7 @@ const SonarrSeriesDetailsScreen = () => {
         },
         container: {
           flex: 1,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.lg,
+          paddingHorizontal: spacing.none,
         },
         header: {
           flexDirection: "row",
@@ -113,7 +114,7 @@ const SonarrSeriesDetailsScreen = () => {
   }, [triggerSearch]);
 
   const handleDeleteSeries = useCallback(() => {
-    Alert.alert(
+  alert(
       "Remove Series",
       "Are you sure you want to remove this series from Sonarr? Existing files will be kept.",
       [
@@ -134,7 +135,7 @@ const SonarrSeriesDetailsScreen = () => {
                   err instanceof Error
                     ? err.message
                     : "Unable to delete series.";
-                Alert.alert("Delete Failed", message);
+                alert("Delete Failed", message);
               });
           },
         },
@@ -163,29 +164,31 @@ const SonarrSeriesDetailsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <View style={styles.container}>
-        <Animated.View
-          style={styles.header}
-          entering={FadeInDown.delay(200).springify()}
-          layout={Layout.springify()}
-        >
-          <Button
-            mode="text"
-            onPress={handleClose}
-            accessibilityLabel="Go back"
+        {!series ? (
+          <Animated.View
+            style={styles.header}
+            entering={FadeInDown.delay(200).springify()}
+            layout={Layout.springify()}
           >
-            Back
-          </Button>
-          {isFetching ? (
-            <Text
-              variant="labelMedium"
-              style={{ color: theme.colors.onSurfaceVariant }}
+            <Button
+              mode="text"
+              onPress={handleClose}
+              accessibilityLabel="Go back"
             >
-              Refreshing…
-            </Text>
-          ) : null}
-        </Animated.View>
+              Back
+            </Button>
+            {isFetching ? (
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Refreshing…
+              </Text>
+            ) : null}
+          </Animated.View>
+        ) : null}
 
         {isLoading && !series ? (
           <MediaDetailsSkeleton showSeasons={true} />
@@ -206,26 +209,35 @@ const SonarrSeriesDetailsScreen = () => {
             />
           </View>
         ) : series ? (
-          <MediaDetails
-            title={series.title}
-            year={series.year}
-            status={series.status}
-            overview={series.overview}
-            genres={series.genres}
-            network={series.network}
+          <DetailHero
             posterUri={series.posterUrl}
             backdropUri={series.backdropUrl}
-            monitored={series.monitored}
-            seasons={series.seasons}
-            runtimeMinutes={runtimeMinutes}
-            type="series"
-            onToggleMonitor={handleToggleMonitor}
-            onSearchPress={handleTriggerSearch}
-            onDeletePress={handleDeleteSeries}
-            isUpdatingMonitor={isTogglingMonitor}
-            isSearching={isTriggeringSearch}
-            isDeleting={isDeleting}
-          />
+            onBack={handleClose}
+            isFetching={isFetching}
+          >
+            <MediaDetails
+              title={series.title}
+              year={series.year}
+              status={series.status}
+              overview={series.overview}
+              genres={series.genres}
+              network={series.network}
+              posterUri={series.posterUrl}
+              backdropUri={series.backdropUrl}
+              monitored={series.monitored}
+              seasons={series.seasons}
+              runtimeMinutes={runtimeMinutes}
+              type="series"
+              onToggleMonitor={handleToggleMonitor}
+              onSearchPress={handleTriggerSearch}
+              onDeletePress={handleDeleteSeries}
+              isUpdatingMonitor={isTogglingMonitor}
+              isSearching={isTriggeringSearch}
+              isDeleting={isDeleting}
+              showPoster={false}
+              disableScroll={true}
+            />
+          </DetailHero>
         ) : (
           <View style={{ flex: 1, justifyContent: "center" }}>
             <EmptyState

@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { JellyfinConnector } from '@/connectors/implementations/JellyfinConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
+import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { JellyfinItem } from '@/models/jellyfin.types';
 
@@ -11,8 +12,8 @@ interface UseJellyfinItemDetailsOptions {
   readonly itemId?: string;
 }
 
-const ensureConnector = (manager: ConnectorManager, serviceId: string): JellyfinConnector => {
-  const connector = manager.getConnector(serviceId);
+const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): JellyfinConnector => {
+  const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== 'jellyfin') {
     throw new Error(`Jellyfin connector not registered for service ${serviceId}.`);
@@ -22,7 +23,7 @@ const ensureConnector = (manager: ConnectorManager, serviceId: string): Jellyfin
 };
 
 export const useJellyfinItemDetails = ({ serviceId, itemId }: UseJellyfinItemDetailsOptions) => {
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
+  const { getConnector } = useConnectorsStore();
   const enabled = Boolean(serviceId && itemId);
 
   return useQuery<JellyfinItem>({
@@ -37,7 +38,7 @@ export const useJellyfinItemDetails = ({ serviceId, itemId }: UseJellyfinItemDet
         throw new Error('Jellyfin item identifier is required.');
       }
 
-      const connector = ensureConnector(manager, serviceId);
+      const connector = ensureConnector(getConnector, serviceId);
       return connector.getItem(itemId);
     },
   });

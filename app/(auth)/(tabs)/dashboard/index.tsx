@@ -2,7 +2,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import { Text, useTheme, IconButton } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
@@ -546,7 +547,7 @@ const DashboardScreen = () => {
           ? signOutError.message
           : "Unable to sign out. Please try again.";
 
-      Alert.alert("Sign out failed", message);
+  alert("Sign out failed", message);
     }
   }, [router, signOut]);
 
@@ -594,7 +595,7 @@ const DashboardScreen = () => {
           });
           break;
         default:
-          Alert.alert(
+          alert(
             "Coming soon",
             `${
               serviceTypeLabels[service.config.type]

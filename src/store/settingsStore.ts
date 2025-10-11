@@ -4,12 +4,12 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { logger } from '@/services/logger/LoggerService';
 import type { NotificationCategory, QuietHoursConfig } from '@/models/notification.types';
+import type { CalendarView } from '@/models/calendar.types';
 import {
   createDefaultQuietHoursConfig,
   normalizeQuietHoursConfig,
 } from '@/utils/quietHours.utils';
 import { defaultCustomThemeConfig, type CustomThemeConfig } from '@/constants/theme';
-import type { CloudProvider, CloudStorageConfig } from '@/services/backup/CloudStorageService';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -25,7 +25,8 @@ type SettingsData = {
   refreshIntervalMinutes: number;
   quietHours: Record<NotificationCategory, QuietHoursConfig>;
   criticalHealthAlertsBypassQuietHours: boolean;
-  cloudBackupConfigs: Record<CloudProvider, CloudStorageConfig>;
+  // Remember last selected calendar view (week/day/month/list)
+  lastCalendarView: CalendarView;
 };
 
 interface SettingsState extends SettingsData {
@@ -45,9 +46,8 @@ interface SettingsState extends SettingsData {
     partial: Partial<QuietHoursConfig>,
   ) => void;
   setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
-  updateCloudBackupConfig: (provider: CloudProvider, config: Partial<CloudStorageConfig>) => void;
-  setCloudBackupConfig: (provider: CloudProvider, config: CloudStorageConfig) => void;
   reset: () => void;
+  setLastCalendarView: (view: CalendarView) => void;
 }
 
 const STORAGE_KEY = 'SettingsStore:v1';
@@ -70,21 +70,6 @@ const createDefaultQuietHoursState = (): Record<NotificationCategory, QuietHours
   serviceHealth: createDefaultQuietHoursConfig('everyday'),
 });
 
-const createDefaultCloudBackupConfigs = (): Record<CloudProvider, CloudStorageConfig> => ({
-  icloud: {
-    provider: 'icloud',
-    enabled: false,
-    autoBackup: false,
-    backupFrequency: 'weekly',
-  },
-  googledrive: {
-    provider: 'googledrive',
-    enabled: false,
-    autoBackup: false,
-    backupFrequency: 'weekly',
-  },
-});
-
 const createDefaultSettings = (): SettingsData => ({
   theme: 'system',
   customThemeConfig: defaultCustomThemeConfig,
@@ -97,7 +82,7 @@ const createDefaultSettings = (): SettingsData => ({
   refreshIntervalMinutes: DEFAULT_REFRESH_INTERVAL,
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
-  cloudBackupConfigs: createDefaultCloudBackupConfigs(),
+  lastCalendarView: 'week',
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -133,21 +118,8 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       setCriticalHealthAlertsBypassQuietHours: (enabled) =>
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
-      updateCloudBackupConfig: (provider, config) =>
-        set((state) => ({
-          cloudBackupConfigs: {
-            ...state.cloudBackupConfigs,
-            [provider]: { ...state.cloudBackupConfigs[provider], ...config },
-          },
-        })),
-      setCloudBackupConfig: (provider, config) =>
-        set((state) => ({
-          cloudBackupConfigs: {
-            ...state.cloudBackupConfigs,
-            [provider]: config,
-          },
-        })),
-      reset: () => set(createDefaultSettings()),
+  setLastCalendarView: (view: CalendarView) => set({ lastCalendarView: view }),
+  reset: () => set(createDefaultSettings()),
     }),
     {
       name: STORAGE_KEY,
@@ -254,6 +226,5 @@ export const selectQuietHoursForCategory = (
     state.quietHours[category] ?? createDefaultQuietHoursState()[category];
 export const selectCriticalHealthAlertsBypassQuietHours = (state: SettingsState): boolean =>
   state.criticalHealthAlertsBypassQuietHours;
-export const selectCloudBackupConfigs = (state: SettingsState) => state.cloudBackupConfigs;
-export const selectCloudBackupConfig = (provider: CloudProvider) =>
-  (state: SettingsState) => state.cloudBackupConfigs[provider];
+
+export const selectLastCalendarView = (state: SettingsState) => state.lastCalendarView;

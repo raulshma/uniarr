@@ -15,6 +15,7 @@ import type {
 } from '@/models/calendar.types';
 
 import { queryKeys } from '@/hooks/queryKeys';
+import { useSettingsStore, selectLastCalendarView, } from '@/store/settingsStore';
 import { 
   formatDate, 
   getDateRangeForView, 
@@ -29,6 +30,7 @@ export interface UseCalendarReturn {
   calendarData: CalendarMonth | CalendarWeek | CalendarDay;
   stats: CalendarStats;
   navigation: CalendarNavigation;
+  releases: MediaRelease[];
   setView: (view: CalendarView) => void;
   setCurrentDate: (date: string) => void;
   setSelectedDate: (date?: string) => void;
@@ -44,12 +46,14 @@ const DEFAULT_FILTERS: CalendarFilters = {
   mediaTypes: ['movie', 'series', 'episode'],
   statuses: ['upcoming', 'released'],
   services: [],
+  serviceTypes: [],
+  monitoredStatus: 'all',
 };
 
 const DEFAULT_STATE: CalendarState = {
   currentDate: new Date().toISOString().split('T')[0]!,
-  view: 'month',
-  filters: DEFAULT_FILTERS,
+  view: 'week',
+  filters: { ...DEFAULT_FILTERS },
   isLoading: false,
 };
 
@@ -57,7 +61,13 @@ const DEFAULT_STATE: CalendarState = {
  * Hook for managing calendar state and data
  */
 export const useCalendar = (): UseCalendarReturn => {
-  const [state, setState] = useState<CalendarState>(DEFAULT_STATE);
+  const lastCalendarView = useSettingsStore(selectLastCalendarView);
+  const setLastCalendarView = useSettingsStore((s) => s.setLastCalendarView);
+
+  const [state, setState] = useState<CalendarState>(() => ({
+    ...DEFAULT_STATE,
+    view: lastCalendarView ?? DEFAULT_STATE.view,
+  }));
 
   // Fetch releases from calendar service
   const { data: releases = [], isLoading, error } = useQuery({
@@ -78,7 +88,15 @@ export const useCalendar = (): UseCalendarReturn => {
 
   const setView = useCallback((view: CalendarView) => {
     updateState({ view });
-  }, [updateState]);
+    // Persist last selected view so next time the calendar opens it honors user's choice
+    try {
+      setLastCalendarView(view);
+    } catch (err) {
+      // Fail silently - persistence shouldn't break the UI
+      // eslint-disable-next-line no-console
+      console.warn('Failed to persist last calendar view', err);
+    }
+  }, [updateState, setLastCalendarView]);
 
   const setCurrentDate = useCallback((date: string) => {
     if (!validateDateString(date)) {
@@ -97,13 +115,13 @@ export const useCalendar = (): UseCalendarReturn => {
   }, [updateState]);
 
   const setFilters = useCallback((filters: Partial<CalendarFilters>) => {
-    updateState({ 
-      filters: { ...state.filters, ...filters }
+    updateState({
+      filters: { ...state.filters, ...filters },
     });
   }, [state.filters, updateState]);
 
   const clearFilters = useCallback(() => {
-    updateState({ filters: DEFAULT_FILTERS });
+    updateState({ filters: { ...DEFAULT_FILTERS } });
   }, [updateState]);
 
   const goToToday = useCallback(() => {
@@ -266,6 +284,7 @@ export const useCalendar = (): UseCalendarReturn => {
     calendarData,
     stats,
     navigation,
+    releases,
     
     // Actions
     setView,
@@ -292,6 +311,9 @@ function generateCalendarData(currentDate: string, view: CalendarView, releases:
       return generateWeekData(current, releases);
     case 'day':
       return generateDayData(current, releases);
+    case 'custom':
+      // For custom, return a dummy month data, but releasesForView will handle it specially
+      return generateMonthData(current, releases);
     default:
       return generateMonthData(current, releases);
   }

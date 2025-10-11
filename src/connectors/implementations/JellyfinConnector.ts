@@ -287,9 +287,14 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     const userId = await this.ensureUserId();
 
     try {
+      // Request recent sessions from the server. Previously we filtered by
+      // ControllableByUserId which caused many legitimate playback sessions
+      // (for example sessions the user owns but cannot remote-control) to be
+      // excluded by the server. Instead, request sessions in general and
+      // perform client-side filtering to include sessions that belong to the
+      // current user (or list them as active).
       const response = await this.client.get<readonly JellyfinSession[]>('/Sessions', {
         params: {
-          ControllableByUserId: userId,
           ActiveWithinSeconds: 600,
           EnableImages: true,
           Fields: DEFAULT_ITEM_FIELDS,
@@ -300,7 +305,22 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
         return [];
       }
 
-      return response.data.map((session) => ({ ...session }));
+      // The server may return both `NowPlayingItem` and `NowViewingItem`.
+      // Consumers of our API expect `NowPlayingItem` to contain the media
+      // that's actually playing. For some clients the item will instead be
+      // present on `NowViewingItem` — copy that over as a convenience so the
+      // UI doesn't have to special-case both fields. Return the list as-is
+      // to avoid dropping sessions the server returned (this keeps behavior
+      // stable across refetches and avoids transient "Nothing is playing"
+      // UX when the server omits certain filters).
+      return response.data.map((session) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const s = { ...session } as any;
+        if (!s.NowPlayingItem && s.NowViewingItem) {
+          s.NowPlayingItem = s.NowViewingItem;
+        }
+        return s as JellyfinSession;
+      });
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
     }

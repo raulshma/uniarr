@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
   Button,
@@ -13,10 +13,11 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { alert } from '@/services/dialogService';
 
 import { MediaPoster } from './MediaPoster';
 import type { AppTheme } from '@/constants/theme';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import type { Series } from '@/models/media.types';
 import type { Movie } from '@/models/movie.types';
 import type { QualityProfile } from '@/models/media.types';
@@ -45,14 +46,14 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
   serviceId,
 }) => {
   const theme = useTheme<AppTheme>();
+  const { getConnector } = useConnectorsStore();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [qualityProfiles, setQualityProfiles] = useState<QualityProfile[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [editedItem, setEditedItem] = useState<MediaItem | null>(null);
 
-  const manager = ConnectorManager.getInstance();
-  const connector = manager.getConnector(serviceId);
+  const connector = getConnector(serviceId);
 
   useEffect(() => {
     if (visible && mediaItem) {
@@ -75,7 +76,7 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
       setTags(tagList);
     } catch (error) {
       console.error('Failed to load metadata:', error);
-      Alert.alert('Error', 'Failed to load metadata for editing.');
+      alert('Error', 'Failed to load metadata for editing.');
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +109,7 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
       onDismiss();
     } catch (error) {
       console.error('Failed to save media:', error);
-      Alert.alert('Error', 'Failed to save changes.');
+      alert('Error', 'Failed to save changes.');
     } finally {
       setIsSaving(false);
     }
@@ -124,53 +125,21 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
         await (connector as any).refreshMovie(editedItem.id);
       }
 
-      Alert.alert('Success', 'Metadata refresh started.');
+  alert('Success', 'Metadata refresh started.');
     } catch (error) {
       console.error('Failed to refresh metadata:', error);
-      Alert.alert('Error', 'Failed to refresh metadata.');
+      alert('Error', 'Failed to refresh metadata.');
     }
   }, [editedItem, connector]);
 
+  const [moveDialogVisible, setMoveDialogVisible] = useState(false);
+  const [moveDestination, setMoveDestination] = useState<string | undefined>(undefined);
+
   const handleMoveFiles = useCallback(async () => {
-    if (!editedItem || !connector) return;
-
-    Alert.prompt(
-      'Move Files',
-      'Enter the new path for the media files:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Move',
-          onPress: async (newPath?: string) => {
-            if (!newPath?.trim()) return;
-
-            try {
-              if (connector.config.type === 'sonarr') {
-                await (connector as any).moveSeries({
-                  seriesId: editedItem.id,
-                  destinationPath: newPath.trim(),
-                  moveFiles: true,
-                });
-              } else if (connector.config.type === 'radarr') {
-                await (connector as any).moveMovie({
-                  movieId: editedItem.id,
-                  destinationPath: newPath.trim(),
-                  moveFiles: true,
-                });
-              }
-
-              Alert.alert('Success', 'Files move operation started.');
-            } catch (error) {
-              console.error('Failed to move files:', error);
-              Alert.alert('Error', 'Failed to move files.');
-            }
-          },
-        },
-      ],
-      'plain-text',
-      editedItem.path,
-    );
-  }, [editedItem, connector]);
+    if (!editedItem) return;
+    setMoveDestination(editedItem.path);
+    setMoveDialogVisible(true);
+  }, [editedItem]);
 
   const updateEditedItem = useCallback((updates: Partial<MediaItem>) => {
     setEditedItem(prev => prev ? { ...prev, ...updates } as MediaItem : null);
@@ -373,6 +342,53 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
           </Button>
         </Dialog.Actions>
       </Dialog>
+      {/* Move files prompt dialog (replacement for Alert.prompt) */}
+      <Portal>
+        <Dialog visible={moveDialogVisible} onDismiss={() => setMoveDialogVisible(false)}>
+          <Dialog.Title>Move Files</Dialog.Title>
+          <Dialog.Content>
+            <Text>Enter the new path for the media files:</Text>
+            <TextInput
+              value={moveDestination}
+              onChangeText={(t) => setMoveDestination(t)}
+              placeholder="/path/to/destination"
+              style={{ marginTop: 12 }}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setMoveDialogVisible(false)}>Cancel</Button>
+            <Button
+              onPress={async () => {
+                if (!moveDestination?.trim()) return;
+                try {
+                  if (connector?.config.type === 'sonarr') {
+                    await (connector as any).moveSeries({
+                      seriesId: editedItem.id,
+                      destinationPath: moveDestination.trim(),
+                      moveFiles: true,
+                    });
+                  } else if (connector?.config.type === 'radarr') {
+                    await (connector as any).moveMovie({
+                      movieId: editedItem.id,
+                      destinationPath: moveDestination.trim(),
+                      moveFiles: true,
+                    });
+                  }
+
+                  alert('Success', 'Files move operation started.');
+                } catch (error) {
+                  console.error('Failed to move files:', error);
+                  alert('Error', 'Failed to move files.');
+                } finally {
+                  setMoveDialogVisible(false);
+                }
+              }}
+            >
+              Move
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </Portal>
   );
 };

@@ -2,7 +2,8 @@ import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import { Chip, Searchbar, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
@@ -327,7 +328,7 @@ const RadarrMoviesListScreen = () => {
 
   const handleAddMovie = useCallback(() => {
     if (!hasValidServiceId) {
-      Alert.alert(
+  alert(
         "Invalid service",
         "The selected service identifier is not valid."
       );

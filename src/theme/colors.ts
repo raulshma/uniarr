@@ -12,6 +12,23 @@ export type CustomColorScheme = {
   error?: string;
 };
 
+// Legacy aliases: map old brand-based preset keys to new neutral keys
+export const presetKeyAliases: Record<string, string> = {
+  netflix: 'cinematicRed',
+  plex: 'goldenHour',
+  jellyfin: 'oceanic',
+  spotify: 'forest',
+  youtube: 'vividRed',
+  hbomax: 'velvet',
+  disney: 'wonder',
+  primevideo: 'azure',
+  hulu: 'fresh',
+  emby: 'ember',
+  trakt: 'tracker',
+  kodi: 'cobalt',
+  appletv: 'modern',
+};
+
 type PresetModeOverrides = {
   background: string;
   surface: string;
@@ -47,7 +64,7 @@ export const presetThemes: Record<string, ThemePreset> = {
       },
     },
   },
-  netflix: {
+  cinematicRed: {
     common: {
       primary: '#E50914',
       secondary: '#221F1F',
@@ -67,7 +84,7 @@ export const presetThemes: Record<string, ThemePreset> = {
       },
     },
   },
-  plex: {
+  goldenHour: {
     common: {
       primary: '#EBAF00',
       secondary: '#282A2D',
@@ -87,7 +104,7 @@ export const presetThemes: Record<string, ThemePreset> = {
       },
     },
   },
-  jellyfin: {
+  oceanic: {
     common: {
       primary: '#00A4DC',
       secondary: '#1E1E1E',
@@ -107,7 +124,7 @@ export const presetThemes: Record<string, ThemePreset> = {
       },
     },
   },
-  spotify: {
+  forest: {
     common: {
       primary: '#1DB954',
       secondary: '#121212',
@@ -127,7 +144,7 @@ export const presetThemes: Record<string, ThemePreset> = {
       },
     },
   },
-  youtube: {
+  vividRed: {
     common: {
       primary: '#FF0000',
       secondary: '#0F0F0F',
@@ -144,6 +161,166 @@ export const presetThemes: Record<string, ThemePreset> = {
         background: '#0F0F0F',
         surface: '#171717',
         surfaceVariant: '#212121',
+      },
+    },
+  },
+  velvet: {
+    common: {
+      primary: '#5B2D90',
+      secondary: '#000000',
+      tertiary: '#F3EAFE',
+      error: '#D7263D',
+    },
+    modes: {
+      light: {
+        background: '#FBF7FF',
+        surface: '#FFFFFF',
+        surfaceVariant: '#EDE5F6',
+      },
+      dark: {
+        background: '#0A0710',
+        surface: '#141018',
+        surfaceVariant: '#221827',
+      },
+    },
+  },
+  wonder: {
+    common: {
+      primary: '#113CCF',
+      secondary: '#FFFFFF',
+      tertiary: '#DCEBFF',
+      error: '#B00020',
+    },
+    modes: {
+      light: {
+        background: '#F6FAFF',
+        surface: '#FFFFFF',
+        surfaceVariant: '#E6F0FF',
+      },
+      dark: {
+        background: '#07102A',
+        surface: '#0E1A36',
+        surfaceVariant: '#12243F',
+      },
+    },
+  },
+  azure: {
+    common: {
+      primary: '#00A8E4',
+      secondary: '#0B0B0B',
+      tertiary: '#F1FBFF',
+      error: '#FFB300',
+    },
+    modes: {
+      light: {
+        background: '#F3FBFF',
+        surface: '#FFFFFF',
+        surfaceVariant: '#E6F5FB',
+      },
+      dark: {
+        background: '#071219',
+        surface: '#0E1A22',
+        surfaceVariant: '#16232D',
+      },
+    },
+  },
+  fresh: {
+    common: {
+      primary: '#1CE783',
+      secondary: '#000000',
+      tertiary: '#E8FFF3',
+      error: '#FF4C4C',
+    },
+    modes: {
+      light: {
+        background: '#F7FFFB',
+        surface: '#FFFFFF',
+        surfaceVariant: '#EAFCEF',
+      },
+      dark: {
+        background: '#07120C',
+        surface: '#0E1B14',
+        surfaceVariant: '#16281E',
+      },
+    },
+  },
+  ember: {
+    common: {
+      primary: '#E64135',
+      secondary: '#1C1C1C',
+      tertiary: '#FFFFFF',
+      error: '#A40000',
+    },
+    modes: {
+      light: {
+        background: '#FFF8F7',
+        surface: '#FFFFFF',
+        surfaceVariant: '#F6E9E7',
+      },
+      dark: {
+        background: '#0B0A0A',
+        surface: '#141313',
+        surfaceVariant: '#241D1D',
+      },
+    },
+  },
+  tracker: {
+    common: {
+      primary: '#1A8FE3',
+      secondary: '#0F1720',
+      tertiary: '#E9F5FF',
+      error: '#E03A3A',
+    },
+    modes: {
+      light: {
+        background: '#F5FBFF',
+        surface: '#FFFFFF',
+        surfaceVariant: '#E6F2FB',
+      },
+      dark: {
+        background: '#071022',
+        surface: '#0D1B2B',
+        surfaceVariant: '#152636',
+      },
+    },
+  },
+  cobalt: {
+    common: {
+      primary: '#0099FF',
+      secondary: '#0E0E0E',
+      tertiary: '#E8F7FF',
+      error: '#FF3B30',
+    },
+    modes: {
+      light: {
+        background: '#F3FAFF',
+        surface: '#FFFFFF',
+        surfaceVariant: '#E6F6FF',
+      },
+      dark: {
+        background: '#071015',
+        surface: '#0D151B',
+        surfaceVariant: '#162027',
+      },
+    },
+  },
+  modern: {
+    common: {
+      primary: '#0F1720',
+      secondary: '#FFFFFF',
+      tertiary: '#A9B3BD',
+      error: '#FF3B30',
+    },
+    modes: {
+      light: {
+        background: '#FAFBFC',
+        surface: '#FFFFFF',
+        surfaceVariant: '#EFEFF2',
+      },
+      dark: {
+        background: '#08090B',
+        surface: '#0F1113',
+        surfaceVariant: '#1A1C1E',
       },
     },
   },
@@ -241,8 +418,29 @@ const getRelativeLuminance = (color: string): number => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
-const getAccessibleOnColor = (background: string): string =>
-  getRelativeLuminance(background) < 0.45 ? '#FFFFFF' : '#000000';
+const getContrastRatio = (colorA: string, colorB: string): number => {
+  const lA = getRelativeLuminance(colorA);
+  const lB = getRelativeLuminance(colorB);
+  const lighter = Math.max(lA, lB);
+  const darker = Math.min(lA, lB);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+const getAccessibleOnColor = (background: string): string => {
+  // Fallback quick-path
+  const normalized = normalizeHex(background);
+  if (!normalized) return '#000000';
+
+  const contrastWhite = getContrastRatio(normalized, '#FFFFFF');
+  const contrastBlack = getContrastRatio(normalized, '#000000');
+
+  // Prefer a color that meets the 4.5:1 contrast requirement for normal text.
+  if (contrastWhite >= 4.5) return '#FFFFFF';
+  if (contrastBlack >= 4.5) return '#000000';
+
+  // Otherwise choose the color with the higher contrast ratio.
+  return contrastWhite >= contrastBlack ? '#FFFFFF' : '#000000';
+};
 
 const ensureDarkSurface = (color?: string, fallback: string = FALLBACK_DARK_SURFACE): string => {
   const normalized = normalizeHex(color);

@@ -116,6 +116,18 @@ interface ApiMediaDetails {
   readonly rating?: number;
   readonly runtime?: number;
   readonly genres?: { readonly name: string }[];
+  readonly credits?: ApiCreditsResponse;
+}
+
+interface ApiCreditPerson {
+  readonly id?: number;
+  readonly name?: string;
+  readonly character?: string;
+  readonly profilePath?: string;
+}
+
+interface ApiCreditsResponse {
+  readonly cast?: ApiCreditPerson[];
 }
 
 interface ApiSearchResult {
@@ -333,6 +345,13 @@ const mapMediaDetails = (media: ApiMediaDetails): JellyseerrMediaSummary => {
     genres,
   };
 };
+
+const mapCastMember = (p: ApiCreditPerson) => ({
+  id: p.id,
+  name: p.name,
+  character: p.character,
+  profileUrl: resolveImageUrl(p.profilePath),
+});
 
 const mapSearchResults = (results: ApiSearchResult[]): JellyseerrSearchResult[] =>
   results
@@ -595,6 +614,29 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'getMediaDetails',
+        endpoint: mediaType === 'movie' ? `${API_PREFIX}/movie/${mediaId}` : `${API_PREFIX}/tv/${mediaId}`,
+      });
+    }
+  }
+
+  async getMediaCredits(mediaId: number, mediaType: 'movie' | 'tv'): Promise<{ id?: number; name?: string; character?: string; profileUrl?: string }[]> {
+    await this.ensureAuthenticated();
+
+    try {
+      // Jellyseerr exposes credits as part of the full media details
+      // response (see /movie/{movieId} and /tv/{tvId} in the OpenAPI spec).
+      const endpoint = mediaType === 'movie'
+        ? `${API_PREFIX}/movie/${mediaId}`
+        : `${API_PREFIX}/tv/${mediaId}`;
+
+      const response = await this.client.get<ApiMediaDetails>(endpoint);
+      const cast = response.data.credits?.cast ?? [];
+      return cast.map(mapCastMember);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getMediaCredits',
         endpoint: mediaType === 'movie' ? `${API_PREFIX}/movie/${mediaId}` : `${API_PREFIX}/tv/${mediaId}`,
       });
     }

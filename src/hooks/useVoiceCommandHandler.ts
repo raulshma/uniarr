@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Alert } from 'react-native';
+import { alert } from '@/services/dialogService';
 import { VoiceAssistantService } from '../services/voice';
 import { useUnifiedSearch } from './useUnifiedSearch';
 import { useNetworkStatus } from './useNetworkStatus';
@@ -61,7 +61,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
 
         default:
           console.warn('Unknown voice command action:', action);
-          Alert.alert(
+          alert(
             'Voice Command',
             `Received unknown command: ${action}`,
             [{ text: 'OK' }]
@@ -69,7 +69,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
       }
     } catch (error) {
       console.error('Error processing voice command:', error);
-      Alert.alert(
+  alert(
         'Voice Command Error',
         'Failed to process voice command. Please try again.',
         [{ text: 'OK' }]
@@ -79,7 +79,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
 
   const handleSearchMedia = async (query?: string): Promise<void> => {
     if (!query) {
-      Alert.alert(
+  alert(
         'Search Media',
         'Please specify what you want to search for.',
         [
@@ -100,7 +100,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
       // Small delay to ensure navigation completes
       setTimeout(() => {
         // This would trigger the unified search if we had a way to pass the query
-        Alert.alert(
+  alert(
           'Search Results',
           `Searching for "${query}" across all services...`,
           [
@@ -116,7 +116,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
         );
       }, 500);
     } catch (error) {
-      Alert.alert('Search Error', 'Failed to search for media');
+  alert('Search Error', 'Failed to search for media');
     }
   };
 
@@ -126,7 +126,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
       const serviceCount = 3; // Mock: would come from useNetworkStatus()
       const onlineServices = 2; // Mock: would come from useNetworkStatus()
 
-      Alert.alert(
+  alert(
         'Service Status',
         `Services: ${onlineServices}/${serviceCount} online\n\nTap "View Details" to see more information.`,
         [
@@ -138,7 +138,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
         ]
       );
     } catch (error) {
-      Alert.alert('Service Check Error', 'Failed to check service status');
+  alert('Service Check Error', 'Failed to check service status');
     }
   };
 
@@ -148,7 +148,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
       const activeDownloads = 2; // Mock: would come from useQBittorrentTorrents()
       const totalDownloads = 5; // Mock: would come from useQBittorrentTorrents()
 
-      Alert.alert(
+  alert(
         'Download Status',
         `Active downloads: ${activeDownloads}\nTotal downloads: ${totalDownloads}\n\nTap "View Queue" to see all downloads.`,
         [
@@ -160,13 +160,13 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
         ]
       );
     } catch (error) {
-      Alert.alert('Download Check Error', 'Failed to check download status');
+  alert('Download Check Error', 'Failed to check download status');
     }
   };
 
   const handleAddMedia = async (mediaName?: string): Promise<void> => {
     if (!mediaName) {
-      Alert.alert(
+  alert(
         'Add Media',
         'Please specify the name of the movie or TV show you want to add.',
         [
@@ -185,7 +185,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
   router.push('/(auth)/search');
 
       setTimeout(() => {
-        Alert.alert(
+  alert(
           'Add Media',
           `Searching for "${mediaName}" to add to your services...`,
           [
@@ -201,7 +201,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
         );
       }, 500);
     } catch (error) {
-      Alert.alert('Add Media Error', 'Failed to add media');
+  alert('Add Media Error', 'Failed to add media');
     }
   };
 
@@ -210,7 +210,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
       // Mock implementation - in a real app this would use the requests hook
       const pendingRequests = 3; // Mock: would come from useJellyseerrRequests()
 
-      Alert.alert(
+  alert(
         'Jellyseerr Requests',
         `Pending requests: ${pendingRequests}\n\nTap "View Requests" to manage your requests.`,
         [
@@ -222,7 +222,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
         ]
       );
     } catch (error) {
-      Alert.alert('Request Check Error', 'Failed to check requests');
+  alert('Request Check Error', 'Failed to check requests');
     }
   };
 

@@ -6,6 +6,37 @@ import type { Movie } from '@/models/movie.types';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 
+// Import SonarrEpisode type to ensure proper typing
+interface SonarrImage {
+  readonly coverType: 'poster' | 'fanart' | string;
+  readonly url?: string;
+  readonly remoteUrl?: string;
+}
+
+interface SonarrSeries {
+  readonly id: number;
+  readonly title: string;
+  readonly year?: number;
+  readonly overview?: string;
+  readonly network?: string;
+  readonly genres?: string[];
+  readonly images?: SonarrImage[];
+}
+
+interface SonarrEpisode {
+  readonly id: number;
+  readonly seriesId: number;
+  readonly seasonNumber: number;
+  readonly episodeNumber: number;
+  readonly title: string;
+  readonly overview?: string;
+  readonly airDate?: string;
+  readonly hasFile: boolean;
+  readonly monitored: boolean;
+  readonly images?: SonarrImage[];
+  readonly series?: SonarrSeries;
+}
+
 /**
  * Service for fetching and managing calendar data from various media services
  */
@@ -34,31 +65,38 @@ export class CalendarService {
       
       const releases: MediaRelease[] = [];
       
-      // Fetch from Sonarr services
-      const sonarrConfigs = configs.filter(config => 
-        config.type === 'sonarr' && config.enabled
-      );
-      
-      for (const config of sonarrConfigs) {
-        try {
-          const sonarrReleases = await this.getSonarrReleases(config.id, filters);
-          releases.push(...sonarrReleases);
-        } catch (error) {
-          console.warn(`Failed to fetch releases from Sonarr ${config.name}:`, error);
+  const allowedTypes = new Set(filters.serviceTypes ?? []);
+      const fetchAllTypes = allowedTypes.size === 0;
+
+      // Fetch from Sonarr services when allowed
+      if (fetchAllTypes || allowedTypes.has('sonarr')) {
+        const sonarrConfigs = configs.filter(config =>
+          config.type === 'sonarr' && config.enabled
+        );
+
+        for (const config of sonarrConfigs) {
+          try {
+            const sonarrReleases = await this.getSonarrReleases(config.id, filters);
+            releases.push(...sonarrReleases);
+          } catch (error) {
+            console.warn(`Failed to fetch releases from Sonarr ${config.name}:`, error);
+          }
         }
       }
-      
-      // Fetch from Radarr services
-      const radarrConfigs = configs.filter(config => 
-        config.type === 'radarr' && config.enabled
-      );
-      
-      for (const config of radarrConfigs) {
-        try {
-          const radarrReleases = await this.getRadarrReleases(config.id, filters);
-          releases.push(...radarrReleases);
-        } catch (error) {
-          console.warn(`Failed to fetch releases from Radarr ${config.name}:`, error);
+
+      // Fetch from Radarr services when allowed
+      if (fetchAllTypes || allowedTypes.has('radarr')) {
+        const radarrConfigs = configs.filter(config =>
+          config.type === 'radarr' && config.enabled
+        );
+
+        for (const config of radarrConfigs) {
+          try {
+            const radarrReleases = await this.getRadarrReleases(config.id, filters);
+            releases.push(...radarrReleases);
+          } catch (error) {
+            console.warn(`Failed to fetch releases from Radarr ${config.name}:`, error);
+          }
         }
       }
       
@@ -79,66 +117,75 @@ export class CalendarService {
     }
 
     const sonarrConnector = connector as SonarrConnector;
-    const series = await sonarrConnector.getSeries();
+    
+    // Determine date range
+    const { startDate, endDate } = this.getDateRange(filters);
+    
+    // Fetch calendar episodes
+    const episodes = await sonarrConnector.getCalendar(startDate, endDate, filters.monitoredStatus === 'unmonitored');
+    
+    const seriesCache = new Map<number, { title: string; posterUrl?: string; genres?: string[]; year?: number; network?: string }>();
     
     const releases: MediaRelease[] = [];
     
-    for (const seriesItem of series) {
-      // Convert series to releases
-      if (seriesItem.nextAiring) {
+    for (const episode of episodes) {
+      if (episode.airDate) {
+        let seriesTitle = episode.series?.title;
+        let seriesPosterUrl: string | undefined;
+        let seriesGenres = episode.series?.genres;
+        let seriesYear = episode.series?.year;
+        let seriesNetwork = episode.series?.network;
+        // If series information is not included in the calendar response, fetch it
+        if (!seriesTitle && episode.seriesId) {
+          if (!seriesCache.has(episode.seriesId)) {
+            try {
+              const series = await sonarrConnector.getById(episode.seriesId);
+              seriesCache.set(episode.seriesId, {
+                title: series.title,
+                posterUrl: series.posterUrl,
+                genres: series.genres,
+                year: series.year,
+                network: series.network,
+              });
+            } catch (error) {
+              console.warn(`Failed to fetch series ${episode.seriesId}:`, error);
+              // Fallback to seriesId as string
+              seriesCache.set(episode.seriesId, { title: `Series ${episode.seriesId}` });
+            }
+          }
+          
+          const cachedSeries = seriesCache.get(episode.seriesId)!;
+          seriesTitle = cachedSeries.title;
+          seriesPosterUrl = cachedSeries.posterUrl;
+          seriesGenres = cachedSeries.genres;
+          seriesYear = cachedSeries.year;
+          seriesNetwork = cachedSeries.network;
+        } else if (episode.series?.images) {
+          // If series is included, extract poster URL from images
+          seriesPosterUrl = this.findSonarrImageUrl(episode.series.images, 'poster');
+        }
+        
         const release: MediaRelease = {
-          id: `sonarr-${serviceId}-series-${seriesItem.id}`,
-          title: seriesItem.title,
-          type: 'series',
-          releaseDate: seriesItem.nextAiring.split('T')[0]!,
-          status: this.determineReleaseStatus(seriesItem.nextAiring),
-          posterUrl: seriesItem.posterUrl,
-          backdropUrl: seriesItem.backdropUrl,
-          overview: seriesItem.overview,
-          genres: seriesItem.genres,
-          year: seriesItem.year,
-          network: seriesItem.network,
-          monitored: seriesItem.monitored,
+          id: `sonarr-${serviceId}-episode-${episode.id}`,
+          title: seriesTitle ? `${seriesTitle} - ${episode.title}` : episode.title,
+          type: 'episode',
+          releaseDate: episode.airDate.split('T')[0]!,
+          status: this.determineReleaseStatus(episode.airDate),
+          posterUrl: seriesPosterUrl,
+          overview: episode.overview,
+          genres: seriesGenres,
+          year: seriesYear,
+          network: seriesNetwork,
+          monitored: episode.monitored,
           serviceId,
           serviceType: 'sonarr',
-          seriesId: seriesItem.id.toString(),
-          seriesTitle: seriesItem.title,
+          seriesId: episode.seriesId?.toString(),
+          seriesTitle,
+          seasonNumber: episode.seasonNumber,
+          episodeNumber: episode.episodeNumber,
         };
         
         releases.push(release);
-      }
-      
-      // Add episodes if available
-      if (seriesItem.seasons) {
-        for (const season of seriesItem.seasons) {
-          if (season.episodes) {
-            for (const episode of season.episodes) {
-              if (episode.airDate) {
-                const release: MediaRelease = {
-                  id: `sonarr-${serviceId}-episode-${episode.id}`,
-                  title: episode.title,
-                  type: 'episode',
-                  releaseDate: episode.airDate.split('T')[0]!,
-                  status: this.determineReleaseStatus(episode.airDate),
-                  posterUrl: seriesItem.posterUrl,
-                  overview: episode.overview,
-                  genres: seriesItem.genres,
-                  year: seriesItem.year,
-                  network: seriesItem.network,
-                  monitored: episode.monitored,
-                  serviceId,
-                  serviceType: 'sonarr',
-                  seriesId: seriesItem.id.toString(),
-                  seriesTitle: seriesItem.title,
-                  seasonNumber: episode.seasonNumber,
-                  episodeNumber: episode.episodeNumber,
-                };
-                
-                releases.push(release);
-              }
-            }
-          }
-        }
       }
     }
     
@@ -155,7 +202,12 @@ export class CalendarService {
     }
 
     const radarrConnector = connector as RadarrConnector;
-    const movies = await radarrConnector.getMovies();
+    
+    // Determine date range
+    const { startDate, endDate } = this.getDateRange(filters);
+    
+    // Fetch calendar movies
+    const movies = await radarrConnector.getCalendar(startDate, endDate, filters.monitoredStatus === 'unmonitored');
     
     const releases: MediaRelease[] = [];
     
@@ -168,9 +220,9 @@ export class CalendarService {
           title: movie.title,
           type: 'movie',
           releaseDate: releaseDate.split('T')[0]!,
-          status: 'released', // Movies in Radarr are typically already released
-          posterUrl: movie.posterUrl,
-          backdropUrl: movie.backdropUrl,
+          status: this.determineReleaseStatus(releaseDate),
+          posterUrl: movie.images ? this.findRadarrImageUrl(movie.images, 'poster') : undefined,
+          backdropUrl: movie.images ? this.findRadarrImageUrl(movie.images, 'fanart') : undefined,
           overview: movie.overview,
           genres: movie.genres,
           year: movie.year,
@@ -213,6 +265,20 @@ export class CalendarService {
       
       // Filter by service
       if (filters.services.length > 0 && release.serviceId && !filters.services.includes(release.serviceId)) {
+        return false;
+      }
+
+      // Filter by service type
+  if ((filters.serviceTypes?.length ?? 0) > 0 && release.serviceType && !filters.serviceTypes.includes(release.serviceType)) {
+        return false;
+      }
+
+      // Filter by monitored status
+      if (filters.monitoredStatus === 'monitored' && !release.monitored) {
+        return false;
+      }
+
+      if (filters.monitoredStatus === 'unmonitored' && release.monitored) {
         return false;
       }
       
@@ -283,5 +349,43 @@ export class CalendarService {
     });
     
     return stats;
+  }
+
+  /**
+   * Get date range for calendar fetching
+   */
+  private getDateRange(filters: CalendarFilters): { startDate?: string; endDate?: string } {
+    if (filters.dateRange) {
+      return {
+        startDate: filters.dateRange.start,
+        endDate: filters.dateRange.end,
+      };
+    }
+
+    // Default: last 30 days to next 90 days
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setDate(now.getDate() - 30);
+    const endDate = new Date(now);
+    endDate.setDate(now.getDate() + 90);
+
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+    };
+  }
+
+  /**
+   * Find image URL from Sonarr images array
+   */
+  private findSonarrImageUrl(images: { coverType: string; url?: string; remoteUrl?: string }[], type: string): string | undefined {
+    return images?.find((image) => image.coverType === type)?.remoteUrl ?? undefined;
+  }
+
+  /**
+   * Find image URL from Radarr images array
+   */
+  private findRadarrImageUrl(images: { coverType: string; url?: string; remoteUrl?: string }[], type: string): string | undefined {
+    return images?.find((image) => image.coverType === type)?.remoteUrl ?? undefined;
   }
 }

@@ -18,7 +18,7 @@ import type { AppTheme } from '@/constants/theme';
 import { spacing } from '@/theme/spacing';
 import { useUnifiedSearch } from '@/hooks/useUnifiedSearch';
 import type { SearchHistoryEntry, UnifiedSearchMediaType, UnifiedSearchResult } from '@/models/search.types';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 
 const mediaTypeLabels: Record<UnifiedSearchMediaType, string> = {
@@ -75,7 +75,7 @@ const buildIdentifier = (entry: SearchHistoryEntry): string => {
 export const UnifiedSearchPanel: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
-  const connectorManager = useMemo(() => ConnectorManager.getInstance(), []);
+  const { getConnector } = useConnectorsStore();
   const params = useLocalSearchParams<{
     query?: string;
     tmdbId?: string;
@@ -257,7 +257,7 @@ export const UnifiedSearchPanel: React.FC = () => {
     try {
       // Validate basics
       if (item.serviceType !== 'jellyseerr') return false;
-      const connector = connectorManager.getConnector(item.serviceId) as JellyseerrConnector | undefined;
+      const connector = getConnector(item.serviceId) as JellyseerrConnector | undefined;
       if (!connector || connector.config.type !== 'jellyseerr') return false;
 
       // Prefer TMDB id for Jellyseerr routes; fallback to service native id
@@ -276,7 +276,7 @@ export const UnifiedSearchPanel: React.FC = () => {
     } catch {
       return false;
     }
-  }, [connectorManager]);
+  }, [getConnector]);
 
   // If the route provides search params (e.g. from Discover card), prefill the search
   useEffect(() => {

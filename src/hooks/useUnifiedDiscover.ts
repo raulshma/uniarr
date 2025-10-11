@@ -4,7 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import type { IConnector } from '@/connectors/base/IConnector';
+import type { ServiceType } from '@/models/service.types';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { DiscoverMediaItem, DiscoverSection, UnifiedDiscoverPayload, UnifiedDiscoverServices } from '@/models/discover.types';
 import type { JellyseerrSearchResult } from '@/models/jellyseerr.types';
@@ -23,7 +25,11 @@ const mapServiceSummaries = (configs: ServiceConfig[]) =>
     type: config.type,
   }));
 
-const mapTrendingResult = (result: JellyseerrSearchResult, mediaType: DiscoverMediaItem['mediaType']): DiscoverMediaItem => ({
+const mapTrendingResult = (
+  result: JellyseerrSearchResult,
+  mediaType: DiscoverMediaItem['mediaType'],
+  sourceServiceId?: string,
+): DiscoverMediaItem => ({
   id: `${mediaType}-${result.tmdbId ?? result.tvdbId ?? result.id}`,
   title: result.title,
   mediaType,
@@ -41,19 +47,20 @@ const mapTrendingResult = (result: JellyseerrSearchResult, mediaType: DiscoverMe
     const parsed = Number.parseInt(dateString.slice(0, 4), 10);
     return Number.isFinite(parsed) ? parsed : undefined;
   })(),
+  sourceId: result.id,
   tmdbId: result.tmdbId,
   tvdbId: result.tvdbId,
   imdbId: result.imdbId,
+  voteCount: result.popularity ?? undefined,
+  sourceServiceId: sourceServiceId,
   source: 'jellyseerr',
 });
 
-const fetchUnifiedDiscover = async (): Promise<UnifiedDiscoverPayload> => {
-  const manager = ConnectorManager.getInstance();
-  await manager.loadSavedServices();
+const fetchUnifiedDiscover = async (getConnectorsByType: (type: ServiceType) => IConnector[]): Promise<UnifiedDiscoverPayload> => {
 
-  const jellyConnectors = manager.getConnectorsByType('jellyseerr') as JellyseerrConnector[];
-  const sonarrConnectors = manager.getConnectorsByType('sonarr') as SonarrConnector[];
-  const radarrConnectors = manager.getConnectorsByType('radarr') as RadarrConnector[];
+  const jellyConnectors = getConnectorsByType('jellyseerr') as JellyseerrConnector[];
+  const sonarrConnectors = getConnectorsByType('sonarr') as SonarrConnector[];
+  const radarrConnectors = getConnectorsByType('radarr') as RadarrConnector[];
 
   const services: UnifiedDiscoverServices = {
     sonarr: mapServiceSummaries(sonarrConnectors.map((connector) => connector.config)),
@@ -61,19 +68,21 @@ const fetchUnifiedDiscover = async (): Promise<UnifiedDiscoverPayload> => {
     jellyseerr: mapServiceSummaries(jellyConnectors.map((connector) => connector.config)),
   };
 
-  const trendingBatches = await Promise.all(
+  const trendingResponses = await Promise.all(
     jellyConnectors.map(async (connector) => {
       try {
         const response = await connector.getTrending({ page: 1 });
-        return response.items;
+        return { connectorId: connector.config.id, items: response.items } as const;
       } catch (error) {
         console.warn(`Failed to load trending titles from ${connector.config.name}:`, error);
-        return [] as JellyseerrSearchResult[];
+        return { connectorId: connector.config.id, items: [] as JellyseerrSearchResult[] } as const;
       }
     }),
   );
 
-  const trendingItems = trendingBatches.flat();
+  // Flatten while keeping a reference to which connector the item came from so
+  // that we can pre-fill sourceServiceId for subsequent detailed fetches.
+  const trendingItems = trendingResponses.flatMap((r) => r.items.map((it) => ({ ...it, __sourceServiceId: r.connectorId } as unknown as JellyseerrSearchResult & { __sourceServiceId?: string })));
 
   if (trendingItems.length === 0) {
     return {
@@ -82,11 +91,11 @@ const fetchUnifiedDiscover = async (): Promise<UnifiedDiscoverPayload> => {
     };
   }
 
-  const deduped = new Map<string, JellyseerrSearchResult>();
+  const deduped = new Map<string, JellyseerrSearchResult & { __sourceServiceId?: string }>();
   for (const item of trendingItems) {
     const key = item.tmdbId ? `tmdb-${item.tmdbId}` : `${item.mediaType}-${item.id}`;
     if (!deduped.has(key)) {
-      deduped.set(key, item);
+      deduped.set(key, item as JellyseerrSearchResult & { __sourceServiceId?: string });
     }
   }
 
@@ -94,10 +103,11 @@ const fetchUnifiedDiscover = async (): Promise<UnifiedDiscoverPayload> => {
   const movieResults: DiscoverMediaItem[] = [];
 
   deduped.forEach((value) => {
+    const connectorId = (value as any).__sourceServiceId as string | undefined;
     if (value.mediaType === 'tv') {
-      tvResults.push(mapTrendingResult(value, 'series'));
+      tvResults.push(mapTrendingResult(value, 'series', connectorId));
     } else if (value.mediaType === 'movie') {
-      movieResults.push(mapTrendingResult(value, 'movie'));
+      movieResults.push(mapTrendingResult(value, 'movie', connectorId));
     }
   });
 
@@ -130,9 +140,10 @@ const fetchUnifiedDiscover = async (): Promise<UnifiedDiscoverPayload> => {
 };
 
 export const useUnifiedDiscover = () => {
+  const { getConnectorsByType } = useConnectorsStore();
   const query = useQuery<UnifiedDiscoverPayload>({
     queryKey: queryKeys.discover.unified,
-    queryFn: fetchUnifiedDiscover,
+    queryFn: () => fetchUnifiedDiscover(getConnectorsByType),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,

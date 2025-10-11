@@ -2,7 +2,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View, Pressable } from "react-native";
+import { ScrollView, StyleSheet, View, Pressable } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   HelperText,
   Text,
@@ -131,7 +132,7 @@ const EditServiceScreen = () => {
   useEffect(() => {
     const loadServiceConfig = async () => {
       if (!serviceId) {
-        Alert.alert("Error", "Service ID is required", [
+  alert("Error", "Service ID is required", [
           { text: "OK", onPress: () => router.back() },
         ]);
         return;
@@ -142,7 +143,7 @@ const EditServiceScreen = () => {
         const config = configs.find((c) => c.id === serviceId);
 
         if (!config) {
-          Alert.alert("Error", "Service not found", [
+          alert("Error", "Service not found", [
             { text: "OK", onPress: () => router.back() },
           ]);
           return;
@@ -150,7 +151,7 @@ const EditServiceScreen = () => {
 
         setExistingConfig(config);
       } catch (error) {
-        Alert.alert("Error", "Failed to load service configuration", [
+  alert("Error", "Failed to load service configuration", [
           { text: "OK", onPress: () => router.back() },
         ]);
       } finally {
@@ -528,7 +529,7 @@ const EditServiceScreen = () => {
         console.log("✅ [Edit] Queries invalidated");
 
         console.log("🎉 [Edit] Service updated successfully, showing alert...");
-        Alert.alert(
+  alert(
           "Service updated",
           `${serviceTypeLabels[config.type]} has been updated successfully.`,
           [

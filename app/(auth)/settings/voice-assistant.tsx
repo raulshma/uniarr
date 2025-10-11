@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, ScrollView, Alert, Platform } from "react-native";
+import { View, ScrollView, Platform } from "react-native";
+import { alert } from '@/services/dialogService';
 import { useRouter } from "expo-router";
 import {
   Card,
@@ -47,13 +48,13 @@ const VoiceAssistantScreen: React.FC = () => {
     try {
       await setEnabled(enabled);
     } catch (error) {
-      Alert.alert("Error", "Failed to update voice assistant settings");
+      alert("Error", "Failed to update voice assistant settings");
     }
   };
 
   const handleAddShortcut = async () => {
     if (!newShortcut.title || !newShortcut.phrase || !newShortcut.action) {
-      Alert.alert("Error", "Please fill in all required fields");
+  alert("Error", "Please fill in all required fields");
       return;
     }
 
@@ -68,12 +69,12 @@ const VoiceAssistantScreen: React.FC = () => {
         platform: Platform.OS === "ios" ? "ios" : "android",
       });
     } catch (error) {
-      Alert.alert("Error", "Failed to add voice shortcut");
+      alert("Error", "Failed to add voice shortcut");
     }
   };
 
   const handleRemoveShortcut = (id: string) => {
-    Alert.alert(
+    alert(
       "Remove Shortcut",
       "Are you sure you want to remove this voice shortcut?",
       [
@@ -91,7 +92,7 @@ const VoiceAssistantScreen: React.FC = () => {
     try {
       await updateShortcut(id, { enabled });
     } catch (error) {
-      Alert.alert("Error", "Failed to update shortcut");
+      alert("Error", "Failed to update shortcut");
     }
   };
 

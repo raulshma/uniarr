@@ -21,7 +21,16 @@ export interface DiscoverMediaItem {
   popularity?: number;
   releaseDate?: string;
   year?: number;
+  /**
+   * The original source service identifier (for example, Jellyseerr's internal media id).
+   * Used to fetch richer details from the original provider when available.
+   */
+  sourceId?: number;
   tmdbId?: number;
+  /** Number of votes / reviews reported by the source (if available). */
+  voteCount?: number;
+  /** The originating service id (e.g. jellyseerr connector id) for richer details. */
+  sourceServiceId?: string;
   tvdbId?: number;
   imdbId?: string;
   source: DiscoverSource;
