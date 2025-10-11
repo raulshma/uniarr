@@ -75,8 +75,8 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
-  lazy: true,
-  animation: 'none',
+        lazy: true,
+        animation: "none",
       }}
       tabBar={(props) => <CustomCurvedTabBar {...props} />}
     >

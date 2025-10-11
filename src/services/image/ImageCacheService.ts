@@ -1,12 +1,12 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 // Use legacy FileSystem API to avoid deprecation warnings for getInfoAsync.
 // TODO: migrate to the new File/Directory API from `expo-file-system` to remove
 // the legacy dependency and use the modern APIs for file info and operations.
-import * as FileSystem from 'expo-file-system/legacy';
-import { Image } from 'expo-image';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import * as FileSystem from "expo-file-system/legacy";
+import { Image } from "expo-image";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
-import { logger } from '@/services/logger/LoggerService';
+import { logger } from "@/services/logger/LoggerService";
 
 export type ImageCacheUsage = {
   size: number;
@@ -14,13 +14,17 @@ export type ImageCacheUsage = {
   formattedSize: string;
 };
 
-const STORAGE_KEY = 'ImageCacheService:trackedUris';
+const STORAGE_KEY = "ImageCacheService:trackedUris";
+const STORAGE_KEY_VARIANT_STATS = "ImageCacheService:variantStats";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 class ImageCacheService {
   private static instance: ImageCacheService | null = null;
 
   private trackedUris: Set<string> = new Set();
+  // Telemetry: track how often each URI variant resolves to a cache path.
+  // Map keys are descriptive variant labels (eg. 'original', 'encoded', 'decoded', 'stripped').
+  private variantStats: Map<string, number> = new Map();
 
   private isInitialized = false;
 
@@ -58,10 +62,13 @@ class ImageCacheService {
         return localPath;
       }
     } catch (error) {
-      void logger.warn('ImageCacheService: resolveUri failed, falling back to remote URI.', {
-        uri,
-        error: this.stringifyError(error),
-      });
+      void logger.warn(
+        "ImageCacheService: resolveUri failed, falling back to remote URI.",
+        {
+          uri,
+          error: this.stringifyError(error),
+        }
+      );
     }
 
     // If the image couldn't be resolved to a cached path, check whether the
@@ -72,11 +79,11 @@ class ImageCacheService {
       const connectors = ConnectorManager.getInstance().getAllConnectors();
       for (const connector of connectors) {
         try {
-          const base = connector.config.url.replace(/\/+$/, '');
+          const base = connector.config.url.replace(/\/+$/, "");
           if (uri.startsWith(base) && connector.config.apiKey) {
             const parsed = new URL(uri);
-            if (!parsed.searchParams.has('apikey')) {
-              parsed.searchParams.set('apikey', connector.config.apiKey);
+            if (!parsed.searchParams.has("apikey")) {
+              parsed.searchParams.set("apikey", connector.config.apiKey);
               return parsed.toString();
             }
           }
@@ -110,12 +117,12 @@ class ImageCacheService {
             this.trackUri(url);
           }
         } catch (error) {
-          void logger.warn('ImageCacheService: prefetch failed.', {
+          void logger.warn("ImageCacheService: prefetch failed.", {
             uri: url,
             error: this.stringifyError(error),
           });
         }
-      }),
+      })
     );
   }
 
@@ -127,11 +134,11 @@ class ImageCacheService {
 
     const uris = Array.from(this.trackedUris);
 
-  let totalSize = 0;
-  let fileCount = 0;
-  const missingUris: string[] = [];
-  let addedTrackedUris = false;
-  const countedPaths = new Set<string>();
+    let totalSize = 0;
+    let fileCount = 0;
+    const missingUris: string[] = [];
+    let addedTrackedUris = false;
+    const countedPaths = new Set<string>();
 
     await Promise.all(
       uris.map(async (uri) => {
@@ -145,14 +152,15 @@ class ImageCacheService {
           // URI, try the connector-aware variants so we can still account for
           // disk usage.
           try {
-            const connectors = ConnectorManager.getInstance().getAllConnectors();
+            const connectors =
+              ConnectorManager.getInstance().getAllConnectors();
             for (const connector of connectors) {
               try {
-                const base = connector.config.url.replace(/\/+$/, '');
+                const base = connector.config.url.replace(/\/+$/, "");
                 if (uri.startsWith(base) && connector.config.apiKey) {
                   const parsed = new URL(uri);
-                  if (!parsed.searchParams.has('apikey')) {
-                    parsed.searchParams.set('apikey', connector.config.apiKey);
+                  if (!parsed.searchParams.has("apikey")) {
+                    parsed.searchParams.set("apikey", connector.config.apiKey);
                   }
                   const fetchUri = parsed.toString();
                   const altCachedPath = await this.getCachedPath(fetchUri);
@@ -192,17 +200,22 @@ class ImageCacheService {
           return;
         }
 
-        const modifiedAt = fileInfo.modificationTime ? fileInfo.modificationTime * 1000 : undefined;
+        const modifiedAt = fileInfo.modificationTime
+          ? fileInfo.modificationTime * 1000
+          : undefined;
         if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
           // Stale cache entry; schedule cleanup by removing file and skipping from usage count.
           missingUris.push(uri);
           try {
             await FileSystem.deleteAsync(cachedPath, { idempotent: true });
           } catch (deleteError) {
-            void logger.warn('ImageCacheService: failed to delete stale cache file.', {
-              cachedPath,
-              error: this.stringifyError(deleteError),
-            });
+            void logger.warn(
+              "ImageCacheService: failed to delete stale cache file.",
+              {
+                cachedPath,
+                error: this.stringifyError(deleteError),
+              }
+            );
           }
           return;
         }
@@ -210,7 +223,7 @@ class ImageCacheService {
         totalSize += fileInfo.size ?? 0;
         fileCount += 1;
         countedPaths.add(cachedPath);
-      }),
+      })
     );
 
     if (missingUris.length) {
@@ -238,13 +251,21 @@ class ImageCacheService {
               if (countedPaths.has(path)) return;
               const info = await FileSystem.getInfoAsync(path);
               if (!info.exists || info.isDirectory) return;
-              const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+              const modifiedAt = info.modificationTime
+                ? info.modificationTime * 1000
+                : undefined;
               if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
                 try {
                   await FileSystem.deleteAsync(path, { idempotent: true });
-                  void logger.debug('ImageCacheService: removed stale fallback cached image during directory scan.', { path });
+                  void logger.debug(
+                    "ImageCacheService: removed stale fallback cached image during directory scan.",
+                    { path }
+                  );
                 } catch (err) {
-                  void logger.warn('ImageCacheService: failed to delete stale fallback cached image during directory scan.', { path, error: this.stringifyError(err) });
+                  void logger.warn(
+                    "ImageCacheService: failed to delete stale fallback cached image during directory scan.",
+                    { path, error: this.stringifyError(err) }
+                  );
                 }
                 return;
               }
@@ -257,7 +278,7 @@ class ImageCacheService {
           };
 
           for (const name of entries) {
-            if (typeof name !== 'string') continue;
+            if (typeof name !== "string") continue;
             const path = `${cacheDir}${name}`;
             // If it's a file with an image extension, count it directly.
             if (imageExtRegex.test(name)) {
@@ -272,8 +293,11 @@ class ImageCacheService {
                 try {
                   const sub = await FileSystem.readDirectoryAsync(path);
                   for (const subName of sub) {
-                    if (typeof subName !== 'string') continue;
-                    if (imageExtRegex.test(subName) || subName.startsWith('image-')) {
+                    if (typeof subName !== "string") continue;
+                    if (
+                      imageExtRegex.test(subName) ||
+                      subName.startsWith("image-")
+                    ) {
                       work.push(maybeCountFile(`${path}/${subName}`));
                     }
                   }
@@ -290,7 +314,10 @@ class ImageCacheService {
         }
       }
     } catch (err) {
-      void logger.debug('ImageCacheService: failed to scan cache directory for images.', { error: this.stringifyError(err) });
+      void logger.debug(
+        "ImageCacheService: failed to scan cache directory for images.",
+        { error: this.stringifyError(err) }
+      );
     }
 
     return {
@@ -313,9 +340,9 @@ class ImageCacheService {
       ]);
       this.trackedUris.clear();
       await this.persistTrackedUris();
-      void logger.info('ImageCacheService: cleared image cache.');
+      void logger.info("ImageCacheService: cleared image cache.");
     } catch (error) {
-      void logger.error('ImageCacheService: failed to clear cache.', {
+      void logger.error("ImageCacheService: failed to clear cache.", {
         error: this.stringifyError(error),
       });
       throw error;
@@ -324,14 +351,19 @@ class ImageCacheService {
 
   static formatBytes(bytes: number): string {
     if (!Number.isFinite(bytes) || bytes <= 0) {
-      return '0 B';
+      return "0 B";
     }
 
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    const index = Math.min(
+      Math.floor(Math.log(bytes) / Math.log(1024)),
+      units.length - 1
+    );
     const value = bytes / 1024 ** index;
 
-    return `${value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
+    return `${
+      value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)
+    } ${units[index]}`;
   }
 
   // Create a short hash for a URI to use in generating cache filenames.
@@ -339,7 +371,7 @@ class ImageCacheService {
     let hash = 5381;
     for (let i = 0; i < uri.length; i++) {
       // djb2
-      hash = ((hash << 5) + hash) + uri.charCodeAt(i);
+      hash = (hash << 5) + hash + uri.charCodeAt(i);
       hash = hash & hash; // keep in 32-bit
     }
     return (hash >>> 0).toString(36);
@@ -355,7 +387,7 @@ class ImageCacheService {
     } catch {
       // ignore
     }
-    return '.img';
+    return ".img";
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -370,7 +402,7 @@ class ImageCacheService {
         if (Array.isArray(parsed)) {
           let sanitizedAny = false;
           parsed.forEach((uri) => {
-            if (typeof uri === 'string' && uri.length) {
+            if (typeof uri === "string" && uri.length) {
               const sanitized = this.sanitizeUriForStorage(uri);
               if (sanitized !== uri) {
                 sanitizedAny = true;
@@ -387,8 +419,32 @@ class ImageCacheService {
         }
       }
     } catch (error) {
-      void logger.warn('ImageCacheService: failed to restore tracked URIs.', {
+      void logger.warn("ImageCacheService: failed to restore tracked URIs.", {
         error: this.stringifyError(error),
+      });
+    }
+
+    // Restore variant stats
+    try {
+      const serializedStats = await AsyncStorage.getItem(
+        STORAGE_KEY_VARIANT_STATS
+      );
+      if (serializedStats) {
+        const parsed = JSON.parse(serializedStats) as Record<
+          string,
+          number
+        > | null;
+        if (parsed && typeof parsed === "object") {
+          Object.entries(parsed).forEach(([k, v]) => {
+            if (typeof v === "number" && Number.isFinite(v)) {
+              this.variantStats.set(k, v);
+            }
+          });
+        }
+      }
+    } catch (err) {
+      void logger.warn("ImageCacheService: failed to restore variant stats.", {
+        error: this.stringifyError(err),
       });
     }
 
@@ -399,10 +455,29 @@ class ImageCacheService {
     try {
       // Ensure we never persist secrets (eg. apikey query param). Persist a
       // sanitized copy of the current URIs.
-      const sanitized = Array.from(this.trackedUris).map((u) => this.sanitizeUriForStorage(u));
+      const sanitized = Array.from(this.trackedUris).map((u) =>
+        this.sanitizeUriForStorage(u)
+      );
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      // Persist variant stats alongside tracked URIs (best-effort)
+      try {
+        const statsObj: Record<string, number> = {};
+        this.variantStats.forEach((v, k) => {
+          statsObj[k] = v;
+        });
+        await AsyncStorage.setItem(
+          STORAGE_KEY_VARIANT_STATS,
+          JSON.stringify(statsObj)
+        );
+      } catch (err) {
+        // non-fatal
+        void logger.warn(
+          "ImageCacheService: failed to persist variant stats.",
+          { error: this.stringifyError(err) }
+        );
+      }
     } catch (error) {
-      void logger.warn('ImageCacheService: failed to persist tracked URIs.', {
+      void logger.warn("ImageCacheService: failed to persist tracked URIs.", {
         error: this.stringifyError(error),
       });
     }
@@ -434,12 +509,12 @@ class ImageCacheService {
 
       for (const connector of connectors) {
         try {
-          const base = connector.config.url.replace(/\/+$/, '');
+          const base = connector.config.url.replace(/\/+$/, "");
           if (fetchUri.startsWith(base) && connector.config.apiKey) {
             // Only add apikey if it's not already present
             const parsed = new URL(fetchUri);
-            if (!parsed.searchParams.has('apikey')) {
-              parsed.searchParams.set('apikey', connector.config.apiKey);
+            if (!parsed.searchParams.has("apikey")) {
+              parsed.searchParams.set("apikey", connector.config.apiKey);
               fetchUri = parsed.toString();
             }
             break;
@@ -449,9 +524,13 @@ class ImageCacheService {
         }
       }
 
-      const success = await Image.prefetch(fetchUri, { cachePolicy: 'disk' });
+      const success = await Image.prefetch(fetchUri, { cachePolicy: "disk" });
 
-      void logger.debug('ImageCacheService: prefetch result.', { uri, fetchUri, success });
+      void logger.debug("ImageCacheService: prefetch result.", {
+        uri,
+        fetchUri,
+        success,
+      });
 
       // If prefetch failed, try a robust fallback by downloading the image
       // directly into the app cache so we can return a filesystem path. If
@@ -461,6 +540,12 @@ class ImageCacheService {
       if (!success) {
         const downloadPath = await this.fallbackDownload(uri, fetchUri);
         if (downloadPath) {
+          // Telemetry: record a fallback-download occurrence (prefetch path)
+          try {
+            this.incrementVariantStat('fallback-download-prefetch');
+          } catch {
+            // ignore
+          }
           return downloadPath;
         }
         return null;
@@ -475,13 +560,28 @@ class ImageCacheService {
       }
 
       if (!cachedPath) {
-        void logger.debug('ImageCacheService: prefetch succeeded but cache path missing; attempting fallback download.', { uri, fetchUri });
+        void logger.debug(
+          "ImageCacheService: prefetch succeeded but cache path missing; attempting fallback download.",
+          { uri, fetchUri }
+        );
         const downloadPath = await this.fallbackDownload(uri, fetchUri);
         if (downloadPath) {
-          void logger.info('ImageCacheService: fallback download succeeded after missing cache path.', { uri, fetchUri, downloadPath });
+          // Telemetry: fallback used after prefetch reported success but cache was missing
+          try {
+            this.incrementVariantStat('fallback-download-after-prefetch');
+          } catch {
+            // ignore
+          }
+          void logger.info(
+            "ImageCacheService: fallback download succeeded after missing cache path.",
+            { uri, fetchUri, downloadPath }
+          );
           return downloadPath;
         }
-        void logger.warn('ImageCacheService: prefetch succeeded but no cache path available and fallback download failed.', { uri, fetchUri });
+        void logger.warn(
+          "ImageCacheService: prefetch succeeded but no cache path available and fallback download failed.",
+          { uri, fetchUri }
+        );
         return null;
       }
 
@@ -493,7 +593,10 @@ class ImageCacheService {
     try {
       const result = await prefetchPromise;
       if (!result) {
-        void logger.debug('ImageCacheService: prefetch returned empty result.', { uri });
+        void logger.debug(
+          "ImageCacheService: prefetch returned empty result.",
+          { uri }
+        );
       }
       return result;
     } finally {
@@ -526,7 +629,7 @@ class ImageCacheService {
     }
     try {
       // strip trailing slashes which sometimes differ between callers
-      const stripped = uri.replace(/\/+$/, '');
+      const stripped = uri.replace(/\/+$/, "");
       if (stripped !== uri) variants.push(stripped);
     } catch {
       // ignore
@@ -544,19 +647,48 @@ class ImageCacheService {
           continue;
         }
 
-        const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+        const modifiedAt = info.modificationTime
+          ? info.modificationTime * 1000
+          : undefined;
         if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
           try {
             await FileSystem.deleteAsync(cachedPath, { idempotent: true });
-            void logger.debug('ImageCacheService: removed stale cached image.', { cachedPath, uri: attemptUri });
+            void logger.debug(
+              "ImageCacheService: removed stale cached image.",
+              { cachedPath, uri: attemptUri }
+            );
           } catch (error) {
-            void logger.warn('ImageCacheService: failed to delete stale cached image.', {
-              cachedPath,
-              uri: attemptUri,
-              error: this.stringifyError(error),
-            });
+            void logger.warn(
+              "ImageCacheService: failed to delete stale cached image.",
+              {
+                cachedPath,
+                uri: attemptUri,
+                error: this.stringifyError(error),
+              }
+            );
           }
           continue;
+        }
+
+        // Record which variant succeeded
+        try {
+          const label =
+            attemptUri === uri
+              ? "original"
+              : attemptUri === encodeURI(uri)
+              ? "encoded"
+              : attemptUri === decodeURI(uri)
+              ? "decoded"
+              : "normalized";
+          const prev = this.variantStats.get(label) ?? 0;
+          this.variantStats.set(label, prev + 1);
+          // Persist stats best-effort, but don't await in the hot path
+          void AsyncStorage.setItem(
+            STORAGE_KEY_VARIANT_STATS,
+            JSON.stringify(Object.fromEntries(this.variantStats))
+          );
+        } catch {
+          // ignore telemetry errors
         }
 
         return cachedPath;
@@ -576,21 +708,35 @@ class ImageCacheService {
         return null;
       }
 
-      const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+      const modifiedAt = info.modificationTime
+        ? info.modificationTime * 1000
+        : undefined;
       if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
         try {
           await FileSystem.deleteAsync(dest, { idempotent: true });
-          void logger.debug('ImageCacheService: removed stale fallback cached image.', { dest, uri });
+          void logger.debug(
+            "ImageCacheService: removed stale fallback cached image.",
+            { dest, uri }
+          );
         } catch (error) {
-          void logger.warn('ImageCacheService: failed to delete stale fallback cached image.', {
-            dest,
-            uri,
-            error: this.stringifyError(error),
-          });
+          void logger.warn(
+            "ImageCacheService: failed to delete stale fallback cached image.",
+            {
+              dest,
+              uri,
+              error: this.stringifyError(error),
+            }
+          );
         }
         return null;
       }
 
+      // Telemetry: deterministic fallback cached file was found on disk
+      try {
+        this.incrementVariantStat('fallback-cache-file');
+      } catch {
+        // ignore
+      }
       return dest;
     } catch {
       return null;
@@ -602,15 +748,27 @@ class ImageCacheService {
    * local filesystem path. This is used as a fallback when Image.prefetch
    * either fails or reports success but no cache path is exposed.
    */
-  private async fallbackDownload(originalUri: string, fetchUri: string): Promise<string | null> {
+  private async fallbackDownload(
+    originalUri: string,
+    fetchUri: string
+  ): Promise<string | null> {
     try {
       const ext = ImageCacheService.extractExt(originalUri || fetchUri);
-      const filename = `image-${ImageCacheService.hashUri(originalUri || fetchUri)}${ext}`;
+      const filename = `image-${ImageCacheService.hashUri(
+        originalUri || fetchUri
+      )}${ext}`;
       const dest = `${FileSystem.cacheDirectory}${filename}`;
-      void logger.debug('ImageCacheService: attempting fallback download.', { originalUri, fetchUri, dest });
+      void logger.debug("ImageCacheService: attempting fallback download.", {
+        originalUri,
+        fetchUri,
+        dest,
+      });
       const download = await FileSystem.downloadAsync(fetchUri, dest);
       // downloadAsync returns an object with status on some platforms
-      if (download && (download.status === 200 || download.status === 0 || download.uri)) {
+      if (
+        download &&
+        (download.status === 200 || download.status === 0 || download.uri)
+      ) {
         // Make sure file exists
         const info = await FileSystem.getInfoAsync(dest);
         if (info.exists && !info.isDirectory) {
@@ -621,7 +779,12 @@ class ImageCacheService {
       if (fetchUri !== originalUri) {
         try {
           const download2 = await FileSystem.downloadAsync(originalUri, dest);
-          if (download2 && (download2.status === 200 || download2.status === 0 || download2.uri)) {
+          if (
+            download2 &&
+            (download2.status === 200 ||
+              download2.status === 0 ||
+              download2.uri)
+          ) {
             const info2 = await FileSystem.getInfoAsync(dest);
             if (info2.exists && !info2.isDirectory) {
               return dest;
@@ -629,11 +792,14 @@ class ImageCacheService {
           }
         } catch (err2) {
           // keep falling through to return null
-          void logger.debug('ImageCacheService: fallback download with originalUri failed.', { originalUri, error: this.stringifyError(err2) });
+          void logger.debug(
+            "ImageCacheService: fallback download with originalUri failed.",
+            { originalUri, error: this.stringifyError(err2) }
+          );
         }
       }
     } catch (downloadError) {
-      void logger.warn('ImageCacheService: fallback download failed.', {
+      void logger.warn("ImageCacheService: fallback download failed.", {
         uri: fetchUri,
         error: this.stringifyError(downloadError),
       });
@@ -650,14 +816,42 @@ class ImageCacheService {
     }
   }
 
+  /**
+   * Increment a named variant stat and persist the stats (best-effort).
+   */
+  private incrementVariantStat(name: string): void {
+    const prev = this.variantStats.get(name) ?? 0;
+    this.variantStats.set(name, prev + 1);
+    // Persist asynchronously (don't await in hot path)
+    void AsyncStorage.setItem(
+      STORAGE_KEY_VARIANT_STATS,
+      JSON.stringify(Object.fromEntries(this.variantStats))
+    ).catch(() => {
+      // ignore persistence failures
+    });
+  }
+
+  /**
+   * Return a snapshot of variant success statistics for telemetry/debugging.
+   */
+  getVariantStats(): Record<string, number> {
+    const out: Record<string, number> = {};
+    this.variantStats.forEach((v, k) => {
+      out[k] = v;
+    });
+    return out;
+  }
+
   // Remove known sensitive query parameters before persisting URIs and when
   // storing tracked URIs so we never save API keys to storage.
   private sanitizeUriForStorage(uri: string): string {
     try {
       const parsed = new URL(uri);
       // Remove apikey and other potentially sensitive params
-      ['apikey', 'token', 'access_token'].forEach((p) => parsed.searchParams.delete(p));
-      parsed.hash = '';
+      ["apikey", "token", "access_token"].forEach((p) =>
+        parsed.searchParams.delete(p)
+      );
+      parsed.hash = "";
       return parsed.toString();
     } catch {
       return uri;
@@ -669,14 +863,14 @@ class ImageCacheService {
       return error.message;
     }
 
-    if (typeof error === 'string') {
+    if (typeof error === "string") {
       return error;
     }
 
     try {
       return JSON.stringify(error);
     } catch {
-      return 'Unknown error';
+      return "Unknown error";
     }
   }
 }

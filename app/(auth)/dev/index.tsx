@@ -10,6 +10,7 @@ import {
   useDialog,
 } from '@/components/common';
 import dialogService from '@/services/dialogService';
+import { imageCacheService } from '@/services/image/ImageCacheService';
 
 const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
 
@@ -27,6 +28,31 @@ const DevComponentsScreen: React.FC = () => {
   }, [router]);
 
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [variantStats, setVariantStats] = useState<Record<string, number> | null>(null);
+
+  // Known labels we collect; show zeros by default for clarity
+  const knownLabels = [
+    'original',
+    'encoded',
+    'decoded',
+    'normalized',
+    'fallback-download-after-prefetch',
+    'fallback-download-prefetch',
+    'fallback-cache-file',
+  ];
+
+  useEffect(() => {
+    // Auto-refresh stats on mount
+    const stats = imageCacheService.getVariantStats();
+    if (stats && Object.keys(stats).length) {
+      setVariantStats(stats);
+    } else {
+      // show zeros for known labels to make UI clearer
+      const zeros: Record<string, number> = {};
+      knownLabels.forEach((l) => { zeros[l] = stats?.[l] ?? 0; });
+      setVariantStats(zeros);
+    }
+  }, []);
 
   // Local direct component toggles
   const [alertVisible, setAlertVisible] = useState(false);
@@ -176,6 +202,40 @@ const DevComponentsScreen: React.FC = () => {
         <Text variant="bodyMedium" style={{ marginTop: 8 }}>
           {lastAction ?? 'No action yet'}
         </Text>
+      </View>
+
+      <Divider />
+
+      <View style={styles.section}>
+        <Text variant="titleMedium">Image cache variant stats</Text>
+        <Text variant="bodyMedium" style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}>
+          These are collected locally in AsyncStorage and indicate which URI variant resolved a cache path.
+        </Text>
+        <View style={{ marginTop: 8 }}>
+          <Button
+            mode="outlined"
+            onPress={() => {
+              const stats = imageCacheService.getVariantStats();
+              // Merge with known labels to ensure visibility of zeros
+              const merged: Record<string, number> = {};
+              knownLabels.forEach((l) => { merged[l] = stats?.[l] ?? 0; });
+              Object.entries(stats || {}).forEach(([k, v]) => { merged[k] = v; });
+              setVariantStats(merged && Object.keys(merged).length ? merged : null);
+            }}
+          >
+            Refresh stats
+          </Button>
+        </View>
+
+        <View style={{ marginTop: 8 }}>
+          {variantStats ? (
+            Object.entries(variantStats).map(([k, v]) => (
+              <Text key={k} variant="bodyMedium">{`${k}: ${v}`}</Text>
+            ))
+          ) : (
+            <Text variant="bodyMedium">No stats yet (press Refresh)</Text>
+          )}
+        </View>
       </View>
 
       {/* Render the direct components so they can be exercised without going through the presenter */}
