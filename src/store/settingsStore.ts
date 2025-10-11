@@ -27,6 +27,7 @@ type SettingsData = {
   criticalHealthAlertsBypassQuietHours: boolean;
   // Remember last selected calendar view (week/day/month/list)
   lastCalendarView: CalendarView;
+  useNativeTabs: boolean;
 };
 
 interface SettingsState extends SettingsData {
@@ -48,6 +49,7 @@ interface SettingsState extends SettingsData {
   setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
   reset: () => void;
   setLastCalendarView: (view: CalendarView) => void;
+  setUseNativeTabs: (enabled: boolean) => void;
 }
 
 const STORAGE_KEY = 'SettingsStore:v1';
@@ -83,6 +85,7 @@ const createDefaultSettings = (): SettingsData => ({
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
   lastCalendarView: 'week',
+  useNativeTabs: false,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -119,6 +122,7 @@ export const useSettingsStore = create<SettingsState>()(
       setCriticalHealthAlertsBypassQuietHours: (enabled) =>
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
   setLastCalendarView: (view: CalendarView) => set({ lastCalendarView: view }),
+  setUseNativeTabs: (enabled: boolean) => set({ useNativeTabs: enabled }),
   reset: () => set(createDefaultSettings()),
     }),
     {
@@ -195,6 +199,7 @@ export const useSettingsStore = create<SettingsState>()(
           criticalHealthAlertsBypassQuietHours:
             partial.criticalHealthAlertsBypassQuietHours ??
             baseDefaults.criticalHealthAlertsBypassQuietHours,
+          useNativeTabs: partial.useNativeTabs ?? baseDefaults.useNativeTabs,
         } satisfies SettingsData;
       },
     },
@@ -228,3 +233,4 @@ export const selectCriticalHealthAlertsBypassQuietHours = (state: SettingsState)
   state.criticalHealthAlertsBypassQuietHours;
 
 export const selectLastCalendarView = (state: SettingsState) => state.lastCalendarView;
+export const selectUseNativeTabs = (state: SettingsState) => state.useNativeTabs;

@@ -61,6 +61,8 @@ const SettingsScreen = () => {
     setRequestNotificationsEnabled,
     setServiceHealthNotificationsEnabled,
     setRefreshIntervalMinutes,
+    useNativeTabs,
+    setUseNativeTabs,
   } = useSettingsStore();
   const [imageCacheUsage, setImageCacheUsage] = useState<ImageCacheUsage>({
     size: 0,
@@ -273,7 +275,7 @@ const SettingsScreen = () => {
         {/* Appearance Section */}
         <AnimatedSection style={styles.section} delay={50}>
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <AnimatedListItem index={0} totalItems={2}>
+          <AnimatedListItem index={0} totalItems={3}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -345,7 +347,7 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
+          <AnimatedListItem index={1} totalItems={3}>
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -372,6 +374,33 @@ const SettingsScreen = () => {
                   icon="chevron-right"
                   size={20}
                   iconColor={theme.colors.outline}
+                />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={2} totalItems={3}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="tab"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Navigation Style</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Use Expo Router native tabs
+                  </Text>
+                  <Text style={styles.settingValue}>
+                    {useNativeTabs ? "Native tabs enabled" : "Custom curved tabs"}
+                  </Text>
+                </View>
+                <Switch
+                  value={useNativeTabs}
+                  onValueChange={setUseNativeTabs}
+                  color={theme.colors.primary}
                 />
               </View>
             </Card>
