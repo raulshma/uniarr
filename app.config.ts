@@ -14,20 +14,48 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: "./assets/splash-icon.png",
     resizeMode: "contain",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#1F1F1F", // Dark theme background
   },
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.uniarr.app",
+    infoPlist: {
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: true,
+      },
+      // Siri Shortcuts Configuration
+      NSSiriUsageDescription: "UniArr uses Siri to help you manage your media library with voice commands.",
+      NSUserActivityTypes: [
+        "com.uniarr.app.search",
+        "com.uniarr.app.services",
+        "com.uniarr.app.downloads",
+        "com.uniarr.app.add",
+        "com.uniarr.app.requests"
+      ],
+    },
+    associatedDomains: [
+      "applinks:uniarr.com"
+    ],
   },
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#ffffff",
+      backgroundColor: "#1F1F1F", // Dark theme background
     },
     package: "com.raulshma.uniarr",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
+    intentFilters: [
+      {
+        action: "VIEW",
+        data: [
+          {
+            scheme: "uniarr",
+          },
+        ],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+    ],
   },
   web: {
     bundler: "metro",
@@ -37,6 +65,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-router",
     "expo-secure-store",
     "expo-notifications",
+    [
+      "expo-build-properties",
+      {
+        android: {
+          usesCleartextTraffic: true,
+        },
+      },
+    ],
     [
       "expo-web-browser",
       {

@@ -4,6 +4,10 @@ import type { AddItemRequest, ConnectionResult, IConnector, SystemHealth } from 
 import type { ServiceConfig } from '@/models/service.types';
 import { handleApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
+import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
+import { testSonarrApi, testRadarrApi, testQBittorrentApi, testJellyseerrApi, testBazarrApi } from '@/utils/api-test.utils';
+import { debugLogger } from '@/utils/debug-logger';
+import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -14,6 +18,7 @@ export abstract class BaseConnector<
   TUpdatePayload = Partial<TResource>,
 > implements IConnector<TResource, TCreatePayload, TUpdatePayload> {
   protected readonly client: AxiosInstance;
+  private isAuthenticated = false;
 
   constructor(public readonly config: ServiceConfig) {
     this.client = this.createHttpClient();
@@ -38,11 +43,77 @@ export abstract class BaseConnector<
   /** Test connectivity to the remote service and return diagnostic information. */
   async testConnection(): Promise<ConnectionResult> {
     const startedAt = Date.now();
+    debugLogger.startConnectionTest(this.config.type, this.config.url);
 
     try {
+      // For VPN connections, we'll be more lenient with network tests
+      // and focus on the actual API endpoint test
+      debugLogger.addStep({
+        id: 'network-test-start',
+        title: 'Testing Network Connectivity',
+        status: 'running',
+        message: `Testing connection to ${this.config.url}`,
+      });
+      
+      // Test basic network connectivity with increased timeout for VPN
+      const networkTimeout = this.config.timeout ?? 15000; // Increased timeout for VPN
+      const networkTest = await testNetworkConnectivity(this.config.url, networkTimeout);
+      
+      if (!networkTest.success) {
+        // For VPN connections, don't fail immediately on network test
+        // Instead, log the issue and continue with API test
+        const vpnIssues = diagnoseVpnIssues({ code: 'ERR_NETWORK', message: networkTest.error }, this.config.type);
+        debugLogger.addWarning(
+          `Network test failed but continuing with API test: ${networkTest.error}`,
+          vpnIssues.join('\n')
+        );
+        
+        // Don't return early - continue with API test
+      } else {
+        debugLogger.addNetworkTest(true);
+      }
+      
+      // Test API endpoint using the new authentication system
+      debugLogger.addStep({
+        id: 'api-test-start',
+        title: 'Testing API Authentication',
+        status: 'running',
+        message: `Testing ${this.config.type} API endpoint`,
+      });
+      
+      try {
+        await this.ensureAuthenticated();
+        debugLogger.addSuccess('API authentication successful');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
+        const vpnIssues = diagnoseVpnIssues({ 
+          code: 'AUTH_ERROR', 
+          message: errorMessage 
+        }, this.config.type);
+        
+        debugLogger.addError(`API authentication failed: ${errorMessage}`, 
+          `VPN Issues:\n${vpnIssues.join('\n')}`);
+        
+        return {
+          success: false,
+          message: `API authentication failed: ${errorMessage}. ${vpnIssues.join(' ')}`,
+          latency: Date.now() - startedAt,
+        };
+      }
+      
+      // Test service initialization
+      debugLogger.addStep({
+        id: 'service-test-start',
+        title: 'Testing Service Connection',
+        status: 'running',
+        message: `Initializing ${this.config.type} service`,
+      });
+      
       await this.initialize();
       const version = await this.getVersion();
       const latency = Date.now() - startedAt;
+      
+      debugLogger.addServiceTest(this.config.type, true, version);
 
       return {
         success: true,
@@ -51,11 +122,19 @@ export abstract class BaseConnector<
         version,
       };
     } catch (error) {
+      // Diagnose VPN-specific issues
+      const vpnIssues = diagnoseVpnIssues(error, this.config.type);
+      
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: 'testConnection',
       });
+
+      debugLogger.addError(
+        `Service test failed: ${diagnostic.message}`,
+        vpnIssues.length > 0 ? `VPN Issues:\n${vpnIssues.join('\n')}` : undefined
+      );
 
       void logger.error('Connector test failed.', {
         serviceId: this.config.id,
@@ -63,11 +142,12 @@ export abstract class BaseConnector<
         message: diagnostic.message,
         statusCode: diagnostic.statusCode,
         code: diagnostic.code,
+        vpnIssues,
       });
 
       return {
         success: false,
-        message: diagnostic.message,
+        message: `${diagnostic.message}${vpnIssues.length > 0 ? ` ${vpnIssues.join(' ')}` : ''}`,
         latency: Date.now() - startedAt,
       };
     }
@@ -108,6 +188,7 @@ export abstract class BaseConnector<
       baseURL: this.config.url,
       timeout: this.config.timeout ?? 30_000,
       headers: this.getDefaultHeaders(),
+      ...this.getAuthConfig(),
     });
 
     instance.interceptors.request.use(
@@ -117,11 +198,15 @@ export abstract class BaseConnector<
           serviceType: this.config.type,
           method: requestConfig.method?.toUpperCase(),
           url: requestConfig.url,
+          fullUrl: `${this.config.url}${requestConfig.url}`,
+          headers: requestConfig.headers,
+          timeout: requestConfig.timeout,
         });
 
         return requestConfig;
       },
       (error) => {
+        void logger.error('Connector request setup error.', { serviceId: this.config.id, error });
         this.logRequestError(error);
         return Promise.reject(error);
       },
@@ -134,11 +219,24 @@ export abstract class BaseConnector<
           serviceType: this.config.type,
           status: response.status,
           url: response.config.url,
+          statusText: response.statusText,
+          headers: response.headers,
+          dataType: typeof response.data,
+          dataLength: response.data ? JSON.stringify(response.data).length : 0,
         });
 
         return response;
       },
       (error) => {
+        void logger.error('Connector response error.', {
+          serviceId: this.config.id,
+          message: error?.message,
+          code: error?.code,
+          status: error?.response?.status,
+          statusText: error?.response?.statusText,
+          url: error?.config?.url,
+        });
+
         this.handleHttpError(error);
         return Promise.reject(error);
       },
@@ -161,6 +259,63 @@ export abstract class BaseConnector<
     }
 
     return headers;
+  }
+
+  /**
+   * Ensure the service is authenticated before making requests
+   */
+  protected async ensureAuthenticated(): Promise<void> {
+    if (this.isAuthenticated) {
+      return;
+    }
+
+    try {
+      const result = await ServiceAuthHelper.authenticateService(this.config);
+      
+      if (!result.success || !result.authenticated) {
+        throw new Error(result.error || 'Authentication failed');
+      }
+
+      this.isAuthenticated = true;
+      
+      void logger.debug('Service authenticated successfully.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+      });
+    } catch (error) {
+      this.isAuthenticated = false;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
+      
+      void logger.error('Service authentication failed.', {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        error: errorMessage,
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get authentication configuration for the HTTP client.
+   * This method now uses the centralized authentication system.
+   */
+  protected getAuthConfig(): { auth?: { username: string; password: string } } {
+    // For services that use basic auth (qBittorrent, Transmission, Deluge), we still need to provide credentials to axios
+    if ((this.config.type === 'qbittorrent' || this.config.type === 'transmission' || this.config.type === 'deluge')
+        && this.config.username && this.config.password) {
+      return {
+        auth: {
+          username: this.config.username,
+          password: this.config.password,
+        },
+      };
+    }
+
+    // For session-based auth (qBittorrent), we don't need to set auth here
+    // as the session is managed through cookies
+    // For API key auth (Sonarr/Radarr/Jellyseerr/SABnzbd), the API key is handled in getDefaultHeaders()
+    return {};
   }
 
   /** Log and surface Axios errors that occur during the request lifecycle. */

@@ -52,7 +52,6 @@ jest.mock('@/services/storage/SecureStorage', () => ({
 }));
 
 // Mock connector implementations
-// @ts-ignore - Jest mock typing issues
 jest.mock('@/connectors/implementations/SonarrConnector', () => ({
   SonarrConnector: jest.fn().mockImplementation(() => ({
     testConnection: jest.fn().mockResolvedValue({

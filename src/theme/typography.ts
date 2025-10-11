@@ -6,6 +6,8 @@ export type TypographyStyle = {
   lineHeight: number;
 };
 
+export type FontScale = 'small' | 'medium' | 'large' | 'extra-large';
+
 export type TypographyScale = {
   displayLarge: TypographyStyle;
   displayMedium: TypographyStyle;
@@ -22,6 +24,128 @@ export type TypographyScale = {
   bodyLarge: TypographyStyle;
   bodyMedium: TypographyStyle;
   bodySmall: TypographyStyle;
+};
+
+/**
+ * Generate typography scale with font scaling
+ */
+export const generateTypographyScale = (fontScale: FontScale = 'medium'): TypographyScale => {
+  const scaleFactors = {
+    small: 0.85,
+    medium: 1.0,
+    large: 1.15,
+    'extra-large': 1.3,
+  };
+
+  const scale = scaleFactors[fontScale];
+
+  return {
+    displayLarge: {
+      fontFamily,
+      letterSpacing: 0,
+      lineHeight: Math.round(64 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(57 * scale),
+    },
+    displayMedium: {
+      fontFamily,
+      letterSpacing: 0,
+      lineHeight: Math.round(52 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(45 * scale),
+    },
+    displaySmall: {
+      fontFamily,
+      letterSpacing: 0,
+      lineHeight: Math.round(44 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(36 * scale),
+    },
+    headlineLarge: {
+      fontFamily,
+      letterSpacing: 0,
+      lineHeight: Math.round(40 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(32 * scale),
+    },
+    headlineMedium: {
+      fontFamily,
+      letterSpacing: 0,
+      lineHeight: Math.round(36 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(28 * scale),
+    },
+    headlineSmall: {
+      fontFamily,
+      letterSpacing: 0,
+      lineHeight: Math.round(32 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(24 * scale),
+    },
+    titleLarge: {
+      fontFamily,
+      letterSpacing: 0,
+      lineHeight: Math.round(28 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(22 * scale),
+    },
+    titleMedium: {
+      fontFamily,
+      letterSpacing: 0.15,
+      lineHeight: Math.round(24 * scale),
+      fontWeight: '500',
+      fontSize: Math.round(16 * scale),
+    },
+    titleSmall: {
+      fontFamily,
+      letterSpacing: 0.1,
+      lineHeight: Math.round(20 * scale),
+      fontWeight: '500',
+      fontSize: Math.round(14 * scale),
+    },
+    labelLarge: {
+      fontFamily,
+      letterSpacing: 0.1,
+      lineHeight: Math.round(20 * scale),
+      fontWeight: '500',
+      fontSize: Math.round(14 * scale),
+    },
+    labelMedium: {
+      fontFamily,
+      letterSpacing: 0.5,
+      lineHeight: Math.round(16 * scale),
+      fontWeight: '500',
+      fontSize: Math.round(12 * scale),
+    },
+    labelSmall: {
+      fontFamily,
+      letterSpacing: 0.5,
+      lineHeight: Math.round(16 * scale),
+      fontWeight: '500',
+      fontSize: Math.round(11 * scale),
+    },
+    bodyLarge: {
+      fontFamily,
+      letterSpacing: 0.5,
+      lineHeight: Math.round(24 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(16 * scale),
+    },
+    bodyMedium: {
+      fontFamily,
+      letterSpacing: 0.25,
+      lineHeight: Math.round(20 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(14 * scale),
+    },
+    bodySmall: {
+      fontFamily,
+      letterSpacing: 0.4,
+      lineHeight: Math.round(16 * scale),
+      fontWeight: '400',
+      fontSize: Math.round(12 * scale),
+    },
+  };
 };
 
 const fontFamily = 'System';

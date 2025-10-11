@@ -9,8 +9,9 @@ import {
 
 import type { AddMovieRequest, Movie } from '@/models/movie.types';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
+import { IConnector } from '@/connectors/base/IConnector';
 
 interface UseRadarrMoviesResult {
   movies: Movie[] | undefined;
@@ -28,10 +29,10 @@ interface UseRadarrMoviesResult {
 const RADARR_SERVICE_TYPE = 'radarr';
 
 const ensureRadarrConnector = (
-  manager: ConnectorManager,
+  getConnector: (id: string) => IConnector | undefined,
   serviceId: string,
 ): RadarrConnector => {
-  const connector = manager.getConnector(serviceId);
+  const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== RADARR_SERVICE_TYPE) {
     throw new Error(`Radarr connector not registered for service ${serviceId}.`);
   }
@@ -41,10 +42,11 @@ const ensureRadarrConnector = (
 
 export const useRadarrMovies = (serviceId: string): UseRadarrMoviesResult => {
   const queryClient = useQueryClient();
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
-  const hasConnector = manager.getConnector(serviceId)?.config.type === RADARR_SERVICE_TYPE;
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId);
+  const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureRadarrConnector(manager, serviceId), [manager, serviceId]);
+  const resolveConnector = useCallback(() => ensureRadarrConnector(getConnector, serviceId), [getConnector, serviceId]);
 
   const moviesQuery = useQuery({
     queryKey: queryKeys.radarr.moviesList(serviceId),

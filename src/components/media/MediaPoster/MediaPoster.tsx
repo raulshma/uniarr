@@ -32,13 +32,16 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   uri,
   size = 'medium',
   aspectRatio = DEFAULT_ASPECT_RATIO,
-  borderRadius = DEFAULT_RADIUS,
+  borderRadius,
   style,
   onPress,
   accessibilityLabel,
   showPlaceholderLabel = false,
 }) => {
   const theme = useTheme<AppTheme>();
+
+  // Use theme's poster style configuration if borderRadius is not explicitly provided
+  const effectiveBorderRadius = borderRadius ?? theme.custom.config?.posterStyle.borderRadius ?? DEFAULT_RADIUS;
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
@@ -94,18 +97,33 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       {
         width,
         height,
-        borderRadius,
+        borderRadius: effectiveBorderRadius,
         backgroundColor: theme.colors.surfaceVariant,
+        // Apply shadow styling from theme configuration
+        shadowColor: theme.colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.3,
+        shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
+        elevation: 5,
       },
       style,
     ] as StyleProp<ViewStyle>,
-    [width, height, borderRadius, style, theme.colors.surfaceVariant],
+    [
+      width,
+      height,
+      effectiveBorderRadius,
+      style,
+      theme.colors.surfaceVariant,
+      theme.colors.shadow,
+      theme.custom.config?.posterStyle.shadowOpacity,
+      theme.custom.config?.posterStyle.shadowRadius,
+    ],
   );
 
   const isFallback = hasError || !resolvedUri;
 
   const content = isFallback ? (
-    <View style={[styles.fallback, { borderRadius }]}>
+    <View style={[styles.fallback, { borderRadius: effectiveBorderRadius }]}>
       <Icon source="image-off-outline" size={32} color={theme.colors.onSurfaceVariant} />
       {showPlaceholderLabel ? (
         <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
@@ -116,7 +134,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   ) : (
     <Image
       source={{ uri: resolvedUri }}
-      style={[StyleSheet.absoluteFillObject, { borderRadius }]}
+      style={[StyleSheet.absoluteFillObject, { borderRadius: effectiveBorderRadius }]}
       accessibilityLabel={accessibilityLabel}
       cachePolicy="memory-disk"
       contentFit="cover"

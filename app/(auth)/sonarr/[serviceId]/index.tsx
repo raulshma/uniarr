@@ -1,8 +1,9 @@
-import { FlashList } from '@shopify/flash-list';
-import { useFocusEffect } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlashList } from "@shopify/flash-list";
+import { useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   Icon,
   IconButton,
@@ -11,41 +12,66 @@ import {
   Text,
   TouchableRipple,
   useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  FadingTransition,
+  Layout,
+  LinearTransition,
+} from "react-native-reanimated";
 
-import { EmptyState } from '@/components/common/EmptyState';
-import { ListRefreshControl } from '@/components/common/ListRefreshControl';
-import { MediaPoster } from '@/components/media/MediaPoster';
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
-import { SeriesListItemSkeleton } from '@/components/media/skeletons';
-import type { AppTheme } from '@/constants/theme';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import { useSonarrSeries } from '@/hooks/useSonarrSeries';
-import type { Series } from '@/models/media.types';
-import { logger } from '@/services/logger/LoggerService';
-import { spacing } from '@/theme/spacing';
+import { EmptyState } from "@/components/common/EmptyState";
+import { ListRefreshControl } from "@/components/common/ListRefreshControl";
+import { MediaPoster } from "@/components/media/MediaPoster";
+import MediaEditor, { type MediaItem } from "@/components/media/MediaEditor";
+import {
+  MediaSelectorProvider,
+  MediaSelectorActions,
+  MediaSelectableItem,
+  type SelectableMediaItem,
+} from "@/components/media/MediaSelector";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { SeriesListItemSkeleton } from "@/components/media/skeletons";
+import type { AppTheme } from "@/constants/theme";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { useSonarrSeries } from "@/hooks/useSonarrSeries";
+import type { Series } from "@/models/media.types";
+import { logger } from "@/services/logger/LoggerService";
+import { spacing } from "@/theme/spacing";
 
-const FILTER_ALL = 'all';
-const FILTER_MONITORED = 'monitored';
-const FILTER_UNMONITORED = 'unmonitored';
+const FILTER_ALL = "all";
+const FILTER_MONITORED = "monitored";
+const FILTER_UNMONITORED = "unmonitored";
 
-type FilterValue = typeof FILTER_ALL | typeof FILTER_MONITORED | typeof FILTER_UNMONITORED;
+type FilterValue =
+  | typeof FILTER_ALL
+  | typeof FILTER_MONITORED
+  | typeof FILTER_UNMONITORED;
 
-const FILTER_OPTIONS: FilterValue[] = [FILTER_ALL, FILTER_MONITORED, FILTER_UNMONITORED];
+const FILTER_OPTIONS: FilterValue[] = [
+  FILTER_ALL,
+  FILTER_MONITORED,
+  FILTER_UNMONITORED,
+];
 
 const FILTER_LABELS: Record<FilterValue, string> = {
-  [FILTER_ALL]: 'All Statuses',
-  [FILTER_MONITORED]: 'Monitored',
-  [FILTER_UNMONITORED]: 'Unmonitored',
+  [FILTER_ALL]: "All Statuses",
+  [FILTER_MONITORED]: "Monitored",
+  [FILTER_UNMONITORED]: "Unmonitored",
 };
 
-const normalizeSearchTerm = (input: string): string => input.trim().toLowerCase();
+const normalizeSearchTerm = (input: string): string =>
+  input.trim().toLowerCase();
 
 const SonarrSeriesListScreen = () => {
-  const { serviceId: rawServiceId } = useLocalSearchParams<{ serviceId?: string }>();
-  const serviceId = typeof rawServiceId === 'string' ? rawServiceId : '';
+  const { serviceId: rawServiceId } = useLocalSearchParams<{
+    serviceId?: string;
+  }>();
+  const serviceId = typeof rawServiceId === "string" ? rawServiceId : "";
   const hasValidServiceId = serviceId.length > 0;
 
   const router = useRouter();
@@ -53,12 +79,15 @@ const SonarrSeriesListScreen = () => {
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterValue, setFilterValue] = useState<FilterValue>(FILTER_ALL);
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
+  const [editingItem, setEditingItem] = useState<Series | null>(null);
+  const [isEditorVisible, setIsEditorVisible] = useState(false);
 
-  const { series, isLoading, isFetching, isError, error, refetch } = useSonarrSeries(serviceId);
+  const { series, isLoading, isFetching, isError, error, refetch } =
+    useSonarrSeries(serviceId);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -85,10 +114,12 @@ const SonarrSeriesListScreen = () => {
         }
       } catch (bootstrapError) {
         const message =
-          bootstrapError instanceof Error ? bootstrapError.message : 'Unknown connector bootstrap error.';
+          bootstrapError instanceof Error
+            ? bootstrapError.message
+            : "Unknown connector bootstrap error.";
 
-        void logger.warn('Failed to preload Sonarr connector.', {
-          location: 'SonarrSeriesListScreen.bootstrap',
+        void logger.warn("Failed to preload Sonarr connector.", {
+          location: "SonarrSeriesListScreen.bootstrap",
           serviceId,
           message,
         });
@@ -113,11 +144,13 @@ const SonarrSeriesListScreen = () => {
       }
 
       void refetch();
-    }, [hasValidServiceId, refetch]),
+    }, [hasValidServiceId, refetch])
   );
 
-  const connector = hasValidServiceId ? manager.getConnector(serviceId) : undefined;
-  const connectorIsSonarr = connector?.config.type === 'sonarr';
+  const connector = hasValidServiceId
+    ? manager.getConnector(serviceId)
+    : undefined;
+  const connectorIsSonarr = connector?.config.type === "sonarr";
 
   const isRefreshing = isFetching && !isLoading;
   const isInitialLoad = isBootstrapping || isLoading;
@@ -168,9 +201,9 @@ const SonarrSeriesListScreen = () => {
           paddingBottom: spacing.lg,
         },
         topBar: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: spacing.lg,
         },
         topBarSpacer: {
@@ -178,7 +211,7 @@ const SonarrSeriesListScreen = () => {
         },
         topBarTitle: {
           flex: 1,
-          textAlign: 'center',
+          textAlign: "center",
           color: theme.colors.onBackground,
         },
         topBarAction: {
@@ -193,14 +226,14 @@ const SonarrSeriesListScreen = () => {
           color: theme.colors.onSurface,
         },
         filterRow: {
-          flexDirection: 'row',
+          flexDirection: "row",
           marginBottom: spacing.lg,
         },
         filterButton: {
           flex: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           borderRadius: 16,
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.sm,
@@ -210,8 +243,8 @@ const SonarrSeriesListScreen = () => {
           color: theme.colors.onSurface,
         },
         filterButtonContent: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
         },
         filterButtonIcon: {
           marginLeft: spacing.xs,
@@ -227,7 +260,7 @@ const SonarrSeriesListScreen = () => {
           height: spacing.md,
         },
         seriesCard: {
-          flexDirection: 'row',
+          flexDirection: "row",
           padding: spacing.md,
           borderRadius: 18,
         },
@@ -239,7 +272,7 @@ const SonarrSeriesListScreen = () => {
         },
         seriesMeta: {
           flex: 1,
-          justifyContent: 'center',
+          justifyContent: "center",
         },
         seriesTitle: {
           color: theme.colors.onSurface,
@@ -252,52 +285,80 @@ const SonarrSeriesListScreen = () => {
         progressTrack: {
           height: 6,
           borderRadius: 999,
-          overflow: 'hidden',
+          overflow: "hidden",
           backgroundColor: theme.colors.surfaceVariant,
           marginBottom: spacing.xs,
         },
         progressFill: {
-          height: '100%',
+          height: "100%",
           backgroundColor: theme.colors.primary,
         },
         episodesMeta: {
           color: theme.colors.onSurfaceVariant,
         },
       }),
-    [theme],
+    [theme]
   );
 
   const handleSeriesPress = useCallback(
-    (item: Series) => {
+    (item: SelectableMediaItem) => {
       if (!hasValidServiceId) {
         return;
       }
 
       router.push({
-        pathname: '/(auth)/sonarr/[serviceId]/series/[id]',
+        pathname: "/(auth)/sonarr/[serviceId]/series/[id]",
         params: {
           serviceId,
           id: item.id.toString(),
         },
       });
     },
-    [hasValidServiceId, router, serviceId],
+    [hasValidServiceId, router, serviceId]
   );
 
   const handleAddSeries = useCallback(() => {
     if (!hasValidServiceId) {
-      Alert.alert('Invalid service', 'The selected service identifier is not valid.');
+  alert(
+        "Invalid service",
+        "The selected service identifier is not valid."
+      );
       return;
     }
 
     router.push({
-      pathname: '/(auth)/sonarr/[serviceId]/add',
+      pathname: "/(auth)/sonarr/[serviceId]/add",
       params: { serviceId },
     });
   }, [hasValidServiceId, router, serviceId]);
 
+  const handleEditSeries = useCallback((item: Series) => {
+    setEditingItem(item);
+    setIsEditorVisible(true);
+  }, []);
+
+  const handleEditorDismiss = useCallback(() => {
+    setIsEditorVisible(false);
+    setEditingItem(null);
+  }, []);
+
+  const handleEditorSave = useCallback(
+    async (updatedItem: MediaItem) => {
+      // The updated item is already saved via the connector in MediaEditor
+      await refetch();
+    },
+    [refetch]
+  );
+
+  const handleSeriesLongPress = useCallback(
+    (item: SelectableMediaItem) => {
+      handleEditSeries(item as Series);
+    },
+    [handleEditSeries]
+  );
+
   const handleClearFilters = useCallback(() => {
-    setSearchTerm('');
+    setSearchTerm("");
     setFilterValue(FILTER_ALL);
     setStatusMenuVisible(false);
   }, []);
@@ -309,59 +370,84 @@ const SonarrSeriesListScreen = () => {
 
   const renderSeriesItem = useCallback(
     ({ item, index }: { item: Series; index: number }) => {
-      const totalEpisodes = item.episodeCount ?? item.statistics?.episodeCount ?? 0;
-      const availableEpisodes = item.episodeFileCount ?? item.statistics?.episodeFileCount ?? 0;
-      const progress = totalEpisodes > 0 ? Math.min(availableEpisodes / totalEpisodes, 1) : 0;
+      const totalEpisodes =
+        item.episodeCount ?? item.statistics?.episodeCount ?? 0;
+      const availableEpisodes =
+        item.episodeFileCount ?? item.statistics?.episodeFileCount ?? 0;
+      const progress =
+        totalEpisodes > 0 ? Math.min(availableEpisodes / totalEpisodes, 1) : 0;
 
       return (
         <Animated.View
-          entering={FadeInUp.delay(index * 50).springify()}
           exiting={FadeOut.springify()}
-          layout={Layout.springify()}
+          entering={FadeInUp.delay(index * 50).springify()}
+          layout={FadingTransition.build()}
         >
-          <Pressable
-            onPress={() => handleSeriesPress(item)}
-            style={({ pressed }) => [styles.seriesCard, pressed && styles.seriesCardPressed]}
+          <MediaSelectableItem
+            item={item}
+            onPress={handleSeriesPress}
+            onLongPress={handleSeriesLongPress}
+            onPressSeries={handleSeriesPress}
           >
-            <MediaPoster
-              uri={item.posterUrl}
-              size={96}
-              borderRadius={16}
-              style={styles.seriesPoster}
-            />
-            <View style={styles.seriesMeta}>
-              <Text variant="titleMedium" numberOfLines={1} style={styles.seriesTitle}>
-                {item.title}
-              </Text>
-              <Text variant="bodyMedium" numberOfLines={1} style={styles.seriesStatus}>
-                {item.status ?? 'Status unavailable'}
-              </Text>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.seriesCard,
+                pressed && styles.seriesCardPressed,
+              ]}
+            >
+              <MediaPoster
+                uri={item.posterUrl}
+                size={96}
+                borderRadius={16}
+                style={styles.seriesPoster}
+              />
+              <View style={styles.seriesMeta}>
+                <Text
+                  variant="titleMedium"
+                  numberOfLines={1}
+                  style={styles.seriesTitle}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  variant="bodyMedium"
+                  numberOfLines={1}
+                  style={styles.seriesStatus}
+                >
+                  {item.status ?? "Status unavailable"}
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.round(progress * 100)}%` },
+                    ]}
+                  />
+                </View>
+                <Text variant="bodySmall" style={styles.episodesMeta}>
+                  {totalEpisodes > 0
+                    ? `${availableEpisodes} / ${totalEpisodes} episodes`
+                    : "Episodes unavailable"}
+                </Text>
               </View>
-              <Text variant="bodySmall" style={styles.episodesMeta}>
-                {totalEpisodes > 0
-                  ? `${availableEpisodes} / ${totalEpisodes} episodes`
-                  : 'Episodes unavailable'}
-              </Text>
-            </View>
-          </Pressable>
+            </Pressable>
+          </MediaSelectableItem>
         </Animated.View>
       );
     },
-    [handleSeriesPress, styles],
+    [handleSeriesPress, handleSeriesLongPress, styles]
   );
 
   const keyExtractor = useCallback((item: Series) => item.id.toString(), []);
 
   const listHeader = useMemo(
     () => (
-      <Animated.View 
+      <Animated.View
         style={styles.listHeader}
         entering={FadeInDown.springify()}
         layout={Layout.springify()}
       >
-        <Animated.View 
+        <Animated.View
           style={styles.topBar}
           entering={FadeInDown.delay(100).springify()}
           layout={Layout.springify()}
@@ -414,7 +500,11 @@ const SonarrSeriesListScreen = () => {
                       {FILTER_LABELS[filterValue]}
                     </Text>
                     <View style={styles.filterButtonIcon}>
-                      <Icon source="chevron-down" size={20} color={theme.colors.onSurfaceVariant} />
+                      <Icon
+                        source="chevron-down"
+                        size={20}
+                        color={theme.colors.onSurfaceVariant}
+                      />
                     </View>
                   </View>
                 </TouchableRipple>
@@ -425,7 +515,7 @@ const SonarrSeriesListScreen = () => {
                   key={value}
                   title={FILTER_LABELS[value]}
                   onPress={() => handleStatusChange(value)}
-                  trailingIcon={filterValue === value ? 'check' : undefined}
+                  trailingIcon={filterValue === value ? "check" : undefined}
                 />
               ))}
             </Menu>
@@ -433,7 +523,15 @@ const SonarrSeriesListScreen = () => {
         </Animated.View>
       </Animated.View>
     ),
-    [filterValue, handleAddSeries, handleStatusChange, searchTerm, statusMenuVisible, styles, theme],
+    [
+      filterValue,
+      handleAddSeries,
+      handleStatusChange,
+      searchTerm,
+      statusMenuVisible,
+      styles,
+      theme,
+    ]
   );
 
   const listEmptyComponent = useMemo(() => {
@@ -464,7 +562,9 @@ const SonarrSeriesListScreen = () => {
 
   if (!hasValidServiceId) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="Missing service identifier"
           description="Return to the dashboard and select a Sonarr service before continuing."
@@ -492,7 +592,12 @@ const SonarrSeriesListScreen = () => {
               <SkeletonPlaceholder width="40%" height={28} borderRadius={10} />
               <SkeletonPlaceholder width={44} height={44} borderRadius={22} />
             </View>
-            <SkeletonPlaceholder width="100%" height={48} borderRadius={24} style={{ marginBottom: spacing.md }} />
+            <SkeletonPlaceholder
+              width="100%"
+              height={48}
+              borderRadius={24}
+              style={{ marginBottom: spacing.md }}
+            />
             <SkeletonPlaceholder width="55%" height={36} borderRadius={18} />
           </View>
           {Array.from({ length: 6 }).map((_, index) => (
@@ -507,7 +612,9 @@ const SonarrSeriesListScreen = () => {
 
   if (!connector || !connectorIsSonarr) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="Sonarr connector unavailable"
           description="Verify the service configuration in settings and try again."
@@ -519,10 +626,15 @@ const SonarrSeriesListScreen = () => {
   }
 
   if (isError) {
-    const message = error instanceof Error ? error.message : 'Unable to load series from Sonarr.';
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to load series from Sonarr.";
 
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="Failed to load series"
           description={message}
@@ -534,29 +646,41 @@ const SonarrSeriesListScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Animated.View 
-        style={{ flex: 1 }}
-        entering={FadeIn.delay(100).springify()}
-        layout={Layout.springify()}
-      >
-        <FlashList
-          data={filteredSeries}
-          keyExtractor={keyExtractor}
-          renderItem={renderSeriesItem}
-          ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
-          contentContainerStyle={styles.listContent}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
-          refreshControl={
-            <ListRefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => refetch()}
-            />
-          }
+    <MediaSelectorProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <Animated.View
+          style={{ flex: 1 }}
+          entering={FadeIn.delay(100).springify()}
+          layout={Layout.springify()}
+        >
+          <FlashList
+            data={filteredSeries}
+            keyExtractor={keyExtractor}
+            renderItem={renderSeriesItem}
+            ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
+            contentContainerStyle={styles.listContent}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>{listEmptyComponent}</View>
+            }
+            refreshControl={
+              <ListRefreshControl
+                refreshing={isRefreshing}
+                onRefresh={() => refetch()}
+              />
+            }
+          />
+        </Animated.View>
+        <MediaSelectorActions serviceId={serviceId} onRefresh={refetch} />
+        <MediaEditor
+          visible={isEditorVisible}
+          mediaItem={editingItem}
+          onDismiss={handleEditorDismiss}
+          onSave={handleEditorSave}
+          serviceId={serviceId}
         />
-      </Animated.View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </MediaSelectorProvider>
   );
 };
 

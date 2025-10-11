@@ -5,7 +5,9 @@ import type { Series } from '@/models/media.types';
 import type { Movie } from '@/models/movie.types';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import type { IConnector } from '@/connectors/base/IConnector';
+import type { ServiceType } from '@/models/service.types';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 
 export type RecentlyAddedItem = {
@@ -23,12 +25,10 @@ export type RecentlyAddedOverview = {
   total: number;
 };
 
-const fetchRecentlyAdded = async (): Promise<RecentlyAddedOverview> => {
-  const manager = ConnectorManager.getInstance();
-  await manager.loadSavedServices();
+const fetchRecentlyAdded = async (getConnectorsByType: (type: ServiceType) => IConnector[]): Promise<RecentlyAddedOverview> => {
 
-  const sonarrConnectors = manager.getConnectorsByType('sonarr') as SonarrConnector[];
-  const radarrConnectors = manager.getConnectorsByType('radarr') as RadarrConnector[];
+  const sonarrConnectors = getConnectorsByType('sonarr') as SonarrConnector[];
+  const radarrConnectors = getConnectorsByType('radarr') as RadarrConnector[];
 
   const recentlyAddedItems: RecentlyAddedItem[] = [];
 
@@ -100,6 +100,7 @@ const fetchRecentlyAdded = async (): Promise<RecentlyAddedOverview> => {
 };
 
 export const useRecentlyAdded = () => {
+  const { getConnectorsByType } = useConnectorsStore();
   const {
     data,
     isLoading,
@@ -109,7 +110,7 @@ export const useRecentlyAdded = () => {
     refetch,
   } = useQuery({
     queryKey: queryKeys.activity.recentlyAdded,
-    queryFn: fetchRecentlyAdded,
+    queryFn: () => fetchRecentlyAdded(getConnectorsByType),
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
     staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
     refetchOnWindowFocus: false,

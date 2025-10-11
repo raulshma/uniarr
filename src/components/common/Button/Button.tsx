@@ -13,6 +13,7 @@ type PaperButtonRef = React.ComponentRef<typeof PaperButton>;
 
 export type ButtonProps = PaperButtonProps & {
   fullWidth?: boolean;
+  align?: 'left' | 'center' | 'right';
 };
 
 const Button = forwardRef<PaperButtonRef, ButtonProps>(
@@ -23,6 +24,7 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
       contentStyle,
       labelStyle,
       fullWidth = false,
+      align = 'center',
       loading = false,
       disabled = false,
       mode = 'contained',
@@ -56,13 +58,30 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
 
     const isDisabled = disabled || loading;
 
+    const getAlignmentStyle = () => {
+      switch (align) {
+        case 'left':
+          return styles.alignLeft;
+        case 'center':
+          return styles.alignCenter;
+        case 'right':
+          return styles.alignRight;
+        default:
+          return styles.alignCenter;
+      }
+    };
+
     return (
       <PaperButton
         ref={ref}
         mode={mode}
         loading={loading}
         disabled={isDisabled}
-        style={[styles.base, fullWidth ? styles.fullWidth : undefined, style]}
+        style={[
+          styles.base,
+          fullWidth ? styles.fullWidth : getAlignmentStyle(),
+          style
+        ]}
         contentStyle={combinedContentStyle}
         labelStyle={combinedLabelStyle}
         accessibilityRole="button"
@@ -82,10 +101,18 @@ export default Button;
 const styles = StyleSheet.create({
   base: {
     borderRadius: 999,
-    alignSelf: 'flex-start',
   },
   fullWidth: {
     alignSelf: 'stretch',
+  },
+  alignLeft: {
+    alignSelf: 'flex-start',
+  },
+  alignCenter: {
+    alignSelf: 'center',
+  },
+  alignRight: {
+    alignSelf: 'flex-end',
   },
   baseContent: {
     height: 48,

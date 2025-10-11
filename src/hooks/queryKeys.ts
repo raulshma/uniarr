@@ -81,10 +81,58 @@ export const queryKeys = {
       'requests',
       requestId,
     ] as const,
+    mediaDetail: (serviceId: string, mediaType: 'movie' | 'tv', mediaId: number): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'media',
+      mediaType,
+      mediaId,
+    ] as const,
+    /**
+     * Credits for a media item (cast/crew) keyed by service, media type and id.
+     */
+    mediaCredits: (serviceId: string, mediaType: 'movie' | 'tv', mediaId: number): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'mediaCredits',
+      mediaType,
+      mediaId,
+    ] as const,
     search: (serviceId: string, term: string, params?: Record<string, unknown>): QueryKeyBuilder => [
       ...queryKeys.jellyseerr.service(serviceId),
       'search',
       { term, params },
+    ] as const,
+  },
+  jellyfin: {
+    base: ['jellyfin'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['jellyfin', serviceId] as const,
+    libraries: (serviceId: string): QueryKeyBuilder => [...queryKeys.jellyfin.service(serviceId), 'libraries'] as const,
+    resume: (serviceId: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'resume',
+      options ?? {},
+    ] as const,
+    latest: (serviceId: string, libraryId: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'latest',
+      libraryId,
+      options ?? {},
+    ] as const,
+    libraryItems: (serviceId: string, libraryId: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'libraryItems',
+      libraryId,
+      options ?? {},
+    ] as const,
+    item: (serviceId: string, itemId: string): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'item',
+      itemId,
+    ] as const,
+    nowPlaying: (serviceId: string): QueryKeyBuilder => [...queryKeys.jellyfin.service(serviceId), 'nowPlaying'] as const,
+    search: (serviceId: string, term: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.jellyfin.service(serviceId),
+      'search',
+      { term, options },
     ] as const,
   },
   qbittorrent: {
@@ -96,6 +144,75 @@ export const queryKeys = {
       filters ?? {},
     ] as const,
     transferInfo: (serviceId: string): QueryKeyBuilder => [...queryKeys.qbittorrent.service(serviceId), 'transferInfo'] as const,
+  },
+  transmission: {
+    base: ['transmission'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['transmission', serviceId] as const,
+    torrents: (serviceId: string, filters?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.transmission.service(serviceId),
+      'torrents',
+      filters ?? {},
+    ] as const,
+    transferInfo: (serviceId: string): QueryKeyBuilder => [...queryKeys.transmission.service(serviceId), 'transferInfo'] as const,
+  },
+  calendar: {
+    base: ['calendar'] as const,
+    releases: (currentDate: string, filters?: Record<string, unknown>): QueryKeyBuilder => [
+      'calendar',
+      'releases',
+      currentDate,
+      filters ?? {},
+    ] as const,
+    stats: (currentDate: string, filters?: Record<string, unknown>): QueryKeyBuilder => [
+      'calendar',
+      'stats',
+      currentDate,
+      filters ?? {},
+    ] as const,
+  },
+  discover: {
+    base: ['discover'] as const,
+    unified: ['discover', 'unified'] as const,
+  },
+  bazarr: {
+    base: ['bazarr'] as const,
+    service: (serviceId: string): QueryKeyBuilder => ['bazarr', serviceId] as const,
+    moviesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'movies'] as const,
+    movieDetail: (serviceId: string, movieId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'movies',
+      movieId,
+    ] as const,
+    episodesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'episodes'] as const,
+    episodeDetail: (serviceId: string, episodeId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'episodes',
+      episodeId,
+    ] as const,
+    subtitlesList: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'subtitles'] as const,
+    subtitlesByMovie: (serviceId: string, movieId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'subtitles',
+      'movie',
+      movieId,
+    ] as const,
+    subtitlesByEpisode: (serviceId: string, episodeId: number): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'subtitles',
+      'episode',
+      episodeId,
+    ] as const,
+    languages: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'languages'] as const,
+    providers: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'providers'] as const,
+    profiles: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'profiles'] as const,
+    queue: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'queue'] as const,
+    history: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'history'] as const,
+    statistics: (serviceId: string): QueryKeyBuilder => [...queryKeys.bazarr.service(serviceId), 'statistics'] as const,
+    search: (serviceId: string, query: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      ...queryKeys.bazarr.service(serviceId),
+      'search',
+      { query, options },
+    ] as const,
   },
 } as const;
 

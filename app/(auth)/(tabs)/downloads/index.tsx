@@ -1,28 +1,35 @@
-import { FlashList } from '@shopify/flash-list';
-import { useFocusEffect } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native';
-import { IconButton, ProgressBar, Text, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlashList } from "@shopify/flash-list";
+import { useFocusEffect } from "@react-navigation/native";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { useCallback, useMemo } from "react";
+import { ScrollView, StyleSheet, View, TouchableOpacity } from "react-native";
+import { IconButton, ProgressBar, Text, useTheme } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { TabHeader } from '@/components/common/TabHeader';
+import { TabHeader } from "@/components/common/TabHeader";
 
-import { Button } from '@/components/common/Button';
-import { EmptyState } from '@/components/common/EmptyState';
-import { ListRefreshControl } from '@/components/common/ListRefreshControl';
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
-import { AnimatedListItem, AnimatedSection, AnimatedProgress } from '@/components/common/AnimatedComponents';
-import { TorrentCardSkeleton } from '@/components/torrents';
-import type { AppTheme } from '@/constants/theme';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import type { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
-import { queryKeys } from '@/hooks/queryKeys';
-import type { Torrent } from '@/models/torrent.types';
-import type { TorrentTransferInfo } from '@/models/torrent.types';
-import { logger } from '@/services/logger/LoggerService';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ListRefreshControl } from "@/components/common/ListRefreshControl";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+  AnimatedProgress,
+} from "@/components/common/AnimatedComponents";
+import { TorrentCardSkeleton } from "@/components/torrents";
+import type { AppTheme } from "@/constants/theme";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import type { QBittorrentConnector } from "@/connectors/implementations/QBittorrentConnector";
+import type { TransmissionConnector } from "@/connectors/implementations/TransmissionConnector";
+import type { DelugeConnector } from "@/connectors/implementations/DelugeConnector";
+import type { SABnzbdConnector } from "@/connectors/implementations/SABnzbdConnector";
+import { queryKeys } from "@/hooks/queryKeys";
+import type { Torrent } from "@/models/torrent.types";
+import type { TorrentTransferInfo } from "@/models/torrent.types";
+import { logger } from "@/services/logger/LoggerService";
+import { spacing } from "@/theme/spacing";
 import {
   deriveTorrentStatusLabel,
   formatBytes,
@@ -31,7 +38,7 @@ import {
   isTorrentActive,
   isTorrentCompleted,
   isTorrentPaused,
-} from '@/utils/torrent.utils';
+} from "@/utils/torrent.utils";
 
 type TorrentWithService = Torrent & {
   serviceId: string;
@@ -50,12 +57,31 @@ type DownloadsOverview = {
   };
 };
 
+const DOWNLOAD_CLIENT_TYPES = [
+  "qbittorrent",
+  "transmission",
+  "deluge",
+  "sabnzbd",
+] as const;
+
 const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
   const manager = ConnectorManager.getInstance();
   await manager.loadSavedServices();
-  const connectors = manager.getConnectorsByType('qbittorrent') as QBittorrentConnector[];
 
-  if (connectors.length === 0) {
+  // Get all download client connectors
+  const allConnectors: Array<
+    | QBittorrentConnector
+    | TransmissionConnector
+    | DelugeConnector
+    | SABnzbdConnector
+  > = [];
+
+  for (const clientType of DOWNLOAD_CLIENT_TYPES) {
+    const connectors = manager.getConnectorsByType(clientType);
+    allConnectors.push(...(connectors as any));
+  }
+
+  if (allConnectors.length === 0) {
     return {
       torrents: [],
       totals: {
@@ -74,20 +100,24 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
   let totalUploadSpeed = 0;
 
   await Promise.all(
-    connectors.map(async (connector) => {
+    allConnectors.map(async (connector) => {
       try {
         const [torrents, transferInfo] = await Promise.all([
           connector.getTorrents(),
-          connector
-            .getTransferInfo()
-            .catch((transferError) => {
-              const message = transferError instanceof Error ? transferError.message : String(transferError);
-              void logger.warn('Failed to load transfer info for qBittorrent.', {
+          connector.getTransferInfo().catch((transferError) => {
+            const message =
+              transferError instanceof Error
+                ? transferError.message
+                : String(transferError);
+            void logger.warn(
+              `Failed to load transfer info for ${connector.config.type}.`,
+              {
                 serviceId: connector.config.id,
                 message,
-              });
-              return undefined;
-            }),
+              }
+            );
+            return undefined;
+          }),
         ]);
 
         // Add service info to each torrent
@@ -101,10 +131,15 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
         totalDownloadSpeed += transferInfo?.downloadSpeed ?? 0;
         totalUploadSpeed += transferInfo?.uploadSpeed ?? 0;
       } catch (connectorError) {
-        const message = connectorError instanceof Error ? connectorError.message : String(connectorError);
-        throw new Error(`Failed to load downloads for ${connector.config.name}: ${message}`);
+        const message =
+          connectorError instanceof Error
+            ? connectorError.message
+            : String(connectorError);
+        throw new Error(
+          `Failed to load downloads for ${connector.config.name}: ${message}`
+        );
       }
-    }),
+    })
   );
 
   // Sort torrents by download speed (active torrents first)
@@ -117,7 +152,8 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
   const totals = {
     total: allTorrents.length,
     active: allTorrents.filter((torrent) => isTorrentActive(torrent)).length,
-    completed: allTorrents.filter((torrent) => isTorrentCompleted(torrent)).length,
+    completed: allTorrents.filter((torrent) => isTorrentCompleted(torrent))
+      .length,
     paused: allTorrents.filter((torrent) => isTorrentPaused(torrent)).length,
     downloadSpeed: totalDownloadSpeed,
     uploadSpeed: totalUploadSpeed,
@@ -130,15 +166,8 @@ const DownloadsScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: queryKeys.qbittorrent.base,
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: ["downloads", "overview"],
     queryFn: fetchDownloadsOverview,
     refetchInterval: 15_000,
     refetchOnWindowFocus: false,
@@ -147,7 +176,7 @@ const DownloadsScreen = () => {
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch]),
+    }, [refetch])
   );
 
   const overview = data ?? {
@@ -173,7 +202,7 @@ const DownloadsScreen = () => {
           backgroundColor: theme.colors.background,
         },
         listContent: {
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal: spacing.md,
           paddingBottom: 80,
         },
         torrentItem: {
@@ -183,21 +212,21 @@ const DownloadsScreen = () => {
           marginBottom: spacing.sm,
         },
         torrentHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
           marginBottom: spacing.sm,
         },
         torrentName: {
           flex: 1,
           color: theme.colors.onSurface,
           fontSize: 14,
-          fontWeight: '500',
+          fontWeight: "500",
           marginRight: spacing.sm,
         },
         torrentActions: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: spacing.xs,
         },
         actionButton: {
@@ -205,8 +234,8 @@ const DownloadsScreen = () => {
           height: 32,
           borderRadius: 16,
           backgroundColor: theme.colors.elevation.level2,
-          justifyContent: 'center',
-          alignItems: 'center',
+          justifyContent: "center",
+          alignItems: "center",
         },
         progressContainer: {
           marginBottom: spacing.sm,
@@ -219,14 +248,14 @@ const DownloadsScreen = () => {
         progressPercentage: {
           color: theme.colors.onSurface,
           fontSize: 12,
-          fontWeight: '500',
+          fontWeight: "500",
           marginTop: spacing.xs,
-          textAlign: 'right',
+          textAlign: "right",
         },
         torrentDetails: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
         },
         torrentDetail: {
           color: theme.colors.onSurfaceVariant,
@@ -237,45 +266,56 @@ const DownloadsScreen = () => {
           paddingTop: spacing.xl,
         },
       }),
-    [theme],
+    [theme]
   );
 
   const handleAddService = useCallback(() => {
-    router.push('/(auth)/add-service');
+    router.push("/(auth)/add-service");
   }, [router]);
 
   const handleRefresh = useCallback(() => {
     void refetch();
   }, [refetch]);
 
-  const handleTorrentAction = useCallback(async (torrent: TorrentWithService, action: 'pause' | 'resume' | 'delete') => {
-    try {
-      const manager = ConnectorManager.getInstance();
-      const connector = manager.getConnector(torrent.serviceId) as QBittorrentConnector;
-      
-      if (!connector) {
-        throw new Error('Service not found');
-      }
+  const handleTorrentAction = useCallback(
+    async (
+      torrent: TorrentWithService,
+      action: "pause" | "resume" | "delete"
+    ) => {
+      try {
+        const manager = ConnectorManager.getInstance();
+        const connector = manager.getConnector(torrent.serviceId);
 
-      switch (action) {
-        case 'pause':
-          await connector.pauseTorrent(torrent.hash);
-          break;
-        case 'resume':
-          await connector.resumeTorrent(torrent.hash);
-          break;
-        case 'delete':
-          await connector.deleteTorrent(torrent.hash, true);
-          break;
+        if (!connector) {
+          throw new Error("Service not found");
+        }
+
+        // Use the appropriate connector method based on the action
+        switch (action) {
+          case "pause":
+            await (connector as any).pauseTorrent(torrent.hash);
+            break;
+          case "resume":
+            await (connector as any).resumeTorrent(torrent.hash);
+            break;
+          case "delete":
+            await (connector as any).deleteTorrent(torrent.hash, true);
+            break;
+        }
+
+        // Refresh data after action
+        void refetch();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void logger.error("Failed to perform torrent action", {
+          action,
+          torrentHash: torrent.hash,
+          message,
+        });
       }
-      
-      // Refresh data after action
-      void refetch();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      void logger.error('Failed to perform torrent action', { action, torrentHash: torrent.hash, message });
-    }
-  }, [refetch]);
+    },
+    [refetch]
+  );
 
   const renderTorrentItem = useCallback(
     ({ item, index }: { item: TorrentWithService; index: number }) => {
@@ -286,24 +326,29 @@ const DownloadsScreen = () => {
       const isCompleted = isTorrentCompleted(item);
 
       const getStatusText = () => {
-        if (isCompleted) return 'Completed';
-        if (isPaused) return 'Paused';
-        if (isActive) return `${formatBytes(item.downloaded)} / ${formatBytes(item.size)} • ${formatSpeed(item.downloadSpeed)} • ~${formatEta(item.eta)} remaining`;
+        if (isCompleted) return "Completed";
+        if (isPaused) return "Paused";
+        if (isActive)
+          return `${formatBytes(item.downloaded)} / ${formatBytes(
+            item.size
+          )} • ${formatSpeed(item.downloadSpeed)} • ~${formatEta(
+            item.eta
+          )} remaining`;
         return deriveTorrentStatusLabel(item);
       };
 
       const getActionIcon = () => {
-        if (isCompleted) return 'check';
-        if (isPaused) return 'play';
-        return 'pause';
+        if (isCompleted) return "check";
+        if (isPaused) return "play";
+        return "pause";
       };
 
       const handleActionPress = () => {
         if (isCompleted) return; // No action for completed torrents
         if (isPaused) {
-          void handleTorrentAction(item, 'resume');
+          void handleTorrentAction(item, "resume");
         } else {
-          void handleTorrentAction(item, 'pause');
+          void handleTorrentAction(item, "pause");
         }
       };
 
@@ -315,16 +360,25 @@ const DownloadsScreen = () => {
                 {item.name}
               </Text>
               <View style={styles.torrentActions}>
-                <TouchableOpacity style={styles.actionButton} onPress={handleActionPress}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleActionPress}
+                >
                   <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>
-                    {getActionIcon() === 'check' ? '✓' : getActionIcon() === 'play' ? '▶' : '⏸'}
+                    {getActionIcon() === "check"
+                      ? "✓"
+                      : getActionIcon() === "play"
+                      ? "▶"
+                      : "⏸"}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => void handleTorrentAction(item, 'delete')}
+                  onPress={() => void handleTorrentAction(item, "delete")}
                 >
-                  <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>✕</Text>
+                  <Text style={{ color: theme.colors.onSurface, fontSize: 16 }}>
+                    ✕
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -335,26 +389,25 @@ const DownloadsScreen = () => {
                 color={theme.colors.primary}
                 style={styles.progressBar}
               />
-              <Text style={styles.progressPercentage}>
-                {percent}%
-              </Text>
+              <Text style={styles.progressPercentage}>{percent}%</Text>
             </AnimatedProgress>
 
             <View style={styles.torrentDetails}>
-              <Text style={styles.torrentDetail}>
-                {getStatusText()}
-              </Text>
+              <Text style={styles.torrentDetail}>{getStatusText()}</Text>
             </View>
           </View>
         </AnimatedListItem>
       );
     },
-    [handleTorrentAction, styles, theme.colors, overview.torrents.length],
+    [handleTorrentAction, styles, theme.colors, overview.torrents.length]
   );
 
   const listEmptyComponent = useMemo(() => {
     if (isError) {
-      const message = error instanceof Error ? error.message : 'Unable to load downloads overview.';
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to load downloads overview.";
 
       return (
         <EmptyState
@@ -381,18 +434,28 @@ const DownloadsScreen = () => {
           showBackButton={true}
           onBackPress={() => router.back()}
           rightAction={{
-            icon: 'plus',
+            icon: "plus",
             onPress: handleAddService,
-            accessibilityLabel: 'Add service',
+            accessibilityLabel: "Add service",
           }}
         />
         <AnimatedSection style={styles.listContent} delay={100}>
           <View style={{ marginBottom: spacing.lg }}>
-            <SkeletonPlaceholder width="60%" height={28} borderRadius={10} style={{ marginBottom: spacing.xs }} />
+            <SkeletonPlaceholder
+              width="60%"
+              height={28}
+              borderRadius={10}
+              style={{ marginBottom: spacing.xs }}
+            />
             <SkeletonPlaceholder width="40%" height={18} borderRadius={8} />
           </View>
           {Array.from({ length: 5 }).map((_, index) => (
-            <AnimatedListItem key={index} index={index} totalItems={5} style={{ marginBottom: spacing.md }}>
+            <AnimatedListItem
+              key={index}
+              index={index}
+              totalItems={5}
+              style={{ marginBottom: spacing.md }}
+            >
               <TorrentCardSkeleton showActions={false} />
             </AnimatedListItem>
           ))}
@@ -417,7 +480,11 @@ const DownloadsScreen = () => {
         data={overview.torrents}
         keyExtractor={(item) => item.hash}
         renderItem={renderTorrentItem}
-        ListEmptyComponent={<AnimatedSection style={styles.emptyContainer} delay={100}>{listEmptyComponent}</AnimatedSection>}
+        ListEmptyComponent={
+          <AnimatedSection style={styles.emptyContainer} delay={100}>
+            {listEmptyComponent}
+          </AnimatedSection>
+        }
         contentContainerStyle={styles.listContent}
         refreshControl={
           <ListRefreshControl

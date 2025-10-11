@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack } from "expo-router";
 
 export default function RadarrServiceLayout() {
   return (
@@ -12,16 +12,17 @@ export default function RadarrServiceLayout() {
       <Stack.Screen
         name="movies/[id]"
         options={{
-          presentation: 'transparentModal',
-          contentStyle: { backgroundColor: 'transparent' },
-          animation: 'none', // Disable default animation since we're using custom sheet transitions
+          presentation: "transparentModal",
+          contentStyle: { backgroundColor: "transparent" },
+          animation: "none", // Disable default animation since we're using custom sheet transitions
           headerShown: false, // Hide the header completely
         }}
       />
       <Stack.Screen
         name="add"
         options={{
-          title: 'Add Movie',
+          title: "Add Movie",
+          headerShown: false,
         }}
       />
     </Stack>

@@ -15,6 +15,8 @@ export class ConnectorManager {
 
   private readonly connectors = new Map<string, IConnector>();
 
+  private updateStore?: (connectors: Map<string, IConnector>) => void;
+
   private constructor() {}
 
   static getInstance(): ConnectorManager {
@@ -23,6 +25,10 @@ export class ConnectorManager {
     }
 
     return ConnectorManager.instance;
+  }
+
+  setUpdateStore(updateStore: (connectors: Map<string, IConnector>) => void) {
+    this.updateStore = updateStore;
   }
 
   /** Load previously saved service configurations and bootstrap connectors for enabled entries. */
@@ -51,17 +57,24 @@ export class ConnectorManager {
     config: ServiceConfig,
     options: AddConnectorOptions = {},
   ): Promise<IConnector> {
+    logger.debug('[ConnectorManager] Adding connector', { serviceType: config.type, serviceId: config.id });
+    
     const existing = this.connectors.get(config.id);
     if (existing) {
+      logger.debug('[ConnectorManager] Disposing existing connector', { serviceId: config.id });
       existing.dispose();
       this.connectors.delete(config.id);
     }
 
+    logger.debug('[ConnectorManager] Creating connector via factory');
     const connector = ConnectorFactory.create(config);
+    logger.debug('[ConnectorManager] Connector created, adding to map', { serviceId: config.id });
     this.connectors.set(config.id, connector);
+    this.updateStore?.(this.connectors);
 
     if (options.persist !== false) {
       await secureStorage.saveServiceConfig(config);
+      logger.debug('[ConnectorManager] Persisted config to storage', { serviceId: config.id });
     }
 
     void logger.info('Connector registered.', {
@@ -69,6 +82,7 @@ export class ConnectorManager {
       serviceType: config.type,
     });
 
+    logger.debug('[ConnectorManager] Connector registration completed', { serviceId: config.id });
     return connector;
   }
 
@@ -99,6 +113,7 @@ export class ConnectorManager {
 
     connector.dispose();
     this.connectors.delete(id);
+    this.updateStore?.(this.connectors);
 
     if (persist) {
       await secureStorage.removeServiceConfig(id);
@@ -139,5 +154,6 @@ export class ConnectorManager {
       connector.dispose();
     }
     this.connectors.clear();
+    this.updateStore?.(this.connectors);
   }
 }

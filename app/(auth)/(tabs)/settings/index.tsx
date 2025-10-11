@@ -1,22 +1,40 @@
-import { useRouter } from 'expo-router';
-import { Alert, StyleSheet, View, ScrollView } from 'react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Text, useTheme, Button, Switch, IconButton, Chip, Portal, Dialog } from 'react-native-paper';
-import ConfirmDialog from '@/components/common/ConfirmDialog/ConfirmDialog';
-import { Card } from '@/components/common/Card';
-import { AnimatedListItem, AnimatedScrollView, AnimatedSection } from '@/components/common/AnimatedComponents';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from "expo-router";
+import { StyleSheet, View, ScrollView } from "react-native";
+import { alert } from '@/services/dialogService';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Text,
+  useTheme,
+  Button,
+  Switch,
+  IconButton,
+  Chip,
+  Portal,
+  Dialog,
+} from "react-native-paper";
+import { CustomConfirm } from "@/components/common";
+import { Card } from "@/components/common/Card";
+import {
+  AnimatedListItem,
+  AnimatedScrollView,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { TabHeader } from '@/components/common/TabHeader';
+import { TabHeader } from "@/components/common/TabHeader";
 
-import type { AppTheme } from '@/constants/theme';
-import { useAuth } from '@/services/auth/AuthProvider';
-import { imageCacheService, type ImageCacheUsage } from '@/services/image/ImageCacheService';
-import { logger } from '@/services/logger/LoggerService';
-import { spacing } from '@/theme/spacing';
-import { useSettingsStore } from '@/store/settingsStore';
-import type { NotificationCategory } from '@/models/notification.types';
-import { getCategoryFriendlyName } from '@/utils/quietHours.utils';
+import type { AppTheme } from "@/constants/theme";
+import { useAuth } from "@/services/auth/AuthProvider";
+import {
+  imageCacheService,
+  type ImageCacheUsage,
+} from "@/services/image/ImageCacheService";
+import { logger } from "@/services/logger/LoggerService";
+import { spacing } from "@/theme/spacing";
+import { useSettingsStore } from "@/store/settingsStore";
+import type { NotificationCategory } from "@/models/notification.types";
+import { getCategoryFriendlyName } from "@/utils/quietHours.utils";
+// Backup & restore moved to its own settings screen
 
 const SettingsScreen = () => {
   const router = useRouter();
@@ -24,6 +42,7 @@ const SettingsScreen = () => {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
   const theme = useTheme<AppTheme>();
+  const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
 
   // Settings store
   const {
@@ -34,7 +53,7 @@ const SettingsScreen = () => {
     requestNotificationsEnabled,
     serviceHealthNotificationsEnabled,
     refreshIntervalMinutes,
-  quietHours,
+    quietHours,
     setTheme,
     setNotificationsEnabled,
     setDownloadNotificationsEnabled,
@@ -46,7 +65,7 @@ const SettingsScreen = () => {
   const [imageCacheUsage, setImageCacheUsage] = useState<ImageCacheUsage>({
     size: 0,
     fileCount: 0,
-    formattedSize: '0 B',
+    formattedSize: "0 B",
   });
   const [isFetchingCacheUsage, setIsFetchingCacheUsage] = useState(false);
   const [isClearingImageCache, setIsClearingImageCache] = useState(false);
@@ -54,11 +73,11 @@ const SettingsScreen = () => {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.background
+      backgroundColor: theme.colors.background,
     },
     scrollContainer: {
       paddingHorizontal: spacing.md,
-      paddingBottom: spacing.xxxxl
+      paddingBottom: spacing.xxxxl,
     },
     listSpacer: {
       height: spacing.sm,
@@ -74,10 +93,10 @@ const SettingsScreen = () => {
       letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
       fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
       marginBottom: spacing.md,
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.xs,
     },
     themeOptions: {
-      flexDirection: 'row',
+      flexDirection: "row",
       gap: spacing.xs,
       marginTop: spacing.xs,
     },
@@ -86,22 +105,22 @@ const SettingsScreen = () => {
     },
     settingCard: {
       backgroundColor: theme.colors.elevation.level1,
-      marginHorizontal: spacing.md,
+      marginHorizontal: spacing.xs,
       marginVertical: spacing.xs,
       borderRadius: 12,
       padding: spacing.md,
     },
     settingContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
     },
     settingIcon: {
       width: 48,
       height: 48,
       borderRadius: 24,
       backgroundColor: theme.colors.surfaceVariant,
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: "center",
+      justifyContent: "center",
       marginRight: spacing.md,
     },
     settingInfo: {
@@ -134,7 +153,7 @@ const SettingsScreen = () => {
       fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
     },
     signOutButton: {
-      marginHorizontal: spacing.md,
+      marginHorizontal: spacing.xs,
       marginTop: spacing.lg,
       marginBottom: 0,
     },
@@ -147,8 +166,10 @@ const SettingsScreen = () => {
       setImageCacheUsage(usage);
     } catch (error) {
       const message = getReadableErrorMessage(error);
-      void logger.error('SettingsScreen: failed to load image cache usage.', { error: message });
-      Alert.alert('Unable to load cache usage', message);
+      void logger.error("SettingsScreen: failed to load image cache usage.", {
+        error: message,
+      });
+  alert("Unable to load cache usage", message);
     } finally {
       setIsFetchingCacheUsage(false);
     }
@@ -163,11 +184,16 @@ const SettingsScreen = () => {
     try {
       await imageCacheService.clearCache();
       await loadImageCacheUsage();
-      Alert.alert('Image cache cleared', 'Poster images will be refreshed on next load.');
+  alert(
+        "Image cache cleared",
+        "Poster images will be refreshed on next load."
+      );
     } catch (error) {
       const message = getReadableErrorMessage(error);
-      void logger.error('SettingsScreen: failed to clear image cache.', { error: message });
-      Alert.alert('Unable to clear image cache', message);
+      void logger.error("SettingsScreen: failed to clear image cache.", {
+        error: message,
+      });
+  alert("Unable to clear image cache", message);
     } finally {
       setIsClearingImageCache(false);
     }
@@ -176,20 +202,20 @@ const SettingsScreen = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      router.replace('/(public)/login');
+      router.replace("/(public)/login");
     } catch (signOutError) {
       const message =
         signOutError instanceof Error
           ? signOutError.message
-          : 'Unable to sign out. Please try again.';
+          : "Unable to sign out. Please try again.";
 
-      Alert.alert('Sign out failed', message);
+  alert("Sign out failed", message);
     }
   };
 
   const confirmSignOut = () => setConfirmVisible(true);
 
-  const handleThemeSelection = (selectedTheme: 'light' | 'dark' | 'system') => {
+  const handleThemeSelection = (selectedTheme: "light" | "dark" | "system") => {
     setTheme(selectedTheme as any);
   };
 
@@ -202,7 +228,7 @@ const SettingsScreen = () => {
     setRefreshIntervalVisible(false);
   };
 
-  const getThemeChipColor = (chipTheme: 'light' | 'dark' | 'system') => {
+  const getThemeChipColor = (chipTheme: "light" | "dark" | "system") => {
     if (themePreference === chipTheme) {
       return {
         backgroundColor: theme.colors.primaryContainer,
@@ -216,23 +242,25 @@ const SettingsScreen = () => {
   };
 
   const quietHoursValue = useMemo(() => {
-    const enabled = Object.entries(quietHours).filter(([, config]) => config.enabled);
+    const enabled = Object.entries(quietHours).filter(
+      ([, config]) => config.enabled
+    );
     if (enabled.length === 0) {
-      return 'Disabled';
+      return "Disabled";
     }
 
     const labels = enabled
-      .map(([category]) => getCategoryFriendlyName(category as NotificationCategory))
-      .join(', ');
+      .map(([category]) =>
+        getCategoryFriendlyName(category as NotificationCategory)
+      )
+      .join(", ");
 
     return `Active: ${labels}`;
   }, [quietHours]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <AnimatedScrollView
-        contentContainerStyle={styles.scrollContainer}
-      >
+      <AnimatedScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Header */}
         <TabHeader
           rightAction={{
@@ -245,52 +273,106 @@ const SettingsScreen = () => {
         {/* Appearance Section */}
         <AnimatedSection style={styles.section} delay={50}>
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <AnimatedListItem index={0} totalItems={1}>
+          <AnimatedListItem index={0} totalItems={2}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="palette" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="palette"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Theme</Text>
-                  <Text style={styles.settingSubtitle}>Choose your preferred theme</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Choose your preferred theme
+                  </Text>
                   <View style={styles.themeOptions}>
                     <Chip
-                      mode={themePreference === 'light' ? 'flat' : 'outlined'}
+                      mode={themePreference === "light" ? "flat" : "outlined"}
                       style={[
                         styles.themeChip,
-                        { backgroundColor: getThemeChipColor('light').backgroundColor }
+                        {
+                          backgroundColor:
+                            getThemeChipColor("light").backgroundColor,
+                        },
                       ]}
-                      textStyle={{ color: getThemeChipColor('light').textColor }}
-                      onPress={() => handleThemeSelection('light')}
+                      textStyle={{
+                        color: getThemeChipColor("light").textColor,
+                      }}
+                      onPress={() => handleThemeSelection("light")}
                     >
                       Light
                     </Chip>
                     <Chip
-                      mode={themePreference === 'dark' ? 'flat' : 'outlined'}
+                      mode={themePreference === "dark" ? "flat" : "outlined"}
                       style={[
                         styles.themeChip,
-                        { backgroundColor: getThemeChipColor('dark').backgroundColor }
+                        {
+                          backgroundColor:
+                            getThemeChipColor("dark").backgroundColor,
+                        },
                       ]}
-                      textStyle={{ color: getThemeChipColor('dark').textColor }}
-                      onPress={() => handleThemeSelection('dark')}
+                      textStyle={{ color: getThemeChipColor("dark").textColor }}
+                      onPress={() => handleThemeSelection("dark")}
                     >
                       Dark
                     </Chip>
                     <Chip
-                      mode={themePreference === 'system' ? 'flat' : 'outlined'}
+                      mode={themePreference === "system" ? "flat" : "outlined"}
                       style={[
                         styles.themeChip,
-                        { backgroundColor: getThemeChipColor('system').backgroundColor }
+                        {
+                          backgroundColor:
+                            getThemeChipColor("system").backgroundColor,
+                        },
                       ]}
-                      textStyle={{ color: getThemeChipColor('system').textColor }}
-                      onPress={() => handleThemeSelection('system')}
+                      textStyle={{
+                        color: getThemeChipColor("system").textColor,
+                      }}
+                      onPress={() => handleThemeSelection("system")}
                     >
                       System
                     </Chip>
                   </View>
                 </View>
-                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={1} totalItems={2}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push("/(auth)/settings/theme-editor")}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="palette-swatch"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Customize Theme</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Advanced theme customization
+                  </Text>
+                  <Text style={styles.settingValue}>
+                    Colors, fonts, density & more
+                  </Text>
+                </View>
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
               </View>
             </Card>
           </AnimatedListItem>
@@ -302,11 +384,17 @@ const SettingsScreen = () => {
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="bell" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="bell"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Enable Notifications</Text>
-                  <Text style={styles.settingSubtitle}>Receive push notifications</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Receive push notifications
+                  </Text>
                 </View>
                 <Switch
                   value={notificationsEnabled}
@@ -320,11 +408,17 @@ const SettingsScreen = () => {
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="check-circle" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="check-circle"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Completed Downloads</Text>
-                  <Text style={styles.settingSubtitle}>Notify when downloads finish</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Notify when downloads finish
+                  </Text>
                 </View>
                 <Switch
                   value={downloadNotificationsEnabled && notificationsEnabled}
@@ -339,14 +433,22 @@ const SettingsScreen = () => {
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="alert-circle" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="alert-circle"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Failed Downloads</Text>
-                  <Text style={styles.settingSubtitle}>Notify when downloads fail</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Notify when downloads fail
+                  </Text>
                 </View>
                 <Switch
-                  value={failedDownloadNotificationsEnabled && notificationsEnabled}
+                  value={
+                    failedDownloadNotificationsEnabled && notificationsEnabled
+                  }
                   onValueChange={setFailedDownloadNotificationsEnabled}
                   disabled={!notificationsEnabled}
                   color={theme.colors.primary}
@@ -358,11 +460,17 @@ const SettingsScreen = () => {
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="account-plus" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="account-plus"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>New Requests</Text>
-                  <Text style={styles.settingSubtitle}>Notify when requests come in</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Notify when requests come in
+                  </Text>
                 </View>
                 <Switch
                   value={requestNotificationsEnabled && notificationsEnabled}
@@ -377,14 +485,22 @@ const SettingsScreen = () => {
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="server-network" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="server-network"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Service Health</Text>
-                  <Text style={styles.settingSubtitle}>Notify on service outages</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Notify on service outages
+                  </Text>
                 </View>
                 <Switch
-                  value={serviceHealthNotificationsEnabled && notificationsEnabled}
+                  value={
+                    serviceHealthNotificationsEnabled && notificationsEnabled
+                  }
                   onValueChange={setServiceHealthNotificationsEnabled}
                   disabled={!notificationsEnabled}
                   color={theme.colors.primary}
@@ -396,18 +512,63 @@ const SettingsScreen = () => {
             <Card
               variant="custom"
               style={styles.settingCard}
-              onPress={() => router.push('/(auth)/(tabs)/settings/quiet-hours')}
+              onPress={() => router.push("/(auth)/settings/quiet-hours")}
             >
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="moon-waning-crescent" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="moon-waning-crescent"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Quiet Hours</Text>
-                  <Text style={styles.settingSubtitle}>Silence notifications on a schedule</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Silence notifications on a schedule
+                  </Text>
                   <Text style={styles.settingValue}>{quietHoursValue}</Text>
                 </View>
-                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
+              </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
+
+        {/* Voice Assistant Section */}
+        <AnimatedSection style={styles.section} delay={175}>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push("/(auth)/settings/voice-assistant")}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="microphone"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Voice Assistant</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Siri Shortcuts & Google Assistant
+                  </Text>
+                  <Text style={styles.settingValue}>
+                    Manage voice commands and shortcuts
+                  </Text>
+                </View>
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
               </View>
             </Card>
           </AnimatedListItem>
@@ -416,17 +577,33 @@ const SettingsScreen = () => {
         {/* Data Refresh Section */}
         <AnimatedSection style={styles.section} delay={150}>
           <AnimatedListItem index={0} totalItems={1}>
-            <Card variant="custom" style={styles.settingCard} onPress={handleRefreshIntervalPress}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={handleRefreshIntervalPress}
+            >
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="refresh" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="refresh"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Refresh Interval</Text>
-                  <Text style={styles.settingSubtitle}>How often to refresh data</Text>
-                  <Text style={styles.settingValue}>{refreshIntervalMinutes} minutes</Text>
+                  <Text style={styles.settingSubtitle}>
+                    How often to refresh data
+                  </Text>
+                  <Text style={styles.settingValue}>
+                    {refreshIntervalMinutes} minutes
+                  </Text>
                 </View>
-                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
               </View>
             </Card>
           </AnimatedListItem>
@@ -438,16 +615,24 @@ const SettingsScreen = () => {
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="folder" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="folder"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Image Cache</Text>
-                  <Text style={styles.settingSubtitle}>Cached artwork for posters and backdrops</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Cached artwork for posters and backdrops
+                  </Text>
                   <Text style={styles.settingValue}>
                     {isFetchingCacheUsage
-                      ? 'Calculating…'
+                      ? "Calculating…"
                       : `${imageCacheUsage.formattedSize}${
-                          imageCacheUsage.fileCount ? ` • ${imageCacheUsage.fileCount} files` : ''
+                          imageCacheUsage.fileCount
+                            ? ` • ${imageCacheUsage.fileCount} files`
+                            : ""
                         }`}
                   </Text>
                 </View>
@@ -472,41 +657,139 @@ const SettingsScreen = () => {
         {/* Services Section */}
         <AnimatedSection style={styles.section} delay={250}>
           <AnimatedListItem index={0} totalItems={1}>
-            <Card variant="custom" style={styles.settingCard} onPress={() => router.push('/(auth)/(tabs)/services')}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push("/(auth)/(tabs)/services")}
+            >
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="server" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="server"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Manage Services</Text>
-                  <Text style={styles.settingSubtitle}>Configure your connected services</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Configure your connected services
+                  </Text>
                 </View>
-                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
+              </View>
+            </Card>
+          </AnimatedListItem>
+        </AnimatedSection>
+
+        {/* Backup & Restore (moved) */}
+        <AnimatedSection style={styles.section} delay={300}>
+          <Text style={styles.sectionTitle}>Backup & Restore</Text>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push("/(auth)/settings/backup-restore")}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="backup-restore"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Backup & Restore</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Export, import and manage backups (including cloud)
+                  </Text>
+                </View>
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
               </View>
             </Card>
           </AnimatedListItem>
         </AnimatedSection>
 
         {/* About Section */}
-        <AnimatedSection style={styles.section} delay={300}>
+        <AnimatedSection style={styles.section} delay={350}>
           <AnimatedListItem index={0} totalItems={1}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
-                  <IconButton icon="information" size={24} iconColor={theme.colors.primary} />
+                  <IconButton
+                    icon="information"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>App Version</Text>
-                  <Text style={styles.settingSubtitle}>Uniarr version 1.2.3</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Uniarr version 1.2.3
+                  </Text>
                 </View>
-                <IconButton icon="chevron-right" size={20} iconColor={theme.colors.outline} />
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
               </View>
             </Card>
           </AnimatedListItem>
         </AnimatedSection>
 
+        {/* Developer Tools (dev only) */}
+        {isDev && (
+          <AnimatedSection style={styles.section} delay={375}>
+            <AnimatedListItem index={0} totalItems={1}>
+              <Card
+                variant="custom"
+                style={styles.settingCard}
+                onPress={() => router.push("/(auth)/dev")}
+              >
+                <View style={styles.settingContent}>
+                  <View style={styles.settingIcon}>
+                    <IconButton
+                      icon="bug"
+                      size={24}
+                      iconColor={theme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>Developer Tools</Text>
+                    <Text style={styles.settingSubtitle}>
+                      Dev-only tools and component playground
+                    </Text>
+                    <Text style={styles.settingValue}>
+                      Visible in development builds
+                    </Text>
+                  </View>
+                  <IconButton
+                    icon="chevron-right"
+                    size={20}
+                    iconColor={theme.colors.outline}
+                  />
+                </View>
+              </Card>
+            </AnimatedListItem>
+          </AnimatedSection>
+        )}
+
         {/* Sign Out Button */}
-        <AnimatedListItem index={0} totalItems={1} style={{ marginTop: spacing.lg }}>
+        <AnimatedListItem
+          index={0}
+          totalItems={1}
+          style={{ marginTop: spacing.lg }}
+        >
           <Button
             mode="outlined"
             onPress={confirmSignOut}
@@ -518,7 +801,7 @@ const SettingsScreen = () => {
           </Button>
         </AnimatedListItem>
 
-        <ConfirmDialog
+        <CustomConfirm
           visible={confirmVisible}
           title="Sign out"
           message="Are you sure you want to sign out?"
@@ -537,28 +820,42 @@ const SettingsScreen = () => {
           <Dialog
             visible={refreshIntervalVisible}
             onDismiss={() => setRefreshIntervalVisible(false)}
-            style={{ borderRadius: 12, backgroundColor: theme.colors.elevation.level1 }}
+            style={{
+              borderRadius: 12,
+              backgroundColor: theme.colors.elevation.level1,
+            }}
           >
-            <Dialog.Title style={styles.sectionTitle}>Refresh Interval</Dialog.Title>
+            <Dialog.Title style={styles.sectionTitle}>
+              Refresh Interval
+            </Dialog.Title>
             <Dialog.Content>
-              <Text style={{ ...styles.settingValue, marginBottom: spacing.md }}>
+              <Text
+                style={{ ...styles.settingValue, marginBottom: spacing.md }}
+              >
                 Select how often to refresh your data:
               </Text>
               <View style={{ gap: spacing.xs }}>
                 {[5, 10, 15, 30, 60, 120].map((minutes) => (
                   <Button
                     key={minutes}
-                    mode={refreshIntervalMinutes === minutes ? "contained" : "outlined"}
+                    mode={
+                      refreshIntervalMinutes === minutes
+                        ? "contained"
+                        : "outlined"
+                    }
                     onPress={() => handleRefreshIntervalSelect(minutes)}
                     style={{ marginVertical: 0 }}
                   >
-                    {minutes} minute{minutes !== 1 ? 's' : ''}
+                    {minutes} minute{minutes !== 1 ? "s" : ""}
                   </Button>
                 ))}
               </View>
             </Dialog.Content>
             <Dialog.Actions>
-              <Button mode="outlined" onPress={() => setRefreshIntervalVisible(false)}>
+              <Button
+                mode="outlined"
+                onPress={() => setRefreshIntervalVisible(false)}
+              >
                 Cancel
               </Button>
             </Dialog.Actions>
@@ -576,13 +873,13 @@ const getReadableErrorMessage = (error: unknown): string => {
     return error.message;
   }
 
-  if (typeof error === 'string') {
+  if (typeof error === "string") {
     return error;
   }
 
   try {
     return JSON.stringify(error);
   } catch {
-    return 'Unexpected error occurred.';
+    return "Unexpected error occurred.";
   }
 };

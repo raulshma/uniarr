@@ -70,6 +70,7 @@ const styles = StyleSheet.create({
   },
   description: {
     marginTop: 8,
+    marginBottom: 24,
     textAlign: 'center',
   },
 });

@@ -1,25 +1,36 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useMemo } from "react";
+import { StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
+import { Text, useTheme } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  Layout,
+} from "react-native-reanimated";
 
-import { Button } from '@/components/common/Button';
-import { EmptyState } from '@/components/common/EmptyState';
-import { MediaDetails } from '@/components/media/MediaDetails';
-import { MovieDetailsSkeleton } from '@/components/media/skeletons';
-import type { AppTheme } from '@/constants/theme';
-import { useRadarrMovieDetails } from '@/hooks/useRadarrMovieDetails';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { MediaDetails } from "@/components/media/MediaDetails";
+import { MovieDetailsSkeleton } from "@/components/media/skeletons";
+import DetailHero from "@/components/media/DetailHero/DetailHero";
+import type { AppTheme } from "@/constants/theme";
+import { useRadarrMovieDetails } from "@/hooks/useRadarrMovieDetails";
+import { spacing } from "@/theme/spacing";
 
 const RadarrMovieDetailsScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
-  const { serviceId, id } = useLocalSearchParams<{ serviceId?: string; id?: string }>();
+  const { serviceId, id } = useLocalSearchParams<{
+    serviceId?: string;
+    id?: string;
+  }>();
   const numericMovieId = Number(id);
   const isMovieIdValid = Number.isFinite(numericMovieId);
-  const serviceKey = serviceId ?? '';
+  const serviceKey = serviceId ?? "";
 
   const {
     movie,
@@ -48,24 +59,24 @@ const RadarrMovieDetailsScreen = () => {
         },
         container: {
           flex: 1,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.lg,
+          paddingHorizontal: spacing.none,
+          paddingBottom: spacing.lg,
         },
         header: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: spacing.md,
         },
       }),
-    [theme],
+    [theme]
   );
 
   const handleToggleMonitor = useCallback(
     (nextState: boolean) => {
       toggleMonitor(nextState);
     },
-    [toggleMonitor],
+    [toggleMonitor]
   );
 
   const handleTriggerSearch = useCallback(() => {
@@ -73,37 +84,40 @@ const RadarrMovieDetailsScreen = () => {
   }, [triggerSearch]);
 
   const handleDeleteMovie = useCallback(() => {
-    Alert.alert(
-      'Remove Movie',
-      'Are you sure you want to remove this movie from Radarr? Existing files will be kept.',
+  alert(
+      "Remove Movie",
+      "Are you sure you want to remove this movie from Radarr? Existing files will be kept.",
       [
         {
-          text: 'Cancel',
-          style: 'cancel',
+          text: "Cancel",
+          style: "cancel",
         },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: () => {
             void deleteMovieAsync()
               .then(() => {
                 router.back();
               })
               .catch((err) => {
-                const message = err instanceof Error ? err.message : 'Unable to delete movie.';
-                Alert.alert('Delete Failed', message);
+                const message =
+                  err instanceof Error
+                    ? err.message
+                    : "Unable to delete movie.";
+                alert("Delete Failed", message);
               });
           },
         },
       ],
-      { cancelable: true },
+      { cancelable: true }
     );
   }, [deleteMovieAsync, router]);
 
   // Handle error states outside of sheet for immediate feedback
   if (!serviceId || !isMovieIdValid) {
     return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
+      <View style={[styles.container, { justifyContent: "center" }]}>
         <EmptyState
           title="Missing movie information"
           description="We couldn't find the service or movie identifier. Please navigate from the Radarr library again."
@@ -120,46 +134,68 @@ const RadarrMovieDetailsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <View style={styles.container}>
-        <Animated.View 
-          style={styles.header}
-          entering={FadeInDown.delay(200).springify()}
-          layout={Layout.springify()}
-        >
-          <Button mode="text" onPress={handleClose} accessibilityLabel="Go back">
-            Back
-          </Button>
-          {isFetching ? <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>Refreshing…</Text> : null}
-        </Animated.View>
+        {!movie ? (
+          <Animated.View
+            style={styles.header}
+            entering={FadeInDown.delay(200).springify()}
+            layout={Layout.springify()}
+          >
+            <Button
+              mode="text"
+              onPress={handleClose}
+              accessibilityLabel="Go back"
+            >
+              Back
+            </Button>
+            {isFetching ? (
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Refreshing…
+              </Text>
+            ) : null}
+          </Animated.View>
+        ) : null}
 
         {isLoading && !movie ? (
           <MovieDetailsSkeleton />
         ) : movie ? (
-          <MediaDetails
-            title={movie.title}
-            year={movie.year}
-            status={movie.status}
-            overview={movie.overview}
-            genres={movie.genres}
-            runtimeMinutes={movie.runtime}
-            network={movie.studio}
+          <DetailHero
             posterUri={movie.posterUrl}
             backdropUri={movie.backdropUrl}
-            monitored={movie.monitored}
-            hasFile={movie.hasFile}
-            movieFile={movie.movieFile}
-            type="movie"
-            rating={movie.ratings?.value}
-            onToggleMonitor={handleToggleMonitor}
-            onSearchPress={handleTriggerSearch}
-            onDeletePress={handleDeleteMovie}
-            isUpdatingMonitor={isTogglingMonitor}
-            isSearching={isTriggeringSearch}
-            isDeleting={isDeleting}
-          />
+            onBack={handleClose}
+            isFetching={isFetching}
+          >
+            <MediaDetails
+              title={movie.title}
+              year={movie.year}
+              status={movie.status}
+              overview={movie.overview}
+              genres={movie.genres}
+              runtimeMinutes={movie.runtime}
+              network={movie.studio}
+              posterUri={movie.posterUrl}
+              backdropUri={movie.backdropUrl}
+              monitored={movie.monitored}
+              hasFile={movie.hasFile}
+              movieFile={movie.movieFile}
+              type="movie"
+              rating={movie.ratings?.value}
+              onToggleMonitor={handleToggleMonitor}
+              onSearchPress={handleTriggerSearch}
+              onDeletePress={handleDeleteMovie}
+              isUpdatingMonitor={isTogglingMonitor}
+              isSearching={isTriggeringSearch}
+              isDeleting={isDeleting}
+              showPoster={false}
+              disableScroll={true}
+            />
+          </DetailHero>
         ) : (
-          <View style={{ flex: 1, justifyContent: 'center' }}>
+          <View style={{ flex: 1, justifyContent: "center" }}>
             <EmptyState
               title="No movie data"
               description="We couldn't load details for this movie."

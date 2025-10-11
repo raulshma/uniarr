@@ -126,21 +126,61 @@ class ImageCacheService {
     await this.ensureInitialized();
 
     const uris = Array.from(this.trackedUris);
-    if (!uris.length) {
-      return {
-        size: 0,
-        fileCount: 0,
-        formattedSize: ImageCacheService.formatBytes(0),
-      };
-    }
 
-    let totalSize = 0;
-    let fileCount = 0;
-    const missingUris: string[] = [];
+  let totalSize = 0;
+  let fileCount = 0;
+  const missingUris: string[] = [];
+  let addedTrackedUris = false;
+  const countedPaths = new Set<string>();
 
     await Promise.all(
       uris.map(async (uri) => {
-        const cachedPath = await this.getCachedPath(uri);
+        let cachedPath = await this.getCachedPath(uri);
+        let effectiveUri = uri;
+
+        if (!cachedPath) {
+          // Try the same fetch logic used during prefetch/resolve: some caches
+          // are created for a modified "fetchUri" (for example when an API key
+          // query param is appended). If we don't find a cache for the original
+          // URI, try the connector-aware variants so we can still account for
+          // disk usage.
+          try {
+            const connectors = ConnectorManager.getInstance().getAllConnectors();
+            for (const connector of connectors) {
+              try {
+                const base = connector.config.url.replace(/\/+$/, '');
+                if (uri.startsWith(base) && connector.config.apiKey) {
+                  const parsed = new URL(uri);
+                  if (!parsed.searchParams.has('apikey')) {
+                    parsed.searchParams.set('apikey', connector.config.apiKey);
+                  }
+                  const fetchUri = parsed.toString();
+                  const altCachedPath = await this.getCachedPath(fetchUri);
+                  if (altCachedPath) {
+                    cachedPath = altCachedPath;
+                    effectiveUri = fetchUri;
+                    // Ensure we persist the fact that the cache is tied to the
+                    // fetch URI so future scans will find it directly.
+                    if (!this.trackedUris.has(effectiveUri)) {
+                      this.trackedUris.add(effectiveUri);
+                      addedTrackedUris = true;
+                    }
+                    // Remove the stale/original tracked URI in favor of the
+                    // effective one; defer actual deletion until after the
+                    // scan so persistent storage is updated in a single write.
+                    missingUris.push(uri);
+                    break;
+                  }
+                }
+              } catch {
+                // Ignore URL parsing / connector errors and continue
+              }
+            }
+          } catch {
+            // Ignore failures looking up connectors
+          }
+        }
+
         if (!cachedPath) {
           missingUris.push(uri);
           return;
@@ -169,12 +209,88 @@ class ImageCacheService {
 
         totalSize += fileInfo.size ?? 0;
         fileCount += 1;
+        countedPaths.add(cachedPath);
       }),
     );
 
     if (missingUris.length) {
       missingUris.forEach((missingUri) => this.trackedUris.delete(missingUri));
-      await this.persistTrackedUris();
+      // Persist if we've removed stale entries or added new effective ones.
+      if (missingUris.length || addedTrackedUris) {
+        await this.persistTrackedUris();
+      }
+    }
+
+    // If nothing was tracked (or there are untracked direct downloads), scan
+    // the app cache directory for files that match our fallback download
+    // naming pattern (image-<hash>.<ext>) so we can report disk usage even
+    // when URIs aren't present in the tracked set.
+    try {
+      const cacheDir = FileSystem.cacheDirectory;
+      if (cacheDir) {
+        const entries = await FileSystem.readDirectoryAsync(cacheDir);
+        if (Array.isArray(entries) && entries.length) {
+          const imageExtRegex = /\.(jpg|jpeg|png|webp|gif|bmp|img)$/i;
+          const work: Promise<void>[] = [];
+
+          const maybeCountFile = async (path: string) => {
+            try {
+              if (countedPaths.has(path)) return;
+              const info = await FileSystem.getInfoAsync(path);
+              if (!info.exists || info.isDirectory) return;
+              const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+              if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
+                try {
+                  await FileSystem.deleteAsync(path, { idempotent: true });
+                  void logger.debug('ImageCacheService: removed stale fallback cached image during directory scan.', { path });
+                } catch (err) {
+                  void logger.warn('ImageCacheService: failed to delete stale fallback cached image during directory scan.', { path, error: this.stringifyError(err) });
+                }
+                return;
+              }
+              totalSize += info.size ?? 0;
+              fileCount += 1;
+              countedPaths.add(path);
+            } catch {
+              // ignore
+            }
+          };
+
+          for (const name of entries) {
+            if (typeof name !== 'string') continue;
+            const path = `${cacheDir}${name}`;
+            // If it's a file with an image extension, count it directly.
+            if (imageExtRegex.test(name)) {
+              work.push(maybeCountFile(path));
+              continue;
+            }
+
+            // If it's a directory, inspect one level deep for image files.
+            try {
+              const info = await FileSystem.getInfoAsync(path);
+              if (info.exists && info.isDirectory) {
+                try {
+                  const sub = await FileSystem.readDirectoryAsync(path);
+                  for (const subName of sub) {
+                    if (typeof subName !== 'string') continue;
+                    if (imageExtRegex.test(subName) || subName.startsWith('image-')) {
+                      work.push(maybeCountFile(`${path}/${subName}`));
+                    }
+                  }
+                } catch {
+                  // ignore per-dir errors
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          await Promise.all(work);
+        }
+      }
+    } catch (err) {
+      void logger.debug('ImageCacheService: failed to scan cache directory for images.', { error: this.stringifyError(err) });
     }
 
     return {
@@ -218,6 +334,30 @@ class ImageCacheService {
     return `${value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
   }
 
+  // Create a short hash for a URI to use in generating cache filenames.
+  static hashUri(uri: string): string {
+    let hash = 5381;
+    for (let i = 0; i < uri.length; i++) {
+      // djb2
+      hash = ((hash << 5) + hash) + uri.charCodeAt(i);
+      hash = hash & hash; // keep in 32-bit
+    }
+    return (hash >>> 0).toString(36);
+  }
+
+  // Attempt to preserve a reasonable file extension from the original URI.
+  static extractExt(uri: string): string {
+    try {
+      const m = uri.match(/\.(jpg|jpeg|png|webp|gif|bmp)(?:\?|$)/i);
+      if (m && m[1]) {
+        return `.${m[1].toLowerCase()}`;
+      }
+    } catch {
+      // ignore
+    }
+    return '.img';
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (this.isInitialized) {
       return;
@@ -228,11 +368,22 @@ class ImageCacheService {
       if (serialized) {
         const parsed = JSON.parse(serialized) as string[];
         if (Array.isArray(parsed)) {
+          let sanitizedAny = false;
           parsed.forEach((uri) => {
             if (typeof uri === 'string' && uri.length) {
-              this.trackedUris.add(uri);
+              const sanitized = this.sanitizeUriForStorage(uri);
+              if (sanitized !== uri) {
+                sanitizedAny = true;
+              }
+              this.trackedUris.add(sanitized);
             }
           });
+          // If any URI contained sensitive query params (eg. apikey), rewrite
+          // the persisted list to the sanitized form so we never persist
+          // secrets.
+          if (sanitizedAny) {
+            await this.persistTrackedUris();
+          }
         }
       }
     } catch (error) {
@@ -246,7 +397,10 @@ class ImageCacheService {
 
   private async persistTrackedUris(): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(this.trackedUris)));
+      // Ensure we never persist secrets (eg. apikey query param). Persist a
+      // sanitized copy of the current URIs.
+      const sanitized = Array.from(this.trackedUris).map((u) => this.sanitizeUriForStorage(u));
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
     } catch (error) {
       void logger.warn('ImageCacheService: failed to persist tracked URIs.', {
         error: this.stringifyError(error),
@@ -296,11 +450,41 @@ class ImageCacheService {
       }
 
       const success = await Image.prefetch(fetchUri, { cachePolicy: 'disk' });
+
+      void logger.debug('ImageCacheService: prefetch result.', { uri, fetchUri, success });
+
+      // If prefetch failed, try a robust fallback by downloading the image
+      // directly into the app cache so we can return a filesystem path. If
+      // prefetch succeeded but the image cache doesn't expose a disk path, we
+      // also attempt the same fallback download — some implementations simply
+      // don't provide a cache path even when prefetch reports success.
       if (!success) {
+        const downloadPath = await this.fallbackDownload(uri, fetchUri);
+        if (downloadPath) {
+          return downloadPath;
+        }
         return null;
       }
 
-      const cachedPath = await this.getCachedPath(uri);
+      // If prefetch succeeded, attempt to resolve the cached path. Some image
+      // cache implementations may not expose a path for the original URI; if
+      // that happens, try to resolve by checking the fetchUri as well.
+      let cachedPath = await this.getCachedPath(uri);
+      if (!cachedPath && fetchUri !== uri) {
+        cachedPath = await this.getCachedPath(fetchUri);
+      }
+
+      if (!cachedPath) {
+        void logger.debug('ImageCacheService: prefetch succeeded but cache path missing; attempting fallback download.', { uri, fetchUri });
+        const downloadPath = await this.fallbackDownload(uri, fetchUri);
+        if (downloadPath) {
+          void logger.info('ImageCacheService: fallback download succeeded after missing cache path.', { uri, fetchUri, downloadPath });
+          return downloadPath;
+        }
+        void logger.warn('ImageCacheService: prefetch succeeded but no cache path available and fallback download failed.', { uri, fetchUri });
+        return null;
+      }
+
       return cachedPath;
     })();
 
@@ -318,38 +502,130 @@ class ImageCacheService {
   }
 
   private async getCachedPath(uri: string): Promise<string | null> {
+    // First, try to resolve the cache path via expo-image. This is the
+    // preferred source of truth for cache locations on platforms where it
+    // exposes filesystem paths.
     const cachedPath = await Image.getCachePathAsync(uri);
-    if (!cachedPath) {
-      return null;
-    }
-
-    const info = await FileSystem.getInfoAsync(cachedPath);
-    if (!info.exists) {
-      return null;
-    }
-
-    const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
-    if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
-      try {
-        await FileSystem.deleteAsync(cachedPath, { idempotent: true });
-        void logger.debug('ImageCacheService: removed stale cached image.', { cachedPath, uri });
-      } catch (error) {
-        void logger.warn('ImageCacheService: failed to delete stale cached image.', {
-          cachedPath,
-          uri,
-          error: this.stringifyError(error),
-        });
+    if (cachedPath) {
+      const info = await FileSystem.getInfoAsync(cachedPath);
+      if (!info.exists) {
+        return null;
       }
-      return null;
+
+      const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+      if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
+        try {
+          await FileSystem.deleteAsync(cachedPath, { idempotent: true });
+          void logger.debug('ImageCacheService: removed stale cached image.', { cachedPath, uri });
+        } catch (error) {
+          void logger.warn('ImageCacheService: failed to delete stale cached image.', {
+            cachedPath,
+            uri,
+            error: this.stringifyError(error),
+          });
+        }
+        return null;
+      }
+
+      return cachedPath;
     }
 
-    return cachedPath;
+    // If expo-image doesn't provide a cache path, check our deterministic
+    // fallback filename that we use when performing a direct download.
+    try {
+      const ext = ImageCacheService.extractExt(uri);
+      const filename = `image-${ImageCacheService.hashUri(uri)}${ext}`;
+      const dest = `${FileSystem.cacheDirectory}${filename}`;
+      const info = await FileSystem.getInfoAsync(dest);
+      if (!info.exists || info.isDirectory) {
+        return null;
+      }
+
+      const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+      if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
+        try {
+          await FileSystem.deleteAsync(dest, { idempotent: true });
+          void logger.debug('ImageCacheService: removed stale fallback cached image.', { dest, uri });
+        } catch (error) {
+          void logger.warn('ImageCacheService: failed to delete stale fallback cached image.', {
+            dest,
+            uri,
+            error: this.stringifyError(error),
+          });
+        }
+        return null;
+      }
+
+      return dest;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Attempt to download an image directly into the app cache and return the
+   * local filesystem path. This is used as a fallback when Image.prefetch
+   * either fails or reports success but no cache path is exposed.
+   */
+  private async fallbackDownload(originalUri: string, fetchUri: string): Promise<string | null> {
+    try {
+      const ext = ImageCacheService.extractExt(originalUri || fetchUri);
+      const filename = `image-${ImageCacheService.hashUri(originalUri || fetchUri)}${ext}`;
+      const dest = `${FileSystem.cacheDirectory}${filename}`;
+      void logger.debug('ImageCacheService: attempting fallback download.', { originalUri, fetchUri, dest });
+      const download = await FileSystem.downloadAsync(fetchUri, dest);
+      // downloadAsync returns an object with status on some platforms
+      if (download && (download.status === 200 || download.status === 0 || download.uri)) {
+        // Make sure file exists
+        const info = await FileSystem.getInfoAsync(dest);
+        if (info.exists && !info.isDirectory) {
+          return dest;
+        }
+      }
+      // If fetchUri download did not create a file try originalUri as a last effort
+      if (fetchUri !== originalUri) {
+        try {
+          const download2 = await FileSystem.downloadAsync(originalUri, dest);
+          if (download2 && (download2.status === 200 || download2.status === 0 || download2.uri)) {
+            const info2 = await FileSystem.getInfoAsync(dest);
+            if (info2.exists && !info2.isDirectory) {
+              return dest;
+            }
+          }
+        } catch (err2) {
+          // keep falling through to return null
+          void logger.debug('ImageCacheService: fallback download with originalUri failed.', { originalUri, error: this.stringifyError(err2) });
+        }
+      }
+    } catch (downloadError) {
+      void logger.warn('ImageCacheService: fallback download failed.', {
+        uri: fetchUri,
+        error: this.stringifyError(downloadError),
+      });
+    }
+
+    return null;
   }
 
   private trackUri(uri: string): void {
-    if (!this.trackedUris.has(uri)) {
-      this.trackedUris.add(uri);
+    const sanitized = this.sanitizeUriForStorage(uri);
+    if (!this.trackedUris.has(sanitized)) {
+      this.trackedUris.add(sanitized);
       void this.persistTrackedUris();
+    }
+  }
+
+  // Remove known sensitive query parameters before persisting URIs and when
+  // storing tracked URIs so we never save API keys to storage.
+  private sanitizeUriForStorage(uri: string): string {
+    try {
+      const parsed = new URL(uri);
+      // Remove apikey and other potentially sensitive params
+      ['apikey', 'token', 'access_token'].forEach((p) => parsed.searchParams.delete(p));
+      parsed.hash = '';
+      return parsed.toString();
+    } catch {
+      return uri;
     }
   }
 

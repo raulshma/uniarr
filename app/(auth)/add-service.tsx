@@ -1,8 +1,9 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View, Pressable } from 'react-native';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ScrollView, StyleSheet, View, Pressable } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   HelperText,
   Text,
@@ -12,38 +13,77 @@ import {
   Modal,
   Divider,
   IconButton,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Controller, useForm } from 'react-hook-form';
-import axios from 'axios';
+  Switch,
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Controller, useForm } from "react-hook-form";
+import axios from "axios";
 
-import { Button } from '@/components/common/Button';
-import type { ConnectionResult } from '@/connectors/base/IConnector';
-import { ConnectorFactory } from '@/connectors/factory/ConnectorFactory';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import type { AppTheme } from '@/constants/theme';
-import type { ServiceConfig, ServiceType } from '@/models/service.types';
-import { queryKeys } from '@/hooks/queryKeys';
-import { logger } from '@/services/logger/LoggerService';
-import { secureStorage } from '@/services/storage/SecureStorage';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { DebugPanel, type DebugStep } from "@/components/common/DebugPanel";
+import type { ConnectionResult } from "@/connectors/base/IConnector";
+import { ConnectorFactory } from "@/connectors/factory/ConnectorFactory";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import type { AppTheme } from "@/constants/theme";
+import type { ServiceConfig, ServiceType } from "@/models/service.types";
+import { queryKeys } from "@/hooks/queryKeys";
+import { logger } from "@/services/logger/LoggerService";
+import { secureStorage } from "@/services/storage/SecureStorage";
+import { spacing } from "@/theme/spacing";
 import {
   serviceConfigSchema,
   type ServiceConfigInput,
-} from '@/utils/validation.utils';
+} from "@/utils/validation.utils";
+import { testApiKeyFormat } from "@/utils/api-key-validator";
+import { debugLogger } from "@/utils/debug-logger";
 
-const allServiceTypes: ServiceType[] = ['sonarr', 'radarr', 'jellyseerr', 'qbittorrent', 'prowlarr'];
+const allServiceTypes: ServiceType[] = [
+  "sonarr",
+  "radarr",
+  "jellyseerr",
+  "jellyfin",
+  "qbittorrent",
+  "transmission",
+  "deluge",
+  "sabnzbd",
+  "nzbget",
+  "rtorrent",
+  "prowlarr",
+  "bazarr",
+];
+const apiKeyServiceTypes = [
+  "sonarr",
+  "radarr",
+  "jellyseerr",
+  "jellyfin",
+  "prowlarr",
+  "bazarr",
+] as const;
+type ApiKeyServiceType = (typeof apiKeyServiceTypes)[number];
+
+const isApiKeyService = (type: ServiceType): type is ApiKeyServiceType =>
+  (apiKeyServiceTypes as readonly ServiceType[]).includes(type);
 
 const serviceTypeLabels: Record<ServiceType, string> = {
-  sonarr: 'Sonarr',
-  radarr: 'Radarr',
-  jellyseerr: 'Jellyseerr',
-  qbittorrent: 'qBittorrent',
-  prowlarr: 'Prowlarr',
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+  jellyseerr: "Jellyseerr",
+  jellyfin: "Jellyfin",
+  qbittorrent: "qBittorrent",
+  transmission: "Transmission",
+  deluge: "Deluge",
+  sabnzbd: "SABnzbd",
+  nzbget: "NZBGet",
+  rtorrent: "rTorrent",
+  prowlarr: "Prowlarr",
+  bazarr: "Bazarr",
 };
 
 const generateServiceId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
 
@@ -57,18 +97,29 @@ const normalizeSensitiveValue = (value?: string): string | undefined => {
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
 };
 
-const buildServiceConfig = (values: ServiceConfigInput, id: string): ServiceConfig => {
+const buildServiceConfig = (
+  values: ServiceConfigInput,
+  id: string
+): ServiceConfig => {
   const now = new Date();
-  const cleanedUrl = values.url.trim().replace(/\/+$/, '');
+  const cleanedUrl = values.url.trim().replace(/\/+$/, "");
+  const apiKey = normalizeSensitiveValue(values.apiKey);
+  let username = normalizeSensitiveValue(values.username);
+  let password = normalizeSensitiveValue(values.password);
+
+  if (values.type === "jellyfin") {
+    username = undefined;
+    password = undefined;
+  }
 
   return {
     id,
     name: values.name.trim(),
     type: values.type,
     url: cleanedUrl,
-    apiKey: normalizeSensitiveValue(values.apiKey),
-    username: normalizeSensitiveValue(values.username),
-    password: normalizeSensitiveValue(values.password),
+    apiKey,
+    username,
+    password,
     enabled: true,
     createdAt: now,
     updatedAt: now,
@@ -77,13 +128,20 @@ const buildServiceConfig = (values: ServiceConfigInput, id: string): ServiceConf
 
 const AddServiceScreen = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const queryClient = useQueryClient();
   const theme = useTheme<AppTheme>();
 
-  const supportedTypes = useMemo(() => ConnectorFactory.getSupportedTypes(), []);
-  const supportedTypeSet = useMemo(() => new Set(supportedTypes), [supportedTypes]);
+  const supportedTypes = useMemo(
+    () => ConnectorFactory.getSupportedTypes(),
+    []
+  );
+  const supportedTypeSet = useMemo(
+    () => new Set(supportedTypes),
+    [supportedTypes]
+  );
 
-  const defaultType = supportedTypes[0] ?? 'sonarr';
+  const defaultType = supportedTypes[0] ?? "sonarr";
 
   const {
     control,
@@ -95,14 +153,14 @@ const AddServiceScreen = () => {
   } = useForm<ServiceConfigInput>({
     resolver: zodResolver(serviceConfigSchema),
     defaultValues: {
-      name: '',
+      name: "",
       type: defaultType,
-      url: '',
-      apiKey: '',
-      username: '',
-      password: '',
+      url: "",
+      apiKey: "",
+      username: "",
+      password: "",
     },
-    mode: 'onChange',
+    mode: "onChange",
   });
 
   const [testResult, setTestResult] = useState<ConnectionResult | null>(null);
@@ -110,12 +168,28 @@ const AddServiceScreen = () => {
   const [isTesting, setIsTesting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [urlValidation, setUrlValidation] = useState<{
-    status: 'idle' | 'validating' | 'success' | 'error';
+    status: "idle" | "validating" | "success" | "error";
     message?: string | null;
-  }>({ status: 'idle', message: null });
+  }>({ status: "idle", message: null });
   const urlValidationController = useRef<AbortController | null>(null);
   const [serviceTypeModalVisible, setServiceTypeModalVisible] = useState(false);
+  const [debugSteps, setDebugSteps] = useState<DebugStep[]>([]);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
+  // Debug showDebugPanel state changes
+  useEffect(() => {
+    console.log("🧪 [AddService] showDebugPanel changed to:", showDebugPanel);
+  }, [showDebugPanel]);
+
+  // Subscribe to debug logger
+  useEffect(() => {
+    const unsubscribe = debugLogger.subscribe((steps) => {
+      console.log("🧪 [AddService] Debug steps updated:", steps);
+      setDebugSteps(steps);
+    });
+    return unsubscribe;
+  }, []);
 
   const styles = useMemo(
     () =>
@@ -125,9 +199,9 @@ const AddServiceScreen = () => {
           backgroundColor: theme.colors.surface,
         },
         headerBar: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.md,
           backgroundColor: theme.colors.surface,
@@ -136,7 +210,7 @@ const AddServiceScreen = () => {
         },
         headerTitle: {
           color: theme.colors.onSurface,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         content: {
           flexGrow: 1,
@@ -150,10 +224,17 @@ const AddServiceScreen = () => {
         },
         heroTitle: {
           color: theme.colors.onSurface,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         heroSubtitle: {
           color: theme.colors.onSurfaceVariant,
+        },
+        scanNetworkButton: {
+          marginTop: spacing.md,
+          backgroundColor: theme.colors.surface,
+        },
+        scanNetworkButtonLabel: {
+          color: theme.colors.primary,
         },
         formCard: {
           gap: spacing.lg,
@@ -163,7 +244,7 @@ const AddServiceScreen = () => {
         },
         sectionLabel: {
           color: theme.colors.onSurface,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         input: {
           borderRadius: 16,
@@ -174,7 +255,7 @@ const AddServiceScreen = () => {
           borderWidth: 1,
         },
         dropdownAnchor: {
-          justifyContent: 'center',
+          justifyContent: "center",
         },
         modalContent: {
           marginHorizontal: spacing.lg,
@@ -191,6 +272,22 @@ const AddServiceScreen = () => {
         },
         optionDisabled: {
           opacity: 0.5,
+        },
+        networkScanHeader: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: spacing.md,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.sm,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.colors.outlineVariant,
+        },
+        networkScanTitle: {
+          fontWeight: "600",
+        },
+        networkScanResults: {
+          flex: 1,
         },
         helperText: {
           marginTop: spacing.xs,
@@ -228,8 +325,20 @@ const AddServiceScreen = () => {
         saveButtonLabel: {
           color: theme.colors.onPrimary,
         },
+        debugToggleContainer: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: spacing.sm,
+        },
+        debugInfoContainer: {
+          marginTop: spacing.sm,
+          paddingTop: spacing.sm,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.outlineVariant,
+        },
       }),
-    [theme],
+    [theme]
   );
 
   const inputTheme = useMemo(
@@ -239,7 +348,7 @@ const AddServiceScreen = () => {
         onSurface: theme.colors.onSurface,
         outline: theme.colors.outlineVariant,
         placeholder: theme.colors.onSurfaceVariant,
-        background: 'transparent',
+        background: "transparent",
       },
     }),
     [
@@ -247,7 +356,7 @@ const AddServiceScreen = () => {
       theme.colors.onSurfaceVariant,
       theme.colors.outlineVariant,
       theme.colors.primary,
-    ],
+    ]
   );
 
   const placeholderColor = theme.colors.onSurfaceVariant;
@@ -256,7 +365,7 @@ const AddServiceScreen = () => {
     setTestResult(null);
     setTestError(null);
     setFormError(null);
-    setUrlValidation({ status: 'idle', message: null });
+    setUrlValidation({ status: "idle", message: null });
     try {
       urlValidationController.current?.abort();
     } catch {
@@ -264,6 +373,33 @@ const AddServiceScreen = () => {
     }
     urlValidationController.current = null;
   }, []);
+
+  // Handle service selection from network scan
+  useEffect(() => {
+    if (params.selectedService) {
+      try {
+        const selectedService = JSON.parse(params.selectedService as string);
+        reset({
+          name: selectedService.name,
+          type: selectedService.type,
+          url: selectedService.url,
+          apiKey: "",
+          username: "",
+          password: "",
+        });
+        resetDiagnostics();
+
+        // Clear the param to avoid re-processing
+        router.setParams({ selectedService: undefined });
+      } catch (error) {
+        console.error("Failed to parse selected service:", error);
+      }
+    }
+  }, [params.selectedService, reset, resetDiagnostics, router]);
+
+  const handleScanNetwork = useCallback((): void => {
+    router.push("/network-scan");
+  }, [router]);
 
   const runConnectionTest = useCallback(
     async (config: ServiceConfig): Promise<ConnectionResult> => {
@@ -275,36 +411,86 @@ const AddServiceScreen = () => {
         connector.dispose();
       }
     },
-    [],
+    []
   );
 
   const handleTestConnection = useCallback(
-    async (values: ServiceConfigInput) => {
+    async (values: ServiceConfigInput): Promise<void> => {
+      console.log(
+        "🧪 [AddService] handleTestConnection called with values:",
+        values
+      );
+      console.log("🧪 [AddService] Form errors:", errors);
       resetDiagnostics();
+      debugLogger.clear();
+      setShowDebugPanel(true);
+      console.log("🧪 [AddService] Debug panel should be visible now");
 
       if (!supportedTypeSet.has(values.type)) {
-        setTestError('Selected service type is not available yet.');
+        console.log("❌ [AddService] Service type not supported:", values.type);
+        debugLogger.addError(
+          "Service type not supported",
+          `Selected service type '${values.type}' is not available yet.`
+        );
+        setTestError("Selected service type is not available yet.");
         return;
       }
 
+      console.log("🧪 [AddService] Starting test connection...");
       setIsTesting(true);
 
       try {
         const config = buildServiceConfig(values, generateServiceId());
+
+        // Validate API key format first (skip for download clients that use username/password)
+        if (values.apiKey && isApiKeyService(values.type)) {
+          const serviceType = values.type as ApiKeyServiceType;
+          const apiKeyTest = testApiKeyFormat(values.apiKey, serviceType);
+          debugLogger.addApiKeyValidation(
+            apiKeyTest.isValid,
+            apiKeyTest.message,
+            apiKeyTest.suggestions
+          );
+
+          if (!apiKeyTest.isValid) {
+            setTestError(
+              `${apiKeyTest.message}. ${apiKeyTest.suggestions.join(" ")}`
+            );
+            return;
+          }
+        }
+
+        console.log(
+          "🧪 [AddService] Starting connection test for:",
+          config.type,
+          config.url
+        );
         const result = await runConnectionTest(config);
+        console.log("🧪 [AddService] Connection test result:", result);
 
         if (result.success) {
           setTestResult(result);
+          console.log("✅ [AddService] Connection test successful");
         } else {
-          setTestError(result.message ?? 'Unable to connect to the selected service.');
+          console.log(
+            "❌ [AddService] Connection test failed:",
+            result.message
+          );
+          setTestError(
+            result.message ?? "Unable to connect to the selected service."
+          );
         }
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : 'Unable to test the connection. Check the configuration and try again.';
+          error instanceof Error
+            ? error.message
+            : "Unable to test the connection. Check the configuration and try again.";
+        console.error("❌ [AddService] Connection test error:", error);
+        debugLogger.addError("Connection test failed", message);
         setTestError(message);
 
-        void logger.warn('Service connection test failed.', {
-          location: 'AddServiceScreen.handleTestConnection',
+        void logger.warn("Service connection test failed.", {
+          location: "AddServiceScreen.handleTestConnection",
           serviceType: values.type,
           message,
         });
@@ -312,77 +498,122 @@ const AddServiceScreen = () => {
         setIsTesting(false);
       }
     },
-    [resetDiagnostics, runConnectionTest, supportedTypeSet],
+    [resetDiagnostics, runConnectionTest, supportedTypeSet]
   );
 
   const handleSave = useCallback(
-    async (values: ServiceConfigInput) => {
+    async (values: ServiceConfigInput): Promise<void> => {
+      console.log("💾 [AddService] handleSave called with values:", values);
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
-        setFormError('This service type is not supported yet.');
+        console.log("❌ Service type not supported:", values.type);
+        setFormError("This service type is not supported yet.");
         return;
       }
 
       const config = buildServiceConfig(values, generateServiceId());
+      console.log("📋 Built config for save:", config);
 
       try {
+        console.log("🔍 Checking existing services...");
         const existingServices = await secureStorage.getServiceConfigs();
+        console.log("📋 Existing services:", existingServices.length);
 
-        if (existingServices.some((service) => service.name.trim().toLowerCase() === config.name.toLowerCase())) {
-          setFormError('A service with this name already exists. Choose a different name.');
+        if (
+          existingServices.some(
+            (service) =>
+              service.name.trim().toLowerCase() === config.name.toLowerCase()
+          )
+        ) {
+          console.log("❌ Service name already exists");
+          setFormError(
+            "A service with this name already exists. Choose a different name."
+          );
           return;
         }
 
         if (
           existingServices.some(
-            (service) => service.type === config.type && service.url.toLowerCase() === config.url.toLowerCase(),
+            (service) =>
+              service.type === config.type &&
+              service.url.toLowerCase() === config.url.toLowerCase()
           )
         ) {
-          setFormError('This service is already configured.');
+          console.log("❌ Service already configured");
+          setFormError("This service is already configured.");
           return;
         }
 
+        console.log("🔄 Testing connection before save...");
         const testOutcome = await runConnectionTest(config);
+        console.log("✅ Connection test result for save:", testOutcome);
 
         if (!testOutcome.success) {
-          setFormError(testOutcome.message ?? 'Unable to verify the connection.');
+          console.log(
+            "❌ Connection test failed during save:",
+            testOutcome.message
+          );
+          setFormError(
+            testOutcome.message ?? "Unable to verify the connection."
+          );
           return;
         }
 
+        console.log("💾 Adding connector to manager...");
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
+        console.log("✅ Connector added to manager");
 
-        await queryClient.invalidateQueries({ queryKey: queryKeys.services.overview });
+        console.log("🔄 Invalidating queries...");
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.services.overview,
+        });
+        console.log("✅ Queries invalidated");
 
-        Alert.alert('Service added', `${serviceTypeLabels[config.type]} has been connected successfully.`, [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]);
+        console.log("🎉 Service saved successfully, showing alert...");
+  alert(
+          "Service added",
+          `${serviceTypeLabels[config.type]} has been connected successfully.`,
+          [
+            {
+              text: "OK",
+              onPress: () => router.back(),
+            },
+          ]
+        );
 
         reset({
-          name: '',
+          name: "",
           type: config.type,
-          url: '',
-          apiKey: '',
-          username: '',
-          password: '',
+          url: "",
+          apiKey: "",
+          username: "",
+          password: "",
         });
       } catch (error) {
+        console.error("❌ Save service error:", error);
         const message =
-          error instanceof Error ? error.message : 'Something went wrong while saving the service configuration.';
+          error instanceof Error
+            ? error.message
+            : "Something went wrong while saving the service configuration.";
         setFormError(message);
 
-        void logger.error('Failed to add service configuration.', {
-          location: 'AddServiceScreen.handleSave',
+        void logger.error("Failed to add service configuration.", {
+          location: "AddServiceScreen.handleSave",
           serviceType: config.type,
           message,
         });
       }
     },
-    [queryClient, reset, resetDiagnostics, router, runConnectionTest, supportedTypeSet],
+    [
+      queryClient,
+      reset,
+      resetDiagnostics,
+      router,
+      runConnectionTest,
+      supportedTypeSet,
+    ]
   );
 
   const serviceOptions = useMemo(
@@ -393,7 +624,7 @@ const AddServiceScreen = () => {
         supported: supportedTypeSet.has(type),
         isLast: index === allServiceTypes.length - 1,
       })),
-    [supportedTypeSet],
+    [supportedTypeSet]
   );
 
   return (
@@ -422,8 +653,18 @@ const AddServiceScreen = () => {
             Connect your automation services
           </Text>
           <Text variant="bodyMedium" style={styles.heroSubtitle}>
-            Enter the connection details exactly as configured in your media server.
+            Enter the connection details exactly as configured in your media
+            server.
           </Text>
+          <Button
+            mode="outlined"
+            onPress={handleScanNetwork}
+            style={styles.scanNetworkButton}
+            labelStyle={styles.scanNetworkButtonLabel}
+            icon="lan"
+          >
+            Scan Network for Services
+          </Button>
         </View>
 
         <View style={styles.formCard}>
@@ -434,37 +675,50 @@ const AddServiceScreen = () => {
             <Controller
               name="type"
               control={control}
-              render={({ field: { value, onChange } }) => (
-                  <>
-                    <Pressable
-                      onPress={() => setServiceTypeModalVisible(true)}
-                      style={styles.dropdownAnchor}
-                      accessibilityRole="button"
-                    >
-                      <TextInput
-                        value={serviceTypeLabels[value]}
-                        mode="outlined"
-                        style={styles.input}
-                        outlineStyle={styles.outline}
-                        theme={inputTheme}
-                        placeholderTextColor={placeholderColor}
-                        right={
-                          <TextInput.Icon
-                            icon="chevron-down"
-                            onPress={() => setServiceTypeModalVisible(true)}
-                          />
-                        }
-                        editable={false}
-                      />
-                    </Pressable>
+              render={({
+                field: { value, onChange },
+              }: {
+                field: {
+                  value: ServiceType;
+                  onChange: (value: ServiceType) => void;
+                };
+              }) => (
+                <>
+                  <Pressable
+                    onPress={() => setServiceTypeModalVisible(true)}
+                    style={styles.dropdownAnchor}
+                    accessibilityRole="button"
+                  >
+                    <TextInput
+                      value={serviceTypeLabels[value]}
+                      mode="outlined"
+                      style={styles.input}
+                      outlineStyle={styles.outline}
+                      theme={inputTheme}
+                      placeholderTextColor={placeholderColor}
+                      right={
+                        <TextInput.Icon
+                          icon="chevron-down"
+                          onPress={() => setServiceTypeModalVisible(true)}
+                        />
+                      }
+                      editable={false}
+                    />
+                  </Pressable>
 
-                    <Portal>
-                      <Modal
-                        visible={serviceTypeModalVisible}
-                        onDismiss={() => setServiceTypeModalVisible(false)}
-                        contentContainerStyle={styles.modalContent}
-                      >
-                        {serviceOptions.map((option) => (
+                  <Portal>
+                    <Modal
+                      visible={serviceTypeModalVisible}
+                      onDismiss={() => setServiceTypeModalVisible(false)}
+                      contentContainerStyle={styles.modalContent}
+                    >
+                      {serviceOptions.map(
+                        (option: {
+                          type: ServiceType;
+                          label: string;
+                          supported: boolean;
+                          isLast: boolean;
+                        }) => (
                           <View key={option.type}>
                             <Pressable
                               onPress={() => {
@@ -474,23 +728,28 @@ const AddServiceScreen = () => {
                                   setServiceTypeModalVisible(false);
                                 }
                               }}
-                              style={({ pressed }) => [
+                              style={({ pressed }: { pressed: boolean }) => [
                                 styles.optionItem,
                                 option.supported ? null : styles.optionDisabled,
                                 pressed ? { opacity: 0.7 } : null,
                               ]}
-                              accessibilityRole={option.supported ? 'button' : 'text'}
+                              accessibilityRole={
+                                option.supported ? "button" : "text"
+                              }
                             >
                               <Text style={styles.optionText}>
-                                {option.supported ? option.label : `${option.label} (coming soon)`}
+                                {option.supported
+                                  ? option.label
+                                  : `${option.label} (coming soon)`}
                               </Text>
                             </Pressable>
                             {!option.isLast && <Divider />}
                           </View>
-                        ))}
-                      </Modal>
-                    </Portal>
-                  </>
+                        )
+                      )}
+                    </Modal>
+                  </Portal>
+                </>
               )}
             />
             {errors.type ? (
@@ -507,10 +766,18 @@ const AddServiceScreen = () => {
             <Controller
               name="name"
               control={control}
-              render={({ field: { value, onChange, onBlur } }) => (
+              render={({
+                field: { value, onChange, onBlur },
+              }: {
+                field: {
+                  value: string;
+                  onChange: (value: string) => void;
+                  onBlur: () => void;
+                };
+              }) => (
                 <TextInput
                   value={value}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     resetDiagnostics();
                     onChange(text);
                   }}
@@ -540,16 +807,24 @@ const AddServiceScreen = () => {
             <Controller
               name="url"
               control={control}
-              render={({ field: { value, onChange, onBlur } }) => (
+              render={({
+                field: { value, onChange, onBlur },
+              }: {
+                field: {
+                  value: string;
+                  onChange: (value: string) => void;
+                  onBlur: () => void;
+                };
+              }) => (
                 <TextInput
                   value={value}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     resetDiagnostics();
                     // Clear any previous URL validation state while user edits
-                    setUrlValidation({ status: 'idle', message: null });
+                    setUrlValidation({ status: "idle", message: null });
                     onChange(text);
                   }}
-                  onBlur={async () => {
+                  onBlur={async (): Promise<void> => {
                     onBlur();
 
                     // If there is already a synchronous validation error from zod, skip async validation
@@ -568,7 +843,10 @@ const AddServiceScreen = () => {
                     const controller = new AbortController();
                     urlValidationController.current = controller;
 
-                    setUrlValidation({ status: 'validating', message: 'Validating URL...' });
+                    setUrlValidation({
+                      status: "validating",
+                      message: "Validating URL...",
+                    });
 
                     try {
                       const response = await axios.get(trimmed, {
@@ -581,21 +859,27 @@ const AddServiceScreen = () => {
                       // If the request was aborted, do nothing
                       if (controller.signal.aborted) return;
 
-                      if (response && typeof response.status === 'number') {
-                        setUrlValidation({ status: 'success', message: 'URL is reachable.' });
-                        clearErrors('url');
+                      if (response && typeof response.status === "number") {
+                        setUrlValidation({
+                          status: "success",
+                          message: "URL is reachable.",
+                        });
+                        clearErrors("url");
                       } else {
-                        const msg = 'No response from the host.';
-                        setUrlValidation({ status: 'error', message: msg });
-                        setError('url', { type: 'validate', message: msg });
+                        const msg = "No response from the host.";
+                        setUrlValidation({ status: "error", message: msg });
+                        setError("url", { type: "validate", message: msg });
                       }
                     } catch (error) {
                       // If canceled, ignore
-                      if ((error as any)?.name === 'CanceledError') return;
+                      if ((error as any)?.name === "CanceledError") return;
 
-                      const message = error instanceof Error ? error.message : 'Unable to reach the specified URL.';
-                      setUrlValidation({ status: 'error', message });
-                      setError('url', { type: 'validate', message });
+                      const message =
+                        error instanceof Error
+                          ? error.message
+                          : "Unable to reach the specified URL.";
+                      setUrlValidation({ status: "error", message });
+                      setError("url", { type: "validate", message });
                     } finally {
                       urlValidationController.current = null;
                     }
@@ -616,15 +900,15 @@ const AddServiceScreen = () => {
               <HelperText type="error" visible style={styles.helperText}>
                 {errors.url.message}
               </HelperText>
-            ) : urlValidation.status === 'validating' ? (
+            ) : urlValidation.status === "validating" ? (
               <HelperText type="info" visible style={styles.helperText}>
                 {urlValidation.message}
               </HelperText>
-            ) : urlValidation.status === 'success' ? (
+            ) : urlValidation.status === "success" ? (
               <HelperText type="info" visible style={styles.helperText}>
                 {urlValidation.message}
               </HelperText>
-            ) : urlValidation.status === 'error' ? (
+            ) : urlValidation.status === "error" ? (
               <HelperText type="error" visible style={styles.helperText}>
                 {urlValidation.message}
               </HelperText>
@@ -634,8 +918,17 @@ const AddServiceScreen = () => {
           <Controller
             name="type"
             control={control}
-            render={({ field: { value: serviceType } }) => {
-              if (serviceType === 'qbittorrent') {
+            render={({
+              field: { value: serviceType },
+            }: {
+              field: { value: ServiceType };
+            }) => {
+              // Services that use username/password authentication instead of API keys
+              if (
+                serviceType === "qbittorrent" ||
+                serviceType === "transmission" ||
+                serviceType === "deluge"
+              ) {
                 return (
                   <>
                     <View style={styles.formField}>
@@ -645,10 +938,18 @@ const AddServiceScreen = () => {
                       <Controller
                         name="username"
                         control={control}
-                        render={({ field: { value, onChange, onBlur } }) => (
+                        render={({
+                          field: { value, onChange, onBlur },
+                        }: {
+                          field: {
+                            value: string | undefined;
+                            onChange: (value: string) => void;
+                            onBlur: () => void;
+                          };
+                        }) => (
                           <TextInput
                             value={value}
-                            onChangeText={(text) => {
+                            onChangeText={(text: string) => {
                               resetDiagnostics();
                               onChange(text);
                             }}
@@ -665,7 +966,11 @@ const AddServiceScreen = () => {
                         )}
                       />
                       {errors.username ? (
-                        <HelperText type="error" visible style={styles.helperText}>
+                        <HelperText
+                          type="error"
+                          visible
+                          style={styles.helperText}
+                        >
                           {errors.username.message}
                         </HelperText>
                       ) : null}
@@ -678,10 +983,18 @@ const AddServiceScreen = () => {
                       <Controller
                         name="password"
                         control={control}
-                        render={({ field: { value, onChange, onBlur } }) => (
+                        render={({
+                          field: { value, onChange, onBlur },
+                        }: {
+                          field: {
+                            value: string | undefined;
+                            onChange: (value: string) => void;
+                            onBlur: () => void;
+                          };
+                        }) => (
                           <TextInput
                             value={value}
-                            onChangeText={(text) => {
+                            onChangeText={(text: string) => {
                               resetDiagnostics();
                               onChange(text);
                             }}
@@ -699,7 +1012,11 @@ const AddServiceScreen = () => {
                         )}
                       />
                       {errors.password ? (
-                        <HelperText type="error" visible style={styles.helperText}>
+                        <HelperText
+                          type="error"
+                          visible
+                          style={styles.helperText}
+                        >
                           {errors.password.message}
                         </HelperText>
                       ) : null}
@@ -716,10 +1033,18 @@ const AddServiceScreen = () => {
                   <Controller
                     name="apiKey"
                     control={control}
-                    render={({ field: { value, onChange, onBlur } }) => (
+                    render={({
+                      field: { value, onChange, onBlur },
+                    }: {
+                      field: {
+                        value: string | undefined;
+                        onChange: (value: string) => void;
+                        onBlur: () => void;
+                      };
+                    }) => (
                       <TextInput
                         value={value}
-                        onChangeText={(text) => {
+                        onChangeText={(text: string) => {
                           resetDiagnostics();
                           onChange(text);
                         }}
@@ -766,16 +1091,62 @@ const AddServiceScreen = () => {
             <View style={[styles.diagnosticsCard, styles.diagnosticsSuccess]}>
               <Text variant="bodySmall" style={styles.diagnosticsText}>
                 Connection successful
-                {testResult.version ? ` · Version ${testResult.version}` : ''}
-                {typeof testResult.latency === 'number' ? ` · ${testResult.latency} ms` : ''}
+                {testResult.version ? ` · Version ${testResult.version}` : ""}
+                {typeof testResult.latency === "number"
+                  ? ` · ${testResult.latency} ms`
+                  : ""}
               </Text>
             </View>
           ) : null}
 
+          {/* Debug Information Toggle */}
+          <View
+            style={[
+              styles.diagnosticsCard,
+              { backgroundColor: theme.colors.surfaceVariant },
+            ]}
+          >
+            <View style={styles.debugToggleContainer}>
+              <Text variant="bodySmall" style={styles.diagnosticsText}>
+                Show Debug Information
+              </Text>
+              <Switch
+                value={showDebugInfo}
+                onValueChange={setShowDebugInfo}
+                color={theme.colors.primary}
+              />
+            </View>
+            {showDebugInfo && (
+              <View style={styles.debugInfoContainer}>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Form Errors: {JSON.stringify(errors, null, 2)}
+                </Text>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Is Submitting: {isSubmitting.toString()}
+                </Text>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Is Testing: {isTesting.toString()}
+                </Text>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Show Debug Panel: {showDebugPanel.toString()}
+                </Text>
+                <Text variant="bodySmall" style={styles.diagnosticsText}>
+                  Debug Steps Count: {debugSteps.length}
+                </Text>
+              </View>
+            )}
+          </View>
+
           <View style={styles.actions}>
             <Button
               mode="contained"
-              onPress={handleSubmit(handleTestConnection)}
+              onPress={() => {
+                console.log("🧪 [AddService] Test Connection button pressed");
+                console.log("🧪 [AddService] Form errors:", errors);
+                console.log("🧪 [AddService] Is submitting:", isSubmitting);
+                console.log("🧪 [AddService] Is testing:", isTesting);
+                handleSubmit(handleTestConnection)();
+              }}
               loading={isTesting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.surface}
@@ -788,7 +1159,13 @@ const AddServiceScreen = () => {
 
             <Button
               mode="contained"
-              onPress={handleSubmit(handleSave)}
+              onPress={() => {
+                console.log("💾 [AddService] Save Service button pressed");
+                console.log("💾 [AddService] Form errors:", errors);
+                console.log("💾 [AddService] Is submitting:", isSubmitting);
+                console.log("💾 [AddService] Is testing:", isTesting);
+                handleSubmit(handleSave)();
+              }}
               loading={isSubmitting}
               disabled={isSubmitting || isTesting}
               buttonColor={theme.colors.primary}
@@ -801,6 +1178,16 @@ const AddServiceScreen = () => {
           </View>
         </View>
       </ScrollView>
+
+      <DebugPanel
+        steps={debugSteps}
+        isVisible={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+        onClear={() => {
+          debugLogger.clear();
+          setDebugSteps([]);
+        }}
+      />
     </SafeAreaView>
   );
 };

@@ -149,3 +149,14 @@ export interface JellyseerrSearchResult {
   readonly isRequested?: boolean;
   readonly mediaStatus?: JellyseerrRequestStatus;
 }
+
+export interface JellyseerrCreditPerson {
+  readonly id?: number;
+  readonly name?: string;
+  readonly character?: string;
+  readonly profileUrl?: string;
+}
+
+export interface JellyseerrCreditsResult {
+  readonly cast?: JellyseerrCreditPerson[];
+}

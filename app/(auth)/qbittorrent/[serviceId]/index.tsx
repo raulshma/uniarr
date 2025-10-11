@@ -1,8 +1,9 @@
-import { FlashList } from '@shopify/flash-list';
-import { useFocusEffect } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { FlashList } from "@shopify/flash-list";
+import { useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
 import {
   IconButton,
   ProgressBar,
@@ -10,20 +11,20 @@ import {
   SegmentedButtons,
   Text,
   useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Button } from '@/components/common/Button';
-import { EmptyState } from '@/components/common/EmptyState';
-import { ListRefreshControl } from '@/components/common/ListRefreshControl';
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
-import { TorrentCardSkeleton } from '@/components/torrents';
-import type { AppTheme } from '@/constants/theme';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import { useQBittorrentTorrents } from '@/hooks/useQBittorrentTorrents';
-import type { Torrent } from '@/models/torrent.types';
-import { logger } from '@/services/logger/LoggerService';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ListRefreshControl } from "@/components/common/ListRefreshControl";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { TorrentCardSkeleton } from "@/components/torrents";
+import type { AppTheme } from "@/constants/theme";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { useQBittorrentTorrents } from "@/hooks/useQBittorrentTorrents";
+import type { Torrent } from "@/models/torrent.types";
+import { logger } from "@/services/logger/LoggerService";
+import { spacing } from "@/theme/spacing";
 import {
   deriveTorrentStatusLabel,
   formatBytes,
@@ -32,20 +33,26 @@ import {
   isTorrentActive,
   isTorrentCompleted,
   isTorrentPaused,
-} from '@/utils/torrent.utils';
+} from "@/utils/torrent.utils";
 
-const FILTER_ALL = 'all';
-const FILTER_ACTIVE = 'active';
-const FILTER_COMPLETED = 'completed';
-const FILTER_PAUSED = 'paused';
+const FILTER_ALL = "all";
+const FILTER_ACTIVE = "active";
+const FILTER_COMPLETED = "completed";
+const FILTER_PAUSED = "paused";
 
-type FilterValue = typeof FILTER_ALL | typeof FILTER_ACTIVE | typeof FILTER_COMPLETED | typeof FILTER_PAUSED;
+type FilterValue =
+  | typeof FILTER_ALL
+  | typeof FILTER_ACTIVE
+  | typeof FILTER_COMPLETED
+  | typeof FILTER_PAUSED;
 
-type TorrentAction = 'pause' | 'resume';
+type TorrentAction = "pause" | "resume";
 
 const QBittorrentServiceScreen = () => {
-  const { serviceId: rawServiceId } = useLocalSearchParams<{ serviceId?: string }>();
-  const serviceId = typeof rawServiceId === 'string' ? rawServiceId : '';
+  const { serviceId: rawServiceId } = useLocalSearchParams<{
+    serviceId?: string;
+  }>();
+  const serviceId = typeof rawServiceId === "string" ? rawServiceId : "";
   const hasValidServiceId = serviceId.length > 0;
 
   const router = useRouter();
@@ -53,10 +60,12 @@ const QBittorrentServiceScreen = () => {
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterValue, setFilterValue] = useState<FilterValue>(FILTER_ALL);
-  const [pendingAction, setPendingAction] = useState<TorrentAction | null>(null);
+  const [pendingAction, setPendingAction] = useState<TorrentAction | null>(
+    null
+  );
   const [pendingHash, setPendingHash] = useState<string | null>(null);
 
   const {
@@ -108,8 +117,11 @@ const QBittorrentServiceScreen = () => {
           await manager.loadSavedServices();
         }
       } catch (bootstrapError) {
-        const message = bootstrapError instanceof Error ? bootstrapError.message : 'Failed to preload qBittorrent connector.';
-        void logger.warn('Failed to bootstrap qBittorrent connector.', {
+        const message =
+          bootstrapError instanceof Error
+            ? bootstrapError.message
+            : "Failed to preload qBittorrent connector.";
+        void logger.warn("Failed to bootstrap qBittorrent connector.", {
           serviceId,
           message,
         });
@@ -135,29 +147,36 @@ const QBittorrentServiceScreen = () => {
 
       void refetch();
       void refreshTransferInfo();
-    }, [hasValidServiceId, refetch, refreshTransferInfo]),
+    }, [hasValidServiceId, refetch, refreshTransferInfo])
   );
 
-  const connector = hasValidServiceId ? manager.getConnector(serviceId) : undefined;
-  const connectorIsQBittorrent = connector?.config.type === 'qbittorrent';
+  const connector = hasValidServiceId
+    ? manager.getConnector(serviceId)
+    : undefined;
+  const connectorIsQBittorrent = connector?.config.type === "qbittorrent";
 
-  const isInitialLoad = isBootstrapping || isLoading || (isTransferLoading && !transferInfo);
+  const isInitialLoad =
+    isBootstrapping || isLoading || (isTransferLoading && !transferInfo);
   const isRefreshing = isFetching && !isLoading;
   const isMutating = isPausing || isResuming || isDeleting || isRechecking;
 
-  const combinedError = pauseError ?? resumeError ?? deleteError ?? recheckError ?? transferError;
+  const combinedError =
+    pauseError ?? resumeError ?? deleteError ?? recheckError ?? transferError;
 
   useEffect(() => {
     if (!combinedError) {
       return;
     }
 
-    const message = combinedError instanceof Error ? combinedError.message : String(combinedError);
-    void logger.warn('qBittorrent action failed.', {
+    const message =
+      combinedError instanceof Error
+        ? combinedError.message
+        : String(combinedError);
+    void logger.warn("qBittorrent action failed.", {
       serviceId,
       message,
     });
-    Alert.alert('Action failed', message);
+  alert("Action failed", message);
   }, [combinedError, serviceId]);
 
   const filteredTorrents = useMemo(() => {
@@ -169,7 +188,11 @@ const QBittorrentServiceScreen = () => {
 
     return torrents.filter((torrent) => {
       if (query.length > 0) {
-        const haystack = [torrent.name, torrent.category, ...(torrent.tags ?? [])]
+        const haystack = [
+          torrent.name,
+          torrent.category,
+          ...(torrent.tags ?? []),
+        ]
           .filter(Boolean)
           .map((value) => value!.toLowerCase());
 
@@ -195,9 +218,11 @@ const QBittorrentServiceScreen = () => {
   const summary = useMemo(() => {
     const list = torrents ?? [];
     const total = list.length;
-  const active = list.filter((torrent) => isTorrentActive(torrent)).length;
-  const completed = list.filter((torrent) => isTorrentCompleted(torrent)).length;
-  const paused = list.filter((torrent) => isTorrentPaused(torrent)).length;
+    const active = list.filter((torrent) => isTorrentActive(torrent)).length;
+    const completed = list.filter((torrent) =>
+      isTorrentCompleted(torrent)
+    ).length;
+    const paused = list.filter((torrent) => isTorrentPaused(torrent)).length;
 
     return { total, active, completed, paused };
   }, [torrents]);
@@ -218,9 +243,9 @@ const QBittorrentServiceScreen = () => {
           paddingBottom: spacing.md,
         },
         headerRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: spacing.sm,
         },
         headerTitle: {
@@ -245,9 +270,9 @@ const QBittorrentServiceScreen = () => {
           padding: spacing.md,
         },
         torrentHeader: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: spacing.xs,
         },
         torrentName: {
@@ -262,8 +287,8 @@ const QBittorrentServiceScreen = () => {
           marginVertical: spacing.sm,
         },
         metaRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
+          flexDirection: "row",
+          flexWrap: "wrap",
           gap: spacing.sm,
           marginBottom: spacing.sm,
         },
@@ -271,13 +296,13 @@ const QBittorrentServiceScreen = () => {
           color: theme.colors.onSurfaceVariant,
         },
         actionRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
         },
         actionButtons: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
         },
         itemSeparator: {
           height: spacing.md,
@@ -287,7 +312,7 @@ const QBittorrentServiceScreen = () => {
           paddingTop: spacing.xl,
         },
         summaryRow: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.md,
           marginBottom: spacing.md,
         },
@@ -303,14 +328,14 @@ const QBittorrentServiceScreen = () => {
         },
         summaryValue: {
           color: theme.colors.onSurface,
-          fontWeight: '600',
+          fontWeight: "600",
         },
       }),
-    [theme],
+    [theme]
   );
 
   const handleViewDownloads = useCallback(() => {
-    router.push('/(auth)/downloads');
+    router.push("/(auth)/downloads");
   }, [router]);
 
   const handleRetry = useCallback(() => {
@@ -327,7 +352,7 @@ const QBittorrentServiceScreen = () => {
       setPendingAction(action);
       setPendingHash(torrent.hash);
       try {
-        if (action === 'pause') {
+        if (action === "pause") {
           await pauseTorrentAsync(torrent.hash);
         } else {
           await resumeTorrentAsync(torrent.hash);
@@ -336,7 +361,7 @@ const QBittorrentServiceScreen = () => {
         setPendingHash(null);
       }
     },
-    [isMutating, pauseTorrentAsync, resumeTorrentAsync],
+    [isMutating, pauseTorrentAsync, resumeTorrentAsync]
   );
 
   const confirmDeleteTorrent = useCallback(
@@ -345,24 +370,32 @@ const QBittorrentServiceScreen = () => {
         return;
       }
 
-      Alert.alert(
-        'Remove torrent',
+  alert(
+        "Remove torrent",
         `Do you want to remove "${torrent.name}" from qBittorrent?`,
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: "Cancel", style: "cancel" },
           {
-            text: 'Delete data',
-            style: 'destructive',
-            onPress: () => void deleteTorrentAsync({ hash: torrent.hash, deleteFiles: true }),
+            text: "Delete data",
+            style: "destructive",
+            onPress: () =>
+              void deleteTorrentAsync({
+                hash: torrent.hash,
+                deleteFiles: true,
+              }),
           },
           {
-            text: 'Remove only',
-            onPress: () => void deleteTorrentAsync({ hash: torrent.hash, deleteFiles: false }),
+            text: "Remove only",
+            onPress: () =>
+              void deleteTorrentAsync({
+                hash: torrent.hash,
+                deleteFiles: false,
+              }),
           },
-        ],
+        ]
       );
     },
-    [deleteTorrentAsync, isMutating],
+    [deleteTorrentAsync, isMutating]
   );
 
   const handleForceRecheck = useCallback(
@@ -373,24 +406,28 @@ const QBittorrentServiceScreen = () => {
 
       await forceRecheckAsync(torrent.hash);
     },
-    [forceRecheckAsync, isMutating],
+    [forceRecheckAsync, isMutating]
   );
 
   const renderTorrentItem = useCallback(
     ({ item }: { item: Torrent }) => {
-  const paused = isTorrentPaused(item);
+      const paused = isTorrentPaused(item);
       const progress = Math.max(0, Math.min(1, item.progress));
       const percent = Math.round(progress * 1000) / 10;
-  const statusLabel = deriveTorrentStatusLabel(item);
-      const etaLabel = percent >= 100 ? 'Complete' : formatEta(item.eta);
-      const action: TorrentAction = paused ? 'resume' : 'pause';
-      const actionIcon = paused ? 'play' : 'pause';
+      const statusLabel = deriveTorrentStatusLabel(item);
+      const etaLabel = percent >= 100 ? "Complete" : formatEta(item.eta);
+      const action: TorrentAction = paused ? "resume" : "pause";
+      const actionIcon = paused ? "play" : "pause";
       const isActionPending = pendingHash === item.hash && isMutating;
 
       return (
         <View style={themeStyles.torrentCard}>
           <View style={themeStyles.torrentHeader}>
-            <Text variant="titleMedium" numberOfLines={2} style={themeStyles.torrentName}>
+            <Text
+              variant="titleMedium"
+              numberOfLines={2}
+              style={themeStyles.torrentName}
+            >
               {item.name}
             </Text>
             <Text variant="bodyMedium" style={themeStyles.torrentStatus}>
@@ -445,95 +482,114 @@ const QBittorrentServiceScreen = () => {
         </View>
       );
     },
-    [confirmDeleteTorrent, handleForceRecheck, isMutating, pendingAction, performPauseResume, theme.colors.primary, themeStyles],
+    [
+      confirmDeleteTorrent,
+      handleForceRecheck,
+      isMutating,
+      pendingAction,
+      performPauseResume,
+      theme.colors.primary,
+      themeStyles,
+    ]
   );
 
   const keyExtractor = useCallback((item: Torrent) => item.hash, []);
 
-  const listHeader = useMemo(() => (
-    <View style={themeStyles.listHeader}>
-      <View style={themeStyles.headerRow}>
-        <View>
-          <Text variant="headlineSmall" style={themeStyles.headerTitle}>
-            Torrents
-          </Text>
-          <Text variant="bodySmall" style={themeStyles.headerMeta}>
-            Showing {filteredTorrents.length} of {summary.total} torrents
-          </Text>
+  const listHeader = useMemo(
+    () => (
+      <View style={themeStyles.listHeader}>
+        <View style={themeStyles.headerRow}>
+          <View>
+            <Text variant="headlineSmall" style={themeStyles.headerTitle}>
+              Torrents
+            </Text>
+            <Text variant="bodySmall" style={themeStyles.headerMeta}>
+              Showing {filteredTorrents.length} of {summary.total} torrents
+            </Text>
+          </View>
+          <Button mode="text" onPress={handleViewDownloads}>
+            Downloads Overview
+          </Button>
         </View>
-        <Button mode="text" onPress={handleViewDownloads}>
-          Downloads Overview
-        </Button>
-      </View>
-      <View style={themeStyles.summaryRow}>
-        <View style={themeStyles.summaryChip}>
-          <Text variant="labelSmall" style={themeStyles.summaryLabel}>
-            Active
-          </Text>
-          <Text variant="titleMedium" style={themeStyles.summaryValue}>
-            {summary.active}
-          </Text>
-        </View>
-        <View style={themeStyles.summaryChip}>
-          <Text variant="labelSmall" style={themeStyles.summaryLabel}>
-            Completed
-          </Text>
-          <Text variant="titleMedium" style={themeStyles.summaryValue}>
-            {summary.completed}
-          </Text>
-        </View>
-        <View style={themeStyles.summaryChip}>
-          <Text variant="labelSmall" style={themeStyles.summaryLabel}>
-            Paused
-          </Text>
-          <Text variant="titleMedium" style={themeStyles.summaryValue}>
-            {summary.paused}
-          </Text>
-        </View>
-      </View>
-      <Searchbar
-        placeholder="Search torrents"
-        value={searchTerm}
-        onChangeText={setSearchTerm}
-        style={themeStyles.searchBar}
-        accessibilityLabel="Search torrents"
-      />
-      <Text variant="labelSmall" style={themeStyles.filterLabel}>
-        Filter torrents
-      </Text>
-      <SegmentedButtons
-        style={themeStyles.filters}
-        value={filterValue}
-        onValueChange={(value) => setFilterValue(value as FilterValue)}
-        buttons={[
-          { label: 'All', value: FILTER_ALL },
-          { label: 'Active', value: FILTER_ACTIVE },
-          { label: 'Completed', value: FILTER_COMPLETED },
-          { label: 'Paused', value: FILTER_PAUSED },
-        ]}
-      />
-      {transferInfo ? (
         <View style={themeStyles.summaryRow}>
           <View style={themeStyles.summaryChip}>
             <Text variant="labelSmall" style={themeStyles.summaryLabel}>
-              Download speed
+              Active
             </Text>
             <Text variant="titleMedium" style={themeStyles.summaryValue}>
-              {formatSpeed(transferInfo.downloadSpeed)}
+              {summary.active}
             </Text>
           </View>
           <View style={themeStyles.summaryChip}>
             <Text variant="labelSmall" style={themeStyles.summaryLabel}>
-              Upload speed
+              Completed
             </Text>
             <Text variant="titleMedium" style={themeStyles.summaryValue}>
-              {formatSpeed(transferInfo.uploadSpeed)}
+              {summary.completed}
+            </Text>
+          </View>
+          <View style={themeStyles.summaryChip}>
+            <Text variant="labelSmall" style={themeStyles.summaryLabel}>
+              Paused
+            </Text>
+            <Text variant="titleMedium" style={themeStyles.summaryValue}>
+              {summary.paused}
             </Text>
           </View>
         </View>
-      ) : null}
-    </View>
-  ), [filterValue, filteredTorrents.length, handleViewDownloads, searchTerm, summary, themeStyles, transferInfo]);
+        <Searchbar
+          placeholder="Search torrents"
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+          style={themeStyles.searchBar}
+          accessibilityLabel="Search torrents"
+        />
+        <Text variant="labelSmall" style={themeStyles.filterLabel}>
+          Filter torrents
+        </Text>
+        <SegmentedButtons
+          style={themeStyles.filters}
+          value={filterValue}
+          onValueChange={(value) => setFilterValue(value as FilterValue)}
+          buttons={[
+            { label: "All", value: FILTER_ALL },
+            { label: "Active", value: FILTER_ACTIVE },
+            { label: "Completed", value: FILTER_COMPLETED },
+            { label: "Paused", value: FILTER_PAUSED },
+          ]}
+        />
+        {transferInfo ? (
+          <View style={themeStyles.summaryRow}>
+            <View style={themeStyles.summaryChip}>
+              <Text variant="labelSmall" style={themeStyles.summaryLabel}>
+                Download speed
+              </Text>
+              <Text variant="titleMedium" style={themeStyles.summaryValue}>
+                {formatSpeed(transferInfo.downloadSpeed)}
+              </Text>
+            </View>
+            <View style={themeStyles.summaryChip}>
+              <Text variant="labelSmall" style={themeStyles.summaryLabel}>
+                Upload speed
+              </Text>
+              <Text variant="titleMedium" style={themeStyles.summaryValue}>
+                {formatSpeed(transferInfo.uploadSpeed)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    ),
+    [
+      filterValue,
+      filteredTorrents.length,
+      handleViewDownloads,
+      searchTerm,
+      summary,
+      themeStyles,
+      transferInfo,
+    ]
+  );
 
   const listEmptyComponent = useMemo(() => {
     if (filteredTorrents.length === 0 && (torrents?.length ?? 0) > 0) {
@@ -543,7 +599,7 @@ const QBittorrentServiceScreen = () => {
           description="Try a different search or reset the filters."
           actionLabel="Clear filters"
           onActionPress={() => {
-            setSearchTerm('');
+            setSearchTerm("");
             setFilterValue(FILTER_ALL);
           }}
         />
@@ -562,7 +618,9 @@ const QBittorrentServiceScreen = () => {
 
   if (!hasValidServiceId) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="Missing service"
           description="Select a qBittorrent service from the dashboard and try again."
@@ -585,26 +643,67 @@ const QBittorrentServiceScreen = () => {
           <View style={themeStyles.listHeader}>
             <View style={themeStyles.headerRow}>
               <View>
-                <SkeletonPlaceholder width="60%" height={28} borderRadius={10} style={{ marginBottom: spacing.xs }} />
+                <SkeletonPlaceholder
+                  width="60%"
+                  height={28}
+                  borderRadius={10}
+                  style={{ marginBottom: spacing.xs }}
+                />
                 <SkeletonPlaceholder width="40%" height={18} borderRadius={8} />
               </View>
               <SkeletonPlaceholder width={160} height={40} borderRadius={20} />
             </View>
             <View style={themeStyles.summaryRow}>
               {[0, 1, 2].map((index) => (
-                <SkeletonPlaceholder key={`summary-${index}`} width="100%" height={56} borderRadius={16} style={{ flex: 1 }} />
+                <SkeletonPlaceholder
+                  key={`summary-${index}`}
+                  width="100%"
+                  height={56}
+                  borderRadius={16}
+                  style={{ flex: 1 }}
+                />
               ))}
             </View>
-            <SkeletonPlaceholder width="100%" height={48} borderRadius={24} style={themeStyles.searchBar} />
-            <SkeletonPlaceholder width="35%" height={16} borderRadius={8} style={themeStyles.filterLabel} />
-            <View style={[themeStyles.filters, { flexDirection: 'row', gap: spacing.sm }]}>
+            <SkeletonPlaceholder
+              width="100%"
+              height={48}
+              borderRadius={24}
+              style={themeStyles.searchBar}
+            />
+            <SkeletonPlaceholder
+              width="35%"
+              height={16}
+              borderRadius={8}
+              style={themeStyles.filterLabel}
+            />
+            <View
+              style={[
+                themeStyles.filters,
+                { flexDirection: "row", gap: spacing.sm },
+              ]}
+            >
               {[0, 1, 2, 3].map((index) => (
-                <SkeletonPlaceholder key={`filter-${index}`} width={96} height={36} borderRadius={18} />
+                <SkeletonPlaceholder
+                  key={`filter-${index}`}
+                  width={96}
+                  height={36}
+                  borderRadius={18}
+                />
               ))}
             </View>
             <View style={themeStyles.summaryRow}>
-              <SkeletonPlaceholder width="100%" height={56} borderRadius={16} style={{ flex: 1 }} />
-              <SkeletonPlaceholder width="100%" height={56} borderRadius={16} style={{ flex: 1 }} />
+              <SkeletonPlaceholder
+                width="100%"
+                height={56}
+                borderRadius={16}
+                style={{ flex: 1 }}
+              />
+              <SkeletonPlaceholder
+                width="100%"
+                height={56}
+                borderRadius={16}
+                style={{ flex: 1 }}
+              />
             </View>
           </View>
           {Array.from({ length: 5 }).map((_, index) => (
@@ -619,7 +718,9 @@ const QBittorrentServiceScreen = () => {
 
   if (!connector || !connectorIsQBittorrent) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="qBittorrent connector unavailable"
           description="Check the service configuration in settings and try again."
@@ -631,10 +732,15 @@ const QBittorrentServiceScreen = () => {
   }
 
   if (isError) {
-    const message = error instanceof Error ? error.message : 'Unable to load torrents from qBittorrent.';
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to load torrents from qBittorrent.";
 
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="Failed to load torrents"
           description={message}
@@ -651,10 +757,14 @@ const QBittorrentServiceScreen = () => {
         data={filteredTorrents}
         keyExtractor={keyExtractor}
         renderItem={renderTorrentItem}
-        ItemSeparatorComponent={() => <View style={themeStyles.itemSeparator} />}
+        ItemSeparatorComponent={() => (
+          <View style={themeStyles.itemSeparator} />
+        )}
         contentContainerStyle={themeStyles.listContent}
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={<View style={themeStyles.emptyContainer}>{listEmptyComponent}</View>}
+        ListEmptyComponent={
+          <View style={themeStyles.emptyContainer}>{listEmptyComponent}</View>
+        }
         refreshControl={
           <ListRefreshControl
             refreshing={isRefreshing}

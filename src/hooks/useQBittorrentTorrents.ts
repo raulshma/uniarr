@@ -7,8 +7,9 @@ import {
   type RefetchOptions,
 } from '@tanstack/react-query';
 
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
+import { useConnectorsStore } from '@/store/connectorsStore';
 import type { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
+import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { Torrent, TorrentTransferInfo } from '@/models/torrent.types';
 import { isTorrentCompleted } from '@/utils/torrent.utils';
@@ -56,8 +57,8 @@ export interface UseQBittorrentResult {
   transferError: unknown;
 }
 
-const ensureConnector = (manager: ConnectorManager, serviceId: string): QBittorrentConnector => {
-  const connector = manager.getConnector(serviceId);
+const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): QBittorrentConnector => {
+  const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== QB_SERVICE_TYPE) {
     throw new Error(`qBittorrent connector not registered for service ${serviceId}.`);
@@ -71,12 +72,13 @@ export const useQBittorrentTorrents = (
   options: UseQBittorrentOptions = {},
 ): UseQBittorrentResult => {
   const queryClient = useQueryClient();
-  const manager = useMemo(() => ConnectorManager.getInstance(), []);
-  const hasConnector = manager.getConnector(serviceId)?.config.type === QB_SERVICE_TYPE;
+  const { getConnector } = useConnectorsStore();
+  const connector = getConnector(serviceId);
+  const hasConnector = connector?.config.type === QB_SERVICE_TYPE;
   const previousTorrentsRef = useRef<Map<string, { progress: number; state: Torrent['state'] }>>(new Map());
   const hasHydratedRef = useRef(false);
 
-  const resolveConnector = useCallback(() => ensureConnector(manager, serviceId), [manager, serviceId]);
+  const resolveConnector = useCallback(() => ensureConnector(getConnector, serviceId), [getConnector, serviceId]);
 
   const torrentsQuery = useQuery({
     queryKey: queryKeys.qbittorrent.torrents(serviceId, options.filters),
@@ -162,7 +164,7 @@ export const useQBittorrentTorrents = (
       return;
     }
 
-    const connector = manager.getConnector(serviceId) as QBittorrentConnector | undefined;
+    const connector = getConnector(serviceId) as QBittorrentConnector | undefined;
     const serviceName = connector?.config.name ?? 'qBittorrent';
     const previous = previousTorrentsRef.current;
     const hasHydrated = hasHydratedRef.current;
@@ -197,7 +199,7 @@ export const useQBittorrentTorrents = (
 
     previousTorrentsRef.current = nextState;
     hasHydratedRef.current = true;
-  }, [hasConnector, manager, serviceId, torrents]);
+  }, [hasConnector, getConnector, serviceId, torrents]);
 
   return {
     torrents,

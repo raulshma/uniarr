@@ -156,12 +156,23 @@ export const handleApiError = (
       cause: axiosError,
     });
 
-    void logger.error('API error captured.', {
+    // Use a less severe log level for client-side (4xx) errors which are
+    // often caused by invalid user input and are expected in some flows
+    // (e.g. short search queries). Network issues and server errors (5xx)
+    // are logged as errors.
+    const isServerOrNetworkError = isNetwork || (statusCode !== undefined && statusCode >= 500);
+    const logContext = {
       message: apiError.message,
       statusCode: apiError.statusCode,
       code: apiError.code,
       context,
-    });
+    } as Record<string, unknown>;
+
+    if (isServerOrNetworkError) {
+      void logger.error('API error captured.', logContext);
+    } else {
+      void logger.warn('API error captured.', logContext);
+    }
 
     return apiError;
   }

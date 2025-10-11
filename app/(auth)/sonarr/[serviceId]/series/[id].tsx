@@ -1,18 +1,26 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useMemo } from "react";
+import { StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
+import { Text, useTheme } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  Layout,
+} from "react-native-reanimated";
 
-import { Button } from '@/components/common/Button';
-import { EmptyState } from '@/components/common/EmptyState';
-import { MediaDetails } from '@/components/media/MediaDetails';
-import { MediaDetailsSkeleton } from '@/components/media/skeletons';
-import type { AppTheme } from '@/constants/theme';
-import type { Series } from '@/models/media.types';
-import { useSonarrSeriesDetails } from '@/hooks/useSonarrSeriesDetails';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { MediaDetails } from "@/components/media/MediaDetails";
+import { MediaDetailsSkeleton } from "@/components/media/skeletons";
+import DetailHero from "@/components/media/DetailHero/DetailHero";
+import type { AppTheme } from "@/constants/theme";
+import type { Series } from "@/models/media.types";
+import { useSonarrSeriesDetails } from "@/hooks/useSonarrSeriesDetails";
+import { spacing } from "@/theme/spacing";
 
 const findEpisodeRuntime = (series?: Series): number | undefined => {
   if (!series?.seasons) {
@@ -36,10 +44,13 @@ const findEpisodeRuntime = (series?: Series): number | undefined => {
 const SonarrSeriesDetailsScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
-  const { serviceId, id } = useLocalSearchParams<{ serviceId?: string; id?: string }>();
+  const { serviceId, id } = useLocalSearchParams<{
+    serviceId?: string;
+    id?: string;
+  }>();
   const numericSeriesId = Number(id);
   const isSeriesIdValid = Number.isFinite(numericSeriesId);
-  const serviceKey = serviceId ?? '';
+  const serviceKey = serviceId ?? "";
 
   const {
     series,
@@ -68,26 +79,25 @@ const SonarrSeriesDetailsScreen = () => {
         },
         container: {
           flex: 1,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.lg,
+          paddingHorizontal: spacing.none,
         },
         header: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: spacing.md,
         },
         title: {
           marginBottom: spacing.sm,
-          textAlign: 'center',
+          textAlign: "center",
           color: theme.colors.onBackground,
         },
         subtitle: {
-          textAlign: 'center',
+          textAlign: "center",
           color: theme.colors.onSurfaceVariant,
         },
       }),
-    [theme],
+    [theme]
   );
 
   const runtimeMinutes = useMemo(() => findEpisodeRuntime(series), [series]);
@@ -96,7 +106,7 @@ const SonarrSeriesDetailsScreen = () => {
     (nextState: boolean) => {
       toggleMonitor(nextState);
     },
-    [toggleMonitor],
+    [toggleMonitor]
   );
 
   const handleTriggerSearch = useCallback(() => {
@@ -104,37 +114,40 @@ const SonarrSeriesDetailsScreen = () => {
   }, [triggerSearch]);
 
   const handleDeleteSeries = useCallback(() => {
-    Alert.alert(
-      'Remove Series',
-      'Are you sure you want to remove this series from Sonarr? Existing files will be kept.',
+  alert(
+      "Remove Series",
+      "Are you sure you want to remove this series from Sonarr? Existing files will be kept.",
       [
         {
-          text: 'Cancel',
-          style: 'cancel',
+          text: "Cancel",
+          style: "cancel",
         },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: () => {
             void deleteSeriesAsync()
               .then(() => {
                 router.back();
               })
               .catch((err) => {
-                const message = err instanceof Error ? err.message : 'Unable to delete series.';
-                Alert.alert('Delete Failed', message);
+                const message =
+                  err instanceof Error
+                    ? err.message
+                    : "Unable to delete series.";
+                alert("Delete Failed", message);
               });
           },
         },
       ],
-      { cancelable: true },
+      { cancelable: true }
     );
   }, [deleteSeriesAsync, router]);
 
   // Handle error states outside of sheet for immediate feedback
   if (!serviceId || !isSeriesIdValid) {
     return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
+      <View style={[styles.container, { justifyContent: "center" }]}>
         <EmptyState
           title="Missing series information"
           description="We couldn't find the service or series identifier. Please navigate from the Sonarr library again."
@@ -151,26 +164,43 @@ const SonarrSeriesDetailsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <View style={styles.container}>
-        <Animated.View 
-          style={styles.header}
-          entering={FadeInDown.delay(200).springify()}
-          layout={Layout.springify()}
-        >
-          <Button mode="text" onPress={handleClose} accessibilityLabel="Go back">
-            Back
-          </Button>
-          {isFetching ? <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>Refreshing…</Text> : null}
-        </Animated.View>
+        {!series ? (
+          <Animated.View
+            style={styles.header}
+            entering={FadeInDown.delay(200).springify()}
+            layout={Layout.springify()}
+          >
+            <Button
+              mode="text"
+              onPress={handleClose}
+              accessibilityLabel="Go back"
+            >
+              Back
+            </Button>
+            {isFetching ? (
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Refreshing…
+              </Text>
+            ) : null}
+          </Animated.View>
+        ) : null}
 
         {isLoading && !series ? (
           <MediaDetailsSkeleton showSeasons={true} />
         ) : isError ? (
-          <View style={{ flex: 1, justifyContent: 'center' }}>
+          <View style={{ flex: 1, justifyContent: "center" }}>
             <EmptyState
               title="Failed to load series"
-              description={error instanceof Error ? error.message : 'Unable to load series details.'}
+              description={
+                error instanceof Error
+                  ? error.message
+                  : "Unable to load series details."
+              }
               actionLabel="Retry"
               onActionPress={() => {
                 void refetch();
@@ -179,28 +209,37 @@ const SonarrSeriesDetailsScreen = () => {
             />
           </View>
         ) : series ? (
-          <MediaDetails
-            title={series.title}
-            year={series.year}
-            status={series.status}
-            overview={series.overview}
-            genres={series.genres}
-            network={series.network}
+          <DetailHero
             posterUri={series.posterUrl}
             backdropUri={series.backdropUrl}
-            monitored={series.monitored}
-            seasons={series.seasons}
-            runtimeMinutes={runtimeMinutes}
-            type="series"
-            onToggleMonitor={handleToggleMonitor}
-            onSearchPress={handleTriggerSearch}
-            onDeletePress={handleDeleteSeries}
-            isUpdatingMonitor={isTogglingMonitor}
-            isSearching={isTriggeringSearch}
-            isDeleting={isDeleting}
-          />
+            onBack={handleClose}
+            isFetching={isFetching}
+          >
+            <MediaDetails
+              title={series.title}
+              year={series.year}
+              status={series.status}
+              overview={series.overview}
+              genres={series.genres}
+              network={series.network}
+              posterUri={series.posterUrl}
+              backdropUri={series.backdropUrl}
+              monitored={series.monitored}
+              seasons={series.seasons}
+              runtimeMinutes={runtimeMinutes}
+              type="series"
+              onToggleMonitor={handleToggleMonitor}
+              onSearchPress={handleTriggerSearch}
+              onDeletePress={handleDeleteSeries}
+              isUpdatingMonitor={isTogglingMonitor}
+              isSearching={isTriggeringSearch}
+              isDeleting={isDeleting}
+              showPoster={false}
+              disableScroll={true}
+            />
+          </DetailHero>
         ) : (
-          <View style={{ flex: 1, justifyContent: 'center' }}>
+          <View style={{ flex: 1, justifyContent: "center" }}>
             <EmptyState
               title="No series data"
               description="We couldn't load details for this series."

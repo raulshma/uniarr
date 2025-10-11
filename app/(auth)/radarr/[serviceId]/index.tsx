@@ -1,39 +1,47 @@
-import { FlashList } from '@shopify/flash-list';
-import { useFocusEffect } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import {
-  Chip,
-  Searchbar,
-  Text,
-  useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut, Layout } from 'react-native-reanimated';
+import { FlashList } from "@shopify/flash-list";
+import { useFocusEffect } from "@react-navigation/native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from '@/services/dialogService';
+import { Chip, Searchbar, Text, useTheme } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  Layout,
+} from "react-native-reanimated";
 
-import { Button } from '@/components/common/Button';
-import { EmptyState } from '@/components/common/EmptyState';
-import { ListRefreshControl } from '@/components/common/ListRefreshControl';
-import { SkeletonPlaceholder } from '@/components/common/Skeleton/';
-import MovieListItem from '@/components/media/MediaCard/MovieListItem';
-import { MovieListItemSkeleton } from '@/components/media/MediaCard';
-import type { MediaDownloadStatus } from '@/components/media/MediaCard';
-import type { AppTheme } from '@/constants/theme';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import { useRadarrMovies } from '@/hooks/useRadarrMovies';
-import type { Movie } from '@/models/movie.types';
-import { logger } from '@/services/logger/LoggerService';
-import { spacing } from '@/theme/spacing';
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ListRefreshControl } from "@/components/common/ListRefreshControl";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton/";
+import MovieListItem from "@/components/media/MediaCard/MovieListItem";
+import { MovieListItemSkeleton } from "@/components/media/MediaCard";
+import type { MediaDownloadStatus } from "@/components/media/MediaCard";
+import type { AppTheme } from "@/constants/theme";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { useRadarrMovies } from "@/hooks/useRadarrMovies";
+import type { Movie } from "@/models/movie.types";
+import { logger } from "@/services/logger/LoggerService";
+import { spacing } from "@/theme/spacing";
 
-const FILTER_ALL = 'all';
-const FILTER_OWNED = 'owned';
-const FILTER_MISSING = 'missing';
-const FILTER_DOWNLOADING = 'downloading';
-const FILTER_MONITORED = 'monitored';
-const FILTER_UNMONITORED = 'unmonitored';
+const FILTER_ALL = "all";
+const FILTER_OWNED = "owned";
+const FILTER_MISSING = "missing";
+const FILTER_DOWNLOADING = "downloading";
+const FILTER_MONITORED = "monitored";
+const FILTER_UNMONITORED = "unmonitored";
 
-type FilterValue = typeof FILTER_ALL | typeof FILTER_OWNED | typeof FILTER_MISSING | typeof FILTER_DOWNLOADING | typeof FILTER_MONITORED | typeof FILTER_UNMONITORED;
+type FilterValue =
+  | typeof FILTER_ALL
+  | typeof FILTER_OWNED
+  | typeof FILTER_MISSING
+  | typeof FILTER_DOWNLOADING
+  | typeof FILTER_MONITORED
+  | typeof FILTER_UNMONITORED;
 
 const formatRuntime = (runtime?: number): string | undefined => {
   if (!runtime) {
@@ -43,7 +51,9 @@ const formatRuntime = (runtime?: number): string | undefined => {
   const hours = Math.floor(runtime / 60);
   const minutes = runtime % 60;
 
-  return hours > 0 ? `${hours}h ${minutes.toString().padStart(2, '0')}m` : `${minutes}m`;
+  return hours > 0
+    ? `${hours}h ${minutes.toString().padStart(2, "0")}m`
+    : `${minutes}m`;
 };
 
 const formatByteSize = (bytes?: number): string | undefined => {
@@ -51,7 +61,7 @@ const formatByteSize = (bytes?: number): string | undefined => {
     return undefined;
   }
 
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const units = ["B", "KB", "MB", "GB", "TB"];
   let value = bytes;
   let index = 0;
 
@@ -66,14 +76,14 @@ const formatByteSize = (bytes?: number): string | undefined => {
 
 const deriveDownloadStatus = (movie: Movie): MediaDownloadStatus => {
   if (movie.hasFile || movie.statistics?.percentAvailable === 100) {
-    return 'available';
+    return "available";
   }
 
   if (movie.movieFile || movie.statistics?.movieFileCount) {
-    return 'downloading';
+    return "downloading";
   }
 
-  return movie.monitored ? 'missing' : 'unknown';
+  return movie.monitored ? "missing" : "unknown";
 };
 
 const getFilterForMovie = (movie: Movie): FilterValue => {
@@ -92,11 +102,14 @@ const getFilterForMovie = (movie: Movie): FilterValue => {
   return FILTER_ALL; // This shouldn't happen for properly configured movies
 };
 
-const normalizeSearchTerm = (input: string): string => input.trim().toLowerCase();
+const normalizeSearchTerm = (input: string): string =>
+  input.trim().toLowerCase();
 
 const RadarrMoviesListScreen = () => {
-  const { serviceId: rawServiceId } = useLocalSearchParams<{ serviceId?: string }>();
-  const serviceId = typeof rawServiceId === 'string' ? rawServiceId : '';
+  const { serviceId: rawServiceId } = useLocalSearchParams<{
+    serviceId?: string;
+  }>();
+  const serviceId = typeof rawServiceId === "string" ? rawServiceId : "";
   const hasValidServiceId = serviceId.length > 0;
 
   const router = useRouter();
@@ -104,12 +117,12 @@ const RadarrMoviesListScreen = () => {
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterValue, setFilterValue] = useState<FilterValue>(FILTER_ALL);
 
-  const { movies, isLoading, isFetching, isError, error, refetch } = useRadarrMovies(serviceId);
-
+  const { movies, isLoading, isFetching, isError, error, refetch } =
+    useRadarrMovies(serviceId);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -135,9 +148,12 @@ const RadarrMoviesListScreen = () => {
           await manager.loadSavedServices();
         }
       } catch (bootstrapError) {
-        const message = bootstrapError instanceof Error ? bootstrapError.message : 'Unknown connector bootstrap error.';
-        void logger.warn('Failed to preload Radarr connector.', {
-          location: 'RadarrMoviesListScreen.bootstrap',
+        const message =
+          bootstrapError instanceof Error
+            ? bootstrapError.message
+            : "Unknown connector bootstrap error.";
+        void logger.warn("Failed to preload Radarr connector.", {
+          location: "RadarrMoviesListScreen.bootstrap",
           serviceId,
           message,
         });
@@ -162,11 +178,13 @@ const RadarrMoviesListScreen = () => {
       }
 
       void refetch();
-    }, [hasValidServiceId, refetch]),
+    }, [hasValidServiceId, refetch])
   );
 
-  const connector = hasValidServiceId ? manager.getConnector(serviceId) : undefined;
-  const connectorIsRadarr = connector?.config.type === 'radarr';
+  const connector = hasValidServiceId
+    ? manager.getConnector(serviceId)
+    : undefined;
+  const connectorIsRadarr = connector?.config.type === "radarr";
 
   const isRefreshing = isFetching && !isLoading;
   const isInitialLoad = isBootstrapping || isLoading;
@@ -189,7 +207,11 @@ const RadarrMoviesListScreen = () => {
           return false;
         }
 
-        if (filterValue === FILTER_OWNED || filterValue === FILTER_MISSING || filterValue === FILTER_DOWNLOADING) {
+        if (
+          filterValue === FILTER_OWNED ||
+          filterValue === FILTER_MISSING ||
+          filterValue === FILTER_DOWNLOADING
+        ) {
           const movieFilter = getFilterForMovie(item);
           if (movieFilter !== filterValue) {
             return false;
@@ -228,9 +250,9 @@ const RadarrMoviesListScreen = () => {
           paddingBottom: spacing.lg,
         },
         headerRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: spacing.lg,
         },
         headerTitle: {
@@ -244,11 +266,11 @@ const RadarrMoviesListScreen = () => {
           marginBottom: spacing.lg,
         },
         filterPills: {
-          flexDirection: 'row',
+          flexDirection: "row",
           marginBottom: spacing.md,
         },
         filterPillsScroll: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.sm,
         },
         filterChip: {
@@ -274,7 +296,7 @@ const RadarrMoviesListScreen = () => {
         filterChipTextSelected: {
           color: theme.colors.onPrimary,
           fontSize: 14,
-          fontWeight: '500',
+          fontWeight: "500",
         },
         emptyContainer: {
           flexGrow: 1,
@@ -284,7 +306,7 @@ const RadarrMoviesListScreen = () => {
           height: spacing.md,
         },
       }),
-    [theme],
+    [theme]
   );
 
   const handleMoviePress = useCallback(
@@ -294,30 +316,33 @@ const RadarrMoviesListScreen = () => {
       }
 
       router.push({
-        pathname: '/(auth)/radarr/[serviceId]/movies/[id]',
+        pathname: "/(auth)/radarr/[serviceId]/movies/[id]",
         params: {
           serviceId,
           id: item.id.toString(),
         },
       });
     },
-    [hasValidServiceId, router, serviceId],
+    [hasValidServiceId, router, serviceId]
   );
 
   const handleAddMovie = useCallback(() => {
     if (!hasValidServiceId) {
-      Alert.alert('Invalid service', 'The selected service identifier is not valid.');
+  alert(
+        "Invalid service",
+        "The selected service identifier is not valid."
+      );
       return;
     }
 
     router.push({
-      pathname: '/(auth)/radarr/[serviceId]/add',
+      pathname: "/(auth)/radarr/[serviceId]/add",
       params: { serviceId },
     });
   }, [hasValidServiceId, router, serviceId]);
 
   const handleClearFilters = useCallback(() => {
-    setSearchTerm('');
+    setSearchTerm("");
     setFilterValue(FILTER_ALL);
   }, []);
 
@@ -348,19 +373,19 @@ const RadarrMoviesListScreen = () => {
         </Animated.View>
       );
     },
-    [handleMoviePress],
+    [handleMoviePress]
   );
 
   const keyExtractor = useCallback((item: Movie) => item.id.toString(), []);
 
   const listHeader = useMemo(
     () => (
-      <Animated.View 
+      <Animated.View
         style={styles.listHeader}
         entering={FadeInDown.springify()}
         layout={Layout.springify()}
       >
-        <Animated.View 
+        <Animated.View
           style={styles.headerRow}
           entering={FadeInDown.delay(100).springify()}
           layout={Layout.springify()}
@@ -396,12 +421,12 @@ const RadarrMoviesListScreen = () => {
             style={styles.filterPills}
           >
             {[
-              { label: 'All', value: FILTER_ALL },
-              { label: 'Owned', value: FILTER_OWNED },
-              { label: 'Missing', value: FILTER_MISSING },
-              { label: 'Downloading', value: FILTER_DOWNLOADING },
-              { label: 'Monitored', value: FILTER_MONITORED },
-              { label: 'Unmonitored', value: FILTER_UNMONITORED },
+              { label: "All", value: FILTER_ALL },
+              { label: "Owned", value: FILTER_OWNED },
+              { label: "Missing", value: FILTER_MISSING },
+              { label: "Downloading", value: FILTER_DOWNLOADING },
+              { label: "Monitored", value: FILTER_MONITORED },
+              { label: "Unmonitored", value: FILTER_UNMONITORED },
             ].map((filter, index) => (
               <Animated.View
                 key={filter.value}
@@ -417,7 +442,8 @@ const RadarrMoviesListScreen = () => {
                   ]}
                   textStyle={[
                     styles.filterChipText,
-                    filterValue === filter.value && styles.filterChipTextSelected,
+                    filterValue === filter.value &&
+                      styles.filterChipTextSelected,
                   ]}
                 >
                   {filter.label}
@@ -428,7 +454,14 @@ const RadarrMoviesListScreen = () => {
         </Animated.View>
       </Animated.View>
     ),
-    [filteredMovies.length, filterValue, handleAddMovie, searchTerm, styles, totalMovies],
+    [
+      filteredMovies.length,
+      filterValue,
+      handleAddMovie,
+      searchTerm,
+      styles,
+      totalMovies,
+    ]
   );
 
   const listEmptyComponent = useMemo(() => {
@@ -459,7 +492,9 @@ const RadarrMoviesListScreen = () => {
 
   if (!hasValidServiceId) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="Missing service identifier"
           description="Return to the dashboard and select a Radarr service before continuing."
@@ -482,12 +517,22 @@ const RadarrMoviesListScreen = () => {
           <View style={styles.listHeader}>
             <View style={styles.headerRow}>
               <View>
-                <SkeletonPlaceholder width="60%" height={28} borderRadius={10} style={{ marginBottom: spacing.xs }} />
+                <SkeletonPlaceholder
+                  width="60%"
+                  height={28}
+                  borderRadius={10}
+                  style={{ marginBottom: spacing.xs }}
+                />
                 <SkeletonPlaceholder width="40%" height={18} borderRadius={8} />
               </View>
               <SkeletonPlaceholder width={120} height={40} borderRadius={20} />
             </View>
-            <SkeletonPlaceholder width="100%" height={48} borderRadius={24} style={styles.searchBar} />
+            <SkeletonPlaceholder
+              width="100%"
+              height={48}
+              borderRadius={24}
+              style={styles.searchBar}
+            />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -495,7 +540,12 @@ const RadarrMoviesListScreen = () => {
               style={styles.filterPills}
             >
               {[0, 1, 2, 3, 4, 5].map((pill) => (
-                <SkeletonPlaceholder key={`pill-${pill}`} width={80} height={28} borderRadius={14} />
+                <SkeletonPlaceholder
+                  key={`pill-${pill}`}
+                  width={80}
+                  height={28}
+                  borderRadius={14}
+                />
               ))}
             </ScrollView>
           </View>
@@ -511,7 +561,9 @@ const RadarrMoviesListScreen = () => {
 
   if (!connector || !connectorIsRadarr) {
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="Radarr connector unavailable"
           description="Verify the service configuration in settings and try again."
@@ -523,10 +575,15 @@ const RadarrMoviesListScreen = () => {
   }
 
   if (isError) {
-    const message = error instanceof Error ? error.message : 'Unable to load movies from Radarr.';
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to load movies from Radarr.";
 
     return (
-      <SafeAreaView style={[{ flex: 1, backgroundColor: theme.colors.background }]}>
+      <SafeAreaView
+        style={[{ flex: 1, backgroundColor: theme.colors.background }]}
+      >
         <EmptyState
           title="Failed to load movies"
           description={message}
@@ -539,7 +596,7 @@ const RadarrMoviesListScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Animated.View 
+      <Animated.View
         style={{ flex: 1 }}
         entering={FadeIn.delay(100).springify()}
         layout={Layout.springify()}
@@ -551,7 +608,9 @@ const RadarrMoviesListScreen = () => {
           ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={listHeader}
-          ListEmptyComponent={<View style={styles.emptyContainer}>{listEmptyComponent}</View>}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>{listEmptyComponent}</View>
+          }
           refreshControl={
             <ListRefreshControl
               refreshing={isRefreshing}

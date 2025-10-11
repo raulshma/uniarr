@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { View, Pressable, StyleSheet, Dimensions, type PressableStateCallbackType } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
@@ -19,9 +19,70 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
   const insets = useSafeAreaInsets();
 
   // Generate the curved path for the bottom bar
-  const curvedPath = getPathDown(screenWidth, 60, 60, true, 'CENTER');
+  const curvedPath = useMemo(() => getPathDown(screenWidth, 65, 65, true, 'CENTER'), []);
 
-  const renderTab = (route: any, index: number) => {
+  const styles = useMemo(() => StyleSheet.create({
+    mainContainer: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 65,
+    },
+    curvedBackground: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
+    contentContainer: {
+      height: 65,
+      alignItems: 'center',
+    },
+    tabPosition: {
+      position: 'absolute',
+      width: 60, // Fixed width for each tab area
+      height: 65,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tabItem: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+    },
+    tabItemPressed: {
+      opacity: 0.85,
+    },
+    tabItemFocused: {
+      borderWidth: 2,
+      borderRadius: 28,
+      paddingVertical: 6,
+    },
+    centerButton: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'absolute',
+      bottom: 30,
+      left: (screenWidth / 2) - 28,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 8,
+    },
+    centerButtonPressed: {
+      opacity: 0.9,
+    },
+    centerButtonFocused: {
+      borderWidth: 2,
+    },
+  }), []);
+
+  const renderTab = useCallback((route: any, index: number) => {
     const descriptor = descriptors[route.key];
     if (!descriptor) return null;
 
@@ -119,9 +180,9 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
         />
       </Pressable>
     );
-  };
+  }, [descriptors, state.index, navigation, styles, theme.colors.primary, theme.colors.onSurfaceVariant]);
 
-  const renderCenterButton = () => {
+  const renderCenterButton = useCallback(() => {
     const dashboardRoute = state.routes.find(route => route.name === 'dashboard/index');
     const isDashboardFocused = state.index === state.routes.findIndex(route => route.name === 'dashboard/index');
 
@@ -182,13 +243,20 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
         />
       </Pressable>
     );
-  };
+  }, [state.routes, state.index, navigation, styles, theme.colors.primary, theme.colors.surfaceVariant, theme.colors.shadow, theme.colors.onPrimary, theme.colors.onSurfaceVariant]);
+
+  const tabPositions = useMemo(() => [
+    { left: screenWidth * 0.08 }, // services (far left)
+    { left: screenWidth * 0.25 }, // recently-added (near left)
+    { right: screenWidth * 0.25 }, // downloads (near right)
+    { right: screenWidth * 0.08 }, // settings (far right)
+  ], []);
 
   return (
     <View style={[styles.mainContainer, { paddingBottom: insets.bottom }]}>
       {/* Curved background */}
       <View style={styles.curvedBackground}>
-        <Svg width={screenWidth} height={60}>
+        <Svg width={screenWidth} height={65}>
           <Path
             fill={theme.colors.surface}
             d={curvedPath}
@@ -205,15 +273,10 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
             // Find the original index in the state.routes array
             const originalIndex = state.routes.findIndex(r => r.key === route.key);
             // Position each tab at specific locations around the center
-            const positions = [
-              { left: screenWidth * 0.08 }, // services (far left)
-              { left: screenWidth * 0.25 }, // recently-added (near left)
-              { right: screenWidth * 0.25 }, // downloads (near right)
-              { right: screenWidth * 0.08 }, // settings (far right)
-            ];
+            const position = tabPositions[index] || {};
 
             return (
-              <View key={route.key} style={[styles.tabPosition, positions[index] || {}]}>
+              <View key={route.key} style={[styles.tabPosition, position]}>
                 {renderTab(route, originalIndex)}
               </View>
             );
@@ -225,66 +288,5 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  mainContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-  },
-  curvedBackground: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  contentContainer: {
-    height: 60,
-    alignItems: 'center',
-  },
-  tabPosition: {
-    position: 'absolute',
-    width: 60, // Fixed width for each tab area
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  tabItemPressed: {
-    opacity: 0.85,
-  },
-  tabItemFocused: {
-    borderWidth: 2,
-    borderRadius: 28,
-    paddingVertical: 6,
-  },
-  centerButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'absolute',
-    bottom: 20,
-    left: (screenWidth / 2) - 28,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  centerButtonPressed: {
-    opacity: 0.9,
-  },
-  centerButtonFocused: {
-    borderWidth: 2,
-  },
-});
 
 export default CustomCurvedTabBar;

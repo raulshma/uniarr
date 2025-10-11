@@ -27,8 +27,7 @@
     "App.tsx",
     "index.ts",
     "src",
-    "src/types",
-    "__tests__"
+    "src/types"
   ],
   "exclude": [
     "node_modules",

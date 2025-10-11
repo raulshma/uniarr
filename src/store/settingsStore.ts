@@ -4,15 +4,18 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { logger } from '@/services/logger/LoggerService';
 import type { NotificationCategory, QuietHoursConfig } from '@/models/notification.types';
+import type { CalendarView } from '@/models/calendar.types';
 import {
   createDefaultQuietHoursConfig,
   normalizeQuietHoursConfig,
 } from '@/utils/quietHours.utils';
+import { defaultCustomThemeConfig, type CustomThemeConfig } from '@/constants/theme';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 type SettingsData = {
   theme: ThemePreference;
+  customThemeConfig: CustomThemeConfig;
   notificationsEnabled: boolean;
   releaseNotificationsEnabled: boolean;
   downloadNotificationsEnabled: boolean;
@@ -22,10 +25,15 @@ type SettingsData = {
   refreshIntervalMinutes: number;
   quietHours: Record<NotificationCategory, QuietHoursConfig>;
   criticalHealthAlertsBypassQuietHours: boolean;
+  // Remember last selected calendar view (week/day/month/list)
+  lastCalendarView: CalendarView;
 };
 
 interface SettingsState extends SettingsData {
   setTheme: (theme: ThemePreference) => void;
+  updateCustomThemeConfig: (config: Partial<CustomThemeConfig>) => void;
+  setCustomThemeConfig: (config: CustomThemeConfig) => void;
+  resetCustomThemeConfig: () => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   setReleaseNotificationsEnabled: (enabled: boolean) => void;
   setDownloadNotificationsEnabled: (enabled: boolean) => void;
@@ -39,6 +47,7 @@ interface SettingsState extends SettingsData {
   ) => void;
   setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
   reset: () => void;
+  setLastCalendarView: (view: CalendarView) => void;
 }
 
 const STORAGE_KEY = 'SettingsStore:v1';
@@ -63,6 +72,7 @@ const createDefaultQuietHoursState = (): Record<NotificationCategory, QuietHours
 
 const createDefaultSettings = (): SettingsData => ({
   theme: 'system',
+  customThemeConfig: defaultCustomThemeConfig,
   notificationsEnabled: true,
   releaseNotificationsEnabled: false,
   downloadNotificationsEnabled: true,
@@ -72,6 +82,7 @@ const createDefaultSettings = (): SettingsData => ({
   refreshIntervalMinutes: DEFAULT_REFRESH_INTERVAL,
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
+  lastCalendarView: 'week',
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -79,6 +90,12 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       ...createDefaultSettings(),
       setTheme: (theme) => set({ theme }),
+      updateCustomThemeConfig: (config) =>
+        set((state) => ({
+          customThemeConfig: { ...state.customThemeConfig, ...config },
+        })),
+      setCustomThemeConfig: (config) => set({ customThemeConfig: config }),
+      resetCustomThemeConfig: () => set({ customThemeConfig: defaultCustomThemeConfig }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setReleaseNotificationsEnabled: (enabled) => set({ releaseNotificationsEnabled: enabled }),
       setDownloadNotificationsEnabled: (enabled) => set({ downloadNotificationsEnabled: enabled }),
@@ -101,7 +118,8 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       setCriticalHealthAlertsBypassQuietHours: (enabled) =>
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
-      reset: () => set(createDefaultSettings()),
+  setLastCalendarView: (view: CalendarView) => set({ lastCalendarView: view }),
+  reset: () => set(createDefaultSettings()),
     }),
     {
       name: STORAGE_KEY,
@@ -184,6 +202,7 @@ export const useSettingsStore = create<SettingsState>()(
 );
 
 export const selectThemePreference = (state: SettingsState): ThemePreference => state.theme;
+export const selectCustomThemeConfig = (state: SettingsState): CustomThemeConfig => state.customThemeConfig;
 export const selectNotificationsEnabled = (state: SettingsState): boolean => state.notificationsEnabled;
 export const selectReleaseNotificationsEnabled = (state: SettingsState): boolean =>
   state.releaseNotificationsEnabled;
@@ -207,3 +226,5 @@ export const selectQuietHoursForCategory = (
     state.quietHours[category] ?? createDefaultQuietHoursState()[category];
 export const selectCriticalHealthAlertsBypassQuietHours = (state: SettingsState): boolean =>
   state.criticalHealthAlertsBypassQuietHours;
+
+export const selectLastCalendarView = (state: SettingsState) => state.lastCalendarView;

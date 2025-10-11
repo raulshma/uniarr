@@ -12,12 +12,14 @@ import { queryClient } from '@/config/queryClient';
 import { clerkTokenCache, getClerkPublishableKey } from '@/services/auth/AuthService';
 import { AuthProvider, useAuth } from '@/services/auth/AuthProvider';
 import { useTheme } from '@/hooks/useTheme';
-import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { defaultTheme } from '@/constants/theme';
+import { ErrorBoundary, DialogProvider } from '@/components/common';
 import { OfflineIndicator } from '@/components/common/OfflineIndicator';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { useNotificationRegistration } from '@/hooks/useNotificationRegistration';
 import { useNotificationResponseHandler } from '@/hooks/useNotificationResponseHandler';
 import { useQuietHoursManager } from '@/hooks/useQuietHoursManager';
+import { useVoiceCommandHandler } from '@/hooks/useVoiceCommandHandler';
 
 const RootLayout = () => {
   const colorScheme = useColorScheme();
@@ -25,18 +27,20 @@ const RootLayout = () => {
   const clerkPublishableKey = useMemo(getClerkPublishableKey, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <SafeAreaProvider>
         <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={clerkTokenCache}>
           <ClerkLoaded>
             <AuthProvider>
               <QueryClientProvider client={queryClient}>
-                <PaperProvider theme={theme}>
-                  <StatusBar style={theme.dark ? 'light' : 'dark'} />
-                  <ErrorBoundary context={{ location: 'RootLayout' }}>
-                    <AppContent />
-                  </ErrorBoundary>
-                  <QueryDevtools />
+                <PaperProvider theme={theme || defaultTheme}>
+                  <DialogProvider>
+                    <StatusBar style={theme.dark ? 'light' : 'dark'} />
+                    <ErrorBoundary context={{ location: 'RootLayout' }}>
+                      <AppContent />
+                    </ErrorBoundary>
+                    <QueryDevtools />
+                  </DialogProvider>
                 </PaperProvider>
               </QueryClientProvider>
             </AuthProvider>
@@ -72,13 +76,21 @@ const RootNavigator = () => {
 
 const AppContent = () => {
   const { isOnline } = useOfflineSync();
+  const theme = useTheme();
   useNotificationRegistration();
   useNotificationResponseHandler();
   useQuietHoursManager();
+  useVoiceCommandHandler();
 
   return (
-    <View style={{ flex: 1 }}>
-      <OfflineIndicator isVisible={!isOnline} />
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      {/*
+        Only show the offline banner when the app has determined the device is
+        explicitly offline. Network status hooks may return `null` while they
+        are initializing; treating `null` as "unknown" prevents flicker of the
+        offline banner when the status is not yet resolved.
+      */}
+      <OfflineIndicator isVisible={isOnline === false} />
       <RootNavigator />
     </View>
   );

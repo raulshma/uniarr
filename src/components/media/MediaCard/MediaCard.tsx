@@ -22,6 +22,7 @@ export type MediaCardProps = {
   posterUri?: string;
   type: MediaKind;
   footer?: React.ReactNode;
+  statusBadge?: React.ReactNode;
   onPress?: () => void;
   onLongPress?: () => void;
   style?: StyleProp<ViewStyle>;
@@ -46,6 +47,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
   posterUri,
   type,
   footer,
+  statusBadge,
   onPress,
   onLongPress,
   style,
@@ -132,7 +134,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
           uri={posterUri}
           size="small"
           borderRadius={12}
-          showPlaceholderLabel={false}
+          showPlaceholderLabel={true}
           style={{ marginRight: theme.custom.spacing.md }}
         />
         <View style={styles.meta}>
@@ -143,6 +145,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
             {secondaryText}
           </Text>
           <View style={styles.badges}>
+            {statusBadge}
             {monitoredChip}
             {downloadChip}
           </View>
