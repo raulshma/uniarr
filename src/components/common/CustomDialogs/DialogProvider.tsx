@@ -61,14 +61,11 @@ export const DialogProvider = ({ children }: { children: ReactNode }) => {
           cancelLabel={cancelBtn?.text}
           confirmLabel={confirmBtn?.text}
           destructive={confirmBtn?.style === 'destructive'}
-          onCancel={() => {
-            cancelBtn?.onPress?.();
-            handleDismiss();
-          }}
-          onConfirm={() => {
-            confirmBtn?.onPress?.();
-            handleDismiss();
-          }}
+          // Call only the developer-provided onPress here; the component will
+          // animate out and call onDismiss after the exit animation completes.
+          onCancel={() => cancelBtn?.onPress?.()}
+          cancelable={current.options?.cancelable ?? true}
+          onConfirm={() => confirmBtn?.onPress?.()}
           onDismiss={handleDismiss}
         />
       </DialogContext.Provider>
@@ -90,18 +87,12 @@ export const DialogProvider = ({ children }: { children: ReactNode }) => {
         tertiaryLabel={tertiary?.text}
         secondaryLabel={secondary?.text}
         primaryLabel={primary?.text ?? 'OK'}
-        onTertiary={() => {
-          tertiary?.onPress?.();
-          handleDismiss();
-        }}
-        onSecondary={() => {
-          secondary?.onPress?.();
-          handleDismiss();
-        }}
-        onPrimary={() => {
-          primary?.onPress?.();
-          handleDismiss();
-        }}
+        // Only trigger callbacks here; the components are responsible for
+        // animating out and will call onDismiss after the exit animation.
+        onTertiary={() => tertiary?.onPress?.()}
+        onSecondary={() => secondary?.onPress?.()}
+        onPrimary={() => primary?.onPress?.()}
+        cancelable={current.options?.cancelable ?? true}
         onDismiss={handleDismiss}
       />
     </DialogContext.Provider>
