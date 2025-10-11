@@ -16,6 +16,8 @@ import type {
 } from '@/models/jellyseerr.types';
 import { handleApiError, ApiError } from '@/utils/error.utils';
 import { logger } from '@/services/logger/LoggerService';
+import axios, { type AxiosResponse, type AxiosRequestConfig } from 'axios';
+import { useSettingsStore } from '@/store/settingsStore';
 
 const API_PREFIX = '/api/v1';
 const REQUEST_ENDPOINT = `${API_PREFIX}/request`;
@@ -83,7 +85,7 @@ interface ApiMedia {
   readonly network?: string;
   readonly studio?: string;
   readonly studios?: { readonly name: string }[];
-  readonly genres?: { readonly name: string }[];
+  readonly genres?: { readonly id?: number; readonly name?: string }[];
 }
 
 interface ApiRequest {
@@ -118,7 +120,7 @@ interface ApiMediaDetails {
   readonly firstAirDate?: string;
   readonly rating?: number;
   readonly runtime?: number;
-  readonly genres?: { readonly name: string }[];
+  readonly genres?: { readonly id?: number; readonly name?: string }[];
   readonly credits?: ApiCreditsResponse;
 }
 
@@ -148,6 +150,7 @@ interface ApiSearchResult {
   readonly popularity?: number;
   readonly voteAverage?: number;
   readonly voteCount?: number;
+  readonly genreIds?: number[];
   readonly mediaInfo?: ApiMedia;
 }
 
@@ -262,8 +265,17 @@ const mapMedia = (
 ): JellyseerrMediaSummary => {
   const availabilityStatus = mapMediaStatus(is4k ? media.status4k : media.status);
 
-  const studios = media.studios?.map((studio) => studio.name).filter(Boolean);
-  const genres = media.genres?.map((genre) => genre.name).filter(Boolean);
+  const studios = media.studios
+    ?.map((studio) => studio.name ?? '')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const studiosValue = studios && studios.length > 0 ? studios : undefined;
+
+  const genres = media.genres
+    ?.map((genre) => genre.name ?? '')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const genresValue = genres && genres.length > 0 ? genres : undefined;
 
   return {
     id: media.id,
@@ -284,8 +296,8 @@ const mapMedia = (
     popularity: media.popularity,
     runtime: media.runtime,
     network: media.network,
-    studios,
-    genres,
+  studios: studiosValue,
+  genres: genresValue,
     externalUrl: media.externalUrl,
   };
 };
@@ -328,7 +340,11 @@ const mapPagedRequests = (data: ApiPaginatedResponse<ApiRequest>): JellyseerrReq
 };
 
 const mapMediaDetails = (media: ApiMediaDetails): JellyseerrMediaSummary => {
-  const genres = media.genres?.map((genre) => genre.name).filter(Boolean);
+  const genres = media.genres
+    ?.map((g) => g.name ?? '')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const genresValue = genres && genres.length > 0 ? genres : undefined;
 
   return {
     id: media.id,
@@ -345,7 +361,7 @@ const mapMediaDetails = (media: ApiMediaDetails): JellyseerrMediaSummary => {
     firstAirDate: media.firstAirDate,
     rating: media.rating,
     runtime: media.runtime,
-    genres,
+  genres: genresValue,
   };
 };
 
@@ -368,6 +384,19 @@ const mapSearchResults = (results: ApiSearchResult[]): JellyseerrSearchResult[] 
           ? item.name ?? item.originalName ?? item.title ?? item.originalTitle
           : item.title ?? item.originalTitle ?? item.name ?? item.originalName;
 
+      // Collect genre ids from top-level result or nested mediaInfo (if present)
+      const genreIdsFromResult = Array.isArray(item.genreIds) ? item.genreIds.filter((g) => typeof g === 'number') : [];
+      const genreIdsFromMedia = Array.isArray(mediaInfo?.genres)
+        ? (mediaInfo!.genres!.map((g) => (g as any).id).filter((id) => typeof id === 'number') as number[])
+        : [];
+      const combinedGenreIds = Array.from(new Set([...genreIdsFromResult, ...genreIdsFromMedia]));
+
+      // Also surface genre names when available
+      const genreNames = mediaInfo?.genres
+        ?.map((g) => g.name ?? '')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
       return {
         id: item.id,
         mediaType: item.mediaType === 'tv' ? 'tv' : 'movie',
@@ -384,6 +413,8 @@ const mapSearchResults = (results: ApiSearchResult[]): JellyseerrSearchResult[] 
         popularity: item.popularity,
         isRequested: Boolean(mediaInfo),
         mediaStatus: status,
+        genres: genreNames && genreNames.length > 0 ? genreNames : undefined,
+        genreIds: combinedGenreIds.length > 0 ? combinedGenreIds : undefined,
       };
     });
 
@@ -523,6 +554,83 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     if (!mediaId || !mediaType) return '';
     return `/${mediaType}/${mediaId}`;
   }
+
+  /**
+   * Generic request runner that will retry transient server (5xx) failures
+   * a configurable number of times as set in the application settings. The
+   * function accepts a request lambda so callers can pass the exact axios
+   * invocation (including params / timeout) and still benefit from the
+   * retry behaviour.
+   *
+   * NOTE: This helper deliberately rethrows the original error so callers
+   * can use their existing error handling logic (including calls to
+   * handleApiError which will attach context & perform logging).
+   */
+  private async requestWithRetry<T>(
+    requestFn: () => Promise<AxiosResponse<T>>,
+    operation: string,
+    endpoint: string,
+  ): Promise<AxiosResponse<T>> {
+    const settings = useSettingsStore.getState();
+    const maxRetries =
+      typeof settings.jellyseerrRetryAttempts === 'number'
+        ? Math.max(0, Math.floor(settings.jellyseerrRetryAttempts))
+        : 3;
+
+    let attempt = 0;
+    while (true) {
+      try {
+        return await requestFn();
+      } catch (error) {
+        const isAxios = axios.isAxiosError(error);
+        const status = isAxios ? error.response?.status : undefined;
+
+        // Only retry for server-side errors (5xx). Do not retry on client
+        // errors or network errors to avoid unexpected behaviour.
+        const shouldRetry = typeof status === 'number' && status >= 500 && status < 600;
+
+        if (shouldRetry && attempt < maxRetries) {
+          attempt += 1;
+          const backoff = Math.min(500 * Math.pow(2, attempt - 1), 2000);
+          void logger.warn('Jellyseerr request failed; retrying', {
+            location: 'JellyseerrConnector.requestWithRetry',
+            serviceId: this.config.id,
+            serviceType: this.config.type,
+            operation,
+            endpoint,
+            attempt,
+            maxRetries,
+            status,
+          });
+
+          // Small exponential backoff before the next attempt
+          await new Promise((resolve) => setTimeout(resolve, backoff));
+          continue;
+        }
+
+        // Exhausted retries or non-retryable error — rethrow and let caller
+        // perform its own error wrapping / handling so the contextual
+        // messages already in each method remain intact.
+        throw error;
+      }
+    }
+  }
+
+  private getWithRetry<T>(
+    endpoint: string,
+    config?: AxiosRequestConfig,
+    operation?: string,
+  ) {
+    return this.requestWithRetry<T>(() => this.client.get<T>(endpoint, config), operation ?? 'get', endpoint);
+  }
+
+  private postWithRetry<T>(endpoint: string, data?: unknown, config?: AxiosRequestConfig, operation?: string) {
+    return this.requestWithRetry<T>(() => this.client.post<T>(endpoint, data, config), operation ?? 'post', endpoint);
+  }
+
+  private deleteWithRetry<T>(endpoint: string, config?: AxiosRequestConfig, operation?: string) {
+    return this.requestWithRetry<T>(() => this.client.delete<T>(endpoint, config), operation ?? 'delete', endpoint);
+  }
   async initialize(): Promise<void> {
     await this.ensureAuthenticated();
     await this.getVersion();
@@ -532,7 +640,7 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
     
     try {
-      const response = await this.client.get<ApiStatusResponse>(STATUS_ENDPOINT);
+  const response = await this.getWithRetry<ApiStatusResponse>(STATUS_ENDPOINT, undefined, 'getVersion');
       return response.data.version ?? response.data.commitTag ?? 'unknown';
     } catch (error) {
       throw handleApiError(error, {
@@ -549,7 +657,7 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     
     try {
       const params = normalizeRequestQuery(options);
-      const response = await this.client.get<ApiPaginatedResponse<ApiRequest>>(REQUEST_ENDPOINT, { params });
+  const response = await this.getWithRetry<ApiPaginatedResponse<ApiRequest>>(REQUEST_ENDPOINT, { params }, 'getRequests');
       let requests = mapPagedRequests(response.data);
 
       // Fetch media details for requests that don't have title
@@ -610,7 +718,7 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         ? `${API_PREFIX}/movie/${mediaId}` 
         : `${API_PREFIX}/tv/${mediaId}`;
       
-      const response = await this.client.get<ApiMediaDetails>(endpoint);
+  const response = await this.getWithRetry<ApiMediaDetails>(endpoint, undefined, 'getMediaDetails');
       return mapMediaDetails(response.data);
     } catch (error) {
       throw handleApiError(error, {
@@ -632,7 +740,7 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         ? `${API_PREFIX}/movie/${mediaId}`
         : `${API_PREFIX}/tv/${mediaId}`;
 
-      const response = await this.client.get<ApiMediaDetails>(endpoint);
+  const response = await this.getWithRetry<ApiMediaDetails>(endpoint, undefined, 'getMediaCredits');
       const cast = response.data.credits?.cast ?? [];
       return cast.map(mapCastMember);
     } catch (error) {
@@ -649,7 +757,7 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
     
     try {
-      const response = await this.client.post<ApiRequest>(REQUEST_ENDPOINT, buildCreatePayload(payload));
+  const response = await this.postWithRetry<ApiRequest>(REQUEST_ENDPOINT, buildCreatePayload(payload), undefined, 'createRequest');
       return mapRequest(response.data);
     } catch (error) {
       throw handleApiError(error, {
@@ -665,9 +773,11 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
     
     try {
-      const response = await this.client.post<ApiRequest>(
+      const response = await this.postWithRetry<ApiRequest>(
         `${REQUEST_ENDPOINT}/${requestId}/approve`,
         buildApproveBody(options),
+        undefined,
+        'approveRequest',
       );
       return mapRequest(response.data);
     } catch (error) {
@@ -684,9 +794,11 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
     
     try {
-      const response = await this.client.post<ApiRequest>(
+      const response = await this.postWithRetry<ApiRequest>(
         `${REQUEST_ENDPOINT}/${requestId}/decline`,
         buildDeclineBody(options),
+        undefined,
+        'declineRequest',
       );
       return mapRequest(response.data);
     } catch (error) {
@@ -703,7 +815,7 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
     
     try {
-      await this.client.delete(`${REQUEST_ENDPOINT}/${requestId}`);
+  await this.deleteWithRetry(`${REQUEST_ENDPOINT}/${requestId}`, undefined, 'deleteRequest');
       return true;
     } catch (error) {
       throw handleApiError(error, {
@@ -776,11 +888,11 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         endpoint: SEARCH_ENDPOINT,
       });
 
-      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(SEARCH_ENDPOINT, {
+      const response = await this.getWithRetry<ApiPaginatedResponse<ApiSearchResult>>(SEARCH_ENDPOINT, {
         params,
         // Use standard axios parameter serialization
         timeout: 10000, // 10 second timeout for search requests
-      });
+      }, 'search');
 
       const results = mapSearchResults(response.data.results);
       
@@ -855,9 +967,9 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         params.language = options.language;
       }
 
-      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(TRENDING_ENDPOINT, {
+      const response = await this.getWithRetry<ApiPaginatedResponse<ApiSearchResult>>(TRENDING_ENDPOINT, {
         params,
-      });
+      }, 'getTrending');
 
       const items = mapSearchResults(response.data.results);
       const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
@@ -906,8 +1018,11 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
 
     try {
+      // Do not request a specific genre from the server. Instead we will
+      // request popular TV entries and filter client-side by the TMDB
+      // Animation genre id (ANIME_GENRE_ID). This avoids relying on
+      // server-side genre filtering and keeps behaviour consistent.
       const params: Record<string, unknown> = {
-        genre: ANIME_GENRE_ID,
         sortBy: 'popularity.desc',
         language: 'ja',
       };
@@ -916,12 +1031,18 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         params.page = options.page;
       }
 
-      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(DISCOVER_TV_ENDPOINT, {
+      const response = await this.getWithRetry<ApiPaginatedResponse<ApiSearchResult>>(DISCOVER_TV_ENDPOINT, {
         params,
-      });
+      }, 'getAnimeRecommendations');
 
-      const items = mapSearchResults(response.data.results);
-      const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
+      const allItems = mapSearchResults(response.data.results);
+      const items = allItems.filter((it) => {
+        const ids = it.genreIds ?? [];
+        if (Array.isArray(ids) && ids.includes(ANIME_GENRE_ID)) return true;
+        if (Array.isArray(it.genres) && it.genres.some((g) => /anime|animation/i.test(g))) return true;
+        return false;
+      });
+      const totalResults = items.length;
 
       return {
         items,
@@ -964,6 +1085,8 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
 
     try {
+      // Query upcoming TV entries and perform client-side filtering for
+      // the Animation genre id so we only present anime to users.
       const params: Record<string, unknown> = {
         language: 'ja',
       };
@@ -972,12 +1095,18 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         params.page = options.page;
       }
 
-      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(`${DISCOVER_TV_ENDPOINT}/upcoming`, {
+      const response = await this.getWithRetry<ApiPaginatedResponse<ApiSearchResult>>(`${DISCOVER_TV_ENDPOINT}/upcoming`, {
         params,
-      });
+      }, 'getAnimeUpcoming');
 
-      const items = mapSearchResults(response.data.results);
-      const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
+      const allItems = mapSearchResults(response.data.results);
+      const items = allItems.filter((it) => {
+        const ids = it.genreIds ?? [];
+        if (Array.isArray(ids) && ids.includes(ANIME_GENRE_ID)) return true;
+        if (Array.isArray(it.genres) && it.genres.some((g) => /anime|animation/i.test(g))) return true;
+        return false;
+      });
+      const totalResults = items.length;
 
       return {
         items,
@@ -1020,13 +1149,21 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
 
     try {
-      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(TRENDING_ENDPOINT, {
+      // For trending we prefer the server's trending endpoint but perform
+      // client-side filtering using genre ids so the caller only receives
+      // anime TV series.
+      const response = await this.getWithRetry<ApiPaginatedResponse<ApiSearchResult>>(TRENDING_ENDPOINT, {
         params: options,
-      });
+      }, 'getTrendingAnime');
 
-      // Filter for anime only (animation genre)
       const allResults = mapSearchResults(response.data.results);
-      const items = allResults.filter(item => item.mediaType === 'tv');
+      const items = allResults.filter((it) => {
+        if (it.mediaType !== 'tv') return false;
+        const ids = it.genreIds ?? [];
+        if (Array.isArray(ids) && ids.includes(ANIME_GENRE_ID)) return true;
+        if (Array.isArray(it.genres) && it.genres.some((g) => /anime|animation/i.test(g))) return true;
+        return false;
+      });
 
       return {
         items,
@@ -1069,8 +1206,9 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
     await this.ensureAuthenticated();
 
     try {
+      // Request popular movies and filter client-side to animation genre ids
+      // so our caller receives only anime movies.
       const params: Record<string, unknown> = {
-        genre: ANIME_GENRE_ID,
         sortBy: 'popularity.desc',
         language: 'ja',
       };
@@ -1079,12 +1217,18 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
         params.page = options.page;
       }
 
-      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(DISCOVER_MOVIES_ENDPOINT, {
+      const response = await this.getWithRetry<ApiPaginatedResponse<ApiSearchResult>>(DISCOVER_MOVIES_ENDPOINT, {
         params,
-      });
+      }, 'getAnimeMovies');
 
-      const items = mapSearchResults(response.data.results);
-      const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
+      const allItems = mapSearchResults(response.data.results);
+      const items = allItems.filter((it) => {
+        const ids = it.genreIds ?? [];
+        if (Array.isArray(ids) && ids.includes(ANIME_GENRE_ID)) return true;
+        if (Array.isArray(it.genres) && it.genres.some((g) => /anime|animation/i.test(g))) return true;
+        return false;
+      });
+      const totalResults = items.length;
 
       return {
         items,

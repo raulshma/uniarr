@@ -19,7 +19,9 @@
     "noFallthroughCasesInSwitch": true,
     "useUnknownInCatchVariables": true,
     "noUncheckedIndexedAccess": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "module": "ESNext", // or "NodeNext"
+    "moduleResolution": "Bundler", // or "NodeNext"
   },
   "include": [
     "app",
@@ -29,9 +31,5 @@
     "src",
     "src/types"
   ],
-  "exclude": [
-    "node_modules",
-    ".expo",
-    ".expo-shared"
-  ]
+  "exclude": ["node_modules", ".expo", ".expo-shared"]
 }

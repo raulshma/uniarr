@@ -20,6 +20,8 @@ import { useRouter } from 'expo-router';
 import type { AppTheme } from '@/constants/theme';
 import { spacing } from '@/theme/spacing';
 import { useAnimeDiscover } from '@/hooks/useAnimeDiscover';
+import { useJikanDiscover, type DiscoverItem as JikanDiscoverItem } from '@/hooks/useJikanDiscover';
+import { Linking } from 'react-native';
 import { useConnectorsStore } from '@/store/connectorsStore';
 import { AnimeCard } from '@/components/anime';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -37,7 +39,7 @@ const AnimeHubScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<FilterCategory>('All');
 
-  // Find the first Jellyseerr service
+  // Find the first Jellyseerr service (optional)
   const jellyseerrService = useMemo(() => {
     const allConnectors = getAllConnectors();
     return allConnectors.find((c) => c.config.type === 'jellyseerr' && c.config.enabled);
@@ -56,6 +58,9 @@ const AnimeHubScreen: React.FC = () => {
     enabled: Boolean(jellyseerrService),
   });
 
+  // Jikan (MyAnimeList) Discover data — public API, does not require a configured service
+  const jikan = useJikanDiscover();
+
   const handleCardPress = useCallback(
     (item: JellyseerrSearchResult) => {
       if (!jellyseerrService) return;
@@ -70,6 +75,15 @@ const AnimeHubScreen: React.FC = () => {
     },
     [jellyseerrService, router]
   );
+
+  const handleJikanCardPress = useCallback(async (item: JikanDiscoverItem) => {
+    const malUrl = `https://myanimelist.net/anime/${item.id}`;
+    try {
+      await Linking.openURL(malUrl);
+    } catch (err) {
+      // ignore errors opening external link
+    }
+  }, []);
 
   const handleSearch = useCallback(() => {
     if (!searchQuery.trim()) return;
@@ -176,29 +190,14 @@ const AnimeHubScreen: React.FC = () => {
     [theme]
   );
 
-  // Show empty state if no Jellyseerr service is configured
-  if (!jellyseerrService) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>Anime Hub</Text>
-          </View>
-        </View>
-        <View style={styles.emptyContainer}>
-          <EmptyState
-            title="No Jellyseerr Service"
-            description="Please configure a Jellyseerr service to explore anime content."
-            actionLabel="Add Service"
-            onActionPress={() => router.push('/add-service')}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // If Jellyseerr is not configured we still show the Jikan discover sections.
+
+  // Combined loading state — show global loader while both sources are fetching
+  const combinedLoading = (Boolean(jellyseerrService) && isLoading) || jikan.isLoading;
+  const combinedError = (Boolean(jellyseerrService) && isError) && jikan.isError;
 
   // Show loading state
-  if (isLoading) {
+  if (combinedLoading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
@@ -215,9 +214,8 @@ const AnimeHubScreen: React.FC = () => {
       </SafeAreaView>
     );
   }
-
-  // Show error state
-  if (isError) {
+  // Show error state when both sources failed
+  if (combinedError) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
@@ -230,7 +228,7 @@ const AnimeHubScreen: React.FC = () => {
             title="Failed to Load"
             description="Unable to fetch anime content. Please check your connection and try again."
             actionLabel="Retry"
-            onActionPress={() => void refetch()}
+            onActionPress={() => void Promise.all([refetch(), jikan.refetch()])}
           />
         </View>
       </SafeAreaView>
@@ -244,6 +242,17 @@ const AnimeHubScreen: React.FC = () => {
       posterUrl={item.posterUrl}
       rating={item.rating}
       onPress={() => handleCardPress(item)}
+      width={160}
+    />
+  );
+
+  const renderJikanItem = ({ item }: { item: JikanDiscoverItem }) => (
+    <AnimeCard
+      id={item.id}
+      title={item.title}
+      posterUrl={item.posterUrl}
+      rating={item.rating}
+      onPress={() => void handleJikanCardPress(item)}
       width={160}
     />
   );
@@ -309,14 +318,14 @@ const AnimeHubScreen: React.FC = () => {
         refreshControl={
           <RefreshControl
             refreshing={false}
-            onRefresh={() => void refetch()}
+            onRefresh={() => void Promise.all([refetch(), jikan.refetch()])}
             colors={[theme.colors.primary]}
             tintColor={theme.colors.primary}
           />
         }
       >
-        {/* Recommended For You */}
-        {recommendations.length > 0 && (
+        {/* Recommended For You (Jellyseerr) */}
+        {recommendations.length > 0 && jellyseerrService && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Recommended For You</Text>
@@ -385,8 +394,8 @@ const AnimeHubScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Trending Anime Series */}
-        {trending.length > 0 && (
+        {/* Trending Anime Series (Jellyseerr) */}
+        {trending.length > 0 && jellyseerrService && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Trending Anime Series</Text>
@@ -402,8 +411,8 @@ const AnimeHubScreen: React.FC = () => {
           </View>
         )}
 
-        {/* New Anime Movies */}
-        {movies.length > 0 && (
+        {/* New Anime Movies (Jellyseerr) */}
+        {movies.length > 0 && jellyseerrService && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>New Anime Movies</Text>
@@ -412,6 +421,74 @@ const AnimeHubScreen: React.FC = () => {
               data={movies}
               renderItem={renderAnimeItem}
               keyExtractor={(item) => `movie-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.list}
+            />
+          </View>
+        )}
+
+        {/* MyAnimeList (Jikan) - Trending */}
+        {jikan.top.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>MAL Top Anime</Text>
+            </View>
+            <FlatList
+              data={jikan.top}
+              renderItem={renderJikanItem}
+              keyExtractor={(item, index) => `jikan-top-${item.id}-${index}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.list}
+            />
+          </View>
+        )}
+
+        {/* MyAnimeList (Jikan) - Recommendations */}
+        {jikan.recommendations.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>MAL Recommendations</Text>
+            </View>
+            <FlatList
+              data={jikan.recommendations}
+              renderItem={renderJikanItem}
+              keyExtractor={(item, index) => `jikan-rec-${item.id}-${index}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.list}
+            />
+          </View>
+        )}
+
+        {/* MyAnimeList (Jikan) - Season Now */}
+        {jikan.now.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Season Now</Text>
+            </View>
+            <FlatList
+              data={jikan.now}
+              renderItem={renderJikanItem}
+              keyExtractor={(item, index) => `jikan-now-${item.id}-${index}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.list}
+            />
+          </View>
+        )}
+
+        {/* MyAnimeList (Jikan) - Upcoming */}
+        {jikan.upcoming.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Upcoming Season</Text>
+            </View>
+            <FlatList
+              data={jikan.upcoming}
+              renderItem={renderJikanItem}
+              keyExtractor={(item, index) => `jikan-up-${item.id}-${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.list}

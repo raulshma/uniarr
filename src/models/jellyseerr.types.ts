@@ -148,6 +148,8 @@ export interface JellyseerrSearchResult {
   readonly popularity?: number;
   readonly isRequested?: boolean;
   readonly mediaStatus?: JellyseerrRequestStatus;
+  readonly genres?: string[];
+  readonly genreIds?: number[];
 }
 
 export interface JellyseerrCreditPerson {
