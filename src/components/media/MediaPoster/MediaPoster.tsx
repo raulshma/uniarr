@@ -1,10 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
-import { Image } from 'expo-image';
-import { Icon, Text, useTheme } from 'react-native-paper';
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from "react-native";
+import { Image } from "expo-image";
+import { Text, useTheme } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import type { AppTheme } from '@/constants/theme';
-import { imageCacheService } from '@/services/image/ImageCacheService';
+import type { AppTheme } from "@/constants/theme";
+import { imageCacheService } from "@/services/image/ImageCacheService";
 
 const sizeMap = {
   small: 96,
@@ -30,7 +37,7 @@ const DEFAULT_RADIUS = 12;
 
 const MediaPoster: React.FC<MediaPosterProps> = ({
   uri,
-  size = 'medium',
+  size = "medium",
   aspectRatio = DEFAULT_ASPECT_RATIO,
   borderRadius,
   style,
@@ -41,7 +48,10 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   const theme = useTheme<AppTheme>();
 
   // Use theme's poster style configuration if borderRadius is not explicitly provided
-  const effectiveBorderRadius = borderRadius ?? theme.custom.config?.posterStyle.borderRadius ?? DEFAULT_RADIUS;
+  const effectiveBorderRadius =
+    borderRadius ??
+    theme.custom.config?.posterStyle.borderRadius ??
+    DEFAULT_RADIUS;
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
@@ -84,30 +94,37 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     };
   }, [uri]);
 
-  const width = useMemo(() => (typeof size === 'number' ? size : sizeMap[size]), [size]);
-  const height = useMemo(() => Math.round(width / aspectRatio), [width, aspectRatio]);
+  const width = useMemo(
+    () => (typeof size === "number" ? size : sizeMap[size]),
+    [size]
+  );
+  const height = useMemo(
+    () => Math.round(width / aspectRatio),
+    [width, aspectRatio]
+  );
 
   const handleImageLoad = () => {
     setIsLoading(false);
   };
 
   const containerStyle = useMemo(
-    () => [
-      styles.container,
-      {
-        width,
-        height,
-        borderRadius: effectiveBorderRadius,
-        backgroundColor: theme.colors.surfaceVariant,
-        // Apply shadow styling from theme configuration
-        shadowColor: theme.colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.3,
-        shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
-        elevation: 5,
-      },
-      style,
-    ] as StyleProp<ViewStyle>,
+    () =>
+      [
+        styles.container,
+        {
+          width,
+          height,
+          borderRadius: effectiveBorderRadius,
+          backgroundColor: theme.colors.surfaceVariant,
+          // Apply shadow styling from theme configuration
+          shadowColor: theme.colors.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.3,
+          shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
+          elevation: 5,
+        },
+        style,
+      ] as StyleProp<ViewStyle>,
     [
       width,
       height,
@@ -117,16 +134,23 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       theme.colors.shadow,
       theme.custom.config?.posterStyle.shadowOpacity,
       theme.custom.config?.posterStyle.shadowRadius,
-    ],
+    ]
   );
 
   const isFallback = hasError || !resolvedUri;
 
   const content = isFallback ? (
     <View style={[styles.fallback, { borderRadius: effectiveBorderRadius }]}>
-      <Icon source="image-off-outline" size={32} color={theme.colors.onSurfaceVariant} />
+      <MaterialCommunityIcons
+        name="image-off-outline"
+        size={32}
+        color={theme.colors.onSurfaceVariant}
+      />
       {showPlaceholderLabel ? (
-        <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+        <Text
+          variant="labelMedium"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
           No artwork
         </Text>
       ) : null}
@@ -134,7 +158,10 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   ) : (
     <Image
       source={{ uri: resolvedUri }}
-      style={[StyleSheet.absoluteFillObject, { borderRadius: effectiveBorderRadius }]}
+      style={[
+        StyleSheet.absoluteFillObject,
+        { borderRadius: effectiveBorderRadius },
+      ]}
       accessibilityLabel={accessibilityLabel}
       cachePolicy="memory-disk"
       contentFit="cover"
@@ -148,8 +175,9 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     />
   );
 
-
-  const effectiveLabel = accessibilityLabel ?? (isFallback ? 'Media artwork unavailable' : 'Media artwork');
+  const effectiveLabel =
+    accessibilityLabel ??
+    (isFallback ? "Media artwork unavailable" : "Media artwork");
 
   if (onPress) {
     return (
@@ -166,7 +194,11 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   }
 
   return (
-    <View style={containerStyle} accessibilityRole="image" accessibilityLabel={effectiveLabel}>
+    <View
+      style={containerStyle}
+      accessibilityRole="image"
+      accessibilityLabel={effectiveLabel}
+    >
       {content}
     </View>
   );
@@ -176,13 +208,13 @@ export default MediaPoster;
 
 const styles = StyleSheet.create({
   container: {
-    overflow: 'hidden',
-    position: 'relative',
+    overflow: "hidden",
+    position: "relative",
   },
   fallback: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
   },
 });
