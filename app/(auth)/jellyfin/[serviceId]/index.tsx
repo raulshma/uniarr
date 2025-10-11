@@ -15,8 +15,8 @@ import {
   HelperText,
   IconButton,
   Searchbar,
-  SegmentedButtons,
   Text,
+  Icon,
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -33,12 +33,16 @@ import type { JellyfinConnector } from "@/connectors/implementations/JellyfinCon
 import { useJellyfinLatestItems } from "@/hooks/useJellyfinLatestItems";
 import { useJellyfinLibraries } from "@/hooks/useJellyfinLibraries";
 import { useJellyfinLibraryItems } from "@/hooks/useJellyfinLibraryItems";
+import { useQuery, useQueries } from '@tanstack/react-query';
+import { queryKeys } from '@/hooks/queryKeys';
 import { useJellyfinResume } from "@/hooks/useJellyfinResume";
+import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
 import type {
   JellyfinItem,
   JellyfinLatestItem,
   JellyfinLibraryView,
   JellyfinResumeItem,
+  JellyfinSession,
 } from "@/models/jellyfin.types";
 import { spacing } from "@/theme/spacing";
 
@@ -132,15 +136,23 @@ const deriveSubtitle = (
   }
 
   if (segment === "tv") {
+    // For series-level items prefer showing the production/premiere year as
+    // the subtitle so the title (series name) doesn't repeat itself beneath
+    // the poster. For episodes, show the parent series name.
+    if (item.Type === 'Series') {
+      const year =
+        item.ProductionYear ??
+        (item.PremiereDate ? new Date(item.PremiereDate).getFullYear() : undefined);
+      return year ? `${year}` : undefined;
+    }
+
     if (item.SeriesName) {
       return item.SeriesName;
     }
 
     const year =
       item.ProductionYear ??
-      (item.PremiereDate
-        ? new Date(item.PremiereDate).getFullYear()
-        : undefined);
+      (item.PremiereDate ? new Date(item.PremiereDate).getFullYear() : undefined);
     return year ? `${year}` : undefined;
   }
 
@@ -155,7 +167,8 @@ const deriveSubtitle = (
 const buildPosterUri = (
   connector: JellyfinConnector | undefined,
   item: JellyfinItem,
-  fallbackWidth: number
+  fallbackWidth: number,
+  imageItemIdOverride?: string
 ): string | undefined => {
   if (!connector) {
     return undefined;
@@ -166,7 +179,8 @@ const buildPosterUri = (
     return undefined;
   }
 
-  return connector.getImageUrl(item.Id, "Primary", {
+  const idToUse = imageItemIdOverride ?? item.Id;
+  return connector.getImageUrl(idToUse, "Primary", {
     tag,
     width: fallbackWidth,
   });
@@ -288,6 +302,10 @@ const JellyfinLibraryScreen = () => {
   );
 
   const resumeQuery = useJellyfinResume({ serviceId, limit: 12 });
+  const nowPlayingQuery = useJellyfinNowPlaying({
+    serviceId,
+    refetchInterval: 10_000,
+  });
   const latestQuery = useJellyfinLatestItems({
     serviceId,
     libraryId: selectedLibraryId ?? undefined,
@@ -304,6 +322,46 @@ const JellyfinLibraryScreen = () => {
     limit: 60,
   });
 
+  // If the primary filtered query returns no items, fetch a fallback set
+  // without an explicit IncludeItemTypes filter so we can surface content
+  // for libraries that expose Seasons/Episodes rather than Series at the
+  // immediate parent level.
+  const fallbackLibraryItemsQuery = useQuery<JellyfinItem[]>({
+    queryKey:
+      serviceId && selectedLibraryId
+        ? queryKeys.jellyfin.libraryItems(serviceId, selectedLibraryId, { search: debouncedSearch.toLowerCase() })
+        : queryKeys.jellyfin.base,
+    enabled: Boolean(
+      serviceId &&
+        selectedLibraryId &&
+        libraryItemsQuery.isSuccess &&
+        (libraryItemsQuery.data?.length ?? 0) === 0
+    ),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous?: JellyfinItem[] | undefined) => previous ?? [],
+    queryFn: async () => {
+      if (!serviceId || !selectedLibraryId) return [] as JellyfinItem[];
+
+      let connector = manager.getConnector(serviceId) as JellyfinConnector | undefined;
+      if (!connector) {
+        await manager.loadSavedServices();
+        connector = manager.getConnector(serviceId) as JellyfinConnector | undefined;
+      }
+
+      if (!connector) return [] as JellyfinItem[];
+
+      return connector.getLibraryItems(selectedLibraryId, {
+        searchTerm: debouncedSearch,
+        // intentionally omit includeItemTypes to widen results
+        mediaTypes: activeSegmentConfig.mediaTypes,
+        sortBy: 'SortName',
+        sortOrder: 'Ascending',
+        limit: 60,
+      });
+    },
+  });
+
   const serviceName = connector?.config.name ?? "Jellyfin";
 
   const isInitialLoad =
@@ -311,12 +369,15 @@ const JellyfinLibraryScreen = () => {
     librariesQuery.isLoading ||
     libraryItemsQuery.isLoading ||
     resumeQuery.isLoading ||
+    nowPlayingQuery.isLoading ||
     latestQuery.isLoading;
   const isRefreshing =
     (libraryItemsQuery.isFetching ||
+      fallbackLibraryItemsQuery.isFetching ||
       resumeQuery.isFetching ||
       latestQuery.isFetching ||
-      librariesQuery.isFetching) &&
+      librariesQuery.isFetching ||
+      nowPlayingQuery.isFetching) &&
     !isInitialLoad;
 
   // Animation: cross-fade skeleton -> content
@@ -376,7 +437,9 @@ const JellyfinLibraryScreen = () => {
   const aggregatedError =
     librariesQuery.error ??
     libraryItemsQuery.error ??
+    fallbackLibraryItemsQuery.error ??
     resumeQuery.error ??
+    nowPlayingQuery.error ??
     latestQuery.error;
   const errorMessage =
     aggregatedError instanceof Error
@@ -385,7 +448,110 @@ const JellyfinLibraryScreen = () => {
       ? "Unable to load Jellyfin data."
       : null;
 
-  const items = libraryItemsQuery.data ?? [];
+  const items =
+    libraryItemsQuery.data && libraryItemsQuery.data.length > 0
+      ? libraryItemsQuery.data
+      : fallbackLibraryItemsQuery.data ?? [];
+
+  // Derive displayItems: for the TV segment, prefer actual 'Series' items. If
+  // none are returned (some libraries expose Seasons/Episodes instead), group
+  // episodes by SeriesId/SeriesName and create representative entries so the
+  // UI shows series-level cards instead of individual episodes.
+  const displayItems = useMemo(() => {
+    if (activeSegment !== 'tv') return items;
+
+    const seriesItems = items.filter((it) => it.Type === 'Series');
+    if (seriesItems.length > 0) return seriesItems;
+
+    const grouped = new Map<string, JellyfinItem & { __navigationId?: string; __posterSourceId?: string }>();
+
+    for (const it of items) {
+      const seriesKey = it.SeriesId ?? it.ParentId ?? it.SeriesName ?? it.Id;
+      if (!grouped.has(seriesKey)) {
+        // Create a representative item (shallow copy) and attach metadata
+        // for navigation (series id) and poster source (episode id).
+        const rep = {
+          ...it,
+          Name: it.SeriesName ?? it.Name,
+          Type: 'Series',
+          PrimaryImageTag: it.PrimaryImageTag ?? it.ImageTags?.Primary,
+          __navigationId: it.SeriesId ?? it.ParentId ?? it.Id,
+          __posterSourceId: it.Id,
+        } as JellyfinItem & { __navigationId?: string; __posterSourceId?: string };
+        grouped.set(seriesKey, rep);
+      }
+    }
+
+    return Array.from(grouped.values());
+  }, [items, activeSegment]);
+
+  // When we have series representatives, fetch their full series-level
+  // metadata (including the series' own PrimaryImageTag) in the
+  // background so we can replace episode posters with proper series
+  // artwork when available.
+  const seriesIds = useMemo(() => {
+    if (activeSegment !== 'tv') return [] as string[];
+    const ids = new Set<string>();
+    for (const it of displayItems) {
+      if ((it as any).__navigationId) ids.add((it as any).__navigationId as string);
+      else if (it.Type === 'Series' && it.Id) ids.add(it.Id);
+    }
+    return Array.from(ids);
+  }, [displayItems, activeSegment]);
+
+  const seriesQueries = useQueries({
+    queries: seriesIds.map((seriesId) => ({
+      queryKey: queryKeys.jellyfin.item(serviceId ?? 'unknown', seriesId),
+      enabled: Boolean(serviceId && seriesId),
+      staleTime: 1000 * 60 * 60, // 1 hour
+      refetchOnWindowFocus: false,
+      queryFn: async () => {
+        if (!serviceId) return null;
+        let connector = manager.getConnector(serviceId) as JellyfinConnector | undefined;
+        if (!connector) {
+          await manager.loadSavedServices();
+          connector = manager.getConnector(serviceId) as JellyfinConnector | undefined;
+        }
+        if (!connector) return null;
+        try {
+          return await connector.getItem(seriesId);
+        } catch (e) {
+          return null;
+        }
+      },
+    })),
+  });
+
+  const seriesMetaMap = useMemo(() => {
+    const map = new Map<string, JellyfinItem>();
+    for (let i = 0; i < seriesIds.length; i++) {
+      const id = seriesIds[i];
+      if (!id) continue;
+      const q = seriesQueries[i] as { data?: JellyfinItem | null } | undefined;
+      if (q && q.data) {
+        map.set(id, q.data);
+      }
+    }
+    return map;
+  }, [seriesIds, seriesQueries]);
+
+  const displayItemsEnriched = useMemo(() => {
+    if (activeSegment !== 'tv') return displayItems;
+    return displayItems.map((it) => {
+      const navId = (it as any).__navigationId ?? it.Id;
+      const meta = navId ? seriesMetaMap.get(navId) : undefined;
+      if (!meta) return it;
+      return {
+        ...it,
+        // Use the series item's id for poster requests when possible
+        __posterSourceId: meta.Id ?? (it as any).__posterSourceId,
+        // Prefer series-level title if available
+        Name: meta.Name ?? it.Name,
+        PrimaryImageTag: meta.PrimaryImageTag ?? it.PrimaryImageTag,
+        ImageTags: meta.ImageTags ?? it.ImageTags,
+      } as JellyfinItem & { __posterSourceId?: string };
+    });
+  }, [displayItems, seriesMetaMap, activeSegment]);
   const librariesForActiveSegment = groupedLibraries[activeSegment] ?? [];
 
   const handleNavigateBack = useCallback(() => {
@@ -429,18 +595,83 @@ const JellyfinLibraryScreen = () => {
       librariesQuery.refetch(),
       libraryItemsQuery.refetch(),
       resumeQuery.refetch(),
+      nowPlayingQuery.refetch(),
       latestQuery.refetch(),
     ]);
-  }, [latestQuery, librariesQuery, libraryItemsQuery, resumeQuery]);
+  }, [
+    latestQuery,
+    librariesQuery,
+    libraryItemsQuery,
+    resumeQuery,
+    nowPlayingQuery,
+  ]);
+
+  const nowPlayingSessions = nowPlayingQuery.data ?? [];
+  const nowPlayingItemIds = useMemo(
+    () =>
+      new Set(
+        nowPlayingSessions
+          .map((s) => s.NowPlayingItem?.Id)
+          .filter(Boolean) as string[]
+      ),
+    [nowPlayingSessions]
+  );
+
+  const continueWatchingItems = useMemo(
+    () =>
+      (resumeQuery.data ?? []).filter((it) => !nowPlayingItemIds.has(it.Id)),
+    [resumeQuery.data, nowPlayingItemIds]
+  );
+
+  const renderNowPlayingItem = useCallback(
+    ({ item, index }: { item: JellyfinSession; index: number }) => {
+      const playing = item.NowPlayingItem;
+      if (!playing) return null;
+
+      const title = playing.Name ?? "Untitled";
+      const posterUri = buildPosterUri(connector, playing, 240);
+
+      return (
+        <Pressable
+          key={item.Id}
+          style={({ pressed }) => [
+            styles.nowPlayingRow,
+            pressed && styles.cardPressed,
+          ]}
+          onPress={() => handleOpenItem(playing.Id)}
+        >
+          <MediaPoster uri={posterUri} size={72} borderRadius={10} />
+          <View style={styles.nowPlayingMeta}>
+            <Text
+              variant="bodyMedium"
+              numberOfLines={1}
+              style={styles.nowPlayingTitle}
+            >
+              {title}
+            </Text>
+            <Text
+              variant="bodySmall"
+              numberOfLines={1}
+              style={styles.nowPlayingSubtitle}
+            >
+              {item.DeviceName ?? "Unknown Device"}
+            </Text>
+          </View>
+          <IconButton
+            icon="dots-vertical"
+            accessibilityLabel="Session actions"
+            onPress={() => void handleOpenNowPlaying()}
+          />
+        </Pressable>
+      );
+    },
+    [connector, handleOpenItem, handleOpenNowPlaying, styles]
+  );
 
   const renderResumeItem = useCallback(
     ({ item, index }: { item: JellyfinResumeItem; index: number }) => {
       const title = item.SeriesName ?? item.Name ?? "Untitled";
-      const subtitle =
-        item.Type === "Episode"
-          ? item.Name ?? undefined
-          : deriveSubtitle(item, "movies");
-      const posterUri = buildPosterUri(connector, item, 240);
+      const posterUri = buildPosterUri(connector, item, 420);
       const progress =
         typeof item.UserData?.PlaybackPositionTicks === "number" &&
         typeof item.RunTimeTicks === "number"
@@ -453,58 +684,57 @@ const JellyfinLibraryScreen = () => {
             )
           : undefined;
 
+      // Responsive poster sizing: prefer two items visible on wide screens
+      const posterSize = Math.max(
+        120,
+        Math.min(
+          240,
+          Math.floor((windowWidth - spacing.lg * 2 - spacing.md) / 2)
+        )
+      );
+
       return (
-        <View>
+        <View style={{ width: posterSize }}>
           <Pressable
             style={({ pressed }) => [
-              styles.resumeCard,
+              styles.resumePosterWrap,
               pressed && styles.cardPressed,
             ]}
             onPress={() => handleOpenItem(item.Id)}
           >
-            <MediaPoster
-              uri={posterUri}
-              size={80}
-              accessibilityLabel={`Continue watching ${title}`}
-            />
-            <View style={styles.resumeMeta}>
-              <Text
-                variant="bodyMedium"
-                numberOfLines={2}
-                style={styles.resumeTitle}
-              >
-                {title}
-              </Text>
-              {subtitle ? (
-                <Text
-                  variant="bodySmall"
-                  numberOfLines={1}
-                  style={styles.resumeSubtitle}
-                >
-                  {subtitle}
-                </Text>
-              ) : null}
+            <View style={styles.resumePosterContainer}>
+              <MediaPoster
+                uri={posterUri}
+                size={posterSize - 8}
+                borderRadius={12}
+                accessibilityLabel={`Continue watching ${title}`}
+              />
+              <View style={styles.playOverlay} pointerEvents="none">
+                <Icon source="play" size={28} color={theme.colors.onPrimary} />
+              </View>
               {typeof progress === "number" ? (
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressRail}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${Math.round(progress * 100)}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text variant="bodySmall" style={styles.progressText}>
-                    {Math.round(progress * 100)}%
-                  </Text>
+                <View style={styles.resumePosterProgressRail}>
+                  <View
+                    style={[
+                      styles.resumePosterProgressFill,
+                      { width: `${Math.round(progress * 100)}%` },
+                    ]}
+                  />
                 </View>
               ) : null}
             </View>
           </Pressable>
+          <Text
+            numberOfLines={1}
+            variant="bodySmall"
+            style={styles.resumePosterTitle}
+          >
+            {title}
+          </Text>
         </View>
       );
     },
-    [connector, handleOpenItem, styles]
+    [connector, handleOpenItem, styles, windowWidth, theme]
   );
 
   const renderLatestItem = useCallback(
@@ -515,44 +745,35 @@ const JellyfinLibraryScreen = () => {
           ? item.SeriesName
           : deriveSubtitle(item, activeSegment);
       const status = formatEpisodeLabel(item);
-
       return (
         <View>
           <Pressable
             style={({ pressed }) => [
-              styles.latestCard,
+              styles.gridCard,
+              index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight,
               pressed && styles.cardPressed,
             ]}
             onPress={() => handleOpenItem(item.Id)}
           >
-            <MediaPoster
-              uri={posterUri}
-              size={96}
-              onPress={() => handleOpenItem(item.Id)}
-            />
-            <View style={styles.latestMeta}>
-              <Text
-                variant="titleSmall"
-                numberOfLines={1}
-                style={styles.latestTitle}
-              >
-                {item.Name ?? "Untitled"}
-              </Text>
-              {subtitle ? (
-                <Text
-                  variant="bodySmall"
-                  numberOfLines={1}
-                  style={styles.latestSubtitle}
-                >
-                  {subtitle}
-                </Text>
-              ) : null}
-              {status ? (
-                <Chip compact mode="outlined" style={styles.episodeChip}>
-                  {status}
-                </Chip>
-              ) : null}
+            <View style={styles.posterFrame}>
+              <MediaPoster uri={posterUri} size={220} borderRadius={18} />
             </View>
+            <Text
+              variant="bodyMedium"
+              numberOfLines={2}
+              style={styles.gridTitle}
+            >
+              {item.Name ?? "Untitled"}
+            </Text>
+            {subtitle ? (
+              <Text
+                variant="bodySmall"
+                numberOfLines={1}
+                style={styles.gridSubtitle}
+              >
+                {subtitle}
+              </Text>
+            ) : null}
           </Pressable>
         </View>
       );
@@ -562,7 +783,17 @@ const JellyfinLibraryScreen = () => {
 
   const renderLibraryItem = useCallback(
     ({ item, index }: { item: JellyfinItem; index: number }) => {
-      const posterUri = buildPosterUri(connector, item, 480);
+      // For TV segment representatives we may have attached internal
+      // metadata: __navigationId (series id to navigate to) and
+      // __posterSourceId (item id to use for the poster image). Use these
+      // when present so we show a series-level grid even when the server
+      // returned episodes.
+      const posterUri = buildPosterUri(
+        connector,
+        item,
+        480,
+        (item as any).__posterSourceId as string | undefined
+      );
       const subtitle = deriveSubtitle(item, activeSegment);
       const positionStyle =
         index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight;
@@ -578,6 +809,9 @@ const JellyfinLibraryScreen = () => {
       );
       const posterSize = Math.max(80, effectiveColumnWidth - spacing.md * 2); // leave room for internal card padding
 
+      const framePadding = spacing.md;
+      const innerPosterSize = Math.max(80, posterSize - framePadding * 2);
+
       return (
         <View>
           <Pressable
@@ -586,9 +820,17 @@ const JellyfinLibraryScreen = () => {
               positionStyle,
               pressed && styles.cardPressed,
             ]}
-            onPress={() => handleOpenItem(item.Id)}
+            onPress={() =>
+              handleOpenItem((item as any).__navigationId ?? item.Id)
+            }
           >
-            <MediaPoster uri={posterUri} size={posterSize} />
+            <View style={styles.posterFrame}>
+              <MediaPoster
+                uri={posterUri}
+                size={innerPosterSize}
+                borderRadius={12}
+              />
+            </View>
             <Text
               variant="bodyMedium"
               numberOfLines={2}
@@ -644,31 +886,7 @@ const JellyfinLibraryScreen = () => {
             </View>
           </View>
         </View>
-        <View>
-          <Searchbar
-            placeholder="Search for movies, shows, or music"
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            style={styles.searchBar}
-            inputStyle={styles.searchInput}
-            accessibilityLabel="Search library"
-          />
-        </View>
-        <View>
-          <SegmentedButtons
-            value={activeSegment}
-            onValueChange={(value) =>
-              setActiveSegment(value as CollectionSegmentKey)
-            }
-            buttons={collectionSegments.map((segment) => ({
-              value: segment.key,
-              label: segment.label,
-              disabled: groupedLibraries[segment.key].length === 0,
-            }))}
-            density="medium"
-            style={styles.segmentedControl}
-          />
-        </View>
+        {/* Search + Tabs will be placed below Now Playing to match design */}
         {librariesForActiveSegment.length > 1 ? (
           <View>
             <View style={styles.libraryChipsRow}>
@@ -687,66 +905,102 @@ const JellyfinLibraryScreen = () => {
           </View>
         ) : null}
 
-        <View>
-          <View style={styles.sectionHeader}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Continue Watching
-            </Text>
-            <IconButton
-              icon="refresh"
-              size={20}
-              accessibilityLabel="Refresh continue watching"
-              onPress={() => void resumeQuery.refetch()}
-            />
-          </View>
-        </View>
-        {resumeQuery.data && resumeQuery.data.length > 0 ? (
-          <FlashList
-            data={resumeQuery.data}
-            keyExtractor={(item) => item.Id}
-            renderItem={renderResumeItem}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.resumeList}
-          />
-        ) : (
-          <View style={styles.emptyStateInline}>
-            <EmptyState
-              title="Nothing queued up"
-              description="Start playing something in Jellyfin to continue here."
-            />
-          </View>
-        )}
+        {continueWatchingItems && continueWatchingItems.length > 0 ? (
+          <View>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Continue Watching
+              </Text>
+              <IconButton
+                icon="refresh"
+                size={20}
+                accessibilityLabel="Refresh continue watching"
+                onPress={() => void resumeQuery.refetch()}
+              />
+            </View>
 
+            <FlashList
+              data={continueWatchingItems}
+              keyExtractor={(item) => item.Id}
+              renderItem={renderResumeItem}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.resumeList}
+            />
+          </View>
+        ) : null}
+
+        {nowPlayingSessions && nowPlayingSessions.length > 0 ? (
+          <View>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Now Playing
+              </Text>
+              <IconButton
+                icon="refresh"
+                size={20}
+                accessibilityLabel="Refresh now playing"
+                onPress={() => void nowPlayingQuery.refetch()}
+              />
+            </View>
+
+            <View style={styles.nowPlayingList}>
+              {nowPlayingSessions.map((s, i) => (
+                <View key={s.Id} style={{ marginBottom: spacing.sm }}>
+                  {renderNowPlayingItem({
+                    item: s as JellyfinSession,
+                    index: i,
+                  })}
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Searchbar and Tabs placed here per design */}
         <View>
-          <View style={styles.sectionHeader}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Latest Additions
-            </Text>
-            <IconButton
-              icon="refresh"
-              size={20}
-              accessibilityLabel="Refresh latest additions"
-              onPress={() => void latestQuery.refetch()}
-            />
-          </View>
-        </View>
-        {latestQuery.data && latestQuery.data.length > 0 ? (
-          <FlashList
-            data={latestQuery.data}
-            keyExtractor={(item) => item.Id}
-            renderItem={renderLatestItem}
-            showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
+          <Searchbar
+            placeholder="Search for movies, shows, or music"
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            style={styles.searchBar}
+            inputStyle={styles.searchInput}
+            accessibilityLabel="Search library"
           />
-        ) : (
-          <View style={styles.emptyStateInline}>
-            <EmptyState
-              title="No recent additions"
-              description="Freshly added media appears here once Jellyfin indexes it."
-            />
-          </View>
-        )}
+        </View>
+
+        <View style={styles.segmentRow}>
+          {collectionSegments.map((segment) => {
+            const isActive = activeSegment === segment.key;
+            return (
+              <Pressable
+                key={segment.key}
+                onPress={() => setActiveSegment(segment.key)}
+                style={({ pressed }) => [
+                  styles.segmentItem,
+                  pressed && styles.segmentPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+              >
+                <Text
+                  style={[
+                    styles.segmentLabel,
+                    isActive && styles.segmentLabelActive,
+                  ]}
+                >
+                  {segment.label}
+                </Text>
+                <View
+                  style={[
+                    styles.segmentIndicator,
+                    isActive && styles.segmentIndicatorActive,
+                  ]}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     );
   }, [
@@ -758,7 +1012,10 @@ const JellyfinLibraryScreen = () => {
     latestQuery.data,
     renderLatestItem,
     renderResumeItem,
+    continueWatchingItems,
     resumeQuery.data,
+    nowPlayingSessions,
+    nowPlayingQuery.data,
     searchTerm,
     selectedLibraryId,
     serviceName,
@@ -810,7 +1067,7 @@ const JellyfinLibraryScreen = () => {
         pointerEvents={contentInteractive ? "auto" : "none"}
       >
         <FlashList
-          data={items}
+          data={displayItemsEnriched}
           keyExtractor={(item) => item.Id}
           renderItem={renderLibraryItem}
           numColumns={2}
@@ -917,6 +1174,11 @@ const createStyles = (theme: AppTheme) =>
     toolbarTitleGroup: {
       flex: 1,
       marginHorizontal: spacing.xs,
+      // Center the title while keeping left/right actions aligned to edges
+      position: "absolute",
+      left: spacing.lg,
+      right: spacing.lg,
+      alignItems: "center",
     },
     toolbarTitle: {
       color: theme.colors.onSurface,
@@ -931,12 +1193,45 @@ const createStyles = (theme: AppTheme) =>
     },
     searchBar: {
       borderRadius: 24,
+      backgroundColor: theme.colors.surface,
     },
     searchInput: {
       fontSize: 16,
+      color: theme.colors.onSurface,
     },
     segmentedControl: {
       marginTop: -spacing.sm,
+    },
+    segmentRow: {
+      flexDirection: "row",
+      gap: spacing.md,
+      marginTop: spacing.sm,
+      alignItems: "center",
+    },
+    segmentItem: {
+      alignItems: "center",
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+    },
+    segmentPressed: {
+      opacity: 0.85,
+    },
+    segmentLabel: {
+      color: theme.colors.onSurfaceVariant,
+      fontWeight: "600",
+    },
+    segmentLabelActive: {
+      color: theme.colors.primary,
+    },
+    segmentIndicator: {
+      height: 3,
+      width: "100%",
+      borderRadius: 3,
+      marginTop: spacing.xs,
+      backgroundColor: "transparent",
+    },
+    segmentIndicatorActive: {
+      backgroundColor: theme.colors.primary,
     },
     libraryChipsRow: {
       flexDirection: "row",
@@ -960,6 +1255,42 @@ const createStyles = (theme: AppTheme) =>
       marginTop: spacing.sm,
       gap: spacing.lg,
       paddingHorizontal: spacing.md,
+    },
+    resumePosterWrap: {
+      alignItems: "center",
+    },
+    resumePosterContainer: {
+      position: "relative",
+      alignItems: "center",
+    },
+    playOverlay: {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: [{ translateX: -18 }, { translateY: -18 }],
+      backgroundColor: "rgba(0,0,0,0.45)",
+      padding: 6,
+      borderRadius: 20,
+    },
+    resumePosterProgressRail: {
+      position: "absolute",
+      left: 8,
+      right: 8,
+      bottom: 8,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.surfaceVariant,
+      overflow: "hidden",
+    },
+    resumePosterProgressFill: {
+      height: "100%",
+      backgroundColor: theme.colors.primary,
+      borderRadius: 2,
+    },
+    resumePosterTitle: {
+      marginTop: spacing.xs,
+      color: theme.colors.onSurface,
+      fontWeight: "600",
     },
     resumeCard: {
       flexDirection: "row",
@@ -1047,6 +1378,11 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surfaceVariant,
       overflow: "hidden",
     },
+    posterFrame: {
+      padding: spacing.sm,
+      borderRadius: 18,
+      alignItems: "center",
+    },
     gridCardLeft: {
       marginRight: spacing.md,
     },
@@ -1058,6 +1394,27 @@ const createStyles = (theme: AppTheme) =>
       fontWeight: "600",
     },
     gridSubtitle: {
+      color: theme.colors.onSurfaceVariant,
+    },
+    nowPlayingList: {
+      marginTop: spacing.sm,
+    },
+    nowPlayingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+      padding: spacing.md,
+      borderRadius: 14,
+      backgroundColor: theme.colors.surfaceVariant,
+    },
+    nowPlayingMeta: {
+      flex: 1,
+    },
+    nowPlayingTitle: {
+      color: theme.colors.onSurface,
+      fontWeight: "600",
+    },
+    nowPlayingSubtitle: {
       color: theme.colors.onSurfaceVariant,
     },
     cardPressed: {
