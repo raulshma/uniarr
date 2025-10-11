@@ -5,7 +5,9 @@ import type { JellyseerrConnector } from '@/connectors/implementations/Jellyseer
 import { useConnectorsStore } from '@/store/connectorsStore';
 import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
-import type { JellyseerrPagedResult, JellyseerrSearchResult } from '@/models/jellyseerr.types';
+import type { components, paths } from '@/connectors/client-schemas/jellyseerr-openapi';
+type JellyseerrSearchResult = components['schemas']['MovieResult'] | components['schemas']['TvResult'];
+type JellyseerrPagedResult<T> = { items: T[]; total: number; pageInfo?: components['schemas']['PageInfo'] };
 
 const JELLYSEERR_SERVICE_TYPE = 'jellyseerr';
 

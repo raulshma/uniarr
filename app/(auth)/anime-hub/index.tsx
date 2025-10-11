@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -6,28 +6,33 @@ import {
   FlatList,
   RefreshControl,
   Pressable,
-} from 'react-native';
+} from "react-native";
+import { Text, useTheme, ActivityIndicator, IconButton, Searchbar, Chip } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
+import { useAnimeDiscover } from "@/hooks/useAnimeDiscover";
 import {
-  Text,
-  Searchbar,
-  Chip,
-  useTheme,
-  ActivityIndicator,
-  IconButton,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import type { AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
-import { useAnimeDiscover } from '@/hooks/useAnimeDiscover';
-import { useJikanDiscover, type DiscoverItem as JikanDiscoverItem } from '@/hooks/useJikanDiscover';
-import { Linking } from 'react-native';
-import { useConnectorsStore } from '@/store/connectorsStore';
-import { AnimeCard } from '@/components/anime';
-import { EmptyState } from '@/components/common/EmptyState';
-import type { JellyseerrSearchResult } from '@/models/jellyseerr.types';
+  useJikanDiscover,
+  type DiscoverItem as JikanDiscoverItem,
+} from "@/hooks/useJikanDiscover";
+import { Linking } from "react-native";
+import { useConnectorsStore } from "@/store/connectorsStore";
+import { AnimeCard } from "@/components/anime";
+import { EmptyState } from "@/components/common/EmptyState";
+import type { components } from '@/connectors/client-schemas/jellyseerr-openapi';
+type JellyseerrSearchResult =
+  | components['schemas']['MovieResult']
+  | components['schemas']['TvResult'];
 
-const FILTER_CATEGORIES = ['All', 'Mecha', 'Slice of Life', 'Isekai', 'Shonen'] as const;
+const FILTER_CATEGORIES = [
+  "All",
+  "Mecha",
+  "Slice of Life",
+  "Isekai",
+  "Shonen",
+] as const;
 
 type FilterCategory = (typeof FILTER_CATEGORIES)[number];
 
@@ -36,13 +41,15 @@ const AnimeHubScreen: React.FC = () => {
   const router = useRouter();
   const { getAllConnectors } = useConnectorsStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState<FilterCategory>('All');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState<FilterCategory>("All");
 
   // Find the first Jellyseerr service (optional)
   const jellyseerrService = useMemo(() => {
     const allConnectors = getAllConnectors();
-    return allConnectors.find((c) => c.config.type === 'jellyseerr' && c.config.enabled);
+    return allConnectors.find(
+      (c) => c.config.type === "jellyseerr" && c.config.enabled
+    );
   }, [getAllConnectors]);
 
   const {
@@ -54,7 +61,7 @@ const AnimeHubScreen: React.FC = () => {
     isError,
     refetch,
   } = useAnimeDiscover({
-    serviceId: jellyseerrService?.config.id ?? '',
+    serviceId: jellyseerrService?.config.id ?? "",
     enabled: Boolean(jellyseerrService),
   });
 
@@ -64,12 +71,13 @@ const AnimeHubScreen: React.FC = () => {
   const handleCardPress = useCallback(
     (item: JellyseerrSearchResult) => {
       if (!jellyseerrService) return;
+      const mediaIdStr = item.mediaInfo?.tmdbId ?? item.id ?? "";
       router.push({
-        pathname: '/jellyseerr/[serviceId]/[mediaType]/[mediaId]',
+        pathname: "/jellyseerr/[serviceId]/[mediaType]/[mediaId]",
         params: {
           serviceId: jellyseerrService.config.id,
-          mediaType: item.mediaType,
-          mediaId: item.tmdbId?.toString() ?? item.id.toString(),
+          mediaType: item.mediaType ?? "movie",
+          mediaId: mediaIdStr,
         },
       });
     },
@@ -89,8 +97,8 @@ const AnimeHubScreen: React.FC = () => {
     if (!searchQuery.trim()) return;
     // Navigate to search with anime filter
     router.push({
-      pathname: '/search',
-      params: { query: searchQuery, filter: 'anime' },
+      pathname: "/search",
+      params: { query: searchQuery, filter: "anime" },
     });
   }, [searchQuery, router]);
 
@@ -108,14 +116,14 @@ const AnimeHubScreen: React.FC = () => {
           backgroundColor: theme.colors.background,
         },
         headerTop: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: spacing.md,
         },
         title: {
           fontSize: 28,
-          fontWeight: 'bold',
+          fontWeight: "bold",
           color: theme.colors.onBackground,
         },
         searchBar: {
@@ -125,7 +133,7 @@ const AnimeHubScreen: React.FC = () => {
           marginBottom: spacing.md,
         },
         filterContainer: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.xs,
         },
         filterChip: {
@@ -141,7 +149,7 @@ const AnimeHubScreen: React.FC = () => {
         },
         filterChipTextSelected: {
           color: theme.colors.onPrimary,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         scrollContent: {
           paddingBottom: spacing.xl * 2,
@@ -155,7 +163,7 @@ const AnimeHubScreen: React.FC = () => {
         },
         sectionTitle: {
           fontSize: 20,
-          fontWeight: 'bold',
+          fontWeight: "bold",
           color: theme.colors.onBackground,
         },
         list: {
@@ -163,18 +171,18 @@ const AnimeHubScreen: React.FC = () => {
         },
         emptyContainer: {
           flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
+          justifyContent: "center",
+          alignItems: "center",
           paddingHorizontal: spacing.lg,
         },
         loadingContainer: {
           flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
+          justifyContent: "center",
+          alignItems: "center",
         },
         episodeInfo: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: spacing.xs,
           paddingHorizontal: spacing.md,
           marginBottom: spacing.sm,
@@ -193,13 +201,14 @@ const AnimeHubScreen: React.FC = () => {
   // If Jellyseerr is not configured we still show the Jikan discover sections.
 
   // Combined loading state — show global loader while both sources are fetching
-  const combinedLoading = (Boolean(jellyseerrService) && isLoading) || jikan.isLoading;
-  const combinedError = (Boolean(jellyseerrService) && isError) && jikan.isError;
+  const combinedLoading =
+    (Boolean(jellyseerrService) && isLoading) || jikan.isLoading;
+  const combinedError = Boolean(jellyseerrService) && isError && jikan.isError;
 
   // Show loading state
   if (combinedLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <Text style={styles.title}>Anime Hub</Text>
@@ -207,7 +216,12 @@ const AnimeHubScreen: React.FC = () => {
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={{ marginTop: spacing.md, color: theme.colors.onSurfaceVariant }}>
+          <Text
+            style={{
+              marginTop: spacing.md,
+              color: theme.colors.onSurfaceVariant,
+            }}
+          >
             Loading anime content...
           </Text>
         </View>
@@ -217,7 +231,7 @@ const AnimeHubScreen: React.FC = () => {
   // Show error state when both sources failed
   if (combinedError) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <Text style={styles.title}>Anime Hub</Text>
@@ -235,16 +249,45 @@ const AnimeHubScreen: React.FC = () => {
     );
   }
 
-  const renderAnimeItem = ({ item }: { item: JellyseerrSearchResult }) => (
-    <AnimeCard
-      id={item.id}
-      title={item.title}
-      posterUrl={item.posterUrl}
-      rating={item.rating}
-      onPress={() => handleCardPress(item)}
-      width={160}
-    />
-  );
+  const getJellyTitle = (r: JellyseerrSearchResult) => {
+    if ('title' in r && r.title) return r.title as string;
+    if ('name' in r && r.name) return r.name as string;
+    return 'Untitled';
+  };
+
+  const getJellyId = (r: JellyseerrSearchResult) => {
+    if (typeof r.id === 'number') return r.id;
+    return r.mediaInfo?.tmdbId ?? 0;
+  };
+
+  const getJellyPosterPath = (r: JellyseerrSearchResult) => {
+    if ('posterPath' in r) return r.posterPath;
+    return undefined;
+  };
+
+  const getJellyVoteAverage = (r: JellyseerrSearchResult) => {
+    if ('voteAverage' in r) return r.voteAverage ?? undefined;
+    return undefined;
+  };
+
+  const renderAnimeItem = ({ item }: { item: JellyseerrSearchResult }) => {
+    const idNum = getJellyId(item) as number;
+    const title = getJellyTitle(item);
+    const poster = getJellyPosterPath(item);
+    const posterUrl = poster ? `https://image.tmdb.org/t/p/original${poster}` : undefined;
+    const rating = getJellyVoteAverage(item);
+
+    return (
+      <AnimeCard
+        id={idNum}
+        title={title}
+        posterUrl={posterUrl}
+        rating={rating}
+        onPress={() => handleCardPress(item)}
+        width={160}
+      />
+    );
+  };
 
   const renderJikanItem = ({ item }: { item: JikanDiscoverItem }) => (
     <AnimeCard
@@ -258,7 +301,7 @@ const AnimeHubScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Fixed Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -355,16 +398,20 @@ const AnimeHubScreen: React.FC = () => {
               >
                 <View
                   style={{
-                    flexDirection: 'row',
+                    flexDirection: "row",
                     paddingHorizontal: spacing.md,
-                    alignItems: 'center',
+                    alignItems: "center",
                   }}
                 >
                   <AnimeCard
-                    id={item.id}
-                    title={item.title}
-                    posterUrl={item.posterUrl}
-                    rating={item.rating}
+                    id={getJellyId(item)}
+                    title={getJellyTitle(item)}
+                    posterUrl={
+                      getJellyPosterPath(item)
+                        ? `https://image.tmdb.org/t/p/original${getJellyPosterPath(item)}`
+                        : undefined
+                    }
+                    rating={getJellyVoteAverage(item)}
                     onPress={() => handleCardPress(item)}
                     width={100}
                   />
@@ -372,13 +419,18 @@ const AnimeHubScreen: React.FC = () => {
                     <Text
                       variant="titleMedium"
                       numberOfLines={2}
-                      style={{ color: theme.colors.onSurface, marginBottom: spacing.xs }}
+                      style={{
+                        color: theme.colors.onSurface,
+                        marginBottom: spacing.xs,
+                      }}
                     >
-                      {item.title}
+                      {(item as any).title ?? (item as any).name ?? (item as any).mediaInfo?.title ?? 'Untitled'}
                     </Text>
                     <View style={styles.episodeInfo}>
                       <Text style={styles.episodeText}>
-                        {item.mediaType === 'tv' ? 'S2 E23 - Shibuya Incident' : 'New Release'}
+                        {item.mediaType === "tv"
+                          ? "S2 E23 - Shibuya Incident"
+                          : "New Release"}
                       </Text>
                       <IconButton
                         icon="dots-horizontal"

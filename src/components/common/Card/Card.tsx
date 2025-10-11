@@ -71,7 +71,7 @@ const Card = forwardRef<PaperCardRef, CardProps>(
   const isDisabled = Boolean(disabled);
   const resolvedAccessibilityRole = onPress ? 'button' : accessibilityRoleProp;
 
-    const baseFocusRingStyle = useMemo<ViewStyle>(
+    const baseFocusRingStyle = useMemo<any>(
       () => ({
         borderColor: theme.colors.primary,
         borderWidth: 2,
@@ -80,7 +80,7 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       [theme.colors.primary],
     );
 
-    const customFocusRingStyle = useMemo<ViewStyle>(
+    const customFocusRingStyle = useMemo<any>(
       () => ({
         borderColor: theme.colors.primary,
         borderWidth: 2,

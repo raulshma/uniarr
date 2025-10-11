@@ -504,30 +504,65 @@ class ImageCacheService {
   private async getCachedPath(uri: string): Promise<string | null> {
     // First, try to resolve the cache path via expo-image. This is the
     // preferred source of truth for cache locations on platforms where it
-    // exposes filesystem paths.
-    const cachedPath = await Image.getCachePathAsync(uri);
-    if (cachedPath) {
-      const info = await FileSystem.getInfoAsync(cachedPath);
-      if (!info.exists) {
-        return null;
-      }
+    // exposes filesystem paths. Some native implementations normalize or
+    // encode the request URL before storing it in the disk cache which can
+    // cause `getCachePathAsync` to return null for the exact input string.
+    // Try a few common URI variants to improve our chances of resolving a
+    // cached path without falling back to a download.
+    const triedUris = new Set<string>();
 
-      const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
-      if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
-        try {
-          await FileSystem.deleteAsync(cachedPath, { idempotent: true });
-          void logger.debug('ImageCacheService: removed stale cached image.', { cachedPath, uri });
-        } catch (error) {
-          void logger.warn('ImageCacheService: failed to delete stale cached image.', {
-            cachedPath,
-            uri,
-            error: this.stringifyError(error),
-          });
+    const variants: string[] = [uri];
+    try {
+      const encoded = encodeURI(uri);
+      if (encoded !== uri) variants.push(encoded);
+    } catch {
+      // ignore
+    }
+    try {
+      const decoded = decodeURI(uri);
+      if (decoded !== uri) variants.push(decoded);
+    } catch {
+      // ignore
+    }
+    try {
+      // strip trailing slashes which sometimes differ between callers
+      const stripped = uri.replace(/\/+$/, '');
+      if (stripped !== uri) variants.push(stripped);
+    } catch {
+      // ignore
+    }
+
+    for (const attemptUri of variants) {
+      if (triedUris.has(attemptUri)) continue;
+      triedUris.add(attemptUri);
+      try {
+        const cachedPath = await Image.getCachePathAsync(attemptUri);
+        if (!cachedPath) continue;
+
+        const info = await FileSystem.getInfoAsync(cachedPath);
+        if (!info.exists) {
+          continue;
         }
-        return null;
-      }
 
-      return cachedPath;
+        const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+        if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
+          try {
+            await FileSystem.deleteAsync(cachedPath, { idempotent: true });
+            void logger.debug('ImageCacheService: removed stale cached image.', { cachedPath, uri: attemptUri });
+          } catch (error) {
+            void logger.warn('ImageCacheService: failed to delete stale cached image.', {
+              cachedPath,
+              uri: attemptUri,
+              error: this.stringifyError(error),
+            });
+          }
+          continue;
+        }
+
+        return cachedPath;
+      } catch {
+        // ignore per-attempt errors and continue to other variants
+      }
     }
 
     // If expo-image doesn't provide a cache path, check our deterministic

@@ -1,4 +1,4 @@
-import { logger } from '@/services/logger/LoggerService';
+import { logger } from "@/services/logger/LoggerService";
 import {
   selectDownloadNotificationsEnabled,
   selectFailedDownloadNotificationsEnabled,
@@ -7,16 +7,16 @@ import {
   selectServiceHealthNotificationsEnabled,
   selectCriticalHealthAlertsBypassQuietHours,
   useSettingsStore,
-} from '@/store/settingsStore';
+} from "@/store/settingsStore";
 import {
   NOTIFICATION_CATEGORIES,
   type DownloadNotificationPayload,
   type FailedDownloadNotificationPayload,
   type RequestNotificationPayload,
   type ServiceHealthNotificationPayload,
-} from '@/models/notification.types';
-import { formatBytes } from '@/utils/torrent.utils';
-import { quietHoursService } from '@/services/notifications/QuietHoursService';
+} from "@/models/notification.types";
+import { formatBytes } from "@/utils/torrent.utils";
+import { quietHoursService } from "@/services/notifications/QuietHoursService";
 
 const COMPLETED_CATEGORY = NOTIFICATION_CATEGORIES.downloads;
 const FAILURE_CATEGORY = NOTIFICATION_CATEGORIES.failures;
@@ -34,7 +34,9 @@ class NotificationEventService {
     return NotificationEventService.instance;
   }
 
-  async notifyDownloadCompleted(payload: DownloadNotificationPayload): Promise<void> {
+  async notifyDownloadCompleted(
+    payload: DownloadNotificationPayload
+  ): Promise<void> {
     const state = useSettingsStore.getState();
     if (
       !selectNotificationsEnabled(state) ||
@@ -58,11 +60,13 @@ class NotificationEventService {
     await quietHoursService.deliverNotification(
       COMPLETED_CATEGORY,
       message,
-      `${payload.torrent.name} • ${sizeLabel}`,
+      `${payload.torrent.name} • ${sizeLabel}`
     );
   }
 
-  async notifyDownloadFailed(payload: FailedDownloadNotificationPayload): Promise<void> {
+  async notifyDownloadFailed(
+    payload: FailedDownloadNotificationPayload
+  ): Promise<void> {
     const state = useSettingsStore.getState();
     if (
       !selectNotificationsEnabled(state) ||
@@ -71,7 +75,7 @@ class NotificationEventService {
       return;
     }
 
-    const reason = payload.reason ?? payload.torrent.state ?? 'Unknown reason';
+    const reason = payload.reason ?? payload.torrent.state ?? "Unknown reason";
 
     const message = {
       title: `Download failed • ${payload.serviceName}`,
@@ -86,7 +90,7 @@ class NotificationEventService {
     await quietHoursService.deliverNotification(
       FAILURE_CATEGORY,
       message,
-      `${payload.torrent.name} → ${reason}`,
+      `${payload.torrent.name} → ${reason}`
     );
   }
 
@@ -99,14 +103,29 @@ class NotificationEventService {
       return;
     }
 
+    const toRecord = (v: unknown): Record<string, unknown> | null =>
+      v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+    const reqRecord = toRecord(payload.request) ?? {};
+    const requestedByRecord = toRecord(reqRecord.requestedBy) ?? {};
     const requestedBy =
-      payload.request.requestedBy?.displayName ??
-      payload.request.requestedBy?.username ??
-      payload.request.requestedBy?.email ??
-      'Someone';
+      (typeof requestedByRecord.username === "string" &&
+        requestedByRecord.username) ??
+      (typeof requestedByRecord.email === "string" &&
+        requestedByRecord.email) ??
+      "Someone";
 
-    const mediaTitle = payload.request.media.title ?? 'A new request';
-    const mediaTypeLabel = payload.request.mediaType === 'movie' ? 'Movie' : 'Series';
+    // Media title may be nested under media.mediaInfo or be present on the top-level
+    const mediaObj = toRecord(reqRecord.media) ?? {};
+    const mediaInfoObj = toRecord(mediaObj.mediaInfo) ?? {};
+    const mediaTitle =
+      (typeof mediaObj.title === "string" && mediaObj.title) ??
+      (typeof mediaObj.name === "string" && mediaObj.name) ??
+      (typeof mediaInfoObj.title === "string" && mediaInfoObj.title) ??
+      "A new request";
+    const mediaTypeLabel =
+      typeof reqRecord.mediaType === "string" && reqRecord.mediaType === "movie"
+        ? "Movie"
+        : "Series";
 
     const message = {
       title: `${mediaTypeLabel} request • ${payload.serviceName}`,
@@ -114,19 +133,24 @@ class NotificationEventService {
       category: REQUEST_CATEGORY,
       data: {
         serviceId: payload.serviceId,
-        requestId: payload.request.id,
-        mediaType: payload.request.mediaType,
+        requestId: (reqRecord.id as number) ?? undefined,
+        mediaType:
+          typeof reqRecord.mediaType === "string"
+            ? reqRecord.mediaType
+            : undefined,
       },
     } as const;
 
     await quietHoursService.deliverNotification(
       REQUEST_CATEGORY,
       message,
-      `${requestedBy} → ${mediaTitle}`,
+      `${requestedBy} → ${mediaTitle}`
     );
   }
 
-  async notifyServiceStatusChange(payload: ServiceHealthNotificationPayload): Promise<void> {
+  async notifyServiceStatusChange(
+    payload: ServiceHealthNotificationPayload
+  ): Promise<void> {
     const state = useSettingsStore.getState();
     if (
       !selectNotificationsEnabled(state) ||
@@ -136,17 +160,17 @@ class NotificationEventService {
     }
 
     const status = payload.health.status;
-    const isOffline = status === 'offline';
-    const isDegraded = status === 'degraded';
-    const wasOffline = payload.previousStatus === 'offline';
+    const isOffline = status === "offline";
+    const isDegraded = status === "degraded";
+    const wasOffline = payload.previousStatus === "offline";
 
     if (status === payload.previousStatus) {
       return;
     }
 
     if (isOffline || isDegraded) {
-      const label = isOffline ? 'offline' : 'degraded';
-      const message = payload.health.message ?? 'Check service connectivity.';
+      const label = isOffline ? "offline" : "degraded";
+      const message = payload.health.message ?? "Check service connectivity.";
 
       const notification = {
         title: `${payload.serviceName} ${label}`,
@@ -159,21 +183,22 @@ class NotificationEventService {
       } as const;
 
       const bypassQuietHours =
-        selectCriticalHealthAlertsBypassQuietHours(state) && status === 'offline';
+        selectCriticalHealthAlertsBypassQuietHours(state) &&
+        status === "offline";
 
       await quietHoursService.deliverNotification(
         SERVICE_CATEGORY,
         notification,
         `${payload.serviceName}: ${label}`,
-        { bypassQuietHours },
+        { bypassQuietHours }
       );
       return;
     }
 
-    if (status === 'healthy' && wasOffline) {
+    if (status === "healthy" && wasOffline) {
       const notification = {
         title: `${payload.serviceName} restored`,
-        body: 'Service connectivity has been restored.',
+        body: "Service connectivity has been restored.",
         category: SERVICE_CATEGORY,
         data: {
           serviceId: payload.serviceId,
@@ -184,15 +209,15 @@ class NotificationEventService {
       await quietHoursService.deliverNotification(
         SERVICE_CATEGORY,
         notification,
-        `${payload.serviceName}: restored`,
+        `${payload.serviceName}: restored`
       );
       return;
     }
   }
 
   async notifyInitializationSkipped(reason: string): Promise<void> {
-    await logger.warn('Notification event skipped.', {
-      location: 'NotificationEventService.notifyInitializationSkipped',
+    await logger.warn("Notification event skipped.", {
+      location: "NotificationEventService.notifyInitializationSkipped",
       reason,
     });
   }

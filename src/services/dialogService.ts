@@ -1,9 +1,13 @@
-import { Alert as RNAlert } from 'react-native';
+import {
+  Alert as RNAlert,
+  type AlertButton,
+  type AlertOptions as RNAlertOptions,
+} from "react-native";
 
 export type RNAlertButton = {
   text: string;
   onPress?: () => void;
-  style?: 'default' | 'cancel' | 'destructive';
+  style?: "default" | "cancel" | "destructive";
 };
 
 export type AlertOptions = {
@@ -36,13 +40,32 @@ export function unregisterDialogPresenter() {
  *
  * Signature mirrors React Native's Alert.alert so replacements are straightforward.
  */
-export function alert(title: string, message?: string, buttons?: RNAlertButton[], options?: AlertOptions) {
+export function alert(
+  title: string,
+  message?: string,
+  buttons?: RNAlertButton[],
+  options?: AlertOptions
+) {
   if (presenter) {
     presenter({ title, message, buttons, options });
   } else {
     // Fallback so nothing breaks if provider isn't mounted yet
-    // Types are slightly different so cast to any for compatibility
-    RNAlert.alert(title, message as any, buttons as any, options as any);
+    // Convert our typed payload into the RN Alert-compatible form without using `any`.
+    const safeButtons = Array.isArray(buttons)
+      ? (buttons.map((b) => ({
+          text: b.text,
+          onPress: b.onPress,
+          style: b.style,
+        })) as AlertButton[])
+      : undefined;
+
+    const safeOptions = options
+      ? ({
+          cancelable: Boolean(options.cancelable),
+          onDismiss: options.onDismiss,
+        } as RNAlertOptions)
+      : undefined;
+    RNAlert.alert(title, message ?? undefined, safeButtons, safeOptions);
   }
 }
 

@@ -1,5 +1,6 @@
 import type { SystemHealth } from '@/connectors/base/IConnector';
-import type { JellyseerrRequest } from '@/models/jellyseerr.types';
+import type { components } from '@/connectors/client-schemas/jellyseerr-openapi';
+type JellyseerrRequest = components['schemas']['MediaRequest'];
 import type { Torrent } from '@/models/torrent.types';
 
 export type NotificationCategory = 'downloads' | 'requests' | 'serviceHealth' | 'failures';

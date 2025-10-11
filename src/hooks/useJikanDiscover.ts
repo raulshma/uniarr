@@ -39,7 +39,7 @@ const uniqueById = (items: DiscoverItem[]) => {
   const seen = new Set<number>();
   const out: DiscoverItem[] = [];
   for (const it of items) {
-    if (!it || typeof it.id !== 'number') continue;
+    if (!it || typeof it.id !== "number") continue;
     if (!seen.has(it.id)) {
       seen.add(it.id);
       out.push(it);
@@ -59,9 +59,14 @@ export const useJikanTopAnime = ({
     queryKey: [...queryKeys.discover.base, "jikan", "top", page],
     queryFn: async () => {
       const data = await JikanClient.getTopAnime(page);
-      const list = Array.isArray((data as any).data)
-        ? ((data as any).data as JikanAnime[])
-        : [data as any as JikanAnime];
+      const toRecord = (v: unknown): Record<string, unknown> | null =>
+        v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+      const d = toRecord(data);
+      const list = Array.isArray(d?.data)
+        ? (d!.data as unknown[]).map((i) => i as JikanAnime)
+        : d
+        ? [d as unknown as JikanAnime]
+        : [];
       const mapped = list.map(mapAnime);
       return uniqueById(mapped);
     },
@@ -81,42 +86,90 @@ export const useJikanRecommendations = ({
     queryKey: [...queryKeys.discover.base, "jikan", "recommendations", page],
     queryFn: async () => {
       const data = await JikanClient.getRecommendations(page);
-      const list = Array.isArray((data as any).data)
-        ? ((data as any).data as any[])
-        : [data as any];
+      const toRecord = (v: unknown): Record<string, unknown> | null =>
+        v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+      const d = toRecord(data);
+      const list = Array.isArray(d?.data)
+        ? (d!.data as unknown[])
+        : d
+        ? [d as unknown]
+        : [];
       // recommendations endpoints return a different shape; try to locate the anime object
       const mapped = list
         .map((r) => {
-          // Recommendation items commonly contain an `entry` array with two elements
-          // (the source and the recommended entry). Ensure we pick the recommended
-          // object when an array is present and normalize the shape so `mapAnime`
-          // can extract title / image / id safely.
-          let candidate: any = r.entry ?? r.anime ?? r.item ?? r;
+          const toRecord = (v: unknown): Record<string, unknown> | null =>
+            v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+          const rec = toRecord(r) ?? {};
+          let candidateRec =
+            toRecord(rec.entry ?? rec.anime ?? rec.item ?? rec) ?? {};
 
-          if (Array.isArray(candidate)) {
-            candidate = candidate.length > 1 ? candidate[1] : candidate[0];
+          if (Array.isArray(rec.entry ?? rec.anime ?? rec.item)) {
+            const arr = (rec.entry ?? rec.anime ?? rec.item) as unknown[];
+            candidateRec = toRecord(arr.length > 1 ? arr[1] : arr[0]) ?? {};
           }
 
-          if (!candidate) return undefined;
-
           const normalized: JikanAnime = {
-            mal_id: candidate.mal_id ?? candidate.id ?? candidate.malId,
-            url: candidate.url ?? candidate.link ?? candidate.uri,
-            images: candidate.images ?? (candidate.image_url ? { jpg: { image_url: candidate.image_url } } : undefined),
-            title: candidate.title ?? candidate.name ?? candidate.title_english ?? undefined,
-            title_english: candidate.title_english ?? null,
-            title_japanese: candidate.title_japanese ?? null,
-            type: candidate.type ?? null,
-            episodes: candidate.episodes ?? null,
-            score: candidate.score ?? null,
-            synopsis: candidate.synopsis ?? null,
-            aired: candidate.aired ?? null,
+            mal_id: (candidateRec.mal_id ??
+              candidateRec.id ??
+              candidateRec.malId) as number,
+            url: (candidateRec.url ?? candidateRec.link ?? candidateRec.uri) as
+              | string
+              | undefined,
+            images: ((): JikanAnime["images"] | undefined => {
+              const imgs =
+                candidateRec.images ??
+                candidateRec.images_url ??
+                candidateRec.image_url ??
+                undefined;
+              if (!imgs) return undefined;
+              // If it's already in expected shape, trust it
+              if (typeof imgs === "object" && ("jpg" in imgs || "webp" in imgs))
+                return imgs as JikanAnime["images"];
+              // If it's a single url string, coerce to the minimal expected shape
+              if (typeof imgs === "string") {
+                return { jpg: { image_url: imgs } } as JikanAnime["images"];
+              }
+              return undefined;
+            })(),
+            title: (candidateRec.title ??
+              candidateRec.name ??
+              candidateRec.title_english) as string | undefined,
+            title_english: (candidateRec.title_english ?? null) as
+              | string
+              | null,
+            title_japanese: (candidateRec.title_japanese ?? null) as
+              | string
+              | null,
+            type: (candidateRec.type ?? null) as string | null,
+            episodes: (candidateRec.episodes ?? null) as number | null,
+            score: (candidateRec.score ?? null) as number | null,
+            synopsis: (candidateRec.synopsis ?? null) as string | null,
+            aired: ((): { from?: string | null; to?: string | null } | null => {
+              const a = candidateRec.aired ?? candidateRec.airing ?? null;
+              if (!a || typeof a !== "object") return null;
+              const aRec = a as Record<string, unknown>;
+              const from = (
+                typeof aRec.from === "string"
+                  ? (aRec.from as string)
+                  : typeof aRec.start_date === "string"
+                  ? (aRec.start_date as string)
+                  : undefined
+              ) as string | null | undefined;
+              const to = (
+                typeof aRec.to === "string"
+                  ? (aRec.to as string)
+                  : typeof aRec.end_date === "string"
+                  ? (aRec.end_date as string)
+                  : undefined
+              ) as string | null | undefined;
+              return { from: from ?? null, to: to ?? null };
+            })(),
           };
 
           return normalized.mal_id ? mapAnime(normalized) : undefined;
         })
         .filter(Boolean) as DiscoverItem[];
-  return uniqueById(mapped);
+      return uniqueById(mapped);
     },
     enabled,
     staleTime: 5 * 60 * 1000,
@@ -128,9 +181,14 @@ export const useJikanSeasonNow = ({ enabled = true }: { enabled?: boolean }) =>
     queryKey: [...queryKeys.discover.base, "jikan", "seasons", "now"],
     queryFn: async () => {
       const data = await JikanClient.getSeasonNow();
-      const list = Array.isArray((data as any).data)
-        ? ((data as any).data as JikanAnime[])
-        : [data as any as JikanAnime];
+      const toRecord = (v: unknown): Record<string, unknown> | null =>
+        v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+      const d = toRecord(data);
+      const list = Array.isArray(d?.data)
+        ? (d!.data as unknown[]).map((i) => i as JikanAnime)
+        : d
+        ? [d as unknown as JikanAnime]
+        : [];
       const mapped = list.map(mapAnime);
       return uniqueById(mapped);
     },
@@ -148,9 +206,14 @@ export const useJikanSeasonUpcoming = ({
     queryKey: [...queryKeys.discover.base, "jikan", "seasons", "upcoming"],
     queryFn: async () => {
       const data = await JikanClient.getSeasonUpcoming();
-      const list = Array.isArray((data as any).data)
-        ? ((data as any).data as JikanAnime[])
-        : [data as any as JikanAnime];
+      const toRecord = (v: unknown): Record<string, unknown> | null =>
+        v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+      const d = toRecord(data);
+      const list = Array.isArray(d?.data)
+        ? (d!.data as unknown[]).map((i) => i as JikanAnime)
+        : d
+        ? [d as unknown as JikanAnime]
+        : [];
       const mapped = list.map(mapAnime);
       return uniqueById(mapped);
     },

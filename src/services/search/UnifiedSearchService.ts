@@ -1,13 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import type { IConnector, SearchOptions } from '@/connectors/base/IConnector';
-import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
-import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import type { Series } from '@/models/media.types';
-import type { Movie } from '@/models/movie.types';
-import type { JellyseerrSearchResult } from '@/models/jellyseerr.types';
+import type { IConnector, SearchOptions } from "@/connectors/base/IConnector";
+import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
+import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
+import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import type { Series } from "@/models/media.types";
+import type { Movie } from "@/models/movie.types";
+import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
+type JellyseerrSearchResult =
+  | components["schemas"]["MovieResult"]
+  | components["schemas"]["TvResult"];
 import type {
   SearchHistoryEntry,
   SearchableServiceSummary,
@@ -16,28 +19,37 @@ import type {
   UnifiedSearchOptions,
   UnifiedSearchResponse,
   UnifiedSearchResult,
-} from '@/models/search.types';
-import { logger } from '@/services/logger/LoggerService';
-import { isApiError, type ApiError } from '@/utils/error.utils';
-import { getOpenApiOperationHint, hasOpenApiForService } from '@/connectors/openapi/OpenApiHelper';
+} from "@/models/search.types";
+import { logger } from "@/services/logger/LoggerService";
+import { isApiError, type ApiError } from "@/utils/error.utils";
+import {
+  getOpenApiOperationHint,
+  hasOpenApiForService,
+} from "@/connectors/openapi/OpenApiHelper";
 
-const HISTORY_STORAGE_KEY = 'UnifiedSearch_history';
+const HISTORY_STORAGE_KEY = "UnifiedSearch_history";
 const HISTORY_LIMIT = 12;
 const SEARCH_TIMEOUT_MS = 2000;
 
 const normalizeTerm = (term: string): string => term.trim();
 
-const sortIdentifiers = <T extends string>(values: readonly T[] | undefined): T[] | undefined =>
-  values && values.length ? Array.from(new Set(values)).sort((first, second) => first.localeCompare(second)) : undefined;
+const sortIdentifiers = <T extends string>(
+  values: readonly T[] | undefined
+): T[] | undefined =>
+  values && values.length
+    ? Array.from(new Set(values)).sort((first, second) =>
+        first.localeCompare(second)
+      )
+    : undefined;
 
 export const createUnifiedSearchHistoryKey = (
   term: string,
   serviceIds?: string[],
-  mediaTypes?: UnifiedSearchMediaType[],
+  mediaTypes?: UnifiedSearchMediaType[]
 ): string => {
   const normalizedTerm = normalizeTerm(term).toLowerCase();
-  const servicesKey = sortIdentifiers(serviceIds)?.join(',') ?? '';
-  const mediaKey = sortIdentifiers(mediaTypes)?.join(',') ?? '';
+  const servicesKey = sortIdentifiers(serviceIds)?.join(",") ?? "";
+  const mediaKey = sortIdentifiers(mediaTypes)?.join(",") ?? "";
   return `${normalizedTerm}__${servicesKey}__${mediaKey}`;
 };
 
@@ -63,7 +75,10 @@ export class UnifiedSearchService {
     return UnifiedSearchService.instance;
   }
 
-  async search(term: string, options: UnifiedSearchOptions = {}): Promise<UnifiedSearchResponse> {
+  async search(
+    term: string,
+    options: UnifiedSearchOptions = {}
+  ): Promise<UnifiedSearchResponse> {
     const normalizedTerm = normalizeTerm(term);
 
     if (normalizedTerm.length < 2) {
@@ -78,16 +93,20 @@ export class UnifiedSearchService {
 
     const connectors = this.manager
       .getAllConnectors()
-      .filter((connector) => typeof connector.search === 'function');
+      .filter((connector) => typeof connector.search === "function");
 
     const filteredConnectors = options.serviceIds?.length
-      ? connectors.filter((connector) => options.serviceIds!.includes(connector.config.id))
+      ? connectors.filter((connector) =>
+          options.serviceIds!.includes(connector.config.id)
+        )
       : connectors;
 
     const start = Date.now();
 
     const settled = await Promise.all(
-      filteredConnectors.map((connector) => this.searchConnector(normalizedTerm, connector, options)),
+      filteredConnectors.map((connector) =>
+        this.searchConnector(normalizedTerm, connector, options)
+      )
     );
 
     const aggregateResults: UnifiedSearchResult[] = [];
@@ -114,13 +133,15 @@ export class UnifiedSearchService {
 
     return this.manager
       .getAllConnectors()
-      .filter((connector) => typeof connector.search === 'function')
+      .filter((connector) => typeof connector.search === "function")
       .map((connector) => ({
         serviceId: connector.config.id,
         serviceName: connector.config.name,
         serviceType: connector.config.type,
       }))
-      .sort((first, second) => first.serviceName.localeCompare(second.serviceName));
+      .sort((first, second) =>
+        first.serviceName.localeCompare(second.serviceName)
+      );
   }
 
   async getHistory(): Promise<SearchHistoryEntry[]> {
@@ -128,10 +149,16 @@ export class UnifiedSearchService {
 
     return this.history
       .slice()
-      .sort((first, second) => second.lastSearchedAt.localeCompare(first.lastSearchedAt));
+      .sort((first, second) =>
+        second.lastSearchedAt.localeCompare(first.lastSearchedAt)
+      );
   }
 
-  async recordSearch(term: string, serviceIds?: string[], mediaTypes?: UnifiedSearchMediaType[]): Promise<void> {
+  async recordSearch(
+    term: string,
+    serviceIds?: string[],
+    mediaTypes?: UnifiedSearchMediaType[]
+  ): Promise<void> {
     const normalizedTerm = normalizeTerm(term);
     if (normalizedTerm.length < 2) {
       return;
@@ -141,7 +168,11 @@ export class UnifiedSearchService {
 
     const normalizedServices = sortIdentifiers(serviceIds);
     const normalizedMedia = sortIdentifiers(mediaTypes);
-    const key = createUnifiedSearchHistoryKey(normalizedTerm, normalizedServices, normalizedMedia);
+    const key = createUnifiedSearchHistoryKey(
+      normalizedTerm,
+      normalizedServices,
+      normalizedMedia
+    );
     const entry: SearchHistoryEntry = {
       term: normalizedTerm,
       lastSearchedAt: new Date().toISOString(),
@@ -150,7 +181,12 @@ export class UnifiedSearchService {
     };
 
     const existingIndex = this.history.findIndex(
-      (item) => createUnifiedSearchHistoryKey(item.term, item.serviceIds, item.mediaTypes) === key,
+      (item) =>
+        createUnifiedSearchHistoryKey(
+          item.term,
+          item.serviceIds,
+          item.mediaTypes
+        ) === key
     );
 
     if (existingIndex >= 0) {
@@ -169,9 +205,18 @@ export class UnifiedSearchService {
   async removeHistoryEntry(entry: SearchHistoryEntry): Promise<void> {
     await this.ensureHistoryLoaded();
 
-    const key = createUnifiedSearchHistoryKey(entry.term, entry.serviceIds, entry.mediaTypes);
+    const key = createUnifiedSearchHistoryKey(
+      entry.term,
+      entry.serviceIds,
+      entry.mediaTypes
+    );
     const nextHistory = this.history.filter(
-      (item) => createUnifiedSearchHistoryKey(item.term, item.serviceIds, item.mediaTypes) !== key,
+      (item) =>
+        createUnifiedSearchHistoryKey(
+          item.term,
+          item.serviceIds,
+          item.mediaTypes
+        ) !== key
     );
 
     if (nextHistory.length === this.history.length) {
@@ -190,8 +235,8 @@ export class UnifiedSearchService {
     try {
       await AsyncStorage.removeItem(HISTORY_STORAGE_KEY);
     } catch (error) {
-      await logger.error('Failed to clear unified search history.', {
-        location: 'UnifiedSearchService.clearHistory',
+      await logger.error("Failed to clear unified search history.", {
+        location: "UnifiedSearchService.clearHistory",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -210,10 +255,14 @@ export class UnifiedSearchService {
         const parsed = JSON.parse(raw) as SearchHistoryEntry[];
         this.history = Array.isArray(parsed)
           ? parsed
-              .filter((entry) => typeof entry.term === 'string' && entry.term.trim().length > 0)
+              .filter(
+                (entry) =>
+                  typeof entry.term === "string" && entry.term.trim().length > 0
+              )
               .map((entry) => ({
                 term: normalizeTerm(entry.term),
-                lastSearchedAt: entry.lastSearchedAt ?? new Date(0).toISOString(),
+                lastSearchedAt:
+                  entry.lastSearchedAt ?? new Date(0).toISOString(),
                 serviceIds: sortIdentifiers(entry.serviceIds),
                 mediaTypes: sortIdentifiers(entry.mediaTypes),
               }))
@@ -221,8 +270,8 @@ export class UnifiedSearchService {
       }
     } catch (error) {
       this.history = [];
-      await logger.error('Failed to load unified search history.', {
-        location: 'UnifiedSearchService.ensureHistoryLoaded',
+      await logger.error("Failed to load unified search history.", {
+        location: "UnifiedSearchService.ensureHistoryLoaded",
         error: error instanceof Error ? error.message : String(error),
       });
     } finally {
@@ -232,10 +281,13 @@ export class UnifiedSearchService {
 
   private async persistHistory(): Promise<void> {
     try {
-      await AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(this.history));
+      await AsyncStorage.setItem(
+        HISTORY_STORAGE_KEY,
+        JSON.stringify(this.history)
+      );
     } catch (error) {
-      await logger.error('Failed to persist unified search history.', {
-        location: 'UnifiedSearchService.persistHistory',
+      await logger.error("Failed to persist unified search history.", {
+        location: "UnifiedSearchService.persistHistory",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -244,7 +296,7 @@ export class UnifiedSearchService {
   private async searchConnector(
     term: string,
     connector: IConnector,
-    options: UnifiedSearchOptions,
+    options: UnifiedSearchOptions
   ): Promise<ConnectorSearchResult> {
     const searchFn = connector.search?.bind(connector);
 
@@ -260,22 +312,27 @@ export class UnifiedSearchService {
             pageSize: options.limitPerService,
           },
         }),
-        ...(options.mediaTypes && options.mediaTypes.length > 0 && {
-          filters: {
-            mediaTypes: options.mediaTypes,
-          },
-        }),
+        ...(options.mediaTypes &&
+          options.mediaTypes.length > 0 && {
+            filters: {
+              mediaTypes: options.mediaTypes,
+            },
+          }),
       };
-      
+
       const rawResults = await this.withTimeout(
-        searchFn(term, Object.keys(searchOptions).length > 0 ? searchOptions : undefined), 
+        searchFn(
+          term,
+          Object.keys(searchOptions).length > 0 ? searchOptions : undefined
+        ),
         SEARCH_TIMEOUT_MS
       );
       const mapped = this.mapResults(rawResults, connector, options.mediaTypes);
       const limit = options.limitPerService ?? 25;
       return { results: mapped.slice(0, limit) };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown search error.';
+      const message =
+        error instanceof Error ? error.message : "Unknown search error.";
 
       // Avoid double-logging and reduce noise for expected API errors
       // (for example, a 400 when a search term is too short). For ApiError
@@ -287,13 +344,24 @@ export class UnifiedSearchService {
         // surface validation expectations (for example minimum search
         // term lengths) to the user without requiring them to inspect logs.
         const apiErr = error as ApiError;
-        const ctx = apiErr.details?.context as Record<string, unknown> | undefined;
+        const ctx = apiErr.details?.context as
+          | Record<string, unknown>
+          | undefined;
         try {
           const endpoint = ctx?.endpoint as string | undefined;
           const operation = ctx?.operation as string | undefined;
           const serviceType = ctx?.serviceType as string | undefined;
-          if (endpoint && operation && serviceType && hasOpenApiForService(serviceType)) {
-            const hint = getOpenApiOperationHint(serviceType, endpoint, operation);
+          if (
+            endpoint &&
+            operation &&
+            serviceType &&
+            hasOpenApiForService(serviceType)
+          ) {
+            const hint = getOpenApiOperationHint(
+              serviceType,
+              endpoint,
+              operation
+            );
             if (hint) {
               apiErr.details = { ...(apiErr.details ?? {}), openApiHint: hint };
               // Keep the original message short but append a compact hint so
@@ -305,8 +373,8 @@ export class UnifiedSearchService {
           // If anything goes wrong while enriching the error we don't want
           // to hide the original error; record the enrichment failure at
           // debug level and continue.
-          void logger.debug('OpenAPI hint enrichment failed.', {
-            location: 'UnifiedSearchService.searchConnector',
+          void logger.debug("OpenAPI hint enrichment failed.", {
+            location: "UnifiedSearchService.searchConnector",
             serviceId: connector.config.id,
             serviceType: connector.config.type,
             error: e instanceof Error ? e.message : String(e),
@@ -314,20 +382,23 @@ export class UnifiedSearchService {
         }
 
         // For jellyseerr search errors, provide specific troubleshooting hints
-        if (connector.config.type === 'jellyseerr' && apiErr.statusCode === 400) {
+        if (
+          connector.config.type === "jellyseerr" &&
+          apiErr.statusCode === 400
+        ) {
           const originalMessage = apiErr.message;
           apiErr.message = `${originalMessage} Try using a different search term or check your Jellyseerr configuration.`;
         }
 
-        await logger.debug('Unified search connector encountered API error.', {
-          location: 'UnifiedSearchService.searchConnector',
+        await logger.debug("Unified search connector encountered API error.", {
+          location: "UnifiedSearchService.searchConnector",
           serviceId: connector.config.id,
           serviceType: connector.config.type,
           error: message,
         });
       } else {
-        await logger.warn('Unified search connector failed.', {
-          location: 'UnifiedSearchService.searchConnector',
+        await logger.warn("Unified search connector failed.", {
+          location: "UnifiedSearchService.searchConnector",
           serviceId: connector.config.id,
           serviceType: connector.config.type,
           error: message,
@@ -348,21 +419,30 @@ export class UnifiedSearchService {
   private mapResults(
     rawResults: unknown,
     connector: IConnector,
-    mediaFilter?: UnifiedSearchMediaType[],
+    mediaFilter?: UnifiedSearchMediaType[]
   ): UnifiedSearchResult[] {
     const { config } = connector;
 
     let mapped: UnifiedSearchResult[] = [];
 
     switch (config.type) {
-      case 'sonarr':
-        mapped = this.mapSonarrResults(rawResults as Series[], connector as SonarrConnector);
+      case "sonarr":
+        mapped = this.mapSonarrResults(
+          rawResults as Series[],
+          connector as SonarrConnector
+        );
         break;
-      case 'radarr':
-        mapped = this.mapRadarrResults(rawResults as Movie[], connector as RadarrConnector);
+      case "radarr":
+        mapped = this.mapRadarrResults(
+          rawResults as Movie[],
+          connector as RadarrConnector
+        );
         break;
-      case 'jellyseerr':
-        mapped = this.mapJellyseerrResults(rawResults as JellyseerrSearchResult[], connector as JellyseerrConnector);
+      case "jellyseerr":
+        mapped = this.mapJellyseerrResults(
+          rawResults as JellyseerrSearchResult[],
+          connector as JellyseerrConnector
+        );
         break;
       default:
         mapped = [];
@@ -377,9 +457,14 @@ export class UnifiedSearchService {
     return mapped.filter((item) => filterSet.has(item.mediaType));
   }
 
-  private mapSonarrResults(seriesList: Series[], connector: SonarrConnector): UnifiedSearchResult[] {
+  private mapSonarrResults(
+    seriesList: Series[],
+    connector: SonarrConnector
+  ): UnifiedSearchResult[] {
     return seriesList.map((series) => ({
-      id: `${connector.config.id}:sonarr:${series.tvdbId ?? series.tmdbId ?? series.id}`,
+      id: `${connector.config.id}:sonarr:${
+        series.tvdbId ?? series.tmdbId ?? series.id
+      }`,
       title: series.title,
       overview: series.overview,
       releaseDate: series.added,
@@ -387,7 +472,7 @@ export class UnifiedSearchService {
       posterUrl: series.posterUrl,
       backdropUrl: series.backdropUrl,
       popularity: series.statistics?.percentOfEpisodes,
-      mediaType: 'series',
+      mediaType: "series",
       serviceType: connector.config.type,
       serviceId: connector.config.id,
       serviceName: connector.config.name,
@@ -407,9 +492,14 @@ export class UnifiedSearchService {
     }));
   }
 
-  private mapRadarrResults(movies: Movie[], connector: RadarrConnector): UnifiedSearchResult[] {
+  private mapRadarrResults(
+    movies: Movie[],
+    connector: RadarrConnector
+  ): UnifiedSearchResult[] {
     return movies.map((movie) => ({
-      id: `${connector.config.id}:radarr:${movie.tmdbId ?? movie.imdbId ?? movie.id}`,
+      id: `${connector.config.id}:radarr:${
+        movie.tmdbId ?? movie.imdbId ?? movie.id
+      }`,
       title: movie.title,
       overview: movie.overview,
       releaseDate: movie.releaseDate ?? movie.inCinemas ?? movie.digitalRelease,
@@ -418,7 +508,7 @@ export class UnifiedSearchService {
       backdropUrl: movie.backdropUrl,
       rating: movie.ratings?.value,
       popularity: movie.statistics?.percentAvailable,
-      mediaType: 'movie',
+      mediaType: "movie",
       serviceType: connector.config.type,
       serviceId: connector.config.id,
       serviceName: connector.config.name,
@@ -439,35 +529,149 @@ export class UnifiedSearchService {
 
   private mapJellyseerrResults(
     results: JellyseerrSearchResult[],
-    connector: JellyseerrConnector,
+    connector: JellyseerrConnector
   ): UnifiedSearchResult[] {
-    return results.map((result) => ({
-      id: `${connector.config.id}:jellyseerr:${result.tmdbId ?? result.id}`,
-      title: result.title,
-      overview: result.overview,
-      releaseDate: result.mediaType === 'movie' ? result.releaseDate : result.firstAirDate,
-      posterUrl: result.posterUrl,
-      backdropUrl: result.backdropUrl,
-      rating: result.rating,
-      popularity: result.popularity,
-      mediaType: result.mediaType === 'tv' ? 'series' : 'movie',
-      serviceType: connector.config.type,
-      serviceId: connector.config.id,
-      serviceName: connector.config.name,
-      isRequested: result.isRequested,
-      externalIds: {
-        tmdbId: result.tmdbId ?? result.id,
-        tvdbId: result.tvdbId,
-        imdbId: result.imdbId,
-        serviceNativeId: result.id,
-      },
-      extra: {
-        mediaStatus: result.mediaStatus,
-      },
-    }));
+    return results.map((result) => {
+      // The generated OpenAPI shapes for Jellyseerr can differ between movie
+      // and tv results. Read common fields defensively (no `any` casts).
+      const toRecord = (v: unknown): Record<string, unknown> | null =>
+        v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+
+      const r = toRecord(result) ?? {};
+      const mediaInfo = toRecord((r.mediaInfo as unknown) ?? undefined);
+
+      const tmdbId =
+        typeof mediaInfo?.tmdbId === "number"
+          ? (mediaInfo!.tmdbId as number)
+          : typeof r.tmdbId === "number"
+          ? (r.tmdbId as number)
+          : undefined;
+      const tvdbId =
+        typeof mediaInfo?.tvdbId === "number"
+          ? (mediaInfo!.tvdbId as number)
+          : typeof r.tvdbId === "number"
+          ? (r.tvdbId as number)
+          : undefined;
+      const imdbId =
+        typeof mediaInfo?.imdbId === "string"
+          ? (mediaInfo!.imdbId as string)
+          : typeof r.imdbId === "string"
+          ? (r.imdbId as string)
+          : undefined;
+
+      const serviceNativeId =
+        typeof r.id === "number" ? (r.id as number) : undefined;
+
+      const title =
+        (typeof r.title === "string" && (r.title as string)) ||
+        (typeof r.name === "string" && (r.name as string)) ||
+        (mediaInfo &&
+          typeof mediaInfo.title === "string" &&
+          (mediaInfo.title as string)) ||
+        (mediaInfo &&
+          typeof mediaInfo.name === "string" &&
+          (mediaInfo.name as string)) ||
+        "";
+      const overview =
+        typeof r.overview === "string"
+          ? (r.overview as string)
+          : mediaInfo && typeof mediaInfo.overview === "string"
+          ? (mediaInfo.overview as string)
+          : undefined;
+
+      const mediaType =
+        typeof r.mediaType === "string" ? (r.mediaType as string) : undefined;
+      const releaseDate =
+        mediaType === "movie"
+          ? typeof r.releaseDate === "string"
+            ? (r.releaseDate as string)
+            : mediaInfo && typeof mediaInfo.releaseDate === "string"
+            ? (mediaInfo.releaseDate as string)
+            : undefined
+          : typeof r.firstAirDate === "string"
+          ? (r.firstAirDate as string)
+          : mediaInfo && typeof mediaInfo.firstAirDate === "string"
+          ? (mediaInfo.firstAirDate as string)
+          : undefined;
+
+      const poster =
+        typeof r.posterPath === "string"
+          ? (r.posterPath as string)
+          : mediaInfo && typeof mediaInfo.posterPath === "string"
+          ? (mediaInfo.posterPath as string)
+          : undefined;
+      const backdrop =
+        typeof r.backdropPath === "string"
+          ? (r.backdropPath as string)
+          : mediaInfo && typeof mediaInfo.backdropPath === "string"
+          ? (mediaInfo.backdropPath as string)
+          : undefined;
+
+      const posterUrl = poster
+        ? `https://image.tmdb.org/t/p/original${poster}`
+        : undefined;
+      const backdropUrl = backdrop
+        ? `https://image.tmdb.org/t/p/original${backdrop}`
+        : undefined;
+
+      const rating =
+        typeof r.voteAverage === "number"
+          ? (r.voteAverage as number)
+          : mediaInfo && typeof mediaInfo.voteAverage === "number"
+          ? (mediaInfo.voteAverage as number)
+          : undefined;
+      const popularity =
+        typeof r.popularity === "number"
+          ? (r.popularity as number)
+          : mediaInfo && typeof mediaInfo.popularity === "number"
+          ? (mediaInfo.popularity as number)
+          : undefined;
+
+      const isRequested = Boolean(
+        (Array.isArray(r.requests as unknown) &&
+          (r.requests as unknown as unknown[]).length > 0) ||
+          (mediaInfo &&
+            Array.isArray(mediaInfo.requests as unknown) &&
+            (mediaInfo.requests as unknown as unknown[]).length > 0)
+      );
+
+      const mediaStatus =
+        typeof mediaInfo?.status === "number"
+          ? (mediaInfo!.status as number)
+          : typeof r.mediaStatus === "number"
+          ? (r.mediaStatus as number)
+          : undefined;
+
+      return {
+        id: `${connector.config.id}:jellyseerr:${tmdbId ?? serviceNativeId}`,
+        title,
+        overview,
+        releaseDate,
+        posterUrl,
+        backdropUrl,
+        rating,
+        popularity,
+        mediaType: mediaType === "tv" ? "series" : "movie",
+        serviceType: connector.config.type,
+        serviceId: connector.config.id,
+        serviceName: connector.config.name,
+        isRequested,
+        externalIds: {
+          tmdbId,
+          tvdbId,
+          imdbId,
+          serviceNativeId,
+        },
+        extra: {
+          mediaStatus,
+        },
+      } as UnifiedSearchResult;
+    });
   }
 
-  private deduplicateAndSort(results: UnifiedSearchResult[]): UnifiedSearchResult[] {
+  private deduplicateAndSort(
+    results: UnifiedSearchResult[]
+  ): UnifiedSearchResult[] {
     const deduped = new Map<string, UnifiedSearchResult>();
 
     for (const item of results) {
@@ -520,7 +724,7 @@ export class UnifiedSearchService {
       parts.push(result.title.toLowerCase());
     }
 
-    return parts.join('::');
+    return parts.join("::");
   }
 
   private parseDate(value?: string): number | undefined {
@@ -535,7 +739,7 @@ export class UnifiedSearchService {
   private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
-        reject(new Error('Search timeout'));
+        reject(new Error("Search timeout"));
       }, timeoutMs);
 
       promise
