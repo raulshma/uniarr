@@ -17,8 +17,6 @@ export type JikanAnimeImages = components["schemas"]["anime_images"];
 
 export type JikanAnimeAiringInfo = components["schemas"]["daterange"];
 
-export type JikanAnimeSearchResponse = components["schemas"]["anime_search"];
-
 export type JikanTopAnimeResponse = NonNullable<
   operations["getTopAnime"]["responses"][200]["content"]["application/json"]
 >;
@@ -49,7 +47,7 @@ export type JikanSeasonUpcomingQuery = NonNullable<
   operations["getSeasonUpcoming"]["parameters"]["query"]
 >;
 
-export type JikanSearchAnimeResponse = NonNullable<
+export type JikanAnimeSearchResponse = NonNullable<
   operations["getAnimeSearch"]["responses"][200]["content"]["application/json"]
 >;
 
@@ -70,3 +68,9 @@ export type JikanRecommendation = NonNullable<
 >[number];
 
 export type JikanAnimePagination = components["schemas"]["pagination_plus"];
+
+export type JikanAnimeFullResponse = NonNullable<
+  operations["getAnimeFullById"]["responses"][200]["content"]["application/json"]
+>;
+
+export type JikanAnimeFull = JikanAnimeFullResponse["data"];

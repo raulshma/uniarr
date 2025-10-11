@@ -17,7 +17,6 @@ import {
   useJikanDiscover,
   type DiscoverItem as JikanDiscoverItem,
 } from "@/hooks/useJikanDiscover";
-import { Linking } from "react-native";
 import { useConnectorsStore } from "@/store/connectorsStore";
 import { AnimeCard } from "@/components/anime";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -84,14 +83,15 @@ const AnimeHubScreen: React.FC = () => {
     [jellyseerrService, router]
   );
 
-  const handleJikanCardPress = useCallback(async (item: JikanDiscoverItem) => {
-    const malUrl = `https://myanimelist.net/anime/${item.id}`;
-    try {
-      await Linking.openURL(malUrl);
-    } catch (err) {
-      // ignore errors opening external link
-    }
-  }, []);
+  const handleJikanCardPress = useCallback(
+    (item: JikanDiscoverItem) => {
+      router.push({
+        pathname: "/(auth)/anime-hub/[malId]",
+        params: { malId: String(item.id) },
+      });
+    },
+    [router]
+  );
 
   const handleSearch = useCallback(() => {
     if (!searchQuery.trim()) return;

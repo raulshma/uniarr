@@ -90,7 +90,7 @@ jobs:
             - Version: v${{ steps.package_version.outputs.version }}
             - Commit: ${{ github.sha }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
@@ -98,4 +98,4 @@ jobs:
           tag_name: "v${{ steps.package_version.outputs.version }}"
           files: ./release/app-release.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
