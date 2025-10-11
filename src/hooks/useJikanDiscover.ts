@@ -26,7 +26,7 @@ const mapAnime = (a: JikanAnime): DiscoverItem => {
     : "tv";
 
   return {
-    id: a.mal_id,
+    id: a.mal_id ?? 0,
     title,
     posterUrl,
     rating: a.score ?? undefined,
@@ -140,13 +140,15 @@ export const useJikanRecommendations = ({
             title_japanese: (candidateRec.title_japanese ?? null) as
               | string
               | null,
-            type: (candidateRec.type ?? null) as string | null,
+            type: (candidateRec.type ?? null) as unknown as JikanAnime["type"],
             episodes: (candidateRec.episodes ?? null) as number | null,
             score: (candidateRec.score ?? null) as number | null,
             synopsis: (candidateRec.synopsis ?? null) as string | null,
-            aired: ((): { from?: string | null; to?: string | null } | null => {
+            aired: (():
+              | { from?: string | null; to?: string | null }
+              | undefined => {
               const a = candidateRec.aired ?? candidateRec.airing ?? null;
-              if (!a || typeof a !== "object") return null;
+              if (!a || typeof a !== "object") return undefined;
               const aRec = a as Record<string, unknown>;
               const from = (
                 typeof aRec.from === "string"

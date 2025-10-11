@@ -125,7 +125,21 @@ const JellyfinNowPlayingScreen = () => {
     refetchInterval: 10_000,
   });
   const sessions = nowPlayingQuery.data ?? [];
-  const activeSession = sessions[0];
+  // Preserve the last known non-empty sessions list to avoid transient "nothing is playing"
+  // while the query is refetching after issuing playback commands.
+  const [cachedSessions, setCachedSessions] = useState<typeof sessions | null>(
+    sessions.length ? sessions : null
+  );
+
+  useEffect(() => {
+    if (sessions.length) {
+      setCachedSessions(sessions);
+    }
+  }, [sessions]);
+
+  const sessionsToShow = sessions.length ? sessions : cachedSessions ?? [];
+  // Use the preserved sessions list for rendering to avoid flicker
+  const activeSession = sessionsToShow[0];
   const item = activeSession?.NowPlayingItem;
   const progress = computeProgress(activeSession);
   const activePlayState = activeSession?.PlayState as
@@ -137,7 +151,8 @@ const JellyfinNowPlayingScreen = () => {
     : item?.RunTimeTicks ?? 0;
   const volumeLevel = activePlayState?.VolumeLevel ?? 0;
 
-  const isLoading = isBootstrapping || nowPlayingQuery.isLoading;
+  // Consider loading only if we're bootstrapping or the query is loading and we have no cached sessions.
+  const isLoading = isBootstrapping || (nowPlayingQuery.isLoading && sessions.length === 0);
   const errorMessage =
     nowPlayingQuery.error instanceof Error
       ? nowPlayingQuery.error.message
