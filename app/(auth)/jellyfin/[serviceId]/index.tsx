@@ -742,6 +742,13 @@ const JellyfinLibraryScreen = () => {
           ? item.SeriesName
           : deriveSubtitle(item, activeSegment);
       const status = formatEpisodeLabel(item);
+
+      // Compute responsive poster size so the image dominates the card
+      const cardWidth = Math.max(
+        120,
+        Math.floor((windowWidth - spacing.lg * 2 - spacing.md) / numColumns)
+      );
+      const posterSize = Math.max(160, cardWidth - spacing.md);
       return (
         <View>
           <Pressable
@@ -753,7 +760,7 @@ const JellyfinLibraryScreen = () => {
             onPress={() => handleOpenItem(item.Id)}
           >
             <View style={styles.posterFrame}>
-              <MediaPoster uri={posterUri} size={220} borderRadius={18} />
+              <MediaPoster uri={posterUri} size={posterSize} borderRadius={14} />
             </View>
             <Text
               variant="bodyMedium"
@@ -795,7 +802,7 @@ const JellyfinLibraryScreen = () => {
       const positionStyle =
         index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight;
 
-      // Column sizing: account for FlashList padding and inter-column gaps so poster fits inside card.
+      // Column sizing: compute card/poster size so image is the focus
       const contentHorizontalPadding = spacing.lg * 2; // listContent applies paddingHorizontal: spacing.lg
       const totalGaps = spacing.xl; // space between columns (gridCardLeft/right use spacing.md)
       const effectiveColumnWidth = Math.max(
@@ -804,10 +811,8 @@ const JellyfinLibraryScreen = () => {
           (windowWidth - contentHorizontalPadding - totalGaps) / numColumns
         )
       );
-      const posterSize = Math.max(80, effectiveColumnWidth - spacing.md * 2); // leave room for internal card padding
-
-      const framePadding = spacing.md;
-      const innerPosterSize = Math.max(80, posterSize - framePadding * 2);
+      const posterSize = Math.max(140, effectiveColumnWidth - spacing.md * 2);
+      const innerPosterSize = posterSize;
 
       return (
         <View>
@@ -822,11 +827,7 @@ const JellyfinLibraryScreen = () => {
             }
           >
             <View style={styles.posterFrame}>
-              <MediaPoster
-                uri={posterUri}
-                size={innerPosterSize}
-                borderRadius={12}
-              />
+              <MediaPoster uri={posterUri} size={innerPosterSize} borderRadius={12} />
             </View>
             <Text
               variant="bodyMedium"
@@ -1368,16 +1369,17 @@ const createStyles = (theme: AppTheme) =>
     },
     gridCard: {
       flex: 1,
-      gap: spacing.sm,
-      marginBottom: spacing.lg,
-      padding: spacing.md,
-      borderRadius: 18,
-      backgroundColor: theme.colors.surfaceVariant,
-      overflow: "hidden",
+      gap: spacing.xs,
+      marginBottom: spacing.md,
+      padding: spacing.sm,
+      borderRadius: 12,
+      backgroundColor: "transparent",
+      overflow: "visible",
     },
     posterFrame: {
-      padding: spacing.sm,
-      borderRadius: 18,
+      // Make poster the dominant element; minimal frame chrome
+      padding: 0,
+      borderRadius: 12,
       alignItems: "center",
     },
     gridCardLeft: {
@@ -1389,9 +1391,12 @@ const createStyles = (theme: AppTheme) =>
     gridTitle: {
       color: theme.colors.onSurface,
       fontWeight: "600",
+      textAlign: "center",
+      marginTop: spacing.xs,
     },
     gridSubtitle: {
       color: theme.colors.onSurfaceVariant,
+      textAlign: "center",
     },
     nowPlayingList: {
       marginTop: spacing.sm,
@@ -1400,9 +1405,9 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.md,
-      padding: spacing.md,
-      borderRadius: 14,
-      backgroundColor: theme.colors.surfaceVariant,
+      padding: spacing.sm,
+      borderRadius: 10,
+      backgroundColor: "transparent",
     },
     nowPlayingMeta: {
       flex: 1,
