@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, Linking } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ActivityIndicator, Chip, Text, useTheme } from "react-native-paper";
@@ -67,20 +67,14 @@ const AnimeHubDetailScreen: React.FC = () => {
     [theme]
   );
 
-  if (!validMalId) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <EmptyState
-          title="Anime not found"
-          description="We were unable to determine which title to open."
-          actionLabel="Go back"
-          onActionPress={() => router.back()}
-        />
-      </SafeAreaView>
-    );
-  }
+  const openOnMal = async () => {
+    if (validMalId) {
+      const url = `https://myanimelist.net/anime/${validMalId}`;
+      await Linking.openURL(url);
+    }
+  };
 
-  if (isLoading && !anime) {
+  if (!validMalId) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loading}>
@@ -138,6 +132,7 @@ const AnimeHubDetailScreen: React.FC = () => {
         posterUri={posterUri}
         backdropUri={backdropUri}
         onBack={() => router.back()}
+        onMal={openOnMal}
       >
         <View style={styles.content}>
           <View style={styles.section}>
