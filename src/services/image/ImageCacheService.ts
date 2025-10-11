@@ -323,32 +323,16 @@ class ImageCacheService {
 
       void logger.debug('ImageCacheService: prefetch result.', { uri, fetchUri, success });
 
+      // If prefetch failed, try a robust fallback by downloading the image
+      // directly into the app cache so we can return a filesystem path. If
+      // prefetch succeeded but the image cache doesn't expose a disk path, we
+      // also attempt the same fallback download — some implementations simply
+      // don't provide a cache path even when prefetch reports success.
       if (!success) {
-        // Prefetch via expo-image failed — attempt a robust fallback by downloading
-        // the image directly into the app cache and returning that path. This
-        // helps on platforms or cases where the native image cache doesn't
-        // expose a disk path via Image.getCachePathAsync.
-        try {
-          const ext = ImageCacheService.extractExt(uri);
-          const filename = `image-${ImageCacheService.hashUri(uri)}${ext}`;
-          const dest = `${FileSystem.cacheDirectory}${filename}`;
-          void logger.debug('ImageCacheService: attempting fallback download.', { uri, dest });
-          const download = await FileSystem.downloadAsync(fetchUri, dest);
-          // downloadAsync returns an object with status on some platforms
-          if (download && (download.status === 200 || download.status === 0 || download.uri)) {
-            // Make sure file exists
-            const info = await FileSystem.getInfoAsync(dest);
-            if (info.exists && !info.isDirectory) {
-              return dest;
-            }
-          }
-        } catch (downloadError) {
-          void logger.warn('ImageCacheService: fallback download failed.', {
-            uri: fetchUri,
-            error: this.stringifyError(downloadError),
-          });
+        const downloadPath = await this.fallbackDownload(uri, fetchUri);
+        if (downloadPath) {
+          return downloadPath;
         }
-
         return null;
       }
 
@@ -359,8 +343,16 @@ class ImageCacheService {
       if (!cachedPath && fetchUri !== uri) {
         cachedPath = await this.getCachedPath(fetchUri);
       }
+
       if (!cachedPath) {
-        void logger.debug('ImageCacheService: prefetch succeeded but cache path missing.', { uri, fetchUri });
+        void logger.debug('ImageCacheService: prefetch succeeded but cache path missing; attempting fallback download.', { uri, fetchUri });
+        const downloadPath = await this.fallbackDownload(uri, fetchUri);
+        if (downloadPath) {
+          void logger.info('ImageCacheService: fallback download succeeded after missing cache path.', { uri, fetchUri, downloadPath });
+          return downloadPath;
+        }
+        void logger.warn('ImageCacheService: prefetch succeeded but no cache path available and fallback download failed.', { uri, fetchUri });
+        return null;
       }
 
       return cachedPath;
@@ -380,32 +372,109 @@ class ImageCacheService {
   }
 
   private async getCachedPath(uri: string): Promise<string | null> {
+    // First, try to resolve the cache path via expo-image. This is the
+    // preferred source of truth for cache locations on platforms where it
+    // exposes filesystem paths.
     const cachedPath = await Image.getCachePathAsync(uri);
-    if (!cachedPath) {
-      return null;
-    }
-
-    const info = await FileSystem.getInfoAsync(cachedPath);
-    if (!info.exists) {
-      return null;
-    }
-
-    const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
-    if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
-      try {
-        await FileSystem.deleteAsync(cachedPath, { idempotent: true });
-        void logger.debug('ImageCacheService: removed stale cached image.', { cachedPath, uri });
-      } catch (error) {
-        void logger.warn('ImageCacheService: failed to delete stale cached image.', {
-          cachedPath,
-          uri,
-          error: this.stringifyError(error),
-        });
+    if (cachedPath) {
+      const info = await FileSystem.getInfoAsync(cachedPath);
+      if (!info.exists) {
+        return null;
       }
-      return null;
+
+      const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+      if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
+        try {
+          await FileSystem.deleteAsync(cachedPath, { idempotent: true });
+          void logger.debug('ImageCacheService: removed stale cached image.', { cachedPath, uri });
+        } catch (error) {
+          void logger.warn('ImageCacheService: failed to delete stale cached image.', {
+            cachedPath,
+            uri,
+            error: this.stringifyError(error),
+          });
+        }
+        return null;
+      }
+
+      return cachedPath;
     }
 
-    return cachedPath;
+    // If expo-image doesn't provide a cache path, check our deterministic
+    // fallback filename that we use when performing a direct download.
+    try {
+      const ext = ImageCacheService.extractExt(uri);
+      const filename = `image-${ImageCacheService.hashUri(uri)}${ext}`;
+      const dest = `${FileSystem.cacheDirectory}${filename}`;
+      const info = await FileSystem.getInfoAsync(dest);
+      if (!info.exists || info.isDirectory) {
+        return null;
+      }
+
+      const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : undefined;
+      if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
+        try {
+          await FileSystem.deleteAsync(dest, { idempotent: true });
+          void logger.debug('ImageCacheService: removed stale fallback cached image.', { dest, uri });
+        } catch (error) {
+          void logger.warn('ImageCacheService: failed to delete stale fallback cached image.', {
+            dest,
+            uri,
+            error: this.stringifyError(error),
+          });
+        }
+        return null;
+      }
+
+      return dest;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Attempt to download an image directly into the app cache and return the
+   * local filesystem path. This is used as a fallback when Image.prefetch
+   * either fails or reports success but no cache path is exposed.
+   */
+  private async fallbackDownload(originalUri: string, fetchUri: string): Promise<string | null> {
+    try {
+      const ext = ImageCacheService.extractExt(originalUri || fetchUri);
+      const filename = `image-${ImageCacheService.hashUri(originalUri || fetchUri)}${ext}`;
+      const dest = `${FileSystem.cacheDirectory}${filename}`;
+      void logger.debug('ImageCacheService: attempting fallback download.', { originalUri, fetchUri, dest });
+      const download = await FileSystem.downloadAsync(fetchUri, dest);
+      // downloadAsync returns an object with status on some platforms
+      if (download && (download.status === 200 || download.status === 0 || download.uri)) {
+        // Make sure file exists
+        const info = await FileSystem.getInfoAsync(dest);
+        if (info.exists && !info.isDirectory) {
+          return dest;
+        }
+      }
+      // If fetchUri download did not create a file try originalUri as a last effort
+      if (fetchUri !== originalUri) {
+        try {
+          const download2 = await FileSystem.downloadAsync(originalUri, dest);
+          if (download2 && (download2.status === 200 || download2.status === 0 || download2.uri)) {
+            const info2 = await FileSystem.getInfoAsync(dest);
+            if (info2.exists && !info2.isDirectory) {
+              return dest;
+            }
+          }
+        } catch (err2) {
+          // keep falling through to return null
+          void logger.debug('ImageCacheService: fallback download with originalUri failed.', { originalUri, error: this.stringifyError(err2) });
+        }
+      }
+    } catch (downloadError) {
+      void logger.warn('ImageCacheService: fallback download failed.', {
+        uri: fetchUri,
+        error: this.stringifyError(downloadError),
+      });
+    }
+
+    return null;
   }
 
   private trackUri(uri: string): void {
