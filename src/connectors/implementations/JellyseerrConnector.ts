@@ -21,8 +21,11 @@ const API_PREFIX = '/api/v1';
 const REQUEST_ENDPOINT = `${API_PREFIX}/request`;
 const SEARCH_ENDPOINT = `${API_PREFIX}/search`;
 const TRENDING_ENDPOINT = `${API_PREFIX}/discover/trending`;
+const DISCOVER_TV_ENDPOINT = `${API_PREFIX}/discover/tv`;
+const DISCOVER_MOVIES_ENDPOINT = `${API_PREFIX}/discover/movies`;
 const STATUS_ENDPOINT = `${API_PREFIX}/status`;
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
+const ANIME_GENRE_ID = 16; // Animation genre in TMDB
 
 interface ApiPagination {
   readonly pages?: number;
@@ -883,6 +886,227 @@ export class JellyseerrConnector extends BaseConnector<JellyseerrRequest, Create
       if (apiError.statusCode && apiError.statusCode >= 500) {
         void logger.warn('Failed to load trending titles from jellyseerr; returning empty result due to server error.', {
           location: 'JellyseerrConnector.getTrending',
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          statusCode: apiError.statusCode,
+        });
+
+        return {
+          items: [],
+          total: 0,
+          pageInfo: { page: options?.page ?? 1, pages: 0, results: 0 },
+        };
+      }
+
+      throw apiError;
+    }
+  }
+
+  async getAnimeRecommendations(options?: { page?: number }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+    await this.ensureAuthenticated();
+
+    try {
+      const params: Record<string, unknown> = {
+        genre: ANIME_GENRE_ID,
+        sortBy: 'popularity.desc',
+        language: 'ja',
+      };
+
+      if (typeof options?.page === 'number' && options.page > 0) {
+        params.page = options.page;
+      }
+
+      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(DISCOVER_TV_ENDPOINT, {
+        params,
+      });
+
+      const items = mapSearchResults(response.data.results);
+      const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
+
+      return {
+        items,
+        total: totalResults,
+        pageInfo: {
+          page: response.data.page ?? response.data.pageInfo?.page,
+          pages: response.data.totalPages ?? response.data.pageInfo?.pages,
+          results: totalResults,
+          totalResults,
+        },
+      };
+    } catch (error) {
+      const apiError = handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getAnimeRecommendations',
+        endpoint: DISCOVER_TV_ENDPOINT,
+      });
+
+      if (apiError.statusCode && apiError.statusCode >= 500) {
+        void logger.warn('Failed to load anime recommendations; returning empty result due to server error.', {
+          location: 'JellyseerrConnector.getAnimeRecommendations',
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          statusCode: apiError.statusCode,
+        });
+
+        return {
+          items: [],
+          total: 0,
+          pageInfo: { page: options?.page ?? 1, pages: 0, results: 0 },
+        };
+      }
+
+      throw apiError;
+    }
+  }
+
+  async getAnimeUpcoming(options?: { page?: number }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+    await this.ensureAuthenticated();
+
+    try {
+      const params: Record<string, unknown> = {
+        language: 'ja',
+      };
+
+      if (typeof options?.page === 'number' && options.page > 0) {
+        params.page = options.page;
+      }
+
+      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(`${DISCOVER_TV_ENDPOINT}/upcoming`, {
+        params,
+      });
+
+      const items = mapSearchResults(response.data.results);
+      const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
+
+      return {
+        items,
+        total: totalResults,
+        pageInfo: {
+          page: response.data.page ?? response.data.pageInfo?.page,
+          pages: response.data.totalPages ?? response.data.pageInfo?.pages,
+          results: totalResults,
+          totalResults,
+        },
+      };
+    } catch (error) {
+      const apiError = handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getAnimeUpcoming',
+        endpoint: `${DISCOVER_TV_ENDPOINT}/upcoming`,
+      });
+
+      if (apiError.statusCode && apiError.statusCode >= 500) {
+        void logger.warn('Failed to load upcoming anime; returning empty result due to server error.', {
+          location: 'JellyseerrConnector.getAnimeUpcoming',
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          statusCode: apiError.statusCode,
+        });
+
+        return {
+          items: [],
+          total: 0,
+          pageInfo: { page: options?.page ?? 1, pages: 0, results: 0 },
+        };
+      }
+
+      throw apiError;
+    }
+  }
+
+  async getTrendingAnime(options?: { page?: number }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+    await this.ensureAuthenticated();
+
+    try {
+      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(TRENDING_ENDPOINT, {
+        params: options,
+      });
+
+      // Filter for anime only (animation genre)
+      const allResults = mapSearchResults(response.data.results);
+      const items = allResults.filter(item => item.mediaType === 'tv');
+
+      return {
+        items,
+        total: items.length,
+        pageInfo: {
+          page: response.data.page ?? response.data.pageInfo?.page,
+          pages: response.data.totalPages ?? response.data.pageInfo?.pages,
+          results: items.length,
+          totalResults: items.length,
+        },
+      };
+    } catch (error) {
+      const apiError = handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getTrendingAnime',
+        endpoint: TRENDING_ENDPOINT,
+      });
+
+      if (apiError.statusCode && apiError.statusCode >= 500) {
+        void logger.warn('Failed to load trending anime; returning empty result due to server error.', {
+          location: 'JellyseerrConnector.getTrendingAnime',
+          serviceId: this.config.id,
+          serviceType: this.config.type,
+          statusCode: apiError.statusCode,
+        });
+
+        return {
+          items: [],
+          total: 0,
+          pageInfo: { page: options?.page ?? 1, pages: 0, results: 0 },
+        };
+      }
+
+      throw apiError;
+    }
+  }
+
+  async getAnimeMovies(options?: { page?: number }): Promise<JellyseerrPagedResult<JellyseerrSearchResult>> {
+    await this.ensureAuthenticated();
+
+    try {
+      const params: Record<string, unknown> = {
+        genre: ANIME_GENRE_ID,
+        sortBy: 'popularity.desc',
+        language: 'ja',
+      };
+
+      if (typeof options?.page === 'number' && options.page > 0) {
+        params.page = options.page;
+      }
+
+      const response = await this.client.get<ApiPaginatedResponse<ApiSearchResult>>(DISCOVER_MOVIES_ENDPOINT, {
+        params,
+      });
+
+      const items = mapSearchResults(response.data.results);
+      const totalResults = response.data.totalResults ?? response.data.pageInfo?.results ?? items.length;
+
+      return {
+        items,
+        total: totalResults,
+        pageInfo: {
+          page: response.data.page ?? response.data.pageInfo?.page,
+          pages: response.data.totalPages ?? response.data.pageInfo?.pages,
+          results: totalResults,
+          totalResults,
+        },
+      };
+    } catch (error) {
+      const apiError = handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: 'getAnimeMovies',
+        endpoint: DISCOVER_MOVIES_ENDPOINT,
+      });
+
+      if (apiError.statusCode && apiError.statusCode >= 500) {
+        void logger.warn('Failed to load anime movies; returning empty result due to server error.', {
+          location: 'JellyseerrConnector.getAnimeMovies',
           serviceId: this.config.id,
           serviceType: this.config.type,
           statusCode: apiError.statusCode,

@@ -101,6 +101,30 @@ export const queryKeys = {
       'search',
       { term, params },
     ] as const,
+    animeRecommendations: (serviceId: string, page?: number): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'anime',
+      'recommendations',
+      { page },
+    ] as const,
+    animeUpcoming: (serviceId: string, page?: number): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'anime',
+      'upcoming',
+      { page },
+    ] as const,
+    trendingAnime: (serviceId: string, page?: number): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'anime',
+      'trending',
+      { page },
+    ] as const,
+    animeMovies: (serviceId: string, page?: number): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'anime',
+      'movies',
+      { page },
+    ] as const,
   },
   jellyfin: {
     base: ['jellyfin'] as const,

@@ -62,6 +62,7 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* Anime Hub moved to a dashboard shortcut tile per user request */}
       <Tabs.Screen
         name="settings/index"
         options={{
