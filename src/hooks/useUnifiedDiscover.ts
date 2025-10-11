@@ -25,7 +25,11 @@ const mapServiceSummaries = (configs: ServiceConfig[]) =>
     type: config.type,
   }));
 
-const mapTrendingResult = (result: JellyseerrSearchResult, mediaType: DiscoverMediaItem['mediaType']): DiscoverMediaItem => ({
+const mapTrendingResult = (
+  result: JellyseerrSearchResult,
+  mediaType: DiscoverMediaItem['mediaType'],
+  sourceServiceId?: string,
+): DiscoverMediaItem => ({
   id: `${mediaType}-${result.tmdbId ?? result.tvdbId ?? result.id}`,
   title: result.title,
   mediaType,
@@ -43,9 +47,12 @@ const mapTrendingResult = (result: JellyseerrSearchResult, mediaType: DiscoverMe
     const parsed = Number.parseInt(dateString.slice(0, 4), 10);
     return Number.isFinite(parsed) ? parsed : undefined;
   })(),
+  sourceId: result.id,
   tmdbId: result.tmdbId,
   tvdbId: result.tvdbId,
   imdbId: result.imdbId,
+  voteCount: result.popularity ?? undefined,
+  sourceServiceId: sourceServiceId,
   source: 'jellyseerr',
 });
 
@@ -61,19 +68,21 @@ const fetchUnifiedDiscover = async (getConnectorsByType: (type: ServiceType) => 
     jellyseerr: mapServiceSummaries(jellyConnectors.map((connector) => connector.config)),
   };
 
-  const trendingBatches = await Promise.all(
+  const trendingResponses = await Promise.all(
     jellyConnectors.map(async (connector) => {
       try {
         const response = await connector.getTrending({ page: 1 });
-        return response.items;
+        return { connectorId: connector.config.id, items: response.items } as const;
       } catch (error) {
         console.warn(`Failed to load trending titles from ${connector.config.name}:`, error);
-        return [] as JellyseerrSearchResult[];
+        return { connectorId: connector.config.id, items: [] as JellyseerrSearchResult[] } as const;
       }
     }),
   );
 
-  const trendingItems = trendingBatches.flat();
+  // Flatten while keeping a reference to which connector the item came from so
+  // that we can pre-fill sourceServiceId for subsequent detailed fetches.
+  const trendingItems = trendingResponses.flatMap((r) => r.items.map((it) => ({ ...it, __sourceServiceId: r.connectorId } as unknown as JellyseerrSearchResult & { __sourceServiceId?: string })));
 
   if (trendingItems.length === 0) {
     return {
@@ -82,11 +91,11 @@ const fetchUnifiedDiscover = async (getConnectorsByType: (type: ServiceType) => 
     };
   }
 
-  const deduped = new Map<string, JellyseerrSearchResult>();
+  const deduped = new Map<string, JellyseerrSearchResult & { __sourceServiceId?: string }>();
   for (const item of trendingItems) {
     const key = item.tmdbId ? `tmdb-${item.tmdbId}` : `${item.mediaType}-${item.id}`;
     if (!deduped.has(key)) {
-      deduped.set(key, item);
+      deduped.set(key, item as JellyseerrSearchResult & { __sourceServiceId?: string });
     }
   }
 
@@ -94,10 +103,11 @@ const fetchUnifiedDiscover = async (getConnectorsByType: (type: ServiceType) => 
   const movieResults: DiscoverMediaItem[] = [];
 
   deduped.forEach((value) => {
+    const connectorId = (value as any).__sourceServiceId as string | undefined;
     if (value.mediaType === 'tv') {
-      tvResults.push(mapTrendingResult(value, 'series'));
+      tvResults.push(mapTrendingResult(value, 'series', connectorId));
     } else if (value.mediaType === 'movie') {
-      movieResults.push(mapTrendingResult(value, 'movie'));
+      movieResults.push(mapTrendingResult(value, 'movie', connectorId));
     }
   });
 

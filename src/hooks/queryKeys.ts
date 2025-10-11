@@ -87,6 +87,15 @@ export const queryKeys = {
       mediaType,
       mediaId,
     ] as const,
+    /**
+     * Credits for a media item (cast/crew) keyed by service, media type and id.
+     */
+    mediaCredits: (serviceId: string, mediaType: 'movie' | 'tv', mediaId: number): QueryKeyBuilder => [
+      ...queryKeys.jellyseerr.service(serviceId),
+      'mediaCredits',
+      mediaType,
+      mediaId,
+    ] as const,
     search: (serviceId: string, term: string, params?: Record<string, unknown>): QueryKeyBuilder => [
       ...queryKeys.jellyseerr.service(serviceId),
       'search',
