@@ -84,7 +84,13 @@ const AppContent = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <OfflineIndicator isVisible={!isOnline} />
+      {/*
+        Only show the offline banner when the app has determined the device is
+        explicitly offline. Network status hooks may return `null` while they
+        are initializing; treating `null` as "unknown" prevents flicker of the
+        offline banner when the status is not yet resolved.
+      */}
+      <OfflineIndicator isVisible={isOnline === false} />
       <RootNavigator />
     </View>
   );
