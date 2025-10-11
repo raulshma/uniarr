@@ -234,11 +234,11 @@ const JellyfinItemDetailsScreen = () => {
       : null;
 
   const runtimeMinutes = useMemo(
-    () => formatRuntimeMinutes(item?.RunTimeTicks),
+    () => formatRuntimeMinutes(item?.RunTimeTicks ?? undefined),
     [item?.RunTimeTicks]
   );
   const releaseYear = useMemo(
-    () => deriveYear(item?.PremiereDate, item?.ProductionYear),
+    () => deriveYear(item?.PremiereDate ?? undefined, item?.ProductionYear ?? undefined),
     [item?.PremiereDate, item?.ProductionYear]
   );
   const ratingLabel =
@@ -246,7 +246,7 @@ const JellyfinItemDetailsScreen = () => {
     (item?.CommunityRating ? `${item.CommunityRating.toFixed(1)}★` : undefined);
   const heroTag = item?.BackdropImageTags?.[0] ?? item?.ImageTags?.Backdrop;
   const heroUri =
-    heroTag && connector && item
+    heroTag && connector && item?.Id
       ? connector.getImageUrl(item.Id, "Backdrop", {
           tag: heroTag,
           width: 1280,
@@ -255,7 +255,7 @@ const JellyfinItemDetailsScreen = () => {
   const posterUri =
     item?.Id && connector
       ? connector.getImageUrl(item.Id, "Primary", {
-          tag: item.PrimaryImageTag ?? item.ImageTags?.Primary,
+          tag: (item as any).PrimaryImageTag ?? item.ImageTags?.Primary,
           width: 720,
         })
       : undefined;
@@ -325,7 +325,11 @@ const JellyfinItemDetailsScreen = () => {
 
     try {
       setIsSyncing(true);
-      await connector.refreshItemMetadata(item.Id, false);
+      if (!item.Id) {
+        setSyncStatus('Unable to refresh metadata: missing item id.');
+      } else {
+        await connector.refreshItemMetadata(item.Id, false);
+      }
       setSyncStatus(
         "Metadata refresh requested. Jellyfin will update this item shortly."
       );
@@ -347,9 +351,13 @@ const JellyfinItemDetailsScreen = () => {
       const personIdentifier = person?.Name || person?.Id;
       const avatarUri =
         personIdentifier &&
-        connector?.getPersonImageUrl(personIdentifier, person.PrimaryImageTag, {
-          width: 320,
-        });
+          connector?.getPersonImageUrl(
+            personIdentifier,
+            (person as any).PrimaryImageTag ?? (person as any).ImageTags?.Primary,
+            {
+              width: 320,
+            }
+          );
 
       return (
         <View style={styles.castCard}>
@@ -537,13 +545,13 @@ const JellyfinItemDetailsScreen = () => {
             </View>
             {cast.length > 0 ? (
               <FlashList
-                data={cast}
-                keyExtractor={(person) => person.Id}
-                renderItem={renderCastMember}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.castList}
-              />
+                  data={cast}
+                  keyExtractor={(person) => person.Id ?? person.Name ?? ''}
+                  renderItem={renderCastMember}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.castList}
+                />
             ) : (
               <Text variant="bodySmall" style={styles.sectionEmptyText}>
                 Cast information is not available.

@@ -30,8 +30,8 @@ const computeProgress = (session: JellyfinSession | undefined): number => {
   }
 
   const runtime =
-    session.PlayState.RunTimeTicks ?? session.NowPlayingItem?.RunTimeTicks ?? 0;
-  const position = session.PlayState.PositionTicks ?? 0;
+    ((session.PlayState as any).RunTimeTicks ?? session.NowPlayingItem?.RunTimeTicks) ?? 0;
+  const position = (session.PlayState as any).PositionTicks ?? 0;
 
   if (runtime <= 0) {
     return 0;
@@ -123,7 +123,7 @@ const JellyfinNowPlayingScreen = () => {
   const progress = computeProgress(activeSession);
   const positionTicks = activeSession?.PlayState?.PositionTicks ?? 0;
   const runtimeTicks =
-    activeSession?.PlayState?.RunTimeTicks ?? item?.RunTimeTicks ?? 0;
+    ((activeSession?.PlayState as any)?.RunTimeTicks ?? item?.RunTimeTicks) ?? 0;
   const volumeLevel = activeSession?.PlayState?.VolumeLevel ?? 0;
 
   const isLoading = isBootstrapping || nowPlayingQuery.isLoading;
@@ -135,15 +135,15 @@ const JellyfinNowPlayingScreen = () => {
       : null;
 
   const posterUri =
-    item && connector
+    item && connector && item.Id
       ? connector.getImageUrl(item.Id, "Primary", {
-          tag: item.PrimaryImageTag ?? item.ImageTags?.Primary,
+          tag: (item as any).PrimaryImageTag ?? item.ImageTags?.Primary,
           width: 720,
         })
       : undefined;
   const backdropTag = item?.BackdropImageTags?.[0] ?? item?.ImageTags?.Backdrop;
   const backdropUri =
-    item && connector && backdropTag
+    item && connector && backdropTag && item.Id
       ? connector.getImageUrl(item.Id, "Backdrop", {
           tag: backdropTag,
           width: 1280,
@@ -176,7 +176,8 @@ const JellyfinNowPlayingScreen = () => {
     }
 
     try {
-      await connector.sendPlaystateCommand(activeSession.Id, "PlayPause");
+  if (!activeSession.Id) throw new Error('Session id missing');
+  await connector.sendPlaystateCommand(activeSession.Id, "PlayPause");
       void nowPlayingQuery.refetch();
     } catch (error) {
       const message =
@@ -192,7 +193,8 @@ const JellyfinNowPlayingScreen = () => {
       }
 
       try {
-        await connector.sendPlaystateCommand(activeSession.Id, direction);
+  if (!activeSession.Id) throw new Error('Session id missing');
+  await connector.sendPlaystateCommand(activeSession.Id, direction);
         void nowPlayingQuery.refetch();
       } catch (error) {
         const message =
@@ -210,12 +212,13 @@ const JellyfinNowPlayingScreen = () => {
       }
 
       const deltaTicks = deltaSeconds * TICKS_PER_SECOND;
-      const target = Math.min(
-        Math.max((activeSession.PlayState?.PositionTicks ?? 0) + deltaTicks, 0),
-        runtimeTicks
-      );
+        const target = Math.min(
+          Math.max((activeSession.PlayState?.PositionTicks ?? 0) + deltaTicks, 0),
+          runtimeTicks
+        );
 
       try {
+        if (!activeSession.Id) throw new Error('Session id missing');
         await connector.sendPlaystateCommand(activeSession.Id, "Seek", {
           seekPositionTicks: Math.round(target),
         });
@@ -248,7 +251,8 @@ const JellyfinNowPlayingScreen = () => {
         Math.max(0, Math.round(volumeLevel + delta))
       );
       try {
-        await connector.setVolume(activeSession.Id, nextVolume);
+    if (!activeSession.Id) throw new Error('Session id missing');
+    await connector.setVolume(activeSession.Id, nextVolume);
         void nowPlayingQuery.refetch();
       } catch (error) {
         const message =
