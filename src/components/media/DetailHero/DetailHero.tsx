@@ -37,7 +37,9 @@ export type DetailHeroProps = {
   children?: React.ReactNode;
 };
 
-const AnimatedScrollView = Animated.createAnimatedComponent(Animated.ScrollView);
+const AnimatedScrollView = Animated.createAnimatedComponent(
+  Animated.ScrollView
+);
 
 const DetailHero: React.FC<DetailHeroProps> = ({
   posterUri,
@@ -74,7 +76,12 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   const threshold = Math.max(1, heroHeight - finalTop);
 
   const posterAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
+    const progress = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
     // scale down a bit
     const finalScale = 0.75;
     const scale = interpolate(progress, [0, 1], [1, finalScale]);
@@ -90,10 +97,30 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   // Header collapse state & animation (fades out / slides up)
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   const headerAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
-    const opacity = interpolate(progress, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP);
-    const translateY = interpolate(progress, [0, 1], [0, -actionBarHeight], Extrapolation.CLAMP);
-    const height = interpolate(progress, [0, 1], [actionBarHeight, 0], Extrapolation.CLAMP);
+    const progress = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+    const opacity = interpolate(
+      progress,
+      [0, 0.6, 1],
+      [1, 0, 0],
+      Extrapolation.CLAMP
+    );
+    const translateY = interpolate(
+      progress,
+      [0, 1],
+      [0, -actionBarHeight],
+      Extrapolation.CLAMP
+    );
+    const height = interpolate(
+      progress,
+      [0, 1],
+      [actionBarHeight, 0],
+      Extrapolation.CLAMP
+    );
     return { opacity, transform: [{ translateY }], height } as any;
   });
 
@@ -107,14 +134,29 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   );
 
   const blurAnimatedStyle = useAnimatedStyle(() => {
-    const blurOpacity = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
+    const blurOpacity = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
     return { opacity: blurOpacity } as any;
   });
 
   const heroAnimatedStyle = useAnimatedStyle(() => {
-    const progress = interpolate(scrollY.value, [0, threshold], [0, 1], Extrapolation.CLAMP);
+    const progress = interpolate(
+      scrollY.value,
+      [0, threshold],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
     const finalHeroHeight = finalTopWithoutHeader + posterSize * 1.25;
-    const height = interpolate(progress, [0, 1], [heroHeight, finalHeroHeight], Extrapolation.CLAMP);
+    const height = interpolate(
+      progress,
+      [0, 1],
+      [heroHeight, finalHeroHeight],
+      Extrapolation.CLAMP
+    );
     return { height } as any;
   });
 
@@ -128,9 +170,19 @@ const DetailHero: React.FC<DetailHeroProps> = ({
       <Animated.View style={[styles.heroArea, heroAnimatedStyle]}>
         {heroUri ? (
           <View style={styles.heroImage}>
-            <Image source={{ uri: heroUri }} style={RNStyleSheet.absoluteFill} cachePolicy="memory-disk" />
-            <Animated.View style={[RNStyleSheet.absoluteFill, blurAnimatedStyle]}>
-              <BlurView intensity={80} tint={theme.dark ? "dark" : "light"} style={RNStyleSheet.absoluteFill} />
+            <Image
+              source={{ uri: heroUri }}
+              style={RNStyleSheet.absoluteFill}
+              cachePolicy="memory-disk"
+            />
+            <Animated.View
+              style={[RNStyleSheet.absoluteFill, blurAnimatedStyle]}
+            >
+              <BlurView
+                intensity={80}
+                tint={theme.dark ? "dark" : "light"}
+                style={RNStyleSheet.absoluteFill}
+              />
             </Animated.View>
             <LinearGradient
               colors={["transparent", theme.colors.background]}
@@ -153,25 +205,42 @@ const DetailHero: React.FC<DetailHeroProps> = ({
           pointerEvents={isHeaderCollapsed ? "none" : "auto"}
           style={[styles.heroActions, { top: insets.top }, headerAnimatedStyle]}
         >
-          <IconButton icon="arrow-left" accessibilityLabel="Go back" onPress={handleBack} />
+          <IconButton
+            icon="arrow-left"
+            accessibilityLabel="Go back"
+            onPress={handleBack}
+          />
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {isFetching ? (
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+              <Text
+                variant="labelMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 Refreshing…
               </Text>
             ) : null}
-            <IconButton icon="share-variant" accessibilityLabel="Share" onPress={handleShare} />
+            <IconButton
+              icon="share-variant"
+              accessibilityLabel="Share"
+              onPress={handleShare}
+            />
           </View>
         </Animated.View>
       </Animated.View>
 
       {/* Pinned poster overlay */}
-      <Animated.View pointerEvents="box-none" style={[styles.heroPoster, posterAnimatedStyle]}>
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.heroPoster, posterAnimatedStyle]}
+      >
         <MediaPoster uri={posterUri} size={posterSize} />
       </Animated.View>
 
       <AnimatedScrollView
-        contentContainerStyle={{ paddingBottom: 32, paddingTop: heroHeight * 0.5 }}
+        contentContainerStyle={{
+          paddingBottom: 32,
+          paddingTop: heroHeight * 0.5,
+        }}
         onScroll={onScroll}
         scrollEventThrottle={16}
       >
