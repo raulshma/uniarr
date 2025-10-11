@@ -862,7 +862,7 @@ const DashboardScreen = () => {
               <AnimatedSection style={styles.shortcutsWrapper} delay={40}>
                 <AnimatedListItem
                   index={0}
-                  totalItems={3}
+                  totalItems={4}
                   style={styles.shortcutTileWrapper}
                 >
                   <ShortcutTile
@@ -876,7 +876,7 @@ const DashboardScreen = () => {
                 <AnimatedListItem
                   style={styles.shortcutTileWrapper}
                   index={1}
-                  totalItems={3}
+                  totalItems={4}
                 >
                   <ShortcutTile
                     testID="shortcut-search"
@@ -889,7 +889,7 @@ const DashboardScreen = () => {
                 <AnimatedListItem
                   style={styles.shortcutTileWrapper}
                   index={2}
-                  totalItems={3}
+                  totalItems={4}
                 >
                   <ShortcutTile
                     testID="shortcut-calendar"
@@ -897,6 +897,19 @@ const DashboardScreen = () => {
                     subtitle="Upcoming releases"
                     icon="calendar"
                     onPress={handleOpenCalendar}
+                  />
+                </AnimatedListItem>
+                <AnimatedListItem
+                  style={styles.shortcutTileWrapper}
+                  index={3}
+                  totalItems={4}
+                >
+                  <ShortcutTile
+                    testID="shortcut-animehub"
+                    label="Anime Hub"
+                    subtitle="Explore anime"
+                    icon="animation"
+                    onPress={() => router.push("/(auth)/anime-hub")}
                   />
                 </AnimatedListItem>
                 {/* Keep layout flexible so more shortcuts can be added easily */}
@@ -989,7 +1002,7 @@ const DashboardScreen = () => {
               <AnimatedListItem
                 style={styles.shortcutTileWrapper}
                 index={0}
-                totalItems={3}
+                totalItems={4}
               >
                 <ShortcutTile
                   testID="shortcut-discover-loading"
@@ -1002,7 +1015,7 @@ const DashboardScreen = () => {
               <AnimatedListItem
                 style={styles.shortcutTileWrapper}
                 index={1}
-                totalItems={3}
+                totalItems={4}
               >
                 <ShortcutTile
                   testID="shortcut-search-loading"
@@ -1015,7 +1028,7 @@ const DashboardScreen = () => {
               <AnimatedListItem
                 style={styles.shortcutTileWrapper}
                 index={2}
-                totalItems={3}
+                totalItems={4}
               >
                 <ShortcutTile
                   testID="shortcut-calendar-loading"
@@ -1023,6 +1036,19 @@ const DashboardScreen = () => {
                   subtitle="Upcoming releases"
                   icon="calendar"
                   onPress={handleOpenCalendar}
+                />
+              </AnimatedListItem>
+              <AnimatedListItem
+                style={styles.shortcutTileWrapper}
+                index={3}
+                totalItems={4}
+              >
+                <ShortcutTile
+                  testID="shortcut-animehub-loading"
+                  label="Anime Hub"
+                  subtitle="Explore anime"
+                  icon="animation"
+                  onPress={() => router.push("/(auth)/anime-hub")}
                 />
               </AnimatedListItem>
             </AnimatedSection>
@@ -1034,8 +1060,8 @@ const DashboardScreen = () => {
               borderRadius={10}
               style={{ marginBottom: spacing.md, marginHorizontal: spacing.md }}
             />
-            {Array.from({ length: 3 }).map((_, index) => (
-              <AnimatedListItem key={index} index={index} totalItems={3}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <AnimatedListItem key={index} index={index} totalItems={4}>
                 <View
                   style={{
                     marginBottom: spacing.sm,
@@ -1054,11 +1080,11 @@ const DashboardScreen = () => {
               borderRadius={10}
               style={{ marginBottom: spacing.md, marginHorizontal: spacing.md }}
             />
-            {Array.from({ length: 3 }).map((_, index) => (
+            {Array.from({ length: 4 }).map((_, index) => (
               <AnimatedListItem
                 key={`activity-${index}`}
                 index={index}
-                totalItems={3}
+                totalItems={4}
               >
                 <View
                   style={{
