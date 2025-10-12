@@ -16,6 +16,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     resizeMode: "contain",
     backgroundColor: "#1F1F1F", // Dark theme background
   },
+  experiments: {
+    reactCompiler: true,
+  },
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.uniarr.app",
@@ -24,18 +27,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         NSAllowsArbitraryLoads: true,
       },
       // Siri Shortcuts Configuration
-      NSSiriUsageDescription: "UniArr uses Siri to help you manage your media library with voice commands.",
+      NSSiriUsageDescription:
+        "UniArr uses Siri to help you manage your media library with voice commands.",
       NSUserActivityTypes: [
         "com.uniarr.app.search",
         "com.uniarr.app.services",
         "com.uniarr.app.downloads",
         "com.uniarr.app.add",
-        "com.uniarr.app.requests"
+        "com.uniarr.app.requests",
       ],
     },
-    associatedDomains: [
-      "applinks:uniarr.com"
-    ],
+    associatedDomains: ["applinks:uniarr.com"],
   },
   android: {
     adaptiveIcon: {
