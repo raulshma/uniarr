@@ -17,7 +17,7 @@ import type { AppTheme } from '@/constants/theme';
 import type { Series } from '@/models/media.types';
 import type { Movie } from '@/models/movie.types';
 import { spacing } from '@/theme/spacing';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 
 export type SelectableMediaItem = Series | Movie;
 
@@ -126,7 +126,7 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
   onRefresh,
 }) => {
   const theme = useTheme<AppTheme>();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const { selectedItems, isSelectionMode, exitSelectionMode } = useMediaSelector();
   const [menuVisible, setMenuVisible] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);

@@ -75,6 +75,10 @@ export const useUnifiedSearch = (term: string, config: UseUnifiedSearchConfig = 
     }),
     queryFn: () => service.search(normalizedTerm, searchOptions),
     enabled: (config.enabled ?? true) && normalizedTerm.length >= 2,
+    // Search results are relatively short-lived; keep previous data while
+    // parameters change to avoid UI flicker when typing/paging. KeepPreviousData
+    // isn't available in the strict option types here; components can opt-in
+    // when needed via the consumer-level useQuery call overload.
     staleTime: 15 * 1000,
     gcTime: 5 * 60 * 1000,
   });
@@ -82,6 +86,8 @@ export const useUnifiedSearch = (term: string, config: UseUnifiedSearchConfig = 
   const historyQuery = useQuery<SearchHistoryEntry[]>({
     queryKey: queryKeys.unifiedSearch.history,
     queryFn: () => service.getHistory(),
+    // History is user-managed and rarely changing; mark as never stale to
+    // avoid unnecessary refetches.
     staleTime: Infinity,
   });
 

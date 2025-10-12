@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { JellyfinConnector } from '@/connectors/implementations/JellyfinConnector';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { JellyfinResumeItem, JellyfinSession } from '@/models/jellyfin.types';
@@ -24,7 +24,7 @@ const ensureConnector = (getConnector: (id: string) => IConnector | undefined, s
 };
 
 export const useJellyfinResume = ({ serviceId, limit = 20, includeTypes }: UseJellyfinResumeOptions) => {
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
 
   return useQuery<JellyfinResumeItem[]>({
     queryKey: serviceId

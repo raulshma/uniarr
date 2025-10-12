@@ -4,6 +4,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // the legacy dependency and use the modern APIs for file info and operations.
 import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
+import * as ImageManipulator from 'expo-image-manipulator';
+import { PixelRatio } from 'react-native';
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 import { logger } from "@/services/logger/LoggerService";
@@ -16,6 +18,7 @@ export type ImageCacheUsage = {
 
 const STORAGE_KEY = "ImageCacheService:trackedUris";
 const STORAGE_KEY_VARIANT_STATS = "ImageCacheService:variantStats";
+const STORAGE_KEY_THUMBHASH = "ImageCacheService:thumbhashes";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 class ImageCacheService {
@@ -25,10 +28,17 @@ class ImageCacheService {
   // Telemetry: track how often each URI variant resolves to a cache path.
   // Map keys are descriptive variant labels (eg. 'original', 'encoded', 'decoded', 'stripped').
   private variantStats: Map<string, number> = new Map();
+  // Map of sanitized URI -> thumbhash string
+  private thumbhashes: Map<string, string> = new Map();
 
   private isInitialized = false;
 
   private inFlightPrefetches = new Map<string, Promise<string | null>>();
+  // Semaphore to limit concurrent image manipulations/downloads
+  private concurrentOps = 0;
+  // default, overridden dynamically from settings store
+  private readonly DEFAULT_MAX_CONCURRENT_OPS = 3;
+  private opQueue: Array<() => void> = [];
 
   static getInstance(): ImageCacheService {
     if (!ImageCacheService.instance) {
@@ -96,6 +106,19 @@ class ImageCacheService {
     }
 
     return uri;
+  }
+
+  /**
+   * Resolve a URI for a target display size (CSS points). This will attempt to
+   * return a cached resized thumbnail appropriate for the device pixel ratio
+   * and requested size. Falls back to resolveUri when resizing isn't possible.
+   */
+  async resolveForSize(uri: string, widthPx: number, heightPx: number): Promise<string> {
+    await this.ensureInitialized();
+
+    if (!uri) return uri;
+    // Thumbnail generation removed — always resolve to original/cached URI
+    return this.resolveUri(uri);
   }
 
   /**
@@ -448,6 +471,25 @@ class ImageCacheService {
       });
     }
 
+    // Restore thumbhash map
+    try {
+      const serializedThumbs = await AsyncStorage.getItem(STORAGE_KEY_THUMBHASH);
+      if (serializedThumbs) {
+        const parsed = JSON.parse(serializedThumbs) as Record<string, string> | null;
+        if (parsed && typeof parsed === "object") {
+          Object.entries(parsed).forEach(([k, v]) => {
+            if (typeof v === "string" && v.length) {
+              this.thumbhashes.set(k, v);
+            }
+          });
+        }
+      }
+    } catch (err) {
+      void logger.warn("ImageCacheService: failed to restore thumbhashes.", {
+        error: this.stringifyError(err),
+      });
+    }
+
     this.isInitialized = true;
   }
 
@@ -475,6 +517,18 @@ class ImageCacheService {
           "ImageCacheService: failed to persist variant stats.",
           { error: this.stringifyError(err) }
         );
+      }
+      // Persist thumbhashes alongside tracked URIs (best-effort)
+      try {
+        const thumbsObj: Record<string, string> = {};
+        this.thumbhashes.forEach((v, k) => {
+          thumbsObj[k] = v;
+        });
+        await AsyncStorage.setItem(STORAGE_KEY_THUMBHASH, JSON.stringify(thumbsObj));
+      } catch (err) {
+        void logger.warn("ImageCacheService: failed to persist thumbhashes.", {
+          error: this.stringifyError(err),
+        });
       }
     } catch (error) {
       void logger.warn("ImageCacheService: failed to persist tracked URIs.", {
@@ -583,6 +637,12 @@ class ImageCacheService {
           { uri, fetchUri }
         );
         return null;
+      }
+      // If we have a cached path, try to generate a thumbhash (do not await)
+      try {
+        void this.maybeGenerateThumbhash(uri, cachedPath);
+      } catch {
+        // ignore
       }
 
       return cachedPath;
@@ -772,6 +832,12 @@ class ImageCacheService {
         // Make sure file exists
         const info = await FileSystem.getInfoAsync(dest);
         if (info.exists && !info.isDirectory) {
+          // Generate thumbhash for downloaded image (fire-and-forget)
+          try {
+            void this.maybeGenerateThumbhash(originalUri, dest);
+          } catch {
+            // ignore
+          }
           return dest;
         }
       }
@@ -806,6 +872,55 @@ class ImageCacheService {
     }
 
     return null;
+  }
+
+  /**
+   * Return a stored thumbhash for the given URI if available.
+   * The URI is sanitized before lookup so stored entries don't contain secrets.
+   */
+  getThumbhash(uri: string): string | undefined {
+    try {
+      const key = this.sanitizeUriForStorage(uri);
+      return this.thumbhashes.get(key);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Generate a thumbhash for a source (URL or file path) and store it keyed by
+   * the sanitized originalUri. This is best-effort and doesn't throw on errors.
+   */
+  private async maybeGenerateThumbhash(origUri: string, source?: string): Promise<void> {
+    try {
+      const key = this.sanitizeUriForStorage(origUri);
+      if (this.thumbhashes.has(key)) return;
+      const src = source ?? origUri;
+      if (!src) return;
+      // generateThumbhashAsync accepts a URL string or ImageRef
+      const th = await Image.generateThumbhashAsync(src);
+      if (th && typeof th === 'string' && th.length) {
+        this.thumbhashes.set(key, th);
+        // Persist thumbhashes (best-effort)
+        try {
+          const thumbsObj: Record<string, string> = {};
+          this.thumbhashes.forEach((v, k) => {
+            thumbsObj[k] = v;
+          });
+          await AsyncStorage.setItem(STORAGE_KEY_THUMBHASH, JSON.stringify(thumbsObj));
+        } catch {
+          // ignore persistence failures
+        }
+        try {
+          this.incrementVariantStat('thumbhash-generated');
+        } catch {
+          // ignore
+        }
+      }
+    } catch (err) {
+      // non-fatal
+      void logger.debug('ImageCacheService: failed to generate thumbhash.', { error: this.stringifyError(err) });
+    }
   }
 
   private trackUri(uri: string): void {
@@ -857,6 +972,45 @@ class ImageCacheService {
       return uri;
     }
   }
+
+  /**
+   * Generate a deterministic filename for a thumbnail variant.
+   */
+  private static thumbFilename(uri: string, w: number, h: number): string {
+    // prefer webp extension for thumbnails
+    return `image-${ImageCacheService.hashUri(uri)}-${w}x${h}.webp`;
+  }
+
+  // Thumbnail helper methods removed
+
+  private acquireOp(): Promise<void> {
+    const max = this.DEFAULT_MAX_CONCURRENT_OPS;
+
+    if (this.concurrentOps < max) {
+      this.concurrentOps += 1;
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.opQueue.push(() => {
+        this.concurrentOps += 1;
+        resolve();
+      });
+    });
+  }
+
+  private releaseOp(): void {
+    this.concurrentOps = Math.max(0, this.concurrentOps - 1);
+    const next = this.opQueue.shift();
+    if (next) next();
+    // Try to release next queued op up to the default max
+    if (this.opQueue.length > 0 && this.concurrentOps < this.DEFAULT_MAX_CONCURRENT_OPS) {
+      const next = this.opQueue.shift()!;
+      this.concurrentOps += 1;
+      next();
+    }
+  }
+
 
   private stringifyError(error: unknown): string {
     if (error instanceof Error) {

@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+// Export shallow equality helper for components to use when selecting parts of the store
+export { shallow } from 'zustand/shallow';
 
 export type ServicesViewMode = 'grid' | 'list';
 export type ServicesSortKey = 'name' | 'status' | 'type';

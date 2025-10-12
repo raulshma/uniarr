@@ -7,7 +7,7 @@ import {
   type RefetchOptions,
 } from '@tanstack/react-query';
 
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { TransmissionConnector } from '@/connectors/implementations/TransmissionConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { Torrent, TorrentTransferInfo } from '@/models/torrent.types';
@@ -72,7 +72,7 @@ export const useTransmissionTorrents = (
   options: UseTransmissionOptions = {},
 ): UseTransmissionResult => {
   const queryClient = useQueryClient();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === TRANSMISSION_SERVICE_TYPE;
   const previousTorrentsRef = useRef<Map<string, { progress: number; state: Torrent['state'] }>>(new Map());

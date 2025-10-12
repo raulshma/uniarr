@@ -18,7 +18,7 @@ import type {
 const DEFAULT_BASE = "https://api.jikan.moe/v4";
 
 // Rate limiting configuration
-const RATE_LIMIT_PER_SECOND = 3;
+const RATE_LIMIT_PER_SECOND = 10;
 const RATE_LIMIT_PER_MINUTE = 180;
 
 // Token bucket for rate limiting

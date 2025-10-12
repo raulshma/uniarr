@@ -3,7 +3,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 import type { components } from '@/connectors/client-schemas/jellyseerr-openapi';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 
 export type JellyseerrMediaType = 'movie' | 'tv';
@@ -17,7 +17,7 @@ export const useJellyseerrMediaDetails = (
   mediaType: JellyseerrMediaType,
   mediaId: number,
 ): UseQueryResult<JellyseerrMediaDetails, Error> => {
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId) as JellyseerrConnector | undefined;
   const enabled = Boolean(connector && connector.config.type === 'jellyseerr' && mediaId && mediaType);
 

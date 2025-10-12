@@ -6,7 +6,7 @@ import type { RadarrConnector } from "@/connectors/implementations/RadarrConnect
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import type { IConnector } from "@/connectors/base/IConnector";
 import type { ServiceType } from "@/models/service.types";
-import { useConnectorsStore } from "@/store/connectorsStore";
+import { useConnectorsStore, selectGetConnectorsByType } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 import type {
   DiscoverMediaItem,
@@ -276,12 +276,15 @@ const fetchUnifiedDiscover = async (
 };
 
 export const useUnifiedDiscover = () => {
-  const { getConnectorsByType } = useConnectorsStore();
+  const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
   const query = useQuery<UnifiedDiscoverPayload>({
     queryKey: queryKeys.discover.unified,
     queryFn: () => fetchUnifiedDiscover(getConnectorsByType),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    // Keep previous data can be useful to avoid loading flashes; components
+    // that render this query can opt into `keepPreviousData` via a local
+    // useQuery overload if needed. We disable refetchOnWindowFocus here.
     refetchOnWindowFocus: false,
   });
 

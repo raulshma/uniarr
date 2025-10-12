@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useConnectorsStore } from "@/store/connectorsStore";
+import { useConnectorsStore, selectGetConnector } from "@/store/connectorsStore";
 import type { components } from "@/connectors/client-schemas/prowlarr-openapi";
 
 type ProwlarrIndexerResource = components["schemas"]["IndexerResource"];
@@ -67,7 +67,7 @@ export const useProwlarrIndexers = (
   const [lastApiEvent, setLastApiEvent] = useState<ApiEvent | null>(null);
 
   // Get connector instance
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
 
   const formatDetails = (maybe: unknown): Record<string, unknown> | string => {

@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { AppTheme } from "@/constants/theme";
 import { imageCacheService } from "@/services/image/ImageCacheService";
+import { PixelRatio } from 'react-native';
 
 const sizeMap = {
   small: 96,
@@ -76,7 +77,11 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       }
 
       try {
-        const localUri = await imageCacheService.resolveUri(uri);
+        // Request a sized thumbnail matching the rendered size * device DPR
+        const dpr = PixelRatio.get();
+        const reqWidth = Math.round(width * dpr);
+        const reqHeight = Math.round(height * dpr);
+        const localUri = await imageCacheService.resolveForSize(uri, width, height);
         if (isMounted) {
           setResolvedUri(localUri);
         }
@@ -158,6 +163,10 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   ) : (
     <Image
       source={{ uri: resolvedUri }}
+      // Use stored thumbhash as a placeholder when available. Expo Image accepts
+      // placeholder as an object or a string; providing the thumbhash string
+      // directly will render a compact placeholder until the real image loads.
+      placeholder={resolvedUri ? imageCacheService.getThumbhash(resolvedUri) ?? undefined : undefined}
       style={[
         StyleSheet.absoluteFillObject,
         { borderRadius: effectiveBorderRadius },

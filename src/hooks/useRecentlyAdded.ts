@@ -7,7 +7,7 @@ import type { SonarrConnector } from '@/connectors/implementations/SonarrConnect
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 import type { IConnector } from '@/connectors/base/IConnector';
 import type { ServiceType } from '@/models/service.types';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnectorsByType } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 
 export type RecentlyAddedItem = {
@@ -100,7 +100,7 @@ const fetchRecentlyAdded = async (getConnectorsByType: (type: ServiceType) => IC
 };
 
 export const useRecentlyAdded = () => {
-  const { getConnectorsByType } = useConnectorsStore();
+  const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
   const {
     data,
     isLoading,

@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+// Exportable shallow equality helper for components to use when selecting
+// small slices of state to avoid unnecessary re-renders.
+export { shallow } from 'zustand/shallow';
 
 import { logger } from '@/services/logger/LoggerService';
 import type { NotificationCategory, QuietHoursConfig } from '@/models/notification.types';
@@ -32,6 +35,7 @@ type SettingsData = {
   // returns 5xx errors. This value represents the number of retry attempts
   // after the initial request. Default: 3
   jellyseerrRetryAttempts: number;
+    // (thumbnail generation removed)
 };
 
 interface SettingsState extends SettingsData {
@@ -55,6 +59,7 @@ interface SettingsState extends SettingsData {
   setLastCalendarView: (view: CalendarView) => void;
   setUseNativeTabs: (enabled: boolean) => void;
   setJellyseerrRetryAttempts: (attempts: number) => void;
+    // (thumbnail setters removed)
 }
 
 const STORAGE_KEY = 'SettingsStore:v1';
@@ -64,6 +69,7 @@ const DEFAULT_REFRESH_INTERVAL = 15;
 const DEFAULT_JELLYSEERR_RETRY_ATTEMPTS = 3;
 const MIN_JELLYSEERR_RETRY_ATTEMPTS = 0;
 const MAX_JELLYSEERR_RETRY_ATTEMPTS = 10;
+// thumbnail generation removed
 
 const clampRetryAttempts = (value: number): number => {
   if (Number.isNaN(value)) return DEFAULT_JELLYSEERR_RETRY_ATTEMPTS;
@@ -100,6 +106,7 @@ const createDefaultSettings = (): SettingsData => ({
   lastCalendarView: 'week',
   useNativeTabs: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
+    // (thumbnail defaults removed)
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -143,8 +150,29 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: STORAGE_KEY,
-      // Bump version since we're adding a new persisted field
-      version: 3,
+      // Only persist a focused subset of the settings state. Persisting the
+      // entire state (including derived values or large objects) can cause
+      // unnecessary rehydration work and extra memory usage. Keep the
+      // persisted slice intentionally small.
+      partialize: (state) => ({
+        theme: state.theme,
+        customThemeConfig: state.customThemeConfig,
+        notificationsEnabled: state.notificationsEnabled,
+        releaseNotificationsEnabled: state.releaseNotificationsEnabled,
+        downloadNotificationsEnabled: state.downloadNotificationsEnabled,
+        failedDownloadNotificationsEnabled: state.failedDownloadNotificationsEnabled,
+        requestNotificationsEnabled: state.requestNotificationsEnabled,
+        serviceHealthNotificationsEnabled: state.serviceHealthNotificationsEnabled,
+        refreshIntervalMinutes: state.refreshIntervalMinutes,
+        quietHours: state.quietHours,
+        criticalHealthAlertsBypassQuietHours: state.criticalHealthAlertsBypassQuietHours,
+        lastCalendarView: state.lastCalendarView,
+        useNativeTabs: state.useNativeTabs,
+        jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
+  // thumbnail fields removed
+      }),
+      // Bump version since we're adding new persisted fields
+      version: 4,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -173,6 +201,8 @@ export const useSettingsStore = create<SettingsState>()(
             state.jellyseerrRetryAttempts = normalizedRetries;
           }
         }
+
+        // thumbnail rehydration removed
 
         const quietHoursEntries = Object.entries(state.quietHours ?? {}) as [
           NotificationCategory,
@@ -225,6 +255,7 @@ export const useSettingsStore = create<SettingsState>()(
           jellyseerrRetryAttempts: clampRetryAttempts(
             partial.jellyseerrRetryAttempts ?? baseDefaults.jellyseerrRetryAttempts,
           ),
+          // thumbnail migration removed
           quietHours,
           criticalHealthAlertsBypassQuietHours:
             partial.criticalHealthAlertsBypassQuietHours ??

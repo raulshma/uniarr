@@ -27,11 +27,18 @@ export const queryClient = new QueryClient({
     queries: {
       retry: shouldRetryRequest,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30_000),
-      staleTime: 5 * 60 * 1000, // 5 minutes - longer for offline support
-      gcTime: 24 * 60 * 60 * 1000, // 24 hours - keep in cache longer for offline use
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true, // Refetch when back online
-      networkMode: 'offlineFirst', // Use cached data first, then sync when online
+      // Defaults tuned for a mobile app: be conservative with refetches and
+      // prefer cached data to improve perceived latency and reduce network
+      // traffic. Individual hooks can override these for real-time screens.
+      staleTime: 5 * 60 * 1000, // 5 minutes - treat most data as fresh for short periods
+      gcTime: 24 * 60 * 60 * 1000, // 24 hours - keep cached data longer for offline use
+      refetchOnWindowFocus: false, // mobile apps don't need aggressive window-focus refetching
+      refetchOnReconnect: true, // when device comes back online, attempt to refresh
+      refetchInterval: false, // don't poll by default
+      // Use offline-first network mode so cached data is used and network is
+      // attempted when available. Hooks that need real-time updates should
+      // opt into a different networkMode.
+      networkMode: 'offlineFirst',
     },
     mutations: {
       retry: shouldRetryRequest,

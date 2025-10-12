@@ -17,7 +17,7 @@ import { alert } from '@/services/dialogService';
 
 import { MediaPoster } from './MediaPoster';
 import type { AppTheme } from '@/constants/theme';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { Series } from '@/models/media.types';
 import type { Movie } from '@/models/movie.types';
 import type { QualityProfile } from '@/models/media.types';
@@ -46,7 +46,7 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
   serviceId,
 }) => {
   const theme = useTheme<AppTheme>();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [qualityProfiles, setQualityProfiles] = useState<QualityProfile[]>([]);

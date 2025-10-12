@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-query';
 
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { components, paths } from '@/connectors/client-schemas/jellyseerr-openapi';
@@ -103,7 +103,7 @@ export const useJellyseerrRequests = (
   options?: JellyseerrRequestQueryOptions,
 ): UseJellyseerrRequestsResult => {
   const queryClient = useQueryClient();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
   const previousRequestIdsRef = useRef<Set<number>>(new Set());

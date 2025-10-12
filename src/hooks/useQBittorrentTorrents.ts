@@ -7,7 +7,7 @@ import {
   type RefetchOptions,
 } from '@tanstack/react-query';
 
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
 import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
@@ -72,7 +72,7 @@ export const useQBittorrentTorrents = (
   options: UseQBittorrentOptions = {},
 ): UseQBittorrentResult => {
   const queryClient = useQueryClient();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === QB_SERVICE_TYPE;
   const previousTorrentsRef = useRef<Map<string, { progress: number; state: Torrent['state'] }>>(new Map());

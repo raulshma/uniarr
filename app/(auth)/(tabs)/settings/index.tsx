@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { StyleSheet, View, ScrollView } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { alert } from '@/services/dialogService';
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -65,6 +65,7 @@ const SettingsScreen = () => {
     setUseNativeTabs,
     jellyseerrRetryAttempts,
     setJellyseerrRetryAttempts,
+  // image thumbnailing controls removed
   } = useSettingsStore();
   const [jellyseerrRetriesVisible, setJellyseerrRetriesVisible] = useState(false);
   const [imageCacheUsage, setImageCacheUsage] = useState<ImageCacheUsage>({
@@ -684,6 +685,7 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
+          {/* Thumbnail generation controls removed */}
         </AnimatedSection>
 
         {/* Services Section */}
@@ -803,6 +805,8 @@ const SettingsScreen = () => {
             </Card>
           </AnimatedListItem>
         </AnimatedSection>
+
+        {/* Thumbnail concurrency dialog removed */}
 
         {/* Developer Tools (dev only) */}
         {isDev && (

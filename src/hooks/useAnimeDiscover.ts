@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { components, paths } from '@/connectors/client-schemas/jellyseerr-openapi';
@@ -28,7 +28,7 @@ interface UseAnimeDiscoverOptions {
 }
 
 export const useAnimeRecommendations = ({ serviceId, page = 1, enabled = true }: UseAnimeDiscoverOptions) => {
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
 
@@ -45,7 +45,7 @@ export const useAnimeRecommendations = ({ serviceId, page = 1, enabled = true }:
 };
 
 export const useAnimeUpcoming = ({ serviceId, page = 1, enabled = true }: UseAnimeDiscoverOptions) => {
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
 
@@ -62,7 +62,7 @@ export const useAnimeUpcoming = ({ serviceId, page = 1, enabled = true }: UseAni
 };
 
 export const useTrendingAnime = ({ serviceId, page = 1, enabled = true }: UseAnimeDiscoverOptions) => {
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
 
@@ -79,7 +79,7 @@ export const useTrendingAnime = ({ serviceId, page = 1, enabled = true }: UseAni
 };
 
 export const useAnimeMovies = ({ serviceId, page = 1, enabled = true }: UseAnimeDiscoverOptions) => {
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
 

@@ -7,7 +7,7 @@ import {
   type RefetchOptions,
 } from '@tanstack/react-query';
 
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
 import type { IConnector } from '@/connectors/base/IConnector';
 import type { Movie } from '@/models/movie.types';
@@ -58,7 +58,7 @@ export const useRadarrMovieDetails = ({
   movieId,
 }: UseRadarrMovieDetailsParams): UseRadarrMovieDetailsResult => {
   const queryClient = useQueryClient();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
 
