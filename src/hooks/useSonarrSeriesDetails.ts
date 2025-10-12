@@ -7,7 +7,7 @@ import {
   type RefetchOptions,
 } from '@tanstack/react-query';
 
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
 import type { IConnector } from '@/connectors/base/IConnector';
 import type { Series } from '@/models/media.types';
@@ -64,7 +64,7 @@ export const useSonarrSeriesDetails = ({
   seriesId,
 }: UseSonarrSeriesDetailsParams): UseSonarrSeriesDetailsResult => {
   const queryClient = useQueryClient();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === SONARR_SERVICE_TYPE;
 

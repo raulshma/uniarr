@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { JellyfinConnector } from '@/connectors/implementations/JellyfinConnector';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { JellyfinItem } from '@/models/jellyfin.types';
@@ -38,7 +38,7 @@ export const useJellyfinLibraryItems = ({
   sortOrder,
   limit,
 }: UseJellyfinLibraryItemsOptions) => {
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
 
   const enabled = Boolean(serviceId && libraryId);
   const normalizedSearch = searchTerm?.trim() ?? '';

@@ -9,7 +9,7 @@ import {
 
 import type { AddMovieRequest, Movie } from '@/models/movie.types';
 import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 import { IConnector } from '@/connectors/base/IConnector';
 
@@ -42,7 +42,7 @@ const ensureRadarrConnector = (
 
 export const useRadarrMovies = (serviceId: string): UseRadarrMoviesResult => {
   const queryClient = useQueryClient();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
 

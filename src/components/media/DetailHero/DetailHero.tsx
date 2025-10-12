@@ -17,11 +17,13 @@ import Animated, {
   Extrapolation,
 } from "react-native-reanimated";
 import { Image } from "expo-image";
+import { PixelRatio } from 'react-native';
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { IconButton, Text, useTheme } from "react-native-paper";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
+import { imageCacheService } from "@/services/image/ImageCacheService";
 import { spacing } from "@/theme/spacing";
 import type { AppTheme } from "@/constants/theme";
 
@@ -167,16 +169,40 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   const handleMal = () => onMal?.();
 
   const heroUri = backdropUri;
+  const [resolvedHeroUri, setResolvedHeroUri] = useState<string | undefined>(heroUri);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const resolveHero = async () => {
+      if (!heroUri) {
+        if (mounted) setResolvedHeroUri(undefined);
+        return;
+      }
+      try {
+        const dpr = PixelRatio.get();
+        const targetW = Math.round(Dimensions.get('window').width * dpr);
+        const targetH = Math.round(heroHeight * dpr);
+        const r = await imageCacheService.resolveForSize(heroUri, targetW, targetH);
+        if (mounted) setResolvedHeroUri(r);
+      } catch {
+        if (mounted) setResolvedHeroUri(heroUri);
+      }
+    };
+    void resolveHero();
+    return () => { mounted = false; };
+  }, [heroUri, heroHeight]);
 
   return (
     <View style={styles.scaffold}>
       <Animated.View style={[styles.heroArea, heroAnimatedStyle]}>
-        {heroUri ? (
+        {resolvedHeroUri ? (
           <View style={styles.heroImage}>
             <Image
-              source={{ uri: heroUri }}
+              source={{ uri: resolvedHeroUri }}
               style={RNStyleSheet.absoluteFill}
+              placeholder={resolvedHeroUri ? imageCacheService.getThumbhash(resolvedHeroUri) ?? undefined : undefined}
               cachePolicy="memory-disk"
+              priority="high"
             />
             <Animated.View
               style={[RNStyleSheet.absoluteFill, blurAnimatedStyle]}

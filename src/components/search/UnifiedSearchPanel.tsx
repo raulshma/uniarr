@@ -18,7 +18,7 @@ import type { AppTheme } from '@/constants/theme';
 import { spacing } from '@/theme/spacing';
 import { useUnifiedSearch } from '@/hooks/useUnifiedSearch';
 import type { SearchHistoryEntry, UnifiedSearchMediaType, UnifiedSearchResult } from '@/models/search.types';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
 
 const mediaTypeLabels: Record<UnifiedSearchMediaType, string> = {
@@ -75,7 +75,7 @@ const buildIdentifier = (entry: SearchHistoryEntry): string => {
 export const UnifiedSearchPanel: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const params = useLocalSearchParams<{
     query?: string;
     tmdbId?: string;

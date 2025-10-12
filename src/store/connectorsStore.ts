@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+// Export shallow equality helper for consumers to use with selectors
+export { shallow } from 'zustand/shallow';
 
 import type { IConnector } from '@/connectors/base/IConnector';
 import type { ServiceType } from '@/models/service.types';
@@ -33,3 +35,6 @@ export const selectConnectors = (state: ConnectorsState): Map<string, IConnector
 export const selectGetConnector = (state: ConnectorsState) => state.getConnector;
 export const selectGetConnectorsByType = (state: ConnectorsState) => state.getConnectorsByType;
 export const selectGetAllConnectors = (state: ConnectorsState) => state.getAllConnectors;
+// Lightweight selectors: prefer these in components when only metadata is needed
+export const selectConnectorIds = (state: ConnectorsState): string[] => Array.from(state.connectors.keys());
+export const selectConnectorsCount = (state: ConnectorsState): number => state.connectors.size;

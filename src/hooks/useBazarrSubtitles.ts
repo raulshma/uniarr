@@ -17,7 +17,7 @@ import type {
   BazarrDownloadRequest,
 } from '@/models/bazarr.types';
 import type { BazarrConnector } from '@/connectors/implementations/BazarrConnector';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import type { IConnector } from '@/connectors/base/IConnector';
 import { queryKeys } from '@/hooks/queryKeys';
 
@@ -58,7 +58,7 @@ const ensureBazarrConnector = (
 
 export const useBazarrSubtitles = (serviceId: string): UseBazarrSubtitlesResult => {
   const queryClient = useQueryClient();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === BAZARR_SERVICE_TYPE;
 

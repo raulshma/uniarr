@@ -9,7 +9,7 @@ import {
 
 import type { AddSeriesRequest, Series } from '@/models/media.types';
 import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 import { IConnector } from '@/connectors/base/IConnector';
 
@@ -42,7 +42,7 @@ const ensureSonarrConnector = (
 
 export const useSonarrSeries = (serviceId: string): UseSonarrSeriesResult => {
   const queryClient = useQueryClient();
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === SONARR_SERVICE_TYPE;
 

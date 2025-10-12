@@ -12,6 +12,8 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
+import { PixelRatio, Dimensions } from 'react-native';
+import { imageCacheService } from '@/services/image/ImageCacheService';
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -192,6 +194,28 @@ const JellyfinNowPlayingScreen = () => {
           width: 1280,
         })
       : undefined;
+
+  const [resolvedBackdropUri, setResolvedBackdropUri] = useState<string | undefined>(backdropUri);
+  useEffect(() => {
+    let mounted = true;
+    const resolve = async () => {
+      if (!backdropUri) {
+        if (mounted) setResolvedBackdropUri(undefined);
+        return;
+      }
+      try {
+        const dpr = PixelRatio.get();
+        const w = Math.round(Dimensions.get('window').width * dpr);
+        const h = Math.round(360 * dpr);
+        const r = await imageCacheService.resolveForSize(backdropUri, w, h);
+        if (mounted) setResolvedBackdropUri(r);
+      } catch {
+        if (mounted) setResolvedBackdropUri(backdropUri);
+      }
+    };
+    void resolve();
+    return () => { mounted = false; };
+  }, [backdropUri]);
 
   const handleNavigateBack = useCallback(() => {
     router.back();
@@ -398,12 +422,14 @@ const JellyfinNowPlayingScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {backdropUri ? (
+      {resolvedBackdropUri ? (
         <Image
-          source={{ uri: backdropUri }}
+          source={{ uri: resolvedBackdropUri }}
           style={[StyleSheet.absoluteFillObject, styles.backdropImage]}
           cachePolicy="memory-disk"
           contentFit="cover"
+          priority="high"
+          placeholder={imageCacheService.getThumbhash(resolvedBackdropUri) ?? undefined}
         />
       ) : null}
       {backdropUri ? (

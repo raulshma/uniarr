@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
 import { queryKeys } from '@/hooks/queryKeys';
 import type { components } from '@/connectors/client-schemas/jellyseerr-openapi';
 type JellyseerrCreditPerson = components['schemas']['Cast'];
@@ -12,7 +12,7 @@ export const useJellyseerrMediaCredits = (
   mediaType: 'movie' | 'tv',
   mediaId?: number,
 ) => {
-  const { getConnector } = useConnectorsStore();
+  const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId) as JellyseerrConnector | undefined;
   const enabled = Boolean(connector && mediaId);
 
