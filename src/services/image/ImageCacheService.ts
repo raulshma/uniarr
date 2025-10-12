@@ -4,8 +4,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // the legacy dependency and use the modern APIs for file info and operations.
 import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
-import * as ImageManipulator from 'expo-image-manipulator';
-import { PixelRatio } from 'react-native';
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 import { logger } from "@/services/logger/LoggerService";

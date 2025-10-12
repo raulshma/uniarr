@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { JikanClient } from "@/services/jikan/JikanClient";
+import { JikanClient, subscribeJikanThrottle, isJikanThrottled } from "@/services/jikan/JikanClient";
 import type { JikanAnime } from "@/models/jikan.types";
 import { queryKeys } from "@/hooks/queryKeys";
 
@@ -230,6 +230,13 @@ export const useJikanDiscover = () => {
   const now = useJikanSeasonNow({});
   const upcoming = useJikanSeasonUpcoming({});
 
+  const [isThrottled, setIsThrottled] = useState<boolean>(() => isJikanThrottled());
+
+  useEffect(() => {
+    const unsub = subscribeJikanThrottle((v) => setIsThrottled(v));
+    return () => unsub();
+  }, []);
+
   const isLoading = useMemo(
     () =>
       top.isLoading ||
@@ -254,6 +261,7 @@ export const useJikanDiscover = () => {
     recommendations: recommendations.data ?? [],
     now: now.data ?? [],
     upcoming: upcoming.data ?? [],
+    isThrottled,
     isLoading,
     isError,
     refetch: async () => {
