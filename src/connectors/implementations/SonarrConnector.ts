@@ -113,7 +113,11 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         serviceId: this.config.id,
         error,
       });
-      const axiosError = error as any;
+      const axiosError = error as unknown as {
+        message?: string;
+        code?: string;
+        response?: { status?: number; statusText?: string };
+      };
       logger.debug("[SonarrConnector] Error details", {
         serviceId: this.config.id,
         message: axiosError?.message,
@@ -486,13 +490,16 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
           !Array.isArray(response.data) &&
           "error" in response.data
         ) {
-          throw new Error((response.data as any).error as string);
+          const errObj = response.data as unknown as { error?: string };
+          throw new Error(errObj.error ?? "Unknown error");
         }
 
         return response.data.map((profile) => this.mapQualityProfile(profile));
       } catch (error) {
         // If this endpoint returned a 404, try the next candidate.
-        const axiosError = error as any;
+        const axiosError = error as unknown as {
+          response?: { status?: number };
+        };
         const status = axiosError?.response?.status;
         // Only continue trying on 404; for other errors, fail-fast and report diagnostics
         if (status !== 404) {
@@ -627,7 +634,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       tvdbId: data.tvdbId ?? undefined,
       imdbId: data.imdbId ?? undefined,
       tmdbId: data.tmdbId ?? undefined,
-      traktId: (data as any).traktId ?? undefined,
+      traktId: (data as unknown as { traktId?: number })?.traktId ?? undefined,
       cleanTitle: data.cleanTitle ?? undefined,
       titleSlug: data.titleSlug ?? undefined,
       rootFolderPath: data.rootFolderPath ?? undefined,
@@ -707,10 +714,16 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       monitored: Boolean(episode.monitored),
       hasFile: Boolean(episode.hasFile),
       episodeFileId: episode.episodeFileId ?? undefined,
-      quality: (episode as any).quality?.quality
-        ? this.mapQualityResource((episode as any).quality.quality)
+      quality: (episode as unknown as { quality?: { quality?: SonarrQuality } })
+        ?.quality?.quality
+        ? this.mapQualityResource(
+            (episode as unknown as { quality?: { quality?: SonarrQuality } })
+              .quality!.quality!
+          )
         : undefined,
-      relativePath: (episode as any).relativePath ?? undefined,
+      relativePath:
+        (episode as unknown as { relativePath?: string })?.relativePath ??
+        undefined,
       posterUrl,
     };
   }
@@ -859,7 +872,8 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     // For groups, we need to handle differently, but for now, if no quality, use a placeholder
     const quality =
       (item.quality as components["schemas"]["Quality"] | undefined) ??
-      (item as any).quality ??
+      (item as unknown as { quality?: components["schemas"]["Quality"] })
+        ?.quality ??
       ({
         id: item.id || 0,
         name: item.name || "Unknown",
@@ -878,14 +892,18 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       | components["schemas"]["QualityModel"]
       | components["schemas"]["Quality"]
   ): Quality {
+    const maybe = resource as unknown;
     const qualityObj: components["schemas"]["Quality"] =
-      (resource as any).quality ?? (resource as any);
+      ((maybe as { quality?: components["schemas"]["Quality"] })?.quality as
+        | components["schemas"]["Quality"]
+        | undefined) ?? (maybe as components["schemas"]["Quality"]);
+
     return {
-      id: (qualityObj as any).id ?? 0,
-      name: (qualityObj as any).name ?? "Unknown",
-      source: (qualityObj as any).source ?? undefined,
-      resolution: (qualityObj as any).resolution ?? 0,
-      sort: (qualityObj as any).sort ?? 0,
+      id: qualityObj?.id ?? 0,
+      name: qualityObj?.name ?? "Unknown",
+      source: qualityObj?.source ?? undefined,
+      resolution: qualityObj?.resolution ?? 0,
+      sort: (qualityObj as unknown as { sort?: number })?.sort ?? 0,
     };
   }
 
