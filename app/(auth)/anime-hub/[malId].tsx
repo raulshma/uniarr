@@ -127,7 +127,7 @@ const AnimeHubDetailScreen: React.FC = () => {
         },
         pictureItem: {
           width: "30%",
-          aspectRatio: 16/9,
+          aspectRatio: 16 / 9,
           borderRadius: 8,
           overflow: "hidden",
         },
