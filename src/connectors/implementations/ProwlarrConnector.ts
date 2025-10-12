@@ -202,30 +202,33 @@ export class ProwlarrConnector extends BaseConnector<
     } catch (error) {
       // If API responds with 400, try to extract validation messages and include
       // them in the thrown error to make debugging easier in the client.
-      const anyErr = error as any;
-      const resp = anyErr?.response;
+      const resp = (error as { response?: unknown })?.response as
+        | { status?: number; data?: unknown }
+        | undefined;
       if (resp && resp.status === 400 && resp.data) {
         // Prowlarr may return a body with message, errors, or model state
-        const body = resp.data;
+        const body = resp.data as unknown;
         let details = "";
         if (typeof body === "string") {
           details = body;
-        } else if (body.message) {
-          details = String(body.message);
-        }
-        // Collect validation details if available
-        if (body.errors && typeof body.errors === "object") {
-          try {
-            details += "\n" + JSON.stringify(body.errors, null, 2);
-          } catch (_) {
-            details += "\n" + String(body.errors);
+        } else if (body && typeof body === "object") {
+          const b = body as Record<string, unknown>;
+          if (typeof b.message === "string") details = b.message;
+
+          if (b.errors && typeof b.errors === "object") {
+            try {
+              details += "\n" + JSON.stringify(b.errors, null, 2);
+            } catch (_) {
+              details += "\n" + String(b.errors);
+            }
           }
-        }
-        if (body.modelState) {
-          try {
-            details += "\n" + JSON.stringify(body.modelState, null, 2);
-          } catch (_) {
-            details += "\n" + String(body.modelState);
+
+          if (b.modelState) {
+            try {
+              details += "\n" + JSON.stringify(b.modelState, null, 2);
+            } catch (_) {
+              details += "\n" + String(b.modelState);
+            }
           }
         }
 
@@ -455,17 +458,12 @@ export class ProwlarrConnector extends BaseConnector<
         const cmdResp = await this.client.get("/api/v1/command");
         if (Array.isArray(cmdResp.data)) {
           commands = cmdResp.data as components["schemas"]["CommandResource"][];
-        } else if (
-          cmdResp.data &&
-          Array.isArray((cmdResp.data as any).records)
-        ) {
-          // Some endpoints wrap results in a paging resource with a `records` array
-          commands =
-            (
-              cmdResp.data as {
-                records?: components["schemas"]["CommandResource"][];
-              }
-            ).records ?? [];
+        } else if (cmdResp.data) {
+          const maybePaging = cmdResp.data as { records?: unknown };
+          if (Array.isArray(maybePaging.records)) {
+            commands =
+              maybePaging.records as components["schemas"]["CommandResource"][];
+          }
         }
       } catch (cmdErr) {
         // Non-fatal - commands may not be available on all Prowlarr builds
@@ -480,11 +478,12 @@ export class ProwlarrConnector extends BaseConnector<
       if (connectedApps.length === 0) {
         try {
           const profilesResp = await this.client.get("/api/v1/appprofile");
-          const profiles = profilesResp.data ?? [];
+          const profiles = (profilesResp.data ??
+            []) as components["schemas"]["AppProfileResource"][];
           const profileNames = (Array.isArray(profiles) ? profiles : [])
-            .map((p: any) => p.name)
-            .filter(Boolean);
-          if (profileNames.length > 0) connectedApps = profileNames as string[];
+            .map((p) => p.name)
+            .filter(Boolean) as string[];
+          if (profileNames.length > 0) connectedApps = profileNames;
         } catch (profileErr) {
           // ignore - appprofile endpoint may not be present on all versions
         }
