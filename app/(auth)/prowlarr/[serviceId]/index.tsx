@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   FAB,
   Icon,
@@ -24,7 +24,9 @@ import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
-import type { ProwlarrIndexerResource } from "@/models/prowlarr.types";
+import type { components } from "@/connectors/client-schemas/prowlarr-openapi";
+
+type ProwlarrIndexerResource = components["schemas"]["IndexerResource"];
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
 import { useProwlarrIndexers } from "@/hooks/useProwlarrIndexers";
@@ -106,7 +108,11 @@ const ProwlarrIndexerListScreen = () => {
     item?: ProwlarrIndexerResource;
   } | null>(null);
   const [isFabMenuVisible, setIsFabMenuVisible] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // Indexer IDs are optional on the generated schema, allow undefined in the
+  // selection set locally and filter when calling APIs that require numbers.
+  const [selectedIds, setSelectedIds] = useState<Set<number | undefined>>(
+    new Set()
+  );
   const multiSelectActive = selectedIds.size > 0;
   const [isAddDialogVisible, setIsAddDialogVisible] = useState(false);
   const [isAppsDialogVisible, setIsAppsDialogVisible] = useState(false);
@@ -224,7 +230,7 @@ const ProwlarrIndexerListScreen = () => {
 
   const handleDeleteIndexer = useCallback(
     async (indexer: ProwlarrIndexerResource) => {
-  alert(
+      alert(
         "Delete Indexer",
         `Are you sure you want to delete "${indexer.name}"? This action cannot be undone.`,
         [
@@ -233,6 +239,11 @@ const ProwlarrIndexerListScreen = () => {
             text: "Delete",
             style: "destructive",
             onPress: async () => {
+              // Guard against missing id on the generated type
+              if (typeof indexer.id !== "number") {
+                alert("Error", "Indexer id is missing or invalid");
+                return;
+              }
               // Delete and rely on API banner for any errors.
               await deleteIndexer(indexer.id);
             },
@@ -247,19 +258,19 @@ const ProwlarrIndexerListScreen = () => {
   const handleSyncIndexers = useCallback(async () => {
     const success = await syncIndexersToApps();
     if (success) {
-  alert("Success", "Indexers synced to connected applications");
+      alert("Success", "Indexers synced to connected applications");
       void refreshSyncStatus();
     } else {
-  alert("Error", "Failed to sync indexers");
+      alert("Error", "Failed to sync indexers");
     }
   }, [syncIndexersToApps]);
 
   const handleRescanIndexers = useCallback(async () => {
     const success = await rescanIndexers();
     if (success) {
-  alert("Success", "Indexers rescanned successfully");
+      alert("Success", "Indexers rescanned successfully");
     } else {
-  alert("Error", "Failed to rescan indexers");
+      alert("Error", "Failed to rescan indexers");
     }
   }, [rescanIndexers]);
 
@@ -354,7 +365,7 @@ const ProwlarrIndexerListScreen = () => {
             </View>
           </View>
         </View>
-  </View>
+      </View>
     </Pressable>
   );
 
@@ -778,7 +789,11 @@ const ProwlarrIndexerListScreen = () => {
                   label: `Enable (${selectedIds.size})`,
                   onPress: async () => {
                     setIsFabMenuVisible(false);
-                    await bulkEnableDisable(Array.from(selectedIds), true);
+                    const ids = Array.from(selectedIds).filter(
+                      (id): id is number => typeof id === "number"
+                    );
+                    if (ids.length === 0) return;
+                    await bulkEnableDisable(ids, true);
                     setSelectedIds(new Set());
                   },
                 },
@@ -787,7 +802,11 @@ const ProwlarrIndexerListScreen = () => {
                   label: `Disable (${selectedIds.size})`,
                   onPress: async () => {
                     setIsFabMenuVisible(false);
-                    await bulkEnableDisable(Array.from(selectedIds), false);
+                    const ids = Array.from(selectedIds).filter(
+                      (id): id is number => typeof id === "number"
+                    );
+                    if (ids.length === 0) return;
+                    await bulkEnableDisable(ids, false);
                     setSelectedIds(new Set());
                   },
                 },
@@ -796,7 +815,11 @@ const ProwlarrIndexerListScreen = () => {
                   label: `Delete (${selectedIds.size})`,
                   onPress: async () => {
                     setIsFabMenuVisible(false);
-                    await bulkDelete(Array.from(selectedIds));
+                    const ids = Array.from(selectedIds).filter(
+                      (id): id is number => typeof id === "number"
+                    );
+                    if (ids.length === 0) return;
+                    await bulkDelete(ids);
                     setSelectedIds(new Set());
                   },
                 },

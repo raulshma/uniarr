@@ -1,103 +1,21 @@
-/**
- * Prowlarr-specific types for indexer management
- */
+import type { components } from '@/connectors/client-schemas/prowlarr-openapi';
 
-/**
- * Represents an indexer as returned by Prowlarr (/api/v1/indexer)
- * This mirrors the `IndexerResource` in the Prowlarr OpenAPI spec.
- */
-export interface ProwlarrIndexerResource {
-  id: number;
-  name?: string | null;
-  fields?: ProwlarrField[] | null;
-  implementationName?: string | null;
-  implementation?: string | null;
-  configContract?: string | null;
-  infoLink?: string | null;
-  message?: unknown;
-  tags?: number[] | null;
-  presets?: ProwlarrIndexerResource[] | null;
-  indexerUrls?: string[] | null;
-  legacyUrls?: string[] | null;
-  definitionName?: string | null;
-  description?: string | null;
-  language?: string | null;
-  encoding?: string | null;
-  enable?: boolean;
-  redirect?: boolean;
-  supportsRss?: boolean;
-  supportsSearch?: boolean;
-  supportsRedirect?: boolean;
-  supportsPagination?: boolean;
-  appProfileId?: number | null;
-  protocol?: unknown;
-  privacy?: unknown;
-  capabilities?: unknown;
-  priority?: number;
-  downloadClientId?: number | null;
-  added?: string;
-  status?: unknown;
-  sortName?: string | null;
-}
+// Re-export common Prowlarr types from the generated OpenAPI schemas so the
+// rest of the app can switch to the generated types without changing import
+// paths across the codebase.
+export type ProwlarrIndexerResource = components['schemas']['IndexerResource'];
+export type ProwlarrField = components['schemas']['Field'];
+export type ProwlarrSelectOption = components['schemas']['SelectOption'];
+export type ProwlarrApplicationBulkResource = components['schemas']['ApplicationBulkResource'];
+export type ProwlarrConnectedApplication = components['schemas']['ApplicationResource'];
 
-export interface ProwlarrField {
-  name: string;
-  value?: unknown;
-  type?: string;
-  label?: string;
-  helpText?: string;
-  helpLink?: string;
-  order?: number;
-  advanced?: boolean;
-  privacy?: string;
-  placeholder?: string;
-  selectOptions?: ProwlarrSelectOption[];
-}
+// Test endpoints vary between Prowlarr versions; keep a lightweight shape for
+// callers while avoiding `any`.
+export type ProwlarrTestResult = void | { isValid: boolean; errors?: string[]; warnings?: string[] };
 
-export interface ProwlarrSelectOption {
-  value: number;
-  name?: string;
-  order?: number;
-  hint?: string;
-  parentValue?: number;
-}
-
-export interface ProwlarrApplicationBulkResource {
-  ids: number[];
-  tags?: number[];
-  applyTags?: string;
-  enable?: boolean;
-  priority?: number;
-  syncLevel?: string;
-}
-
-/**
- * Represents a connected application/resource in Prowlarr (/api/v1/applications)
- * This is distinct from the indexer resource; applications typically represent
- * connected Sonarr/Radarr instances and include fields such as `syncLevel`.
- */
-export interface ProwlarrConnectedApplication {
-  id: number;
-  name?: string | null;
-  fields?: ProwlarrField[] | null;
-  implementationName?: string | null;
-  implementation?: string | null;
-  configContract?: string | null;
-  infoLink?: string | null;
-  message?: unknown;
-  tags?: number[] | null;
-  presets?: ProwlarrConnectedApplication[] | null;
-  syncLevel?: string;
-  testCommand?: string | null;
-}
-
-export interface ProwlarrTestResult {
-  isValid: boolean;
-  errors?: string[];
-  warnings?: string[];
-}
-
-export interface ProwlarrStatistics {
+// App-level statistics shape used by the UI; keep this shape stable and map
+// to generated types inside connectors.
+export type ProwlarrStatistics = {
   applicationId: number;
   applicationName: string;
   statistics: {
@@ -107,41 +25,7 @@ export interface ProwlarrStatistics {
     lastQueryTime?: string;
     lastGrabTime?: string;
   };
-}
+};
 
-/**
- * Statistics types aligned with Prowlarr OpenAPI spec
- */
-export interface IndexerStatistics {
-  indexerId: number;
-  indexerName?: string | null;
-  averageResponseTime: number;
-  averageGrabResponseTime: number;
-  numberOfQueries: number;
-  numberOfGrabs: number;
-  numberOfRssQueries: number;
-  numberOfAuthQueries: number;
-  numberOfFailedQueries: number;
-  numberOfFailedGrabs: number;
-  numberOfFailedRssQueries: number;
-  numberOfFailedAuthQueries: number;
-}
-
-export interface UserAgentStatistics {
-  userAgent?: string | null;
-  numberOfQueries: number;
-  numberOfGrabs: number;
-}
-
-export interface HostStatistics {
-  host?: string | null;
-  numberOfQueries: number;
-  numberOfGrabs: number;
-}
-
-export interface IndexerStatsResource {
-  id: number;
-  indexers?: IndexerStatistics[] | null;
-  userAgents?: UserAgentStatistics[] | null;
-  hosts?: HostStatistics[] | null;
-}
+export type IndexerStatistics = components['schemas']['IndexerStatistics'];
+export type IndexerStatsResource = components['schemas']['IndexerStatsResource'];

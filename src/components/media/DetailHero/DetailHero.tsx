@@ -33,6 +33,7 @@ export type DetailHeroProps = {
   actionBarHeight?: number;
   onBack?: () => void;
   onShare?: () => void;
+  onMal?: () => void;
   isFetching?: boolean;
   children?: React.ReactNode;
 };
@@ -49,6 +50,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   actionBarHeight = 48,
   onBack,
   onShare,
+  onMal,
   isFetching,
   children,
 }) => {
@@ -162,6 +164,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
 
   const handleBack = () => onBack?.();
   const handleShare = () => onShare?.();
+  const handleMal = () => onMal?.();
 
   const heroUri = backdropUri;
 
@@ -224,6 +227,13 @@ const DetailHero: React.FC<DetailHeroProps> = ({
               accessibilityLabel="Share"
               onPress={handleShare}
             />
+            {onMal ? (
+              <IconButton
+                icon="web"
+                accessibilityLabel="View on MyAnimeList"
+                onPress={handleMal}
+              />
+            ) : null}
           </View>
         </Animated.View>
       </Animated.View>

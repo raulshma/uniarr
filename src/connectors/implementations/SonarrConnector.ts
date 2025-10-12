@@ -1,5 +1,5 @@
-import { BaseConnector } from '@/connectors/base/BaseConnector';
-import { logger } from '@/services/logger/LoggerService';
+import { BaseConnector } from "@/connectors/base/BaseConnector";
+import { logger } from "@/services/logger/LoggerService";
 import type {
   AddSeriesRequest,
   Episode,
@@ -10,91 +10,25 @@ import type {
   RootFolder,
   Series,
   Season,
-} from '@/models/media.types';
-import type { SearchOptions } from '@/connectors/base/IConnector';
-import { handleApiError } from '@/utils/error.utils';
+} from "@/models/media.types";
+import type { SearchOptions } from "@/connectors/base/IConnector";
+import { handleApiError } from "@/utils/error.utils";
+import type { components } from "@/connectors/client-schemas/sonarr-openapi";
 
-interface SonarrImage {
-  readonly coverType: 'poster' | 'fanart' | string;
-  readonly url?: string;
-  readonly remoteUrl?: string;
-}
-
-interface SonarrStatistics {
-  readonly seasonCount?: number;
-  readonly episodeCount?: number;
-  readonly episodeFileCount?: number;
-  readonly percentOfEpisodes?: number;
-}
-
-interface SonarrSeason {
-  readonly id?: number;
-  readonly seasonNumber: number;
-  readonly monitored: boolean;
-  readonly statistics?: SonarrStatistics;
-  readonly images?: SonarrImage[];
-}
-
-interface SonarrSeries {
-  readonly id: number;
-  readonly title: string;
-  readonly sortTitle?: string;
-  readonly year?: number;
-  readonly status: string;
-  readonly overview?: string;
-  readonly network?: string;
-  readonly genres?: string[];
-  readonly path?: string;
-  readonly qualityProfileId?: number;
-  readonly seasonFolder?: boolean;
-  readonly monitored: boolean;
-  readonly tvdbId?: number;
-  readonly imdbId?: string;
-  readonly tmdbId?: number;
-  readonly traktId?: number;
-  readonly cleanTitle?: string;
-  readonly titleSlug?: string;
-  readonly rootFolderPath?: string;
-  readonly tags?: number[];
-  readonly seasons?: SonarrSeason[];
-  readonly nextAiring?: string;
-  readonly previousAiring?: string;
-  readonly added?: string;
-  readonly images?: SonarrImage[];
-  readonly statistics?: SonarrStatistics;
-}
-
-interface SonarrEpisode {
-  readonly id: number;
-  readonly seriesId: number;
-  readonly episodeFileId?: number;
-  readonly seasonNumber: number;
-  readonly episodeNumber: number;
-  readonly title: string;
-  readonly overview?: string;
-  readonly airDate?: string;
-  readonly airDateUtc?: string;
-  readonly hasFile: boolean;
-  readonly monitored: boolean;
-  readonly absoluteEpisodeNumber?: number;
-  readonly runtime?: number;
-  readonly quality?: {
-    readonly quality?: {
-      readonly id: number;
-      readonly name: string;
-      readonly source?: string;
-      readonly resolution?: number;
-      readonly sort?: number;
-    };
-  };
-  readonly relativePath?: string;
-  readonly images?: SonarrImage[];
-  readonly series?: SonarrSeries;
-}
-
-interface SonarrSystemStatus {
-  readonly version?: string;
-}
+// Local aliases for the Sonarr OpenAPI-generated schemas. Using these aliases
+// keeps the rest of the file readable and allows us to change the underlying
+// source of truth without updating every usage site.
+type SonarrSeries = components["schemas"]["SeriesResource"];
+type SonarrEpisode = components["schemas"]["EpisodeResource"];
+type SonarrSystemStatus = components["schemas"]["SystemResource"];
+type SonarrQualityProfile = components["schemas"]["QualityProfileResource"];
+type SonarrQualityProfileItem =
+  components["schemas"]["QualityProfileQualityItemResource"];
+type SonarrQuality = components["schemas"]["Quality"];
+type SonarrRootFolder = components["schemas"]["RootFolderResource"];
+type SonarrQueueResponse = components["schemas"]["QueueResourcePagingResource"];
+type SonarrQueueRecord = components["schemas"]["QueueResource"];
+type SonarrTag = components["schemas"]["TagResource"];
 
 export interface SonarrQueueItem {
   readonly id: number;
@@ -114,64 +48,9 @@ export interface SonarrQueueItem {
   readonly timeleft?: string;
 }
 
-interface SonarrQueueSeries {
-  readonly id: number;
-  readonly title: string;
-}
-
-interface SonarrQueueEpisode {
-  readonly id: number;
-  readonly title: string;
-  readonly seasonNumber: number;
-  readonly episodeNumber: number;
-}
-
-interface SonarrQueueRecord {
-  readonly id: number;
-  readonly series: SonarrQueueSeries;
-  readonly episode?: SonarrQueueEpisode;
-  readonly status?: string;
-  readonly trackedDownloadState?: string;
-  readonly trackedDownloadStatus?: string;
-  readonly downloadId?: string;
-  readonly protocol?: string;
-  readonly size?: number;
-  readonly sizeleft?: number;
-  readonly timeleft?: string;
-}
-
-interface SonarrQueueResponse {
-  readonly records: SonarrQueueRecord[];
-}
-
-interface SonarrQualityItem {
-  readonly id: number;
-  readonly name: string;
-  readonly source?: string;
-  readonly resolution?: number;
-  readonly sort?: number;
-}
-
-interface SonarrQualityProfileItem {
-  readonly allowed: boolean;
-  readonly quality?: SonarrQualityItem;
-  readonly items?: SonarrQualityProfileItem[];
-  readonly name?: string;
-  readonly id?: number;
-}
-
-interface SonarrQualityProfile {
-  readonly id: number;
-  readonly name: string;
-  readonly upgradeAllowed?: boolean;
-  readonly cutoff: number;
-  readonly items: SonarrQualityProfileItem[];
-}
-
-interface SonarrTag {
-  readonly id: number;
-  readonly label: string;
-}
+// A number of small local helper interfaces were previously defined here to
+// model Sonarr API responses. We now prefer to use the generated OpenAPI
+// types (aliased above) to avoid drift and duplication.
 
 interface SonarrSeriesEditor {
   readonly seriesIds: number[];
@@ -191,40 +70,55 @@ interface SonarrRenameSeriesOptions {
   readonly renameFiles?: boolean;
 }
 
-interface SonarrRootFolder {
-  readonly id: number;
-  readonly path: string;
-  readonly accessible?: boolean;
-  readonly freeSpace?: number;
-}
+// SonarrRootFolder mapped via SonarrRootFolder alias above
 
 export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async initialize(): Promise<void> {
-    logger.debug('[SonarrConnector] Initializing', { serviceId: this.config.id });
+    logger.debug("[SonarrConnector] Initializing", {
+      serviceId: this.config.id,
+    });
     await this.getVersion();
-    logger.debug('[SonarrConnector] Initialization completed', { serviceId: this.config.id });
+    logger.debug("[SonarrConnector] Initialization completed", {
+      serviceId: this.config.id,
+    });
   }
 
   async getVersion(): Promise<string> {
     try {
       const fullUrl = `${this.config.url}/api/v3/system/status`;
-      logger.debug('[SonarrConnector] Getting version', { serviceId: this.config.id, url: fullUrl });
+      logger.debug("[SonarrConnector] Getting version", {
+        serviceId: this.config.id,
+        url: fullUrl,
+      });
 
-      logger.debug('[SonarrConnector] Config details', {
+      logger.debug("[SonarrConnector] Config details", {
         serviceId: this.config.id,
         url: this.config.url,
-        apiKey: this.config.apiKey ? '***' : 'missing',
+        apiKey: this.config.apiKey ? "***" : "missing",
         timeout: this.config.timeout,
       });
 
-      const response = await this.client.get<SonarrSystemStatus>('/api/v3/system/status');
-      const version = response.data.version ?? 'unknown';
-      logger.debug('[SonarrConnector] Version retrieved', { serviceId: this.config.id, version, status: response.status });
+      const response = await this.client.get<
+        components["schemas"]["SystemResource"]
+      >("/api/v3/system/status");
+      const version = response.data.version ?? "unknown";
+      logger.debug("[SonarrConnector] Version retrieved", {
+        serviceId: this.config.id,
+        version,
+        status: response.status,
+      });
       return version;
     } catch (error) {
-      logger.error('[SonarrConnector] Version request failed', { serviceId: this.config.id, error });
-      const axiosError = error as any;
-      logger.debug('[SonarrConnector] Error details', {
+      logger.error("[SonarrConnector] Version request failed", {
+        serviceId: this.config.id,
+        error,
+      });
+      const axiosError = error as unknown as {
+        message?: string;
+        code?: string;
+        response?: { status?: number; statusText?: string };
+      };
+      logger.debug("[SonarrConnector] Error details", {
         serviceId: this.config.id,
         message: axiosError?.message,
         code: axiosError?.code,
@@ -233,29 +127,38 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       });
 
       // Check for network connectivity issues and log at debug level
-      if (axiosError?.code === 'ECONNREFUSED' || axiosError?.code === 'ENOTFOUND' || axiosError?.code === 'ETIMEDOUT') {
-        logger.debug('[SonarrConnector] Network connectivity issue detected', { serviceId: this.config.id, code: axiosError.code });
+      if (
+        axiosError?.code === "ECONNREFUSED" ||
+        axiosError?.code === "ENOTFOUND" ||
+        axiosError?.code === "ETIMEDOUT"
+      ) {
+        logger.debug("[SonarrConnector] Network connectivity issue detected", {
+          serviceId: this.config.id,
+          code: axiosError.code,
+        });
       }
 
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getVersion',
-        endpoint: '/api/v3/system/status',
+        operation: "getVersion",
+        endpoint: "/api/v3/system/status",
       });
     }
   }
 
   async getSeries(): Promise<Series[]> {
     try {
-      const response = await this.client.get<SonarrSeries[]>('/api/v3/series');
-      return response.data.map((item: SonarrSeries) => this.mapSeries(item));
+      const response = await this.client.get<
+        components["schemas"]["SeriesResource"][]
+      >("/api/v3/series");
+      return response.data.map((item) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getSeries',
-        endpoint: '/api/v3/series',
+        operation: "getSeries",
+        endpoint: "/api/v3/series",
       });
     }
   }
@@ -268,17 +171,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         Object.assign(params, options.filters);
       }
 
-      const response = await this.client.get<SonarrSeries[]>('/api/v3/series/lookup', {
+      const response = await this.client.get<
+        components["schemas"]["SeriesResource"][]
+      >("/api/v3/series/lookup", {
         params,
       });
 
-      return response.data.map((item: SonarrSeries) => this.mapSeries(item));
+      return response.data.map((item) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'search',
-        endpoint: '/api/v3/series/lookup',
+        operation: "search",
+        endpoint: "/api/v3/series/lookup",
       });
     }
   }
@@ -286,16 +191,25 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getById(id: number): Promise<Series> {
     try {
       const [seriesResponse, episodesResponse] = await Promise.all([
-        this.client.get<SonarrSeries>(`/api/v3/series/${id}`, {
-          params: { includeSeasonImages: true },
-        }),
-        this.client.get<SonarrEpisode[]>(`/api/v3/episode`, {
-          params: { seriesId: id, includeImages: true },
-        }),
+        this.client.get<components["schemas"]["SeriesResource"]>(
+          `/api/v3/series/${id}`,
+          {
+            params: { includeSeasonImages: true },
+          }
+        ),
+        this.client.get<components["schemas"]["EpisodeResource"][]>(
+          `/api/v3/episode`,
+          {
+            params: { seriesId: id, includeImages: true },
+          }
+        ),
       ]);
 
       const series = this.mapSeries(seriesResponse.data);
-      const episodesBySeason = this.groupEpisodesBySeason(episodesResponse.data, seriesResponse.data.id);
+      const episodesBySeason = this.groupEpisodesBySeason(
+        episodesResponse.data,
+        series.id
+      );
 
       const seasons: Season[] | undefined = series.seasons?.map((season) => ({
         ...season,
@@ -310,7 +224,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getById',
+        operation: "getById",
         endpoint: `/api/v3/series/${id}`,
       });
     }
@@ -319,37 +233,39 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async add(request: AddSeriesRequest): Promise<Series> {
     try {
       const payload = this.buildAddPayload(request);
-      const response = await this.client.post<SonarrSeries>('/api/v3/series', payload);
+      const response = await this.client.post<
+        components["schemas"]["SeriesResource"]
+      >("/api/v3/series", payload);
       return this.mapSeries(response.data);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'add',
-        endpoint: '/api/v3/series',
+        operation: "add",
+        endpoint: "/api/v3/series",
       });
     }
   }
 
   async triggerSearch(seriesId: number): Promise<void> {
     try {
-      await this.client.post('/api/v3/command', {
-        name: 'SeriesSearch',
+      await this.client.post("/api/v3/command", {
+        name: "SeriesSearch",
         seriesId,
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'triggerSearch',
-        endpoint: '/api/v3/command',
+        operation: "triggerSearch",
+        endpoint: "/api/v3/command",
       });
     }
   }
 
   async setMonitored(seriesId: number, monitored: boolean): Promise<void> {
     try {
-      await this.client.post('/api/v3/series/monitor', {
+      await this.client.post("/api/v3/series/monitor", {
         seriesIds: [seriesId],
         monitored,
       });
@@ -357,15 +273,15 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'setMonitored',
-        endpoint: '/api/v3/series/monitor',
+        operation: "setMonitored",
+        endpoint: "/api/v3/series/monitor",
       });
     }
   }
 
   async deleteSeries(
     seriesId: number,
-    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
+    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {}
   ): Promise<void> {
     try {
       const params = {
@@ -380,7 +296,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'deleteSeries',
+        operation: "deleteSeries",
         endpoint: `/api/v3/series/${seriesId}`,
       });
     }
@@ -388,16 +304,23 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async updateSeries(
     seriesId: number,
-    updates: Partial<Omit<SonarrSeries, 'id' | 'seasons' | 'statistics'>>
+    updates: Partial<
+      Omit<
+        components["schemas"]["SeriesResource"],
+        "id" | "seasons" | "statistics"
+      >
+    >
   ): Promise<Series> {
     try {
-      const response = await this.client.put<SonarrSeries>(`/api/v3/series/${seriesId}`, updates);
+      const response = await this.client.put<
+        components["schemas"]["SeriesResource"]
+      >(`/api/v3/series/${seriesId}`, updates);
       return this.mapSeries(response.data);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'updateSeries',
+        operation: "updateSeries",
         endpoint: `/api/v3/series/${seriesId}`,
       });
     }
@@ -405,105 +328,116 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async refreshSeries(seriesId: number): Promise<void> {
     try {
-      await this.client.post('/api/v3/command', {
-        name: 'SeriesRefresh',
+      await this.client.post("/api/v3/command", {
+        name: "SeriesRefresh",
         seriesId,
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'refreshSeries',
-        endpoint: '/api/v3/command',
+        operation: "refreshSeries",
+        endpoint: "/api/v3/command",
       });
     }
   }
 
   async rescanSeries(seriesId: number): Promise<void> {
     try {
-      await this.client.post('/api/v3/command', {
-        name: 'SeriesRescan',
+      await this.client.post("/api/v3/command", {
+        name: "SeriesRescan",
         seriesId,
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'rescanSeries',
-        endpoint: '/api/v3/command',
+        operation: "rescanSeries",
+        endpoint: "/api/v3/command",
       });
     }
   }
 
   async moveSeries(options: SonarrMoveSeriesOptions): Promise<void> {
     try {
-      await this.client.post('/api/v3/command', {
-        name: 'SeriesMove',
+      await this.client.post("/api/v3/command", {
+        name: "SeriesMove",
         ...options,
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'moveSeries',
-        endpoint: '/api/v3/command',
+        operation: "moveSeries",
+        endpoint: "/api/v3/command",
       });
     }
   }
 
   async renameSeries(options: SonarrRenameSeriesOptions): Promise<void> {
     try {
-      await this.client.post('/api/v3/command', {
-        name: 'SeriesRename',
+      await this.client.post("/api/v3/command", {
+        name: "SeriesRename",
         ...options,
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'renameSeries',
-        endpoint: '/api/v3/command',
+        operation: "renameSeries",
+        endpoint: "/api/v3/command",
       });
     }
   }
 
-  async getTags(): Promise<SonarrTag[]> {
+  async getTags(): Promise<components["schemas"]["TagResource"][]> {
     try {
-      const response = await this.client.get<SonarrTag[]>('/api/v3/tag');
+      const response = await this.client.get<
+        components["schemas"]["TagResource"][]
+      >("/api/v3/tag");
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getTags',
-        endpoint: '/api/v3/tag',
+        operation: "getTags",
+        endpoint: "/api/v3/tag",
       });
     }
   }
 
-  async createTag(label: string): Promise<SonarrTag> {
+  async createTag(
+    label: string
+  ): Promise<components["schemas"]["TagResource"]> {
     try {
-      const response = await this.client.post<SonarrTag>('/api/v3/tag', { label });
+      const response = await this.client.post<
+        components["schemas"]["TagResource"]
+      >("/api/v3/tag", { label });
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'createTag',
-        endpoint: '/api/v3/tag',
+        operation: "createTag",
+        endpoint: "/api/v3/tag",
       });
     }
   }
 
-  async updateTag(tagId: number, label: string): Promise<SonarrTag> {
+  async updateTag(
+    tagId: number,
+    label: string
+  ): Promise<components["schemas"]["TagResource"]> {
     try {
-      const response = await this.client.put<SonarrTag>(`/api/v3/tag/${tagId}`, { id: tagId, label });
+      const response = await this.client.put<
+        components["schemas"]["TagResource"]
+      >(`/api/v3/tag/${tagId}`, { id: tagId, label });
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'updateTag',
+        operation: "updateTag",
         endpoint: `/api/v3/tag/${tagId}`,
       });
     }
@@ -516,7 +450,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'deleteTag',
+        operation: "deleteTag",
         endpoint: `/api/v3/tag/${tagId}`,
       });
     }
@@ -524,44 +458,58 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async bulkUpdateSeries(editor: SonarrSeriesEditor): Promise<void> {
     try {
-      await this.client.put('/api/v3/series/editor', editor);
+      await this.client.put("/api/v3/series/editor", editor);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'bulkUpdateSeries',
-        endpoint: '/api/v3/series/editor',
+        operation: "bulkUpdateSeries",
+        endpoint: "/api/v3/series/editor",
       });
     }
   }
 
   async getQualityProfiles(): Promise<QualityProfile[]> {
-    const candidateEndpoints = ['/api/v3/qualityprofile', '/api/v3/qualityProfile', '/api/v3/qualityProfiles'];
+    const candidateEndpoints = [
+      "/api/v3/qualityprofile",
+      "/api/v3/qualityProfile",
+      "/api/v3/qualityProfiles",
+    ];
 
     for (const endpoint of candidateEndpoints) {
       try {
         // Attempt endpoint variant
-        const response = await this.client.get<SonarrQualityProfile[]>(endpoint);
-        
+        const response = await this.client.get<
+          components["schemas"]["QualityProfileResource"][]
+        >(endpoint);
+
         // Check if response contains an error
-        if (response.data && typeof response.data === 'object' && !Array.isArray(response.data) && 'error' in response.data) {
-          throw new Error((response.data as any).error as string);
+        if (
+          response.data &&
+          typeof response.data === "object" &&
+          !Array.isArray(response.data) &&
+          "error" in response.data
+        ) {
+          const errObj = response.data as unknown as { error?: string };
+          throw new Error(errObj.error ?? "Unknown error");
         }
-        
-        return response.data.map((profile: SonarrQualityProfile) => this.mapQualityProfile(profile));
+
+        return response.data.map((profile) => this.mapQualityProfile(profile));
       } catch (error) {
         // If this endpoint returned a 404, try the next candidate.
-        const axiosError = error as any;
+        const axiosError = error as unknown as {
+          response?: { status?: number };
+        };
         const status = axiosError?.response?.status;
         // Only continue trying on 404; for other errors, fail-fast and report diagnostics
         if (status !== 404) {
           const enhancedError = new Error(
-            'Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.'
+            "Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again."
           );
           throw handleApiError(enhancedError, {
             serviceId: this.config.id,
             serviceType: this.config.type,
-            operation: 'getQualityProfiles',
+            operation: "getQualityProfiles",
             endpoint,
           });
         }
@@ -570,31 +518,37 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
 
     const enhancedError = new Error(
-      'Failed to load quality profiles. Tried several Sonarr endpoints but none responded. This may be due to API changes or server configuration.'
+      "Failed to load quality profiles. Tried several Sonarr endpoints but none responded. This may be due to API changes or server configuration."
     );
     throw handleApiError(enhancedError, {
       serviceId: this.config.id,
       serviceType: this.config.type,
-      operation: 'getQualityProfiles',
-      endpoint: candidateEndpoints.join(' | '),
+      operation: "getQualityProfiles",
+      endpoint: candidateEndpoints.join(" | "),
     });
   }
 
   async getRootFolders(): Promise<RootFolder[]> {
     try {
-      const response = await this.client.get<SonarrRootFolder[]>('/api/v3/rootfolder');
-      return response.data.map((folder: SonarrRootFolder) => this.mapRootFolder(folder));
+      const response = await this.client.get<
+        components["schemas"]["RootFolderResource"][]
+      >("/api/v3/rootfolder");
+      return response.data.map((folder) => this.mapRootFolder(folder));
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getRootFolders',
-        endpoint: '/api/v3/rootfolder',
+        operation: "getRootFolders",
+        endpoint: "/api/v3/rootfolder",
       });
     }
   }
 
-  async getCalendar(start?: string, end?: string, unmonitored?: boolean): Promise<SonarrEpisode[]> {
+  async getCalendar(
+    start?: string,
+    end?: string,
+    unmonitored?: boolean
+  ): Promise<SonarrEpisode[]> {
     try {
       const params: Record<string, unknown> = {
         includeSeries: true,
@@ -603,35 +557,44 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       if (end) params.end = end;
       if (unmonitored !== undefined) params.unmonitored = unmonitored;
 
-      const response = await this.client.get<SonarrEpisode[]>('/api/v3/calendar', { params });
-      return response.data;
+      const response = await this.client.get<
+        components["schemas"]["EpisodeResource"][]
+      >("/api/v3/calendar", { params });
+      return response.data ?? [];
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getCalendar',
-        endpoint: '/api/v3/calendar',
+        operation: "getCalendar",
+        endpoint: "/api/v3/calendar",
       });
     }
   }
 
   async getQueue(): Promise<SonarrQueueItem[]> {
     try {
-      const response = await this.client.get<SonarrQueueResponse>('/api/v3/queue');
-      return (response.data.records ?? []).map((record: SonarrQueueRecord) => this.mapQueueRecord(record));
+      const response = await this.client.get<
+        components["schemas"]["QueueResourcePagingResource"]
+      >("/api/v3/queue");
+      return (response.data.records ?? []).map((record) =>
+        this.mapQueueRecord(record)
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getQueue',
-        endpoint: '/api/v3/queue',
+        operation: "getQueue",
+        endpoint: "/api/v3/queue",
       });
     }
   }
 
   private buildAddPayload(request: AddSeriesRequest): Record<string, unknown> {
     const addOptions = {
-      searchForMissingEpisodes: request.searchNow ?? request.addOptions?.searchForMissingEpisodes ?? false,
+      searchForMissingEpisodes:
+        request.searchNow ??
+        request.addOptions?.searchForMissingEpisodes ??
+        false,
       monitor: request.addOptions?.monitor,
     };
 
@@ -645,41 +608,43 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       rootFolderPath: request.rootFolderPath,
       seasonFolder: request.seasonFolder ?? true,
       monitored: request.monitored ?? true,
-      seriesType: request.seriesType ?? 'standard',
+      seriesType: request.seriesType ?? "standard",
       tags: request.tags,
       addOptions,
     };
   }
 
-  private mapSeries(data: SonarrSeries): Series {
-    const posterUrl = this.findImageUrl(data.images, 'poster');
-    const backdropUrl = this.findImageUrl(data.images, 'fanart');
+  private mapSeries(data: components["schemas"]["SeriesResource"]): Series {
+    const posterUrl = this.findImageUrl(data.images ?? undefined, "poster");
+    const backdropUrl = this.findImageUrl(data.images ?? undefined, "fanart");
 
     return {
-      id: data.id,
-      title: data.title,
-      sortTitle: data.sortTitle,
-      year: data.year,
-      status: data.status,
-      overview: data.overview,
-      network: data.network,
-      genres: data.genres,
-      path: data.path,
-      qualityProfileId: data.qualityProfileId,
-      seasonFolder: data.seasonFolder,
-      monitored: data.monitored,
-      tvdbId: data.tvdbId,
-      imdbId: data.imdbId,
-      tmdbId: data.tmdbId,
-      traktId: data.traktId,
-      cleanTitle: data.cleanTitle,
-      titleSlug: data.titleSlug,
-      rootFolderPath: data.rootFolderPath,
-      tags: data.tags,
-      seasons: data.seasons?.map((season) => this.mapSeason(season, data.id)),
-      nextAiring: data.nextAiring,
-      previousAiring: data.previousAiring,
-      added: data.added,
+      id: data.id ?? 0,
+      title: data.title ?? "",
+      sortTitle: data.sortTitle ?? undefined,
+      year: data.year ?? undefined,
+      status: (data.status as unknown as string) ?? "unknown",
+      overview: data.overview ?? undefined,
+      network: data.network ?? undefined,
+      genres: data.genres ?? undefined,
+      path: data.path ?? undefined,
+      qualityProfileId: data.qualityProfileId ?? undefined,
+      seasonFolder: data.seasonFolder ?? undefined,
+      monitored: Boolean(data.monitored),
+      tvdbId: data.tvdbId ?? undefined,
+      imdbId: data.imdbId ?? undefined,
+      tmdbId: data.tmdbId ?? undefined,
+      traktId: (data as unknown as { traktId?: number })?.traktId ?? undefined,
+      cleanTitle: data.cleanTitle ?? undefined,
+      titleSlug: data.titleSlug ?? undefined,
+      rootFolderPath: data.rootFolderPath ?? undefined,
+      tags: data.tags ?? undefined,
+      seasons: data.seasons?.map((season) =>
+        this.mapSeason(season, data.id ?? undefined)
+      ),
+      nextAiring: data.nextAiring ?? undefined,
+      previousAiring: data.previousAiring ?? undefined,
+      added: data.added ?? undefined,
       posterUrl,
       backdropUrl,
       statistics: this.mapStatistics(data.statistics),
@@ -688,19 +653,30 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     };
   }
 
-  private mapSeason(season: SonarrSeason, seriesId?: number): Season {
-    const posterUrl = this.findImageUrl(season.images, 'poster') ?? (seriesId ? this.buildSeasonPosterUrl(seriesId, season.seasonNumber) : undefined);
+  private mapSeason(
+    season: components["schemas"]["SeasonResource"],
+    seriesId?: number
+  ): Season {
+    const posterUrl =
+      this.findImageUrl(season.images ?? undefined, "poster") ??
+      (seriesId && (season.seasonNumber ?? undefined)
+        ? this.buildSeasonPosterUrl(seriesId, season.seasonNumber ?? 0)
+        : undefined);
 
     return {
-      id: season.id,
-      seasonNumber: season.seasonNumber,
-      monitored: season.monitored,
+      id: undefined,
+      seasonNumber: season.seasonNumber ?? 0,
+      monitored: Boolean(season.monitored),
       statistics: this.mapStatistics(season.statistics),
       posterUrl,
     };
   }
 
-  private mapStatistics(statistics?: SonarrStatistics): MediaStatistics | undefined {
+  private mapStatistics(
+    statistics?:
+      | components["schemas"]["SeasonStatisticsResource"]
+      | components["schemas"]["SeriesStatisticsResource"]
+  ): MediaStatistics | undefined {
     if (!statistics) {
       return undefined;
     }
@@ -712,56 +688,86 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     };
   }
 
-  private mapEpisode(episode: SonarrEpisode, seriesId?: number): Episode {
+  private mapEpisode(
+    episode: components["schemas"]["EpisodeResource"],
+    seriesId?: number
+  ): Episode {
     // Try to get poster from images array first (if available in API response)
     // Try screenshot first as it's more commonly available for episodes
-    const posterUrl = this.findImageUrl(episode.images, 'screenshot') 
-      ?? this.findImageUrl(episode.images, 'poster')
-      ?? (seriesId ? this.buildEpisodePosterUrl(seriesId, episode.id) : undefined);
+    const posterUrl =
+      this.findImageUrl(episode.images ?? undefined, "screenshot") ??
+      this.findImageUrl(episode.images ?? undefined, "poster") ??
+      (seriesId && episode.id
+        ? this.buildEpisodePosterUrl(seriesId, episode.id)
+        : undefined);
 
     return {
-      id: episode.id,
-      title: episode.title,
-      overview: episode.overview,
-      seasonNumber: episode.seasonNumber,
-      episodeNumber: episode.episodeNumber,
-      absoluteEpisodeNumber: episode.absoluteEpisodeNumber,
-      airDate: episode.airDate,
-      airDateUtc: episode.airDateUtc,
-      runtime: episode.runtime,
-      monitored: episode.monitored,
-      hasFile: episode.hasFile,
-      episodeFileId: episode.episodeFileId,
-      quality: episode.quality?.quality ? this.mapQualityResource(episode.quality.quality) : undefined,
-      relativePath: episode.relativePath,
+      id: episode.id ?? 0,
+      title: episode.title ?? "",
+      overview: episode.overview ?? undefined,
+      seasonNumber: episode.seasonNumber ?? 0,
+      episodeNumber: episode.episodeNumber ?? 0,
+      absoluteEpisodeNumber: episode.absoluteEpisodeNumber ?? undefined,
+      airDate: episode.airDate ?? undefined,
+      airDateUtc: episode.airDateUtc ?? undefined,
+      runtime: episode.runtime ?? undefined,
+      monitored: Boolean(episode.monitored),
+      hasFile: Boolean(episode.hasFile),
+      episodeFileId: episode.episodeFileId ?? undefined,
+      quality: (episode as unknown as { quality?: { quality?: SonarrQuality } })
+        ?.quality?.quality
+        ? this.mapQualityResource(
+            (episode as unknown as { quality?: { quality?: SonarrQuality } })
+              .quality!.quality!
+          )
+        : undefined,
+      relativePath:
+        (episode as unknown as { relativePath?: string })?.relativePath ??
+        undefined,
       posterUrl,
     };
   }
 
-  private groupEpisodesBySeason(episodes: SonarrEpisode[], seriesId: number): Map<number, Episode[]> {
+  private groupEpisodesBySeason(
+    episodes: components["schemas"]["EpisodeResource"][],
+    seriesId: number
+  ): Map<number, Episode[]> {
     return episodes.reduce((accumulator, episode) => {
-      const collection = accumulator.get(episode.seasonNumber) ?? [];
+      const seasonNum = episode.seasonNumber ?? 0;
+      const collection = accumulator.get(seasonNum) ?? [];
       collection.push(this.mapEpisode(episode, seriesId));
-      accumulator.set(episode.seasonNumber, collection);
+      accumulator.set(seasonNum, collection);
       return accumulator;
     }, new Map<number, Episode[]>());
   }
 
-  private findImageUrl(images: SonarrImage[] | undefined, type: SonarrImage['coverType']): string | undefined {
-    return images?.find((image) => image.coverType === type)?.remoteUrl ?? undefined;
+  private findImageUrl(
+    images: components["schemas"]["MediaCover"][] | null | undefined,
+    type: string
+  ): string | undefined {
+    return (
+      images?.find((image) => image.coverType === type)?.remoteUrl ?? undefined
+    );
   }
 
   private buildSeasonPosterUrl(seriesId: number, seasonNumber: number): string {
     try {
-      const url = new URL(`/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg`, this.config.url);
+      const url = new URL(
+        `/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg`,
+        this.config.url
+      );
       if (this.config.apiKey) {
-        url.searchParams.set('apikey', this.config.apiKey);
+        url.searchParams.set("apikey", this.config.apiKey);
       }
       return url.toString();
     } catch (_e) {
       // Fallback to string concat if URL construction fails for any reason
-      return `${this.config.url}/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg${
-        this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
+      return `${
+        this.config.url
+      }/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg${
+        this.config.apiKey
+          ? `?apikey=${encodeURIComponent(this.config.apiKey)}`
+          : ""
       }`;
     }
   }
@@ -772,111 +778,143 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       // Use 'screenshot' as the image type for episodes (most common)
       const url = new URL(
         `/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
-        this.config.url,
+        this.config.url
       );
       if (this.config.apiKey) {
-        url.searchParams.set('apikey', this.config.apiKey);
+        url.searchParams.set("apikey", this.config.apiKey);
       }
       return url.toString();
     } catch (_e) {
-      return `${this.config.url}/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg${
-        this.config.apiKey ? `?apikey=${encodeURIComponent(this.config.apiKey)}` : ''
+      return `${
+        this.config.url
+      }/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg${
+        this.config.apiKey
+          ? `?apikey=${encodeURIComponent(this.config.apiKey)}`
+          : ""
       }`;
     }
   }
 
-  private mapQueueRecord(record: SonarrQueueRecord): SonarrQueueItem {
+  private mapQueueRecord(
+    record: components["schemas"]["QueueResource"]
+  ): SonarrQueueItem {
     return {
-      id: record.id,
-      seriesId: record.series.id,
-      seriesTitle: record.series.title,
+      id: record.id ?? 0,
+      seriesId: record.series?.id ?? 0,
+      seriesTitle: record.series?.title ?? undefined,
       episodeId: record.episode?.id,
-      episodeTitle: record.episode?.title,
-      seasonNumber: record.episode?.seasonNumber,
+      episodeTitle: record.episode?.title ?? undefined,
+      seasonNumber: record.seasonNumber ?? record.episode?.seasonNumber,
       episodeNumber: record.episode?.episodeNumber,
-      status: record.status,
-      trackedDownloadState: record.trackedDownloadState,
-      trackedDownloadStatus: record.trackedDownloadStatus,
-      downloadId: record.downloadId,
-      protocol: record.protocol,
-      size: record.size,
-      sizeleft: record.sizeleft,
-      timeleft: record.timeleft,
+      status: record.status as unknown as string,
+      trackedDownloadState: record.trackedDownloadState as unknown as string,
+      trackedDownloadStatus: record.trackedDownloadStatus as unknown as string,
+      downloadId: record.downloadId ?? undefined,
+      protocol: record.protocol as unknown as string | undefined,
+      size: record.size as unknown as number | undefined,
+      sizeleft: record.sizeleft as unknown as number | undefined,
+      timeleft: record.timeleft ?? undefined,
     };
   }
 
-  private mapQualityProfile(profile: SonarrQualityProfile): QualityProfile {
+  private mapQualityProfile(
+    profile: components["schemas"]["QualityProfileResource"]
+  ): QualityProfile {
     return {
-      id: profile.id,
-      name: profile.name,
-      upgradeAllowed: profile.upgradeAllowed,
-      cutoff: this.findQualityById(profile.items, profile.cutoff),
-      items: profile.items.map((item) => this.mapQualityProfileItem(item)),
+      id: profile.id ?? 0,
+      name: profile.name ?? "",
+      upgradeAllowed: profile.upgradeAllowed ?? false,
+      cutoff: this.findQualityById(profile.items ?? [], profile.cutoff ?? 0),
+      items: (profile.items ?? []).map((item) =>
+        this.mapQualityProfileItem(item)
+      ),
     };
   }
 
-  private findQualityById(items: SonarrQualityProfileItem[], qualityId: number): Quality {
+  private findQualityById(
+    items: components["schemas"]["QualityProfileQualityItemResource"][] = [],
+    qualityId: number
+  ): Quality {
     // Flatten all qualities from the nested structure
-    const allQualities: SonarrQualityItem[] = [];
-    
-    const processItem = (item: SonarrQualityProfileItem) => {
+    const allQualities: components["schemas"]["Quality"][] = [];
+
+    const processItem = (
+      item: components["schemas"]["QualityProfileQualityItemResource"]
+    ) => {
       if (item.quality) {
         allQualities.push(item.quality);
       }
       if (item.items) {
-        item.items.forEach(processItem);
+        (item.items ?? []).forEach(processItem);
       }
     };
-    
+
     items.forEach(processItem);
-    
-    const found = allQualities.find(q => q.id === qualityId);
+
+    const found = allQualities.find((q) => (q.id ?? 0) === qualityId);
     if (found) {
       return this.mapQualityResource(found);
     }
-    
+
     // Fallback: create a minimal quality object if not found
     return {
       id: qualityId,
       name: `Quality ${qualityId}`,
-      source: 'unknown',
+      source: "unknown",
       resolution: 0,
       sort: 0,
     };
   }
 
-  private mapQualityProfileItem(item: SonarrQualityProfileItem): QualityProfileItem {
+  private mapQualityProfileItem(
+    item: components["schemas"]["QualityProfileQualityItemResource"]
+  ): QualityProfileItem {
     // For groups, we need to handle differently, but for now, if no quality, use a placeholder
-    const quality = item.quality || {
-      id: item.id || 0,
-      name: item.name || 'Unknown',
-      source: 'unknown',
-      resolution: 0,
-      sort: 0,
-    };
-    
+    const quality =
+      (item.quality as components["schemas"]["Quality"] | undefined) ??
+      (item as unknown as { quality?: components["schemas"]["Quality"] })
+        ?.quality ??
+      ({
+        id: item.id || 0,
+        name: item.name || "Unknown",
+        source: "unknown",
+        resolution: 0,
+        sort: 0,
+      } as components["schemas"]["Quality"]);
+
     return {
-      allowed: item.allowed,
+      allowed: Boolean(item.allowed),
       quality: this.mapQualityResource(quality),
     };
   }
+  private mapQualityResource(
+    resource:
+      | components["schemas"]["QualityModel"]
+      | components["schemas"]["Quality"]
+  ): Quality {
+    const maybe = resource as unknown;
+    const qualityObj: components["schemas"]["Quality"] =
+      ((maybe as { quality?: components["schemas"]["Quality"] })?.quality as
+        | components["schemas"]["Quality"]
+        | undefined) ?? (maybe as components["schemas"]["Quality"]);
 
-  private mapQualityResource(resource: SonarrQualityItem): Quality {
     return {
-      id: resource.id,
-      name: resource.name,
-      source: resource.source,
-      resolution: resource.resolution,
-      sort: resource.sort,
+      id: qualityObj?.id ?? 0,
+      name: qualityObj?.name ?? "Unknown",
+      source: qualityObj?.source ?? undefined,
+      resolution: qualityObj?.resolution ?? 0,
+      sort: (qualityObj as unknown as { sort?: number })?.sort ?? 0,
     };
   }
 
-  private mapRootFolder(folder: SonarrRootFolder): RootFolder {
+  private mapRootFolder(
+    folder: components["schemas"]["RootFolderResource"]
+  ): RootFolder {
     return {
-      id: folder.id,
-      path: folder.path,
-      accessible: folder.accessible,
-      freeSpace: folder.freeSpace,
+      id: folder.id ?? 0,
+      path: folder.path ?? "",
+      accessible: folder.accessible ?? undefined,
+      freeSpace: folder.freeSpace ?? undefined,
     };
   }
 }
