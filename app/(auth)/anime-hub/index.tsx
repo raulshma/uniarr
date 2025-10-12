@@ -10,6 +10,7 @@ import {
 import { Text, useTheme, ActivityIndicator, IconButton, Searchbar, Chip } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { strings } from '@/constants/strings';
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useAnimeDiscover } from "@/hooks/useAnimeDiscover";
@@ -66,6 +67,7 @@ const AnimeHubScreen: React.FC = () => {
 
   // Jikan (MyAnimeList) Discover data — public API, does not require a configured service
   const jikan = useJikanDiscover();
+
 
   const handleCardPress = useCallback(
     (item: JellyseerrSearchResult) => {
@@ -306,12 +308,14 @@ const AnimeHubScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Anime Hub</Text>
-          <IconButton
-            icon="dots-vertical"
-            size={24}
-            onPress={() => {}}
-            style={styles.menuButton}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <IconButton
+              icon="dots-vertical"
+              size={24}
+              onPress={() => {}}
+              style={styles.menuButton}
+            />
+          </View>
         </View>
 
         {/* Search Bar */}

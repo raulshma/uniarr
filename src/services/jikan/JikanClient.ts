@@ -27,6 +27,10 @@ class TokenBucket {
   private lastRefill: number;
   private capacity: number;
   private refillRate: number; // tokens per millisecond
+  // Callback to notify when a caller is waiting due to rate limits
+  private onWaiting?: (waiting: boolean) => void;
+  // Track whether we are currently waiting
+  private waiting = false;
 
   constructor(capacity: number, refillRate: number) {
     this.capacity = capacity;
@@ -51,8 +55,18 @@ class TokenBucket {
 
         if (this.tokens >= tokens) {
           this.tokens -= tokens;
+          // If we were waiting, notify that waiting has ended
+          if (this.waiting) {
+            this.waiting = false;
+            this.onWaiting?.(false);
+          }
           resolve();
         } else {
+          // Notify that we're waiting due to rate limiting
+          if (!this.waiting) {
+            this.waiting = true;
+            this.onWaiting?.(true);
+          }
           // Wait and try again
           setTimeout(tryAcquire, 100);
         }
@@ -60,6 +74,10 @@ class TokenBucket {
 
       tryAcquire();
     });
+  }
+
+  setWaitingCallback(cb?: (waiting: boolean) => void) {
+    this.onWaiting = cb;
   }
 }
 
@@ -142,6 +160,45 @@ async function makeRequest<T>(requestFn: () => Promise<T>, retries = 0): Promise
     throw error;
   }
 }
+
+// Throttle/subscription helpers — track whether any token bucket currently has waiting callers
+let _isThrottled = false;
+const throttleSubscribers = new Set<(v: boolean) => void>();
+
+function setThrottled(v: boolean) {
+  if (_isThrottled === v) return;
+  _isThrottled = v;
+  throttleSubscribers.forEach((s) => {
+    try {
+      s(v);
+    } catch {}
+  });
+}
+
+export function isJikanThrottled() {
+  return _isThrottled;
+}
+
+export function subscribeJikanThrottle(cb: (v: boolean) => void) {
+  throttleSubscribers.add(cb);
+  return () => {
+    throttleSubscribers.delete(cb);
+  };
+}
+
+// External flags to avoid touching private fields on the TokenBucket instances
+let _secondWaiting = false;
+let _minuteWaiting = false;
+
+secondBucket.setWaitingCallback((w) => {
+  _secondWaiting = w;
+  setThrottled(_secondWaiting || _minuteWaiting);
+});
+
+minuteBucket.setWaitingCallback((w) => {
+  _minuteWaiting = w;
+  setThrottled(_secondWaiting || _minuteWaiting);
+});
 
 export const JikanClient = {
   async getTopAnime(page = 1, filter?: JikanTopAnimeQuery["filter"]) {
