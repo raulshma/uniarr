@@ -28,7 +28,7 @@ const useWarmUpBrowser = () => {
 WebBrowser.maybeCompleteAuthSession();
 
 const LoginScreen = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, continueAsGuest } = useAuth();
   const { isLoaded, signIn, setActive } = useSignIn();
   const { startSSOFlow } = useSSO();
   const router = useRouter();
@@ -123,6 +123,9 @@ const LoginScreen = () => {
         signUpText: {
           marginLeft: spacing.xs,
           color: theme.colors.primary,
+        },
+        guestButton: {
+          marginTop: spacing.md,
         },
       }),
     [theme],
@@ -281,6 +284,10 @@ const LoginScreen = () => {
     router.push('/(public)/signup');
   }, [router]);
 
+  const handleContinueAsGuest = useCallback(() => {
+    continueAsGuest();
+  }, [continueAsGuest]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -384,6 +391,15 @@ const LoginScreen = () => {
                 Facebook
               </Button>
             </View>
+            <Button
+              mode="text"
+              onPress={handleContinueAsGuest}
+              disabled={isSubmitting}
+              accessibilityRole="button"
+              style={styles.guestButton}
+            >
+              Continue as Guest
+            </Button>
           </View>
         </View>
 

@@ -27,7 +27,7 @@ const useWarmUpBrowser = () => {
 WebBrowser.maybeCompleteAuthSession();
 
 const SignupScreen = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, continueAsGuest } = useAuth();
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
   const theme = useTheme<AppTheme>();
@@ -124,6 +124,9 @@ const SignupScreen = () => {
         verificationText: {
           textAlign: 'center',
           marginBottom: spacing.md,
+        },
+        guestButton: {
+          marginTop: spacing.md,
         },
       }),
     [theme],
@@ -243,6 +246,10 @@ const SignupScreen = () => {
     router.replace('/(public)/login');
   }, [router]);
 
+  const handleContinueAsGuest = useCallback(() => {
+    continueAsGuest();
+  }, [continueAsGuest]);
+
   if (isVerifying) {
     return (
       <SafeAreaView style={styles.container}>
@@ -269,6 +276,13 @@ const SignupScreen = () => {
               style={styles.primaryButton}
             >
               Back to Sign In
+            </Button>
+            <Button
+              mode="text"
+              onPress={handleContinueAsGuest}
+              style={styles.guestButton}
+            >
+              Continue as Guest
             </Button>
           </View>
         </View>
@@ -388,6 +402,15 @@ const SignupScreen = () => {
               style={styles.primaryButton}
             >
               Create Account
+            </Button>
+            <Button
+              mode="text"
+              onPress={handleContinueAsGuest}
+              disabled={isSubmitting}
+              accessibilityRole="button"
+              style={styles.guestButton}
+            >
+              Continue as Guest
             </Button>
           </View>
         </View>

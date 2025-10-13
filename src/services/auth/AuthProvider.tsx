@@ -15,8 +15,10 @@ import { logger } from '@/services/logger/LoggerService';
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isGuest: boolean;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  continueAsGuest: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -25,8 +27,18 @@ export const AuthProvider = ({ children }: PropsWithChildren): ReactElement => {
   const { isLoaded: isAuthLoaded, isSignedIn, signOut: clerkSignOut } = useClerkAuth();
   const { isLoaded: isUserLoaded, user: clerkUser } = useUser();
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
+
+  const continueAsGuest = useCallback(() => {
+    setIsGuest(true);
+  }, []);
 
   const signOut = useCallback(async () => {
+    if (isGuest) {
+      setIsGuest(false);
+      return;
+    }
+
     if (!isAuthLoaded) {
       return;
     }
@@ -51,19 +63,35 @@ export const AuthProvider = ({ children }: PropsWithChildren): ReactElement => {
     }
 
     setIsTransitioning(false);
-  }, [clerkSignOut, isAuthLoaded]);
+  }, [clerkSignOut, isAuthLoaded, isGuest]);
 
-  const user = useMemo(() => mapClerkUser(clerkUser), [clerkUser]);
-  const isLoading = !isAuthLoaded || !isUserLoaded || isTransitioning;
+  const user = useMemo(() => {
+    if (isGuest) {
+      return {
+        id: 'guest',
+        email: null,
+        firstName: null,
+        lastName: null,
+        imageUrl: null,
+        displayName: 'Guest',
+      } satisfies AuthUser;
+    }
+
+    return mapClerkUser(clerkUser);
+  }, [clerkUser, isGuest]);
+
+  const isLoading = (!isAuthLoaded && !isGuest) || (!isUserLoaded && !isGuest) || isTransitioning;
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isAuthenticated: Boolean(isSignedIn),
+      isAuthenticated: Boolean(isSignedIn || isGuest),
+      isGuest,
       isLoading,
       signOut,
+      continueAsGuest,
     }),
-    [user, isSignedIn, isLoading, signOut],
+    [user, isSignedIn, isGuest, isLoading, signOut, continueAsGuest],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
