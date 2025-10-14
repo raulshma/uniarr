@@ -6,7 +6,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   IconButton,
@@ -26,6 +26,8 @@ import type { AppTheme } from "@/constants/theme";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import { spacing } from "@/theme/spacing";
+import { useTmdbKey } from "@/hooks/useTmdbKey";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const placeholderText = "Search for movies, shows, and more";
 
@@ -96,6 +98,8 @@ const DiscoverCard = ({
 const DiscoverScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
+  const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
+  const { apiKey: tmdbKey } = useTmdbKey();
 
   const { sections, services, isLoading, isFetching, isError, error, refetch } =
     useUnifiedDiscover();
@@ -180,6 +184,10 @@ const DiscoverScreen = () => {
 
   const openSettings = useCallback(() => {
     router.push("/(auth)/(tabs)/settings");
+  }, [router]);
+
+  const openTmdbDiscover = useCallback(() => {
+    router.push("/(auth)/discover/tmdb");
   }, [router]);
 
   const openServicePicker = useCallback(
@@ -306,6 +314,15 @@ const DiscoverScreen = () => {
       <TabHeader
         title="Discover"
         showTitle={true}
+        leftAction={
+          tmdbEnabled && tmdbKey
+            ? {
+                icon: "movie-open",
+                onPress: openTmdbDiscover,
+                accessibilityLabel: "Open TMDB discover",
+              }
+            : undefined
+        }
         rightAction={{
           icon: "cog",
           onPress: openSettings,

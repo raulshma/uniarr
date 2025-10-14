@@ -31,6 +31,7 @@ type SettingsData = {
   // Remember last selected calendar view (week/day/month/list)
   lastCalendarView: CalendarView;
   useNativeTabs: boolean;
+  tmdbEnabled: boolean;
   // Number of retry attempts to perform for Jellyseerr requests when the server
   // returns 5xx errors. This value represents the number of retry attempts
   // after the initial request. Default: 3
@@ -58,6 +59,7 @@ interface SettingsState extends SettingsData {
   reset: () => void;
   setLastCalendarView: (view: CalendarView) => void;
   setUseNativeTabs: (enabled: boolean) => void;
+  setTmdbEnabled: (enabled: boolean) => void;
   setJellyseerrRetryAttempts: (attempts: number) => void;
     // (thumbnail setters removed)
 }
@@ -105,6 +107,7 @@ const createDefaultSettings = (): SettingsData => ({
   criticalHealthAlertsBypassQuietHours: true,
   lastCalendarView: 'week',
   useNativeTabs: false,
+  tmdbEnabled: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
     // (thumbnail defaults removed)
 });
@@ -144,6 +147,7 @@ export const useSettingsStore = create<SettingsState>()(
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
   setLastCalendarView: (view: CalendarView) => set({ lastCalendarView: view }),
   setUseNativeTabs: (enabled: boolean) => set({ useNativeTabs: enabled }),
+      setTmdbEnabled: (enabled: boolean) => set({ tmdbEnabled: enabled }),
       setJellyseerrRetryAttempts: (attempts: number) =>
         set({ jellyseerrRetryAttempts: clampRetryAttempts(attempts) }),
   reset: () => set(createDefaultSettings()),
@@ -168,11 +172,12 @@ export const useSettingsStore = create<SettingsState>()(
         criticalHealthAlertsBypassQuietHours: state.criticalHealthAlertsBypassQuietHours,
         lastCalendarView: state.lastCalendarView,
         useNativeTabs: state.useNativeTabs,
+        tmdbEnabled: state.tmdbEnabled,
         jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
   // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -223,6 +228,10 @@ export const useSettingsStore = create<SettingsState>()(
             state.quietHours[category] = baseDefaults.quietHours[category];
           }
         });
+
+        if (typeof state.tmdbEnabled !== 'boolean') {
+          state.tmdbEnabled = baseDefaults.tmdbEnabled;
+        }
       },
       migrate: (persistedState) => {
         if (!persistedState) {
@@ -255,6 +264,7 @@ export const useSettingsStore = create<SettingsState>()(
           jellyseerrRetryAttempts: clampRetryAttempts(
             partial.jellyseerrRetryAttempts ?? baseDefaults.jellyseerrRetryAttempts,
           ),
+          tmdbEnabled: partial.tmdbEnabled ?? baseDefaults.tmdbEnabled,
           // thumbnail migration removed
           quietHours,
           criticalHealthAlertsBypassQuietHours:

@@ -199,6 +199,52 @@ export const queryKeys = {
     unified: ['discover', 'unified'] as const,
     jikanDetail: (malId: number): QueryKeyBuilder => ['discover', 'jikan', 'detail', malId] as const,
   },
+  tmdb: {
+    base: ['tmdb'] as const,
+    discover: (
+      mediaType: 'movie' | 'tv',
+      filters: Record<string, unknown>,
+    ): QueryKeyBuilder => ['tmdb', 'discover', mediaType, filters] as const,
+    genres: (mediaType: 'movie' | 'tv', language?: string): QueryKeyBuilder => [
+      'tmdb',
+      'genres',
+      mediaType,
+      language ?? 'default',
+    ] as const,
+    details: (mediaType: 'movie' | 'tv', tmdbId: number, language?: string): QueryKeyBuilder => [
+      'tmdb',
+      'details',
+      mediaType,
+      tmdbId,
+      language ?? 'default',
+    ] as const,
+    videos: (mediaType: 'movie' | 'tv', tmdbId: number, language?: string): QueryKeyBuilder => [
+      'tmdb',
+      'videos',
+      mediaType,
+      tmdbId,
+      language ?? 'default',
+    ] as const,
+    images: (mediaType: 'movie' | 'tv', tmdbId: number, language?: string): QueryKeyBuilder => [
+      'tmdb',
+      'images',
+      mediaType,
+      tmdbId,
+      language ?? 'default',
+    ] as const,
+    watchProviders: (mediaType: 'movie' | 'tv', tmdbId: number): QueryKeyBuilder => [
+      'tmdb',
+      'watchProviders',
+      mediaType,
+      tmdbId,
+    ] as const,
+    search: (term: string, options?: Record<string, unknown>): QueryKeyBuilder => [
+      'tmdb',
+      'search',
+      term,
+      options ?? {},
+    ] as const,
+  },
   bazarr: {
     base: ['bazarr'] as const,
     service: (serviceId: string): QueryKeyBuilder => ['bazarr', serviceId] as const,

@@ -230,6 +230,18 @@ class SecureStorage {
     }
   }
 
+  async removeItem(key: string): Promise<void> {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch (error) {
+      await logger.error('Failed to remove item from secure storage.', {
+        location: 'SecureStorage.removeItem',
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (this.isInitialized) {
       return;

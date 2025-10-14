@@ -65,6 +65,7 @@ const SettingsScreen = () => {
     setUseNativeTabs,
     jellyseerrRetryAttempts,
     setJellyseerrRetryAttempts,
+    tmdbEnabled,
   // image thumbnailing controls removed
   } = useSettingsStore();
   const [jellyseerrRetriesVisible, setJellyseerrRetriesVisible] = useState(false);
@@ -690,7 +691,7 @@ const SettingsScreen = () => {
 
         {/* Services Section */}
         <AnimatedSection style={styles.section} delay={250}>
-          <AnimatedListItem index={0} totalItems={2}>
+          <AnimatedListItem index={0} totalItems={3}>
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -718,7 +719,38 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
+            <AnimatedListItem index={1} totalItems={3}>
+              <Card
+                variant="custom"
+                style={styles.settingCard}
+                onPress={() => router.push("/(auth)/settings/tmdb")}
+              >
+                <View style={styles.settingContent}>
+                  <View style={styles.settingIcon}>
+                    <IconButton
+                      icon="movie-open"
+                      size={24}
+                      iconColor={theme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>TMDB Integration</Text>
+                    <Text style={styles.settingSubtitle}>
+                      Configure TMDB API access for Discover
+                    </Text>
+                    <Text style={styles.settingValue}>
+                      {tmdbEnabled ? "Enabled" : "Disabled"}
+                    </Text>
+                  </View>
+                  <IconButton
+                    icon="chevron-right"
+                    size={20}
+                    iconColor={theme.colors.outline}
+                  />
+                </View>
+              </Card>
+            </AnimatedListItem>
+            <AnimatedListItem index={2} totalItems={3}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>

@@ -20,6 +20,10 @@ type JellyseerrSearchResult =
   | components["schemas"]["TvResult"];
 
 import type { ServiceConfig } from "@/models/service.types";
+import { useSettingsStore } from "@/store/settingsStore";
+import { getTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
+import { mapTmdbMovieToDiscover, mapTmdbTvToDiscover } from "@/utils/tmdb.utils";
+import { logger } from "@/services/logger/LoggerService";
 
 const emptyServices: UnifiedDiscoverServices = {
   sonarr: [],
@@ -150,7 +154,8 @@ const mapTrendingResult = (
 };
 
 const fetchUnifiedDiscover = async (
-  getConnectorsByType: (type: ServiceType) => IConnector[]
+  getConnectorsByType: (type: ServiceType) => IConnector[],
+  options: { tmdbEnabled: boolean }
 ): Promise<UnifiedDiscoverPayload> => {
   const jellyConnectors = getConnectorsByType(
     "jellyseerr"
@@ -202,13 +207,6 @@ const fetchUnifiedDiscover = async (
         } as unknown as JellyseerrSearchResult & { __sourceServiceId?: string })
     )
   );
-
-  if (trendingItems.length === 0) {
-    return {
-      sections: [],
-      services,
-    };
-  }
 
   const deduped = new Map<
     string,
@@ -269,6 +267,91 @@ const fetchUnifiedDiscover = async (
     });
   }
 
+  const seenTmdbIds = new Set<number>();
+  sections.forEach((section) => {
+    section.items.forEach((item) => {
+      if (typeof item.tmdbId === "number") {
+        seenTmdbIds.add(item.tmdbId);
+      }
+    });
+  });
+
+  if (options.tmdbEnabled) {
+    const tmdbConnector = await getTmdbConnector();
+    if (tmdbConnector) {
+      try {
+        const [movieDiscover, tvDiscover] = await Promise.all([
+          tmdbConnector.discoverMovies({ sort_by: "popularity.desc", page: 1 }),
+          tmdbConnector.discoverTv({ sort_by: "popularity.desc", page: 1 }),
+        ]);
+
+        const mapWithDedupe = (
+          items: Array<unknown>,
+          mapper: (item: any) => DiscoverMediaItem,
+        ) =>
+          items
+            .map((item) => {
+              try {
+                return mapper(item);
+              } catch (error) {
+                void logger.warn("Failed to map TMDB item", {
+                  location: "useUnifiedDiscover.mapWithDedupe",
+                  error: error instanceof Error ? error.message : String(error),
+                });
+                return null;
+              }
+            })
+            .filter((item): item is DiscoverMediaItem => Boolean(item))
+            .filter((item) => {
+              if (typeof item.tmdbId === "number") {
+                if (seenTmdbIds.has(item.tmdbId)) {
+                  return false;
+                }
+                seenTmdbIds.add(item.tmdbId);
+              }
+              return true;
+            });
+
+        const tmdbMovieItems = mapWithDedupe(
+          movieDiscover.results ?? [],
+          mapTmdbMovieToDiscover,
+        ).slice(0, 12);
+
+        const tmdbTvItems = mapWithDedupe(
+          tvDiscover.results ?? [],
+          mapTmdbTvToDiscover,
+        ).slice(0, 12);
+
+        if (tmdbMovieItems.length) {
+          sections.push({
+            id: "tmdb-popular-movies",
+            title: "Popular on TMDB",
+            mediaType: "movie",
+            source: "tmdb",
+            subtitle: "Film highlights directly from TMDB",
+            items: tmdbMovieItems,
+          });
+        }
+
+        if (tmdbTvItems.length) {
+          sections.push({
+            id: "tmdb-popular-tv",
+            title: "TMDB TV Favorites",
+            mediaType: "series",
+            source: "tmdb",
+            subtitle: "Series trending across TMDB",
+            items: tmdbTvItems,
+          });
+        }
+      } catch (error) {
+        void logger.warn("Failed to load TMDB discover sections", {
+          location: "useUnifiedDiscover.fetchTmdb",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
   return {
     sections,
     services,
@@ -277,9 +360,10 @@ const fetchUnifiedDiscover = async (
 
 export const useUnifiedDiscover = () => {
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
+  const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const query = useQuery<UnifiedDiscoverPayload>({
-    queryKey: queryKeys.discover.unified,
-    queryFn: () => fetchUnifiedDiscover(getConnectorsByType),
+    queryKey: [...queryKeys.discover.unified, { tmdbEnabled }] as const,
+    queryFn: () => fetchUnifiedDiscover(getConnectorsByType, { tmdbEnabled }),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     // Keep previous data can be useful to avoid loading flashes; components
