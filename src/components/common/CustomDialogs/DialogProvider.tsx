@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
+import { Portal } from 'react-native-paper';
 import CustomConfirm from './CustomConfirm';
 import CustomAlert from './CustomAlert';
 import { registerDialogPresenter, unregisterDialogPresenter } from '@/services/dialogService';
@@ -17,34 +18,15 @@ const DialogContext = createContext({
 
 export const useDialog = () => useContext(DialogContext);
 
-export const DialogProvider = ({ children }: { children: ReactNode }) => {
-  const [current, setCurrent] = useState<DialogPayload | null>(null);
+// Separate component to render dialogs using Portal to avoid affecting the provider tree
+const DialogRenderer = ({ current, onDismiss }: { current: DialogPayload | null; onDismiss: () => void }) => {
+  if (!current) return null;
 
-  const present = useCallback((payload: DialogPayload) => {
-    setCurrent(payload);
-  }, []);
-
-  useEffect(() => {
-    // Register present function so services.dialogService can call into this provider
-    registerDialogPresenter((payload) => {
-      present(payload as any);
-    });
-
-    return () => {
-      unregisterDialogPresenter();
-    };
-  }, [present]);
-
-  if (!current) {
-    return <DialogContext.Provider value={{ present }}>{children}</DialogContext.Provider>;
-  }
-
-  // Map buttons to either a confirm (two actions) or multi-action alert
   const buttons = current.buttons ?? [];
 
   const handleDismiss = () => {
     current.options?.onDismiss?.();
-    setCurrent(null);
+    onDismiss();
   };
 
   if (buttons.length === 2) {
@@ -52,8 +34,7 @@ export const DialogProvider = ({ children }: { children: ReactNode }) => {
     const confirmBtn = buttons.find((b) => b.style !== 'cancel') ?? buttons[1] ?? buttons[0];
 
     return (
-      <DialogContext.Provider value={{ present }}>
-        {children}
+      <Portal>
         <CustomConfirm
           visible
           title={current.title}
@@ -68,7 +49,7 @@ export const DialogProvider = ({ children }: { children: ReactNode }) => {
           onConfirm={() => confirmBtn?.onPress?.()}
           onDismiss={handleDismiss}
         />
-      </DialogContext.Provider>
+      </Portal>
     );
   }
 
@@ -78,8 +59,7 @@ export const DialogProvider = ({ children }: { children: ReactNode }) => {
   const primary = buttons[2] ?? buttons[0];
 
   return (
-    <DialogContext.Provider value={{ present }}>
-      {children}
+    <Portal>
       <CustomAlert
         visible
         title={current.title}
@@ -95,6 +75,43 @@ export const DialogProvider = ({ children }: { children: ReactNode }) => {
         cancelable={current.options?.cancelable ?? true}
         onDismiss={handleDismiss}
       />
+    </Portal>
+  );
+};
+
+export const DialogProvider = ({ children }: { children: ReactNode }) => {
+  const [current, setCurrent] = useState<DialogPayload | null>(null);
+  const presentRef = useRef<(payload: DialogPayload) => void>(() => {});
+
+  const present = useCallback((payload: DialogPayload) => {
+    setCurrent(payload);
+  }, []);
+
+  // Store the latest present function in a ref to avoid stale closure issues
+  presentRef.current = present;
+
+  useEffect(() => {
+    // Register present function so services.dialogService can call into this provider
+    registerDialogPresenter((payload) => {
+      presentRef.current(payload as any);
+    });
+
+    return () => {
+      unregisterDialogPresenter();
+    };
+  }, []); // Empty dependency array since we use ref
+
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({ present }), [present]);
+
+  const handleDialogDismiss = useCallback(() => {
+    setCurrent(null);
+  }, []);
+
+  return (
+    <DialogContext.Provider value={contextValue}>
+      {children}
+      <DialogRenderer current={current} onDismiss={handleDialogDismiss} />
     </DialogContext.Provider>
   );
 };
