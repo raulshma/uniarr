@@ -63,8 +63,12 @@ const TmdbDiscoverScreen = () => {
         },
         content: {
           flex: 1,
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal: 0,
           paddingBottom: spacing.lg,
+        },
+        // inner area keeps the original horizontal padding for toolbar and summary
+        inner: {
+          paddingHorizontal: spacing.lg,
         },
         toolbar: {
           marginBottom: spacing.md,
@@ -402,7 +406,8 @@ const TmdbDiscoverScreen = () => {
 
     return (
       <View style={styles.content}>
-        <View style={styles.toolbar}>
+        <View style={styles.inner}>
+          <View style={styles.toolbar}>
           <View style={styles.toolbarRow}>
             <Button
               icon="tune"
@@ -443,6 +448,7 @@ const TmdbDiscoverScreen = () => {
           </Banner>
         ) : null}
 
+        </View>
         {body}
       </View>
     );

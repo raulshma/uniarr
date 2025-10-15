@@ -51,6 +51,8 @@ const DiscoverCard = ({
         },
         posterWrapper: {
           marginBottom: spacing.xs,
+          // anchor overlays inside the poster area so absolute elements position correctly
+          position: 'relative',
         },
         title: {
           color: theme.colors.onBackground,
@@ -62,9 +64,11 @@ const DiscoverCard = ({
         },
         addButton: {
           position: "absolute",
-          top: spacing.xs,
-          right: spacing.xs,
+          top: spacing.sm,
+          right: spacing.sm,
           backgroundColor: theme.colors.primary,
+          zIndex: 100,
+          elevation: 100,
         },
       }),
     [theme]
@@ -77,15 +81,20 @@ const DiscoverCard = ({
       accessibilityRole="button"
     >
       <View style={styles.posterWrapper}>
-        <MediaPoster uri={item.posterUrl} size={152} />
-        <IconButton
-          icon="plus"
-          size={20}
-          mode="contained"
-          style={styles.addButton}
-          iconColor={theme.colors.onPrimary}
-          onPress={() => onAdd(item)}
-          accessibilityLabel={`Add ${item.title}`}
+        <MediaPoster
+          uri={item.posterUrl}
+          size={152}
+          overlay={
+            <IconButton
+              icon="plus"
+              size={20}
+              mode="contained"
+              style={styles.addButton}
+              iconColor={theme.colors.onPrimary}
+              onPress={() => onAdd(item)}
+              accessibilityLabel={`Add ${item.title}`}
+            />
+          }
         />
       </View>
       <Text numberOfLines={2} style={styles.title}>
@@ -190,6 +199,10 @@ const DiscoverScreen = () => {
     router.push("/(auth)/discover/tmdb");
   }, [router]);
 
+  const openSectionPage = useCallback((sectionId: string) => {
+    router.push(`/(auth)/discover/section/${sectionId}`);
+  }, [router]);
+
   const openServicePicker = useCallback(
     (item: DiscoverMediaItem) => {
       const options =
@@ -260,6 +273,7 @@ const DiscoverScreen = () => {
 
   const renderSection = useCallback(
     (
+      sectionId: string,
       sectionTitle: string,
       subtitle: string | undefined,
       items: DiscoverMediaItem[]
@@ -275,7 +289,7 @@ const DiscoverScreen = () => {
           <PaperButton
             mode="text"
             compact
-            onPress={openUnifiedSearch}
+            onPress={() => openSectionPage(sectionId)}
             textColor={theme.colors.primary}
           >
             View all
@@ -300,7 +314,7 @@ const DiscoverScreen = () => {
     [
       handleCardPress,
       openServicePicker,
-      openUnifiedSearch,
+      openSectionPage,
       styles.listContent,
       styles.sectionHeader,
       styles.sectionSubtitle,
@@ -334,7 +348,7 @@ const DiscoverScreen = () => {
         data={sections}
         keyExtractor={(section) => section.id}
         renderItem={({ item }) =>
-          renderSection(item.title, item.subtitle, item.items)
+          renderSection(item.id, item.title, item.subtitle, item.items)
         }
         contentContainerStyle={[styles.content, styles.sectionsContainer]}
         ListHeaderComponent={

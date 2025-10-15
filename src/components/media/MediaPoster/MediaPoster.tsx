@@ -31,6 +31,7 @@ export type MediaPosterProps = {
   onPress?: () => void;
   accessibilityLabel?: string;
   showPlaceholderLabel?: boolean;
+  overlay?: React.ReactNode;
 };
 
 const DEFAULT_ASPECT_RATIO = 2 / 3;
@@ -45,6 +46,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   onPress,
   accessibilityLabel,
   showPlaceholderLabel = false,
+  overlay,
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -197,6 +199,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       >
         <View style={containerStyle} pointerEvents="none">
           {content}
+          {overlay}
         </View>
       </Pressable>
     );
@@ -209,6 +212,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       accessibilityLabel={effectiveLabel}
     >
       {content}
+      {overlay}
     </View>
   );
 };

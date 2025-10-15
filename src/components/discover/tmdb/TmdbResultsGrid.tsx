@@ -1,17 +1,17 @@
 import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   RefreshControl,
   StyleSheet,
   View,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Text, useTheme } from 'react-native-paper';
 
 import type { AppTheme } from '@/constants/theme';
 import type { DiscoverMediaItem } from '@/models/discover.types';
 import { spacing } from '@/theme/spacing';
-import { TmdbCard } from '@/components/discover/tmdb/TmdbCard';
+import { TmdbListItem } from '@/components/discover/tmdb/TmdbListItem';
 
 interface Props {
   items: DiscoverMediaItem[];
@@ -37,8 +37,8 @@ export const TmdbResultsGrid: React.FC<Props> = ({
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        // removed horizontal padding so items can render edge-to-edge
         contentContainer: {
-          paddingHorizontal: spacing.sm,
           paddingBottom: spacing.xxl,
         },
         emptyState: {
@@ -53,35 +53,42 @@ export const TmdbResultsGrid: React.FC<Props> = ({
     [],
   );
 
+  const renderItem = ({ item }: { item: DiscoverMediaItem }) => (
+    <TmdbListItem item={item} onAdd={onAdd} onPress={onCardPress} />
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyState}>
+      <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+        No results yet
+      </Text>
+      <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+        Adjust filters or try another media type.
+      </Text>
+    </View>
+  );
+
+  const renderFooter = () => {
+    if (onEndReached && isFetchingMore) {
+      return (
+        <View style={styles.footer}>
+          <ActivityIndicator />
+        </View>
+      );
+    }
+    return null;
+  };
+
   return (
-    <FlatList
+    <FlashList
       data={items}
       keyExtractor={(item) => item.id}
-      numColumns={2}
+      renderItem={renderItem}
+      ListEmptyComponent={renderEmpty}
+      ListFooterComponent={renderFooter}
       onEndReached={onEndReached}
-      onEndReachedThreshold={0.6}
-      renderItem={({ item }) => (
-        <TmdbCard item={item} onAdd={onAdd} onPress={onCardPress} />
-      )}
-      ListEmptyComponent={
-        <View style={styles.emptyState}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-            No results yet
-          </Text>
-          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-            Adjust filters or try another media type.
-          </Text>
-        </View>
-      }
-      ListFooterComponent={
-        isFetchingMore ? (
-          <View style={styles.footer}>
-            <ActivityIndicator />
-          </View>
-        ) : null
-      }
+      onEndReachedThreshold={0.3}
       contentContainerStyle={styles.contentContainer}
-      columnWrapperStyle={{ justifyContent: 'space-between' }}
       refreshControl={
         onRefresh
           ? (

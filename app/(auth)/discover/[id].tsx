@@ -29,10 +29,22 @@ const DiscoverItemDetails = () => {
   const { sections, services } = useUnifiedDiscover();
 
   const item = useMemo(() => {
+    // First try to find by exact ID match
     for (const section of sections) {
       const found = section.items.find((i) => i.id === id);
       if (found) return found;
     }
+
+    // If not found, try to find by TMDB ID or source ID
+    for (const section of sections) {
+      const found = section.items.find((i) =>
+        (i.tmdbId && `movie-${i.tmdbId}` === id) ||
+        (i.tmdbId && `series-${i.tmdbId}` === id) ||
+        (i.sourceId && `${i.mediaType}-${i.sourceId}` === id)
+      );
+      if (found) return found;
+    }
+
     return undefined;
   }, [sections, id]);
 
