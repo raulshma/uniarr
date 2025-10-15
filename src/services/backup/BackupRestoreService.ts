@@ -2,26 +2,159 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Crypto from 'expo-crypto';
 
 import { logger } from '@/services/logger/LoggerService';
 import { secureStorage } from '@/services/storage/SecureStorage';
+import { type ServiceConfig, type ServiceType } from '@/models/service.types';
+import { getStoredTmdbKey, setStoredTmdbKey } from '@/services/tmdb/TmdbCredentialService';
 
-export interface BackupData {
-  version: '1.0';
+export interface BackupExportOptions {
+  includeSettings: boolean;
+  includeServiceConfigs: boolean;
+  includeServiceCredentials: boolean;
+  includeTmdbCredentials: boolean;
+  includeNetworkHistory: boolean;
+  includeRecentIPs: boolean;
+  encryptSensitive: boolean;
+  password?: string;
+}
+
+export interface BackupSelectionConfig {
+  settings: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  serviceConfigs: {
+    enabled: boolean;
+    sensitive: boolean;
+    includeCredentials: boolean;
+  };
+  tmdbCredentials: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  networkHistory: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  recentIPs: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+}
+
+export interface EncryptedBackupData {
+  version: '1.2';
   timestamp: string;
+  encrypted: true;
+  encryptionInfo: {
+    algorithm: 'XOR-PBKDF2';
+    salt: string;
+    iv: string;
+  };
   appData: {
-    settings: Record<string, unknown>;
-    serviceConfigs: Array<{
+    settings?: Record<string, unknown>;
+    serviceConfigs?: Array<{
       id: string;
-      type: string;
+      type: ServiceType;
       name: string;
       url: string;
+      apiKey?: string;
+      username?: string;
+      password?: string;
+      proxyUrl?: string;
+      timeout?: number;
       enabled: boolean;
       createdAt: string;
       updatedAt: string;
     }>;
+    encryptedData?: string; // Contains sensitive data (credentials, API keys, etc.)
+    networkScanHistory?: Array<{
+      id: string;
+      timestamp: string;
+      duration: number;
+      scannedHosts: number;
+      servicesFound: number;
+      subnet: string;
+      customIp?: string;
+      services: Array<{
+        type: string;
+        name: string;
+        url: string;
+        port: number;
+        version?: string;
+        requiresAuth?: boolean;
+      }>;
+    }>;
+    recentIPs?: Array<{
+      ip: string;
+      timestamp: string;
+      subnet?: string;
+      servicesFound?: number;
+    }>;
+    tmdbCredentials?: {
+      apiKey?: string;
+    };
   };
 }
+
+export interface BackupData {
+  version: '1.1' | '1.2';
+  timestamp: string;
+  encrypted?: boolean;
+  encryptionInfo?: {
+    algorithm: 'XOR-PBKDF2';
+    salt: string;
+    iv: string;
+  };
+  appData: {
+    settings?: Record<string, unknown>;
+    serviceConfigs?: Array<{
+      id: string;
+      type: ServiceType;
+      name: string;
+      url: string;
+      apiKey?: string;
+      username?: string;
+      password?: string;
+      proxyUrl?: string;
+      timeout?: number;
+      enabled: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    encryptedData?: string; // For encrypted sensitive data
+    networkScanHistory?: Array<{
+      id: string;
+      timestamp: string;
+      duration: number;
+      scannedHosts: number;
+      servicesFound: number;
+      subnet: string;
+      customIp?: string;
+      services: Array<{
+        type: string;
+        name: string;
+        url: string;
+        port: number;
+        version?: string;
+        requiresAuth?: boolean;
+      }>;
+    }>;
+    recentIPs?: Array<{
+      ip: string;
+      timestamp: string;
+      subnet?: string;
+      servicesFound?: number;
+    }>;
+    tmdbCredentials?: {
+      apiKey?: string;
+    };
+  };
+}
+
+export type AnyBackupData = BackupData | EncryptedBackupData;
 
 class BackupRestoreService {
   private static instance: BackupRestoreService | null = null;
@@ -31,6 +164,424 @@ class BackupRestoreService {
       BackupRestoreService.instance = new BackupRestoreService();
     }
     return BackupRestoreService.instance;
+  }
+
+  /**
+   * Generate secure random hex string
+   */
+  private async generateSecureRandomHex(length: number): Promise<string> {
+    try {
+      const randomBytes = await Crypto.getRandomBytesAsync(length);
+      return Array.from(randomBytes)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+    } catch (error) {
+      // Fallback to a simpler random generator
+      const chars = '0123456789abcdef';
+      let result = '';
+      for (let i = 0; i < length * 2; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+  }
+
+  /**
+   * Derive encryption key from password and salt using simple hash
+   */
+  private deriveKey(password: string, salt: string): string {
+    // Simple key derivation using multiple rounds of hashing
+    let key = password + salt;
+    for (let i = 0; i < 10000; i++) {
+      key = this.simpleHash(key + i.toString());
+    }
+    return key;
+  }
+
+  /**
+   * Simple hash function for key derivation
+   * Returns a fixed-length hex string (8 chars) to ensure consistent key derivation
+   */
+  private simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    // Pad to 8 characters to ensure consistent length
+    return Math.abs(hash).toString(16).padStart(8, '0');
+  }
+
+  /**
+   * React Native compatible base64 encoding
+   */
+  private base64Encode(str: string): string {
+    try {
+      return Buffer.from(str, 'utf8').toString('base64');
+    } catch (error) {
+      // Fallback manual base64 encoding
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      let result = '';
+      let i = 0;
+
+      while (i < str.length) {
+        const a = str.charCodeAt(i++);
+        const b = i < str.length ? str.charCodeAt(i++) : 0;
+        const c = i < str.length ? str.charCodeAt(i++) : 0;
+
+        const bitmap = (a << 16) | (b << 8) | c;
+
+        result += chars.charAt((bitmap >> 18) & 63);
+        result += chars.charAt((bitmap >> 12) & 63);
+        result += i - 2 < str.length ? chars.charAt((bitmap >> 6) & 63) : '=';
+        result += i - 1 < str.length ? chars.charAt(bitmap & 63) : '=';
+      }
+
+      return result;
+    }
+  }
+
+  /**
+   * React Native compatible base64 decoding
+   */
+  private base64Decode(str: string): string {
+    try {
+      return Buffer.from(str, 'base64').toString('utf8');
+    } catch (error) {
+      // Fallback manual base64 decoding
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      let result = '';
+      let i = 0;
+
+      str = str.replace(/[^A-Za-z0-9+/]/g, '');
+
+      while (i < str.length) {
+        const encoded1 = chars.indexOf(str.charAt(i++));
+        const encoded2 = chars.indexOf(str.charAt(i++));
+        const encoded3 = chars.indexOf(str.charAt(i++));
+        const encoded4 = chars.indexOf(str.charAt(i++));
+
+        // Handle missing characters
+        if (encoded1 === -1 || encoded2 === -1) {
+          continue; // Skip invalid base64 characters
+        }
+
+        const bitmap = (encoded1 << 18) | (encoded2 << 12) | (encoded3 << 6) | encoded4;
+
+        result += String.fromCharCode((bitmap >> 16) & 255);
+        if (encoded3 !== 64) result += String.fromCharCode((bitmap >> 8) & 255);
+        if (encoded4 !== 64) result += String.fromCharCode(bitmap & 255);
+      }
+
+      return result;
+    }
+  }
+
+  /**
+   * Simple XOR encryption for React Native compatibility
+   */
+  private xorEncrypt(text: string, key: string): string {
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      const charCode = text.charCodeAt(i);
+      const keyChar = key.charCodeAt(i % key.length);
+      result += String.fromCharCode(charCode ^ keyChar);
+    }
+    return this.base64Encode(result); // Base64 encode for safe JSON storage
+  }
+
+  /**
+   * Simple XOR decryption
+   */
+  private xorDecrypt(encryptedText: string, key: string): string {
+    const text = this.base64Decode(encryptedText); // Base64 decode
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      const charCode = text.charCodeAt(i);
+      const keyChar = key.charCodeAt(i % key.length);
+      result += String.fromCharCode(charCode ^ keyChar);
+    }
+    return result;
+  }
+
+  /**
+   * Encrypt sensitive data using simple XOR encryption with password
+   */
+  private async encryptSensitiveData(data: any, password: string): Promise<{
+    encryptedData: string;
+    salt: string;
+    iv: string;
+  }> {
+    try {
+      // Generate salt using secure random values
+      const salt = await this.generateSecureRandomHex(32);
+      const iv = await this.generateSecureRandomHex(16); // IV for future AES compatibility
+
+      // Derive encryption key
+      const key = this.deriveKey(password, salt);
+
+      // Encrypt the data
+      const jsonString = JSON.stringify(data);
+      const encryptedData = this.xorEncrypt(jsonString, key);
+
+      return {
+        encryptedData,
+        salt,
+        iv,
+      };
+    } catch (error) {
+      throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Decrypt sensitive data using password
+   */
+  async decryptSensitiveData(
+    encryptedData: string,
+    password: string,
+    salt: string,
+    iv: string
+  ): Promise<any> {
+    try {
+      await logger.info('Starting sensitive data decryption', {
+        location: 'BackupRestoreService.decryptSensitiveData',
+        encryptedDataLength: encryptedData.length,
+        saltLength: salt.length,
+        ivLength: iv.length,
+      });
+
+      // Derive the same key used for encryption
+      const key = this.deriveKey(password, salt);
+
+      // Decrypt the data
+      let decryptedText = this.xorDecrypt(encryptedData, key);
+
+      if (!decryptedText) {
+        throw new Error('Decryption produced empty result - possibly wrong password');
+      }
+
+      await logger.info('Data decrypted successfully, parsing JSON', {
+        location: 'BackupRestoreService.decryptSensitiveData',
+        decryptedTextLength: decryptedText.length,
+        decryptedTextPreview: decryptedText.substring(0, 50),
+      });
+
+      try {
+        // Clean the decrypted text before parsing
+        let cleanedText = decryptedText.trim();
+
+        // Remove potential BOM or other invisible characters
+        cleanedText = cleanedText.replace(/^\uFEFF/, ''); // Remove BOM
+        // Only remove truly invalid control characters (not tabs, newlines in JSON strings)
+        cleanedText = cleanedText.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '');
+
+        // Log character codes for debugging
+        const charCodes = cleanedText.substring(0, 10).split('').map(c => c.charCodeAt(0));
+        await logger.info('JSON parsing attempt', {
+          location: 'BackupRestoreService.decryptSensitiveData',
+          first10Chars: cleanedText.substring(0, 10),
+          charCodes: charCodes,
+          textLength: cleanedText.length,
+        });
+
+        // Check if it looks like valid JSON before parsing
+        if (!cleanedText.startsWith('{') && !cleanedText.startsWith('[')) {
+          throw new Error(`Invalid JSON structure - decrypted data doesn't start with { or [ (starts with "${cleanedText.substring(0, 1)}", code: ${cleanedText.charCodeAt(0)}). This likely indicates an incorrect password or corrupted backup.`);
+        }
+
+        const parsed = JSON.parse(cleanedText);
+        await logger.info('JSON parsed successfully', {
+          location: 'BackupRestoreService.decryptSensitiveData',
+          parsedKeys: Object.keys(parsed),
+        });
+        return parsed;
+      } catch (parseError) {
+        await logger.error('JSON parse failed during decryption', {
+          location: 'BackupRestoreService.decryptSensitiveData',
+          error: parseError instanceof Error ? parseError.message : String(parseError),
+          decryptedTextFirstChars: decryptedText.substring(0, 20),
+          textLength: decryptedText.length,
+          charCodes: decryptedText.substring(0, 10).split('').map(c => c.charCodeAt(0)),
+        });
+        throw new Error(`JSON Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Provide more helpful error message
+      let helpfulMessage = errorMessage;
+      if (errorMessage.includes('Unexpected character') || errorMessage.includes('wrong password') || errorMessage.includes('Invalid JSON structure')) {
+        helpfulMessage = `${errorMessage} Please verify your backup password is correct.`;
+      }
+
+      await logger.error('Decryption failed', {
+        location: 'BackupRestoreService.decryptSensitiveData',
+        error: helpfulMessage,
+      });
+      throw new Error(`Decryption failed: ${helpfulMessage}`);
+    }
+  }
+
+  /**
+   * Create a selective backup based on user options
+   */
+  async createSelectiveBackup(options: BackupExportOptions): Promise<string> {
+    try {
+      await logger.info('Starting selective backup creation', {
+        location: 'BackupRestoreService.createSelectiveBackup',
+        options: {
+          includeSettings: options.includeSettings,
+          includeServiceConfigs: options.includeServiceConfigs,
+          includeServiceCredentials: options.includeServiceCredentials,
+          includeTmdbCredentials: options.includeTmdbCredentials,
+          includeNetworkHistory: options.includeNetworkHistory,
+          includeRecentIPs: options.includeRecentIPs,
+          encryptSensitive: options.encryptSensitive,
+        },
+      });
+
+      const backupData: any = {
+        version: options.encryptSensitive ? '1.2' : '1.1',
+        timestamp: new Date().toISOString(),
+        appData: {},
+      };
+
+      // Add encryption metadata if needed
+      if (options.encryptSensitive) {
+        backupData.encrypted = true;
+        backupData.encryptionInfo = {
+          algorithm: 'XOR-PBKDF2',
+          salt: '', // Will be filled during encryption
+          iv: '',   // Will be filled during encryption
+        };
+      }
+
+      const sensitiveData: any = {};
+
+      // Collect settings
+      if (options.includeSettings) {
+        const settingsKey = 'SettingsStore:v1';
+        const settingsData = await AsyncStorage.getItem(settingsKey);
+        if (settingsData) {
+          const settings = JSON.parse(settingsData);
+          if (options.encryptSensitive) {
+            sensitiveData.settings = settings;
+          } else {
+            backupData.appData.settings = settings;
+          }
+        }
+      }
+
+      // Collect service configs
+      if (options.includeServiceConfigs) {
+        const serviceConfigs = await secureStorage.getServiceConfigs();
+
+        const nonSensitiveConfigs = serviceConfigs.map(config => ({
+          id: config.id,
+          type: config.type,
+          name: config.name,
+          url: config.url,
+          enabled: config.enabled,
+          createdAt: config.createdAt.toISOString(),
+          updatedAt: config.updatedAt.toISOString(),
+        }));
+
+        const sensitiveConfigs = serviceConfigs.map(config => ({
+          id: config.id,
+          type: config.type,
+          name: config.name,
+          url: config.url,
+          apiKey: config.apiKey,
+          username: config.username,
+          password: config.password,
+          proxyUrl: config.proxyUrl,
+          timeout: config.timeout,
+          enabled: config.enabled,
+          createdAt: config.createdAt.toISOString(),
+          updatedAt: config.updatedAt.toISOString(),
+        }));
+
+        if (options.encryptSensitive && options.includeServiceCredentials) {
+          sensitiveData.serviceConfigs = sensitiveConfigs;
+          backupData.appData.serviceConfigs = nonSensitiveConfigs;
+        } else if (options.includeServiceCredentials) {
+          backupData.appData.serviceConfigs = sensitiveConfigs;
+        } else {
+          backupData.appData.serviceConfigs = nonSensitiveConfigs;
+        }
+      }
+
+      // Collect TMDB credentials
+      if (options.includeTmdbCredentials) {
+        const tmdbApiKey = await getStoredTmdbKey();
+        if (tmdbApiKey) {
+          if (options.encryptSensitive) {
+            sensitiveData.tmdbCredentials = { apiKey: tmdbApiKey };
+          } else {
+            backupData.appData.tmdbCredentials = { apiKey: tmdbApiKey };
+          }
+        }
+      }
+
+      // Collect network history
+      if (options.includeNetworkHistory) {
+        const networkScanHistory = await secureStorage.getNetworkScanHistory();
+        if (networkScanHistory.length > 0) {
+          backupData.appData.networkScanHistory = networkScanHistory;
+        }
+      }
+
+      // Collect recent IPs
+      if (options.includeRecentIPs) {
+        const recentIPs = await secureStorage.getRecentIPs();
+        if (recentIPs.length > 0) {
+          backupData.appData.recentIPs = recentIPs;
+        }
+      }
+
+      // Encrypt sensitive data if needed
+      if (options.encryptSensitive && (options.includeServiceCredentials || options.includeTmdbCredentials || options.includeSettings)) {
+        if (!options.password) {
+          throw new Error('Password is required for encrypted backup');
+        }
+
+        const { encryptedData, salt, iv } = await this.encryptSensitiveData(sensitiveData, options.password);
+        backupData.appData.encryptedData = encryptedData;
+        backupData.encryptionInfo!.salt = salt;
+        backupData.encryptionInfo!.iv = iv;
+
+        await logger.info('Sensitive data encrypted for backup', {
+          location: 'BackupRestoreService.createSelectiveBackup',
+          hasServiceCredentials: !!sensitiveData.serviceConfigs,
+          hasTmdbCredentials: !!sensitiveData.tmdbCredentials,
+          hasSettings: !!sensitiveData.settings,
+          encryptionMethod: 'XOR encryption with PBKDF2 key derivation',
+        });
+      }
+
+      // Create backup file
+      const fileName = `uniarr-backup-${new Date().toISOString().split('T')[0]}${options.encryptSensitive ? '-encrypted' : ''}.json`;
+      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(backupData, null, 2));
+
+      await logger.info('Selective backup file created', {
+        location: 'BackupRestoreService.createSelectiveBackup',
+        fileName,
+        encrypted: options.encryptSensitive,
+        version: backupData.version,
+      });
+
+      return filePath;
+    } catch (error) {
+      await logger.error('Failed to create selective backup', {
+        location: 'BackupRestoreService.createSelectiveBackup',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   /**
@@ -51,9 +602,14 @@ class BackupRestoreService {
       // Fetch service configs
       const serviceConfigs = await secureStorage.getServiceConfigs();
 
+      // Fetch additional data from secure storage
+      const networkScanHistory = await secureStorage.getNetworkScanHistory();
+      const recentIPs = await secureStorage.getRecentIPs();
+      const tmdbApiKey = await getStoredTmdbKey();
+
       // Prepare backup data structure
       const backupData: BackupData = {
-        version: '1.0',
+        version: '1.1',
         timestamp: new Date().toISOString(),
         appData: {
           settings,
@@ -62,6 +618,11 @@ class BackupRestoreService {
             type: config.type,
             name: config.name,
             url: config.url,
+            apiKey: config.apiKey,
+            username: config.username,
+            password: config.password,
+            proxyUrl: config.proxyUrl,
+            timeout: config.timeout,
             enabled: config.enabled,
             createdAt:
               config.createdAt instanceof Date
@@ -72,6 +633,11 @@ class BackupRestoreService {
                 ? config.updatedAt.toISOString()
                 : String(config.updatedAt),
           })),
+          networkScanHistory,
+          recentIPs,
+          tmdbCredentials: {
+            apiKey: tmdbApiKey || undefined,
+          },
         },
       };
 
@@ -85,6 +651,9 @@ class BackupRestoreService {
         location: 'BackupRestoreService.createBackup',
         fileName,
         configCount: serviceConfigs.length,
+        hasNetworkHistory: networkScanHistory.length > 0,
+        hasRecentIPs: recentIPs.length > 0,
+        hasTmdbCredentials: !!tmdbApiKey,
       });
 
       return filePath;
@@ -127,14 +696,23 @@ class BackupRestoreService {
   /**
    * Select and restore from a backup file
    */
-  async selectAndRestoreBackup(): Promise<BackupData> {
+  async selectAndRestoreBackup(): Promise<AnyBackupData> {
     try {
       await logger.info('Starting backup restore selection', {
         location: 'BackupRestoreService.selectAndRestoreBackup',
       });
 
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/json',
+        type: '*/*', // Allow all file types, will validate later
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      await logger.info('DocumentPicker result received', {
+        location: 'BackupRestoreService.selectAndRestoreBackup',
+        canceled: result.canceled,
+        hasAssets: result.assets && result.assets.length > 0,
+        assetCount: result.assets?.length || 0,
       });
 
       if (result.canceled) {
@@ -145,29 +723,53 @@ class BackupRestoreService {
       }
 
       const fileUri = result.assets[0]?.uri;
+      const fileName = result.assets[0]?.name;
       if (!fileUri) {
         throw new Error('No file selected');
+      }
+
+      // Validate file extension
+      if (fileName && !fileName.toLowerCase().endsWith('.json')) {
+        throw new Error('Selected file is not a JSON file. Please select a valid backup file with .json extension.');
       }
 
       // Read the file
       const fileContent = await FileSystem.readAsStringAsync(fileUri);
 
-      const backupData = JSON.parse(fileContent) as BackupData;
+      // Validate that the file content is valid JSON
+      let backupData: AnyBackupData;
+      try {
+        backupData = JSON.parse(fileContent);
+      } catch (parseError) {
+        throw new Error('Selected file is not a valid JSON file. The file may be corrupted or not in the correct format.');
+      }
 
       // Validate backup structure
       if (
         !backupData.version ||
         !backupData.timestamp ||
-        !backupData.appData ||
-        !Array.isArray(backupData.appData.serviceConfigs)
+        !backupData.appData
       ) {
         throw new Error('Invalid backup file format');
       }
 
+      // Validate service configs array if it exists (older versions require it)
+      if (backupData.appData.serviceConfigs && !Array.isArray(backupData.appData.serviceConfigs)) {
+        throw new Error('Invalid backup file format: serviceConfigs must be an array');
+      }
+
+      // Check version compatibility
+      const supportedVersions = ['1.0', '1.1', '1.2'];
+      if (!supportedVersions.includes(backupData.version)) {
+        throw new Error(`Unsupported backup version: ${backupData.version}`);
+      }
+
       await logger.info('Backup file loaded and validated', {
         location: 'BackupRestoreService.selectAndRestoreBackup',
+        fileName,
         version: backupData.version,
-        configCount: backupData.appData.serviceConfigs.length,
+        encrypted: backupData.encrypted || false,
+        configCount: backupData.appData.serviceConfigs?.length || 0,
       });
 
       return backupData;
@@ -185,7 +787,7 @@ class BackupRestoreService {
    * Pass skipSettings=true to restore only service configs
    * Pass skipServices=true to restore only settings
    */
-  async restoreBackup(backupData: BackupData, options?: {
+  async restoreBackup(backupData: AnyBackupData, options?: {
     skipSettings?: boolean;
     skipServices?: boolean;
   }): Promise<void> {
@@ -213,17 +815,77 @@ class BackupRestoreService {
         // Clear existing service configs
         await secureStorage.clearAll();
 
-        // Restore each config
+        // Restore each config with credentials
         for (const configData of backupData.appData.serviceConfigs) {
-          // We can't restore without the actual credentials/api keys
-          // This would need to be handled separately or the backup would need to include encrypted credentials
-          // For now, we'll log what we're restoring
-          await logger.info('Restoring service config', {
+          const fullConfig: ServiceConfig = {
+            id: configData.id,
+            type: configData.type,
+            name: configData.name,
+            url: configData.url,
+            apiKey: configData.apiKey,
+            username: configData.username,
+            password: configData.password,
+            proxyUrl: configData.proxyUrl,
+            timeout: configData.timeout,
+            enabled: configData.enabled,
+            createdAt: new Date(configData.createdAt),
+            updatedAt: new Date(configData.updatedAt),
+          };
+
+          await secureStorage.saveServiceConfig(fullConfig);
+
+          await logger.info('Service config restored', {
             location: 'BackupRestoreService.restoreBackup',
             serviceType: configData.type,
             serviceName: configData.name,
+            hasCredentials: !!(configData.apiKey || configData.username),
           });
         }
+      }
+
+      // Restore network scan history if available
+      if (backupData.appData.networkScanHistory && Array.isArray(backupData.appData.networkScanHistory)) {
+        // Clear existing history first
+        await secureStorage.clearNetworkScanHistory();
+
+        // The saveNetworkScanHistory method expects individual entries, but it's designed to save one at a time
+        // and manage the list internally. We need to add each entry but the current implementation
+        // overwrites the entire history. Let's add them in reverse order to maintain the original order.
+        const reversedHistory = [...backupData.appData.networkScanHistory].reverse();
+        for (const historyEntry of reversedHistory) {
+          await secureStorage.saveNetworkScanHistory(historyEntry);
+        }
+
+        await logger.info('Network scan history restored', {
+          location: 'BackupRestoreService.restoreBackup',
+          entryCount: backupData.appData.networkScanHistory.length,
+        });
+      }
+
+      // Restore recent IPs if available
+      if (backupData.appData.recentIPs && Array.isArray(backupData.appData.recentIPs)) {
+        // Clear existing recent IPs first
+        await secureStorage.clearRecentIPs();
+
+        // Add each recent IP
+        for (const recentIP of backupData.appData.recentIPs) {
+          await secureStorage.addRecentIP(recentIP.ip, recentIP.subnet, recentIP.servicesFound);
+        }
+
+        await logger.info('Recent IPs restored', {
+          location: 'BackupRestoreService.restoreBackup',
+          ipCount: backupData.appData.recentIPs.length,
+        });
+      }
+
+      // Restore TMDB credentials if available
+      if (backupData.appData.tmdbCredentials?.apiKey) {
+        await setStoredTmdbKey(backupData.appData.tmdbCredentials.apiKey);
+
+        await logger.info('TMDB credentials restored', {
+          location: 'BackupRestoreService.restoreBackup',
+          hasApiKey: !!backupData.appData.tmdbCredentials.apiKey,
+        });
       }
 
       await logger.info('Backup restore completed successfully', {
@@ -236,6 +898,130 @@ class BackupRestoreService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Select and restore from an encrypted backup file with password
+   */
+  async selectAndRestoreEncryptedBackup(password: string): Promise<AnyBackupData> {
+    try {
+      await logger.info('Starting encrypted backup restore selection', {
+        location: 'BackupRestoreService.selectAndRestoreEncryptedBackup',
+      });
+
+      const backupData = await this.selectAndRestoreBackup();
+
+      if (!backupData.encrypted || !backupData.encryptionInfo || !backupData.appData.encryptedData) {
+        throw new Error('Selected backup is not encrypted');
+      }
+
+      // Decrypt sensitive data
+      const decryptedData = await this.decryptSensitiveData(
+        backupData.appData.encryptedData,
+        password,
+        backupData.encryptionInfo.salt,
+        backupData.encryptionInfo.iv
+      );
+
+      // Merge decrypted data with backup data
+      const restoredBackup = {
+        ...backupData,
+        appData: {
+          ...backupData.appData,
+          ...decryptedData,
+          // Keep non-encrypted data as is
+          serviceConfigs: decryptedData.serviceConfigs || backupData.appData.serviceConfigs,
+          networkScanHistory: backupData.appData.networkScanHistory,
+          recentIPs: backupData.appData.recentIPs,
+        },
+      };
+
+      // Remove encrypted data after decryption
+      delete restoredBackup.appData.encryptedData;
+
+      await logger.info('Encrypted backup decrypted successfully', {
+        location: 'BackupRestoreService.selectAndRestoreEncryptedBackup',
+        hasServiceCredentials: !!decryptedData.serviceConfigs,
+        hasTmdbCredentials: !!decryptedData.tmdbCredentials,
+        hasSettings: !!decryptedData.settings,
+      });
+
+      return restoredBackup;
+    } catch (error) {
+      await logger.error('Failed to load and decrypt backup file', {
+        location: 'BackupRestoreService.selectAndRestoreEncryptedBackup',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get default backup export options
+   */
+  getDefaultExportOptions(): BackupExportOptions {
+    return {
+      includeSettings: true,
+      includeServiceConfigs: true,
+      includeServiceCredentials: true,
+      includeTmdbCredentials: true,
+      includeNetworkHistory: true,
+      includeRecentIPs: true,
+      encryptSensitive: false,
+    };
+  }
+
+  /**
+   * Get backup selection configuration with sensitivity markers
+   */
+  getBackupSelectionConfig(): BackupSelectionConfig {
+    return {
+      settings: {
+        enabled: true,
+        sensitive: true, // Settings may contain sensitive preferences
+      },
+      serviceConfigs: {
+        enabled: true,
+        sensitive: true,
+        includeCredentials: true,
+      },
+      tmdbCredentials: {
+        enabled: true,
+        sensitive: true,
+      },
+      networkHistory: {
+        enabled: true,
+        sensitive: false, // Network history is not considered sensitive
+      },
+      recentIPs: {
+        enabled: true,
+        sensitive: false, // Recent IPs are not considered highly sensitive
+      },
+    };
+  }
+
+  /**
+   * Validate export options
+   */
+  validateExportOptions(options: BackupExportOptions): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (options.encryptSensitive && !options.password) {
+      errors.push('Password is required when encryption is enabled');
+    }
+
+    if (options.password && options.password.length < 8) {
+      errors.push('Password must be at least 8 characters long');
+    }
+
+    if (options.includeServiceCredentials && !options.includeServiceConfigs) {
+      errors.push('Service configurations must be included to include service credentials');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
   }
 
   /**

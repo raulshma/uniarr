@@ -9,7 +9,7 @@ import { TabHeader } from "@/components/common/TabHeader";
 import { Card } from "@/components/common/Card";
 import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
-import { backupRestoreService, type BackupData } from "@/services/backup/BackupRestoreService";
+import { backupRestoreService, type AnyBackupData } from "@/services/backup/BackupRestoreService";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -102,10 +102,25 @@ const BackupRestoreScreen = () => {
 
       const backupData = await backupRestoreService.selectAndRestoreBackup();
 
+      // Check if it's an encrypted backup
+      if (backupData.encrypted) {
+        await alert(
+          "Encrypted Backup Detected",
+          "This backup is encrypted. Please use the 'Restore Encrypted Backup' option to restore it.",
+          [{ text: "OK", onPress: () => setIsRestoring(false) }]
+        );
+        return;
+      }
+
       // Confirm restoration
+      const hasTmdbCredentials = !!backupData.appData.tmdbCredentials?.apiKey;
+      const servicesCount = backupData.appData.serviceConfigs?.length || 0;
+      const servicesText = `${servicesCount} service configuration(s)`;
+      const additionalText = hasTmdbCredentials ? ' and TMDB credentials' : '';
+
       await alert(
         "Restore Backup?",
-        `This will restore ${backupData.appData.serviceConfigs.length} service configuration(s) and your settings. This action cannot be undone.`,
+        `This will restore ${servicesText}${additionalText} and your settings. Make sure to select a .json backup file. This action cannot be undone.`,
         [
           {
             text: "Cancel",
@@ -295,7 +310,7 @@ const BackupRestoreScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Local Backup</Text>
           <Text style={styles.sectionDescription}>
-            Create a backup of your settings and service configurations. You can store it locally or share it.
+            Create a backup of your settings, service configurations, credentials, and TMDB API key. You can store it locally or share it.
           </Text>
 
           <Card style={styles.card}>
@@ -316,6 +331,30 @@ const BackupRestoreScreen = () => {
                 onPress={handleRestoreBackup}
               >
                 {isRestoring ? "Restoring..." : "Restore from File"}
+              </Button>
+            </View>
+          </Card>
+
+          <Card style={styles.card}>
+            <Text style={styles.sectionDescription}>
+              Enhanced backup options with selective export and encryption:
+            </Text>
+            <View style={styles.buttonContainer}>
+              <Button
+                mode="contained-tonal"
+                icon="export"
+                disabled={isCreatingBackup || isRestoring}
+                onPress={() => router.push("/(auth)/settings/backup-export")}
+              >
+                Export Custom Backup
+              </Button>
+              <Button
+                mode="contained-tonal"
+                icon="lock-open-variant"
+                disabled={isCreatingBackup || isRestoring}
+                onPress={() => router.push("/(auth)/settings/backup-restore-encrypted")}
+              >
+                Restore Encrypted Backup
               </Button>
             </View>
           </Card>
@@ -379,10 +418,12 @@ const BackupRestoreScreen = () => {
           <Text style={styles.sectionTitle}>About Backups</Text>
           <Card style={styles.card}>
             <Text style={styles.sectionDescription}>
-              • Backups include your app settings and service configurations{"\n"}
+              • Standard backups include your app settings, service configurations with credentials, TMDB API key, and network scan history{"\n"}
+              • Custom backups allow you to select exactly what to export{"\n"}
+              • Encrypted backups protect sensitive data with password encryption (XOR-PBKDF2){"\n"}
               • Backups are stored in JSON format for compatibility{"\n"}
               • You can share backups via email, cloud storage, or other apps{"\n"}
-              • Restoring a backup will replace your current settings
+              • Restoring a backup will replace your current settings, services, and TMDB configuration
             </Text>
           </Card>
         </View>
