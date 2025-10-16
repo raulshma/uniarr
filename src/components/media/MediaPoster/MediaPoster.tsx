@@ -66,6 +66,9 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
+  const [thumbhash, setThumbhash] = useState<string | undefined>(() =>
+    uri ? imageCacheService.getThumbhash(uri) : undefined
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -76,6 +79,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
           setResolvedUri(undefined);
           setIsLoading(false);
           setHasError(false);
+          setThumbhash(undefined);
         }
         return;
       }
@@ -84,6 +88,9 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         setIsLoading(true);
         setHasError(false);
         setResolvedUri(undefined);
+        // Update thumbhash for new URI
+        const existingThumbhash = imageCacheService.getThumbhash(uri);
+        setThumbhash(existingThumbhash);
       }
 
       try {
@@ -106,13 +113,30 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     };
   }, [uri, width, height]);
 
-  // Proactively generate thumbhash for the original URI
+  // Proactively generate thumbhash for the original URI and update state when available
   useEffect(() => {
-    if (uri && !imageCacheService.getThumbhash(uri)) {
+    if (uri && !thumbhash) {
       // Generate thumbhash in background without blocking
       void imageCacheService.generateThumbhash(uri);
+
+      // Poll for thumbhash availability (this is a simple approach)
+      let attempts = 0;
+      const checkInterval = setInterval(() => {
+        attempts++;
+        const hash = imageCacheService.getThumbhash(uri);
+        if (hash && hash !== thumbhash) {
+          setThumbhash(hash);
+          clearInterval(checkInterval);
+        } else if (attempts >= 50) { // 5 seconds max
+          clearInterval(checkInterval);
+        }
+      }, 100);
+
+      return () => {
+        clearInterval(checkInterval);
+      };
     }
-  }, [uri]);
+  }, [uri, thumbhash]);
 
   const handleImageLoad = () => {
     setIsLoading(false);
@@ -149,6 +173,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   );
 
   const isFallback = hasError || !resolvedUri;
+  const showLoadingPlaceholder = isLoading && !thumbhash;
 
   const content = isFallback ? (
     <View style={[styles.fallback, { borderRadius: effectiveBorderRadius }]}>
@@ -166,13 +191,22 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         </Text>
       ) : null}
     </View>
+  ) : showLoadingPlaceholder ? (
+    <View style={[styles.loadingPlaceholder, { borderRadius: effectiveBorderRadius }]}>
+      <MaterialCommunityIcons
+        name="image-outline"
+        size={32}
+        color={theme.colors.onSurfaceVariant}
+        opacity={0.5}
+      />
+    </View>
   ) : (
-    <Image
-      source={{ uri: resolvedUri }}
-      // Use stored thumbhash as a placeholder when available. Expo Image accepts
-      // placeholder as an object or a string; providing the thumbhash string
-      // directly will render a compact placeholder until the real image loads.
-      placeholder={uri ? imageCacheService.getThumbhash(uri) ?? undefined : undefined}
+    <>
+      <Image
+        source={{ uri: resolvedUri }}
+        // Use stored thumbhash as a placeholder when available. Expo Image accepts
+        // placeholder as an object with thumbhash property for proper rendering.
+        placeholder={thumbhash ? { thumbhash } : undefined}
       style={[
         StyleSheet.absoluteFillObject,
         { borderRadius: effectiveBorderRadius },
@@ -188,6 +222,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         setHasError(true);
       }}
     />
+    </>
   );
 
   const effectiveLabel =
@@ -229,6 +264,12 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   fallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  loadingPlaceholder: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",

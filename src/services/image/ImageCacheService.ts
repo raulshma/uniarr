@@ -1206,8 +1206,10 @@ class ImageCacheService {
       if (this.thumbhashes.has(key)) return;
       const src = source ?? origUri;
       if (!src) return;
+
       // generateThumbhashAsync accepts a URL string or ImageRef
       const th = await Image.generateThumbhashAsync(src);
+
       if (th && typeof th === 'string' && th.length) {
         this.thumbhashes.set(key, th);
         // Persist thumbhashes (best-effort)
