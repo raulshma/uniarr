@@ -2197,7 +2197,7 @@ const RecentActivityCard = React.memo(({
             <View style={styles.trendingTVSection}>
               <View style={styles.trendingTVHeader}>
                 <Text style={styles.trendingTVSectionTitle}>Trending TV Shows</Text>
-                <TouchableOpacity onPress={() => router.push("/(auth)/discover/trending-tv")}>
+                <TouchableOpacity onPress={() => router.push("/(auth)/discover")}>
                   <Text style={styles.seeAllButtonSmall}>See all</Text>
                 </TouchableOpacity>
               </View>
@@ -2223,7 +2223,7 @@ const RecentActivityCard = React.memo(({
             <View style={styles.trendingTVSection}>
               <View style={styles.trendingTVHeader}>
                 <Text style={styles.trendingTVSectionTitle}>Trending TV Shows</Text>
-                <TouchableOpacity onPress={() => router.push("/(auth)/discover/trending-tv")}>
+                <TouchableOpacity onPress={() => router.push("/(auth)/discover")}>
                   <Text style={styles.seeAllButtonSmall}>See all</Text>
                 </TouchableOpacity>
               </View>
