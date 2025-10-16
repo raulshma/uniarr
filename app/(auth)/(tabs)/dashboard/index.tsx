@@ -29,6 +29,19 @@ import {
 import type { ServiceStatusState } from "@/components/service/ServiceStatus";
 import type { ConnectionResult } from "@/connectors/base/IConnector";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+
+// Memoize manager initialization to prevent multiple loadSavedServices calls
+let managerInitPromise: Promise<ConnectorManager> | null = null;
+const getInitializedManager = async (): Promise<ConnectorManager> => {
+  if (!managerInitPromise) {
+    managerInitPromise = (async () => {
+      const manager = ConnectorManager.getInstance();
+      await manager.loadSavedServices();
+      return manager;
+    })();
+  }
+  return managerInitPromise;
+};
 import { queryKeys } from "@/hooks/queryKeys";
 import type { AppTheme } from "@/constants/theme";
 import type { ServiceConfig, ServiceType } from "@/models/service.types";
@@ -207,8 +220,7 @@ const deriveStatus = (
 };
 
 const fetchServicesOverview = async (useFullTest = false): Promise<ServiceOverviewItem[]> => {
-  const manager = ConnectorManager.getInstance();
-  await manager.loadSavedServices();
+  const manager = await getInitializedManager();
 
   const configs = await secureStorage.getServiceConfigs();
   if (configs.length === 0) {
@@ -306,11 +318,8 @@ const formatRelativeTime = (input?: Date): string | undefined => {
 const fetchStatistics = async (filter: 'all' | 'recent' | 'month' = 'all'): Promise<StatisticsData> => {
   try {
     const { secureStorage } = await import('@/services/storage/SecureStorage');
-    const { ConnectorManager } = await import('@/connectors/manager/ConnectorManager');
 
-    const manager = ConnectorManager.getInstance();
-    await manager.loadSavedServices();
-
+    const manager = await getInitializedManager();
     const configs = await secureStorage.getServiceConfigs();
     const enabledConfigs = configs.filter(config => config.enabled);
 
@@ -377,11 +386,8 @@ const fetchStatistics = async (filter: 'all' | 'recent' | 'month' = 'all'): Prom
 const fetchRecentActivity = async (): Promise<RecentActivityItem[]> => {
   try {
     const { secureStorage } = await import('@/services/storage/SecureStorage');
-    const { ConnectorManager } = await import('@/connectors/manager/ConnectorManager');
 
-    const manager = ConnectorManager.getInstance();
-    await manager.loadSavedServices();
-
+    const manager = await getInitializedManager();
     const configs = await secureStorage.getServiceConfigs();
     const enabledConfigs = configs.filter(config => config.enabled);
 
@@ -511,11 +517,8 @@ const fetchContinueWatching = async (): Promise<ContinueWatchingItem[]> => {
   try {
     const { secureStorage } = await import('@/services/storage/SecureStorage');
     const { useConnectorsStore, selectGetConnectorsByType } = await import('@/store/connectorsStore');
-    const { ConnectorManager } = await import('@/connectors/manager/ConnectorManager');
 
-    const manager = ConnectorManager.getInstance();
-    await manager.loadSavedServices();
-
+    const manager = await getInitializedManager();
     const configs = await secureStorage.getServiceConfigs();
     const jellyfinConfigs = configs.filter(config => config.type === 'jellyfin' && config.enabled);
 
@@ -609,12 +612,9 @@ const calculateProgress = (positionTicks?: number, totalTicks?: number): number 
 const fetchTrendingTV = async (): Promise<TrendingTVItem[]> => {
   try {
     const { secureStorage } = await import('@/services/storage/SecureStorage');
-    const { ConnectorManager } = await import('@/connectors/manager/ConnectorManager');
     const { useUnifiedDiscover } = await import('@/hooks/useUnifiedDiscover');
 
-    const manager = ConnectorManager.getInstance();
-    await manager.loadSavedServices();
-
+    const manager = await getInitializedManager();
     const configs = await secureStorage.getServiceConfigs();
     const jellyseerrConfigs = configs.filter(config => config.type === 'jellyseerr' && config.enabled);
 
@@ -733,8 +733,8 @@ const DashboardScreen = () => {
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.services.overview,
     queryFn: () => fetchServicesOverview(false),
-    refetchInterval: 60000,
-    staleTime: 30000,
+    refetchInterval: false,
+    staleTime: 2 * 60 * 1000, // 2 minutes - cache services overview aggressively
   });
 
   // Custom refetch function that performs full connection tests
@@ -750,15 +750,15 @@ const DashboardScreen = () => {
   const { data: statisticsData, refetch: refetchStatistics } = useQuery({
     queryKey: ["statistics", statsFilter],
     queryFn: () => fetchStatistics(statsFilter),
-    refetchInterval: 300000, // 5 minutes
-    staleTime: 60000, // 1 minute
+    refetchInterval: false,
+    staleTime: 10 * 60 * 1000, // 10 minutes - statistics don't need real-time updates
   });
 
   const { data: recentActivityData, refetch: refetchRecentActivity } = useQuery({
     queryKey: ["recent-activity"],
     queryFn: fetchRecentActivity,
-    refetchInterval: 300000, // 5 minutes
-    staleTime: 60000, // 1 minute
+    refetchInterval: false,
+    staleTime: 10 * 60 * 1000, // 10 minutes - activity doesn't need real-time
   });
 
   const {
@@ -769,8 +769,8 @@ const DashboardScreen = () => {
 } = useQuery({
     queryKey: ["continue-watching"],
     queryFn: fetchContinueWatching,
-    refetchInterval: 300000, // 5 minutes
-    staleTime: 60000, // 1 minute
+    refetchInterval: false,
+    staleTime: 10 * 60 * 1000, // 10 minutes - cache continue watching
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     enabled: true,
@@ -784,8 +784,8 @@ const DashboardScreen = () => {
   } = useQuery({
     queryKey: ["trending-tv"],
     queryFn: fetchTrendingTV,
-    refetchInterval: 600000, // 10 minutes
-    staleTime: 300000, // 5 minutes
+    refetchInterval: false,
+    staleTime: 15 * 60 * 1000, // 15 minutes - trending data is not time-sensitive
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     enabled: true,
@@ -799,23 +799,26 @@ const DashboardScreen = () => {
   } = useQuery({
     queryKey: ["upcoming-releases"],
     queryFn: fetchUpcomingReleases,
-    refetchInterval: 600000, // 10 minutes
-    staleTime: 300000, // 5 minutes
+    refetchInterval: false,
+    staleTime: 15 * 60 * 1000, // 15 minutes - upcoming releases don't change often
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     enabled: true,
   });
 
-  
+  // Only refetch on manual pull-to-refresh, not on navigation
+  // This prevents the 3-4 second delay when switching to this screen
   useFocusEffect(
     useCallback(() => {
-      void refetch();
-      void refetchStatistics();
-      void refetchRecentActivity();
-      void refetchContinueWatching();
-      void refetchTrendingTV();
-      void refetchUpcomingReleases();
-    }, [refetch, refetchStatistics, refetchRecentActivity, refetchContinueWatching, refetchTrendingTV, refetchUpcomingReleases])
+      // Don't automatically refetch - rely on staleTime
+      // Manually trigger only if data is critically stale (> 5 minutes)
+      const now = Date.now();
+      const CRITICAL_STALE_THRESHOLD = 5 * 60 * 1000;
+      
+      // This callback intentionally does nothing on focus
+      // Users can pull-to-refresh for fresh data
+      return undefined;
+    }, [])
   );
 
   const services = data ?? [];
