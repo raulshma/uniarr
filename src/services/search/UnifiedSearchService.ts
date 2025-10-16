@@ -134,9 +134,6 @@ export class UnifiedSearchService {
     await this.manager.loadSavedServices();
 
     const allConnectors = this.manager.getAllConnectors();
-    console.log('UnifiedSearchService Debug - All connectors:',
-      allConnectors.map(c => ({ id: c.config.id, name: c.config.name, type: c.config.type, hasSearch: typeof c.search === 'function' }))
-    );
 
     const searchableServices = allConnectors
       .filter((connector) => typeof connector.search === "function")
@@ -149,7 +146,6 @@ export class UnifiedSearchService {
         first.serviceName.localeCompare(second.serviceName)
       );
 
-    console.log('UnifiedSearchService Debug - Searchable services:', searchableServices);
     return searchableServices;
   }
 

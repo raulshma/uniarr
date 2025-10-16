@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LogEntry, LogFilterOptions, LogLevel } from '@/models/logger.types';
 
 const STORAGE_KEY = 'LoggerService:entries';
+const LEVEL_STORAGE_KEY = 'LoggerService:level';
 const MAX_ENTRIES = 1_000;
 
 const levelPriority: Record<LogLevel, number> = {
@@ -72,6 +73,8 @@ class LoggerService {
 
   private minimumLevel: LogLevel = LogLevel.DEBUG;
 
+  private levelInitialized = false;
+
   static getInstance(): LoggerService {
     if (!LoggerService.instance) {
       LoggerService.instance = new LoggerService();
@@ -95,11 +98,30 @@ class LoggerService {
       this.entries = [];
     }
 
+    // Try to load a small persisted minimum level to apply earlier than
+    // any external rehydration of the settings store.
+    try {
+      const storedLevel = await AsyncStorage.getItem(LEVEL_STORAGE_KEY);
+      if (storedLevel && Object.values(LogLevel).includes(storedLevel as LogLevel)) {
+        this.minimumLevel = storedLevel as LogLevel;
+      }
+    } catch (error) {
+      if (isDevelopment) {
+        console.warn('[LoggerService] Failed to load persisted log level.', error);
+      }
+    }
+
     this.isInitialized = true;
   }
 
   setMinimumLevel(level: LogLevel): void {
     this.minimumLevel = level;
+    // Persist small key for faster startup next time
+    void AsyncStorage.setItem(LEVEL_STORAGE_KEY, level).catch((error) => {
+      if (isDevelopment) {
+        console.warn('[LoggerService] Failed to persist minimum log level.', error);
+      }
+    });
   }
 
   async clear(): Promise<void> {

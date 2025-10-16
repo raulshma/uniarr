@@ -22,13 +22,10 @@ export const NetworkTestButton: React.FC<NetworkTestButtonProps> = ({
     setIsTesting(true);
     
     try {
-      console.log(`🧪 [NetworkTestButton] Testing ${serviceType} connectivity to ${baseUrl}`);
-      
       const result = await testServiceAccessibility(baseUrl, serviceType);
       
       if (result.success) {
         const message = `${serviceType} is accessible! Latency: ${result.latency}ms`;
-        console.log(`✅ [NetworkTestButton] ${message}`);
   alert('Network Test', message);
         onResult?.({ success: true, message });
       } else {

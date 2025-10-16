@@ -100,13 +100,6 @@ export const UnifiedSearchPanel: React.FC = () => {
     mediaTypes: mediaFilters,
   });
 
-  // Debug logging
-  console.log('UnifiedSearchPanel Debug:', {
-    areServicesLoading,
-    searchableServicesLength: searchableServices.length,
-    searchableServices: searchableServices.map(s => ({ id: s.serviceId, name: s.serviceName, type: s.serviceType }))
-  });
-
   const serviceNameById = useMemo(() => {
     const entries = new Map<string, string>();
     for (const service of searchableServices) {

@@ -210,7 +210,6 @@ export class VoiceAssistantService {
   private async initializeSiriShortcuts(): Promise<void> {
     // Note: This requires native iOS code or Expo development build
     // For now, we'll provide the interface and note the requirement
-    console.log('Siri Shortcuts initialization - requires native iOS implementation');
 
     // Register all enabled iOS shortcuts
     const iosShortcuts = this.getShortcutsForPlatform('ios');
@@ -222,7 +221,6 @@ export class VoiceAssistantService {
   }
 
   private async cleanupSiriShortcuts(): Promise<void> {
-    console.log('Siri Shortcuts cleanup - requires native iOS implementation');
   }
 
   private async registerShortcutWithPlatform(shortcut: VoiceShortcut): Promise<void> {
@@ -252,7 +250,6 @@ export class VoiceAssistantService {
   private async registerSiriShortcut(shortcut: VoiceShortcut): Promise<void> {
     // This would use react-native-siri-shortcut or native iOS code
     // For now, we'll log what would be registered
-    console.log(`Register Siri Shortcut: ${shortcut.phrase} -> ${shortcut.action}`, shortcut.parameters);
 
     // Example implementation would be:
     // const SiriShortcut = require('react-native-siri-shortcut');
@@ -265,14 +262,11 @@ export class VoiceAssistantService {
   }
 
   private async unregisterSiriShortcut(shortcut: VoiceShortcut): Promise<void> {
-    console.log(`Unregister Siri Shortcut: ${shortcut.id}`);
     // Example: await SiriShortcut.deleteShortcut(shortcut.id);
   }
 
   // Google Assistant implementation (Android)
   private async initializeGoogleAssistant(): Promise<void> {
-    console.log('Google Assistant initialization - requires Android App Actions configuration');
-
     // Register all enabled Android shortcuts
     const androidShortcuts = this.getShortcutsForPlatform('android');
     for (const shortcut of androidShortcuts) {
@@ -283,13 +277,11 @@ export class VoiceAssistantService {
   }
 
   private async cleanupGoogleAssistant(): Promise<void> {
-    console.log('Google Assistant cleanup - requires Android configuration');
   }
 
   private async registerGoogleAssistantAction(shortcut: VoiceShortcut): Promise<void> {
     // This requires Android App Actions configuration in AndroidManifest.xml
     // and shortcuts.xml resource file
-    console.log(`Register Google Assistant Action: ${shortcut.phrase} -> ${shortcut.action}`, shortcut.parameters);
 
     // Example implementation would involve:
     // 1. Adding intent filters to AndroidManifest.xml
@@ -298,7 +290,6 @@ export class VoiceAssistantService {
   }
 
   private async unregisterGoogleAssistantAction(shortcut: VoiceShortcut): Promise<void> {
-    console.log(`Unregister Google Assistant Action: ${shortcut.id}`);
   }
 
   // Voice command processing

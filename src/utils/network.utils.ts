@@ -23,9 +23,6 @@ export async function testNetworkConnectivity(
   const startTime = Date.now();
 
   try {
-    console.log("🌐 [NetworkTest] Testing connectivity to:", url);
-    console.log("🌐 [NetworkTest] Timeout:", timeout);
-
     const response = await axios.get(url, {
       timeout,
       validateStatus: () => true, // Accept any status code
@@ -39,13 +36,6 @@ export async function testNetworkConnectivity(
     });
 
     const latency = Date.now() - startTime;
-
-    console.log("🌐 [NetworkTest] Response received:", {
-      status: response.status,
-      statusText: response.statusText,
-      latency,
-      headers: response.headers,
-    });
 
     return {
       success: true,
@@ -67,13 +57,6 @@ export async function testNetworkConnectivity(
       errRec && typeof errRec.code === "string"
         ? (errRec.code as string)
         : undefined;
-
-    console.error("🌐 [NetworkTest] Connection failed:", {
-      url,
-      error: errorMessage,
-      code: errorCode,
-      latency,
-    });
 
     // For VPN connections, some errors might still indicate partial connectivity
     const isPartialSuccess =
@@ -116,10 +99,6 @@ export async function testServiceAccessibility(
   }
 
   const fullUrl = `${baseUrl}${endpoint}`;
-  console.log(
-    `🌐 [ServiceTest] Testing ${serviceType} accessibility:`,
-    fullUrl
-  );
 
   return testNetworkConnectivity(fullUrl);
 }

@@ -455,27 +455,21 @@ const EditServiceScreen = () => {
 
   const handleSave = useCallback(
     async (values: ServiceConfigInput) => {
-      console.log("💾 [Edit] Starting save service with values:", values);
       if (!existingConfig) {
-        console.log("❌ [Edit] No existing config for save");
         return;
       }
 
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
-        console.log("❌ [Edit] Service type not supported:", values.type);
         setFormError("This service type is not supported yet.");
         return;
       }
 
       const config = buildServiceConfig(values, existingConfig);
-      console.log("📋 [Edit] Built config for save:", config);
 
       try {
-        console.log("🔍 [Edit] Checking existing services...");
         const existingServices = await secureStorage.getServiceConfigs();
-        console.log("📋 [Edit] Existing services:", existingServices.length);
 
         // Check for name conflicts (excluding current service)
         if (
@@ -485,7 +479,6 @@ const EditServiceScreen = () => {
               service.name.trim().toLowerCase() === config.name.toLowerCase()
           )
         ) {
-          console.log("❌ [Edit] Service name already exists");
           setFormError(
             "A service with this name already exists. Choose a different name."
           );
@@ -501,14 +494,11 @@ const EditServiceScreen = () => {
               service.url.toLowerCase() === config.url.toLowerCase()
           )
         ) {
-          console.log("❌ [Edit] Service already configured");
           setFormError("This service is already configured.");
           return;
         }
 
-        console.log("🔄 [Edit] Testing connection before save...");
         const testOutcome = await runConnectionTest(config);
-        console.log("✅ [Edit] Connection test result for save:", testOutcome);
 
         if (!testOutcome.success) {
           setFormError(
@@ -517,18 +507,13 @@ const EditServiceScreen = () => {
           return;
         }
 
-        console.log("💾 [Edit] Adding connector to manager...");
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
-        console.log("✅ [Edit] Connector added to manager");
 
-        console.log("🔄 [Edit] Invalidating queries...");
         await queryClient.invalidateQueries({
           queryKey: queryKeys.services.overview,
         });
-        console.log("✅ [Edit] Queries invalidated");
 
-        console.log("🎉 [Edit] Service updated successfully, showing alert...");
   alert(
           "Service updated",
           `${serviceTypeLabels[config.type]} has been updated successfully.`,

@@ -5,7 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 // small slices of state to avoid unnecessary re-renders.
 export { shallow } from 'zustand/shallow';
 
-import { logger } from '@/services/logger/LoggerService';
+import { logger, LogLevel } from '@/services/logger/LoggerService';
 import type { NotificationCategory, QuietHoursConfig } from '@/models/notification.types';
 import type { CalendarView } from '@/models/calendar.types';
 import {
@@ -38,6 +38,8 @@ type SettingsData = {
   jellyseerrRetryAttempts: number;
   // Maximum image cache size in bytes. Default: 100MB
   maxImageCacheSize: number;
+  // Minimum log level for the application's logger
+  logLevel: LogLevel;
     // (thumbnail generation removed)
 };
 
@@ -64,6 +66,7 @@ interface SettingsState extends SettingsData {
   setTmdbEnabled: (enabled: boolean) => void;
   setJellyseerrRetryAttempts: (attempts: number) => void;
   setMaxImageCacheSize: (size: number) => void;
+  setLogLevel: (level: LogLevel) => void;
     // (thumbnail setters removed)
 }
 
@@ -121,6 +124,7 @@ const createDefaultSettings = (): SettingsData => ({
   tmdbEnabled: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
   maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
+  logLevel: LogLevel.DEBUG,
     // (thumbnail defaults removed)
 });
 
@@ -128,6 +132,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       ...createDefaultSettings(),
+      setLogLevel: (level: LogLevel) => set({ logLevel: level }),
       setTheme: (theme) => set({ theme }),
       updateCustomThemeConfig: (config) =>
         set((state) => ({
@@ -189,10 +194,11 @@ export const useSettingsStore = create<SettingsState>()(
         tmdbEnabled: state.tmdbEnabled,
         jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
         maxImageCacheSize: state.maxImageCacheSize,
+        logLevel: state.logLevel,
   // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 5,
+      version: 6,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -257,6 +263,16 @@ export const useSettingsStore = create<SettingsState>()(
             state.maxImageCacheSize = normalizedSize;
           }
         }
+
+        // Ensure we have a valid log level and apply it to the logger
+        if (typeof state.logLevel === 'undefined') {
+          state.logLevel = baseDefaults.logLevel;
+        }
+        try {
+          logger.setMinimumLevel(state.logLevel);
+        } catch {
+          // don't crash on logger wiring
+        }
       },
       migrate: (persistedState) => {
         if (!persistedState) {
@@ -293,6 +309,7 @@ export const useSettingsStore = create<SettingsState>()(
           maxImageCacheSize: clampMaxImageCacheSize(
             partial.maxImageCacheSize ?? baseDefaults.maxImageCacheSize,
           ),
+          logLevel: (partial.logLevel as LogLevel) ?? baseDefaults.logLevel,
           // thumbnail migration removed
           quietHours,
           criticalHealthAlertsBypassQuietHours:

@@ -177,15 +177,9 @@ const AddServiceScreen = () => {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
-  // Debug showDebugPanel state changes
-  useEffect(() => {
-    console.log("🧪 [AddService] showDebugPanel changed to:", showDebugPanel);
-  }, [showDebugPanel]);
-
   // Subscribe to debug logger
   useEffect(() => {
     const unsubscribe = debugLogger.subscribe((steps) => {
-      console.log("🧪 [AddService] Debug steps updated:", steps);
       setDebugSteps(steps);
     });
     return unsubscribe;
@@ -416,18 +410,11 @@ const AddServiceScreen = () => {
 
   const handleTestConnection = useCallback(
     async (values: ServiceConfigInput): Promise<void> => {
-      console.log(
-        "🧪 [AddService] handleTestConnection called with values:",
-        values
-      );
-      console.log("🧪 [AddService] Form errors:", errors);
       resetDiagnostics();
       debugLogger.clear();
       setShowDebugPanel(true);
-      console.log("🧪 [AddService] Debug panel should be visible now");
 
       if (!supportedTypeSet.has(values.type)) {
-        console.log("❌ [AddService] Service type not supported:", values.type);
         debugLogger.addError(
           "Service type not supported",
           `Selected service type '${values.type}' is not available yet.`
@@ -436,7 +423,6 @@ const AddServiceScreen = () => {
         return;
       }
 
-      console.log("🧪 [AddService] Starting test connection...");
       setIsTesting(true);
 
       try {
@@ -460,22 +446,11 @@ const AddServiceScreen = () => {
           }
         }
 
-        console.log(
-          "🧪 [AddService] Starting connection test for:",
-          config.type,
-          config.url
-        );
         const result = await runConnectionTest(config);
-        console.log("🧪 [AddService] Connection test result:", result);
 
         if (result.success) {
           setTestResult(result);
-          console.log("✅ [AddService] Connection test successful");
         } else {
-          console.log(
-            "❌ [AddService] Connection test failed:",
-            result.message
-          );
           setTestError(
             result.message ?? "Unable to connect to the selected service."
           );
@@ -503,22 +478,17 @@ const AddServiceScreen = () => {
 
   const handleSave = useCallback(
     async (values: ServiceConfigInput): Promise<void> => {
-      console.log("💾 [AddService] handleSave called with values:", values);
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
-        console.log("❌ Service type not supported:", values.type);
         setFormError("This service type is not supported yet.");
         return;
       }
 
       const config = buildServiceConfig(values, generateServiceId());
-      console.log("📋 Built config for save:", config);
 
       try {
-        console.log("🔍 Checking existing services...");
         const existingServices = await secureStorage.getServiceConfigs();
-        console.log("📋 Existing services:", existingServices.length);
 
         if (
           existingServices.some(
@@ -526,7 +496,6 @@ const AddServiceScreen = () => {
               service.name.trim().toLowerCase() === config.name.toLowerCase()
           )
         ) {
-          console.log("❌ Service name already exists");
           setFormError(
             "A service with this name already exists. Choose a different name."
           );
@@ -540,38 +509,26 @@ const AddServiceScreen = () => {
               service.url.toLowerCase() === config.url.toLowerCase()
           )
         ) {
-          console.log("❌ Service already configured");
           setFormError("This service is already configured.");
           return;
         }
 
-        console.log("🔄 Testing connection before save...");
         const testOutcome = await runConnectionTest(config);
-        console.log("✅ Connection test result for save:", testOutcome);
 
         if (!testOutcome.success) {
-          console.log(
-            "❌ Connection test failed during save:",
-            testOutcome.message
-          );
           setFormError(
             testOutcome.message ?? "Unable to verify the connection."
           );
           return;
         }
 
-        console.log("💾 Adding connector to manager...");
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
-        console.log("✅ Connector added to manager");
 
-        console.log("🔄 Invalidating queries...");
         await queryClient.invalidateQueries({
           queryKey: queryKeys.services.overview,
         });
-        console.log("✅ Queries invalidated");
 
-        console.log("🎉 Service saved successfully, showing alert...");
   alert(
           "Service added",
           `${serviceTypeLabels[config.type]} has been connected successfully.`,
@@ -1141,10 +1098,6 @@ const AddServiceScreen = () => {
             <Button
               mode="contained"
               onPress={() => {
-                console.log("🧪 [AddService] Test Connection button pressed");
-                console.log("🧪 [AddService] Form errors:", errors);
-                console.log("🧪 [AddService] Is submitting:", isSubmitting);
-                console.log("🧪 [AddService] Is testing:", isTesting);
                 handleSubmit(handleTestConnection)();
               }}
               loading={isTesting}
@@ -1160,10 +1113,6 @@ const AddServiceScreen = () => {
             <Button
               mode="contained"
               onPress={() => {
-                console.log("💾 [AddService] Save Service button pressed");
-                console.log("💾 [AddService] Form errors:", errors);
-                console.log("💾 [AddService] Is submitting:", isSubmitting);
-                console.log("💾 [AddService] Is testing:", isTesting);
                 handleSubmit(handleSave)();
               }}
               loading={isSubmitting}

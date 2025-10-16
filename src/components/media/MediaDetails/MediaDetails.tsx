@@ -469,10 +469,6 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                         value={season.monitored ?? true}
                         onValueChange={() => {
                           // TODO: Handle season monitoring toggle
-                          console.log(
-                            "Toggle season monitoring for season",
-                            season.seasonNumber
-                          );
                         }}
                         color={theme.colors.primary}
                         trackColor={{
@@ -652,7 +648,6 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             <Button
               mode="contained"
               onPress={() => {
-                console.log("Search missing episodes");
               }}
               buttonColor={theme.colors.primary}
               textColor={theme.colors.onPrimary}
@@ -665,7 +660,6 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             <Button
               mode="outlined"
               onPress={() => {
-                console.log("Unmonitor all episodes");
               }}
               textColor={theme.colors.onSurfaceVariant}
               style={{ flex: 1, borderRadius: 8 }}

@@ -289,7 +289,6 @@ const VoiceAssistantScreen: React.FC = () => {
                 value={config.naturalLanguageEnabled}
                 onValueChange={(enabled) => {
                   // This would update the config in the service
-                  console.log("NLP setting:", enabled);
                 }}
               />
             </View>
@@ -311,7 +310,6 @@ const VoiceAssistantScreen: React.FC = () => {
                 value={config.voiceFeedback}
                 onValueChange={(enabled) => {
                   // This would update the config in the service
-                  console.log("Voice feedback setting:", enabled);
                 }}
               />
             </View>

@@ -92,8 +92,11 @@ const SettingsScreen = () => {
     tmdbEnabled,
     maxImageCacheSize,
     setMaxImageCacheSize,
+    logLevel,
+    setLogLevel,
   // image thumbnailing controls removed
   } = useSettingsStore();
+  const [logLevelVisible, setLogLevelVisible] = useState(false);
   const [jellyseerrRetriesVisible, setJellyseerrRetriesVisible] = useState(false);
   const [imageCacheUsage, setImageCacheUsage] = useState<ImageCacheUsage>({
     size: 0,
@@ -849,6 +852,31 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
+          <AnimatedListItem index={2} totalItems={2}>
+            <Card variant="custom" style={styles.settingCard}>
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="console"
+                    size={20}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Log Level</Text>
+                  <Text style={styles.settingValue}>{logLevel}</Text>
+                </View>
+                <Button
+                  mode="contained-tonal"
+                  compact
+                  onPress={() => setLogLevelVisible(true)}
+                  style={{ height: 32 }}
+                >
+                  Set
+                </Button>
+              </View>
+            </Card>
+          </AnimatedListItem>
         </AnimatedSection>
 
         {/* Thumbnail concurrency dialog removed */}
@@ -999,6 +1027,51 @@ const SettingsScreen = () => {
             </Dialog.Content>
             <Dialog.Actions>
               <Button mode="outlined" onPress={() => setJellyseerrRetriesVisible(false)}>
+                Cancel
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+        {/* Log Level Selection Dialog */}
+        <Portal>
+          <Dialog
+            visible={logLevelVisible}
+            onDismiss={() => setLogLevelVisible(false)}
+            style={{
+              borderRadius: 12,
+              backgroundColor: theme.colors.elevation.level1,
+            }}
+          >
+            <Dialog.Title style={styles.sectionTitle}>Log Level</Dialog.Title>
+            <Dialog.Content>
+              <Text style={{ ...styles.settingValue, marginBottom: spacing.md }}>
+                Select minimum log level to record and show in developer consoles.
+              </Text>
+              <View style={{ gap: spacing.xs }}>
+                {["DEBUG", "INFO", "WARN", "ERROR"].map((level) => (
+                  <Button
+                    key={level}
+                    mode={logLevel === level ? "contained" : "outlined"}
+                    onPress={() => {
+                      // Update store and logger
+                      // cast is safe because model uses same string enums
+                      setLogLevel(level as any);
+                      try {
+                        logger.setMinimumLevel(level as any);
+                      } catch {
+                        // noop
+                      }
+                      setLogLevelVisible(false);
+                    }}
+                    style={{ marginVertical: 0 }}
+                  >
+                    {level}
+                  </Button>
+                ))}
+              </View>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button mode="outlined" onPress={() => setLogLevelVisible(false)}>
                 Cancel
               </Button>
             </Dialog.Actions>

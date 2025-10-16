@@ -250,7 +250,6 @@ const CalendarScreen = () => {
   });
 
   const handleReleasePress = useCallback((releaseId: string) => {
-    console.log("Release pressed:", releaseId);
   }, []);
 
   const handleRetry = useCallback(() => {
