@@ -116,8 +116,11 @@ type DashboardListItem =
   | { type: "services-grid"; data: ServiceOverviewItem[] }
   | { type: "statistics"; data: StatisticsData }
   | { type: "continue-watching"; data: ContinueWatchingItem[] }
+  | { type: "continue-watching-loading" }
   | { type: "trending-tv"; data: TrendingTVItem[] }
+  | { type: "trending-tv-loading" }
   | { type: "upcoming-releases"; data: UpcomingReleaseItem[] }
+  | { type: "upcoming-releases-loading" }
   | { type: "recent-activity-header" }
   | { type: "recent-activity"; data: RecentActivityItem[] }
   | { type: "activity" }
@@ -789,47 +792,49 @@ const DashboardScreen = () => {
   const listData: DashboardListItem[] = useMemo(() => {
     const items: DashboardListItem[] = [{ type: "header" }, { type: "welcome-section" }, { type: "shortcuts" }];
 
-    if (services.length === 0) {
-      items.push({ type: "empty" });
-      return items;
+    // Always show services grid if there are services or they're loading
+    if (services.length > 0) {
+      items.push({ type: "services-grid", data: services });
     }
 
-    // Add services grid
-    items.push({ type: "services-grid", data: services });
-
-    // Add statistics
+    // Always show statistics section
     if (statisticsData) {
       items.push({ type: "statistics", data: statisticsData });
     }
 
-    // Add continue watching section - always show for development/debugging
-    if (continueWatchingData && continueWatchingData.length > 0) {
+    // Add continue watching section - always show during loading or when available
+    if (isLoadingContinueWatching) {
+      items.push({ type: "continue-watching-loading" });
+    } else if (continueWatchingData && continueWatchingData.length > 0) {
       items.push({ type: "continue-watching", data: continueWatchingData });
-    } else if (isLoadingContinueWatching || !continueWatchingData) {
-      // Show loading skeleton or empty state when data is loading or unavailable
-      items.push({ type: "continue-watching", data: continueWatchingData || [] });
     }
 
-    // Add trending TV section - always show for development/debugging
-    if (trendingTVData && trendingTVData.length > 0) {
+    // Add trending TV section - always show during loading or when available
+    if (isLoadingTrendingTV) {
+      items.push({ type: "trending-tv-loading" });
+    } else if (trendingTVData && trendingTVData.length > 0) {
       items.push({ type: "trending-tv", data: trendingTVData });
-    } else if (isLoadingTrendingTV || !trendingTVData) {
-      // Show loading skeleton or empty state when data is loading or unavailable
-      items.push({ type: "trending-tv", data: trendingTVData || [] });
     }
 
-    // Add upcoming releases section - always show for development/debugging
-    if (upcomingReleasesData && upcomingReleasesData.length > 0) {
+    // Add upcoming releases section - always show during loading or when available
+    if (isLoadingUpcomingReleases) {
+      items.push({ type: "upcoming-releases-loading" });
+    } else if (upcomingReleasesData && upcomingReleasesData.length > 0) {
       items.push({ type: "upcoming-releases", data: upcomingReleasesData });
-    } else if (isLoadingUpcomingReleases || !upcomingReleasesData) {
-      // Show loading skeleton or empty state when data is loading or unavailable
-      items.push({ type: "upcoming-releases", data: upcomingReleasesData || [] });
     }
 
     // Add recent activity header and content
     items.push({ type: "recent-activity-header" });
     if (recentActivityData && recentActivityData.length > 0) {
       items.push({ type: "recent-activity", data: recentActivityData });
+    }
+
+    // Only show empty state if there are no services AND no dynamic content is loading/available
+    if (services.length === 0 &&
+        !isLoadingContinueWatching && !continueWatchingData &&
+        !isLoadingTrendingTV && !trendingTVData &&
+        !isLoadingUpcomingReleases && !upcomingReleasesData) {
+      items.push({ type: "empty" });
     }
 
     return items;
@@ -2027,24 +2032,34 @@ const RecentActivityCard = React.memo(({
                 </TouchableOpacity>
               </View>
               <View style={styles.continueWatchingList}>
-                {item.data.length > 0 ? (
-                  item.data.slice(0, 4).map((watching, index) => (
-                    <AnimatedListItem
-                      key={watching.id}
-                      index={index}
-                      totalItems={item.data.length}
-                    >
-                      <ContinueWatchingCard item={watching} />
-                    </AnimatedListItem>
-                  ))
-                ) : (
-                  // Show skeleton when data is loading
-                  Array.from({ length: 4 }).map((_, index) => (
-                    <AnimatedListItem key={`continue-watching-loading-${index}`} index={index} totalItems={4}>
-                      <ContinueWatchingCardSkeleton />
-                    </AnimatedListItem>
-                  ))
-                )}
+                {item.data.slice(0, 4).map((watching, index) => (
+                  <AnimatedListItem
+                    key={watching.id}
+                    index={index}
+                    totalItems={item.data.length}
+                  >
+                    <ContinueWatchingCard item={watching} />
+                  </AnimatedListItem>
+                ))}
+              </View>
+            </View>
+          );
+
+        case "continue-watching-loading":
+          return (
+            <View style={styles.continueWatchingSection}>
+              <View style={styles.continueWatchingHeader}>
+                <Text style={styles.continueWatchingTitle}>Continue Watching</Text>
+                <TouchableOpacity onPress={() => router.push("/(auth)/continue-watching")}>
+                  <Text style={styles.seeAllButtonSmall}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.continueWatchingList}>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <AnimatedListItem key={`continue-watching-loading-${index}`} index={index} totalItems={4}>
+                    <ContinueWatchingCardSkeleton />
+                  </AnimatedListItem>
+                ))}
               </View>
             </View>
           );
@@ -2059,24 +2074,34 @@ const RecentActivityCard = React.memo(({
                 </TouchableOpacity>
               </View>
               <View style={styles.trendingTVList}>
-                {item.data.length > 0 ? (
-                  item.data.slice(0, 8).map((show, index) => (
-                    <AnimatedListItem
-                      key={show.id}
-                      index={index}
-                      totalItems={item.data.length}
-                    >
-                      <TrendingTVCard item={show} />
-                    </AnimatedListItem>
-                  ))
-                ) : (
-                  // Show skeleton when data is loading
-                  Array.from({ length: 8 }).map((_, index) => (
-                    <AnimatedListItem key={`trending-tv-loading-${index}`} index={index} totalItems={8}>
-                      <TrendingTVCardSkeleton />
-                    </AnimatedListItem>
-                  ))
-                )}
+                {item.data.slice(0, 8).map((show, index) => (
+                  <AnimatedListItem
+                    key={show.id}
+                    index={index}
+                    totalItems={item.data.length}
+                  >
+                    <TrendingTVCard item={show} />
+                  </AnimatedListItem>
+                ))}
+              </View>
+            </View>
+          );
+
+        case "trending-tv-loading":
+          return (
+            <View style={styles.trendingTVSection}>
+              <View style={styles.trendingTVHeader}>
+                <Text style={styles.trendingTVSectionTitle}>Trending TV Shows</Text>
+                <TouchableOpacity onPress={() => router.push("/(auth)/discover/trending-tv")}>
+                  <Text style={styles.seeAllButtonSmall}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.trendingTVList}>
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <AnimatedListItem key={`trending-tv-loading-${index}`} index={index} totalItems={8}>
+                    <TrendingTVCardSkeleton />
+                  </AnimatedListItem>
+                ))}
               </View>
             </View>
           );
@@ -2091,24 +2116,34 @@ const RecentActivityCard = React.memo(({
                 </TouchableOpacity>
               </View>
               <View style={styles.upcomingReleasesList}>
-                {item.data.length > 0 ? (
-                  item.data.slice(0, 4).map((release, index) => (
-                    <AnimatedListItem
-                      key={release.id}
-                      index={index}
-                      totalItems={item.data.length}
-                    >
-                      <UpcomingReleaseCard item={release} />
-                    </AnimatedListItem>
-                  ))
-                ) : (
-                  // Show skeleton when data is loading
-                  Array.from({ length: 4 }).map((_, index) => (
-                    <AnimatedListItem key={`upcoming-releases-loading-${index}`} index={index} totalItems={4}>
-                      <UpcomingReleaseCardSkeleton />
-                    </AnimatedListItem>
-                  ))
-                )}
+                {item.data.slice(0, 4).map((release, index) => (
+                  <AnimatedListItem
+                    key={release.id}
+                    index={index}
+                    totalItems={item.data.length}
+                  >
+                    <UpcomingReleaseCard item={release} />
+                  </AnimatedListItem>
+                ))}
+              </View>
+            </View>
+          );
+
+        case "upcoming-releases-loading":
+          return (
+            <View style={styles.upcomingReleasesSection}>
+              <View style={styles.upcomingReleasesHeader}>
+                <Text style={styles.upcomingReleasesTitle}>Upcoming Releases</Text>
+                <TouchableOpacity onPress={() => router.push("/(auth)/calendar")}>
+                  <Text style={styles.seeAllButtonSmall}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.upcomingReleasesList}>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <AnimatedListItem key={`upcoming-releases-loading-${index}`} index={index} totalItems={4}>
+                    <UpcomingReleaseCardSkeleton />
+                  </AnimatedListItem>
+                ))}
               </View>
             </View>
           );
@@ -2182,6 +2217,9 @@ const RecentActivityCard = React.memo(({
       continueWatchingData,
       trendingTVData,
       upcomingReleasesData,
+      isLoadingContinueWatching,
+      isLoadingTrendingTV,
+      isLoadingUpcomingReleases,
     ]
   );
 
@@ -2199,10 +2237,16 @@ const RecentActivityCard = React.memo(({
         return "statistics";
       case "continue-watching":
         return `continue-watching-${item.data.length}`;
+      case "continue-watching-loading":
+        return "continue-watching-loading";
       case "trending-tv":
         return `trending-tv-${item.data.length}`;
+      case "trending-tv-loading":
+        return "trending-tv-loading";
       case "upcoming-releases":
         return `upcoming-releases-${item.data.length}`;
+      case "upcoming-releases-loading":
+        return "upcoming-releases-loading";
       case "recent-activity-header":
         return "recent-activity-header";
       case "recent-activity":
@@ -2216,108 +2260,7 @@ const RecentActivityCard = React.memo(({
 
   const getItemType = useCallback((item: DashboardListItem) => item.type, []);
 
-  if (isLoading && services.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.listContent}>
-          <AnimatedHeader>
-            <TabHeader
-              rightAction={{
-                icon: "plus",
-                onPress: handleAddService,
-                accessibilityLabel: "Add service",
-              }}
-            />
-          </AnimatedHeader>
-          <View style={styles.welcomeSection}>
-            <View style={styles.welcomeHeader}>
-              <SkeletonPlaceholder width={120} height={32} borderRadius={8} />
-              <SkeletonPlaceholder width={60} height={20} borderRadius={4} />
-            </View>
-          </View>
-          <View style={styles.shortcutsSection}>
-            <View style={styles.shortcutsGrid}>
-              {Array.from({ length: 4 }).map((_, index) => (
-                <AnimatedListItem key={`shortcut-skeleton-${index}`} index={index} totalItems={4}>
-                  <SkeletonPlaceholder width={(screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4} height={80} borderRadius={12} />
-                </AnimatedListItem>
-              ))}
-            </View>
-          </View>
-          <View style={styles.servicesGrid}>
-            {Array.from({ length: 4 }).map((_, index) => (
-              <AnimatedListItem key={`service-skeleton-${index}`} index={index} totalItems={4}>
-                <SkeletonPlaceholder width={(screenWidth - spacing.lg * 2 - spacing.sm) / 2} height={80} borderRadius={12} />
-              </AnimatedListItem>
-            ))}
-          </View>
-          <View style={styles.statisticsSection}>
-            <View style={styles.statisticsHeader}>
-              <SkeletonPlaceholder width={100} height={24} borderRadius={6} />
-              <SkeletonPlaceholder width={50} height={18} borderRadius={4} />
-            </View>
-            <View style={styles.statisticsGrid}>
-              {Array.from({ length: 4 }).map((_, index) => (
-                <AnimatedListItem key={`stat-skeleton-${index}`} index={index} totalItems={4}>
-                  <SkeletonPlaceholder width={(screenWidth - spacing.lg * 2 - spacing.sm) / 2} height={100} borderRadius={12} />
-                </AnimatedListItem>
-              ))}
-            </View>
-          </View>
-          <View style={styles.continueWatchingSection}>
-            <View style={styles.continueWatchingHeader}>
-              <SkeletonPlaceholder width={140} height={24} borderRadius={6} />
-              <SkeletonPlaceholder width={50} height={18} borderRadius={4} />
-            </View>
-            <View style={styles.continueWatchingList}>
-              {Array.from({ length: 4 }).map((_, index) => (
-                <AnimatedListItem key={`continue-watching-skeleton-${index}`} index={index} totalItems={4}>
-                  <ContinueWatchingCardSkeleton />
-                </AnimatedListItem>
-              ))}
-            </View>
-          </View>
-          <View style={styles.trendingTVSection}>
-            <View style={styles.trendingTVHeader}>
-              <SkeletonPlaceholder width={140} height={24} borderRadius={6} />
-              <SkeletonPlaceholder width={50} height={18} borderRadius={4} />
-            </View>
-            <View style={styles.trendingTVList}>
-              {Array.from({ length: 8 }).map((_, index) => (
-                <AnimatedListItem key={`trending-tv-skeleton-${index}`} index={index} totalItems={8}>
-                  <TrendingTVCardSkeleton />
-                </AnimatedListItem>
-              ))}
-            </View>
-          </View>
-          <View style={styles.upcomingReleasesSection}>
-            <View style={styles.upcomingReleasesHeader}>
-              <SkeletonPlaceholder width={140} height={24} borderRadius={6} />
-              <SkeletonPlaceholder width={50} height={18} borderRadius={4} />
-            </View>
-            <View style={styles.upcomingReleasesList}>
-              {Array.from({ length: 4 }).map((_, index) => (
-                <AnimatedListItem key={`upcoming-releases-skeleton-${index}`} index={index} totalItems={4}>
-                  <UpcomingReleaseCardSkeleton />
-                </AnimatedListItem>
-              ))}
-            </View>
-          </View>
-          <View style={styles.recentActivityHeader}>
-            <SkeletonPlaceholder width={140} height={24} borderRadius={6} />
-          </View>
-          <View style={styles.recentActivityList}>
-            {Array.from({ length: 3 }).map((_, index) => (
-              <AnimatedListItem key={`activity-skeleton-${index}`} index={index} totalItems={3}>
-                <SkeletonPlaceholder width={screenWidth - spacing.lg * 2} height={95} borderRadius={12} />
-              </AnimatedListItem>
-            ))}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
+  
   return (
     <Portal.Host>
       <SafeAreaView style={styles.container}>
