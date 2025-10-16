@@ -34,11 +34,6 @@ export class ConnectorManager {
   /** Load previously saved service configurations and bootstrap connectors for enabled entries. */
   async loadSavedServices(): Promise<void> {
     const configs = await secureStorage.getServiceConfigs();
-    console.log('ConnectorManager Debug - Loading saved services:', {
-      totalConfigs: configs.length,
-      enabledConfigs: configs.filter(c => c.enabled).length,
-      configs: configs.map(c => ({ id: c.id, name: c.name, type: c.type, enabled: c.enabled }))
-    });
 
     await Promise.all(
       configs
@@ -55,8 +50,6 @@ export class ConnectorManager {
           }
         }),
     );
-
-    console.log('ConnectorManager Debug - Finished loading services. Total connectors:', this.connectors.size);
   }
 
   /** Create and register a connector for the provided configuration. */
@@ -64,24 +57,18 @@ export class ConnectorManager {
     config: ServiceConfig,
     options: AddConnectorOptions = {},
   ): Promise<IConnector> {
-    logger.debug('[ConnectorManager] Adding connector', { serviceType: config.type, serviceId: config.id });
-    
     const existing = this.connectors.get(config.id);
     if (existing) {
-      logger.debug('[ConnectorManager] Disposing existing connector', { serviceId: config.id });
       existing.dispose();
       this.connectors.delete(config.id);
     }
 
-    logger.debug('[ConnectorManager] Creating connector via factory');
     const connector = ConnectorFactory.create(config);
-    logger.debug('[ConnectorManager] Connector created, adding to map', { serviceId: config.id });
     this.connectors.set(config.id, connector);
     this.updateStore?.(this.connectors);
 
     if (options.persist !== false) {
       await secureStorage.saveServiceConfig(config);
-      logger.debug('[ConnectorManager] Persisted config to storage', { serviceId: config.id });
     }
 
     void logger.info('Connector registered.', {
@@ -89,7 +76,6 @@ export class ConnectorManager {
       serviceType: config.type,
     });
 
-    logger.debug('[ConnectorManager] Connector registration completed', { serviceId: config.id });
     return connector;
   }
 

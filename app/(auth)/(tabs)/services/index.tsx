@@ -24,8 +24,6 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import {
   AnimatedListItem,
-  AnimatedSection,
-  AnimatedScrollView,
 } from "@/components/common/AnimatedComponents";
 import { ServiceStatus } from "@/components/service/ServiceStatus";
 import type { ServiceStatusState } from "@/components/service/ServiceStatus";
@@ -163,8 +161,18 @@ const fetchServicesOverview = async (): Promise<ServiceOverviewItem[]> => {
     return [];
   }
 
-  const connectionResults = await manager.testAllConnections();
   const checkedAt = new Date();
+
+  // Test connections with a timeout and staggered approach to avoid blocking UI
+  const connectionResults = await Promise.race([
+    manager.testAllConnections(),
+    new Promise<Map<string, ConnectionResult>>((resolve) => {
+      // Timeout after 8 seconds to show partial results
+      setTimeout(() => {
+        resolve(new Map());
+      }, 8000);
+    }),
+  ]);
 
   return configs.map((config) => {
     const connectionResult = connectionResults.get(config.id);
@@ -203,10 +211,7 @@ const ServicesScreen = () => {
   const isRefreshing = isFetching && !isLoading;
 
   // We render the tab header outside of the list so it remains fixed.
-  const listData: ServiceOverviewItem[] = useMemo(
-    () => services.slice(),
-    [services]
-  );
+  const listData: ServiceOverviewItem[] = services;
 
   const styles = useMemo(
     () =>
@@ -475,17 +480,11 @@ const ServicesScreen = () => {
     }
   );
 
-  const renderServiceItem = useCallback(
+  const renderItem = useCallback(
     ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
       <ServiceCard item={item} index={index} />
     ),
     []
-  );
-
-  const renderItem = useCallback(
-    ({ item, index }: { item: ServiceOverviewItem; index: number }) =>
-      renderServiceItem({ item, index }),
-    [renderServiceItem]
   );
 
   const keyExtractor = useCallback(
@@ -533,14 +532,14 @@ const ServicesScreen = () => {
           }}
           style={{ paddingHorizontal: spacing.xxs }}
         />
-        <AnimatedScrollView
+        <ScrollView
           style={styles.content}
           contentContainerStyle={{
             paddingVertical: spacing.lg,
             paddingBottom: spacing.xxxxl,
           }}
         >
-          <AnimatedSection style={styles.section} delay={100}>
+          <View style={styles.section}>
             <SkeletonPlaceholder
               width="50%"
               height={28}
@@ -548,20 +547,18 @@ const ServicesScreen = () => {
               style={{ marginBottom: spacing.md }}
             />
             {Array.from({ length: 4 }).map((_, index) => (
-              <AnimatedListItem
+              <View
                 key={index}
-                index={index}
-                totalItems={4}
                 style={{
                   marginBottom: spacing.sm,
                   marginHorizontal: spacing.md,
                 }}
               >
                 <ServiceCardSkeleton />
-              </AnimatedListItem>
+              </View>
             ))}
-          </AnimatedSection>
-        </AnimatedScrollView>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -588,9 +585,9 @@ const ServicesScreen = () => {
           { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
         ]}
         ListEmptyComponent={
-          <AnimatedSection style={styles.emptyContainer} delay={100}>
+          <View style={styles.emptyContainer}>
             {listEmptyComponent}
-          </AnimatedSection>
+          </View>
         }
         refreshControl={
           <ListRefreshControl
@@ -601,6 +598,7 @@ const ServicesScreen = () => {
         showsVerticalScrollIndicator={false}
         getItemType={getItemType}
         removeClippedSubviews={true}
+        scrollEventThrottle={16}
       />
 
       <Portal>
@@ -613,7 +611,7 @@ const ServicesScreen = () => {
             borderRadius: 12,
           }}
         >
-          <AnimatedSection delay={50}>
+          <View>
             <List.Item
               title="Edit Service"
               left={(props) => <List.Icon {...props} icon="pencil" />}
@@ -632,7 +630,7 @@ const ServicesScreen = () => {
               )}
               onPress={handleDeleteService}
             />
-          </AnimatedSection>
+          </View>
         </Modal>
       </Portal>
     </SafeAreaView>

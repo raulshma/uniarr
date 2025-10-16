@@ -107,22 +107,15 @@ export const AnimatedListItem: React.FC<AnimatedListItemProps> = React.memo(({
   index = 0,
   totalItems = 1,
 }) => {
-  // Calculate minimal delay for staggered effect (max 200ms total delay)
-  // Limit items that get animated to prevent performance issues with large lists
-  const isWithinAnimationLimit = index < 8;
-  const delay = isWithinAnimationLimit ? Math.min(index * 40, 200) : 0;
-
+  // Skip animations entirely for performance
   return (
-    <Animated.View
+    <View
       style={style}
-      entering={isWithinAnimationLimit ? FadeIn.duration(300).delay(delay) : undefined}
-      exiting={isWithinAnimationLimit ? FadeOut.duration(200) : undefined}
-      // Performance optimizations
       removeClippedSubviews={true}
       collapsable={true}
     >
       {children}
-    </Animated.View>
+    </View>
   );
 });
 
@@ -138,17 +131,15 @@ export const AnimatedSection: React.FC<AnimatedSectionProps> = React.memo(({
   style,
   delay = 0,
 }) => {
+  // Skip animations entirely for performance
   return (
-    <Animated.View
+    <View
       style={style}
-      entering={FadeIn.duration(400).delay(delay)}
-      exiting={FadeOut.duration(250)}
-      // Performance optimizations
       removeClippedSubviews={true}
       collapsable={true}
     >
       {children}
-    </Animated.View>
+    </View>
   );
 });
 
