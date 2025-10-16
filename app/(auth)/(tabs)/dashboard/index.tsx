@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View, Dimensions } from "react-native";
+import type { ViewStyle } from 'react-native';
 import { alert } from '@/services/dialogService';
 import { Text, useTheme, IconButton, Modal, Portal } from "react-native-paper";
 import { TouchableOpacity } from "react-native";
@@ -1819,13 +1820,17 @@ const ContinueWatchingCard = React.memo(({
 
 const TrendingTVCard = React.memo(({
   item,
-  onPress
+  onPress,
+  style,
+  posterSize,
 }: {
   item: TrendingTVItem;
   onPress?: (item: TrendingTVItem) => void;
+  style?: ViewStyle | ViewStyle[];
+  posterSize?: number;
 }) => (
   <TouchableOpacity
-    style={styles.trendingTVCard}
+    style={[styles.trendingTVCard, style]}
     onPress={() => onPress?.(item)}
     activeOpacity={0.7}
   >
@@ -1833,7 +1838,7 @@ const TrendingTVCard = React.memo(({
       {item.posterUri ? (
         <MediaPoster
           uri={item.posterUri}
-          size={(screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4}
+          size={posterSize ?? ((screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4)}
           borderRadius={0}
           style={{ width: '100%', height: '100%' }}
         />
@@ -2189,7 +2194,14 @@ const RecentActivityCard = React.memo(({
             </View>
           );
 
-        case "trending-tv":
+        case "trending-tv": {
+          // Use 2 columns when there are fewer than 4 items to make better use of space
+          const totalItems = Math.min(item.data.length, 8);
+          const columns = totalItems < 4 ? 2 : 4;
+          const gutterTotal = spacing.lg * 2 + spacing.sm * (columns - 1);
+          const cardWidth = (screenWidth - gutterTotal) / columns;
+          const posterSize = cardWidth; // poster should fill card width
+
           return (
             <View style={styles.trendingTVSection}>
               <View style={styles.trendingTVHeader}>
@@ -2203,17 +2215,20 @@ const RecentActivityCard = React.memo(({
                   <AnimatedListItem
                     key={show.id}
                     index={index}
-                    totalItems={item.data.length}
+                    totalItems={totalItems}
                   >
                     <TrendingTVCard
                       item={show}
                       onPress={handleTrendingTVPress}
+                      style={{ width: cardWidth }}
+                      posterSize={posterSize}
                     />
                   </AnimatedListItem>
                 ))}
               </View>
             </View>
           );
+        }
 
         case "trending-tv-loading":
           return (
