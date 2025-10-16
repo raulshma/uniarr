@@ -517,6 +517,31 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
+  async getHistory(options?: { page?: number; pageSize?: number }): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
+    try {
+      const params: Record<string, unknown> = {};
+      if (options?.page) params.page = options.page;
+      if (options?.pageSize) params.pageSize = options.pageSize;
+      // Include related data for better UI display
+      params.includeMovie = true;
+      // Order by most recent first
+      params.sortKey = "date";
+      params.sortDirection = "descending";
+
+      const response = await this.client.get<
+        components["schemas"]["HistoryResourcePagingResource"]
+      >(`${RADARR_API_PREFIX}/history`, { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getHistory",
+        endpoint: `${RADARR_API_PREFIX}/history`,
+      });
+    }
+  }
+
   private buildAddPayload(request: AddMovieRequest): Record<string, unknown> {
     const sanitizedRoot = this.trimTrailingSlash(request.rootFolderPath);
     const pathSuffix =

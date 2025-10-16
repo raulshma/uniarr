@@ -34,6 +34,11 @@ export class ConnectorManager {
   /** Load previously saved service configurations and bootstrap connectors for enabled entries. */
   async loadSavedServices(): Promise<void> {
     const configs = await secureStorage.getServiceConfigs();
+    console.log('ConnectorManager Debug - Loading saved services:', {
+      totalConfigs: configs.length,
+      enabledConfigs: configs.filter(c => c.enabled).length,
+      configs: configs.map(c => ({ id: c.id, name: c.name, type: c.type, enabled: c.enabled }))
+    });
 
     await Promise.all(
       configs
@@ -50,6 +55,8 @@ export class ConnectorManager {
           }
         }),
     );
+
+    console.log('ConnectorManager Debug - Finished loading services. Total connectors:', this.connectors.size);
   }
 
   /** Create and register a connector for the provided configuration. */

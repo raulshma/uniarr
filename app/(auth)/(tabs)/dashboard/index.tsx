@@ -1,10 +1,11 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View, Dimensions } from "react-native";
 import { alert } from '@/services/dialogService';
-import { Text, useTheme, IconButton } from "react-native-paper";
+import { Text, useTheme, IconButton, Modal, Portal } from "react-native-paper";
+import { TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 
@@ -15,16 +16,13 @@ import {
   AnimatedSection,
 } from "@/components/common";
 
-import { Button } from "@/components/common/Button";
-import { Card } from "@/components/common/Card";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
+import { MediaPoster } from "@/components/media/MediaPoster";
 import {
-  ServiceCard,
   ServiceCardSkeleton,
 } from "@/components/service/ServiceCard";
 import {
-  ListRowSkeleton,
   SkeletonPlaceholder,
 } from "@/components/common/Skeleton";
 // Unified search has been moved to its own page. Navigate to the search route from the dashboard.
@@ -32,9 +30,6 @@ import type { ServiceStatusState } from "@/components/service/ServiceStatus";
 import type { ConnectionResult } from "@/connectors/base/IConnector";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { queryKeys } from "@/hooks/queryKeys";
-import { useRecentlyAdded } from "@/hooks/useRecentlyAdded";
-import type { QBittorrentConnector } from "@/connectors/implementations/QBittorrentConnector";
-import { isTorrentActive } from "@/utils/torrent.utils";
 import type { AppTheme } from "@/constants/theme";
 import type { ServiceConfig, ServiceType } from "@/models/service.types";
 import { useAuth } from "@/services/auth/AuthProvider";
@@ -60,11 +55,71 @@ type SummaryMetrics = {
   lastUpdated?: Date;
 };
 
+type StatisticsData = {
+  shows: number;
+  movies: number;
+  episodes: number;
+  watched: number;
+};
+
+type RecentActivityItem = {
+  id: string;
+  title: string;
+  episode: string;
+  show: string;
+  date: string;
+  image?: string;
+};
+
+type ContinueWatchingItem = {
+  id: string;
+  title: string;
+  type: 'movie' | 'episode';
+  show?: string;
+  season?: number;
+  episode?: number;
+  progress: number; // 0-100
+  duration: number; // in minutes
+  watchedMinutes: number;
+  posterUri?: string;
+  nextEpisodeAvailable?: boolean;
+};
+
+type TrendingTVItem = {
+  id: string;
+  title: string;
+  year?: number;
+  rating?: number;
+  posterUri?: string;
+  tmdbId?: number;
+  tvdbId?: number;
+  overview?: string;
+  popularity?: number;
+};
+
+type UpcomingReleaseItem = {
+  id: string;
+  title: string;
+  type: 'movie' | 'episode';
+  releaseDate: string;
+  posterUri?: string;
+  show?: string;
+  season?: number;
+  episode?: number;
+  monitored?: boolean;
+};
+
 type DashboardListItem =
   | { type: "header" }
-  | { type: "search" }
-  | { type: "services" }
-  | { type: "service"; data: ServiceOverviewItem }
+  | { type: "welcome-section" }
+  | { type: "shortcuts" }
+  | { type: "services-grid"; data: ServiceOverviewItem[] }
+  | { type: "statistics"; data: StatisticsData }
+  | { type: "continue-watching"; data: ContinueWatchingItem[] }
+  | { type: "trending-tv"; data: TrendingTVItem[] }
+  | { type: "upcoming-releases"; data: UpcomingReleaseItem[] }
+  | { type: "recent-activity-header" }
+  | { type: "recent-activity"; data: RecentActivityItem[] }
   | { type: "activity" }
   | { type: "empty" };
 
@@ -118,12 +173,11 @@ const deriveStatus = (
 
   const latency = result.latency ?? undefined;
   const version = result.version ?? undefined;
+  // For health checks, we don't measure latency, so don't mark as degraded based on latency
   const isHighLatency = typeof latency === "number" && latency > 2000;
 
   const status: ServiceStatusState = result.success
-    ? isHighLatency
-      ? "degraded"
-      : "online"
+    ? (latency === undefined ? "online" : isHighLatency ? "degraded" : "online")
     : "offline";
 
   const descriptionParts: string[] = [];
@@ -149,7 +203,7 @@ const deriveStatus = (
   };
 };
 
-const fetchServicesOverview = async (): Promise<ServiceOverviewItem[]> => {
+const fetchServicesOverview = async (useFullTest = false): Promise<ServiceOverviewItem[]> => {
   const manager = ConnectorManager.getInstance();
   await manager.loadSavedServices();
 
@@ -158,11 +212,47 @@ const fetchServicesOverview = async (): Promise<ServiceOverviewItem[]> => {
     return [];
   }
 
-  const connectionResults = await manager.testAllConnections();
+  let results: Map<string, ConnectionResult>;
   const checkedAt = new Date();
 
+  if (useFullTest) {
+    // Use full connection tests for refresh (provides latency and version info)
+    results = await manager.testAllConnections();
+  } else {
+    // Use health checks for initial dashboard load (faster and lighter)
+    const healthResults = await Promise.allSettled(
+      configs.map(async (config): Promise<[string, ConnectionResult]> => {
+        const connector = manager.getConnector(config.id);
+        if (!connector) {
+          return [config.id, { success: false, message: 'Connector not found' }];
+        }
+
+        try {
+          const health = await connector.getHealth();
+          return [config.id, {
+            success: health.status === 'healthy',
+            message: health.message,
+            latency: undefined, // Health checks don't measure latency
+            version: undefined,
+          }];
+        } catch (error) {
+          return [config.id, {
+            success: false,
+            message: error instanceof Error ? error.message : 'Health check failed'
+          }];
+        }
+      })
+    );
+
+    const fulfilledResults = healthResults
+      .filter((result): result is PromiseFulfilledResult<[string, ConnectionResult]> => result.status === 'fulfilled')
+      .map(result => result.value);
+
+    results = new Map(fulfilledResults);
+  }
+
   return configs.map((config) => {
-    const connectionResult = connectionResults.get(config.id);
+    const connectionResult = results.get(config.id);
     const statusFields = deriveStatus(config, connectionResult, checkedAt);
 
     return {
@@ -209,92 +299,554 @@ const formatRelativeTime = (input?: Date): string | undefined => {
   return `${months}mo ago`;
 };
 
-const fetchDownloadsSummary = async (): Promise<{
-  active: number;
-  total: number;
-}> => {
-  const manager = ConnectorManager.getInstance();
-  await manager.loadSavedServices();
-  const connectors = manager.getConnectorsByType(
-    "qbittorrent"
-  ) as QBittorrentConnector[];
 
-  if (connectors.length === 0) {
-    return { active: 0, total: 0 };
-  }
+const fetchStatistics = async (filter: 'all' | 'recent' | 'month' = 'all'): Promise<StatisticsData> => {
+  try {
+    const { secureStorage } = await import('@/services/storage/SecureStorage');
+    const { ConnectorManager } = await import('@/connectors/manager/ConnectorManager');
 
-  let totalActive = 0;
-  let totalTorrents = 0;
+    const manager = ConnectorManager.getInstance();
+    await manager.loadSavedServices();
 
-  for (const connector of connectors) {
-    try {
-      const torrents = await connector.getTorrents();
-      totalTorrents += torrents.length;
-      totalActive += torrents.filter(isTorrentActive).length;
-    } catch (error) {
-      // Skip this connector if it fails
-      console.warn(
-        `Failed to fetch torrents from ${connector.config.name}:`,
-        error
-      );
+    const configs = await secureStorage.getServiceConfigs();
+    const enabledConfigs = configs.filter(config => config.enabled);
+
+    let shows = 0;
+    let movies = 0;
+    let episodes = 0;
+    let watched = 0;
+
+    // Fetch statistics from Sonarr
+    const sonarrConfigs = enabledConfigs.filter(config => config.type === 'sonarr');
+    for (const config of sonarrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (connector && connector.config.type === 'sonarr') {
+          const sonarrConnector = connector as any;
+          // Get all series and calculate statistics
+          const series = await sonarrConnector.getSeries?.();
+          if (series) {
+            shows += series.length;
+            episodes += series.reduce((sum: number, s: any) => sum + (s.episodeFileCount || 0), 0);
+            watched += series.reduce((sum: number, s: any) => sum + (s.episodeCount || 0), 0);
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch statistics from Sonarr ${config.name}:`, error);
+      }
     }
-  }
 
-  return { active: totalActive, total: totalTorrents };
+    // Fetch statistics from Radarr
+    const radarrConfigs = enabledConfigs.filter(config => config.type === 'radarr');
+    for (const config of radarrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (connector && connector.config.type === 'radarr') {
+          const radarrConnector = connector as any;
+          // Get all movies and calculate statistics
+          const moviesList = await radarrConnector.getMovies?.();
+          if (moviesList) {
+            movies += moviesList.filter((m: any) => m.hasFile).length;
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch statistics from Radarr ${config.name}:`, error);
+      }
+    }
+
+    return {
+      shows,
+      movies,
+      episodes,
+      watched,
+    };
+  } catch (error) {
+    console.error('Failed to fetch statistics data:', error);
+    return {
+      shows: 0,
+      movies: 0,
+      episodes: 0,
+      watched: 0,
+    };
+  }
+};
+
+const fetchRecentActivity = async (): Promise<RecentActivityItem[]> => {
+  try {
+    const { secureStorage } = await import('@/services/storage/SecureStorage');
+    const { ConnectorManager } = await import('@/connectors/manager/ConnectorManager');
+
+    const manager = ConnectorManager.getInstance();
+    await manager.loadSavedServices();
+
+    const configs = await secureStorage.getServiceConfigs();
+    const enabledConfigs = configs.filter(config => config.enabled);
+
+    const recentActivity: RecentActivityItem[] = [];
+
+    // Fetch recent activity from Sonarr
+    const sonarrConfigs = enabledConfigs.filter(config => config.type === 'sonarr');
+    for (const config of sonarrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (connector && connector.config.type === 'sonarr') {
+          const sonarrConnector = connector as any;
+          const history = await sonarrConnector.getHistory?.({ page: 1, pageSize: 10 });
+          if (history?.records) {
+            for (const record of history.records.slice(0, 5)) {
+              if ((record as any).series) {
+                // Build image URL from series data
+                const series = (record as any).series;
+                let imageUrl: string | undefined;
+
+                if (series.images && series.images.length > 0) {
+                  const posterImage = series.images.find((img: any) => img.coverType === 'poster');
+                  if (posterImage) {
+                    const connector = manager.getConnector(config.id);
+                    imageUrl = `${(connector?.config as any)?.baseUrl}/MediaCover/${series.id}/poster.jpg?apikey=${(connector?.config as any)?.apiKey}`;
+                  }
+                }
+
+                recentActivity.push({
+                  id: `sonarr-${config.id}-${record.id}`,
+                  title: series.title || 'Unknown',
+                  episode: (record as any).episode ? `S${(record as any).episode.seasonNumber?.toString().padStart(2, '0')}E${(record as any).episode.episodeNumber?.toString().padStart(2, '0')}` : '',
+                  show: series.title || '',
+                  date: formatRelativeTime(new Date((record as any).date)) || 'Unknown',
+                  image: imageUrl,
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch recent activity from Sonarr ${config.name}:`, error);
+      }
+    }
+
+    // Fetch recent activity from Radarr
+    const radarrConfigs = enabledConfigs.filter(config => config.type === 'radarr');
+    for (const config of radarrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (connector && connector.config.type === 'radarr') {
+          const radarrConnector = connector as any;
+          const history = await radarrConnector.getHistory?.({ page: 1, pageSize: 10 });
+          if (history?.records) {
+            for (const record of history.records.slice(0, 5)) {
+              if ((record as any).movie) {
+                // Build image URL from movie data
+                const movie = (record as any).movie;
+                let imageUrl: string | undefined;
+
+                if (movie.images && movie.images.length > 0) {
+                  const posterImage = movie.images.find((img: any) => img.coverType === 'poster');
+                  if (posterImage) {
+                    const connector = manager.getConnector(config.id);
+                    imageUrl = `${(connector?.config as any)?.baseUrl}/MediaCover/${movie.id}/poster.jpg?apikey=${(connector?.config as any)?.apiKey}`;
+                  }
+                }
+
+                recentActivity.push({
+                  id: `radarr-${config.id}-${record.id}`,
+                  title: movie.title || 'Unknown',
+                  episode: 'Movie',
+                  show: movie.title || '',
+                  date: formatRelativeTime(new Date((record as any).date)) || 'Unknown',
+                  image: imageUrl,
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch recent activity from Radarr ${config.name}:`, error);
+      }
+    }
+
+    // Sort by date (most recent first) and limit to 10 items
+    return recentActivity.slice(0, 10);
+  } catch (error) {
+    console.error('Failed to fetch recent activity data:', error);
+    return [];
+  }
+};
+
+const fetchContinueWatching = async (): Promise<ContinueWatchingItem[]> => {
+  try {
+    const { secureStorage } = await import('@/services/storage/SecureStorage');
+    const { useConnectorsStore, selectGetConnectorsByType } = await import('@/store/connectorsStore');
+    const { ConnectorManager } = await import('@/connectors/manager/ConnectorManager');
+
+    const manager = ConnectorManager.getInstance();
+    await manager.loadSavedServices();
+
+    const configs = await secureStorage.getServiceConfigs();
+    const jellyfinConfigs = configs.filter(config => config.type === 'jellyfin' && config.enabled);
+
+    if (jellyfinConfigs.length === 0) {
+      return [];
+    }
+
+    const continueWatchingItems: ContinueWatchingItem[] = [];
+
+    for (const config of jellyfinConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (!connector || connector.config.type !== 'jellyfin') continue;
+
+        const jellyfinConnector = connector as any;
+
+        // Get resume items and currently playing sessions
+        const [resumeItems, sessions] = await Promise.all([
+          jellyfinConnector.getResumeItems?.(20, ['Movie', 'Episode']) || [],
+          jellyfinConnector.getNowPlayingSessions?.() || []
+        ]);
+
+        // Process resume items
+        for (const item of resumeItems.slice(0, 4)) {
+          const progress = calculateProgress(item.UserData?.PlaybackPositionTicks, item.RunTimeTicks);
+          if (progress > 0 && progress < 100) {
+            continueWatchingItems.push({
+              id: item.Id || `jellyfin-${config.id}-${item.Name}`,
+              title: item.Name || 'Unknown',
+              type: item.Type === 'Movie' ? 'movie' : 'episode',
+              show: item.Type === 'Episode' ? item.SeriesName : undefined,
+              season: item.Type === 'Episode' ? item.ParentIndexNumber : undefined,
+              episode: item.Type === 'Episode' ? item.IndexNumber : undefined,
+              progress,
+              duration: Math.floor((item.RunTimeTicks || 0) / 600000000), // Convert ticks to minutes
+              watchedMinutes: Math.floor((item.UserData?.PlaybackPositionTicks || 0) / 600000000),
+              posterUri: item.ImageTags?.Primary
+                ? `${(connector.config as any).baseUrl}/Items/${item.Id}/Images/Primary?api_key=${(connector.config as any).apiKey}&tag=${item.ImageTags.Primary}`
+                : undefined,
+              nextEpisodeAvailable: false, // This would need additional API call
+            });
+          }
+        }
+
+        // Process currently playing sessions
+        for (const session of sessions.slice(0, 4)) {
+          const item = session.NowPlayingItem || session.NowViewingItem;
+          if (!item) continue;
+
+          const progress = calculateProgress(session.PlayState?.PositionTicks, item.RunTimeTicks);
+          if (progress > 0 && progress < 100) {
+            continueWatchingItems.push({
+              id: item.Id || `jellyfin-session-${config.id}-${item.Name}`,
+              title: item.Name || 'Unknown',
+              type: item.Type === 'Movie' ? 'movie' : 'episode',
+              show: item.Type === 'Episode' ? item.SeriesName : undefined,
+              season: item.Type === 'Episode' ? item.ParentIndexNumber : undefined,
+              episode: item.Type === 'Episode' ? item.IndexNumber : undefined,
+              progress,
+              duration: Math.floor((item.RunTimeTicks || 0) / 600000000),
+              watchedMinutes: Math.floor((session.PlayState?.PositionTicks || 0) / 600000000),
+              posterUri: item.ImageTags?.Primary
+                ? `${(connector.config as any).baseUrl}/Items/${item.Id}/Images/Primary?api_key=${(connector.config as any).apiKey}&tag=${item.ImageTags.Primary}`
+                : undefined,
+              nextEpisodeAvailable: false,
+            });
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch continue watching from Jellyfin ${config.name}:`, error);
+      }
+    }
+
+    // Return empty array if no data found
+
+    // Sort by last played and limit to 4 items
+    return continueWatchingItems.slice(0, 4);
+  } catch (error) {
+    console.error('Failed to fetch continue watching data:', error);
+    return [];
+  }
+};
+
+// Helper function to calculate progress percentage
+const calculateProgress = (positionTicks?: number, totalTicks?: number): number => {
+  if (!positionTicks || !totalTicks) return 0;
+  const progress = (positionTicks / totalTicks) * 100;
+  return Math.round(Math.min(Math.max(progress, 0), 100));
+};
+
+const fetchTrendingTV = async (): Promise<TrendingTVItem[]> => {
+  try {
+    const { secureStorage } = await import('@/services/storage/SecureStorage');
+    const { ConnectorManager } = await import('@/connectors/manager/ConnectorManager');
+    const { useUnifiedDiscover } = await import('@/hooks/useUnifiedDiscover');
+
+    const manager = ConnectorManager.getInstance();
+    await manager.loadSavedServices();
+
+    const configs = await secureStorage.getServiceConfigs();
+    const jellyseerrConfigs = configs.filter(config => config.type === 'jellyseerr' && config.enabled);
+
+    if (jellyseerrConfigs.length === 0) {
+      return [];
+    }
+
+    const trendingTVItems: TrendingTVItem[] = [];
+
+    for (const config of jellyseerrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (!connector || connector.config.type !== 'jellyseerr') continue;
+
+        const jellyseerrConnector = connector as any;
+
+        // Fetch trending TV shows from Jellyseerr
+        const response = await jellyseerrConnector.getTrending?.({ page: 1 });
+        if (!response?.items) continue;
+
+        // Filter only TV shows and map to our format
+        for (const item of response.items.slice(0, 8)) {
+          if (item.mediaType === 'tv') {
+            const tvItem: TrendingTVItem = {
+              id: item.id || `jellyseerr-tv-${item.title}`,
+              title: item.title || item.name || 'Unknown',
+              year: item.releaseDate ? parseInt(item.releaseDate.split('-')[0]) : undefined,
+              rating: item.voteAverage,
+              posterUri: item.posterPath
+                ? `https://image.tmdb.org/t/p/w500${item.posterPath}`
+                : (item.mediaInfo?.posterPath
+                  ? `https://image.tmdb.org/t/p/w500${item.mediaInfo.posterPath}`
+                  : undefined),
+              tmdbId: item.tmdbId || item.mediaInfo?.tmdbId,
+              tvdbId: item.tvdbId || item.mediaInfo?.tvdbId,
+              overview: item.overview || item.mediaInfo?.overview,
+              popularity: item.popularity,
+            };
+            trendingTVItems.push(tvItem);
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch trending TV from Jellyseerr ${config.name}:`, error);
+      }
+    }
+
+    // Return empty array if no data found
+
+    // Sort by popularity and limit to 8 items
+    return trendingTVItems
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 8);
+  } catch (error) {
+    console.error('Failed to fetch trending TV data:', error);
+    return [];
+  }
+};
+
+const fetchUpcomingReleases = async (): Promise<UpcomingReleaseItem[]> => {
+  try {
+    const { CalendarService } = await import('@/services/calendar/CalendarService');
+
+    const calendarService = CalendarService.getInstance();
+
+    // Set filters for upcoming releases (next 30 days)
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 30);
+
+    const filters = {
+      mediaTypes: ['movie', 'episode'] as ['movie', 'episode'],
+      statuses: ['upcoming'] as ['upcoming'],
+      services: [],
+      serviceTypes: ['sonarr', 'radarr'] as ['sonarr', 'radarr'],
+      monitoredStatus: 'monitored' as const,
+      dateRange: {
+        start: today.toISOString().split('T')[0]!,
+        end: endDate.toISOString().split('T')[0]!,
+      },
+    };
+
+    const releases = await calendarService.getReleases(filters);
+
+    // Map to our format and limit to 4 items
+    if (releases && releases.length > 0) {
+      return releases.slice(0, 4).map((release) => ({
+        id: release.id,
+        title: release.type === 'episode' ? (release.seriesTitle || release.title) : release.title,
+        type: release.type as 'movie' | 'episode',
+        releaseDate: release.releaseDate,
+        posterUri: release.posterUrl,
+        show: release.type === 'episode' ? release.seriesTitle : undefined,
+        season: release.seasonNumber,
+        episode: release.episodeNumber,
+        monitored: release.monitored,
+      }));
+    }
+
+    // Return empty array if no real data found
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch upcoming releases data:', error);
+    return [];
+  }
 };
 
 const DashboardScreen = () => {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const queryClient = useQueryClient();
   const [menuVisible, setMenuVisible] = useState(false);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [statsFilter, setStatsFilter] = useState<'all' | 'recent' | 'month'>('all');
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.services.overview,
-    queryFn: fetchServicesOverview,
+    queryFn: () => fetchServicesOverview(false),
     refetchInterval: 60000,
     staleTime: 30000,
   });
 
-  const { data: downloadsData, isLoading: isLoadingDownloads } = useQuery({
-    queryKey: queryKeys.activity.downloadsOverview,
-    queryFn: fetchDownloadsSummary,
-    refetchInterval: 30000,
-    staleTime: 15000,
+  // Custom refetch function that performs full connection tests
+  const refetchWithFullTest = useCallback(async () => {
+    // Trigger a full connection test by calling the function with useFullTest=true
+    const result = await fetchServicesOverview(true);
+    // Update the query cache with the new results
+    queryClient.setQueryData(queryKeys.services.overview, result);
+    return result;
+  }, [queryClient]);
+
+  
+  const { data: statisticsData, refetch: refetchStatistics } = useQuery({
+    queryKey: ["statistics", statsFilter],
+    queryFn: () => fetchStatistics(statsFilter),
+    refetchInterval: 300000, // 5 minutes
+    staleTime: 60000, // 1 minute
+  });
+
+  const { data: recentActivityData, refetch: refetchRecentActivity } = useQuery({
+    queryKey: ["recent-activity"],
+    queryFn: fetchRecentActivity,
+    refetchInterval: 300000, // 5 minutes
+    staleTime: 60000, // 1 minute
   });
 
   const {
-    recentlyAdded: recentlyAddedData,
-    isLoading: isLoadingRecentlyAdded,
-  } = useRecentlyAdded();
+  data: continueWatchingData,
+  isLoading: isLoadingContinueWatching,
+  error: continueWatchingError,
+  refetch: refetchContinueWatching
+} = useQuery({
+    queryKey: ["continue-watching"],
+    queryFn: fetchContinueWatching,
+    refetchInterval: 300000, // 5 minutes
+    staleTime: 60000, // 1 minute
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    enabled: true,
+  });
 
+  const {
+    data: trendingTVData,
+    isLoading: isLoadingTrendingTV,
+    error: trendingTVError,
+    refetch: refetchTrendingTV
+  } = useQuery({
+    queryKey: ["trending-tv"],
+    queryFn: fetchTrendingTV,
+    refetchInterval: 600000, // 10 minutes
+    staleTime: 300000, // 5 minutes
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    enabled: true,
+  });
+
+  const {
+    data: upcomingReleasesData,
+    isLoading: isLoadingUpcomingReleases,
+    error: upcomingReleasesError,
+    refetch: refetchUpcomingReleases
+  } = useQuery({
+    queryKey: ["upcoming-releases"],
+    queryFn: fetchUpcomingReleases,
+    refetchInterval: 600000, // 10 minutes
+    staleTime: 300000, // 5 minutes
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    enabled: true,
+  });
+
+  
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch])
+      void refetchStatistics();
+      void refetchRecentActivity();
+      void refetchContinueWatching();
+      void refetchTrendingTV();
+      void refetchUpcomingReleases();
+    }, [refetch, refetchStatistics, refetchRecentActivity, refetchContinueWatching, refetchTrendingTV, refetchUpcomingReleases])
   );
 
   const services = data ?? [];
   const isRefreshing = isFetching && !isLoading;
 
   const listData: DashboardListItem[] = useMemo(() => {
-    const items: DashboardListItem[] = [{ type: "header" }, { type: "search" }];
+    const items: DashboardListItem[] = [{ type: "header" }, { type: "welcome-section" }, { type: "shortcuts" }];
 
     if (services.length === 0) {
       items.push({ type: "empty" });
       return items;
     }
 
-    items.push({ type: "services" });
+    // Add services grid
+    items.push({ type: "services-grid", data: services });
 
-    services.forEach((service) => {
-      items.push({ type: "service", data: service });
-    });
+    // Add statistics
+    if (statisticsData) {
+      items.push({ type: "statistics", data: statisticsData });
+    }
 
-    items.push({ type: "activity" });
+    // Add continue watching section - always show for development/debugging
+    if (continueWatchingData && continueWatchingData.length > 0) {
+      items.push({ type: "continue-watching", data: continueWatchingData });
+    } else if (isLoadingContinueWatching || !continueWatchingData) {
+      // Show loading skeleton or empty state when data is loading or unavailable
+      items.push({ type: "continue-watching", data: continueWatchingData || [] });
+    }
+
+    // Add trending TV section - always show for development/debugging
+    if (trendingTVData && trendingTVData.length > 0) {
+      items.push({ type: "trending-tv", data: trendingTVData });
+    } else if (isLoadingTrendingTV || !trendingTVData) {
+      // Show loading skeleton or empty state when data is loading or unavailable
+      items.push({ type: "trending-tv", data: trendingTVData || [] });
+    }
+
+    // Add upcoming releases section - always show for development/debugging
+    if (upcomingReleasesData && upcomingReleasesData.length > 0) {
+      items.push({ type: "upcoming-releases", data: upcomingReleasesData });
+    } else if (isLoadingUpcomingReleases || !upcomingReleasesData) {
+      // Show loading skeleton or empty state when data is loading or unavailable
+      items.push({ type: "upcoming-releases", data: upcomingReleasesData || [] });
+    }
+
+    // Add recent activity header and content
+    items.push({ type: "recent-activity-header" });
+    if (recentActivityData && recentActivityData.length > 0) {
+      items.push({ type: "recent-activity", data: recentActivityData });
+    }
 
     return items;
-  }, [services]);
+  }, [
+    services,
+    statisticsData,
+    continueWatchingData,
+    trendingTVData,
+    upcomingReleasesData,
+    recentActivityData,
+    isLoadingContinueWatching,
+    isLoadingTrendingTV,
+    isLoadingUpcomingReleases,
+    isLoading
+  ]);
+
+  const screenWidth = Dimensions.get('window').width;
 
   const styles = useMemo(
     () =>
@@ -304,63 +856,462 @@ const DashboardScreen = () => {
           backgroundColor: theme.colors.background,
         },
         listContent: {
-          paddingBottom: 100, // Increased to account for curved tab bar (60px + 20px center button extension + extra padding)
+          paddingBottom: 100,
         },
-        section: {
-          marginTop: spacing.xs,
+
+        // Welcome Section
+        welcomeSection: {
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+          marginBottom: spacing.md,
         },
-        searchWrapper: {
-          marginTop: spacing.xxs,
-          marginHorizontal: spacing.md,
+        welcomeHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         },
-        shortcutsWrapper: {
-          flexDirection: "row",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          marginHorizontal: spacing.md,
+        welcomeTitle: {
+          fontSize: 28,
+          fontWeight: '700',
+          color: theme.colors.onBackground,
+          letterSpacing: -0.5,
         },
-        shortcutTile: {
-          width: "100%",
-          backgroundColor: theme.colors.elevation.level1,
+        seeAllButton: {
+          fontSize: 16,
+          fontWeight: '500',
+          color: theme.colors.primary,
+        },
+
+        // Shortcuts Section
+        shortcutsSection: {
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.xl,
+        },
+        shortcutsGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+        },
+        shortcutCard: {
+          width: (screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4,
+          backgroundColor: theme.colors.surface,
           borderRadius: 12,
-          padding: spacing.sm,
+          padding: spacing.md,
           marginBottom: spacing.sm,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          alignItems: 'center',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
         },
-        // wrapper around each shortcut to control column width when using Animated wrappers
-        shortcutTileWrapper: {
-          width: "48%",
-        },
-        shortcutInner: {
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 96,
-        },
-        shortcutIcon: {
+        shortcutIconContainer: {
           width: 40,
           height: 40,
           borderRadius: 20,
-          backgroundColor: theme.colors.surfaceVariant,
-          alignItems: "center",
-          justifyContent: "center",
+          backgroundColor: theme.colors.primaryContainer,
+          alignItems: 'center',
+          justifyContent: 'center',
           marginBottom: spacing.xs,
         },
         shortcutLabel: {
+          fontSize: 12,
+          fontWeight: '600',
           color: theme.colors.onSurface,
-          fontSize: theme.custom.typography.titleSmall.fontSize,
-          fontFamily: theme.custom.typography.titleSmall.fontFamily,
-          lineHeight: theme.custom.typography.titleSmall.lineHeight,
-          letterSpacing: theme.custom.typography.titleSmall.letterSpacing,
-          fontWeight: theme.custom.typography.titleSmall.fontWeight as any,
-          textAlign: "center",
+          textAlign: 'center',
         },
         shortcutSubtitle: {
+          fontSize: 10,
           color: theme.colors.onSurfaceVariant,
-          fontSize: theme.custom.typography.bodySmall.fontSize,
-          fontFamily: theme.custom.typography.bodySmall.fontFamily,
-          lineHeight: theme.custom.typography.bodySmall.lineHeight,
-          letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
-          fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
-          textAlign: "center",
+          textAlign: 'center',
+          marginTop: 2,
+        },
+
+        // Services Grid
+        servicesGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.xl,
+        },
+        serviceCard: {
+          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 12,
+          padding: spacing.md,
+          marginBottom: spacing.sm,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+        serviceContent: {
+          flexDirection: "row",
+          alignItems: "center",
+        },
+        serviceIcon: {
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: theme.colors.primaryContainer,
+          alignItems: "center",
+          justifyContent: "center",
+          marginRight: spacing.sm,
+        },
+        serviceInfo: {
+          flex: 1,
+        },
+        serviceName: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: theme.colors.onSurface,
+          marginBottom: 4,
+        },
+        serviceStatus: {
+          flexDirection: "row",
+          alignItems: "center",
+        },
+        statusIndicator: {
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          marginRight: 6,
+        },
+        statusOnline: {
+          backgroundColor: '#10B981', // Green
+        },
+        statusOffline: {
+          backgroundColor: '#EF4444', // Red
+        },
+        statusDegraded: {
+          backgroundColor: '#F59E0B', // Amber
+        },
+        serviceStatusText: {
+          fontSize: 12,
+          color: theme.colors.onSurfaceVariant,
+          fontWeight: '500',
+        },
+
+        // Statistics Section
+        statisticsSection: {
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.xl,
+        },
+        statisticsHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: spacing.lg,
+        },
+        statisticsTitle: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: theme.colors.onBackground,
+          letterSpacing: -0.5,
+        },
+        filterButton: {
+          fontSize: 14,
+          fontWeight: '500',
+          color: theme.colors.primary,
+        },
+        statisticsGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+        },
+        statCard: {
+          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 12,
+          padding: spacing.lg,
+          marginBottom: spacing.sm,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          alignItems: 'center',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+        statNumber: {
+          fontSize: 28,
+          fontWeight: '700',
+          color: theme.colors.primary,
+          marginBottom: spacing.xs,
+        },
+        statLabel: {
+          fontSize: 14,
+          fontWeight: '500',
+          color: theme.colors.onSurfaceVariant,
+          textAlign: 'center',
+        },
+
+        // Continue Watching Section
+        continueWatchingSection: {
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.xl,
+        },
+        continueWatchingHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: spacing.lg,
+        },
+        continueWatchingTitle: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: theme.colors.onBackground,
+          letterSpacing: -0.5,
+        },
+        seeAllButtonSmall: {
+          fontSize: 14,
+          fontWeight: '500',
+          color: theme.colors.primary,
+        },
+        continueWatchingList: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+        },
+        continueWatchingCard: {
+          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 12,
+          marginBottom: spacing.sm,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+          overflow: 'hidden',
+        },
+        continueWatchingPoster: {
+          width: '100%',
+          height: 120,
+          backgroundColor: theme.colors.surfaceVariant,
+          position: 'relative',
+        },
+        continueWatchingOverlay: {
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: spacing.sm,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+        },
+        progressBar: {
+          height: 3,
+          backgroundColor: 'rgba(255,255,255,0.3)',
+          borderRadius: 1.5,
+          overflow: 'hidden',
+        },
+        progressFill: {
+          height: '100%',
+          backgroundColor: theme.colors.primary,
+        },
+        continueWatchingContent: {
+          padding: spacing.md,
+        },
+        continueWatchingCardTitle: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: theme.colors.onSurface,
+          marginBottom: spacing.xs,
+        },
+        continueWatchingMeta: {
+          fontSize: 12,
+          color: theme.colors.onSurfaceVariant,
+        },
+
+        // Trending TV Section
+        trendingTVSection: {
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.xl,
+        },
+        trendingTVHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: spacing.lg,
+        },
+        trendingTVSectionTitle: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: theme.colors.onBackground,
+          letterSpacing: -0.5,
+        },
+        trendingTVList: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+        },
+        trendingTVCard: {
+          width: (screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 12,
+          marginBottom: spacing.sm,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+          overflow: 'hidden',
+        },
+        trendingTVPoster: {
+          width: '100%',
+          height: 160,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        trendingTVContent: {
+          padding: spacing.sm,
+        },
+        trendingTVTitle: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: theme.colors.onSurface,
+          textAlign: 'center',
+        },
+        trendingTVRating: {
+          fontSize: 10,
+          color: theme.colors.onSurfaceVariant,
+          textAlign: 'center',
+          marginTop: 2,
+        },
+
+        // Upcoming Releases Section
+        upcomingReleasesSection: {
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.xl,
+        },
+        upcomingReleasesHeader: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: spacing.lg,
+        },
+        upcomingReleasesTitle: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: theme.colors.onBackground,
+          letterSpacing: -0.5,
+        },
+        upcomingReleasesList: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+        },
+        upcomingReleaseCard: {
+          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 12,
+          marginBottom: spacing.sm,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+          overflow: 'hidden',
+        },
+        upcomingReleasePoster: {
+          width: '100%',
+          height: 100,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        upcomingReleaseContent: {
+          padding: spacing.md,
+        },
+        upcomingReleaseTitle: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: theme.colors.onSurface,
+          marginBottom: spacing.xs,
+        },
+        upcomingReleaseMeta: {
+          fontSize: 12,
+          color: theme.colors.onSurfaceVariant,
+        },
+        releaseDateBadge: {
+          fontSize: 10,
+          fontWeight: '500',
+          color: theme.colors.onPrimary,
+          backgroundColor: theme.colors.primary,
+          paddingHorizontal: spacing.xs,
+          paddingVertical: 2,
+          borderRadius: 4,
+          alignSelf: 'flex-start',
+          marginTop: spacing.xs,
+        },
+
+        // Recent Activity Section
+        recentActivityHeader: {
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.lg,
+        },
+        recentActivityTitle: {
+          fontSize: 20,
+          fontWeight: '700',
+          color: theme.colors.onBackground,
+          letterSpacing: -0.5,
+        },
+        recentActivityList: {
+          paddingHorizontal: spacing.lg,
+        },
+        activityCard: {
+          flexDirection: 'row',
+          backgroundColor: theme.colors.surface,
+          borderRadius: 12,
+          padding: spacing.md,
+          marginBottom: spacing.md,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+        activityImage: {
+          width: 50,
+          height: 75,
+          borderRadius: 8,
+          marginRight: spacing.md,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        activityContent: {
+          flex: 1,
+          justifyContent: 'center',
+        },
+        activityTitle: {
+          fontSize: 16,
+          fontWeight: '600',
+          color: theme.colors.onSurface,
+          marginBottom: 4,
+        },
+        activityShow: {
+          fontSize: 14,
+          color: theme.colors.onSurfaceVariant,
+          marginBottom: 4,
+        },
+        activityDate: {
+          fontSize: 12,
+          color: theme.colors.outline,
+        },
+
+        // Legacy styles for backward compatibility
+        section: {
           marginTop: spacing.xs,
         },
         sectionTitle: {
@@ -373,111 +1324,6 @@ const DashboardScreen = () => {
           marginBottom: spacing.md,
           paddingHorizontal: spacing.md,
         },
-        serviceCard: {
-          backgroundColor: theme.colors.elevation.level1,
-          marginHorizontal: spacing.md,
-          marginVertical: spacing.xs,
-          borderRadius: 12,
-          padding: spacing.md,
-        },
-        serviceContent: {
-          flexDirection: "row",
-          alignItems: "center",
-        },
-        serviceIcon: {
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          backgroundColor: theme.colors.surfaceVariant,
-          alignItems: "center",
-          justifyContent: "center",
-          marginRight: spacing.md,
-        },
-        serviceInfo: {
-          flex: 1,
-        },
-        serviceName: {
-          color: theme.colors.onSurface,
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontFamily: theme.custom.typography.titleMedium.fontFamily,
-          lineHeight: theme.custom.typography.titleMedium.lineHeight,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
-          marginBottom: spacing.xxs,
-        },
-        serviceStatus: {
-          flexDirection: "row",
-          alignItems: "center",
-        },
-        statusIndicator: {
-          width: 8,
-          height: 8,
-          borderRadius: 4,
-          marginRight: spacing.xs,
-        },
-        statusOnline: {
-          backgroundColor: theme.colors.primary,
-        },
-        statusOffline: {
-          backgroundColor: theme.colors.error,
-        },
-        statusDegraded: {
-          backgroundColor: theme.colors.tertiary,
-        },
-        serviceStatusText: {
-          color: theme.colors.onSurfaceVariant,
-          fontSize: theme.custom.typography.bodyMedium.fontSize,
-          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
-          lineHeight: theme.custom.typography.bodyMedium.lineHeight,
-          letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
-          fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
-        },
-        serviceArrow: {
-          color: theme.colors.outline,
-        },
-        activityCard: {
-          backgroundColor: theme.colors.elevation.level1,
-          marginHorizontal: spacing.md,
-          marginVertical: spacing.xs,
-          borderRadius: 12,
-          padding: spacing.md,
-        },
-        activityContent: {
-          flexDirection: "row",
-          alignItems: "center",
-        },
-        activityIcon: {
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          backgroundColor: theme.colors.surfaceVariant,
-          alignItems: "center",
-          justifyContent: "center",
-          marginRight: spacing.md,
-        },
-        activityInfo: {
-          flex: 1,
-        },
-        activityTitle: {
-          color: theme.colors.onSurface,
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontFamily: theme.custom.typography.titleMedium.fontFamily,
-          lineHeight: theme.custom.typography.titleMedium.lineHeight,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
-          marginBottom: spacing.xxs,
-        },
-        activitySubtitle: {
-          color: theme.colors.onSurfaceVariant,
-          fontSize: theme.custom.typography.bodyMedium.fontSize,
-          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
-          lineHeight: theme.custom.typography.bodyMedium.lineHeight,
-          letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
-          fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
-        },
-        activityArrow: {
-          color: theme.colors.outline,
-        },
         listSpacer: {
           height: spacing.sm,
         },
@@ -486,7 +1332,7 @@ const DashboardScreen = () => {
           paddingTop: spacing.xl,
         },
       }),
-    [theme]
+    [theme, screenWidth]
   );
 
   const summary = useMemo<SummaryMetrics>(() => {
@@ -634,6 +1480,46 @@ const DashboardScreen = () => {
     router.push("/(auth)/discover");
   }, [router]);
 
+  const handleStatsFilter = useCallback((filter: 'all' | 'recent' | 'month') => {
+    setStatsFilter(filter);
+    setFilterVisible(false);
+    void refetchStatistics();
+  }, [refetchStatistics]);
+
+  const ShortcutCard = React.memo(({
+    label,
+    subtitle,
+    icon,
+    onPress,
+    testID,
+  }: {
+    label: string;
+    subtitle?: string;
+    icon: string;
+    onPress: () => void;
+    testID?: string;
+  }) => (
+    <TouchableOpacity
+      style={styles.shortcutCard}
+      onPress={onPress}
+      activeOpacity={0.7}
+      testID={testID}
+    >
+      <View style={styles.shortcutIconContainer}>
+        <IconButton
+          icon={icon}
+          size={20}
+          iconColor={theme.colors.primary}
+        />
+      </View>
+      <Text style={styles.shortcutLabel}>{label}</Text>
+      {subtitle ? (
+        <Text style={styles.shortcutSubtitle}>{subtitle}</Text>
+      ) : null}
+    </TouchableOpacity>
+  ));
+
+
   const ServiceCard = React.memo(({ item }: { item: ServiceOverviewItem }) => {
     const getStatusColor = (status: ServiceStatusState) => {
       switch (status) {
@@ -668,16 +1554,16 @@ const DashboardScreen = () => {
     };
 
     return (
-      <Card
-        variant="custom"
+      <TouchableOpacity
         style={styles.serviceCard}
         onPress={() => handleServicePress(item)}
+        activeOpacity={0.7}
       >
         <View style={styles.serviceContent}>
           <View style={styles.serviceIcon}>
             <IconButton
               icon={getStatusIcon(item.config.type)}
-              size={24}
+              size={20}
               iconColor={theme.colors.primary}
             />
           </View>
@@ -689,143 +1575,306 @@ const DashboardScreen = () => {
               />
               <Text style={styles.serviceStatusText}>
                 {item.status === "online"
-                  ? "Healthy"
+                  ? "Connected"
                   : item.status === "offline"
                   ? "Offline"
                   : "Degraded"}
               </Text>
             </View>
           </View>
-          <IconButton
-            icon="chevron-right"
-            size={20}
-            iconColor={theme.colors.outline}
-          />
         </View>
-      </Card>
+      </TouchableOpacity>
     );
   });
 
-  const ShortcutTile = ({
-    label,
-    subtitle,
-    icon,
-    onPress,
-    testID,
-  }: {
-    label: string;
-    subtitle?: string;
-    icon: string;
-    onPress: () => void;
-    testID?: string;
-  }) => (
-    <Card
-      variant="custom"
-      onPress={onPress}
-      style={styles.shortcutTile}
-      testID={testID}
+  const StatCard = React.memo(({
+  number,
+  label,
+  onPress
+}: {
+  number: number;
+  label: string;
+  onPress?: () => void;
+}) => (
+  <TouchableOpacity
+    style={styles.statCard}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <Text style={styles.statNumber}>{number}</Text>
+    <Text style={styles.statLabel}>{label}</Text>
+  </TouchableOpacity>
+));
+
+const ContinueWatchingCardSkeleton = React.memo(() => (
+  <View style={styles.continueWatchingCard}>
+    <SkeletonPlaceholder
+      width="100%"
+      height={120}
+      borderRadius={0}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0 }}
+    />
+    <View style={styles.continueWatchingContent}>
+      <SkeletonPlaceholder width="80%" height={16} borderRadius={4} style={{ marginBottom: spacing.xs }} />
+      <SkeletonPlaceholder width="60%" height={12} borderRadius={4} />
+    </View>
+  </View>
+));
+
+const TrendingTVCardSkeleton = React.memo(() => (
+  <View style={styles.trendingTVCard}>
+    <SkeletonPlaceholder
+      width="100%"
+      height={160}
+      borderRadius={0}
+      style={{ marginBottom: spacing.sm }}
+    />
+    <View style={styles.trendingTVContent}>
+      <SkeletonPlaceholder width="90%" height={12} borderRadius={4} style={{ marginBottom: 2 }} />
+      <SkeletonPlaceholder width="40%" height={10} borderRadius={4} />
+    </View>
+  </View>
+));
+
+const UpcomingReleaseCardSkeleton = React.memo(() => (
+  <View style={styles.upcomingReleaseCard}>
+    <SkeletonPlaceholder
+      width="100%"
+      height={100}
+      borderRadius={0}
+      style={{ marginBottom: spacing.md }}
+    />
+    <View style={styles.upcomingReleaseContent}>
+      <SkeletonPlaceholder width="85%" height={14} borderRadius={4} style={{ marginBottom: spacing.xs }} />
+      <SkeletonPlaceholder width="50%" height={12} borderRadius={4} style={{ marginBottom: spacing.xs }} />
+      <SkeletonPlaceholder width={40} height={16} borderRadius={4} />
+    </View>
+  </View>
+));
+
+const ContinueWatchingCard = React.memo(({
+  item
+}: {
+  item: ContinueWatchingItem;
+}) => {
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  const formatDate = (date: Date) => {
+    const releaseDate = new Date(date);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - releaseDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return releaseDate.toLocaleDateString();
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.continueWatchingCard}
+      activeOpacity={0.7}
     >
-      <View style={styles.shortcutInner}>
-        <View style={styles.shortcutIcon}>
-          <IconButton icon={icon} size={20} iconColor={theme.colors.primary} />
+      <View style={styles.continueWatchingPoster}>
+        {item.posterUri ? (
+          <MediaPoster
+            uri={item.posterUri}
+            size={((screenWidth - spacing.lg * 2 - spacing.sm) / 2) * 0.5}
+            borderRadius={0}
+            style={{ width: '100%', height: '100%' }}
+          />
+        ) : null}
+        <View style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          padding: spacing.sm,
+        }}>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${item.progress}%` }]} />
+          </View>
         </View>
-        <Text
-          style={styles.shortcutLabel}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {label}
+      </View>
+      <View style={styles.continueWatchingContent}>
+        <Text style={styles.continueWatchingCardTitle} numberOfLines={2}>
+          {item.type === 'episode' ? item.show : item.title}
         </Text>
-        {subtitle ? (
-          <Text
-            style={styles.shortcutSubtitle}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {subtitle}
-          </Text>
+        <Text style={styles.continueWatchingMeta} numberOfLines={1}>
+          {item.type === 'episode' ? `S${item.season}E${item.episode}` : `${formatTime(item.duration)}`}
+          {' • '}{Math.round(item.progress)}% watched
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const TrendingTVCard = React.memo(({
+  item
+}: {
+  item: TrendingTVItem;
+}) => (
+  <TouchableOpacity
+    style={styles.trendingTVCard}
+    activeOpacity={0.7}
+  >
+    <View style={styles.trendingTVPoster}>
+      {item.posterUri ? (
+        <MediaPoster
+          uri={item.posterUri}
+          size={(screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4}
+          borderRadius={0}
+          style={{ width: '100%', height: '100%' }}
+        />
+      ) : null}
+    </View>
+    <View style={styles.trendingTVContent}>
+      <Text style={styles.trendingTVTitle} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text style={styles.trendingTVRating} numberOfLines={1}>
+        {item.rating ? `★ ${item.rating.toFixed(1)}` : ''}
+      </Text>
+    </View>
+  </TouchableOpacity>
+));
+
+const UpcomingReleaseCard = React.memo(({
+  item
+}: {
+  item: UpcomingReleaseItem;
+}) => {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+    });
+  };
+
+  const getTimeToRelease = (dateString: string) => {
+    const releaseDate = new Date(dateString);
+    const now = new Date();
+    const diffMs = releaseDate.getTime() - now.getTime();
+
+    if (diffMs < 0) return 'Released';
+
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMinutes / 60);
+    const remainingMinutes = diffMinutes % 60;
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays === 0) {
+      if (diffHours === 0) {
+        if (diffMinutes <= 1) return 'In 1 min';
+        return `In ${diffMinutes} min`;
+      }
+      if (diffHours === 1) {
+        return remainingMinutes > 0 ? `In 1h ${remainingMinutes}m` : 'In 1h';
+      }
+      return remainingMinutes > 0 ? `In ${diffHours}h ${remainingMinutes}m` : `In ${diffHours}h`;
+    }
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays <= 7) return `In ${diffDays} days`;
+    if (diffDays <= 30) return `In ${Math.floor(diffDays / 7)} weeks`;
+    return `In ${Math.floor(diffDays / 30)} months`;
+  };
+
+  const getReleaseDisplay = (dateString: string) => {
+    const releaseDate = new Date(dateString);
+    const now = new Date();
+    const diffMs = releaseDate.getTime() - now.getTime();
+
+    if (diffMs < 0) return formatDate(dateString);
+
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    // For releases today, show only the time to release
+    if (diffDays === 0) {
+      return getTimeToRelease(dateString);
+    }
+
+    // For other releases, show the date
+    return formatDate(dateString);
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.upcomingReleaseCard}
+      activeOpacity={0.7}
+    >
+      <View style={styles.upcomingReleasePoster}>
+        {item.posterUri ? (
+          <MediaPoster
+            uri={item.posterUri}
+            size={(screenWidth - spacing.lg * 2 - spacing.sm) / 2}
+            borderRadius={0}
+            style={{ width: '100%', height: '100%' }}
+          />
         ) : null}
       </View>
-    </Card>
+      <View style={styles.upcomingReleaseContent}>
+        <Text style={styles.upcomingReleaseTitle} numberOfLines={2}>
+          {item.type === 'episode' ? item.show : item.title}
+        </Text>
+        <Text style={styles.upcomingReleaseMeta} numberOfLines={1}>
+          {item.type === 'episode' ? `S${item.season}E${item.episode}` : 'Movie'}
+        </Text>
+        <View style={styles.releaseDateBadge}>
+          <Text style={{ color: theme.colors.onPrimary, fontSize: 10 }}>
+            {getReleaseDisplay(item.releaseDate)}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
+});
 
-  const renderServiceItem = useCallback(
-    ({ item }: { item: ServiceOverviewItem }) => <ServiceCard item={item} />,
-    []
-  );
+const RecentActivityCard = React.memo(({
+  item
+}: {
+  item: RecentActivityItem;
+}) => (
+  <TouchableOpacity
+    style={styles.activityCard}
+    activeOpacity={0.7}
+  >
+    {item.image ? (
+      <MediaPoster
+        uri={item.image}
+        size={50}
+        borderRadius={8}
+        style={styles.activityImage}
+      />
+    ) : (
+      <View style={styles.activityImage} />
+    )}
+    <View style={styles.activityContent}>
+      <Text style={styles.activityTitle}>{item.title}</Text>
+      <Text style={styles.activityShow}>{item.show} • {item.episode}</Text>
+      <Text style={styles.activityDate}>{item.date}</Text>
+    </View>
+  </TouchableOpacity>
+));
 
-  const renderActivityItem = useCallback(() => {
-    const downloadsActive = downloadsData?.active ?? 0;
-    const downloadsTotal = downloadsData?.total ?? 0;
-    const recentlyAddedTotal = recentlyAddedData?.total ?? 0;
 
-    return (
-      <>
-        <AnimatedListItem index={0} totalItems={2}>
-          <Card
-            variant="custom"
-            style={styles.activityCard}
-            onPress={() => router.push("/(auth)/downloads")}
-          >
-            <View style={styles.activityContent}>
-              <View style={styles.activityIcon}>
-                <IconButton
-                  icon="download"
-                  size={24}
-                  iconColor={theme.colors.primary}
-                />
-              </View>
-              <View style={styles.activityInfo}>
-                <Text style={styles.activityTitle}>Downloads</Text>
-                <Text style={styles.activitySubtitle}>
-                  {downloadsActive > 0
-                    ? `${downloadsActive} active`
-                    : `${downloadsTotal} total`}
-                </Text>
-              </View>
-              <IconButton
-                icon="chevron-right"
-                size={20}
-                iconColor={theme.colors.outline}
-              />
-            </View>
-          </Card>
-        </AnimatedListItem>
-        <AnimatedListItem index={1} totalItems={2}>
-          <Card
-            variant="custom"
-            style={styles.activityCard}
-            onPress={() => router.push("/(auth)/recently-added")}
-          >
-            <View style={styles.activityContent}>
-              <View style={styles.activityIcon}>
-                <IconButton
-                  icon="plus"
-                  size={24}
-                  iconColor={theme.colors.primary}
-                />
-              </View>
-              <View style={styles.activityInfo}>
-                <Text style={styles.activityTitle}>Recently Added</Text>
-                <Text style={styles.activitySubtitle}>
-                  {recentlyAddedTotal > 0
-                    ? `${recentlyAddedTotal} added`
-                    : "No recent activity"}
-                </Text>
-              </View>
-              <IconButton
-                icon="chevron-right"
-                size={20}
-                iconColor={theme.colors.outline}
-              />
-            </View>
-          </Card>
-        </AnimatedListItem>
-        {/* Release Calendar removed from Activity section per request */}
-      </>
-    );
-  }, [router, styles, downloadsData, recentlyAddedData, theme]);
-
+  
   const emptyServicesContent = useMemo(() => {
     if (isError) {
       const message =
@@ -856,110 +1905,283 @@ const DashboardScreen = () => {
       switch (item.type) {
         case "header":
           return renderHeader();
-        case "search":
+
+        case "welcome-section":
           return (
-            <View style={styles.searchWrapper}>
-              <AnimatedSection style={styles.shortcutsWrapper} delay={40}>
+            <View style={styles.welcomeSection}>
+              <View style={styles.welcomeHeader}>
+                <Text style={styles.welcomeTitle}>Dashboard</Text>
+                <TouchableOpacity onPress={() => router.push("/(auth)/services")}>
+                  <Text style={styles.seeAllButton}>See all</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+
+        case "shortcuts":
+          return (
+            <View style={styles.shortcutsSection}>
+              <AnimatedSection style={styles.shortcutsGrid} delay={40}>
                 <AnimatedListItem
                   index={0}
                   totalItems={4}
-                  style={styles.shortcutTileWrapper}
                 >
-                  <ShortcutTile
+                  <ShortcutCard
                     testID="shortcut-discover"
                     label="Discover"
-                    subtitle="Trending picks"
+                    subtitle="Trending"
                     icon="compass-outline"
                     onPress={handleOpenDiscover}
                   />
                 </AnimatedListItem>
                 <AnimatedListItem
-                  style={styles.shortcutTileWrapper}
                   index={1}
                   totalItems={4}
                 >
-                  <ShortcutTile
+                  <ShortcutCard
                     testID="shortcut-search"
-                    label="Unified Search"
-                    subtitle="Search across services"
+                    label="Search"
+                    subtitle="Unified"
                     icon="magnify"
                     onPress={handleOpenSearch}
                   />
                 </AnimatedListItem>
                 <AnimatedListItem
-                  style={styles.shortcutTileWrapper}
                   index={2}
                   totalItems={4}
                 >
-                  <ShortcutTile
+                  <ShortcutCard
                     testID="shortcut-calendar"
-                    label="Release Calendar"
-                    subtitle="Upcoming releases"
+                    label="Calendar"
+                    subtitle="Releases"
                     icon="calendar"
                     onPress={handleOpenCalendar}
                   />
                 </AnimatedListItem>
                 <AnimatedListItem
-                  style={styles.shortcutTileWrapper}
                   index={3}
                   totalItems={4}
                 >
-                  <ShortcutTile
+                  <ShortcutCard
                     testID="shortcut-animehub"
-                    label="Anime Hub"
-                    subtitle="Explore anime"
+                    label="Anime"
+                    subtitle="Hub"
                     icon="animation"
                     onPress={() => router.push("/(auth)/anime-hub")}
                   />
                 </AnimatedListItem>
-                {/* Keep layout flexible so more shortcuts can be added easily */}
               </AnimatedSection>
             </View>
           );
-        case "services":
+
+        case "services-grid":
           return (
-            <AnimatedSection style={styles.section}>
-              <Text style={styles.sectionTitle}>Services</Text>
-            </AnimatedSection>
-          );
-        case "service": {
-          const serviceItem = item.data;
-          const serviceIndex = services.findIndex(
-            (s) => s.config.id === serviceItem.config.id
+            <View style={styles.servicesGrid}>
+              {item.data.slice(0, 4).map((service, index) => (
+                <AnimatedListItem
+                  key={service.config.id}
+                  index={index}
+                  totalItems={item.data.length}
+                >
+                  <ServiceCard item={service} />
+                </AnimatedListItem>
+              ))}
+            </View>
           );
 
+        case "statistics":
           return (
-            <AnimatedListItem
-              index={serviceIndex >= 0 ? serviceIndex : 0}
-              totalItems={Math.max(services.length, 1)}
-            >
-              <ServiceCard item={serviceItem} />
-            </AnimatedListItem>
+            <View style={styles.statisticsSection}>
+              <View style={styles.statisticsHeader}>
+                <Text style={styles.statisticsTitle}>Statistics</Text>
+                <TouchableOpacity onPress={() => setFilterVisible(true)}>
+                  <Text style={styles.filterButton}>
+                    {statsFilter === 'all' ? 'All' : statsFilter === 'recent' ? 'Recent' : 'Month'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.statisticsGrid}>
+                <AnimatedListItem index={0} totalItems={4}>
+                  <StatCard number={item.data.shows} label="Shows" />
+                </AnimatedListItem>
+                <AnimatedListItem index={1} totalItems={4}>
+                  <StatCard number={item.data.movies} label="Movies" />
+                </AnimatedListItem>
+                <AnimatedListItem index={2} totalItems={4}>
+                  <StatCard number={item.data.episodes} label="Episodes" />
+                </AnimatedListItem>
+                <AnimatedListItem index={3} totalItems={4}>
+                  <StatCard number={item.data.watched} label="Watched" />
+                </AnimatedListItem>
+              </View>
+            </View>
           );
-        }
-        case "activity":
+
+        case "continue-watching":
           return (
-            <AnimatedSection style={styles.section} delay={20}>
-              <Text style={styles.sectionTitle}>Activity</Text>
-              {renderActivityItem()}
-            </AnimatedSection>
+            <View style={styles.continueWatchingSection}>
+              <View style={styles.continueWatchingHeader}>
+                <Text style={styles.continueWatchingTitle}>Continue Watching</Text>
+                <TouchableOpacity onPress={() => router.push("/(auth)/continue-watching")}>
+                  <Text style={styles.seeAllButtonSmall}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.continueWatchingList}>
+                {item.data.length > 0 ? (
+                  item.data.slice(0, 4).map((watching, index) => (
+                    <AnimatedListItem
+                      key={watching.id}
+                      index={index}
+                      totalItems={item.data.length}
+                    >
+                      <ContinueWatchingCard item={watching} />
+                    </AnimatedListItem>
+                  ))
+                ) : (
+                  // Show skeleton when data is loading
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <AnimatedListItem key={`continue-watching-loading-${index}`} index={index} totalItems={4}>
+                      <ContinueWatchingCardSkeleton />
+                    </AnimatedListItem>
+                  ))
+                )}
+              </View>
+            </View>
           );
+
+        case "trending-tv":
+          return (
+            <View style={styles.trendingTVSection}>
+              <View style={styles.trendingTVHeader}>
+                <Text style={styles.trendingTVSectionTitle}>Trending TV Shows</Text>
+                <TouchableOpacity onPress={() => router.push("/(auth)/discover/trending-tv")}>
+                  <Text style={styles.seeAllButtonSmall}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.trendingTVList}>
+                {item.data.length > 0 ? (
+                  item.data.slice(0, 8).map((show, index) => (
+                    <AnimatedListItem
+                      key={show.id}
+                      index={index}
+                      totalItems={item.data.length}
+                    >
+                      <TrendingTVCard item={show} />
+                    </AnimatedListItem>
+                  ))
+                ) : (
+                  // Show skeleton when data is loading
+                  Array.from({ length: 8 }).map((_, index) => (
+                    <AnimatedListItem key={`trending-tv-loading-${index}`} index={index} totalItems={8}>
+                      <TrendingTVCardSkeleton />
+                    </AnimatedListItem>
+                  ))
+                )}
+              </View>
+            </View>
+          );
+
+        case "upcoming-releases":
+          return (
+            <View style={styles.upcomingReleasesSection}>
+              <View style={styles.upcomingReleasesHeader}>
+                <Text style={styles.upcomingReleasesTitle}>Upcoming Releases</Text>
+                <TouchableOpacity onPress={() => router.push("/(auth)/calendar")}>
+                  <Text style={styles.seeAllButtonSmall}>See all</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.upcomingReleasesList}>
+                {item.data.length > 0 ? (
+                  item.data.slice(0, 4).map((release, index) => (
+                    <AnimatedListItem
+                      key={release.id}
+                      index={index}
+                      totalItems={item.data.length}
+                    >
+                      <UpcomingReleaseCard item={release} />
+                    </AnimatedListItem>
+                  ))
+                ) : (
+                  // Show skeleton when data is loading
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <AnimatedListItem key={`upcoming-releases-loading-${index}`} index={index} totalItems={4}>
+                      <UpcomingReleaseCardSkeleton />
+                    </AnimatedListItem>
+                  ))
+                )}
+              </View>
+            </View>
+          );
+
+        case "recent-activity-header":
+          return (
+            <View style={styles.recentActivityHeader}>
+              <Text style={styles.recentActivityTitle}>Recent Activity</Text>
+            </View>
+          );
+
+        case "recent-activity":
+          return (
+            <View style={styles.recentActivityList}>
+              {item.data.length > 0 ? (
+                item.data.map((activity, index) => (
+                  <AnimatedListItem
+                    key={activity.id}
+                    index={index}
+                    totalItems={item.data.length}
+                  >
+                    <RecentActivityCard item={activity} />
+                  </AnimatedListItem>
+                ))
+              ) : (
+                <View style={{
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: 12,
+                  padding: spacing.lg,
+                  borderWidth: 1,
+                  borderColor: theme.colors.outlineVariant,
+                  alignItems: 'center',
+                }}>
+                  <Text style={{
+                    fontSize: 16,
+                    color: theme.colors.onSurfaceVariant,
+                    textAlign: 'center',
+                  }}>
+                    No recent activity found
+                  </Text>
+                  <Text style={{
+                    fontSize: 14,
+                    color: theme.colors.onSurfaceVariant,
+                    textAlign: 'center',
+                    marginTop: spacing.xs,
+                    opacity: 0.7,
+                  }}>
+                    Recent downloads and imports will appear here
+                  </Text>
+                </View>
+              )}
+            </View>
+          );
+
         case "empty":
           return (
             <AnimatedSection style={styles.section}>
               {emptyServicesContent}
             </AnimatedSection>
           );
+
         default:
           return null;
       }
     },
     [
       emptyServicesContent,
-      renderActivityItem,
       renderHeader,
-      renderServiceItem,
+      router,
       styles,
+      continueWatchingData,
+      trendingTVData,
+      upcomingReleasesData,
     ]
   );
 
@@ -967,14 +2189,24 @@ const DashboardScreen = () => {
     switch (item.type) {
       case "header":
         return "header";
-      case "search":
-        return "search";
-      case "services":
-        return "services";
-      case "service":
-        return `service-${item.data.config.id}`;
-      case "activity":
-        return "activity";
+      case "welcome-section":
+        return "welcome-section";
+      case "shortcuts":
+        return "shortcuts";
+      case "services-grid":
+        return "services-grid";
+      case "statistics":
+        return "statistics";
+      case "continue-watching":
+        return `continue-watching-${item.data.length}`;
+      case "trending-tv":
+        return `trending-tv-${item.data.length}`;
+      case "upcoming-releases":
+        return `upcoming-releases-${item.data.length}`;
+      case "recent-activity-header":
+        return "recent-activity-header";
+      case "recent-activity":
+        return `recent-activity-${item.data.length}`;
       case "empty":
         return "empty";
       default:
@@ -997,103 +2229,87 @@ const DashboardScreen = () => {
               }}
             />
           </AnimatedHeader>
-          <View style={styles.searchWrapper}>
-            <AnimatedSection style={styles.shortcutsWrapper} delay={40}>
-              <AnimatedListItem
-                style={styles.shortcutTileWrapper}
-                index={0}
-                totalItems={4}
-              >
-                <ShortcutTile
-                  testID="shortcut-discover-loading"
-                  label="Discover"
-                  subtitle="Trending picks"
-                  icon="compass-outline"
-                  onPress={handleOpenDiscover}
-                />
-              </AnimatedListItem>
-              <AnimatedListItem
-                style={styles.shortcutTileWrapper}
-                index={1}
-                totalItems={4}
-              >
-                <ShortcutTile
-                  testID="shortcut-search-loading"
-                  label="Unified Search"
-                  subtitle="Search across services"
-                  icon="magnify"
-                  onPress={handleOpenSearch}
-                />
-              </AnimatedListItem>
-              <AnimatedListItem
-                style={styles.shortcutTileWrapper}
-                index={2}
-                totalItems={4}
-              >
-                <ShortcutTile
-                  testID="shortcut-calendar-loading"
-                  label="Release Calendar"
-                  subtitle="Upcoming releases"
-                  icon="calendar"
-                  onPress={handleOpenCalendar}
-                />
-              </AnimatedListItem>
-              <AnimatedListItem
-                style={styles.shortcutTileWrapper}
-                index={3}
-                totalItems={4}
-              >
-                <ShortcutTile
-                  testID="shortcut-animehub-loading"
-                  label="Anime Hub"
-                  subtitle="Explore anime"
-                  icon="animation"
-                  onPress={() => router.push("/(auth)/anime-hub")}
-                />
-              </AnimatedListItem>
-            </AnimatedSection>
+          <View style={styles.welcomeSection}>
+            <View style={styles.welcomeHeader}>
+              <SkeletonPlaceholder width={120} height={32} borderRadius={8} />
+              <SkeletonPlaceholder width={60} height={20} borderRadius={4} />
+            </View>
           </View>
-          <View style={styles.section}>
-            <SkeletonPlaceholder
-              width="40%"
-              height={28}
-              borderRadius={10}
-              style={{ marginBottom: spacing.md, marginHorizontal: spacing.md }}
-            />
+          <View style={styles.shortcutsSection}>
+            <View style={styles.shortcutsGrid}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <AnimatedListItem key={`shortcut-skeleton-${index}`} index={index} totalItems={4}>
+                  <SkeletonPlaceholder width={(screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4} height={80} borderRadius={12} />
+                </AnimatedListItem>
+              ))}
+            </View>
+          </View>
+          <View style={styles.servicesGrid}>
             {Array.from({ length: 4 }).map((_, index) => (
-              <AnimatedListItem key={index} index={index} totalItems={4}>
-                <View
-                  style={{
-                    marginBottom: spacing.sm,
-                    marginHorizontal: spacing.md,
-                  }}
-                >
-                  <ServiceCardSkeleton />
-                </View>
+              <AnimatedListItem key={`service-skeleton-${index}`} index={index} totalItems={4}>
+                <SkeletonPlaceholder width={(screenWidth - spacing.lg * 2 - spacing.sm) / 2} height={80} borderRadius={12} />
               </AnimatedListItem>
             ))}
           </View>
-          <View style={styles.section}>
-            <SkeletonPlaceholder
-              width="40%"
-              height={28}
-              borderRadius={10}
-              style={{ marginBottom: spacing.md, marginHorizontal: spacing.md }}
-            />
-            {Array.from({ length: 4 }).map((_, index) => (
-              <AnimatedListItem
-                key={`activity-${index}`}
-                index={index}
-                totalItems={4}
-              >
-                <View
-                  style={{
-                    marginBottom: spacing.sm,
-                    marginHorizontal: spacing.md,
-                  }}
-                >
-                  <ListRowSkeleton showSecondaryLine={true} />
-                </View>
+          <View style={styles.statisticsSection}>
+            <View style={styles.statisticsHeader}>
+              <SkeletonPlaceholder width={100} height={24} borderRadius={6} />
+              <SkeletonPlaceholder width={50} height={18} borderRadius={4} />
+            </View>
+            <View style={styles.statisticsGrid}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <AnimatedListItem key={`stat-skeleton-${index}`} index={index} totalItems={4}>
+                  <SkeletonPlaceholder width={(screenWidth - spacing.lg * 2 - spacing.sm) / 2} height={100} borderRadius={12} />
+                </AnimatedListItem>
+              ))}
+            </View>
+          </View>
+          <View style={styles.continueWatchingSection}>
+            <View style={styles.continueWatchingHeader}>
+              <SkeletonPlaceholder width={140} height={24} borderRadius={6} />
+              <SkeletonPlaceholder width={50} height={18} borderRadius={4} />
+            </View>
+            <View style={styles.continueWatchingList}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <AnimatedListItem key={`continue-watching-skeleton-${index}`} index={index} totalItems={4}>
+                  <ContinueWatchingCardSkeleton />
+                </AnimatedListItem>
+              ))}
+            </View>
+          </View>
+          <View style={styles.trendingTVSection}>
+            <View style={styles.trendingTVHeader}>
+              <SkeletonPlaceholder width={140} height={24} borderRadius={6} />
+              <SkeletonPlaceholder width={50} height={18} borderRadius={4} />
+            </View>
+            <View style={styles.trendingTVList}>
+              {Array.from({ length: 8 }).map((_, index) => (
+                <AnimatedListItem key={`trending-tv-skeleton-${index}`} index={index} totalItems={8}>
+                  <TrendingTVCardSkeleton />
+                </AnimatedListItem>
+              ))}
+            </View>
+          </View>
+          <View style={styles.upcomingReleasesSection}>
+            <View style={styles.upcomingReleasesHeader}>
+              <SkeletonPlaceholder width={140} height={24} borderRadius={6} />
+              <SkeletonPlaceholder width={50} height={18} borderRadius={4} />
+            </View>
+            <View style={styles.upcomingReleasesList}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <AnimatedListItem key={`upcoming-releases-skeleton-${index}`} index={index} totalItems={4}>
+                  <UpcomingReleaseCardSkeleton />
+                </AnimatedListItem>
+              ))}
+            </View>
+          </View>
+          <View style={styles.recentActivityHeader}>
+            <SkeletonPlaceholder width={140} height={24} borderRadius={6} />
+          </View>
+          <View style={styles.recentActivityList}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <AnimatedListItem key={`activity-skeleton-${index}`} index={index} totalItems={3}>
+                <SkeletonPlaceholder width={screenWidth - spacing.lg * 2} height={95} borderRadius={12} />
               </AnimatedListItem>
             ))}
           </View>
@@ -1103,8 +2319,9 @@ const DashboardScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <FlashList
+    <Portal.Host>
+      <SafeAreaView style={styles.container}>
+        <FlashList
         data={listData}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
@@ -1118,14 +2335,85 @@ const DashboardScreen = () => {
         refreshControl={
           <ListRefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => refetch()}
+            onRefresh={() => refetchWithFullTest()}
           />
         }
         showsVerticalScrollIndicator={false}
         getItemType={getItemType}
         removeClippedSubviews={true}
       />
-    </SafeAreaView>
+        <Portal>
+          <Modal
+            visible={filterVisible}
+            onDismiss={() => setFilterVisible(false)}
+            contentContainerStyle={{
+              backgroundColor: theme.colors.surface,
+              padding: spacing.lg,
+              margin: spacing.lg,
+              borderRadius: 12,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: spacing.md, color: theme.colors.onSurface }}>
+              Filter Statistics
+            </Text>
+
+            <TouchableOpacity
+              style={{
+                padding: spacing.md,
+                borderRadius: 8,
+                backgroundColor: statsFilter === 'all' ? theme.colors.primaryContainer : 'transparent',
+                marginBottom: spacing.sm,
+              }}
+              onPress={() => handleStatsFilter('all')}
+            >
+              <Text style={{
+                color: theme.colors.onSurface,
+                fontWeight: statsFilter === 'all' ? '600' : '400',
+                fontSize: 16,
+              }}>
+                All Time
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                padding: spacing.md,
+                borderRadius: 8,
+                backgroundColor: statsFilter === 'recent' ? theme.colors.primaryContainer : 'transparent',
+                marginBottom: spacing.sm,
+              }}
+              onPress={() => handleStatsFilter('recent')}
+            >
+              <Text style={{
+                color: theme.colors.onSurface,
+                fontWeight: statsFilter === 'recent' ? '600' : '400',
+                fontSize: 16,
+              }}>
+                Recent (7 days)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                padding: spacing.md,
+                borderRadius: 8,
+                backgroundColor: statsFilter === 'month' ? theme.colors.primaryContainer : 'transparent',
+                marginBottom: spacing.sm,
+              }}
+              onPress={() => handleStatsFilter('month')}
+            >
+              <Text style={{
+                color: theme.colors.onSurface,
+                fontWeight: statsFilter === 'month' ? '600' : '400',
+                fontSize: 16,
+              }}>
+                This Month
+              </Text>
+            </TouchableOpacity>
+          </Modal>
+        </Portal>
+      </SafeAreaView>
+    </Portal.Host>
   );
 };
 

@@ -21,6 +21,7 @@ export interface UnifiedSearchResult {
   readonly overview?: string;
   readonly releaseDate?: string;
   readonly year?: number;
+  readonly runtime?: number;
   readonly posterUrl?: string;
   readonly backdropUrl?: string;
   readonly rating?: number;

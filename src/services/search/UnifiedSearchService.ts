@@ -4,9 +4,11 @@ import type { IConnector, SearchOptions } from "@/connectors/base/IConnector";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { Series } from "@/models/media.types";
 import type { Movie } from "@/models/movie.types";
+import type { JellyfinItem } from "@/models/jellyfin.types";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
 type JellyseerrSearchResult =
   | components["schemas"]["MovieResult"]
@@ -131,8 +133,12 @@ export class UnifiedSearchService {
   async getSearchableServices(): Promise<SearchableServiceSummary[]> {
     await this.manager.loadSavedServices();
 
-    return this.manager
-      .getAllConnectors()
+    const allConnectors = this.manager.getAllConnectors();
+    console.log('UnifiedSearchService Debug - All connectors:',
+      allConnectors.map(c => ({ id: c.config.id, name: c.config.name, type: c.config.type, hasSearch: typeof c.search === 'function' }))
+    );
+
+    const searchableServices = allConnectors
       .filter((connector) => typeof connector.search === "function")
       .map((connector) => ({
         serviceId: connector.config.id,
@@ -142,6 +148,9 @@ export class UnifiedSearchService {
       .sort((first, second) =>
         first.serviceName.localeCompare(second.serviceName)
       );
+
+    console.log('UnifiedSearchService Debug - Searchable services:', searchableServices);
+    return searchableServices;
   }
 
   async getHistory(): Promise<SearchHistoryEntry[]> {
@@ -444,6 +453,12 @@ export class UnifiedSearchService {
           connector as JellyseerrConnector
         );
         break;
+      case "jellyfin":
+        mapped = this.mapJellyfinResults(
+          rawResults as JellyfinItem[],
+          connector as JellyfinConnector
+        );
+        break;
       default:
         mapped = [];
         break;
@@ -664,6 +679,70 @@ export class UnifiedSearchService {
         },
         extra: {
           mediaStatus,
+        },
+      } as UnifiedSearchResult;
+    });
+  }
+
+  private mapJellyfinResults(
+    items: JellyfinItem[],
+    connector: JellyfinConnector
+  ): UnifiedSearchResult[] {
+    return items.map((item) => {
+      const providerIds = item.ProviderIds ?? {};
+      const tmdbId = providerIds.Tmdb
+        ? Number(providerIds.Tmdb)
+        : undefined;
+      const tvdbId = providerIds.Tvdb
+        ? Number(providerIds.Tvdb)
+        : undefined;
+      const imdbId = providerIds.Imdb as string | undefined;
+
+      // Determine media type based on Jellyfin item type
+      let mediaType: UnifiedSearchMediaType = "unknown";
+      if (item.Type === "Series" || item.Type === "Episode") {
+        mediaType = "series";
+      } else if (item.Type === "Movie") {
+        mediaType = "movie";
+      }
+
+      const releaseDate = item.PremiereDate ?? item.ProductionYear?.toString();
+      
+      let posterUrl: string | undefined;
+      if (item.ImageTags?.Primary && item.Id) {
+        posterUrl = connector.getImageUrl(item.Id, "Primary", { width: 200 });
+      }
+      
+      let backdropUrl: string | undefined;
+      if (item.ImageTags?.Backdrop && item.Id) {
+        backdropUrl = connector.getImageUrl(item.Id, "Backdrop", { width: 400 });
+      }
+
+      return {
+        id: `${connector.config.id}:jellyfin:${item.Id}`,
+        title: item.Name ?? "",
+        overview: item.Overview,
+        releaseDate,
+        year: item.ProductionYear,
+        posterUrl,
+        backdropUrl,
+        runtime: item.RunTimeTicks
+          ? Math.floor(item.RunTimeTicks / 10_000_000 / 60)
+          : undefined,
+        mediaType,
+        serviceType: connector.config.type,
+        serviceId: connector.config.id,
+        serviceName: connector.config.name,
+        isInLibrary: true, // Items from search are assumed to be in the library
+        externalIds: {
+          tmdbId,
+          tvdbId,
+          imdbId,
+          serviceNativeId: item.Id,
+        },
+        extra: {
+          genres: item.Genres?.join(", "),
+          studios: item.Studios?.join(", "),
         },
       } as UnifiedSearchResult;
     });

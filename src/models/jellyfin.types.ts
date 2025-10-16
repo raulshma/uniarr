@@ -37,3 +37,9 @@ export type JellyfinImageOptions = paths['/Items/{itemId}/Images/{imageType}']['
 export type JellyfinSessionPlayState = components['schemas']['PlayerStateInfo'];
 
 export type JellyfinSession = components['schemas']['SessionInfoDto'];
+
+export type JellyfinSearchHintResult = components['schemas']['SearchHintResult'];
+
+export type JellyfinSearchHint = components['schemas']['SearchHint'];
+
+export type JellyfinSearchOptions = paths['/Search/Hints']['get']['parameters']['query'];

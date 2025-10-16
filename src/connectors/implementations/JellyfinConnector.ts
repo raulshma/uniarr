@@ -11,6 +11,8 @@ import type {
   JellyfinUserProfile,
   JellyfinImageOptions,
   JellyfinSession,
+  JellyfinSearchHintResult,
+  JellyfinSearchOptions,
 } from '@/models/jellyfin.types';
 import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
 import { logger } from '@/services/logger/LoggerService';
@@ -223,24 +225,51 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     const limit = options?.pagination?.pageSize ?? 25;
     const filters = options?.filters ?? {};
 
-    const params: Record<string, unknown> = {
-      SearchTerm: query,
-      UserId: userId,
-      Limit: limit,
-      Recursive: true,
-      IncludeItemTypes: DEFAULT_SEARCH_TYPES.join(','),
-      Fields: 'PrimaryImageAspectRatio,Overview,ParentId,SeriesInfo,ProviderIds',
-      EnableImages: true,
+    // Build search parameters using the /Search/Hints endpoint which is the proper Jellyfin search endpoint
+    const params: Record<string, unknown> & JellyfinSearchOptions = {
+      searchTerm: query,
+      userId, // Optional. Supply a user id to search within a user's library
+      limit,
+      startIndex: options?.pagination?.page && options.pagination.page > 1
+        ? (options.pagination.page - 1) * limit
+        : undefined,
+      includeItemTypes: DEFAULT_SEARCH_TYPES as any,
+      includePeople: false,
+      includeMedia: true,
+      includeGenres: false,
+      includeStudios: false,
+      includeArtists: false,
       ...filters,
     };
 
-    if (options?.pagination?.page && options.pagination.page > 1) {
-      params.StartIndex = (options.pagination.page - 1) * limit;
-    }
+    // Remove undefined values
+    Object.keys(params).forEach((key) => {
+      if (params[key] === undefined) {
+        delete params[key];
+      }
+    });
 
     try {
-      const response = await this.client.get<JellyfinItemsResponse>(`/Items/Search`, { params });
-      return Array.isArray(response.data?.Items) ? [...response.data.Items] : [];
+      const response = await this.client.get<JellyfinSearchHintResult>(`/Search/Hints`, { params });
+      
+      // Convert search hints back to JellyfinItem-like format for compatibility
+      // SearchHint has limited info, so we map available fields and cast to JellyfinItem
+      const items: JellyfinItem[] = (response.data?.SearchHints ?? []).map((hint) => {
+        const item: Partial<JellyfinItem> = {
+          Id: hint.Id || hint.ItemId,
+          Name: hint.Name,
+          Type: hint.Type as any,
+          MediaType: hint.MediaType as any,
+          ProductionYear: hint.ProductionYear ?? undefined,
+          ImageTags: hint.PrimaryImageTag ? { Primary: hint.PrimaryImageTag } : undefined,
+          RunTimeTicks: hint.RunTimeTicks ?? undefined,
+          // SearchHint doesn't include ProviderIds, Overview, or Genres
+          // These will be undefined but that's acceptable for search results
+        };
+        return item as JellyfinItem;
+      });
+
+      return items;
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
     }

@@ -589,6 +589,32 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
+  async getHistory(options?: { page?: number; pageSize?: number }): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
+    try {
+      const params: Record<string, unknown> = {};
+      if (options?.page) params.page = options.page;
+      if (options?.pageSize) params.pageSize = options.pageSize;
+      // Include related data for better UI display
+      params.includeSeries = true;
+      params.includeEpisode = true;
+      // Order by most recent first
+      params.sortKey = "date";
+      params.sortDirection = "descending";
+
+      const response = await this.client.get<
+        components["schemas"]["HistoryResourcePagingResource"]
+      >("/api/v3/history", { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getHistory",
+        endpoint: "/api/v3/history",
+      });
+    }
+  }
+
   private buildAddPayload(request: AddSeriesRequest): Record<string, unknown> {
     const addOptions = {
       searchForMissingEpisodes:
