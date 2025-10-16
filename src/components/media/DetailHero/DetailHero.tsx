@@ -24,6 +24,7 @@ import { IconButton, Text, useTheme } from "react-native-paper";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { imageCacheService } from "@/services/image/ImageCacheService";
+import { useThumbhash } from "@/hooks/useThumbhash";
 import { spacing } from "@/theme/spacing";
 import type { AppTheme } from "@/constants/theme";
 
@@ -171,6 +172,12 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   const heroUri = backdropUri;
   const [resolvedHeroUri, setResolvedHeroUri] = useState<string | undefined>(heroUri);
 
+  // Use thumbhash hook for the backdrop image
+  const { thumbhash: heroThumbhash } = useThumbhash(heroUri, {
+    autoGenerate: true,
+    generateDelay: 200, // Slightly longer delay for backdrop images
+  });
+
   React.useEffect(() => {
     let mounted = true;
     const resolveHero = async () => {
@@ -200,7 +207,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
             <Image
               source={{ uri: resolvedHeroUri }}
               style={RNStyleSheet.absoluteFill}
-              placeholder={resolvedHeroUri ? imageCacheService.getThumbhash(resolvedHeroUri) ?? undefined : undefined}
+              placeholder={heroThumbhash ? { thumbhash: heroThumbhash } : undefined}
               cachePolicy="memory-disk"
               priority="high"
             />

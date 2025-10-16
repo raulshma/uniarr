@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { PixelRatio, Dimensions } from 'react-native';
 import { imageCacheService } from '@/services/image/ImageCacheService';
+import { useThumbhash } from '@/hooks/useThumbhash';
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -196,6 +197,13 @@ const JellyfinNowPlayingScreen = () => {
       : undefined;
 
   const [resolvedBackdropUri, setResolvedBackdropUri] = useState<string | undefined>(backdropUri);
+
+  // Use thumbhash hook for the backdrop image
+  const { thumbhash: backdropThumbhash } = useThumbhash(backdropUri, {
+    autoGenerate: true,
+    generateDelay: 300, // Longer delay for backdrop images
+  });
+
   useEffect(() => {
     let mounted = true;
     const resolve = async () => {
@@ -429,7 +437,7 @@ const JellyfinNowPlayingScreen = () => {
           cachePolicy="memory-disk"
           contentFit="cover"
           priority="high"
-          placeholder={imageCacheService.getThumbhash(resolvedBackdropUri) ?? undefined}
+          placeholder={backdropThumbhash ? { thumbhash: backdropThumbhash } : undefined}
         />
       ) : null}
       {backdropUri ? (

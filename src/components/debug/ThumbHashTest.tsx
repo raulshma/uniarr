@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Button } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from 'react-native-paper';
-import { imageCacheService } from '@/services/image/ImageCacheService';
+import { thumbhashService } from '@/services/image/ThumbhashService';
 
 const ThumbHashTest = () => {
   const [thumbhash, setThumbhash] = useState<string | undefined>();
@@ -19,15 +19,15 @@ const ThumbHashTest = () => {
   }, []);
 
   const checkThumbhash = () => {
-    const existing = imageCacheService.getThumbhash(testImageUrl);
+    const existing = thumbhashService.getThumbhash(testImageUrl);
     addLog(`Existing thumbhash: ${existing ? 'found' : 'not found'}`);
-    setThumbhash(existing);
+    setThumbhash(existing || undefined);
   };
 
   const generateThumbhash = async () => {
     try {
-      addLog('Starting thumbhash generation...');
-      const hash = await Image.generateThumbhashAsync(testImageUrl);
+      addLog('Starting thumbhash generation via ThumbhashService...');
+      const hash = await thumbhashService.generateThumbhash(testImageUrl);
       addLog(`Generated thumbhash: ${hash ? 'success' : 'failed'}`);
       setThumbhash(hash || undefined);
     } catch (error) {
@@ -35,15 +35,14 @@ const ThumbHashTest = () => {
     }
   };
 
-  const prefetchImage = async () => {
+  const clearThumbhashes = async () => {
     try {
-      addLog('Starting image prefetch...');
-      await imageCacheService.prefetch(testImageUrl);
-      addLog('Prefetch completed');
-      // Check if thumbhash was generated during prefetch
-      setTimeout(checkThumbhash, 500);
+      addLog('Clearing all thumbhashes...');
+      await thumbhashService.clearThumbhashes();
+      setThumbhash(undefined);
+      addLog('Thumbhashes cleared');
     } catch (error) {
-      addLog(`Prefetch error: ${error}`);
+      addLog(`Error clearing thumbhashes: ${error}`);
     }
   };
 
@@ -60,7 +59,7 @@ const ThumbHashTest = () => {
         <Text variant="titleMedium">Actions</Text>
         <Button title="Check Thumbhash" onPress={checkThumbhash} />
         <Button title="Generate Thumbhash" onPress={generateThumbhash} />
-        <Button title="Prefetch Image" onPress={prefetchImage} />
+        <Button title="Clear All Thumbhashes" onPress={clearThumbhashes} />
       </View>
 
       {thumbhash && (

@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { AppTheme } from "@/constants/theme";
 import { imageCacheService } from "@/services/image/ImageCacheService";
+import { useThumbhash } from "@/hooks/useThumbhash";
 
 const sizeMap = {
   small: 96,
@@ -66,9 +67,12 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
-  const [thumbhash, setThumbhash] = useState<string | undefined>(() =>
-    uri ? imageCacheService.getThumbhash(uri) : undefined
-  );
+
+  // Use the new thumbhash hook for clean thumbhash management
+  const { thumbhash, isGenerating } = useThumbhash(uri, {
+    autoGenerate: true,
+    generateDelay: 100, // Small delay to not block initial render
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -79,7 +83,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
           setResolvedUri(undefined);
           setIsLoading(false);
           setHasError(false);
-          setThumbhash(undefined);
         }
         return;
       }
@@ -88,9 +91,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         setIsLoading(true);
         setHasError(false);
         setResolvedUri(undefined);
-        // Update thumbhash for new URI
-        const existingThumbhash = imageCacheService.getThumbhash(uri);
-        setThumbhash(existingThumbhash);
       }
 
       try {
@@ -113,31 +113,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     };
   }, [uri, width, height]);
 
-  // Proactively generate thumbhash for the original URI and update state when available
-  useEffect(() => {
-    if (uri && !thumbhash) {
-      // Generate thumbhash in background without blocking
-      void imageCacheService.generateThumbhash(uri);
-
-      // Poll for thumbhash availability (this is a simple approach)
-      let attempts = 0;
-      const checkInterval = setInterval(() => {
-        attempts++;
-        const hash = imageCacheService.getThumbhash(uri);
-        if (hash && hash !== thumbhash) {
-          setThumbhash(hash);
-          clearInterval(checkInterval);
-        } else if (attempts >= 50) { // 5 seconds max
-          clearInterval(checkInterval);
-        }
-      }, 100);
-
-      return () => {
-        clearInterval(checkInterval);
-      };
-    }
-  }, [uri, thumbhash]);
-
+  
   const handleImageLoad = () => {
     setIsLoading(false);
   };

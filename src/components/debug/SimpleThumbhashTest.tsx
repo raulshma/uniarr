@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Button } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from 'react-native-paper';
-import { imageCacheService } from '@/services/image/ImageCacheService';
+import { thumbhashService } from '@/services/image/ThumbhashService';
 
 const SimpleThumbhashTest = () => {
   const [thumbhash, setThumbhash] = useState<string | undefined>();
@@ -34,22 +34,27 @@ const SimpleThumbhashTest = () => {
     }
   };
 
-  const testCacheService = async () => {
+  const testThumbhashService = async () => {
     try {
-      addLog('Testing cache service thumbhash...');
-      await imageCacheService.generateThumbhash(testImageUrl);
-
-      // Wait a moment then check if it was stored
-      setTimeout(() => {
-        const stored = imageCacheService.getThumbhash(testImageUrl);
-        addLog(`Cache service result: ${stored ? 'FOUND' : 'NOT FOUND'}`);
-        if (stored) {
-          setThumbhash(stored);
-          addLog(`Stored thumbhash length: ${stored.length}`);
-        }
-      }, 1000);
+      addLog('Testing ThumbhashService...');
+      const hash = await thumbhashService.generateThumbhash(testImageUrl);
+      addLog(`ThumbhashService result: ${hash ? 'SUCCESS' : 'FAILED'}`);
+      if (hash) {
+        setThumbhash(hash);
+        addLog(`Stored thumbhash length: ${hash.length}`);
+        addLog(`Thumbhash preview: ${hash.substring(0, 20)}...`);
+      }
     } catch (error) {
-      addLog(`Cache service error: ${error}`);
+      addLog(`ThumbhashService error: ${error}`);
+    }
+  };
+
+  const checkStoredThumbhash = () => {
+    const stored = thumbhashService.getThumbhash(testImageUrl);
+    addLog(`Stored thumbhash: ${stored ? 'FOUND' : 'NOT FOUND'}`);
+    if (stored && stored !== thumbhash) {
+      setThumbhash(stored);
+      addLog(`Updated thumbhash from storage`);
     }
   };
 
@@ -70,7 +75,8 @@ const SimpleThumbhashTest = () => {
       <View style={styles.section}>
         <Text variant="titleMedium">Actions</Text>
         <Button title="Generate Direct Thumbhash" onPress={testDirectThumbhash} />
-        <Button title="Test Cache Service" onPress={testCacheService} />
+        <Button title="Test ThumbhashService" onPress={testThumbhashService} />
+        <Button title="Check Stored Thumbhash" onPress={checkStoredThumbhash} />
       </View>
 
       <View style={styles.section}>
