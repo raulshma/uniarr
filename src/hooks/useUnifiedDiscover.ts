@@ -31,6 +31,23 @@ const emptyServices: UnifiedDiscoverServices = {
   jellyseerr: [],
 };
 
+const placeholderSections: DiscoverSection[] = [
+  {
+    id: "placeholder-tv",
+    title: "Popular TV Shows",
+    mediaType: "series",
+    source: "jellyseerr",
+    items: [],
+  },
+  {
+    id: "placeholder-movies",
+    title: "Trending Movies",
+    mediaType: "movie",
+    source: "jellyseerr",
+    items: [],
+  },
+];
+
 const mapServiceSummaries = (configs: ServiceConfig[]) =>
   configs.map((config) => ({
     id: config.id,
@@ -366,6 +383,10 @@ export const useUnifiedDiscover = () => {
     queryFn: () => fetchUnifiedDiscover(getConnectorsByType, { tmdbEnabled }),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    placeholderData: () => ({
+      sections: placeholderSections,
+      services: emptyServices,
+    }),
     // Keep previous data can be useful to avoid loading flashes; components
     // that render this query can opt into `keepPreviousData` via a local
     // useQuery overload if needed. We disable refetchOnWindowFocus here.

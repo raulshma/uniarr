@@ -9,6 +9,7 @@ import type {
 
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/original';
+const TMDB_PROFILE_BASE = 'https://image.tmdb.org/t/p/w185';
 
 export const buildPosterUrl = (path?: string | null): string | undefined => {
   if (!path) {
@@ -22,6 +23,13 @@ export const buildBackdropUrl = (path?: string | null): string | undefined => {
     return undefined;
   }
   return `${TMDB_BACKDROP_BASE}${path}`;
+};
+
+export const buildProfileUrl = (path?: string | null): string | undefined => {
+  if (!path) {
+    return undefined;
+  }
+  return `${TMDB_PROFILE_BASE}${path}`;
 };
 
 const extractYear = (date?: string | null): number | undefined => {

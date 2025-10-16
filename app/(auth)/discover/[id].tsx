@@ -16,6 +16,8 @@ import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import useJellyseerrMediaCredits from "@/hooks/useJellyseerrMediaCredits";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 import type { AppTheme } from "@/constants/theme";
+import { buildProfileUrl } from "@/utils/tmdb.utils";
+import { useTmdbDetails } from "@/hooks/tmdb/useTmdbDetails";
 import RatingsOverview from "@/components/media/RatingsOverview";
 import { spacing } from "@/theme/spacing";
 import RelatedItems from "@/components/discover/RelatedItems";
@@ -260,17 +262,42 @@ export default DiscoverItemDetails;
     [theme],
   );
 
-  // Only fetch credits for items that originate from Jellyseerr and include a sourceServiceId
-  const shouldFetchCredits = item.source === 'jellyseerr' && item.sourceServiceId && item.sourceId;
-  const creditsQuery = shouldFetchCredits
+  // Fetch credits from Jellyseerr for Jellyseerr items
+  const shouldFetchJellyseerrCredits = item.source === 'jellyseerr' && item.sourceServiceId && item.sourceId;
+  const jellyseerrCreditsQuery = shouldFetchJellyseerrCredits
     ? useJellyseerrMediaCredits(item.sourceServiceId!, item.mediaType === 'series' ? 'tv' : 'movie', item.sourceId!)
     : undefined;
 
-  const cast = creditsQuery?.data ?? [];
+  // Fetch credits from TMDB for TMDB items
+  const shouldFetchTmdbCredits = item.source === 'tmdb' && item.tmdbId;
+  const tmdbDetailsQuery = shouldFetchTmdbCredits
+    ? useTmdbDetails(item.mediaType === 'series' ? 'tv' : 'movie', item.tmdbId!, { enabled: true })
+    : undefined;
 
-  const openPersonSearch = (name?: string) => {
-    if (!name) return;
-    router.push({ pathname: '/(auth)/search', params: { query: name } });
+  // Map TMDB cast data to match Jellyseerr structure for consistent rendering
+  const tmdbCast = useMemo(() => {
+    const rawCast = tmdbDetailsQuery?.data?.credits?.cast;
+    if (!Array.isArray(rawCast)) {
+      return [];
+    }
+
+    return rawCast.slice(0, MAX_VISIBLE).map((person) => ({
+      id: person.id,
+      name: typeof person.name === "string" ? person.name : person.original_name ?? "Unknown",
+      profilePath: typeof person.profile_path === "string" ? person.profile_path : undefined,
+    }));
+  }, [tmdbDetailsQuery?.data?.credits?.cast]);
+
+  // Use either Jellyseerr or TMDB cast data
+  const cast = jellyseerrCreditsQuery?.data ?? tmdbCast ?? [];
+
+  const openPersonDetails = (personId?: number, name?: string) => {
+    if (personId) {
+      router.push({ pathname: '/(auth)/person/[personId]', params: { personId: String(personId) } });
+    } else if (name) {
+      // Fallback to search if no person ID is available
+      router.push({ pathname: '/(auth)/search', params: { query: name } });
+    }
   };
 
   if (!cast.length) {
@@ -302,12 +329,12 @@ export default DiscoverItemDetails;
           <Pressable
             key={String(person.id ?? person.name ?? idx)}
             accessibilityRole="button"
-            accessibilityLabel={person.name ? `Search for ${person.name}` : 'Search for cast member'}
-            onPress={() => openPersonSearch(person.name)}
+            accessibilityLabel={person.name ? `View details for ${person.name}` : 'View cast member details'}
+            onPress={() => openPersonDetails(person.id, person.name)}
             style={{ marginLeft: idx === 0 ? 0 : -OVERLAP, zIndex: idx + 1 }}
           >
             <MediaPoster
-              uri={person.profilePath ? `https://image.tmdb.org/t/p/original${person.profilePath}` : undefined}
+              uri={buildProfileUrl(person.profilePath)}
               size={AVATAR_SIZE}
               aspectRatio={1}
               borderRadius={AVATAR_SIZE / 2}

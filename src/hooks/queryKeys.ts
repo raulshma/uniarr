@@ -244,6 +244,48 @@ export const queryKeys = {
       term,
       options ?? {},
     ] as const,
+    person: {
+      details: (personId: number, language?: string): QueryKeyBuilder => [
+        'tmdb',
+        'person',
+        'details',
+        personId,
+        language ?? 'default',
+      ] as const,
+      movieCredits: (personId: number, language?: string): QueryKeyBuilder => [
+        'tmdb',
+        'person',
+        'movieCredits',
+        personId,
+        language ?? 'default',
+      ] as const,
+      tvCredits: (personId: number, language?: string): QueryKeyBuilder => [
+        'tmdb',
+        'person',
+        'tvCredits',
+        personId,
+        language ?? 'default',
+      ] as const,
+      combinedCredits: (personId: number, language?: string): QueryKeyBuilder => [
+        'tmdb',
+        'person',
+        'combinedCredits',
+        personId,
+        language ?? 'default',
+      ] as const,
+      images: (personId: number): QueryKeyBuilder => [
+        'tmdb',
+        'person',
+        'images',
+        personId,
+      ] as const,
+      externalIds: (personId: number): QueryKeyBuilder => [
+        'tmdb',
+        'person',
+        'externalIds',
+        personId,
+      ] as const,
+    },
   },
   bazarr: {
     base: ['bazarr'] as const,

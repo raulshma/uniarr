@@ -467,8 +467,40 @@ const fetchRecentActivity = async (): Promise<RecentActivityItem[]> => {
       }
     }
 
+    // Deduplicate recent activity items
+    // We'll deduplicate based on a combination of title, episode/show info to avoid showing the same content multiple times
+    const uniqueActivities = recentActivity.reduce((unique: RecentActivityItem[], item) => {
+      // Create a unique key based on title and episode/show info
+      // For movies: use title + "Movie"
+      // For episodes: use title + episode + show
+      const uniqueKey = item.episode === 'Movie'
+        ? `${item.title}-Movie`
+        : `${item.title}-${item.episode}-${item.show}`;
+
+      // Check if we already have this item
+      const existingIndex = unique.findIndex(existing => {
+        const existingKey = existing.episode === 'Movie'
+          ? `${existing.title}-Movie`
+          : `${existing.title}-${existing.episode}-${existing.show}`;
+        return existingKey === uniqueKey;
+      });
+
+      if (existingIndex === -1) {
+        // Item doesn't exist, add it
+        unique.push(item);
+      } else {
+        // Item exists, keep the more recent one
+        const existing = unique[existingIndex];
+        // For simplicity, we'll assume newer items (later in the array) are more recent
+        // since the API should return items in reverse chronological order
+        unique[existingIndex] = item;
+      }
+
+      return unique;
+    }, []);
+
     // Sort by date (most recent first) and limit to 10 items
-    return recentActivity.slice(0, 10);
+    return uniqueActivities.slice(0, 10);
   } catch (error) {
     console.error('Failed to fetch recent activity data:', error);
     return [];

@@ -50,6 +50,14 @@ export type TvVideosResponse = operations['tv-series-videos']['responses'][200][
 export type MovieCreditsResponse = operations['movie-credits']['responses'][200]['content']['application/json'];
 export type TvCreditsResponse = operations['tv-series-credits']['responses'][200]['content']['application/json'];
 
+// Person-related types
+export type PersonDetailsResponse = operations['person-details']['responses'][200]['content']['application/json'];
+export type PersonMovieCreditsResponse = operations['person-movie-credits']['responses'][200]['content']['application/json'];
+export type PersonTvCreditsResponse = operations['person-tv-credits']['responses'][200]['content']['application/json'];
+export type PersonCombinedCreditsResponse = operations['person-combined-credits']['responses'][200]['content']['application/json'];
+export type PersonImagesResponse = operations['person-images']['responses'][200]['content']['application/json'];
+export type PersonExternalIdsResponse = operations['person-external-ids']['responses'][200]['content']['application/json'];
+
 export type MovieDetailsWithExtrasResponse = MovieDetailsResponse & {
   images?: MovieImagesResponse;
   videos?: MovieVideosResponse;
@@ -470,6 +478,89 @@ export class TmdbConnector {
       return response.data;
     } catch (error) {
       return this.handleError(error, 'searchMulti');
+    }
+  }
+
+  // Person-related methods
+  async getPersonDetails(personId: number, language?: string): Promise<PersonDetailsResponse> {
+    try {
+      const response = await this.requestWithRetry<PersonDetailsResponse>({
+        method: 'GET',
+        url: `/3/person/${personId}`,
+        params: this.removeUndefined({ language }),
+      });
+
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getPersonDetails');
+    }
+  }
+
+  async getPersonMovieCredits(personId: number, language?: string): Promise<PersonMovieCreditsResponse> {
+    try {
+      const response = await this.requestWithRetry<PersonMovieCreditsResponse>({
+        method: 'GET',
+        url: `/3/person/${personId}/movie_credits`,
+        params: this.removeUndefined({ language }),
+      });
+
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getPersonMovieCredits');
+    }
+  }
+
+  async getPersonTvCredits(personId: number, language?: string): Promise<PersonTvCreditsResponse> {
+    try {
+      const response = await this.requestWithRetry<PersonTvCreditsResponse>({
+        method: 'GET',
+        url: `/3/person/${personId}/tv_credits`,
+        params: this.removeUndefined({ language }),
+      });
+
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getPersonTvCredits');
+    }
+  }
+
+  async getPersonCombinedCredits(personId: number, language?: string): Promise<PersonCombinedCreditsResponse> {
+    try {
+      const response = await this.requestWithRetry<PersonCombinedCreditsResponse>({
+        method: 'GET',
+        url: `/3/person/${personId}/combined_credits`,
+        params: this.removeUndefined({ language }),
+      });
+
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getPersonCombinedCredits');
+    }
+  }
+
+  async getPersonImages(personId: number): Promise<PersonImagesResponse> {
+    try {
+      const response = await this.requestWithRetry<PersonImagesResponse>({
+        method: 'GET',
+        url: `/3/person/${personId}/images`,
+      });
+
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getPersonImages');
+    }
+  }
+
+  async getPersonExternalIds(personId: number): Promise<PersonExternalIdsResponse> {
+    try {
+      const response = await this.requestWithRetry<PersonExternalIdsResponse>({
+        method: 'GET',
+        url: `/3/person/${personId}/external_ids`,
+      });
+
+      return response.data;
+    } catch (error) {
+      return this.handleError(error, 'getPersonExternalIds');
     }
   }
 }

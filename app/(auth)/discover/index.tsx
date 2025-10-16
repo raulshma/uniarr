@@ -22,6 +22,7 @@ import { useRouter } from "expo-router";
 import { EmptyState } from "@/components/common/EmptyState";
 import { TabHeader } from "@/components/common/TabHeader";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
+import { SectionSkeleton } from "@/components/discover";
 import type { AppTheme } from "@/constants/theme";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 import type { DiscoverMediaItem } from "@/models/discover.types";
@@ -277,40 +278,50 @@ const DiscoverScreen = () => {
       sectionTitle: string,
       subtitle: string | undefined,
       items: DiscoverMediaItem[]
-    ) => (
-      <View>
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>{sectionTitle}</Text>
-            {subtitle ? (
-              <Text style={styles.sectionSubtitle}>{subtitle}</Text>
-            ) : null}
+    ) => {
+      // Show skeleton for placeholder sections (these should always show skeletons)
+      // or when items are empty and we're currently fetching data
+      const shouldShowSkeleton = sectionId.startsWith('placeholder-') || (items.length === 0 && isFetching);
+
+      if (shouldShowSkeleton) {
+        return <SectionSkeleton />;
+      }
+
+      return (
+        <View>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+              {subtitle ? (
+                <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+              ) : null}
+            </View>
+            <PaperButton
+              mode="text"
+              compact
+              onPress={() => openSectionPage(sectionId)}
+              textColor={theme.colors.primary}
+            >
+              View all
+            </PaperButton>
           </View>
-          <PaperButton
-            mode="text"
-            compact
-            onPress={() => openSectionPage(sectionId)}
-            textColor={theme.colors.primary}
-          >
-            View all
-          </PaperButton>
+          <FlatList
+            data={items}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <DiscoverCard
+                item={item}
+                onPress={handleCardPress}
+                onAdd={openServicePicker}
+              />
+            )}
+          />
         </View>
-        <FlatList
-          data={items}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <DiscoverCard
-              item={item}
-              onPress={handleCardPress}
-              onAdd={openServicePicker}
-            />
-          )}
-        />
-      </View>
-    ),
+      );
+    },
     [
       handleCardPress,
       openServicePicker,
@@ -320,6 +331,8 @@ const DiscoverScreen = () => {
       styles.sectionSubtitle,
       styles.sectionTitle,
       theme.colors.primary,
+      isLoading,
+      isFetching,
     ]
   );
 
@@ -370,12 +383,7 @@ const DiscoverScreen = () => {
         }
         ListEmptyComponent={
           <View style={styles.emptyWrapper}>
-            {isLoading ? (
-              <EmptyState
-                title="Loading recommendations"
-                description="Fetching popular titles across your services."
-              />
-            ) : isError ? (
+            {isError ? (
               <EmptyState
                 title="Unable to load recommendations"
                 description={

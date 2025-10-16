@@ -12,7 +12,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { AppTheme } from "@/constants/theme";
 import { imageCacheService } from "@/services/image/ImageCacheService";
-import { PixelRatio } from 'react-native';
 
 const sizeMap = {
   small: 96,
@@ -55,6 +54,15 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     borderRadius ??
     theme.custom.config?.posterStyle.borderRadius ??
     DEFAULT_RADIUS;
+  const width = useMemo(
+    () => (typeof size === "number" ? size : sizeMap[size]),
+    [size]
+  );
+  const height = useMemo(
+    () => Math.round(width / aspectRatio),
+    [width, aspectRatio]
+  );
+
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
@@ -80,9 +88,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
 
       try {
         // Request a sized thumbnail matching the rendered size * device DPR
-        const dpr = PixelRatio.get();
-        const reqWidth = Math.round(width * dpr);
-        const reqHeight = Math.round(height * dpr);
         const localUri = await imageCacheService.resolveForSize(uri, width, height);
         if (isMounted) {
           setResolvedUri(localUri);
@@ -99,7 +104,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [uri]);
+  }, [uri, width, height]);
 
   // Proactively generate thumbhash for the original URI
   useEffect(() => {
@@ -108,15 +113,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       void imageCacheService.generateThumbhash(uri);
     }
   }, [uri]);
-
-  const width = useMemo(
-    () => (typeof size === "number" ? size : sizeMap[size]),
-    [size]
-  );
-  const height = useMemo(
-    () => Math.round(width / aspectRatio),
-    [width, aspectRatio]
-  );
 
   const handleImageLoad = () => {
     setIsLoading(false);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Banner, Button, Chip, Dialog, Portal, RadioButton, Surface, Text, useTheme } from "react-native-paper";
@@ -31,7 +31,7 @@ import {
   buildDestinationOptions,
   mapServiceSummaries,
 } from "@/utils/discover/destination.utils";
-import { buildBackdropUrl, buildPosterUrl } from "@/utils/tmdb.utils";
+import { buildBackdropUrl, buildPosterUrl, buildProfileUrl } from "@/utils/tmdb.utils";
 import { spacing } from "@/theme/spacing";
 import { alert } from "@/services/dialogService";
 
@@ -430,6 +430,7 @@ const TmdbDetailPage = () => {
 
     return rawCast.slice(0, CAST_LIMIT).map((person) => ({
       id: String(person.id ?? Math.random()),
+      personId: typeof person.id === "number" ? person.id : undefined,
       name: typeof person.name === "string" ? person.name : person.original_name ?? "Unknown",
       role: typeof person.character === "string" ? person.character : undefined,
       profilePath: typeof person.profile_path === "string" ? person.profile_path : undefined,
@@ -511,6 +512,16 @@ const TmdbDetailPage = () => {
           mediaType: targetMediaType,
           tmdbId: String(targetId),
         },
+      });
+    },
+    [router],
+  );
+
+  const navigateToPerson = useCallback(
+    (personId: number) => {
+      router.push({
+        pathname: "/(auth)/person/[personId]",
+        params: { personId: String(personId) },
       });
     },
     [router],
@@ -673,30 +684,37 @@ const TmdbDetailPage = () => {
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.castRow}>
                   {cast.map((person) => (
-                    <Surface key={person.id} style={styles.castCard} elevation={1}>
-                      <MediaPoster
-                        uri={buildPosterUrl(person.profilePath)}
-                        size={80}
-                        borderRadius={12}
-                        accessibilityLabel={`${person.name} profile`}
-                      />
-                      <Text
-                        variant="bodyMedium"
-                        style={{ color: theme.colors.onSurface, fontWeight: "600" }}
-                        numberOfLines={1}
-                      >
-                        {person.name}
-                      </Text>
-                      {person.role ? (
+                    <Pressable
+                      key={person.id}
+                      onPress={() => person.personId && navigateToPerson(person.personId)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View details for ${person.name}`}
+                    >
+                      <Surface style={styles.castCard} elevation={1}>
+                        <MediaPoster
+                          uri={buildProfileUrl(person.profilePath)}
+                          size={80}
+                          borderRadius={12}
+                          accessibilityLabel={`${person.name} profile`}
+                        />
                         <Text
-                          variant="bodySmall"
-                          style={{ color: theme.colors.onSurfaceVariant }}
+                          variant="bodyMedium"
+                          style={{ color: theme.colors.onSurface, fontWeight: "600" }}
                           numberOfLines={1}
                         >
-                          as {person.role}
+                          {person.name}
                         </Text>
-                      ) : null}
-                    </Surface>
+                        {person.role ? (
+                          <Text
+                            variant="bodySmall"
+                            style={{ color: theme.colors.onSurfaceVariant }}
+                            numberOfLines={1}
+                          >
+                            as {person.role}
+                          </Text>
+                        ) : null}
+                      </Surface>
+                    </Pressable>
                   ))}
                 </View>
               </ScrollView>
