@@ -22,14 +22,92 @@ async function run() {
 
   fs.mkdirSync(outDir, { recursive: true });
 
-  const files = fs.readdirSync(specsDir).filter((f) => /\.ya?ml$|\.json$/i.test(f));
+  let files = fs.readdirSync(specsDir).filter((f) => /\.ya?ml$|\.json$/i.test(f));
 
   if (files.length === 0) {
     console.warn(`No OpenAPI spec files found in ${specsDir}`);
     process.exit(0);
   }
 
-  console.log(`Found ${files.length} spec(s) in ${specsDir}. Generating types to ${outDir}`);
+  console.log(`Found ${files.length} spec(s) in ${specsDir}.`);
+
+  // Helper to parse a user selection like "1,3-5,7" into zero-based indices
+  function parseSelection(input, max) {
+    const seen = new Set();
+    const parts = input.split(",").map((p) => p.trim()).filter(Boolean);
+    for (const part of parts) {
+      if (/^\d+$/.test(part)) {
+        const n = Number(part);
+        if (n >= 1 && n <= max) seen.add(n - 1);
+        continue;
+      }
+      const m = part.match(/^(\d+)-(\d+)$/);
+      if (m) {
+        let a = Number(m[1]);
+        let b = Number(m[2]);
+        if (a > b) [a, b] = [b, a];
+        for (let i = a; i <= b; i++) {
+          if (i >= 1 && i <= max) seen.add(i - 1);
+        }
+        continue;
+      }
+      // allow filenames directly
+      const idx = files.indexOf(part);
+      if (idx !== -1) seen.add(idx);
+    }
+    return Array.from(seen).sort((a, b) => a - b);
+  }
+
+  // Prompt the user to choose which files to generate
+  async function promptUserToSelectFiles(files) {
+    // If not a TTY (CI or piping), default to all files
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      console.log("Non-interactive shell detected; defaulting to generating all specs.");
+      return files.slice();
+    }
+
+    // If only one file exists, auto-select it
+    if (files.length === 1) {
+      console.log(`Only one spec found: ${files[0]} — selecting it automatically.`);
+      return files.slice();
+    }
+
+    console.log("Available OpenAPI spec files:");
+    files.forEach((f, i) => {
+      console.log(`  ${String(i + 1).padStart(2, " ")}. ${f}`);
+    });
+    console.log('\nEnter numbers (e.g. "1,3-5"), filenames, or "all" to generate for all files. Leave blank to cancel.');
+
+    const readline = require("readline");
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+    const answer = await new Promise((resolve) => {
+      rl.question("Select files to generate: ", (ans) => {
+        rl.close();
+        resolve(String(ans || "").trim());
+      });
+    });
+
+    if (!answer) {
+      console.log("No selection made — aborting.");
+      process.exit(0);
+    }
+
+    if (/^all$|^\*$|^a$/i.test(answer)) {
+      return files.slice();
+    }
+
+    const indices = parseSelection(answer, files.length);
+    if (indices.length === 0) {
+      console.log("No valid selections parsed — aborting.");
+      process.exit(0);
+    }
+    return indices.map((i) => files[i]);
+  }
+
+  files = await promptUserToSelectFiles(files);
+
+  console.log(`Generating types to ${outDir}`);
 
   // Try to use the programmatic API if available so we can capture errors directly.
   let openapiTS = null;
