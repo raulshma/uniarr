@@ -456,9 +456,9 @@ const SettingsScreen = () => {
                   />
                 </View>
                 <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Native Tabs</Text>
+                  <Text style={styles.settingTitle}>Navigation Style</Text>
                   <Text style={styles.settingValue}>
-                    {useNativeTabs ? "Enabled" : "Disabled"}
+                    {useNativeTabs ? "Native Tabs" : "Curved Bar"}
                   </Text>
                 </View>
                 <Switch

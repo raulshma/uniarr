@@ -117,7 +117,7 @@ const createDefaultSettings = (): SettingsData => ({
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
   lastCalendarView: 'week',
-  useNativeTabs: false,
+  useNativeTabs: true,
   tmdbEnabled: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
   maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
