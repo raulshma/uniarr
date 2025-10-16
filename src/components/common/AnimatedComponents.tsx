@@ -1,5 +1,14 @@
 import React from 'react';
 import { View, ScrollView, Pressable, ViewStyle, ScrollViewProps, PressableProps } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
 
 interface AnimatedViewProps {
   children: React.ReactNode;
@@ -40,12 +49,23 @@ interface AnimatedHeaderProps {
   style?: ViewStyle;
 }
 
-export const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
+export const AnimatedHeader: React.FC<AnimatedHeaderProps> = React.memo(({
   children,
   style,
 }) => {
-  return <View style={style}>{children}</View>;
-};
+  return (
+    <Animated.View
+      style={style}
+      entering={FadeIn.duration(250)}
+      exiting={FadeOut.duration(150)}
+      // Performance optimizations
+      removeClippedSubviews={true}
+      collapsable={true}
+    >
+      {children}
+    </Animated.View>
+  );
+});
 
 interface AnimatedListProps {
   children: React.ReactNode;
@@ -81,15 +101,30 @@ interface AnimatedListItemProps {
   totalItems?: number;
 }
 
-export const AnimatedListItem: React.FC<AnimatedListItemProps> = ({
+export const AnimatedListItem: React.FC<AnimatedListItemProps> = React.memo(({
   children,
   style,
   index = 0,
   totalItems = 1,
 }) => {
-  // Preserve API but render without animation so list renders instantly
-  return <View style={style}>{children}</View>;
-};
+  // Calculate minimal delay for staggered effect (max 200ms total delay)
+  // Limit items that get animated to prevent performance issues with large lists
+  const isWithinAnimationLimit = index < 8;
+  const delay = isWithinAnimationLimit ? Math.min(index * 40, 200) : 0;
+
+  return (
+    <Animated.View
+      style={style}
+      entering={isWithinAnimationLimit ? FadeIn.duration(300).delay(delay) : undefined}
+      exiting={isWithinAnimationLimit ? FadeOut.duration(200) : undefined}
+      // Performance optimizations
+      removeClippedSubviews={true}
+      collapsable={true}
+    >
+      {children}
+    </Animated.View>
+  );
+});
 
 // Section animation for grouped content
 interface AnimatedSectionProps {
@@ -98,13 +133,24 @@ interface AnimatedSectionProps {
   delay?: number;
 }
 
-export const AnimatedSection: React.FC<AnimatedSectionProps> = ({
+export const AnimatedSection: React.FC<AnimatedSectionProps> = React.memo(({
   children,
   style,
   delay = 0,
 }) => {
-  return <View style={style}>{children}</View>;
-};
+  return (
+    <Animated.View
+      style={style}
+      entering={FadeIn.duration(400).delay(delay)}
+      exiting={FadeOut.duration(250)}
+      // Performance optimizations
+      removeClippedSubviews={true}
+      collapsable={true}
+    >
+      {children}
+    </Animated.View>
+  );
+});
 
 // Progress bar animation
 interface AnimatedProgressProps {

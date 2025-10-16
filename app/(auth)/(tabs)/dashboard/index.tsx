@@ -806,19 +806,16 @@ const DashboardScreen = () => {
     enabled: true,
   });
 
-  // Only refetch on manual pull-to-refresh, not on navigation
-  // This prevents the 3-4 second delay when switching to this screen
+  // Refresh service health when screen comes back into focus
+  // This ensures service status is up-to-date when user returns to dashboard
   useFocusEffect(
     useCallback(() => {
-      // Don't automatically refetch - rely on staleTime
-      // Manually trigger only if data is critically stale (> 5 minutes)
-      const now = Date.now();
-      const CRITICAL_STALE_THRESHOLD = 5 * 60 * 1000;
-      
-      // This callback intentionally does nothing on focus
-      // Users can pull-to-refresh for fresh data
+      // Only refresh service health, not all data to avoid long delays
+      // Use the regular refetch (faster health checks) instead of full connection tests
+      void refetch();
+
       return undefined;
-    }, [])
+    }, [refetch])
   );
 
   const services = data ?? [];
