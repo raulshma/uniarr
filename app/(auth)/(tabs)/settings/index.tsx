@@ -104,23 +104,23 @@ const SettingsScreen = () => {
       backgroundColor: theme.colors.background,
     },
     scrollContainer: {
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.sm,
       paddingBottom: spacing.xxxxl,
     },
     listSpacer: {
-      height: spacing.sm,
+      height: spacing.xs,
     },
     section: {
-      marginTop: spacing.lg,
+      marginTop: spacing.md,
     },
     sectionTitle: {
       color: theme.colors.onBackground,
-      fontSize: theme.custom.typography.titleLarge.fontSize,
-      fontFamily: theme.custom.typography.titleLarge.fontFamily,
-      lineHeight: theme.custom.typography.titleLarge.lineHeight,
-      letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
-      fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
-      marginBottom: spacing.md,
+      fontSize: theme.custom.typography.titleMedium.fontSize,
+      fontFamily: theme.custom.typography.titleMedium.fontFamily,
+      lineHeight: theme.custom.typography.titleMedium.lineHeight,
+      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+      marginBottom: spacing.sm,
       paddingHorizontal: spacing.xs,
     },
     themeOptions: {
@@ -129,61 +129,83 @@ const SettingsScreen = () => {
       marginTop: spacing.xs,
     },
     themeChip: {
-      borderRadius: 16,
+      borderRadius: 12,
+      height: 32,
     },
     settingCard: {
       backgroundColor: theme.colors.elevation.level1,
       marginHorizontal: spacing.xs,
-      marginVertical: spacing.xs,
-      borderRadius: 12,
-      padding: spacing.md,
+      marginVertical: spacing.xs / 2,
+      borderRadius: 8,
+      padding: spacing.sm,
     },
     settingContent: {
       flexDirection: "row",
       alignItems: "center",
     },
     settingIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       backgroundColor: theme.colors.surfaceVariant,
       alignItems: "center",
       justifyContent: "center",
-      marginRight: spacing.md,
+      marginRight: spacing.sm,
     },
     settingInfo: {
       flex: 1,
     },
     settingTitle: {
       color: theme.colors.onSurface,
-      fontSize: theme.custom.typography.titleMedium.fontSize,
-      fontFamily: theme.custom.typography.titleMedium.fontFamily,
-      lineHeight: theme.custom.typography.titleMedium.lineHeight,
-      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
-      marginBottom: spacing.xxs,
-    },
-    settingSubtitle: {
-      color: theme.colors.onSurfaceVariant,
       fontSize: theme.custom.typography.bodyMedium.fontSize,
       fontFamily: theme.custom.typography.bodyMedium.fontFamily,
       lineHeight: theme.custom.typography.bodyMedium.lineHeight,
       letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
       fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
-      marginBottom: spacing.xxs,
+      marginBottom: 1,
     },
-    settingValue: {
+    settingSubtitle: {
       color: theme.colors.onSurfaceVariant,
       fontSize: theme.custom.typography.bodySmall.fontSize,
       fontFamily: theme.custom.typography.bodySmall.fontFamily,
       lineHeight: theme.custom.typography.bodySmall.lineHeight,
       letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
       fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
+      marginBottom: 1,
+    },
+    settingValue: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: theme.custom.typography.labelSmall.fontSize,
+      fontFamily: theme.custom.typography.labelSmall.fontFamily,
+      lineHeight: theme.custom.typography.labelSmall.lineHeight,
+      letterSpacing: theme.custom.typography.labelSmall.letterSpacing,
+      fontWeight: theme.custom.typography.labelSmall.fontWeight as any,
     },
     signOutButton: {
       marginHorizontal: spacing.xs,
-      marginTop: spacing.lg,
-      marginBottom: 0,
+      marginTop: spacing.md,
+      marginBottom: spacing.xl,
+    },
+    notificationGroup: {
+      backgroundColor: theme.colors.elevation.level1,
+      marginHorizontal: spacing.xs,
+      marginVertical: spacing.xs / 2,
+      borderRadius: 8,
+      padding: spacing.sm,
+    },
+    notificationItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: spacing.xs,
+    },
+    notificationIcon: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: theme.colors.surfaceVariant,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: spacing.sm,
     },
   });
 
@@ -329,15 +351,12 @@ const SettingsScreen = () => {
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="palette"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Theme</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Choose your preferred theme
-                  </Text>
                   <View style={styles.themeOptions}>
                     <Chip
                       mode={themePreference === "light" ? "flat" : "outlined"}
@@ -350,6 +369,7 @@ const SettingsScreen = () => {
                       ]}
                       textStyle={{
                         color: getThemeChipColor("light").textColor,
+                        fontSize: 12,
                       }}
                       onPress={() => handleThemeSelection("light")}
                     >
@@ -364,7 +384,10 @@ const SettingsScreen = () => {
                             getThemeChipColor("dark").backgroundColor,
                         },
                       ]}
-                      textStyle={{ color: getThemeChipColor("dark").textColor }}
+                      textStyle={{
+                        color: getThemeChipColor("dark").textColor,
+                        fontSize: 12,
+                      }}
                       onPress={() => handleThemeSelection("dark")}
                     >
                       Dark
@@ -380,6 +403,7 @@ const SettingsScreen = () => {
                       ]}
                       textStyle={{
                         color: getThemeChipColor("system").textColor,
+                        fontSize: 12,
                       }}
                       onPress={() => handleThemeSelection("system")}
                     >
@@ -387,11 +411,6 @@ const SettingsScreen = () => {
                     </Chip>
                   </View>
                 </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={20}
-                  iconColor={theme.colors.outline}
-                />
               </View>
             </Card>
           </AnimatedListItem>
@@ -405,22 +424,17 @@ const SettingsScreen = () => {
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="palette-swatch"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Customize Theme</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Advanced theme customization
-                  </Text>
-                  <Text style={styles.settingValue}>
-                    Colors, fonts, density & more
-                  </Text>
+                  <Text style={styles.settingValue}>Colors, fonts & more</Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
-                  size={20}
+                  size={18}
                   iconColor={theme.colors.outline}
                 />
               </View>
@@ -432,17 +446,14 @@ const SettingsScreen = () => {
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="tab"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Navigation Style</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Use Expo Router native tabs
-                  </Text>
+                  <Text style={styles.settingTitle}>Native Tabs</Text>
                   <Text style={styles.settingValue}>
-                    {useNativeTabs ? "Native tabs enabled" : "Custom curved tabs"}
+                    {useNativeTabs ? "Enabled" : "Disabled"}
                   </Text>
                 </View>
                 <Switch
@@ -457,21 +468,19 @@ const SettingsScreen = () => {
 
         {/* Notifications Section */}
         <AnimatedSection style={styles.section} delay={100}>
-          <AnimatedListItem index={0} totalItems={6}>
-            <Card variant="custom" style={styles.settingCard}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          <AnimatedListItem index={0} totalItems={1}>
+            <Card variant="custom" style={styles.notificationGroup}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="bell"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Enable Notifications</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Receive push notifications
-                  </Text>
                 </View>
                 <Switch
                   value={notificationsEnabled}
@@ -479,181 +488,109 @@ const SettingsScreen = () => {
                   color={theme.colors.primary}
                 />
               </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={6}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="check-circle"
-                    size={24}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Completed Downloads</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Notify when downloads finish
-                  </Text>
-                </View>
-                <Switch
-                  value={downloadNotificationsEnabled && notificationsEnabled}
-                  onValueChange={setDownloadNotificationsEnabled}
-                  disabled={!notificationsEnabled}
-                  color={theme.colors.primary}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={2} totalItems={6}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="alert-circle"
-                    size={24}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Failed Downloads</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Notify when downloads fail
-                  </Text>
-                </View>
-                <Switch
-                  value={
-                    failedDownloadNotificationsEnabled && notificationsEnabled
-                  }
-                  onValueChange={setFailedDownloadNotificationsEnabled}
-                  disabled={!notificationsEnabled}
-                  color={theme.colors.primary}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={3} totalItems={6}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="account-plus"
-                    size={24}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>New Requests</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Notify when requests come in
-                  </Text>
-                </View>
-                <Switch
-                  value={requestNotificationsEnabled && notificationsEnabled}
-                  onValueChange={setRequestNotificationsEnabled}
-                  disabled={!notificationsEnabled}
-                  color={theme.colors.primary}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={4} totalItems={6}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="server-network"
-                    size={24}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Service Health</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Notify on service outages
-                  </Text>
-                </View>
-                <Switch
-                  value={
-                    serviceHealthNotificationsEnabled && notificationsEnabled
-                  }
-                  onValueChange={setServiceHealthNotificationsEnabled}
-                  disabled={!notificationsEnabled}
-                  color={theme.colors.primary}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={5} totalItems={6}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/quiet-hours")}
-            >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+
+              {notificationsEnabled && (
+                <>
+                  <View style={styles.notificationItem}>
+                    <View style={styles.notificationIcon}>
+                      <IconButton
+                        icon="check-circle"
+                        size={16}
+                        iconColor={theme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingValue}>Completed Downloads</Text>
+                    </View>
+                    <Switch
+                      value={downloadNotificationsEnabled}
+                      onValueChange={setDownloadNotificationsEnabled}
+                      color={theme.colors.primary}
+                    />
+                  </View>
+
+                  <View style={styles.notificationItem}>
+                    <View style={styles.notificationIcon}>
+                      <IconButton
+                        icon="alert-circle"
+                        size={16}
+                        iconColor={theme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingValue}>Failed Downloads</Text>
+                    </View>
+                    <Switch
+                      value={failedDownloadNotificationsEnabled}
+                      onValueChange={setFailedDownloadNotificationsEnabled}
+                      color={theme.colors.primary}
+                    />
+                  </View>
+
+                  <View style={styles.notificationItem}>
+                    <View style={styles.notificationIcon}>
+                      <IconButton
+                        icon="account-plus"
+                        size={16}
+                        iconColor={theme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingValue}>New Requests</Text>
+                    </View>
+                    <Switch
+                      value={requestNotificationsEnabled}
+                      onValueChange={setRequestNotificationsEnabled}
+                      color={theme.colors.primary}
+                    />
+                  </View>
+
+                  <View style={styles.notificationItem}>
+                    <View style={styles.notificationIcon}>
+                      <IconButton
+                        icon="server-network"
+                        size={16}
+                        iconColor={theme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingInfo}>
+                      <Text style={styles.settingValue}>Service Health</Text>
+                    </View>
+                    <Switch
+                      value={serviceHealthNotificationsEnabled}
+                      onValueChange={setServiceHealthNotificationsEnabled}
+                      color={theme.colors.primary}
+                    />
+                  </View>
+                </>
+              )}
+
+              <View style={[styles.notificationItem, { marginTop: spacing.xs }]}>
+                <View style={styles.notificationIcon}>
                   <IconButton
                     icon="moon-waning-crescent"
-                    size={24}
+                    size={16}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Quiet Hours</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Silence notifications on a schedule
-                  </Text>
-                  <Text style={styles.settingValue}>{quietHoursValue}</Text>
+                  <Text style={styles.settingValue}>Quiet Hours: {quietHoursValue}</Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
-                  size={20}
+                  size={16}
                   iconColor={theme.colors.outline}
+                  onPress={() => router.push("/(auth)/settings/quiet-hours")}
                 />
               </View>
             </Card>
           </AnimatedListItem>
         </AnimatedSection>
 
-        {/* Voice Assistant Section */}
-        <AnimatedSection style={styles.section} delay={175}>
-          <AnimatedListItem index={0} totalItems={1}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/voice-assistant")}
-            >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="microphone"
-                    size={24}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Voice Assistant</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Siri Shortcuts & Google Assistant
-                  </Text>
-                  <Text style={styles.settingValue}>
-                    Manage voice commands and shortcuts
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={20}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-        </AnimatedSection>
-
-        {/* Data Refresh Section */}
+        {/* Quick Actions Section */}
         <AnimatedSection style={styles.section} delay={150}>
-          <AnimatedListItem index={0} totalItems={1}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <AnimatedListItem index={0} totalItems={2}>
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -663,22 +600,43 @@ const SettingsScreen = () => {
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="refresh"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Refresh Interval</Text>
-                  <Text style={styles.settingSubtitle}>
-                    How often to refresh data
-                  </Text>
-                  <Text style={styles.settingValue}>
-                    {refreshIntervalMinutes} minutes
-                  </Text>
+                  <Text style={styles.settingValue}>{refreshIntervalMinutes} minutes</Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
-                  size={20}
+                  size={16}
+                  iconColor={theme.colors.outline}
+                />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={1} totalItems={2}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push("/(auth)/settings/voice-assistant")}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="microphone"
+                    size={20}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Voice Assistant</Text>
+                  <Text style={styles.settingValue}>Siri & Google Assistant</Text>
+                </View>
+                <IconButton
+                  icon="chevron-right"
+                  size={16}
                   iconColor={theme.colors.outline}
                 />
               </View>
@@ -695,15 +653,12 @@ const SettingsScreen = () => {
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="folder"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Image Cache</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Cached artwork for posters and backdrops
-                  </Text>
                   <Text style={styles.settingValue}>
                     {isFetchingCacheUsage
                       ? "Calculating…"
@@ -724,6 +679,7 @@ const SettingsScreen = () => {
                     isFetchingCacheUsage ||
                     imageCacheUsage.size === 0
                   }
+                  style={{ height: 32 }}
                 >
                   Clear
                 </Button>
@@ -740,32 +696,27 @@ const SettingsScreen = () => {
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="database-cog"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Cache Limit</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Maximum image cache size
-                  </Text>
-                  <Text style={styles.settingValue}>
-                    {formatBytes(maxImageCacheSize)}
-                  </Text>
+                  <Text style={styles.settingValue}>{formatBytes(maxImageCacheSize)}</Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
-                  size={20}
+                  size={16}
                   iconColor={theme.colors.outline}
                 />
               </View>
             </Card>
           </AnimatedListItem>
-          {/* Thumbnail generation controls removed */}
         </AnimatedSection>
 
         {/* Services Section */}
         <AnimatedSection style={styles.section} delay={250}>
+          <Text style={styles.sectionTitle}>Services</Text>
           <AnimatedListItem index={0} totalItems={3}>
             <Card
               variant="custom"
@@ -776,75 +727,70 @@ const SettingsScreen = () => {
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="server"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Manage Services</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Configure your connected services
-                  </Text>
+                  <Text style={styles.settingValue}>Configure connected services</Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
-                  size={20}
+                  size={16}
                   iconColor={theme.colors.outline}
                 />
               </View>
             </Card>
           </AnimatedListItem>
-            <AnimatedListItem index={1} totalItems={3}>
-              <Card
-                variant="custom"
-                style={styles.settingCard}
-                onPress={() => router.push("/(auth)/settings/tmdb")}
-              >
-                <View style={styles.settingContent}>
-                  <View style={styles.settingIcon}>
-                    <IconButton
-                      icon="movie-open"
-                      size={24}
-                      iconColor={theme.colors.primary}
-                    />
-                  </View>
-                  <View style={styles.settingInfo}>
-                    <Text style={styles.settingTitle}>TMDB Integration</Text>
-                    <Text style={styles.settingSubtitle}>
-                      Configure TMDB API access for Discover
-                    </Text>
-                    <Text style={styles.settingValue}>
-                      {tmdbEnabled ? "Enabled" : "Disabled"}
-                    </Text>
-                  </View>
+          <AnimatedListItem index={1} totalItems={3}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push("/(auth)/settings/tmdb")}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
                   <IconButton
-                    icon="chevron-right"
+                    icon="movie-open"
                     size={20}
-                    iconColor={theme.colors.outline}
+                    iconColor={theme.colors.primary}
                   />
                 </View>
-              </Card>
-            </AnimatedListItem>
-            <AnimatedListItem index={2} totalItems={3}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>TMDB Integration</Text>
+                  <Text style={styles.settingValue}>{tmdbEnabled ? "Enabled" : "Disabled"}</Text>
+                </View>
+                <IconButton
+                  icon="chevron-right"
+                  size={16}
+                  iconColor={theme.colors.outline}
+                />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={2} totalItems={3}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="repeat-variant"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Jellyseerr Retries</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Number of retry attempts for Jellyseerr server errors (5xx)
-                  </Text>
                   <Text style={styles.settingValue}>
                     {jellyseerrRetryAttempts} {jellyseerrRetryAttempts !== 1 ? 'retries' : 'retry'}
                   </Text>
                 </View>
-                <Button mode="contained-tonal" compact onPress={() => setJellyseerrRetriesVisible(true)}>
+                <Button
+                  mode="contained-tonal"
+                  compact
+                  onPress={() => setJellyseerrRetriesVisible(true)}
+                  style={{ height: 32 }}
+                >
                   Set
                 </Button>
               </View>
@@ -852,10 +798,10 @@ const SettingsScreen = () => {
           </AnimatedListItem>
         </AnimatedSection>
 
-        {/* Backup & Restore (moved) */}
+        {/* System Section */}
         <AnimatedSection style={styles.section} delay={300}>
-          <Text style={styles.sectionTitle}>Backup & Restore</Text>
-          <AnimatedListItem index={0} totalItems={1}>
+          <Text style={styles.sectionTitle}>System</Text>
+          <AnimatedListItem index={0} totalItems={2}>
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -865,49 +811,36 @@ const SettingsScreen = () => {
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="backup-restore"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Backup & Restore</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Export, import and manage backups (including cloud)
-                  </Text>
+                  <Text style={styles.settingValue}>Export, import & cloud backups</Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
-                  size={20}
+                  size={16}
                   iconColor={theme.colors.outline}
                 />
               </View>
             </Card>
           </AnimatedListItem>
-        </AnimatedSection>
-
-        {/* About Section */}
-        <AnimatedSection style={styles.section} delay={350}>
-          <AnimatedListItem index={0} totalItems={1}>
+          <AnimatedListItem index={1} totalItems={2}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
                   <IconButton
                     icon="information"
-                    size={24}
+                    size={20}
                     iconColor={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>App Version</Text>
-                  <Text style={styles.settingSubtitle}>
-                    Uniarr version 1.2.3
-                  </Text>
+                  <Text style={styles.settingValue}>Uniarr v1.2.3</Text>
                 </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={20}
-                  iconColor={theme.colors.outline}
-                />
               </View>
             </Card>
           </AnimatedListItem>
@@ -917,7 +850,8 @@ const SettingsScreen = () => {
 
         {/* Developer Tools (dev only) */}
         {isDev && (
-          <AnimatedSection style={styles.section} delay={375}>
+          <AnimatedSection style={styles.section} delay={350}>
+            <Text style={styles.sectionTitle}>Development</Text>
             <AnimatedListItem index={0} totalItems={1}>
               <Card
                 variant="custom"
@@ -928,22 +862,17 @@ const SettingsScreen = () => {
                   <View style={styles.settingIcon}>
                     <IconButton
                       icon="bug"
-                      size={24}
+                      size={20}
                       iconColor={theme.colors.primary}
                     />
                   </View>
                   <View style={styles.settingInfo}>
                     <Text style={styles.settingTitle}>Developer Tools</Text>
-                    <Text style={styles.settingSubtitle}>
-                      Dev-only tools and component playground
-                    </Text>
-                    <Text style={styles.settingValue}>
-                      Visible in development builds
-                    </Text>
+                    <Text style={styles.settingValue}>Dev tools & playground</Text>
                   </View>
                   <IconButton
                     icon="chevron-right"
-                    size={20}
+                    size={16}
                     iconColor={theme.colors.outline}
                   />
                 </View>
@@ -956,12 +885,12 @@ const SettingsScreen = () => {
         <AnimatedListItem
           index={0}
           totalItems={1}
-          style={{ marginTop: spacing.lg }}
+          style={{ marginTop: spacing.md }}
         >
           <Button
             mode="outlined"
             onPress={confirmSignOut}
-            style={styles.signOutButton}
+            style={[styles.signOutButton, { height: 40 }]}
             textColor={theme.colors.error}
             icon="logout"
           >
