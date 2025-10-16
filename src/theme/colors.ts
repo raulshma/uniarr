@@ -477,6 +477,7 @@ export const generateThemeColors = (
   scheme: CustomColorScheme,
   isDark: boolean = false,
   modeOverrides?: PresetModeOverrides,
+  oledEnabled: boolean = false,
 ): ThemeColors => {
   const primary = normalizeHex(scheme.primary) ?? FALLBACK_PRIMARY;
   const secondary = normalizeHex(scheme.secondary) ?? FALLBACK_SECONDARY;
@@ -495,11 +496,26 @@ export const generateThemeColors = (
         surfaceVariant: FALLBACK_LIGHT_SURFACE_VARIANT,
       });
 
-  const background = normalizeHex(scheme.background) ?? normalizeHex(defaultMode.background) ?? (isDark ? FALLBACK_DARK_BACKGROUND : FALLBACK_LIGHT_BACKGROUND);
+  // OLED mode: force pure black background in dark mode
+  const background = (isDark && oledEnabled)
+    ? '#000000'
+    : normalizeHex(scheme.background) ?? normalizeHex(defaultMode.background) ?? (isDark ? FALLBACK_DARK_BACKGROUND : FALLBACK_LIGHT_BACKGROUND);
+
+  // Adjust surface colors for OLED mode to maintain visual hierarchy
+  let effectiveSurfaceMode = defaultMode;
+  if (isDark && oledEnabled) {
+    // Create OLED-optimized surface colors that work well with pure black background
+    effectiveSurfaceMode = {
+      background: '#000000',
+      surface: '#141414', // Slightly raised from pure black
+      surfaceVariant: '#1E1E1E', // More raised for better hierarchy
+    };
+  }
+
   const surface = isDark
-    ? ensureDarkSurface(scheme.surface ?? defaultMode.surface, defaultMode.surface)
-    : ensureLightSurface(scheme.surface ?? defaultMode.surface, defaultMode.surface);
-  const surfaceVariant = normalizeHex(scheme.surfaceVariant) ?? ensureVariantSurface(surface, isDark, defaultMode.surfaceVariant);
+    ? ensureDarkSurface(scheme.surface ?? effectiveSurfaceMode.surface, effectiveSurfaceMode.surface)
+    : ensureLightSurface(scheme.surface ?? effectiveSurfaceMode.surface, effectiveSurfaceMode.surface);
+  const surfaceVariant = normalizeHex(scheme.surfaceVariant) ?? ensureVariantSurface(surface, isDark, effectiveSurfaceMode.surfaceVariant);
 
   const secondaryContainer = isDark ? lightenColor(secondary, 0.25) : darkenColor(secondary, 0.12);
   const tertiaryContainer = isDark ? lightenColor(tertiary, 0.25) : darkenColor(tertiary, 0.12);

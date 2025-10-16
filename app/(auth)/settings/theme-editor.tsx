@@ -8,6 +8,7 @@ import {
   List,
   Portal,
   SegmentedButtons,
+  Switch,
   Text,
   TextInput,
   useTheme,
@@ -83,6 +84,10 @@ export default function ThemeEditorScreen() {
         [key]: value,
       },
     });
+  };
+
+  const handleOledToggle = (enabled: boolean) => {
+    updateConfig({ oledEnabled: enabled });
   };
 
   const handleReset = () => {
@@ -242,6 +247,25 @@ export default function ThemeEditorScreen() {
                 { value: "spacious", label: "Spacious" },
               ]}
             />
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.section}>
+          <Card.Title title="Display Options" />
+          <Card.Content>
+            <List.Section>
+              <List.Item
+                title="OLED Mode"
+                description="Pure black backgrounds for OLED displays (dark mode only)"
+                right={() => (
+                  <Switch
+                    value={config.oledEnabled || false}
+                    onValueChange={handleOledToggle}
+                    color={theme.colors.primary}
+                  />
+                )}
+              />
+            </List.Section>
           </Card.Content>
         </Card>
 

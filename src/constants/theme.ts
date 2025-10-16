@@ -17,6 +17,7 @@ import { spacing } from '@/theme/spacing';
 export type CustomThemeConfig = {
   preset?: keyof typeof presetThemes;
   customColors?: Partial<CustomColorScheme>;
+  oledEnabled?: boolean;
   fontScale: FontScale;
   densityMode: DensityMode;
   posterStyle: {
@@ -63,7 +64,7 @@ export const createCustomTheme = (
   };
 
   // Generate theme colors
-  const colors = generateThemeColors(colorScheme, isDark, isDark ? basePreset.modes.dark : basePreset.modes.light);
+  const colors = generateThemeColors(colorScheme, isDark, isDark ? basePreset.modes.dark : basePreset.modes.light, config.oledEnabled);
 
   // Generate typography and spacing scales
   const typographyScale = generateTypographyScale(config.fontScale);
@@ -95,6 +96,7 @@ export const getAppTheme = (scheme: ColorSchemeName): AppTheme =>
 // Default custom theme configuration
 export const defaultCustomThemeConfig: CustomThemeConfig = {
   preset: 'uniarr',
+  oledEnabled: false,
   fontScale: 'medium',
   densityMode: 'comfortable',
   posterStyle: {

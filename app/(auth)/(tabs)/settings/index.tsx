@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { alert } from '@/services/dialogService';
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Constants from "expo-constants";
+import { useColorScheme } from "react-native";
 import {
   Text,
   useTheme,
@@ -71,6 +72,7 @@ const SettingsScreen = () => {
   // Settings store
   const {
     theme: themePreference,
+    oledEnabled,
     notificationsEnabled,
     downloadNotificationsEnabled,
     failedDownloadNotificationsEnabled,
@@ -79,6 +81,7 @@ const SettingsScreen = () => {
     refreshIntervalMinutes,
     quietHours,
     setTheme,
+    setOledEnabled,
     setNotificationsEnabled,
     setDownloadNotificationsEnabled,
     setFailedDownloadNotificationsEnabled,
@@ -321,6 +324,14 @@ const SettingsScreen = () => {
     };
   };
 
+  // Check if current theme is dark (either directly or via system setting)
+  const isCurrentThemeDark = useMemo(() => {
+    if (themePreference === 'dark') return true;
+    if (themePreference === 'light') return false;
+    // system theme - check the actual system color scheme
+    return useColorScheme() === 'dark';
+  }, [themePreference]);
+
   const quietHoursValue = useMemo(() => {
     const enabled = Object.entries(quietHours).filter(
       ([, config]) => config.enabled
@@ -353,7 +364,7 @@ const SettingsScreen = () => {
         {/* Appearance Section */}
         <AnimatedSection style={styles.section} delay={50}>
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <AnimatedListItem index={0} totalItems={3}>
+          <AnimatedListItem index={0} totalItems={4}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -422,7 +433,34 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={3}>
+          {/* OLED Mode Toggle - Only show when dark theme is active */}
+          {isCurrentThemeDark && (
+            <AnimatedListItem index={1} totalItems={4}>
+              <Card variant="custom" style={styles.settingCard}>
+                <View style={styles.settingContent}>
+                  <View style={styles.settingIcon}>
+                    <IconButton
+                      icon="monitor-star"
+                      size={20}
+                      iconColor={theme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>OLED Mode</Text>
+                    <Text style={styles.settingValue}>
+                      Pure black for OLED displays
+                    </Text>
+                  </View>
+                  <Switch
+                    value={oledEnabled}
+                    onValueChange={setOledEnabled}
+                    color={theme.colors.primary}
+                  />
+                </View>
+              </Card>
+            </AnimatedListItem>
+          )}
+          <AnimatedListItem index={isCurrentThemeDark ? 2 : 1} totalItems={4}>
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -448,7 +486,7 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={2} totalItems={3}>
+          <AnimatedListItem index={isCurrentThemeDark ? 3 : 2} totalItems={4}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>

@@ -19,6 +19,7 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 type SettingsData = {
   theme: ThemePreference;
   customThemeConfig: CustomThemeConfig;
+  oledEnabled: boolean;
   notificationsEnabled: boolean;
   releaseNotificationsEnabled: boolean;
   downloadNotificationsEnabled: boolean;
@@ -48,6 +49,7 @@ interface SettingsState extends SettingsData {
   updateCustomThemeConfig: (config: Partial<CustomThemeConfig>) => void;
   setCustomThemeConfig: (config: CustomThemeConfig) => void;
   resetCustomThemeConfig: () => void;
+  setOledEnabled: (enabled: boolean) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   setReleaseNotificationsEnabled: (enabled: boolean) => void;
   setDownloadNotificationsEnabled: (enabled: boolean) => void;
@@ -110,6 +112,7 @@ const createDefaultQuietHoursState = (): Record<NotificationCategory, QuietHours
 const createDefaultSettings = (): SettingsData => ({
   theme: 'system',
   customThemeConfig: defaultCustomThemeConfig,
+  oledEnabled: false,
   notificationsEnabled: true,
   releaseNotificationsEnabled: false,
   downloadNotificationsEnabled: true,
@@ -140,6 +143,7 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       setCustomThemeConfig: (config) => set({ customThemeConfig: config }),
       resetCustomThemeConfig: () => set({ customThemeConfig: defaultCustomThemeConfig }),
+      setOledEnabled: (enabled: boolean) => set({ oledEnabled: enabled }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setReleaseNotificationsEnabled: (enabled) => set({ releaseNotificationsEnabled: enabled }),
       setDownloadNotificationsEnabled: (enabled) => set({ downloadNotificationsEnabled: enabled }),
@@ -180,6 +184,7 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: (state) => ({
         theme: state.theme,
         customThemeConfig: state.customThemeConfig,
+        oledEnabled: state.oledEnabled,
         notificationsEnabled: state.notificationsEnabled,
         releaseNotificationsEnabled: state.releaseNotificationsEnabled,
         downloadNotificationsEnabled: state.downloadNotificationsEnabled,
@@ -198,7 +203,7 @@ export const useSettingsStore = create<SettingsState>()(
   // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 6,
+      version: 7,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -216,6 +221,11 @@ export const useSettingsStore = create<SettingsState>()(
         const normalizedInterval = clampRefreshInterval(state.refreshIntervalMinutes);
         if (normalizedInterval !== state.refreshIntervalMinutes) {
           state.refreshIntervalMinutes = normalizedInterval;
+        }
+
+        // Ensure oledEnabled is properly initialized
+        if (typeof state.oledEnabled !== 'boolean') {
+          state.oledEnabled = false;
         }
 
         // Normalize jellyseerr retry attempts
@@ -302,6 +312,7 @@ export const useSettingsStore = create<SettingsState>()(
           refreshIntervalMinutes: clampRefreshInterval(
             partial.refreshIntervalMinutes ?? baseDefaults.refreshIntervalMinutes,
           ),
+          oledEnabled: partial.oledEnabled ?? baseDefaults.oledEnabled,
           jellyseerrRetryAttempts: clampRetryAttempts(
             partial.jellyseerrRetryAttempts ?? baseDefaults.jellyseerrRetryAttempts,
           ),

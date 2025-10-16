@@ -39,6 +39,10 @@ const hasCustomThemeOverrides = (config?: CustomThemeConfig): config is CustomTh
     return true;
   }
 
+  if (config.oledEnabled && config.oledEnabled !== defaultCustomThemeConfig.oledEnabled) {
+    return true;
+  }
+
   if (config.fontScale !== defaultCustomThemeConfig.fontScale) {
     return true;
   }
@@ -63,6 +67,7 @@ export const useTheme = (): AppTheme => {
   const systemColorScheme = useColorScheme();
   const themePreference = useSettingsStore((state) => state.theme);
   const customThemeConfig = useSettingsStore((state) => state.customThemeConfig);
+  const oledEnabled = useSettingsStore((state) => state.oledEnabled);
 
   return useMemo(() => {
     // Use default theme if system color scheme is not available yet
@@ -85,13 +90,18 @@ export const useTheme = (): AppTheme => {
         break;
     }
 
+    // Merge OLED setting into custom theme config if OLED is enabled and we're in dark mode
+    const enhancedConfig = effectiveScheme === 'dark' && oledEnabled
+      ? { ...customThemeConfig, oledEnabled: true }
+      : customThemeConfig;
+
     // Check if we have a custom theme configuration
-    if (hasCustomThemeOverrides(customThemeConfig)) {
+    if (hasCustomThemeOverrides(enhancedConfig)) {
       // Use custom theme configuration
-      return createCustomTheme(customThemeConfig, effectiveScheme === 'dark');
+      return createCustomTheme(enhancedConfig, effectiveScheme === 'dark');
     }
 
     // Use standard theme
     return getAppTheme(effectiveScheme);
-  }, [themePreference, systemColorScheme, customThemeConfig]);
+  }, [themePreference, systemColorScheme, customThemeConfig, oledEnabled]);
 };
