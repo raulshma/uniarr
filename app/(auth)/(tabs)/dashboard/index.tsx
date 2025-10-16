@@ -1526,6 +1526,44 @@ const DashboardScreen = () => {
     void refetchStatistics();
   }, [refetchStatistics]);
 
+  const handleContinueWatchingPress = useCallback((item: ContinueWatchingItem) => {
+    // Navigate to the media details page
+    if (item.type === 'movie') {
+      // For movies, try to navigate to Jellyfin details
+      router.push(`/(auth)/jellyfin/${item.id}`);
+    } else if (item.type === 'episode') {
+      // For episodes, try to navigate to Jellyfin details
+      router.push(`/(auth)/jellyfin/${item.id}`);
+    }
+  }, [router]);
+
+  const handleTrendingTVPress = useCallback((item: TrendingTVItem) => {
+    // Navigate to TV show details in discover
+    if (item.tmdbId) {
+      router.push(`/(auth)/discover/tmdb/tv/${item.tmdbId}`);
+    } else {
+      // Fallback: navigate to general discover page if no tmdbId
+      router.push("/(auth)/discover");
+    }
+  }, [router]);
+
+  const handleUpcomingReleasePress = useCallback((item: UpcomingReleaseItem) => {
+    // Navigate to calendar or details based on type
+    router.push(`/(auth)/calendar`);
+  }, [router]);
+
+  const handleRecentActivityPress = useCallback((item: RecentActivityItem) => {
+    // Navigate to appropriate service page based on the activity source
+    // Extract service type from the item ID
+    if (item.id.startsWith('sonarr-')) {
+      // Navigate to Sonarr series list
+      router.push(`/(auth)/sonarr/${item.id.split('-')[1]}`);
+    } else if (item.id.startsWith('radarr-')) {
+      // Navigate to Radarr movies list
+      router.push(`/(auth)/radarr/${item.id.split('-')[1]}`);
+    }
+  }, [router]);
+
   const ShortcutCard = React.memo(({
     label,
     subtitle,
@@ -1646,6 +1684,30 @@ const DashboardScreen = () => {
   </TouchableOpacity>
 ));
 
+  const handleStatCardPress = useCallback((label: string) => {
+    // Navigate to appropriate pages based on statistics type
+    switch (label) {
+      case 'Shows':
+        // Navigate to Sonarr series list
+        router.push('/(auth)/sonarr');
+        break;
+      case 'Movies':
+        // Navigate to Radarr movies list
+        router.push('/(auth)/radarr');
+        break;
+      case 'Episodes':
+        // Navigate to calendar page for episode releases
+        router.push('/(auth)/calendar');
+        break;
+      case 'Watched':
+        // Navigate to recently added page
+        router.push('/(auth)/(tabs)/recently-added');
+        break;
+      default:
+        break;
+    }
+  }, [router]);
+
 const ContinueWatchingCardSkeleton = React.memo(() => (
   <View style={styles.continueWatchingCard}>
     <SkeletonPlaceholder
@@ -1693,9 +1755,11 @@ const UpcomingReleaseCardSkeleton = React.memo(() => (
 ));
 
 const ContinueWatchingCard = React.memo(({
-  item
+  item,
+  onPress
 }: {
   item: ContinueWatchingItem;
+  onPress?: (item: ContinueWatchingItem) => void;
 }) => {
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -1718,6 +1782,7 @@ const ContinueWatchingCard = React.memo(({
   return (
     <TouchableOpacity
       style={styles.continueWatchingCard}
+      onPress={() => onPress?.(item)}
       activeOpacity={0.7}
     >
       <View style={styles.continueWatchingPoster}>
@@ -1756,12 +1821,15 @@ const ContinueWatchingCard = React.memo(({
 });
 
 const TrendingTVCard = React.memo(({
-  item
+  item,
+  onPress
 }: {
   item: TrendingTVItem;
+  onPress?: (item: TrendingTVItem) => void;
 }) => (
   <TouchableOpacity
     style={styles.trendingTVCard}
+    onPress={() => onPress?.(item)}
     activeOpacity={0.7}
   >
     <View style={styles.trendingTVPoster}>
@@ -1786,9 +1854,11 @@ const TrendingTVCard = React.memo(({
 ));
 
 const UpcomingReleaseCard = React.memo(({
-  item
+  item,
+  onPress
 }: {
   item: UpcomingReleaseItem;
+  onPress?: (item: UpcomingReleaseItem) => void;
 }) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -1857,6 +1927,7 @@ const UpcomingReleaseCard = React.memo(({
   return (
     <TouchableOpacity
       style={styles.upcomingReleaseCard}
+      onPress={() => onPress?.(item)}
       activeOpacity={0.7}
     >
       <View style={styles.upcomingReleasePoster}>
@@ -1887,12 +1958,15 @@ const UpcomingReleaseCard = React.memo(({
 });
 
 const RecentActivityCard = React.memo(({
-  item
+  item,
+  onPress
 }: {
   item: RecentActivityItem;
+  onPress?: (item: RecentActivityItem) => void;
 }) => (
   <TouchableOpacity
     style={styles.activityCard}
+    onPress={() => onPress?.(item)}
     activeOpacity={0.7}
   >
     {item.image ? (
@@ -2042,16 +2116,32 @@ const RecentActivityCard = React.memo(({
               </View>
               <View style={styles.statisticsGrid}>
                 <AnimatedListItem index={0} totalItems={4}>
-                  <StatCard number={item.data.shows} label="Shows" />
+                  <StatCard
+                    number={item.data.shows}
+                    label="Shows"
+                    onPress={() => handleStatCardPress("Shows")}
+                  />
                 </AnimatedListItem>
                 <AnimatedListItem index={1} totalItems={4}>
-                  <StatCard number={item.data.movies} label="Movies" />
+                  <StatCard
+                    number={item.data.movies}
+                    label="Movies"
+                    onPress={() => handleStatCardPress("Movies")}
+                  />
                 </AnimatedListItem>
                 <AnimatedListItem index={2} totalItems={4}>
-                  <StatCard number={item.data.episodes} label="Episodes" />
+                  <StatCard
+                    number={item.data.episodes}
+                    label="Episodes"
+                    onPress={() => handleStatCardPress("Episodes")}
+                  />
                 </AnimatedListItem>
                 <AnimatedListItem index={3} totalItems={4}>
-                  <StatCard number={item.data.watched} label="Watched" />
+                  <StatCard
+                    number={item.data.watched}
+                    label="Watched"
+                    onPress={() => handleStatCardPress("Watched")}
+                  />
                 </AnimatedListItem>
               </View>
             </View>
@@ -2073,7 +2163,10 @@ const RecentActivityCard = React.memo(({
                     index={index}
                     totalItems={item.data.length}
                   >
-                    <ContinueWatchingCard item={watching} />
+                    <ContinueWatchingCard
+                      item={watching}
+                      onPress={handleContinueWatchingPress}
+                    />
                   </AnimatedListItem>
                 ))}
               </View>
@@ -2115,7 +2208,10 @@ const RecentActivityCard = React.memo(({
                     index={index}
                     totalItems={item.data.length}
                   >
-                    <TrendingTVCard item={show} />
+                    <TrendingTVCard
+                      item={show}
+                      onPress={handleTrendingTVPress}
+                    />
                   </AnimatedListItem>
                 ))}
               </View>
@@ -2157,7 +2253,10 @@ const RecentActivityCard = React.memo(({
                     index={index}
                     totalItems={item.data.length}
                   >
-                    <UpcomingReleaseCard item={release} />
+                    <UpcomingReleaseCard
+                      item={release}
+                      onPress={handleUpcomingReleasePress}
+                    />
                   </AnimatedListItem>
                 ))}
               </View>
@@ -2200,7 +2299,10 @@ const RecentActivityCard = React.memo(({
                     index={index}
                     totalItems={item.data.length}
                   >
-                    <RecentActivityCard item={activity} />
+                    <RecentActivityCard
+                      item={activity}
+                      onPress={handleRecentActivityPress}
+                    />
                   </AnimatedListItem>
                 ))
               ) : (
@@ -2255,6 +2357,12 @@ const RecentActivityCard = React.memo(({
       isLoadingContinueWatching,
       isLoadingTrendingTV,
       isLoadingUpcomingReleases,
+      handleStatCardPress,
+      handleContinueWatchingPress,
+      handleTrendingTVPress,
+      handleUpcomingReleasePress,
+      handleRecentActivityPress,
+      statsFilter,
     ]
   );
 
