@@ -406,7 +406,7 @@ const fetchRecentActivity = async (): Promise<RecentActivityItem[]> => {
                   const posterImage = series.images.find((img: any) => img.coverType === 'poster');
                   if (posterImage) {
                     const connector = manager.getConnector(config.id);
-                    imageUrl = `${(connector?.config as any)?.baseUrl}/MediaCover/${series.id}/poster.jpg?apikey=${(connector?.config as any)?.apiKey}`;
+                    imageUrl = `${connector?.config.url}/MediaCover/${series.id}/poster.jpg?apikey=${connector?.config.apiKey}`;
                   }
                 }
 
@@ -446,7 +446,7 @@ const fetchRecentActivity = async (): Promise<RecentActivityItem[]> => {
                   const posterImage = movie.images.find((img: any) => img.coverType === 'poster');
                   if (posterImage) {
                     const connector = manager.getConnector(config.id);
-                    imageUrl = `${(connector?.config as any)?.baseUrl}/MediaCover/${movie.id}/poster.jpg?apikey=${(connector?.config as any)?.apiKey}`;
+                    imageUrl = `${connector?.config.url}/MediaCover/${movie.id}/poster.jpg?apikey=${connector?.config.apiKey}`;
                   }
                 }
 
@@ -521,7 +521,7 @@ const fetchContinueWatching = async (): Promise<ContinueWatchingItem[]> => {
               duration: Math.floor((item.RunTimeTicks || 0) / 600000000), // Convert ticks to minutes
               watchedMinutes: Math.floor((item.UserData?.PlaybackPositionTicks || 0) / 600000000),
               posterUri: item.ImageTags?.Primary
-                ? `${(connector.config as any).baseUrl}/Items/${item.Id}/Images/Primary?api_key=${(connector.config as any).apiKey}&tag=${item.ImageTags.Primary}`
+                ? `${connector.config.url}/Items/${item.Id}/Images/Primary?api_key=${connector.config.apiKey}&tag=${item.ImageTags.Primary}`
                 : undefined,
               nextEpisodeAvailable: false, // This would need additional API call
             });
@@ -546,7 +546,7 @@ const fetchContinueWatching = async (): Promise<ContinueWatchingItem[]> => {
               duration: Math.floor((item.RunTimeTicks || 0) / 600000000),
               watchedMinutes: Math.floor((session.PlayState?.PositionTicks || 0) / 600000000),
               posterUri: item.ImageTags?.Primary
-                ? `${(connector.config as any).baseUrl}/Items/${item.Id}/Images/Primary?api_key=${(connector.config as any).apiKey}&tag=${item.ImageTags.Primary}`
+                ? `${connector.config.url}/Items/${item.Id}/Images/Primary?api_key=${connector.config.apiKey}&tag=${item.ImageTags.Primary}`
                 : undefined,
               nextEpisodeAvailable: false,
             });

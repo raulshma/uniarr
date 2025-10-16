@@ -36,6 +36,8 @@ type SettingsData = {
   // returns 5xx errors. This value represents the number of retry attempts
   // after the initial request. Default: 3
   jellyseerrRetryAttempts: number;
+  // Maximum image cache size in bytes. Default: 100MB
+  maxImageCacheSize: number;
     // (thumbnail generation removed)
 };
 
@@ -61,6 +63,7 @@ interface SettingsState extends SettingsData {
   setUseNativeTabs: (enabled: boolean) => void;
   setTmdbEnabled: (enabled: boolean) => void;
   setJellyseerrRetryAttempts: (attempts: number) => void;
+  setMaxImageCacheSize: (size: number) => void;
     // (thumbnail setters removed)
 }
 
@@ -71,11 +74,19 @@ const DEFAULT_REFRESH_INTERVAL = 15;
 const DEFAULT_JELLYSEERR_RETRY_ATTEMPTS = 3;
 const MIN_JELLYSEERR_RETRY_ATTEMPTS = 0;
 const MAX_JELLYSEERR_RETRY_ATTEMPTS = 10;
+const DEFAULT_MAX_IMAGE_CACHE_SIZE = 100 * 1024 * 1024; // 100MB
+const MIN_MAX_IMAGE_CACHE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_MAX_IMAGE_CACHE_SIZE = 1024 * 1024 * 1024; // 1GB
 // thumbnail generation removed
 
 const clampRetryAttempts = (value: number): number => {
   if (Number.isNaN(value)) return DEFAULT_JELLYSEERR_RETRY_ATTEMPTS;
   return Math.min(Math.max(Math.round(value), MIN_JELLYSEERR_RETRY_ATTEMPTS), MAX_JELLYSEERR_RETRY_ATTEMPTS);
+};
+
+const clampMaxImageCacheSize = (value: number): number => {
+  if (Number.isNaN(value)) return DEFAULT_MAX_IMAGE_CACHE_SIZE;
+  return Math.min(Math.max(Math.round(value), MIN_MAX_IMAGE_CACHE_SIZE), MAX_MAX_IMAGE_CACHE_SIZE);
 };
 
 const clampRefreshInterval = (minutes: number): number => {
@@ -109,6 +120,7 @@ const createDefaultSettings = (): SettingsData => ({
   useNativeTabs: false,
   tmdbEnabled: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
+  maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
     // (thumbnail defaults removed)
 });
 
@@ -150,6 +162,8 @@ export const useSettingsStore = create<SettingsState>()(
       setTmdbEnabled: (enabled: boolean) => set({ tmdbEnabled: enabled }),
       setJellyseerrRetryAttempts: (attempts: number) =>
         set({ jellyseerrRetryAttempts: clampRetryAttempts(attempts) }),
+      setMaxImageCacheSize: (size: number) =>
+        set({ maxImageCacheSize: clampMaxImageCacheSize(size) }),
   reset: () => set(createDefaultSettings()),
     }),
     {
@@ -174,6 +188,7 @@ export const useSettingsStore = create<SettingsState>()(
         useNativeTabs: state.useNativeTabs,
         tmdbEnabled: state.tmdbEnabled,
         jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
+        maxImageCacheSize: state.maxImageCacheSize,
   // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
@@ -232,6 +247,16 @@ export const useSettingsStore = create<SettingsState>()(
         if (typeof state.tmdbEnabled !== 'boolean') {
           state.tmdbEnabled = baseDefaults.tmdbEnabled;
         }
+
+        // Normalize max image cache size
+        if (typeof state.maxImageCacheSize !== 'number') {
+          state.maxImageCacheSize = baseDefaults.maxImageCacheSize;
+        } else {
+          const normalizedSize = clampMaxImageCacheSize(state.maxImageCacheSize);
+          if (normalizedSize !== state.maxImageCacheSize) {
+            state.maxImageCacheSize = normalizedSize;
+          }
+        }
       },
       migrate: (persistedState) => {
         if (!persistedState) {
@@ -265,6 +290,9 @@ export const useSettingsStore = create<SettingsState>()(
             partial.jellyseerrRetryAttempts ?? baseDefaults.jellyseerrRetryAttempts,
           ),
           tmdbEnabled: partial.tmdbEnabled ?? baseDefaults.tmdbEnabled,
+          maxImageCacheSize: clampMaxImageCacheSize(
+            partial.maxImageCacheSize ?? baseDefaults.maxImageCacheSize,
+          ),
           // thumbnail migration removed
           quietHours,
           criticalHealthAlertsBypassQuietHours:

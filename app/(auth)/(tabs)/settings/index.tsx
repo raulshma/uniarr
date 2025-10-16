@@ -36,11 +36,30 @@ import type { NotificationCategory } from "@/models/notification.types";
 import { getCategoryFriendlyName } from "@/utils/quietHours.utils";
 // Backup & restore moved to its own settings screen
 
+// Helper function to format bytes
+const formatBytes = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1
+  );
+  const value = bytes / 1024 ** index;
+
+  return `${
+    value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)
+  } ${units[index]}`;
+};
+
 const SettingsScreen = () => {
   const router = useRouter();
   const { signOut } = useAuth();
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
+  const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const theme = useTheme<AppTheme>();
   const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
 
@@ -66,6 +85,8 @@ const SettingsScreen = () => {
     jellyseerrRetryAttempts,
     setJellyseerrRetryAttempts,
     tmdbEnabled,
+    maxImageCacheSize,
+    setMaxImageCacheSize,
   // image thumbnailing controls removed
   } = useSettingsStore();
   const [jellyseerrRetriesVisible, setJellyseerrRetriesVisible] = useState(false);
@@ -233,6 +254,28 @@ const SettingsScreen = () => {
   const handleRefreshIntervalSelect = (minutes: number) => {
     setRefreshIntervalMinutes(minutes);
     setRefreshIntervalVisible(false);
+  };
+
+  const handleCacheLimitPress = () => {
+    setCacheLimitVisible(true);
+  };
+
+  const handleCacheLimitSelect = (size: number) => {
+    setMaxImageCacheSize(size);
+    setCacheLimitVisible(false);
+
+    // Enforce the new cache limit after setting it (fire-and-forget)
+    void (async () => {
+      try {
+        await imageCacheService.enforceCacheLimit(size);
+        await loadImageCacheUsage(); // Refresh the usage display
+      } catch (error) {
+        const message = getReadableErrorMessage(error);
+        void logger.error("SettingsScreen: failed to enforce new cache limit.", {
+          error: message,
+        });
+      }
+    })();
   };
 
   const getThemeChipColor = (chipTheme: "light" | "dark" | "system") => {
@@ -645,7 +688,8 @@ const SettingsScreen = () => {
 
         {/* Storage Section */}
         <AnimatedSection style={styles.section} delay={200}>
-          <AnimatedListItem index={0} totalItems={1}>
+          <Text style={styles.sectionTitle}>Storage</Text>
+          <AnimatedListItem index={0} totalItems={2}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -683,6 +727,37 @@ const SettingsScreen = () => {
                 >
                   Clear
                 </Button>
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={1} totalItems={2}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={handleCacheLimitPress}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="database-cog"
+                    size={24}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Cache Limit</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Maximum image cache size
+                  </Text>
+                  <Text style={styles.settingValue}>
+                    {formatBytes(maxImageCacheSize)}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="chevron-right"
+                  size={20}
+                  iconColor={theme.colors.outline}
+                />
               </View>
             </Card>
           </AnimatedListItem>
@@ -990,6 +1065,55 @@ const SettingsScreen = () => {
             </Dialog.Content>
             <Dialog.Actions>
               <Button mode="outlined" onPress={() => setJellyseerrRetriesVisible(false)}>
+                Cancel
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+
+        {/* Cache Limit Selection Dialog */}
+        <Portal>
+          <Dialog
+            visible={cacheLimitVisible}
+            onDismiss={() => setCacheLimitVisible(false)}
+            style={{
+              borderRadius: 12,
+              backgroundColor: theme.colors.elevation.level1,
+            }}
+          >
+            <Dialog.Title style={styles.sectionTitle}>Cache Limit</Dialog.Title>
+            <Dialog.Content>
+              <Text style={{ ...styles.settingValue, marginBottom: spacing.md }}>
+                Select maximum image cache size. Oldest images will be removed automatically when this limit is exceeded:
+              </Text>
+              <View style={{ gap: spacing.xs }}>
+                {[
+                  { size: 10 * 1024 * 1024, label: "10 MB" },
+                  { size: 25 * 1024 * 1024, label: "25 MB" },
+                  { size: 50 * 1024 * 1024, label: "50 MB" },
+                  { size: 100 * 1024 * 1024, label: "100 MB" },
+                  { size: 250 * 1024 * 1024, label: "250 MB" },
+                  { size: 500 * 1024 * 1024, label: "500 MB" },
+                  { size: 1024 * 1024 * 1024, label: "1 GB" },
+                ].map((option) => (
+                  <Button
+                    key={option.size}
+                    mode={
+                      maxImageCacheSize === option.size ? "contained" : "outlined"
+                    }
+                    onPress={() => handleCacheLimitSelect(option.size)}
+                    style={{ marginVertical: 0 }}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </View>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button
+                mode="outlined"
+                onPress={() => setCacheLimitVisible(false)}
+              >
                 Cancel
               </Button>
             </Dialog.Actions>

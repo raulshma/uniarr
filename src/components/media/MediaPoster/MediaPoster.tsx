@@ -101,6 +101,14 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     };
   }, [uri]);
 
+  // Proactively generate thumbhash for the original URI
+  useEffect(() => {
+    if (uri && !imageCacheService.getThumbhash(uri)) {
+      // Generate thumbhash in background without blocking
+      void imageCacheService.generateThumbhash(uri);
+    }
+  }, [uri]);
+
   const width = useMemo(
     () => (typeof size === "number" ? size : sizeMap[size]),
     [size]
@@ -168,7 +176,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       // Use stored thumbhash as a placeholder when available. Expo Image accepts
       // placeholder as an object or a string; providing the thumbhash string
       // directly will render a compact placeholder until the real image loads.
-      placeholder={resolvedUri ? imageCacheService.getThumbhash(resolvedUri) ?? undefined : undefined}
+      placeholder={uri ? imageCacheService.getThumbhash(uri) ?? undefined : undefined}
       style={[
         StyleSheet.absoluteFillObject,
         { borderRadius: effectiveBorderRadius },

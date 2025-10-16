@@ -17,7 +17,14 @@ export type ImageCacheUsage = {
 const STORAGE_KEY = "ImageCacheService:trackedUris";
 const STORAGE_KEY_VARIANT_STATS = "ImageCacheService:variantStats";
 const STORAGE_KEY_THUMBHASH = "ImageCacheService:thumbhashes";
+const STORAGE_KEY_FILE_METADATA = "ImageCacheService:fileMetadata";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+interface CacheFileMetadata {
+  path: string;
+  lastAccessed: number;
+  size: number;
+}
 
 class ImageCacheService {
   private static instance: ImageCacheService | null = null;
@@ -28,6 +35,8 @@ class ImageCacheService {
   private variantStats: Map<string, number> = new Map();
   // Map of sanitized URI -> thumbhash string
   private thumbhashes: Map<string, string> = new Map();
+  // Map of file path -> metadata for LRU cache management
+  private fileMetadata: Map<string, CacheFileMetadata> = new Map();
 
   private isInitialized = false;
 
@@ -145,6 +154,185 @@ class ImageCacheService {
         }
       })
     );
+  }
+
+  /**
+   * Enforce cache size limits by removing oldest files when exceeding max size.
+   */
+  async enforceCacheLimit(maxSizeBytes: number): Promise<void> {
+    await this.ensureInitialized();
+
+    try {
+      const usage = await this.getCacheUsage();
+
+      if (usage.size <= maxSizeBytes) {
+        // Cache is within limits, no cleanup needed
+        return;
+      }
+
+      const bytesToFree = usage.size - maxSizeBytes;
+      void logger.info(`ImageCacheService: cache exceeds limit, freeing ${ImageCacheService.formatBytes(bytesToFree)}`);
+
+      // Get all cache files with their metadata, sorted by last accessed (oldest first)
+      const filesWithMetadata = await this.getCacheFilesWithMetadata();
+      filesWithMetadata.sort((a, b) => a.lastAccessed - b.lastAccessed);
+
+      let freedBytes = 0;
+      const filesToDelete: string[] = [];
+
+      // Select oldest files to delete until we've freed enough space
+      for (const fileMeta of filesWithMetadata) {
+        if (freedBytes >= bytesToFree) {
+          break;
+        }
+
+        filesToDelete.push(fileMeta.path);
+        freedBytes += fileMeta.size;
+      }
+
+      // Delete selected files
+      await Promise.allSettled(
+        filesToDelete.map(async (path) => {
+          try {
+            await FileSystem.deleteAsync(path, { idempotent: true });
+            this.fileMetadata.delete(path);
+            void logger.debug("ImageCacheService: deleted file during cache cleanup", { path });
+          } catch (error) {
+            void logger.warn("ImageCacheService: failed to delete file during cache cleanup", {
+              path,
+              error: this.stringifyError(error),
+            });
+          }
+        })
+      );
+
+      // Update metadata after cleanup
+      await this.persistFileMetadata();
+
+      void logger.info(`ImageCacheService: freed ${ImageCacheService.formatBytes(freedBytes)} by deleting ${filesToDelete.length} files`);
+    } catch (error) {
+      void logger.error("ImageCacheService: failed to enforce cache limit", {
+        error: this.stringifyError(error),
+        maxSize: maxSizeBytes,
+      });
+    }
+  }
+
+  /**
+   * Get cache files with their metadata for LRU management.
+   */
+  private async getCacheFilesWithMetadata(): Promise<CacheFileMetadata[]> {
+    const metadata: CacheFileMetadata[] = [];
+
+    // Get metadata from our stored map
+    this.fileMetadata.forEach((meta, path) => {
+      metadata.push(meta);
+    });
+
+    // Scan cache directory for any files not in our metadata
+    try {
+      const cacheDir = FileSystem.cacheDirectory;
+      if (!cacheDir) return metadata;
+
+      const entries = await FileSystem.readDirectoryAsync(cacheDir);
+      if (!Array.isArray(entries)) return metadata;
+
+      const imageExtRegex = /\.(jpg|jpeg|png|webp|gif|bmp|img)$/i;
+
+      for (const name of entries) {
+        if (typeof name !== "string") continue;
+
+        if (imageExtRegex.test(name) || name.startsWith("image-")) {
+          const path = `${cacheDir}${name}`;
+
+          // Skip if we already have metadata for this file
+          if (this.fileMetadata.has(path)) continue;
+
+          try {
+            const info = await FileSystem.getInfoAsync(path);
+            if (info.exists && !info.isDirectory && info.size) {
+              const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : Date.now();
+              const fileMeta: CacheFileMetadata = {
+                path,
+                lastAccessed: modifiedAt,
+                size: info.size,
+              };
+              metadata.push(fileMeta);
+              this.fileMetadata.set(path, fileMeta);
+            }
+          } catch {
+            // Ignore errors reading file info
+          }
+        }
+      }
+    } catch (error) {
+      void logger.warn("ImageCacheService: failed to scan cache directory for metadata", {
+        error: this.stringifyError(error),
+      });
+    }
+
+    return metadata;
+  }
+
+  /**
+   * Enforce cache limits after a download (best effort, doesn't block).
+   */
+  private async enforceCacheLimitAfterDownload(): Promise<void> {
+    try {
+      // Import here to avoid circular dependency
+      const { useSettingsStore } = await import('@/store/settingsStore');
+      const { maxImageCacheSize } = useSettingsStore.getState();
+
+      // Only enforce if we have a reasonable limit set
+      if (maxImageCacheSize > 0) {
+        void this.enforceCacheLimit(maxImageCacheSize);
+      }
+    } catch (error) {
+      void logger.debug("ImageCacheService: failed to enforce cache limit after download", {
+        error: this.stringifyError(error),
+      });
+    }
+  }
+
+  /**
+   * Update the last accessed time for a cached file.
+   */
+  private async updateFileAccessTime(path: string): Promise<void> {
+    try {
+      const info = await FileSystem.getInfoAsync(path);
+      if (info.exists && !info.isDirectory && info.size) {
+        const meta: CacheFileMetadata = {
+          path,
+          lastAccessed: Date.now(),
+          size: info.size,
+        };
+        this.fileMetadata.set(path, meta);
+        // Persist metadata asynchronously (don't await in hot path)
+        void this.persistFileMetadata();
+      }
+    } catch {
+      // Ignore errors updating access time
+    }
+  }
+
+  /**
+   * Persist file metadata to storage.
+   */
+  private async persistFileMetadata(): Promise<void> {
+    try {
+      const metadataObj: Record<string, { lastAccessed: number; size: number }> = {};
+      this.fileMetadata.forEach((meta, path) => {
+        metadataObj[path] = {
+          lastAccessed: meta.lastAccessed,
+          size: meta.size,
+        };
+      });
+      await AsyncStorage.setItem(STORAGE_KEY_FILE_METADATA, JSON.stringify(metadataObj));
+    } catch (error) {
+      void logger.warn("ImageCacheService: failed to persist file metadata", {
+        error: this.stringifyError(error),
+      });
+    }
   }
 
   /**
@@ -355,18 +543,96 @@ class ImageCacheService {
     await this.ensureInitialized();
 
     try {
+      // Clear expo-image caches
       await Promise.allSettled([
         Image.clearMemoryCache(),
         Image.clearDiskCache(),
       ]);
+
+      // Clear our fallback downloaded files from cache directory
+      await this.clearFallbackCacheFiles();
+
+      // Clear tracked URIs and persist
       this.trackedUris.clear();
       await this.persistTrackedUris();
+
+      // Clear thumbhashes
+      this.thumbhashes.clear();
+      await AsyncStorage.removeItem(STORAGE_KEY_THUMBHASH);
+
+      // Clear file metadata
+      this.fileMetadata.clear();
+      await AsyncStorage.removeItem(STORAGE_KEY_FILE_METADATA);
+
       void logger.info("ImageCacheService: cleared image cache.");
     } catch (error) {
       void logger.error("ImageCacheService: failed to clear cache.", {
         error: this.stringifyError(error),
       });
       throw error;
+    }
+  }
+
+  /**
+   * Clear fallback cache files created by direct downloads.
+   */
+  private async clearFallbackCacheFiles(): Promise<void> {
+    try {
+      const cacheDir = FileSystem.cacheDirectory;
+      if (!cacheDir) return;
+
+      const entries = await FileSystem.readDirectoryAsync(cacheDir);
+      if (!Array.isArray(entries)) return;
+
+      const imageExtRegex = /\.(jpg|jpeg|png|webp|gif|bmp|img)$/i;
+      const work: Promise<void>[] = [];
+
+      for (const name of entries) {
+        if (typeof name !== "string") continue;
+
+        // Check for image files with our fallback naming pattern
+        if (imageExtRegex.test(name) || name.startsWith("image-")) {
+          const path = `${cacheDir}${name}`;
+          work.push(this.deleteFileIfExists(path));
+        }
+
+        // Also check subdirectories for fallback images
+        const subPath = `${cacheDir}${name}`;
+        try {
+          const info = await FileSystem.getInfoAsync(subPath);
+          if (info.exists && info.isDirectory) {
+            const subEntries = await FileSystem.readDirectoryAsync(subPath);
+            for (const subName of subEntries) {
+              if (typeof subName === "string" &&
+                  (imageExtRegex.test(subName) || subName.startsWith("image-"))) {
+                work.push(this.deleteFileIfExists(`${subPath}/${subName}`));
+              }
+            }
+          }
+        } catch {
+          // Ignore directory errors
+        }
+      }
+
+      await Promise.allSettled(work);
+    } catch (error) {
+      void logger.warn("ImageCacheService: failed to clear fallback cache files.", {
+        error: this.stringifyError(error),
+      });
+    }
+  }
+
+  /**
+   * Delete a file if it exists, with error handling.
+   */
+  private async deleteFileIfExists(path: string): Promise<void> {
+    try {
+      await FileSystem.deleteAsync(path, { idempotent: true });
+    } catch (error) {
+      void logger.debug("ImageCacheService: failed to delete file during cache clear.", {
+        path,
+        error: this.stringifyError(error),
+      });
     }
   }
 
@@ -484,6 +750,29 @@ class ImageCacheService {
       }
     } catch (err) {
       void logger.warn("ImageCacheService: failed to restore thumbhashes.", {
+        error: this.stringifyError(err),
+      });
+    }
+
+    // Restore file metadata
+    try {
+      const serializedMetadata = await AsyncStorage.getItem(STORAGE_KEY_FILE_METADATA);
+      if (serializedMetadata) {
+        const parsed = JSON.parse(serializedMetadata) as Record<string, { lastAccessed: number; size: number }> | null;
+        if (parsed && typeof parsed === "object") {
+          Object.entries(parsed).forEach(([path, meta]) => {
+            if (meta && typeof meta.lastAccessed === "number" && typeof meta.size === "number") {
+              this.fileMetadata.set(path, {
+                path,
+                lastAccessed: meta.lastAccessed,
+                size: meta.size,
+              });
+            }
+          });
+        }
+      }
+    } catch (err) {
+      void logger.warn("ImageCacheService: failed to restore file metadata.", {
         error: this.stringifyError(err),
       });
     }
@@ -628,6 +917,8 @@ class ImageCacheService {
             "ImageCacheService: fallback download succeeded after missing cache path.",
             { uri, fetchUri, downloadPath }
           );
+          // Enforce cache limits after successful download (fire-and-forget)
+          void this.enforceCacheLimitAfterDownload();
           return downloadPath;
         }
         void logger.warn(
@@ -711,6 +1002,7 @@ class ImageCacheService {
         if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
           try {
             await FileSystem.deleteAsync(cachedPath, { idempotent: true });
+            this.fileMetadata.delete(cachedPath);
             void logger.debug(
               "ImageCacheService: removed stale cached image.",
               { cachedPath, uri: attemptUri }
@@ -727,6 +1019,9 @@ class ImageCacheService {
           }
           continue;
         }
+
+        // Update access time for the file (fire-and-forget)
+        void this.updateFileAccessTime(cachedPath);
 
         // Record which variant succeeded
         try {
@@ -772,6 +1067,7 @@ class ImageCacheService {
       if (modifiedAt && Date.now() - modifiedAt > CACHE_MAX_AGE_MS) {
         try {
           await FileSystem.deleteAsync(dest, { idempotent: true });
+          this.fileMetadata.delete(dest);
           void logger.debug(
             "ImageCacheService: removed stale fallback cached image.",
             { dest, uri }
@@ -788,6 +1084,9 @@ class ImageCacheService {
         }
         return null;
       }
+
+      // Update access time for the file (fire-and-forget)
+      void this.updateFileAccessTime(dest);
 
       // Telemetry: deterministic fallback cached file was found on disk
       try {
@@ -836,6 +1135,8 @@ class ImageCacheService {
           } catch {
             // ignore
           }
+          // Enforce cache limits after successful download (fire-and-forget)
+          void this.enforceCacheLimitAfterDownload();
           return dest;
         }
       }
@@ -851,6 +1152,8 @@ class ImageCacheService {
           ) {
             const info2 = await FileSystem.getInfoAsync(dest);
             if (info2.exists && !info2.isDirectory) {
+              // Enforce cache limits after successful download (fire-and-forget)
+              void this.enforceCacheLimitAfterDownload();
               return dest;
             }
           }
@@ -883,6 +1186,14 @@ class ImageCacheService {
     } catch {
       return undefined;
     }
+  }
+
+  /**
+   * Generate and store a thumbhash for the given URI. This is best-effort
+   * and won't throw if generation fails. Useful for proactive generation.
+   */
+  async generateThumbhash(uri: string): Promise<void> {
+    await this.maybeGenerateThumbhash(uri);
   }
 
   /**
