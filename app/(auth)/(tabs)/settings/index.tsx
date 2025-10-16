@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { alert } from '@/services/dialogService';
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Constants from "expo-constants";
 import {
   Text,
   useTheme,
@@ -62,6 +63,10 @@ const SettingsScreen = () => {
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const theme = useTheme<AppTheme>();
   const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+
+  // Get dynamic app version from Expo Constants
+  const appVersion = Constants.expoConfig?.version || Constants.manifest?.version || "Unknown";
+  const appVersionString = `UniArr v${appVersion}`;
 
   // Settings store
   const {
@@ -839,7 +844,7 @@ const SettingsScreen = () => {
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>App Version</Text>
-                  <Text style={styles.settingValue}>Uniarr v1.2.3</Text>
+                  <Text style={styles.settingValue}>{appVersionString}</Text>
                 </View>
               </View>
             </Card>
