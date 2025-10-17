@@ -8,12 +8,7 @@ import { Text, IconButton, Modal, Portal } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 
-import { TabHeader } from "@/components/common/TabHeader";
-import {
-  AnimatedHeader,
-  AnimatedListItem,
-  AnimatedSection,
-} from "@/components/common";
+import { AnimatedListItem, AnimatedSection } from "@/components/common";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
@@ -93,6 +88,7 @@ type DashboardListItem =
   | { type: "welcome-section" }
   | { type: "shortcuts" }
   | { type: "statistics"; data: StatisticsData }
+  | { type: "statistics-loading" }
   | { type: "continue-watching"; data: ContinueWatchingItem[] }
   | { type: "continue-watching-loading" }
   | { type: "trending-tv"; data: TrendingTVItem[] }
@@ -148,6 +144,14 @@ const fetchStatistics = async (
     const configs = await secureStorage.getServiceConfigs();
     const enabledConfigs = configs.filter((config) => config.enabled);
 
+    const now = new Date();
+    let cutoffDate: Date | null = null;
+    if (filter === "recent") {
+      cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+    } else if (filter === "month") {
+      cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+    }
+
     let shows = 0;
     let movies = 0;
     let episodes = 0;
@@ -165,12 +169,19 @@ const fetchStatistics = async (
           // Get all series and calculate statistics
           const series = await sonarrConnector.getSeries?.();
           if (series) {
-            shows += series.length;
-            episodes += series.reduce(
+            let filteredSeries = series;
+            if (cutoffDate) {
+              filteredSeries = series.filter((s: any) => {
+                const added = new Date(s.added);
+                return added >= cutoffDate!;
+              });
+            }
+            shows += filteredSeries.length;
+            episodes += filteredSeries.reduce(
               (sum: number, s: any) => sum + (s.episodeFileCount || 0),
               0,
             );
-            watched += series.reduce(
+            watched += filteredSeries.reduce(
               (sum: number, s: any) => sum + (s.episodeCount || 0),
               0,
             );
@@ -196,7 +207,14 @@ const fetchStatistics = async (
           // Get all movies and calculate statistics
           const moviesList = await radarrConnector.getMovies?.();
           if (moviesList) {
-            movies += moviesList.filter((m: any) => m.hasFile).length;
+            let filteredMovies = moviesList;
+            if (cutoffDate) {
+              filteredMovies = moviesList.filter((m: any) => {
+                const added = new Date(m.added);
+                return added >= cutoffDate!;
+              });
+            }
+            movies += filteredMovies.filter((m: any) => m.hasFile).length;
           }
         }
       } catch (error) {
@@ -620,10 +638,16 @@ const DashboardScreen = () => {
     "all",
   );
 
-  const { data: statisticsData, refetch: refetchStatistics } = useQuery({
+  const {
+    data: statisticsData,
+    isLoading: isLoadingStatistics,
+    refetch: refetchStatistics,
+  } = useQuery({
     queryKey: ["statistics", statsFilter],
     queryFn: () => fetchStatistics(statsFilter),
     refetchInterval: false,
+    experimental_prefetchInRender: true,
+    _optimisticResults: "optimistic",
     staleTime: 10 * 60 * 1000, // 10 minutes - statistics don't need real-time updates
   });
 
@@ -631,6 +655,7 @@ const DashboardScreen = () => {
     queryKey: ["recent-activity"],
     queryFn: fetchRecentActivity,
     refetchInterval: false,
+    experimental_prefetchInRender: true,
     staleTime: 10 * 60 * 1000, // 10 minutes - activity doesn't need real-time
   });
 
@@ -642,6 +667,7 @@ const DashboardScreen = () => {
       staleTime: 10 * 60 * 1000, // 10 minutes - cache continue watching
       retry: 2,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      experimental_prefetchInRender: true,
       enabled: true,
     });
 
@@ -652,6 +678,7 @@ const DashboardScreen = () => {
     staleTime: 15 * 60 * 1000, // 15 minutes - trending data is not time-sensitive
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    experimental_prefetchInRender: true,
     enabled: true,
   });
 
@@ -663,18 +690,20 @@ const DashboardScreen = () => {
       staleTime: 15 * 60 * 1000, // 15 minutes - upcoming releases don't change often
       retry: 2,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      experimental_prefetchInRender: true,
       enabled: true,
     });
 
   const listData: DashboardListItem[] = useMemo(() => {
     const items: DashboardListItem[] = [
-      { type: "header" },
       { type: "welcome-section" },
       { type: "shortcuts" },
     ];
 
     // Always show statistics section
-    if (statisticsData) {
+    if (isLoadingStatistics) {
+      items.push({ type: "statistics-loading" });
+    } else if (statisticsData) {
       items.push({ type: "statistics", data: statisticsData });
     }
 
@@ -715,6 +744,7 @@ const DashboardScreen = () => {
     isLoadingContinueWatching,
     isLoadingTrendingTV,
     isLoadingUpcomingReleases,
+    isLoadingStatistics,
   ]);
 
   const screenWidth = Dimensions.get("window").width;
@@ -733,8 +763,6 @@ const DashboardScreen = () => {
         // Welcome Section
         welcomeSection: {
           paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.md,
-          marginBottom: spacing.md,
         },
         welcomeHeader: {
           flexDirection: "row",
@@ -1147,21 +1175,6 @@ const DashboardScreen = () => {
     router.push("/(auth)/add-service");
   }, [router]);
 
-  const renderHeader = useCallback(
-    () => (
-      <AnimatedHeader>
-        <TabHeader
-          rightAction={{
-            icon: "plus",
-            onPress: handleAddService,
-            accessibilityLabel: "Add service",
-          }}
-        />
-      </AnimatedHeader>
-    ),
-    [handleAddService],
-  );
-
   const handleOpenSearch = useCallback(() => {
     router.push("/(auth)/search");
   }, [router]);
@@ -1375,6 +1388,18 @@ const DashboardScreen = () => {
         />
         <SkeletonPlaceholder width={40} height={16} borderRadius={4} />
       </View>
+    </View>
+  ));
+
+  const StatCardSkeleton = React.memo(() => (
+    <View style={styles.statCard}>
+      <SkeletonPlaceholder
+        width="50%"
+        height={28}
+        borderRadius={4}
+        style={{ marginBottom: spacing.xs }}
+      />
+      <SkeletonPlaceholder width="70%" height={14} borderRadius={4} />
     </View>
   ));
 
@@ -1632,17 +1657,31 @@ const DashboardScreen = () => {
 
   const renderItem = ({ item }: { item: DashboardListItem }) => {
     switch (item.type) {
-      case "header":
-        return renderHeader();
-
       case "welcome-section":
         return (
           <View style={styles.welcomeSection}>
             <View style={styles.welcomeHeader}>
               <Text style={styles.welcomeTitle}>Dashboard</Text>
-              <TouchableOpacity onPress={() => router.push("/(auth)/services")}>
-                <Text style={styles.seeAllButton}>See all</Text>
-              </TouchableOpacity>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.xs,
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() => router.push("/(auth)/services")}
+                  style={{ marginLeft: spacing.sm }}
+                >
+                  <Text style={styles.seeAllButton}>See all</Text>
+                </TouchableOpacity>
+                <IconButton
+                  icon="plus"
+                  size={20}
+                  iconColor={theme.colors.primary}
+                  onPress={handleAddService}
+                />
+              </View>
             </View>
           </View>
         );
@@ -1734,6 +1773,38 @@ const DashboardScreen = () => {
                   label="Watched"
                   onPress={() => handleStatCardPress("Watched")}
                 />
+              </AnimatedListItem>
+            </View>
+          </View>
+        );
+
+      case "statistics-loading":
+        return (
+          <View style={styles.statisticsSection}>
+            <View style={styles.statisticsHeader}>
+              <Text style={styles.statisticsTitle}>Statistics</Text>
+              <TouchableOpacity onPress={() => setFilterVisible(true)}>
+                <Text style={styles.filterButton}>
+                  {statsFilter === "all"
+                    ? "All"
+                    : statsFilter === "recent"
+                      ? "Recent"
+                      : "Month"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.statisticsGrid}>
+              <AnimatedListItem index={0} totalItems={4}>
+                <StatCardSkeleton />
+              </AnimatedListItem>
+              <AnimatedListItem index={1} totalItems={4}>
+                <StatCardSkeleton />
+              </AnimatedListItem>
+              <AnimatedListItem index={2} totalItems={4}>
+                <StatCardSkeleton />
+              </AnimatedListItem>
+              <AnimatedListItem index={3} totalItems={4}>
+                <StatCardSkeleton />
               </AnimatedListItem>
             </View>
           </View>
@@ -1978,14 +2049,14 @@ const DashboardScreen = () => {
 
   const keyExtractor = useCallback((item: DashboardListItem) => {
     switch (item.type) {
-      case "header":
-        return "header";
       case "welcome-section":
         return "welcome-section";
       case "shortcuts":
         return "shortcuts";
       case "statistics":
         return "statistics";
+      case "statistics-loading":
+        return "statistics-loading";
       case "continue-watching":
         return `continue-watching-${item.data.length}`;
       case "continue-watching-loading":
