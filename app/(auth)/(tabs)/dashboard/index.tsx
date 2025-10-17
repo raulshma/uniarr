@@ -1,11 +1,9 @@
-import { useFocusEffect } from "@react-navigation/native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View, Dimensions, TouchableOpacity } from "react-native";
 import type { ViewStyle } from "react-native";
-import { alert } from "@/services/dialogService";
-import { Text, useTheme, IconButton, Modal, Portal } from "react-native-paper";
+import { Text, IconButton, Modal, Portal } from "react-native-paper";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
@@ -17,44 +15,24 @@ import {
   AnimatedSection,
 } from "@/components/common";
 
-import { EmptyState } from "@/components/common/EmptyState";
-import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 // Unified search has been moved to its own page. Navigate to the search route from the dashboard.
-import type { ServiceStatusState } from "@/components/service/ServiceStatus";
-import type { ConnectionResult } from "@/connectors/base/IConnector";
-import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
-import { queryKeys } from "@/hooks/queryKeys";
-import type { AppTheme } from "@/constants/theme";
-import type { ServiceConfig, ServiceType } from "@/models/service.types";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { CalendarService } from "@/services/calendar/CalendarService";
 import { spacing } from "@/theme/spacing";
-
-// Memoize manager initialization to prevent multiple loadSavedServices calls
-let managerInitPromise: Promise<ConnectorManager> | null = null;
-const getInitializedManager = async (): Promise<ConnectorManager> => {
-  if (!managerInitPromise) {
-    managerInitPromise = (async () => {
-      const manager = ConnectorManager.getInstance();
-      await manager.loadSavedServices();
-      return manager;
-    })();
-  }
-  return managerInitPromise;
-};
-
-type ServiceOverviewItem = {
-  config: ServiceConfig;
-  status: ServiceStatusState;
-  statusDescription?: string;
-  lastCheckedAt?: Date;
-  latency?: number;
-  version?: string;
-};
+import { useTheme } from "@/hooks/useTheme";
 
 // SummaryMetrics removed — unused in this file
+
+const getInitializedManager = async () => {
+  const { ConnectorManager } = await import(
+    "@/connectors/manager/ConnectorManager"
+  );
+  const manager = ConnectorManager.getInstance();
+  await manager.loadSavedServices();
+  return manager;
+};
 
 type StatisticsData = {
   shows: number;
@@ -114,7 +92,6 @@ type DashboardListItem =
   | { type: "header" }
   | { type: "welcome-section" }
   | { type: "shortcuts" }
-  | { type: "services-grid"; data: ServiceOverviewItem[] }
   | { type: "statistics"; data: StatisticsData }
   | { type: "continue-watching"; data: ContinueWatchingItem[] }
   | { type: "continue-watching-loading" }
@@ -124,158 +101,7 @@ type DashboardListItem =
   | { type: "upcoming-releases-loading" }
   | { type: "recent-activity-header" }
   | { type: "recent-activity"; data: RecentActivityItem[] }
-  | { type: "activity" }
-  | { type: "empty" };
-
-const serviceTypeLabels: Record<ServiceType, string> = {
-  sonarr: "Sonarr",
-  radarr: "Radarr",
-  jellyseerr: "Jellyseerr",
-  jellyfin: "Jellyfin",
-  qbittorrent: "qBittorrent",
-  transmission: "Transmission",
-  deluge: "Deluge",
-  sabnzbd: "SABnzbd",
-  nzbget: "NZBGet",
-  rtorrent: "rTorrent",
-  prowlarr: "Prowlarr",
-  bazarr: "Bazarr",
-  adguard: "AdGuard Home",
-};
-
-const deriveStatus = (
-  config: ServiceConfig,
-  result: ConnectionResult | undefined,
-  checkedAt: Date,
-): Pick<
-  ServiceOverviewItem,
-  "status" | "statusDescription" | "lastCheckedAt" | "latency" | "version"
-> => {
-  if (!config.enabled) {
-    return {
-      status: "offline",
-      statusDescription: "Service disabled",
-    };
-  }
-
-  if (!result) {
-    return {
-      status: "offline",
-      statusDescription: "Status unavailable",
-      lastCheckedAt: checkedAt,
-    };
-  }
-
-  const latency = result.latency ?? undefined;
-  const version = result.version ?? undefined;
-  // For health checks, we don't measure latency, so don't mark as degraded based on latency
-  const isHighLatency = typeof latency === "number" && latency > 2000;
-
-  const status: ServiceStatusState = result.success
-    ? latency === undefined
-      ? "online"
-      : isHighLatency
-        ? "degraded"
-        : "online"
-    : "offline";
-
-  const descriptionParts: string[] = [];
-  if (result.message) {
-    descriptionParts.push(result.message);
-  }
-  if (typeof latency === "number") {
-    descriptionParts.push(`Latency ${latency}ms`);
-  }
-  if (version) {
-    descriptionParts.push(`Version ${version}`);
-  }
-
-  const statusDescription =
-    descriptionParts.length > 0 ? descriptionParts.join(" • ") : undefined;
-
-  return {
-    status,
-    statusDescription,
-    lastCheckedAt: checkedAt,
-    latency,
-    version,
-  };
-};
-
-const fetchServicesOverview = async (
-  useFullTest = false,
-): Promise<ServiceOverviewItem[]> => {
-  const manager = await getInitializedManager();
-
-  const configs = await secureStorage.getServiceConfigs();
-  if (configs.length === 0) {
-    return [];
-  }
-
-  let results: Map<string, ConnectionResult>;
-  const checkedAt = new Date();
-
-  if (useFullTest) {
-    // Use full connection tests for refresh (provides latency and version info)
-    results = await manager.testAllConnections();
-  } else {
-    // Use health checks for initial dashboard load (faster and lighter)
-    const healthResults = await Promise.allSettled(
-      configs.map(async (config): Promise<[string, ConnectionResult]> => {
-        const connector = manager.getConnector(config.id);
-        if (!connector) {
-          return [
-            config.id,
-            { success: false, message: "Connector not found" },
-          ];
-        }
-
-        try {
-          const health = await connector.getHealth();
-          return [
-            config.id,
-            {
-              success: health.status === "healthy",
-              message: health.message,
-              latency: undefined, // Health checks don't measure latency
-              version: undefined,
-            },
-          ];
-        } catch (error) {
-          return [
-            config.id,
-            {
-              success: false,
-              message:
-                error instanceof Error ? error.message : "Health check failed",
-            },
-          ];
-        }
-      }),
-    );
-
-    const fulfilledResults = healthResults
-      .filter(
-        (
-          result,
-        ): result is PromiseFulfilledResult<[string, ConnectionResult]> =>
-          result.status === "fulfilled",
-      )
-      .map((result) => result.value);
-
-    results = new Map(fulfilledResults);
-  }
-
-  return configs.map((config) => {
-    const connectionResult = results.get(config.id);
-    const statusFields = deriveStatus(config, connectionResult, checkedAt);
-
-    return {
-      config,
-      ...statusFields,
-    };
-  });
-};
+  | { type: "activity" };
 
 const formatRelativeTime = (input?: Date): string | undefined => {
   if (!input) {
@@ -788,28 +614,11 @@ const fetchUpcomingReleases = async (): Promise<UpcomingReleaseItem[]> => {
 
 const DashboardScreen = () => {
   const router = useRouter();
-  const theme = useTheme<AppTheme>();
-  const queryClient = useQueryClient();
+  const theme = useTheme();
   const [filterVisible, setFilterVisible] = useState(false);
   const [statsFilter, setStatsFilter] = useState<"all" | "recent" | "month">(
     "all",
   );
-
-  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: queryKeys.services.overview,
-    queryFn: () => fetchServicesOverview(false),
-    refetchInterval: false,
-    staleTime: 2 * 60 * 1000, // 2 minutes - cache services overview aggressively
-  });
-
-  // Custom refetch function that performs full connection tests
-  const refetchWithFullTest = useCallback(async () => {
-    // Trigger a full connection test by calling the function with useFullTest=true
-    const result = await fetchServicesOverview(true);
-    // Update the query cache with the new results
-    queryClient.setQueryData(queryKeys.services.overview, result);
-    return result;
-  }, [queryClient]);
 
   const { data: statisticsData, refetch: refetchStatistics } = useQuery({
     queryKey: ["statistics", statsFilter],
@@ -857,32 +666,12 @@ const DashboardScreen = () => {
       enabled: true,
     });
 
-  // Refresh service health when screen comes back into focus
-  // This ensures service status is up-to-date when user returns to dashboard
-  useFocusEffect(
-    useCallback(() => {
-      // Only refresh service health, not all data to avoid long delays
-      // Use the regular refetch (faster health checks) instead of full connection tests
-      void refetch();
-
-      return undefined;
-    }, [refetch]),
-  );
-
-  const services = useMemo(() => data ?? [], [data]);
-  const isRefreshing = isFetching && !isLoading;
-
   const listData: DashboardListItem[] = useMemo(() => {
     const items: DashboardListItem[] = [
       { type: "header" },
       { type: "welcome-section" },
       { type: "shortcuts" },
     ];
-
-    // Always show services grid if there are services or they're loading
-    if (services.length > 0) {
-      items.push({ type: "services-grid", data: services });
-    }
 
     // Always show statistics section
     if (statisticsData) {
@@ -916,22 +705,8 @@ const DashboardScreen = () => {
       items.push({ type: "recent-activity", data: recentActivityData });
     }
 
-    // Only show empty state if there are no services AND no dynamic content is loading/available
-    if (
-      services.length === 0 &&
-      !isLoadingContinueWatching &&
-      !continueWatchingData &&
-      !isLoadingTrendingTV &&
-      !trendingTVData &&
-      !isLoadingUpcomingReleases &&
-      !upcomingReleasesData
-    ) {
-      items.push({ type: "empty" });
-    }
-
     return items;
   }, [
-    services,
     statisticsData,
     continueWatchingData,
     trendingTVData,
@@ -1023,75 +798,6 @@ const DashboardScreen = () => {
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
           marginTop: 2,
-        },
-
-        // Services Grid
-        servicesGrid: {
-          flexDirection: "row",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.xl,
-        },
-        serviceCard: {
-          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
-          backgroundColor: theme.colors.surface,
-          borderRadius: 12,
-          padding: spacing.md,
-          marginBottom: spacing.sm,
-          borderWidth: 1,
-          borderColor: theme.colors.outlineVariant,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          elevation: 3,
-        },
-        serviceContent: {
-          flexDirection: "row",
-          alignItems: "center",
-        },
-        serviceIcon: {
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: theme.colors.primaryContainer,
-          alignItems: "center",
-          justifyContent: "center",
-          marginRight: spacing.sm,
-        },
-        serviceInfo: {
-          flex: 1,
-        },
-        serviceName: {
-          fontSize: 14,
-          fontWeight: "600",
-          color: theme.colors.onSurface,
-          marginBottom: 4,
-        },
-        serviceStatus: {
-          flexDirection: "row",
-          alignItems: "center",
-        },
-        statusIndicator: {
-          width: 6,
-          height: 6,
-          borderRadius: 3,
-          marginRight: 6,
-        },
-        statusOnline: {
-          backgroundColor: "#10B981", // Green
-        },
-        statusOffline: {
-          backgroundColor: "#EF4444", // Red
-        },
-        statusDegraded: {
-          backgroundColor: "#F59E0B", // Amber
-        },
-        serviceStatusText: {
-          fontSize: 12,
-          color: theme.colors.onSurfaceVariant,
-          fontWeight: "500",
         },
 
         // Statistics Section
@@ -1441,58 +1147,6 @@ const DashboardScreen = () => {
     router.push("/(auth)/add-service");
   }, [router]);
 
-  const handleServicePress = useCallback(
-    (service: ServiceOverviewItem) => {
-      switch (service.config.type) {
-        case "sonarr":
-          router.push({
-            pathname: "/(auth)/sonarr/[serviceId]",
-            params: { serviceId: service.config.id },
-          });
-          break;
-        case "radarr":
-          router.push({
-            pathname: "/(auth)/radarr/[serviceId]",
-            params: { serviceId: service.config.id },
-          });
-          break;
-        case "jellyseerr":
-          router.push({
-            pathname: "/(auth)/jellyseerr/[serviceId]",
-            params: { serviceId: service.config.id },
-          });
-          break;
-        case "qbittorrent":
-          router.push({
-            pathname: "/(auth)/qbittorrent/[serviceId]",
-            params: { serviceId: service.config.id },
-          });
-          break;
-        case "jellyfin":
-          router.push({
-            pathname: "/(auth)/jellyfin/[serviceId]",
-            params: { serviceId: service.config.id },
-          });
-          break;
-        case "prowlarr":
-          router.push({
-            pathname: "/(auth)/prowlarr/[serviceId]",
-            params: { serviceId: service.config.id },
-          });
-          break;
-        default:
-          alert(
-            "Coming soon",
-            `${
-              serviceTypeLabels[service.config.type]
-            } integration is coming soon.`,
-          );
-          break;
-      }
-    },
-    [router],
-  );
-
   const renderHeader = useCallback(
     () => (
       <AnimatedHeader>
@@ -1609,73 +1263,6 @@ const DashboardScreen = () => {
       </TouchableOpacity>
     ),
   );
-
-  const ServiceCard = React.memo(({ item }: { item: ServiceOverviewItem }) => {
-    const getStatusColor = (status: ServiceStatusState) => {
-      switch (status) {
-        case "online":
-          return styles.statusOnline;
-        case "offline":
-          return styles.statusOffline;
-        case "degraded":
-          return styles.statusDegraded;
-        default:
-          return styles.statusOffline;
-      }
-    };
-
-    const getStatusIcon = (type: ServiceType) => {
-      switch (type) {
-        case "sonarr":
-          return "television-classic";
-        case "radarr":
-          return "movie-open";
-        case "jellyseerr":
-          return "account-search";
-        case "jellyfin":
-          return "television-classic";
-        case "qbittorrent":
-          return "download-network";
-        case "prowlarr":
-          return "radar";
-        default:
-          return "server";
-      }
-    };
-
-    return (
-      <TouchableOpacity
-        style={styles.serviceCard}
-        onPress={() => handleServicePress(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.serviceContent}>
-          <View style={styles.serviceIcon}>
-            <IconButton
-              icon={getStatusIcon(item.config.type)}
-              size={20}
-              iconColor={theme.colors.primary}
-            />
-          </View>
-          <View style={styles.serviceInfo}>
-            <Text style={styles.serviceName}>{item.config.name}</Text>
-            <View style={styles.serviceStatus}>
-              <View
-                style={[styles.statusIndicator, getStatusColor(item.status)]}
-              />
-              <Text style={styles.serviceStatusText}>
-                {item.status === "online"
-                  ? "Connected"
-                  : item.status === "offline"
-                    ? "Offline"
-                    : "Degraded"}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  });
 
   const StatCard = React.memo(
     ({
@@ -2043,31 +1630,6 @@ const DashboardScreen = () => {
     ),
   );
 
-  const emptyServicesContent = useMemo(() => {
-    if (isError) {
-      const message =
-        error instanceof Error ? error.message : "Unable to load services.";
-
-      return (
-        <EmptyState
-          title="Unable to load services"
-          description={message}
-          actionLabel="Retry"
-          onActionPress={() => void refetch()}
-        />
-      );
-    }
-
-    return (
-      <EmptyState
-        title="No services configured"
-        description="Connect Sonarr, Radarr, Jellyseerr, qBittorrent, and more to see their status here."
-        actionLabel="Add Service"
-        onActionPress={handleAddService}
-      />
-    );
-  }, [error, handleAddService, isError, refetch]);
-
   const renderItem = ({ item }: { item: DashboardListItem }) => {
     switch (item.type) {
       case "header":
@@ -2126,21 +1688,6 @@ const DashboardScreen = () => {
                 />
               </AnimatedListItem>
             </AnimatedSection>
-          </View>
-        );
-
-      case "services-grid":
-        return (
-          <View style={styles.servicesGrid}>
-            {item.data.slice(0, 4).map((service, index) => (
-              <AnimatedListItem
-                key={service.config.id}
-                index={index}
-                totalItems={item.data.length}
-              >
-                <ServiceCard item={service} />
-              </AnimatedListItem>
-            ))}
           </View>
         );
 
@@ -2424,13 +1971,6 @@ const DashboardScreen = () => {
           </View>
         );
 
-      case "empty":
-        return (
-          <AnimatedSection style={styles.section}>
-            {emptyServicesContent}
-          </AnimatedSection>
-        );
-
       default:
         return null;
     }
@@ -2444,8 +1984,6 @@ const DashboardScreen = () => {
         return "welcome-section";
       case "shortcuts":
         return "shortcuts";
-      case "services-grid":
-        return "services-grid";
       case "statistics":
         return "statistics";
       case "continue-watching":
@@ -2464,8 +2002,6 @@ const DashboardScreen = () => {
         return "recent-activity-header";
       case "recent-activity":
         return `recent-activity-${item.data.length}`;
-      case "empty":
-        return "empty";
       default:
         return "unknown";
     }
@@ -2482,17 +2018,6 @@ const DashboardScreen = () => {
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
-          ListEmptyComponent={
-            <AnimatedSection style={styles.emptyContainer}>
-              {emptyServicesContent}
-            </AnimatedSection>
-          }
-          refreshControl={
-            <ListRefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => refetchWithFullTest()}
-            />
-          }
           showsVerticalScrollIndicator={false}
           getItemType={getItemType}
           removeClippedSubviews={true}
