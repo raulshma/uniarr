@@ -7,6 +7,7 @@ import { Image } from "expo-image";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 import { logger } from "@/services/logger/LoggerService";
+import { useSettingsStore } from "@/store/settingsStore";
 
 export type ImageCacheUsage = {
   size: number;
@@ -261,8 +262,6 @@ class ImageCacheService {
    */
   private async enforceCacheLimitAfterDownload(): Promise<void> {
     try {
-      // Import here to avoid circular dependency
-      const { useSettingsStore } = await import("@/store/settingsStore");
       const { maxImageCacheSize } = useSettingsStore.getState();
 
       // Only enforce if we have a reasonable limit set
