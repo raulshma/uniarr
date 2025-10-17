@@ -170,11 +170,6 @@ const BottomDrawer: React.FC<Props> = ({
           borderTopRightRadius: 20,
           borderColor: theme.colors.outlineVariant,
           borderWidth: 1,
-          shadowColor: theme.colors.shadow,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          elevation: 8,
         }}
         handleStyle={{
           paddingTop: 8,

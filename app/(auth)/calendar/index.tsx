@@ -16,6 +16,7 @@ import {
   isYesterday,
   parseISO,
 } from "date-fns";
+import { useRouter } from "expo-router";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -54,6 +55,7 @@ const cloneFilters = (filters: CalendarFilters): CalendarFilters => ({
 
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();
+  const router = useRouter();
   const {
     state,
     calendarData,
@@ -259,7 +261,58 @@ const CalendarScreen = () => {
     },
   });
 
-  const handleReleasePress = useCallback((releaseId: string) => {}, []);
+  const handleReleasePress = useCallback(
+    (releaseId: string) => {
+      // Find the release by ID from the current releases list
+      const release = releases.find((r) => r.id === releaseId);
+      if (!release) {
+        console.warn("Release not found:", releaseId);
+        return;
+      }
+
+      // Navigate based on media type
+      switch (release.type) {
+        case "episode":
+          // For episodes, navigate to the series detail page
+          if (release.serviceId && release.seriesId) {
+            router.push(
+              `/sonarr/${release.serviceId}/series/${release.seriesId}`,
+            );
+          } else {
+            console.warn(
+              "Missing serviceId or seriesId for episode navigation",
+            );
+          }
+          break;
+
+        case "movie":
+          // For movies, navigate to the movie detail page using tmdbId
+          if (release.serviceId && release.tmdbId) {
+            router.push(
+              `/radarr/${release.serviceId}/movies/${release.tmdbId}`,
+            );
+          } else {
+            console.warn("Missing serviceId or tmdbId for movie navigation");
+          }
+          break;
+
+        case "series":
+          // For series, navigate to the series detail page
+          if (release.serviceId && release.seriesId) {
+            router.push(
+              `/sonarr/${release.serviceId}/series/${release.seriesId}`,
+            );
+          } else {
+            console.warn("Missing serviceId or seriesId for series navigation");
+          }
+          break;
+
+        default:
+          console.warn("Unknown media type for navigation:", release.type);
+      }
+    },
+    [releases, router],
+  );
 
   const handleRetry = useCallback(() => {
     goToToday();
@@ -607,7 +660,17 @@ const CalendarScreen = () => {
       accessibilityState={{ selected: isActive }}
       testID={testID}
     >
-      <Text style={[styles.pillLabel, isActive && styles.pillLabelActive]}>
+      <Text
+        style={[
+          styles.pillLabel,
+          isActive && styles.pillLabelActive,
+          {
+            color: isActive
+              ? theme.colors.onPrimary
+              : theme.colors.onSurfaceVariant,
+          },
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -696,114 +759,177 @@ const CalendarScreen = () => {
         title="Filter & Sort"
         maxHeight="80%"
       >
-        <View style={styles.drawerSection}>
-          <Text style={styles.drawerSectionTitle}>Service Type</Text>
-          <View style={styles.pillGrid}>
-            {renderPill(
-              "All",
-              pendingFilters.serviceTypes.length === 0,
-              () => handleServiceTypeSelect("all"),
-              "filter-service-all",
-            )}
-            {SERVICE_TYPES.map((service) =>
-              renderPill(
-                service === "sonarr" ? "Sonarr" : "Radarr",
-                pendingFilters.serviceTypes.includes(service),
-                () => handleServiceTypeSelect(service),
-                `filter-service-${service}`,
-              ),
-            )}
-          </View>
-        </View>
-
-        <View style={styles.drawerSection}>
-          <Text style={styles.drawerSectionTitle}>Media Type</Text>
-          <View style={styles.pillGrid}>
-            {renderPill(
-              "All",
-              pendingFilters.mediaTypes.length === ALL_MEDIA_TYPES.length,
-              () => handleMediaTypeSelect("all"),
-              "filter-media-all",
-            )}
-            {renderPill(
-              "TV Shows",
-              pendingFilters.mediaTypes.length === 2 &&
-                pendingFilters.mediaTypes.includes("series") &&
-                pendingFilters.mediaTypes.includes("episode"),
-              () => handleMediaTypeSelect("tv"),
-              "filter-media-tv",
-            )}
-            {renderPill(
-              "Movies",
-              pendingFilters.mediaTypes.length === 1 &&
-                pendingFilters.mediaTypes.includes("movie"),
-              () => handleMediaTypeSelect("movies"),
-              "filter-media-movies",
-            )}
-          </View>
-        </View>
-
-        <View style={styles.drawerSection}>
-          <Text style={styles.drawerSectionTitle}>Monitored Status</Text>
-          <View style={styles.pillGrid}>
-            {renderPill(
-              "All",
-              pendingFilters.monitoredStatus === "all",
-              () => handleMonitoredSelect("all"),
-              "filter-monitored-all",
-            )}
-            {renderPill(
-              "Monitored",
-              pendingFilters.monitoredStatus === "monitored",
-              () => handleMonitoredSelect("monitored"),
-              "filter-monitored-monitored",
-            )}
-            {renderPill(
-              "Unmonitored",
-              pendingFilters.monitoredStatus === "unmonitored",
-              () => handleMonitoredSelect("unmonitored"),
-              "filter-monitored-unmonitored",
-            )}
-          </View>
-        </View>
-
-        <View style={styles.drawerSection}>
-          <Text style={styles.drawerSectionTitle}>Date Range</Text>
-          <View style={styles.dateRow}>
-            <Pressable
-              onPress={() => handleDateFieldPress("start")}
+        <View
+          style={{
+            paddingHorizontal: theme.custom.spacing.md,
+            backgroundColor: theme.colors.surface,
+          }}
+        >
+          <View style={styles.drawerSection}>
+            <Text
               style={[
-                styles.dateField,
-                activeDateField === "start" && styles.dateFieldActive,
+                styles.drawerSectionTitle,
+                { color: theme.colors.onSurface },
               ]}
             >
-              <Text style={styles.dateFieldLabel}>Start Date</Text>
-              <Text style={styles.dateFieldValue}>
-                {formatDateFieldValue(pendingFilters.dateRange?.start)}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleDateFieldPress("end")}
+              Service Type
+            </Text>
+            <View style={styles.pillGrid}>
+              {renderPill(
+                "All",
+                pendingFilters.serviceTypes.length === 0,
+                () => handleServiceTypeSelect("all"),
+                "filter-service-all",
+              )}
+              {SERVICE_TYPES.map((service) =>
+                renderPill(
+                  service === "sonarr" ? "Sonarr" : "Radarr",
+                  pendingFilters.serviceTypes.includes(service),
+                  () => handleServiceTypeSelect(service),
+                  `filter-service-${service}`,
+                ),
+              )}
+            </View>
+          </View>
+
+          <View style={styles.drawerSection}>
+            <Text
               style={[
-                styles.dateField,
-                activeDateField === "end" && styles.dateFieldActive,
+                styles.drawerSectionTitle,
+                { color: theme.colors.onSurface },
               ]}
             >
-              <Text style={styles.dateFieldLabel}>End Date</Text>
-              <Text style={styles.dateFieldValue}>
-                {formatDateFieldValue(pendingFilters.dateRange?.end)}
-              </Text>
-            </Pressable>
+              Media Type
+            </Text>
+            <View style={styles.pillGrid}>
+              {renderPill(
+                "All",
+                pendingFilters.mediaTypes.length === ALL_MEDIA_TYPES.length,
+                () => handleMediaTypeSelect("all"),
+                "filter-media-all",
+              )}
+              {renderPill(
+                "TV Shows",
+                pendingFilters.mediaTypes.length === 2 &&
+                  pendingFilters.mediaTypes.includes("series") &&
+                  pendingFilters.mediaTypes.includes("episode"),
+                () => handleMediaTypeSelect("tv"),
+                "filter-media-tv",
+              )}
+              {renderPill(
+                "Movies",
+                pendingFilters.mediaTypes.length === 1 &&
+                  pendingFilters.mediaTypes.includes("movie"),
+                () => handleMediaTypeSelect("movies"),
+                "filter-media-movies",
+              )}
+            </View>
           </View>
-        </View>
 
-        <View style={styles.drawerActions}>
-          <Button mode="contained" onPress={applyFilters}>
-            Apply Filters
-          </Button>
-          <Button mode="text" onPress={resetFilters} style={styles.clearButton}>
-            Clear Filters
-          </Button>
+          <View style={styles.drawerSection}>
+            <Text
+              style={[
+                styles.drawerSectionTitle,
+                { color: theme.colors.onSurface },
+              ]}
+            >
+              Monitored Status
+            </Text>
+            <View style={styles.pillGrid}>
+              {renderPill(
+                "All",
+                pendingFilters.monitoredStatus === "all",
+                () => handleMonitoredSelect("all"),
+                "filter-monitored-all",
+              )}
+              {renderPill(
+                "Monitored",
+                pendingFilters.monitoredStatus === "monitored",
+                () => handleMonitoredSelect("monitored"),
+                "filter-monitored-monitored",
+              )}
+              {renderPill(
+                "Unmonitored",
+                pendingFilters.monitoredStatus === "unmonitored",
+                () => handleMonitoredSelect("unmonitored"),
+                "filter-monitored-unmonitored",
+              )}
+            </View>
+          </View>
+
+          <View style={styles.drawerSection}>
+            <Text
+              style={[
+                styles.drawerSectionTitle,
+                { color: theme.colors.onSurface },
+              ]}
+            >
+              Date Range
+            </Text>
+            <View style={styles.dateRow}>
+              <Pressable
+                onPress={() => handleDateFieldPress("start")}
+                style={[
+                  styles.dateField,
+                  activeDateField === "start" && styles.dateFieldActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.dateFieldLabel,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
+                >
+                  Start Date
+                </Text>
+                <Text
+                  style={[
+                    styles.dateFieldValue,
+                    { color: theme.colors.onSurface },
+                  ]}
+                >
+                  {formatDateFieldValue(pendingFilters.dateRange?.start)}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleDateFieldPress("end")}
+                style={[
+                  styles.dateField,
+                  activeDateField === "end" && styles.dateFieldActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.dateFieldLabel,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
+                >
+                  End Date
+                </Text>
+                <Text
+                  style={[
+                    styles.dateFieldValue,
+                    { color: theme.colors.onSurface },
+                  ]}
+                >
+                  {formatDateFieldValue(pendingFilters.dateRange?.end)}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.drawerActions}>
+            <Button mode="contained" onPress={applyFilters}>
+              Apply Filters
+            </Button>
+            <Button
+              mode="text"
+              onPress={resetFilters}
+              style={styles.clearButton}
+            >
+              Clear Filters
+            </Button>
+          </View>
         </View>
       </BottomDrawer>
 
