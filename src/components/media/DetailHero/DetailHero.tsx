@@ -214,9 +214,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
             <Image
               source={{ uri: resolvedHeroUri }}
               style={RNStyleSheet.absoluteFill}
-              placeholder={
-                heroThumbhash ? { thumbhash: heroThumbhash } : undefined
-              }
+              placeholder={{ thumbhash: heroThumbhash }}
               cachePolicy="memory-disk"
               priority="high"
             />

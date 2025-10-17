@@ -190,7 +190,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         source={{ uri: resolvedUri }}
         // Use stored thumbhash as a placeholder when available. Expo Image accepts
         // placeholder as an object with thumbhash property for proper rendering.
-        placeholder={thumbhash ? { thumbhash } : undefined}
+        placeholder={thumbhash}
         style={[
           StyleSheet.absoluteFillObject,
           { borderRadius: effectiveBorderRadius },

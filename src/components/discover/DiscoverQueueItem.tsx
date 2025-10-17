@@ -5,6 +5,7 @@ import { Text, Button } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import { spacing } from "@/theme/spacing";
+import { useThumbhash } from "@/hooks/useThumbhash";
 
 const { width, height } = Dimensions.get("window");
 
@@ -109,6 +110,16 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
   const backdropUrl = item.backdropUrl || item.posterUrl;
   const posterUrl = item.posterUrl;
 
+  // Use thumbhash hooks for placeholders
+  const { thumbhash: backdropThumbhash } = useThumbhash(backdropUrl, {
+    autoGenerate: true,
+    generateDelay: 100,
+  });
+  const { thumbhash: posterThumbhash } = useThumbhash(posterUrl, {
+    autoGenerate: true,
+    generateDelay: 100,
+  });
+
   return (
     <View style={styles.container}>
       {backdropUrl && (
@@ -118,7 +129,7 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
           blurRadius={1}
           contentFit="cover"
           cachePolicy="memory-disk"
-          placeholder="blurhash"
+          placeholder={backdropThumbhash}
           placeholderContentFit="cover"
         >
           <View style={styles.overlay} />
@@ -142,7 +153,7 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
               style={styles.poster}
               contentFit="cover"
               cachePolicy="memory-disk"
-              placeholder="blurhash"
+              placeholder={posterThumbhash}
               placeholderContentFit="cover"
             />
           </View>
