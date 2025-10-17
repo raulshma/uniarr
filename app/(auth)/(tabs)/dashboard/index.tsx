@@ -12,18 +12,13 @@ import { AnimatedListItem, AnimatedSection } from "@/components/common";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
-// Unified search has been moved to its own page. Navigate to the search route from the dashboard.
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { CalendarService } from "@/services/calendar/CalendarService";
 import { spacing } from "@/theme/spacing";
 import { useTheme } from "@/hooks/useTheme";
-
-// SummaryMetrics removed — unused in this file
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 const getInitializedManager = async () => {
-  const { ConnectorManager } = await import(
-    "@/connectors/manager/ConnectorManager"
-  );
   const manager = ConnectorManager.getInstance();
   await manager.loadSavedServices();
   return manager;
