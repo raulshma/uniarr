@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useFocusEffect } from "@react-navigation/native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View, Dimensions, TouchableOpacity } from "react-native";
 import type { ViewStyle } from "react-native";
+import { alert } from "@/services/dialogService";
 import { Text, useTheme, IconButton, Modal, Portal } from "react-native-paper";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,11 +18,42 @@ import {
 } from "@/components/common";
 
 import { EmptyState } from "@/components/common/EmptyState";
+import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 // Unified search has been moved to its own page. Navigate to the search route from the dashboard.
+import type { ServiceStatusState } from "@/components/service/ServiceStatus";
+import type { ConnectionResult } from "@/connectors/base/IConnector";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { queryKeys } from "@/hooks/queryKeys";
 import type { AppTheme } from "@/constants/theme";
+import type { ServiceConfig, ServiceType } from "@/models/service.types";
+import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
+
+// Memoize manager initialization to prevent multiple loadSavedServices calls
+let managerInitPromise: Promise<ConnectorManager> | null = null;
+const getInitializedManager = async (): Promise<ConnectorManager> => {
+  if (!managerInitPromise) {
+    managerInitPromise = (async () => {
+      const manager = ConnectorManager.getInstance();
+      await manager.loadSavedServices();
+      return manager;
+    })();
+  }
+  return managerInitPromise;
+};
+
+type ServiceOverviewItem = {
+  config: ServiceConfig;
+  status: ServiceStatusState;
+  statusDescription?: string;
+  lastCheckedAt?: Date;
+  latency?: number;
+  version?: string;
+};
+
+// SummaryMetrics removed — unused in this file
 
 type StatisticsData = {
   shows: number;
@@ -80,6 +113,7 @@ type DashboardListItem =
   | { type: "header" }
   | { type: "welcome-section" }
   | { type: "shortcuts" }
+  | { type: "services-grid"; data: ServiceOverviewItem[] }
   | { type: "statistics"; data: StatisticsData }
   | { type: "continue-watching"; data: ContinueWatchingItem[] }
   | { type: "continue-watching-loading" }
@@ -92,54 +126,700 @@ type DashboardListItem =
   | { type: "activity" }
   | { type: "empty" };
 
-// Note: relative time formatting is provided by components where needed.
+const serviceTypeLabels: Record<ServiceType, string> = {
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+  jellyseerr: "Jellyseerr",
+  jellyfin: "Jellyfin",
+  qbittorrent: "qBittorrent",
+  transmission: "Transmission",
+  deluge: "Deluge",
+  sabnzbd: "SABnzbd",
+  nzbget: "NZBGet",
+  rtorrent: "rTorrent",
+  prowlarr: "Prowlarr",
+  bazarr: "Bazarr",
+};
+
+const deriveStatus = (
+  config: ServiceConfig,
+  result: ConnectionResult | undefined,
+  checkedAt: Date,
+): Pick<
+  ServiceOverviewItem,
+  "status" | "statusDescription" | "lastCheckedAt" | "latency" | "version"
+> => {
+  if (!config.enabled) {
+    return {
+      status: "offline",
+      statusDescription: "Service disabled",
+    };
+  }
+
+  if (!result) {
+    return {
+      status: "offline",
+      statusDescription: "Status unavailable",
+      lastCheckedAt: checkedAt,
+    };
+  }
+
+  const latency = result.latency ?? undefined;
+  const version = result.version ?? undefined;
+  // For health checks, we don't measure latency, so don't mark as degraded based on latency
+  const isHighLatency = typeof latency === "number" && latency > 2000;
+
+  const status: ServiceStatusState = result.success
+    ? latency === undefined
+      ? "online"
+      : isHighLatency
+        ? "degraded"
+        : "online"
+    : "offline";
+
+  const descriptionParts: string[] = [];
+  if (result.message) {
+    descriptionParts.push(result.message);
+  }
+  if (typeof latency === "number") {
+    descriptionParts.push(`Latency ${latency}ms`);
+  }
+  if (version) {
+    descriptionParts.push(`Version ${version}`);
+  }
+
+  const statusDescription =
+    descriptionParts.length > 0 ? descriptionParts.join(" • ") : undefined;
+
+  return {
+    status,
+    statusDescription,
+    lastCheckedAt: checkedAt,
+    latency,
+    version,
+  };
+};
+
+const fetchServicesOverview = async (
+  useFullTest = false,
+): Promise<ServiceOverviewItem[]> => {
+  const manager = await getInitializedManager();
+
+  const configs = await secureStorage.getServiceConfigs();
+  if (configs.length === 0) {
+    return [];
+  }
+
+  let results: Map<string, ConnectionResult>;
+  const checkedAt = new Date();
+
+  if (useFullTest) {
+    // Use full connection tests for refresh (provides latency and version info)
+    results = await manager.testAllConnections();
+  } else {
+    // Use health checks for initial dashboard load (faster and lighter)
+    const healthResults = await Promise.allSettled(
+      configs.map(async (config): Promise<[string, ConnectionResult]> => {
+        const connector = manager.getConnector(config.id);
+        if (!connector) {
+          return [
+            config.id,
+            { success: false, message: "Connector not found" },
+          ];
+        }
+
+        try {
+          const health = await connector.getHealth();
+          return [
+            config.id,
+            {
+              success: health.status === "healthy",
+              message: health.message,
+              latency: undefined, // Health checks don't measure latency
+              version: undefined,
+            },
+          ];
+        } catch (error) {
+          return [
+            config.id,
+            {
+              success: false,
+              message:
+                error instanceof Error ? error.message : "Health check failed",
+            },
+          ];
+        }
+      }),
+    );
+
+    const fulfilledResults = healthResults
+      .filter(
+        (
+          result,
+        ): result is PromiseFulfilledResult<[string, ConnectionResult]> =>
+          result.status === "fulfilled",
+      )
+      .map((result) => result.value);
+
+    results = new Map(fulfilledResults);
+  }
+
+  return configs.map((config) => {
+    const connectionResult = results.get(config.id);
+    const statusFields = deriveStatus(config, connectionResult, checkedAt);
+
+    return {
+      config,
+      ...statusFields,
+    };
+  });
+};
+
+const formatRelativeTime = (input?: Date): string | undefined => {
+  if (!input) {
+    return undefined;
+  }
+
+  const diffMs = Date.now() - input.getTime();
+  if (diffMs < 0) {
+    return "Just now";
+  }
+
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) {
+    return "Just now";
+  }
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) {
+    return `${weeks}w ago`;
+  }
+
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+};
 
 const fetchStatistics = async (
   filter: "all" | "recent" | "month" = "all",
 ): Promise<StatisticsData> => {
-  // Since we removed services functionality, return placeholder statistics
-  // This could be enhanced later to fetch from a local database or other sources
-  return {
-    shows: 0,
-    movies: 0,
-    episodes: 0,
-    watched: 0,
-  };
+  try {
+    const { secureStorage } = await import("@/services/storage/SecureStorage");
+
+    const manager = await getInitializedManager();
+    const configs = await secureStorage.getServiceConfigs();
+    const enabledConfigs = configs.filter((config) => config.enabled);
+
+    let shows = 0;
+    let movies = 0;
+    let episodes = 0;
+    let watched = 0;
+
+    // Fetch statistics from Sonarr
+    const sonarrConfigs = enabledConfigs.filter(
+      (config) => config.type === "sonarr",
+    );
+    for (const config of sonarrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (connector && connector.config.type === "sonarr") {
+          const sonarrConnector = connector as any;
+          // Get all series and calculate statistics
+          const series = await sonarrConnector.getSeries?.();
+          if (series) {
+            shows += series.length;
+            episodes += series.reduce(
+              (sum: number, s: any) => sum + (s.episodeFileCount || 0),
+              0,
+            );
+            watched += series.reduce(
+              (sum: number, s: any) => sum + (s.episodeCount || 0),
+              0,
+            );
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to fetch statistics from Sonarr ${config.name}:`,
+          error,
+        );
+      }
+    }
+
+    // Fetch statistics from Radarr
+    const radarrConfigs = enabledConfigs.filter(
+      (config) => config.type === "radarr",
+    );
+    for (const config of radarrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (connector && connector.config.type === "radarr") {
+          const radarrConnector = connector as any;
+          // Get all movies and calculate statistics
+          const moviesList = await radarrConnector.getMovies?.();
+          if (moviesList) {
+            movies += moviesList.filter((m: any) => m.hasFile).length;
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to fetch statistics from Radarr ${config.name}:`,
+          error,
+        );
+      }
+    }
+
+    return {
+      shows,
+      movies,
+      episodes,
+      watched,
+    };
+  } catch (error) {
+    console.error("Failed to fetch statistics data:", error);
+    return {
+      shows: 0,
+      movies: 0,
+      episodes: 0,
+      watched: 0,
+    };
+  }
 };
 
 const fetchRecentActivity = async (): Promise<RecentActivityItem[]> => {
-  // Since we removed services functionality, return empty array
-  // This could be enhanced later to fetch from a local database or other sources
-  return [];
+  try {
+    const { secureStorage } = await import("@/services/storage/SecureStorage");
+
+    const manager = await getInitializedManager();
+    const configs = await secureStorage.getServiceConfigs();
+    const enabledConfigs = configs.filter((config) => config.enabled);
+
+    const recentActivity: RecentActivityItem[] = [];
+
+    // Fetch recent activity from Sonarr
+    const sonarrConfigs = enabledConfigs.filter(
+      (config) => config.type === "sonarr",
+    );
+    for (const config of sonarrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (connector && connector.config.type === "sonarr") {
+          const sonarrConnector = connector as any;
+          const history = await sonarrConnector.getHistory?.({
+            page: 1,
+            pageSize: 10,
+          });
+          if (history?.records) {
+            for (const record of history.records.slice(0, 5)) {
+              if ((record as any).series) {
+                // Build image URL from series data
+                const series = (record as any).series;
+                let imageUrl: string | undefined;
+
+                if (series.images && series.images.length > 0) {
+                  const posterImage = series.images.find(
+                    (img: any) => img.coverType === "poster",
+                  );
+                  if (posterImage) {
+                    const connector = manager.getConnector(config.id);
+                    imageUrl = `${connector?.config.url}/MediaCover/${series.id}/poster.jpg?apikey=${connector?.config.apiKey}`;
+                  }
+                }
+
+                recentActivity.push({
+                  id: `sonarr-${config.id}-${record.id}`,
+                  title: series.title || "Unknown",
+                  episode: (record as any).episode
+                    ? `S${(record as any).episode.seasonNumber?.toString().padStart(2, "0")}E${(record as any).episode.episodeNumber?.toString().padStart(2, "0")}`
+                    : "",
+                  show: series.title || "",
+                  date:
+                    formatRelativeTime(new Date((record as any).date)) ||
+                    "Unknown",
+                  image: imageUrl,
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to fetch recent activity from Sonarr ${config.name}:`,
+          error,
+        );
+      }
+    }
+
+    // Fetch recent activity from Radarr
+    const radarrConfigs = enabledConfigs.filter(
+      (config) => config.type === "radarr",
+    );
+    for (const config of radarrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (connector && connector.config.type === "radarr") {
+          const radarrConnector = connector as any;
+          const history = await radarrConnector.getHistory?.({
+            page: 1,
+            pageSize: 10,
+          });
+          if (history?.records) {
+            for (const record of history.records.slice(0, 5)) {
+              if ((record as any).movie) {
+                // Build image URL from movie data
+                const movie = (record as any).movie;
+                let imageUrl: string | undefined;
+
+                if (movie.images && movie.images.length > 0) {
+                  const posterImage = movie.images.find(
+                    (img: any) => img.coverType === "poster",
+                  );
+                  if (posterImage) {
+                    const connector = manager.getConnector(config.id);
+                    imageUrl = `${connector?.config.url}/MediaCover/${movie.id}/poster.jpg?apikey=${connector?.config.apiKey}`;
+                  }
+                }
+
+                recentActivity.push({
+                  id: `radarr-${config.id}-${record.id}`,
+                  title: movie.title || "Unknown",
+                  episode: "Movie",
+                  show: movie.title || "",
+                  date:
+                    formatRelativeTime(new Date((record as any).date)) ||
+                    "Unknown",
+                  image: imageUrl,
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to fetch recent activity from Radarr ${config.name}:`,
+          error,
+        );
+      }
+    }
+
+    // Deduplicate recent activity items
+    // We'll deduplicate based on a combination of title, episode/show info to avoid showing the same content multiple times
+    const uniqueActivities = recentActivity.reduce(
+      (unique: RecentActivityItem[], item) => {
+        // Create a unique key based on title and episode/show info
+        // For movies: use title + "Movie"
+        // For episodes: use title + episode + show
+        const uniqueKey =
+          item.episode === "Movie"
+            ? `${item.title}-Movie`
+            : `${item.title}-${item.episode}-${item.show}`;
+
+        // Check if we already have this item
+        const existingIndex = unique.findIndex((existing) => {
+          const existingKey =
+            existing.episode === "Movie"
+              ? `${existing.title}-Movie`
+              : `${existing.title}-${existing.episode}-${existing.show}`;
+          return existingKey === uniqueKey;
+        });
+
+        if (existingIndex === -1) {
+          // Item doesn't exist, add it
+          unique.push(item);
+        } else {
+          // Item exists, keep the more recent one
+          // For simplicity, we'll assume newer items (later in the array) are more recent
+          // since the API should return items in reverse chronological order
+          unique[existingIndex] = item;
+        }
+
+        return unique;
+      },
+      [],
+    );
+
+    // Sort by date (most recent first) and limit to 10 items
+    return uniqueActivities.slice(0, 10);
+  } catch (error) {
+    console.error("Failed to fetch recent activity data:", error);
+    return [];
+  }
 };
 
 const fetchContinueWatching = async (): Promise<ContinueWatchingItem[]> => {
-  // Since we removed services functionality, return empty array
-  // This could be enhanced later to fetch from a local database or other sources
-  return [];
+  try {
+    const { secureStorage } = await import("@/services/storage/SecureStorage");
+
+    const manager = await getInitializedManager();
+    const configs = await secureStorage.getServiceConfigs();
+    const jellyfinConfigs = configs.filter(
+      (config) => config.type === "jellyfin" && config.enabled,
+    );
+
+    if (jellyfinConfigs.length === 0) {
+      return [];
+    }
+
+    const continueWatchingItems: ContinueWatchingItem[] = [];
+
+    for (const config of jellyfinConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (!connector || connector.config.type !== "jellyfin") continue;
+
+        const jellyfinConnector = connector as any;
+
+        // Get resume items and currently playing sessions
+        const [resumeItems, sessions] = await Promise.all([
+          jellyfinConnector.getResumeItems?.(20, ["Movie", "Episode"]) || [],
+          jellyfinConnector.getNowPlayingSessions?.() || [],
+        ]);
+
+        // Process resume items
+        for (const item of resumeItems.slice(0, 4)) {
+          const progress = calculateProgress(
+            item.UserData?.PlaybackPositionTicks,
+            item.RunTimeTicks,
+          );
+          if (progress > 0 && progress < 100) {
+            continueWatchingItems.push({
+              id: item.Id || `jellyfin-${config.id}-${item.Name}`,
+              title: item.Name || "Unknown",
+              type: item.Type === "Movie" ? "movie" : "episode",
+              show: item.Type === "Episode" ? item.SeriesName : undefined,
+              season:
+                item.Type === "Episode" ? item.ParentIndexNumber : undefined,
+              episode: item.Type === "Episode" ? item.IndexNumber : undefined,
+              progress,
+              duration: Math.floor((item.RunTimeTicks || 0) / 600000000), // Convert ticks to minutes
+              watchedMinutes: Math.floor(
+                (item.UserData?.PlaybackPositionTicks || 0) / 600000000,
+              ),
+              posterUri: item.ImageTags?.Primary
+                ? `${connector.config.url}/Items/${item.Id}/Images/Primary?api_key=${connector.config.apiKey}&tag=${item.ImageTags.Primary}`
+                : undefined,
+              nextEpisodeAvailable: false, // This would need additional API call
+            });
+          }
+        }
+
+        // Process currently playing sessions
+        for (const session of sessions.slice(0, 4)) {
+          const item = session.NowPlayingItem || session.NowViewingItem;
+          if (!item) continue;
+
+          const progress = calculateProgress(
+            session.PlayState?.PositionTicks,
+            item.RunTimeTicks,
+          );
+          if (progress > 0 && progress < 100) {
+            continueWatchingItems.push({
+              id: item.Id || `jellyfin-session-${config.id}-${item.Name}`,
+              title: item.Name || "Unknown",
+              type: item.Type === "Movie" ? "movie" : "episode",
+              show: item.Type === "Episode" ? item.SeriesName : undefined,
+              season:
+                item.Type === "Episode" ? item.ParentIndexNumber : undefined,
+              episode: item.Type === "Episode" ? item.IndexNumber : undefined,
+              progress,
+              duration: Math.floor((item.RunTimeTicks || 0) / 600000000),
+              watchedMinutes: Math.floor(
+                (session.PlayState?.PositionTicks || 0) / 600000000,
+              ),
+              posterUri: item.ImageTags?.Primary
+                ? `${connector.config.url}/Items/${item.Id}/Images/Primary?api_key=${connector.config.apiKey}&tag=${item.ImageTags.Primary}`
+                : undefined,
+              nextEpisodeAvailable: false,
+            });
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to fetch continue watching from Jellyfin ${config.name}:`,
+          error,
+        );
+      }
+    }
+
+    // Return empty array if no data found
+
+    // Sort by last played and limit to 4 items
+    return continueWatchingItems.slice(0, 4);
+  } catch (error) {
+    console.error("Failed to fetch continue watching data:", error);
+    return [];
+  }
 };
 
-// progress calculation is handled inline where used
+// Helper function to calculate progress percentage
+const calculateProgress = (
+  positionTicks?: number,
+  totalTicks?: number,
+): number => {
+  if (!positionTicks || !totalTicks) return 0;
+  const progress = (positionTicks / totalTicks) * 100;
+  return Math.round(Math.min(Math.max(progress, 0), 100));
+};
 
 const fetchTrendingTV = async (): Promise<TrendingTVItem[]> => {
-  // Since we removed services functionality, return empty array
-  // This could be enhanced later to fetch from TMDB API directly or other sources
-  return [];
+  try {
+    const { secureStorage } = await import("@/services/storage/SecureStorage");
+
+    const manager = await getInitializedManager();
+    const configs = await secureStorage.getServiceConfigs();
+    const jellyseerrConfigs = configs.filter(
+      (config) => config.type === "jellyseerr" && config.enabled,
+    );
+
+    if (jellyseerrConfigs.length === 0) {
+      return [];
+    }
+
+    const trendingTVItems: TrendingTVItem[] = [];
+
+    for (const config of jellyseerrConfigs) {
+      try {
+        const connector = manager.getConnector(config.id);
+        if (!connector || connector.config.type !== "jellyseerr") continue;
+
+        const jellyseerrConnector = connector as any;
+
+        // Fetch trending TV shows from Jellyseerr
+        const response = await jellyseerrConnector.getTrending?.({ page: 1 });
+        if (!response?.items) continue;
+
+        // Filter only TV shows and map to our format
+        for (const item of response.items.slice(0, 8)) {
+          if (item.mediaType === "tv") {
+            const tvItem: TrendingTVItem = {
+              id: item.id || `jellyseerr-tv-${item.title}`,
+              title: item.title || item.name || "Unknown",
+              year: item.releaseDate
+                ? parseInt(item.releaseDate.split("-")[0])
+                : undefined,
+              rating: item.voteAverage,
+              posterUri: item.posterPath
+                ? `https://image.tmdb.org/t/p/w500${item.posterPath}`
+                : item.mediaInfo?.posterPath
+                  ? `https://image.tmdb.org/t/p/w500${item.mediaInfo.posterPath}`
+                  : undefined,
+              tmdbId: item.tmdbId || item.mediaInfo?.tmdbId,
+              tvdbId: item.tvdbId || item.mediaInfo?.tvdbId,
+              overview: item.overview || item.mediaInfo?.overview,
+              popularity: item.popularity,
+            };
+            trendingTVItems.push(tvItem);
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to fetch trending TV from Jellyseerr ${config.name}:`,
+          error,
+        );
+      }
+    }
+
+    // Return empty array if no data found
+
+    // Sort by popularity and limit to 8 items
+    return trendingTVItems
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 8);
+  } catch (error) {
+    console.error("Failed to fetch trending TV data:", error);
+    return [];
+  }
 };
 
 const fetchUpcomingReleases = async (): Promise<UpcomingReleaseItem[]> => {
-  // Since we removed services functionality, return empty array
-  // This could be enhanced later to fetch from a local database or other sources
-  return [];
+  try {
+    const { CalendarService } = await import(
+      "@/services/calendar/CalendarService"
+    );
+
+    const calendarService = CalendarService.getInstance();
+
+    // Set filters for upcoming releases (next 30 days)
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + 30);
+
+    const filters = {
+      mediaTypes: ["movie", "episode"] as ["movie", "episode"],
+      statuses: ["upcoming"] as ["upcoming"],
+      services: [],
+      serviceTypes: ["sonarr", "radarr"] as ["sonarr", "radarr"],
+      monitoredStatus: "monitored" as const,
+      dateRange: {
+        start: today.toISOString().split("T")[0]!,
+        end: endDate.toISOString().split("T")[0]!,
+      },
+    };
+
+    const releases = await calendarService.getReleases(filters);
+
+    // Map to our format and limit to 4 items
+    if (releases && releases.length > 0) {
+      return releases.slice(0, 4).map((release) => ({
+        id: release.id,
+        title:
+          release.type === "episode"
+            ? release.seriesTitle || release.title
+            : release.title,
+        type: release.type as "movie" | "episode",
+        releaseDate: release.releaseDate,
+        posterUri: release.posterUrl,
+        show: release.type === "episode" ? release.seriesTitle : undefined,
+        season: release.seasonNumber,
+        episode: release.episodeNumber,
+        monitored: release.monitored,
+      }));
+    }
+
+    // Return empty array if no real data found
+    return [];
+  } catch (error) {
+    console.error("Failed to fetch upcoming releases data:", error);
+    return [];
+  }
 };
 
 const DashboardScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const queryClient = useQueryClient();
   const [filterVisible, setFilterVisible] = useState(false);
   const [statsFilter, setStatsFilter] = useState<"all" | "recent" | "month">(
     "all",
   );
+
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: queryKeys.services.overview,
+    queryFn: () => fetchServicesOverview(false),
+    refetchInterval: false,
+    staleTime: 2 * 60 * 1000, // 2 minutes - cache services overview aggressively
+  });
+
+  // Custom refetch function that performs full connection tests
+  const refetchWithFullTest = useCallback(async () => {
+    // Trigger a full connection test by calling the function with useFullTest=true
+    const result = await fetchServicesOverview(true);
+    // Update the query cache with the new results
+    queryClient.setQueryData(queryKeys.services.overview, result);
+    return result;
+  }, [queryClient]);
 
   const { data: statisticsData, refetch: refetchStatistics } = useQuery({
     queryKey: ["statistics", statsFilter],
@@ -187,12 +867,32 @@ const DashboardScreen = () => {
       enabled: true,
     });
 
+  // Refresh service health when screen comes back into focus
+  // This ensures service status is up-to-date when user returns to dashboard
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh service health, not all data to avoid long delays
+      // Use the regular refetch (faster health checks) instead of full connection tests
+      void refetch();
+
+      return undefined;
+    }, [refetch]),
+  );
+
+  const services = useMemo(() => data ?? [], [data]);
+  const isRefreshing = isFetching && !isLoading;
+
   const listData: DashboardListItem[] = useMemo(() => {
     const items: DashboardListItem[] = [
       { type: "header" },
       { type: "welcome-section" },
       { type: "shortcuts" },
     ];
+
+    // Always show services grid if there are services or they're loading
+    if (services.length > 0) {
+      items.push({ type: "services-grid", data: services });
+    }
 
     // Always show statistics section
     if (statisticsData) {
@@ -226,8 +926,9 @@ const DashboardScreen = () => {
       items.push({ type: "recent-activity", data: recentActivityData });
     }
 
-    // Only show empty state if no dynamic content is loading/available
+    // Only show empty state if there are no services AND no dynamic content is loading/available
     if (
+      services.length === 0 &&
       !isLoadingContinueWatching &&
       !continueWatchingData &&
       !isLoadingTrendingTV &&
@@ -240,6 +941,7 @@ const DashboardScreen = () => {
 
     return items;
   }, [
+    services,
     statisticsData,
     continueWatchingData,
     trendingTVData,
@@ -331,6 +1033,75 @@ const DashboardScreen = () => {
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
           marginTop: 2,
+        },
+
+        // Services Grid
+        servicesGrid: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.xl,
+        },
+        serviceCard: {
+          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 12,
+          padding: spacing.md,
+          marginBottom: spacing.sm,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+        serviceContent: {
+          flexDirection: "row",
+          alignItems: "center",
+        },
+        serviceIcon: {
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: theme.colors.primaryContainer,
+          alignItems: "center",
+          justifyContent: "center",
+          marginRight: spacing.sm,
+        },
+        serviceInfo: {
+          flex: 1,
+        },
+        serviceName: {
+          fontSize: 14,
+          fontWeight: "600",
+          color: theme.colors.onSurface,
+          marginBottom: 4,
+        },
+        serviceStatus: {
+          flexDirection: "row",
+          alignItems: "center",
+        },
+        statusIndicator: {
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          marginRight: 6,
+        },
+        statusOnline: {
+          backgroundColor: "#10B981", // Green
+        },
+        statusOffline: {
+          backgroundColor: "#EF4444", // Red
+        },
+        statusDegraded: {
+          backgroundColor: "#F59E0B", // Amber
+        },
+        serviceStatusText: {
+          fontSize: 12,
+          color: theme.colors.onSurfaceVariant,
+          fontWeight: "500",
         },
 
         // Statistics Section
@@ -670,13 +1441,81 @@ const DashboardScreen = () => {
     [theme, screenWidth],
   );
 
+  // Summary metrics are currently unused in this component; keep calculation
+  // in case they are needed later. If not required, we can remove this.
+
+  // Note: sign out flow and menu handler moved to settings screen. Handlers
+  // were removed from dashboard to avoid unused variable lint warnings.
+
+  const handleAddService = useCallback(() => {
+    router.push("/(auth)/add-service");
+  }, [router]);
+
+  const handleServicePress = useCallback(
+    (service: ServiceOverviewItem) => {
+      switch (service.config.type) {
+        case "sonarr":
+          router.push({
+            pathname: "/(auth)/sonarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "radarr":
+          router.push({
+            pathname: "/(auth)/radarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "jellyseerr":
+          router.push({
+            pathname: "/(auth)/jellyseerr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "qbittorrent":
+          router.push({
+            pathname: "/(auth)/qbittorrent/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "jellyfin":
+          router.push({
+            pathname: "/(auth)/jellyfin/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "prowlarr":
+          router.push({
+            pathname: "/(auth)/prowlarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        default:
+          alert(
+            "Coming soon",
+            `${
+              serviceTypeLabels[service.config.type]
+            } integration is coming soon.`,
+          );
+          break;
+      }
+    },
+    [router],
+  );
+
   const renderHeader = useCallback(
     () => (
       <AnimatedHeader>
-        <TabHeader />
+        <TabHeader
+          rightAction={{
+            icon: "plus",
+            onPress: handleAddService,
+            accessibilityLabel: "Add service",
+          }}
+        />
       </AnimatedHeader>
     ),
-    [],
+    [handleAddService],
   );
 
   const handleOpenSearch = useCallback(() => {
@@ -781,13 +1620,119 @@ const DashboardScreen = () => {
     ),
   );
 
+  const ServiceCard = React.memo(({ item }: { item: ServiceOverviewItem }) => {
+    const getStatusColor = (status: ServiceStatusState) => {
+      switch (status) {
+        case "online":
+          return styles.statusOnline;
+        case "offline":
+          return styles.statusOffline;
+        case "degraded":
+          return styles.statusDegraded;
+        default:
+          return styles.statusOffline;
+      }
+    };
+
+    const getStatusIcon = (type: ServiceType) => {
+      switch (type) {
+        case "sonarr":
+          return "television-classic";
+        case "radarr":
+          return "movie-open";
+        case "jellyseerr":
+          return "account-search";
+        case "jellyfin":
+          return "television-classic";
+        case "qbittorrent":
+          return "download-network";
+        case "prowlarr":
+          return "radar";
+        default:
+          return "server";
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        style={styles.serviceCard}
+        onPress={() => handleServicePress(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.serviceContent}>
+          <View style={styles.serviceIcon}>
+            <IconButton
+              icon={getStatusIcon(item.config.type)}
+              size={20}
+              iconColor={theme.colors.primary}
+            />
+          </View>
+          <View style={styles.serviceInfo}>
+            <Text style={styles.serviceName}>{item.config.name}</Text>
+            <View style={styles.serviceStatus}>
+              <View
+                style={[styles.statusIndicator, getStatusColor(item.status)]}
+              />
+              <Text style={styles.serviceStatusText}>
+                {item.status === "online"
+                  ? "Connected"
+                  : item.status === "offline"
+                    ? "Offline"
+                    : "Degraded"}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  });
+
   const StatCard = React.memo(
-    ({ number, label }: { number: number; label: string }) => (
-      <View style={styles.statCard}>
+    ({
+      number,
+      label,
+      onPress,
+    }: {
+      number: number;
+      label: string;
+      onPress?: () => void;
+    }) => (
+      <TouchableOpacity
+        style={styles.statCard}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
         <Text style={styles.statNumber}>{number}</Text>
         <Text style={styles.statLabel}>{label}</Text>
-      </View>
+      </TouchableOpacity>
     ),
+  );
+
+  const handleStatCardPress = useCallback(
+    (label: string) => {
+      // Navigate to appropriate pages based on statistics type
+      switch (label) {
+        case "Shows":
+          // Navigate to Sonarr series list
+          router.push("/(auth)/sonarr");
+          break;
+        case "Movies":
+          // Navigate to Radarr movies list
+          router.push("/(auth)/radarr");
+          break;
+        case "Episodes":
+          // Navigate to calendar page for episode releases
+          router.push("/(auth)/calendar");
+          break;
+        case "Watched":
+          // Navigate to recently added page
+          router.push("/(auth)/(tabs)/recently-added");
+          break;
+        default:
+          break;
+      }
+    },
+    [router],
   );
 
   const ContinueWatchingCardSkeleton = React.memo(() => (
@@ -1108,387 +2053,398 @@ const DashboardScreen = () => {
     ),
   );
 
-  const emptyStateContent = useMemo(() => {
+  const emptyServicesContent = useMemo(() => {
+    if (isError) {
+      const message =
+        error instanceof Error ? error.message : "Unable to load services.";
+
+      return (
+        <EmptyState
+          title="Unable to load services"
+          description={message}
+          actionLabel="Retry"
+          onActionPress={() => void refetch()}
+        />
+      );
+    }
+
     return (
       <EmptyState
-        title="Welcome to UniArr"
-        description="Start exploring your media library with trending shows, upcoming releases, and more."
-        actionLabel="Discover"
-        onActionPress={handleOpenDiscover}
+        title="No services configured"
+        description="Connect Sonarr, Radarr, Jellyseerr, qBittorrent, and more to see their status here."
+        actionLabel="Add Service"
+        onActionPress={handleAddService}
       />
     );
-  }, [handleOpenDiscover]);
+  }, [error, handleAddService, isError, refetch]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: DashboardListItem }) => {
-      switch (item.type) {
-        case "header":
-          return renderHeader();
+  const renderItem = ({ item }: { item: DashboardListItem }) => {
+    switch (item.type) {
+      case "header":
+        return renderHeader();
 
-        case "welcome-section":
-          return (
-            <View style={styles.welcomeSection}>
-              <View style={styles.welcomeHeader}>
-                <Text style={styles.welcomeTitle}>Dashboard</Text>
-              </View>
+      case "welcome-section":
+        return (
+          <View style={styles.welcomeSection}>
+            <View style={styles.welcomeHeader}>
+              <Text style={styles.welcomeTitle}>Dashboard</Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/services")}>
+                <Text style={styles.seeAllButton}>See all</Text>
+              </TouchableOpacity>
             </View>
-          );
+          </View>
+        );
 
-        case "shortcuts":
-          return (
-            <View style={styles.shortcutsSection}>
-              <AnimatedSection style={styles.shortcutsGrid} delay={40}>
-                <AnimatedListItem index={0} totalItems={4}>
-                  <ShortcutCard
-                    testID="shortcut-discover"
-                    label="Discover"
-                    subtitle="Trending"
-                    icon="compass-outline"
-                    onPress={handleOpenDiscover}
+      case "shortcuts":
+        return (
+          <View style={styles.shortcutsSection}>
+            <AnimatedSection style={styles.shortcutsGrid} delay={40}>
+              <AnimatedListItem index={0} totalItems={4}>
+                <ShortcutCard
+                  testID="shortcut-discover"
+                  label="Discover"
+                  subtitle="Trending"
+                  icon="compass-outline"
+                  onPress={handleOpenDiscover}
+                />
+              </AnimatedListItem>
+              <AnimatedListItem index={1} totalItems={4}>
+                <ShortcutCard
+                  testID="shortcut-search"
+                  label="Search"
+                  subtitle="Unified"
+                  icon="magnify"
+                  onPress={handleOpenSearch}
+                />
+              </AnimatedListItem>
+              <AnimatedListItem index={2} totalItems={4}>
+                <ShortcutCard
+                  testID="shortcut-calendar"
+                  label="Calendar"
+                  subtitle="Releases"
+                  icon="calendar"
+                  onPress={handleOpenCalendar}
+                />
+              </AnimatedListItem>
+              <AnimatedListItem index={3} totalItems={4}>
+                <ShortcutCard
+                  testID="shortcut-animehub"
+                  label="Anime"
+                  subtitle="Hub"
+                  icon="animation"
+                  onPress={() => router.push("/(auth)/anime-hub")}
+                />
+              </AnimatedListItem>
+            </AnimatedSection>
+          </View>
+        );
+
+      case "services-grid":
+        return (
+          <View style={styles.servicesGrid}>
+            {item.data.slice(0, 4).map((service, index) => (
+              <AnimatedListItem
+                key={service.config.id}
+                index={index}
+                totalItems={item.data.length}
+              >
+                <ServiceCard item={service} />
+              </AnimatedListItem>
+            ))}
+          </View>
+        );
+
+      case "statistics":
+        return (
+          <View style={styles.statisticsSection}>
+            <View style={styles.statisticsHeader}>
+              <Text style={styles.statisticsTitle}>Statistics</Text>
+              <TouchableOpacity onPress={() => setFilterVisible(true)}>
+                <Text style={styles.filterButton}>
+                  {statsFilter === "all"
+                    ? "All"
+                    : statsFilter === "recent"
+                      ? "Recent"
+                      : "Month"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.statisticsGrid}>
+              <AnimatedListItem index={0} totalItems={4}>
+                <StatCard
+                  number={item.data.shows}
+                  label="Shows"
+                  onPress={() => handleStatCardPress("Shows")}
+                />
+              </AnimatedListItem>
+              <AnimatedListItem index={1} totalItems={4}>
+                <StatCard
+                  number={item.data.movies}
+                  label="Movies"
+                  onPress={() => handleStatCardPress("Movies")}
+                />
+              </AnimatedListItem>
+              <AnimatedListItem index={2} totalItems={4}>
+                <StatCard
+                  number={item.data.episodes}
+                  label="Episodes"
+                  onPress={() => handleStatCardPress("Episodes")}
+                />
+              </AnimatedListItem>
+              <AnimatedListItem index={3} totalItems={4}>
+                <StatCard
+                  number={item.data.watched}
+                  label="Watched"
+                  onPress={() => handleStatCardPress("Watched")}
+                />
+              </AnimatedListItem>
+            </View>
+          </View>
+        );
+
+      case "continue-watching":
+        return (
+          <View style={styles.continueWatchingSection}>
+            <View style={styles.continueWatchingHeader}>
+              <Text style={styles.continueWatchingTitle}>
+                Continue Watching
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push("/(auth)/continue-watching")}
+              >
+                <Text style={styles.seeAllButtonSmall}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.continueWatchingList}>
+              {item.data.slice(0, 4).map((watching, index) => (
+                <AnimatedListItem
+                  key={watching.id}
+                  index={index}
+                  totalItems={item.data.length}
+                >
+                  <ContinueWatchingCard
+                    item={watching}
+                    onPress={handleContinueWatchingPress}
                   />
                 </AnimatedListItem>
-                <AnimatedListItem index={1} totalItems={4}>
-                  <ShortcutCard
-                    testID="shortcut-search"
-                    label="Search"
-                    subtitle="Unified"
-                    icon="magnify"
-                    onPress={handleOpenSearch}
+              ))}
+            </View>
+          </View>
+        );
+
+      case "continue-watching-loading":
+        return (
+          <View style={styles.continueWatchingSection}>
+            <View style={styles.continueWatchingHeader}>
+              <Text style={styles.continueWatchingTitle}>
+                Continue Watching
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push("/(auth)/continue-watching")}
+              >
+                <Text style={styles.seeAllButtonSmall}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.continueWatchingList}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <AnimatedListItem
+                  key={`continue-watching-loading-${index}`}
+                  index={index}
+                  totalItems={4}
+                >
+                  <ContinueWatchingCardSkeleton />
+                </AnimatedListItem>
+              ))}
+            </View>
+          </View>
+        );
+
+      case "trending-tv": {
+        // Use 2 columns when there are fewer than 4 items to make better use of space
+        const totalItems = Math.min(item.data.length, 8);
+        const columns = totalItems < 4 ? 2 : 4;
+        const gutterTotal = spacing.lg * 2 + spacing.sm * (columns - 1);
+        const cardWidth = (screenWidth - gutterTotal) / columns;
+        const posterSize = cardWidth; // poster should fill card width
+
+        return (
+          <View style={styles.trendingTVSection}>
+            <View style={styles.trendingTVHeader}>
+              <Text style={styles.trendingTVSectionTitle}>
+                Trending TV Shows
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/discover")}>
+                <Text style={styles.seeAllButtonSmall}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.trendingTVList}>
+              {item.data.slice(0, 8).map((show, index) => (
+                <AnimatedListItem
+                  key={show.id}
+                  index={index}
+                  totalItems={totalItems}
+                >
+                  <TrendingTVCard
+                    item={show}
+                    onPress={handleTrendingTVPress}
+                    style={{ width: cardWidth }}
+                    posterSize={posterSize}
                   />
                 </AnimatedListItem>
-                <AnimatedListItem index={2} totalItems={4}>
-                  <ShortcutCard
-                    testID="shortcut-calendar"
-                    label="Calendar"
-                    subtitle="Releases"
-                    icon="calendar"
-                    onPress={handleOpenCalendar}
+              ))}
+            </View>
+          </View>
+        );
+      }
+
+      case "trending-tv-loading":
+        return (
+          <View style={styles.trendingTVSection}>
+            <View style={styles.trendingTVHeader}>
+              <Text style={styles.trendingTVSectionTitle}>
+                Trending TV Shows
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/discover")}>
+                <Text style={styles.seeAllButtonSmall}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.trendingTVList}>
+              {Array.from({ length: 8 }).map((_, index) => (
+                <AnimatedListItem
+                  key={`trending-tv-loading-${index}`}
+                  index={index}
+                  totalItems={8}
+                >
+                  <TrendingTVCardSkeleton />
+                </AnimatedListItem>
+              ))}
+            </View>
+          </View>
+        );
+
+      case "upcoming-releases":
+        return (
+          <View style={styles.upcomingReleasesSection}>
+            <View style={styles.upcomingReleasesHeader}>
+              <Text style={styles.upcomingReleasesTitle}>
+                Upcoming Releases
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/calendar")}>
+                <Text style={styles.seeAllButtonSmall}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.upcomingReleasesList}>
+              {item.data.slice(0, 4).map((release, index) => (
+                <AnimatedListItem
+                  key={release.id}
+                  index={index}
+                  totalItems={item.data.length}
+                >
+                  <UpcomingReleaseCard
+                    item={release}
+                    onPress={handleUpcomingReleasePress}
                   />
                 </AnimatedListItem>
-                <AnimatedListItem index={3} totalItems={4}>
-                  <ShortcutCard
-                    testID="shortcut-animehub"
-                    label="Anime"
-                    subtitle="Hub"
-                    icon="animation"
-                    onPress={() => router.push("/(auth)/anime-hub")}
+              ))}
+            </View>
+          </View>
+        );
+
+      case "upcoming-releases-loading":
+        return (
+          <View style={styles.upcomingReleasesSection}>
+            <View style={styles.upcomingReleasesHeader}>
+              <Text style={styles.upcomingReleasesTitle}>
+                Upcoming Releases
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/calendar")}>
+                <Text style={styles.seeAllButtonSmall}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.upcomingReleasesList}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <AnimatedListItem
+                  key={`upcoming-releases-loading-${index}`}
+                  index={index}
+                  totalItems={4}
+                >
+                  <UpcomingReleaseCardSkeleton />
+                </AnimatedListItem>
+              ))}
+            </View>
+          </View>
+        );
+
+      case "recent-activity-header":
+        return (
+          <View style={styles.recentActivityHeader}>
+            <Text style={styles.recentActivityTitle}>Recent Activity</Text>
+          </View>
+        );
+
+      case "recent-activity":
+        return (
+          <View style={styles.recentActivityList}>
+            {item.data.length > 0 ? (
+              item.data.map((activity, index) => (
+                <AnimatedListItem
+                  key={activity.id}
+                  index={index}
+                  totalItems={item.data.length}
+                >
+                  <RecentActivityCard
+                    item={activity}
+                    onPress={handleRecentActivityPress}
                   />
                 </AnimatedListItem>
-              </AnimatedSection>
-            </View>
-          );
-
-        case "statistics":
-          return (
-            <View style={styles.statisticsSection}>
-              <View style={styles.statisticsHeader}>
-                <Text style={styles.statisticsTitle}>Statistics</Text>
-                <TouchableOpacity onPress={() => setFilterVisible(true)}>
-                  <Text style={styles.filterButton}>
-                    {statsFilter === "all"
-                      ? "All"
-                      : statsFilter === "recent"
-                        ? "Recent"
-                        : "Month"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.statisticsGrid}>
-                <AnimatedListItem index={0} totalItems={4}>
-                  <StatCard number={item.data.shows} label="Shows" />
-                </AnimatedListItem>
-                <AnimatedListItem index={1} totalItems={4}>
-                  <StatCard number={item.data.movies} label="Movies" />
-                </AnimatedListItem>
-                <AnimatedListItem index={2} totalItems={4}>
-                  <StatCard number={item.data.episodes} label="Episodes" />
-                </AnimatedListItem>
-                <AnimatedListItem index={3} totalItems={4}>
-                  <StatCard number={item.data.watched} label="Watched" />
-                </AnimatedListItem>
-              </View>
-            </View>
-          );
-
-        case "continue-watching":
-          return (
-            <View style={styles.continueWatchingSection}>
-              <View style={styles.continueWatchingHeader}>
-                <Text style={styles.continueWatchingTitle}>
-                  Continue Watching
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/(auth)/continue-watching")}
-                >
-                  <Text style={styles.seeAllButtonSmall}>See all</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.continueWatchingList}>
-                {item.data.slice(0, 4).map((watching, index) => (
-                  <AnimatedListItem
-                    key={watching.id}
-                    index={index}
-                    totalItems={item.data.length}
-                  >
-                    <ContinueWatchingCard
-                      item={watching}
-                      onPress={handleContinueWatchingPress}
-                    />
-                  </AnimatedListItem>
-                ))}
-              </View>
-            </View>
-          );
-
-        case "continue-watching-loading":
-          return (
-            <View style={styles.continueWatchingSection}>
-              <View style={styles.continueWatchingHeader}>
-                <Text style={styles.continueWatchingTitle}>
-                  Continue Watching
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/(auth)/continue-watching")}
-                >
-                  <Text style={styles.seeAllButtonSmall}>See all</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.continueWatchingList}>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <AnimatedListItem
-                    key={`continue-watching-loading-${index}`}
-                    index={index}
-                    totalItems={4}
-                  >
-                    <ContinueWatchingCardSkeleton />
-                  </AnimatedListItem>
-                ))}
-              </View>
-            </View>
-          );
-
-        case "trending-tv": {
-          // Use 2 columns when there are fewer than 4 items to make better use of space
-          const totalItems = Math.min(item.data.length, 8);
-          const columns = totalItems < 4 ? 2 : 4;
-          const gutterTotal = spacing.lg * 2 + spacing.sm * (columns - 1);
-          const cardWidth = (screenWidth - gutterTotal) / columns;
-          const posterSize = cardWidth; // poster should fill card width
-
-          return (
-            <View style={styles.trendingTVSection}>
-              <View style={styles.trendingTVHeader}>
-                <Text style={styles.trendingTVSectionTitle}>
-                  Trending TV Shows
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/(auth)/discover")}
-                >
-                  <Text style={styles.seeAllButtonSmall}>See all</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.trendingTVList}>
-                {item.data.slice(0, 8).map((show, index) => (
-                  <AnimatedListItem
-                    key={show.id}
-                    index={index}
-                    totalItems={totalItems}
-                  >
-                    <TrendingTVCard
-                      item={show}
-                      onPress={handleTrendingTVPress}
-                      style={{ width: cardWidth }}
-                      posterSize={posterSize}
-                    />
-                  </AnimatedListItem>
-                ))}
-              </View>
-            </View>
-          );
-        }
-
-        case "trending-tv-loading":
-          return (
-            <View style={styles.trendingTVSection}>
-              <View style={styles.trendingTVHeader}>
-                <Text style={styles.trendingTVSectionTitle}>
-                  Trending TV Shows
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/(auth)/discover")}
-                >
-                  <Text style={styles.seeAllButtonSmall}>See all</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.trendingTVList}>
-                {Array.from({ length: 8 }).map((_, index) => (
-                  <AnimatedListItem
-                    key={`trending-tv-loading-${index}`}
-                    index={index}
-                    totalItems={8}
-                  >
-                    <TrendingTVCardSkeleton />
-                  </AnimatedListItem>
-                ))}
-              </View>
-            </View>
-          );
-
-        case "upcoming-releases":
-          return (
-            <View style={styles.upcomingReleasesSection}>
-              <View style={styles.upcomingReleasesHeader}>
-                <Text style={styles.upcomingReleasesTitle}>
-                  Upcoming Releases
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/(auth)/calendar")}
-                >
-                  <Text style={styles.seeAllButtonSmall}>See all</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.upcomingReleasesList}>
-                {item.data.slice(0, 4).map((release, index) => (
-                  <AnimatedListItem
-                    key={release.id}
-                    index={index}
-                    totalItems={item.data.length}
-                  >
-                    <UpcomingReleaseCard
-                      item={release}
-                      onPress={handleUpcomingReleasePress}
-                    />
-                  </AnimatedListItem>
-                ))}
-              </View>
-            </View>
-          );
-
-        case "upcoming-releases-loading":
-          return (
-            <View style={styles.upcomingReleasesSection}>
-              <View style={styles.upcomingReleasesHeader}>
-                <Text style={styles.upcomingReleasesTitle}>
-                  Upcoming Releases
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/(auth)/calendar")}
-                >
-                  <Text style={styles.seeAllButtonSmall}>See all</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.upcomingReleasesList}>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <AnimatedListItem
-                    key={`upcoming-releases-loading-${index}`}
-                    index={index}
-                    totalItems={4}
-                  >
-                    <UpcomingReleaseCardSkeleton />
-                  </AnimatedListItem>
-                ))}
-              </View>
-            </View>
-          );
-
-        case "recent-activity-header":
-          return (
-            <View style={styles.recentActivityHeader}>
-              <Text style={styles.recentActivityTitle}>Recent Activity</Text>
-            </View>
-          );
-
-        case "recent-activity":
-          return (
-            <View style={styles.recentActivityList}>
-              {item.data.length > 0 ? (
-                item.data.map((activity, index) => (
-                  <AnimatedListItem
-                    key={activity.id}
-                    index={index}
-                    totalItems={item.data.length}
-                  >
-                    <RecentActivityCard
-                      item={activity}
-                      onPress={handleRecentActivityPress}
-                    />
-                  </AnimatedListItem>
-                ))
-              ) : (
-                <View
+              ))
+            ) : (
+              <View
+                style={{
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: 12,
+                  padding: spacing.lg,
+                  borderWidth: 1,
+                  borderColor: theme.colors.outlineVariant,
+                  alignItems: "center",
+                }}
+              >
+                <Text
                   style={{
-                    backgroundColor: theme.colors.surface,
-                    borderRadius: 12,
-                    padding: spacing.lg,
-                    borderWidth: 1,
-                    borderColor: theme.colors.outlineVariant,
-                    alignItems: "center",
+                    fontSize: 16,
+                    color: theme.colors.onSurfaceVariant,
+                    textAlign: "center",
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      color: theme.colors.onSurfaceVariant,
-                      textAlign: "center",
-                    }}
-                  >
-                    No recent activity found
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      color: theme.colors.onSurfaceVariant,
-                      textAlign: "center",
-                      marginTop: spacing.xs,
-                      opacity: 0.7,
-                    }}
-                  >
-                    Recent downloads and imports will appear here
-                  </Text>
-                </View>
-              )}
-            </View>
-          );
+                  No recent activity found
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: theme.colors.onSurfaceVariant,
+                    textAlign: "center",
+                    marginTop: spacing.xs,
+                    opacity: 0.7,
+                  }}
+                >
+                  Recent downloads and imports will appear here
+                </Text>
+              </View>
+            )}
+          </View>
+        );
 
-        case "empty":
-          return (
-            <AnimatedSection style={styles.section}>
-              {emptyStateContent}
-            </AnimatedSection>
-          );
+      case "empty":
+        return (
+          <AnimatedSection style={styles.section}>
+            {emptyServicesContent}
+          </AnimatedSection>
+        );
 
-        default:
-          return null;
-      }
-    },
-    [
-      emptyStateContent,
-      renderHeader,
-      router,
-      styles,
-      handleContinueWatchingPress,
-      handleTrendingTVPress,
-      handleUpcomingReleasePress,
-      handleRecentActivityPress,
-      statsFilter,
-      ContinueWatchingCard,
-      ContinueWatchingCardSkeleton,
-      RecentActivityCard,
-      ShortcutCard,
-      StatCard,
-      TrendingTVCard,
-      TrendingTVCardSkeleton,
-      UpcomingReleaseCard,
-      UpcomingReleaseCardSkeleton,
-      handleOpenCalendar,
-      handleOpenDiscover,
-      handleOpenSearch,
-      screenWidth,
-      theme.colors.onSurfaceVariant,
-      theme.colors.outlineVariant,
-      theme.colors.surface,
-    ],
-  );
+      default:
+        return null;
+    }
+  };
 
   const keyExtractor = useCallback((item: DashboardListItem) => {
     switch (item.type) {
@@ -1498,6 +2454,8 @@ const DashboardScreen = () => {
         return "welcome-section";
       case "shortcuts":
         return "shortcuts";
+      case "services-grid":
+        return "services-grid";
       case "statistics":
         return "statistics";
       case "continue-watching":
@@ -1536,8 +2494,14 @@ const DashboardScreen = () => {
           ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
           ListEmptyComponent={
             <AnimatedSection style={styles.emptyContainer}>
-              {emptyStateContent}
+              {emptyServicesContent}
             </AnimatedSection>
+          }
+          refreshControl={
+            <ListRefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => refetchWithFullTest()}
+            />
           }
           showsVerticalScrollIndicator={false}
           getItemType={getItemType}

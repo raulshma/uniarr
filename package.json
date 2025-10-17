@@ -8,6 +8,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky",
     "generate:client-schemas": "node ./scripts/generate-openapi.js",
     "lint": "expo lint"
   },
@@ -70,8 +72,8 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "@tanstack/react-query-devtools": "^5.90.2",
-    "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^13.3.3",
     "@types/d3-shape": "^3.1.7",
     "@types/jest": "^29.5.14",
