@@ -49,6 +49,7 @@ const allServiceTypes: ServiceType[] = [
   "rtorrent",
   "prowlarr",
   "bazarr",
+  "adguard",
 ];
 const apiKeyServiceTypes = [
   "sonarr",
@@ -76,6 +77,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   rtorrent: "rTorrent",
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
+  adguard: "AdGuard Home",
 };
 
 const normalizeSensitiveValue = (value?: string): string | undefined => {
@@ -866,7 +868,8 @@ const EditServiceScreen = () => {
               if (
                 serviceType === "qbittorrent" ||
                 serviceType === "transmission" ||
-                serviceType === "deluge"
+                serviceType === "deluge" ||
+                serviceType === "adguard"
               ) {
                 return (
                   <>

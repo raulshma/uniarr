@@ -2,6 +2,7 @@ import { authManager } from "./AuthManager";
 import { ApiKeyAuthProvider } from "./providers/ApiKeyAuthProvider";
 import { SessionAuthProvider } from "./providers/SessionAuthProvider";
 import { JellyfinAuthProvider } from "./providers/JellyfinAuthProvider";
+import { BasicAuthProvider } from "./providers/BasicAuthProvider";
 import type { ServiceType } from "@/models/service.types";
 
 /**
@@ -25,6 +26,10 @@ export class AuthProviderFactory {
     authManager.registerProvider("jellyfin", new JellyfinAuthProvider());
     authManager.registerProvider("qbittorrent", new SessionAuthProvider());
     authManager.registerProvider("prowlarr", new ApiKeyAuthProvider());
+    authManager.registerProvider(
+      "adguard",
+      new BasicAuthProvider("/control/status"),
+    );
 
     this.initialized = true;
   }

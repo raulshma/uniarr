@@ -106,6 +106,11 @@ export const SERVICE_DETECTION_CONFIGS: Partial<
     commonPorts: [6767],
     detectionEndpoint: "/api/system/status",
   },
+  adguard: {
+    type: "adguard",
+    commonPorts: [3000, 80, 443],
+    detectionEndpoint: "/status",
+  },
 };
 
 export class NetworkScannerService {

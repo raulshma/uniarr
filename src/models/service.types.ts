@@ -10,7 +10,8 @@ export type ServiceType =
   | "nzbget"
   | "rtorrent"
   | "prowlarr"
-  | "bazarr";
+  | "bazarr"
+  | "adguard";
 
 export interface ServiceConfig {
   id: string;

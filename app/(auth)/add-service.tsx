@@ -50,6 +50,7 @@ const allServiceTypes: ServiceType[] = [
   "rtorrent",
   "prowlarr",
   "bazarr",
+  "adguard",
 ];
 const apiKeyServiceTypes = [
   "sonarr",
@@ -77,6 +78,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   rtorrent: "rTorrent",
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
+  adguard: "AdGuard Home",
 };
 
 const generateServiceId = (): string => {
@@ -884,7 +886,8 @@ const AddServiceScreen = () => {
               if (
                 serviceType === "qbittorrent" ||
                 serviceType === "transmission" ||
-                serviceType === "deluge"
+                serviceType === "deluge" ||
+                serviceType === "adguard"
               ) {
                 return (
                   <>

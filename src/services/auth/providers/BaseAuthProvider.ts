@@ -1,5 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { logger } from "@/services/logger/LoggerService";
+import { base64Encode } from "@/utils/base64";
 import type {
   IAuthProvider,
   AuthConfig,
@@ -61,7 +62,6 @@ export abstract class BaseAuthProvider implements IAuthProvider {
       const response = await axios.get(testUrl, {
         timeout: config.timeout || this.timeout,
         headers,
-        auth: this.getBasicAuth(config),
       });
 
       return {
@@ -122,6 +122,17 @@ export abstract class BaseAuthProvider implements IAuthProvider {
 
     if (config.credentials.token) {
       headers["Authorization"] = `Bearer ${config.credentials.token}`;
+    }
+
+    // For basic auth, add the Authorization header preemptively
+    if (
+      config.method === "basic" &&
+      config.credentials.username &&
+      config.credentials.password
+    ) {
+      const credentials = `${config.credentials.username}:${config.credentials.password}`;
+      const base64Credentials = base64Encode(credentials);
+      headers["Authorization"] = `Basic ${base64Credentials}`;
     }
 
     return headers;

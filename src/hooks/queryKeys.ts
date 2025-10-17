@@ -246,6 +246,22 @@ export const queryKeys = {
     transferInfo: (serviceId: string): QueryKeyBuilder =>
       [...queryKeys.qbittorrent.service(serviceId), "transferInfo"] as const,
   },
+  adguard: {
+    base: ["adguard"] as const,
+    service: (serviceId: string): QueryKeyBuilder =>
+      ["adguard", serviceId] as const,
+    overview: (serviceId: string): QueryKeyBuilder =>
+      [...queryKeys.adguard.service(serviceId), "overview"] as const,
+    queryLog: (
+      serviceId: string,
+      params?: Record<string, unknown>,
+    ): QueryKeyBuilder =>
+      [
+        ...queryKeys.adguard.service(serviceId),
+        "queryLog",
+        params ?? {},
+      ] as const,
+  },
   transmission: {
     base: ["transmission"] as const,
     service: (serviceId: string): QueryKeyBuilder =>

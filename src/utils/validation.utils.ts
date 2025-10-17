@@ -15,6 +15,7 @@ const serviceTypeValues = [
   "rtorrent",
   "prowlarr",
   "bazarr",
+  "adguard",
 ] as const satisfies readonly ServiceType[];
 
 const httpSchemeRegex = /^https?:\/\//i;
@@ -62,6 +63,26 @@ export const serviceConfigSchema = z
           code: z.ZodIssueCode.custom,
           path: ["password"],
           message: "Password is required for qBittorrent",
+        });
+      }
+
+      return;
+    }
+
+    if (data.type === "adguard") {
+      if (!data.username || data.username.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["username"],
+          message: "Username is required for AdGuard Home",
+        });
+      }
+
+      if (!data.password || data.password.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["password"],
+          message: "Password is required for AdGuard Home",
         });
       }
 

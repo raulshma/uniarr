@@ -5,6 +5,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as Crypto from "expo-crypto";
 
 import { logger } from "@/services/logger/LoggerService";
+import { base64Encode, base64Decode } from "@/utils/base64";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { type ServiceConfig, type ServiceType } from "@/models/service.types";
 import {
@@ -220,68 +221,14 @@ class BackupRestoreService {
    * React Native compatible base64 encoding
    */
   private base64Encode(str: string): string {
-    try {
-      return Buffer.from(str, "utf8").toString("base64");
-    } catch {
-      // Fallback manual base64 encoding
-      const chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-      let result = "";
-      let i = 0;
-
-      while (i < str.length) {
-        const a = str.charCodeAt(i++);
-        const b = i < str.length ? str.charCodeAt(i++) : 0;
-        const c = i < str.length ? str.charCodeAt(i++) : 0;
-
-        const bitmap = (a << 16) | (b << 8) | c;
-
-        result += chars.charAt((bitmap >> 18) & 63);
-        result += chars.charAt((bitmap >> 12) & 63);
-        result += i - 2 < str.length ? chars.charAt((bitmap >> 6) & 63) : "=";
-        result += i - 1 < str.length ? chars.charAt(bitmap & 63) : "=";
-      }
-
-      return result;
-    }
+    return base64Encode(str);
   }
 
   /**
    * React Native compatible base64 decoding
    */
   private base64Decode(str: string): string {
-    try {
-      return Buffer.from(str, "base64").toString("utf8");
-    } catch {
-      // Fallback manual base64 decoding
-      const chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-      let result = "";
-      let i = 0;
-
-      str = str.replace(/[^A-Za-z0-9+/]/g, "");
-
-      while (i < str.length) {
-        const encoded1 = chars.indexOf(str.charAt(i++));
-        const encoded2 = chars.indexOf(str.charAt(i++));
-        const encoded3 = chars.indexOf(str.charAt(i++));
-        const encoded4 = chars.indexOf(str.charAt(i++));
-
-        // Handle missing characters
-        if (encoded1 === -1 || encoded2 === -1) {
-          continue; // Skip invalid base64 characters
-        }
-
-        const bitmap =
-          (encoded1 << 18) | (encoded2 << 12) | (encoded3 << 6) | encoded4;
-
-        result += String.fromCharCode((bitmap >> 16) & 255);
-        if (encoded3 !== 64) result += String.fromCharCode((bitmap >> 8) & 255);
-        if (encoded4 !== 64) result += String.fromCharCode(bitmap & 255);
-      }
-
-      return result;
-    }
+    return base64Decode(str);
   }
 
   /**

@@ -63,6 +63,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
       rtorrent: "download",
       prowlarr: "search-web",
       bazarr: "subtitles",
+      adguard: "shield-check",
     }),
     [],
   );
@@ -81,6 +82,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
       rtorrent: theme.colors.inversePrimary,
       prowlarr: theme.colors.surfaceVariant,
       bazarr: theme.colors.inverseSurface,
+      adguard: theme.colors.tertiaryContainer,
     }),
     [theme],
   );

@@ -2,9 +2,13 @@ import { BaseAuthProvider } from "./BaseAuthProvider";
 import type { AuthConfig, AuthResult, AuthSession, AuthMethod } from "../types";
 
 /**
- * Authentication provider for services that use basic HTTP authentication (qBittorrent)
+ * Authentication provider for services that use basic HTTP authentication.
  */
 export class BasicAuthProvider extends BaseAuthProvider {
+  constructor(private readonly statusEndpoint: string = "/api/v1/status") {
+    super();
+  }
+
   getAuthMethod(): AuthMethod {
     return "basic";
   }
@@ -20,7 +24,10 @@ export class BasicAuthProvider extends BaseAuthProvider {
     }
 
     // For basic auth, we test the connection with credentials
-    const testUrl = `${config.baseUrl}/api/v1/status`;
+    const normalizedEndpoint = this.statusEndpoint.startsWith("/")
+      ? this.statusEndpoint
+      : `/${this.statusEndpoint}`;
+    const testUrl = `${config.baseUrl}${normalizedEndpoint}`;
 
     return this.testConnection(config, testUrl);
   }

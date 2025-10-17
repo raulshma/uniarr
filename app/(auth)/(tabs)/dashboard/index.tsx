@@ -140,6 +140,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   rtorrent: "rTorrent",
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
+  adguard: "AdGuard Home",
 };
 
 const deriveStatus = (

@@ -58,6 +58,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   rtorrent: "rTorrent",
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
+  adguard: "AdGuard Home",
 };
 
 const serviceDisplayNames: Record<ServiceType, string> = {
@@ -73,6 +74,7 @@ const serviceDisplayNames: Record<ServiceType, string> = {
   rtorrent: "Torrent Client",
   prowlarr: "Indexer",
   bazarr: "Subtitle Manager",
+  adguard: "DNS Protection",
 };
 
 const serviceIcons: Record<ServiceType, string> = {
@@ -88,6 +90,7 @@ const serviceIcons: Record<ServiceType, string> = {
   rtorrent: "download-network",
   prowlarr: "radar",
   bazarr: "subtitles",
+  adguard: "shield-check",
 };
 
 const deriveStatus = (
@@ -333,6 +336,12 @@ const ServicesScreen = () => {
         case "prowlarr":
           router.push({
             pathname: "/(auth)/prowlarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "adguard":
+          router.push({
+            pathname: "/(auth)/adguard/[serviceId]",
             params: { serviceId: service.config.id },
           });
           break;

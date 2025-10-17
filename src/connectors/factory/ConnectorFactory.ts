@@ -11,6 +11,7 @@ import { DelugeConnector } from "@/connectors/implementations/DelugeConnector";
 import { SABnzbdConnector } from "@/connectors/implementations/SABnzbdConnector";
 import { ProwlarrConnector } from "@/connectors/implementations/ProwlarrConnector";
 import { BazarrConnector } from "@/connectors/implementations/BazarrConnector";
+import { AdGuardHomeConnector } from "@/connectors/implementations/AdGuardHomeConnector";
 import { logger } from "@/services/logger/LoggerService";
 
 type ConnectorConstructor<TConnector extends IConnector = IConnector> = new (
@@ -30,6 +31,7 @@ const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
   sabnzbd: SABnzbdConnector as ConnectorConstructor,
   prowlarr: ProwlarrConnector as ConnectorConstructor,
   bazarr: BazarrConnector as ConnectorConstructor,
+  adguard: AdGuardHomeConnector as ConnectorConstructor,
 };
 
 /** Factory responsible for creating connector instances based on service metadata. */

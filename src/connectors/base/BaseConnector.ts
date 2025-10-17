@@ -15,6 +15,7 @@ import {
 } from "@/utils/network.utils";
 import { debugLogger } from "@/utils/debug-logger";
 import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
+import { base64Encode } from "@/utils/base64";
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -288,6 +289,20 @@ export abstract class BaseConnector<
       headers["X-Api-Key"] = this.config.apiKey;
     }
 
+    // For basic auth services (AdGuard, Transmission, Deluge), add the Authorization header preemptively.
+    // qBittorrent uses session-based authentication (cookies) and should NOT receive a preemptive Basic header.
+    if (
+      (this.config.type === "transmission" ||
+        this.config.type === "deluge" ||
+        this.config.type === "adguard") &&
+      this.config.username &&
+      this.config.password
+    ) {
+      const credentials = `${this.config.username}:${this.config.password}`;
+      const base64Credentials = base64Encode(credentials);
+      headers["Authorization"] = `Basic ${base64Credentials}`;
+    }
+
     return headers;
   }
 
@@ -329,28 +344,12 @@ export abstract class BaseConnector<
 
   /**
    * Get authentication configuration for the HTTP client.
-   * This method now uses the centralized authentication system.
+   * We now send basic auth headers preemptively via getDefaultHeaders(),
+   * so this method returns an empty object.
    */
   protected getAuthConfig(): { auth?: { username: string; password: string } } {
-    // For services that use basic auth (qBittorrent, Transmission, Deluge), we still need to provide credentials to axios
-    if (
-      (this.config.type === "qbittorrent" ||
-        this.config.type === "transmission" ||
-        this.config.type === "deluge") &&
-      this.config.username &&
-      this.config.password
-    ) {
-      return {
-        auth: {
-          username: this.config.username,
-          password: this.config.password,
-        },
-      };
-    }
-
-    // For session-based auth (qBittorrent), we don't need to set auth here
-    // as the session is managed through cookies
-    // For API key auth (Sonarr/Radarr/Jellyseerr/SABnzbd), the API key is handled in getDefaultHeaders()
+    // Basic auth is handled preemptively via Authorization headers in getDefaultHeaders()
+    // for services that use HTTP Basic (Transmission, Deluge, AdGuard). qBittorrent uses session cookies.
     return {};
   }
 
