@@ -3,7 +3,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { IconButton, Switch, Text, useTheme } from "react-native-paper";
+import {
+  DataTable,
+  IconButton,
+  Switch,
+  Text,
+  useTheme,
+} from "react-native-paper";
 
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { Button } from "@/components/common/Button";
@@ -31,6 +37,7 @@ const AdGuardHomeDashboardScreen = () => {
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [showAllBlockedDomains, setShowAllBlockedDomains] = useState(false);
 
   const {
     overview,
@@ -217,17 +224,19 @@ const AdGuardHomeDashboardScreen = () => {
         sectionDescription: {
           color: theme.colors.onSurfaceVariant,
         },
-        statsGrid: {
+        statsContainer: {
           flexDirection: "row",
-          flexWrap: "wrap",
+          gap: spacing.md,
+        },
+        statsColumn: {
+          flex: 1,
           gap: spacing.md,
         },
         statCard: {
-          flexBasis: "48%",
           borderRadius: 18,
           backgroundColor: theme.colors.elevation.level1,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.lg,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.md,
         },
         statLabel: {
           color: theme.colors.onSurfaceVariant,
@@ -246,22 +255,8 @@ const AdGuardHomeDashboardScreen = () => {
           backgroundColor: theme.colors.elevation.level1,
           gap: spacing.md,
         },
-        domainsList: {
-          gap: spacing.sm,
-        },
-        domainRow: {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        },
-        domainName: {
-          color: theme.colors.onSurface,
-          flex: 1,
-          marginRight: spacing.md,
-        },
-        domainCount: {
-          color: theme.colors.onSurfaceVariant,
-          fontVariant: ["tabular-nums"],
+        toggleButton: {
+          marginTop: spacing.sm,
         },
         actionsRow: {
           flexDirection: "row",
@@ -289,7 +284,10 @@ const AdGuardHomeDashboardScreen = () => {
   }
 
   const stats = overview?.stats;
-  const topBlockedDomains = stats?.topBlockedDomains ?? [];
+  const allTopBlockedDomains = stats?.topBlockedDomains ?? [];
+  const displayBlockedDomains = showAllBlockedDomains
+    ? allTopBlockedDomains
+    : allTopBlockedDomains.slice(0, 10);
   const statItems = stats
     ? [
         {
@@ -362,31 +360,64 @@ const AdGuardHomeDashboardScreen = () => {
 
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Statistics</Text>
-              <View style={styles.statsGrid}>
-                {statItems.map((item) => (
-                  <View key={item.label} style={styles.statCard}>
-                    <Text style={styles.statLabel}>{item.label}</Text>
-                    <Text style={styles.statValue}>{item.value}</Text>
-                  </View>
-                ))}
+              <View style={styles.statsContainer}>
+                <View style={styles.statsColumn}>
+                  {statItems.slice(0, 2).map((item) => (
+                    <View key={item.label} style={styles.statCard}>
+                      <Text style={styles.statLabel}>{item.label}</Text>
+                      <Text style={styles.statValue}>{item.value}</Text>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.statsColumn}>
+                  {statItems.slice(2, 4).map((item) => (
+                    <View key={item.label} style={styles.statCard}>
+                      <Text style={styles.statLabel}>{item.label}</Text>
+                      <Text style={styles.statValue}>{item.value}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
 
             <View style={styles.domainsSection}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Top Blocked Domains</Text>
+                <Text style={styles.sectionDescription}>
+                  {showAllBlockedDomains
+                    ? `Showing all ${allTopBlockedDomains.length} domains`
+                    : `Showing top 10 of ${allTopBlockedDomains.length} domains`}
+                </Text>
               </View>
-              {topBlockedDomains.length > 0 ? (
-                <View style={styles.domainsList}>
-                  {topBlockedDomains.map((entry) => (
-                    <View key={entry.name} style={styles.domainRow}>
-                      <Text style={styles.domainName}>{entry.name}</Text>
-                      <Text style={styles.domainCount}>
-                        {numberFormatter.format(entry.count)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
+              {displayBlockedDomains.length > 0 ? (
+                <>
+                  <DataTable>
+                    <DataTable.Header>
+                      <DataTable.Title>Domain</DataTable.Title>
+                      <DataTable.Title numeric>Blocked Count</DataTable.Title>
+                    </DataTable.Header>
+                    {displayBlockedDomains.map((entry) => (
+                      <DataTable.Row key={entry.name}>
+                        <DataTable.Cell>{entry.name}</DataTable.Cell>
+                        <DataTable.Cell numeric>
+                          {numberFormatter.format(entry.count)}
+                        </DataTable.Cell>
+                      </DataTable.Row>
+                    ))}
+                  </DataTable>
+                  {allTopBlockedDomains.length > 10 && (
+                    <Button
+                      mode="outlined"
+                      onPress={() =>
+                        setShowAllBlockedDomains(!showAllBlockedDomains)
+                      }
+                      style={styles.toggleButton}
+                      compact
+                    >
+                      {showAllBlockedDomains ? "Show Top 10" : "Show All"}
+                    </Button>
+                  )}
+                </>
               ) : (
                 <Text style={styles.sectionDescription}>
                   No domains have been blocked recently.

@@ -356,8 +356,8 @@ const AdGuardQueryLogScreen = () => {
 
   if (!hasValidServiceId) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <Appbar.Header mode="small" elevated={false}>
+      <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
+        <Appbar.Header mode="small" elevated={false} style={{ padding: 0 }}>
           <Appbar.BackAction onPress={() => router.back()} />
           <Appbar.Content title="Query Log" titleStyle={styles.headerTitle} />
         </Appbar.Header>
@@ -372,8 +372,8 @@ const AdGuardQueryLogScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Appbar.Header mode="small" elevated={false}>
+    <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
+      <Appbar.Header mode="small" elevated={true} style={{ padding: 0 }}>
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title="Query Log" titleStyle={styles.headerTitle} />
       </Appbar.Header>
