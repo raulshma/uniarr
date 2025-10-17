@@ -1,6 +1,6 @@
-export { default as SeriesListItemSkeleton } from './SeriesListItemSkeleton';
-export type { SeriesListItemSkeletonProps } from './SeriesListItemSkeleton';
-export { default as MediaDetailsSkeleton } from './MediaDetailsSkeleton';
-export type { MediaDetailsSkeletonProps } from './MediaDetailsSkeleton';
-export { default as MovieDetailsSkeleton } from './MovieDetailsSkeleton';
-export type { MovieDetailsSkeletonProps } from './MovieDetailsSkeleton';
+export { default as SeriesListItemSkeleton } from "./SeriesListItemSkeleton";
+export type { SeriesListItemSkeletonProps } from "./SeriesListItemSkeleton";
+export { default as MediaDetailsSkeleton } from "./MediaDetailsSkeleton";
+export type { MediaDetailsSkeletonProps } from "./MediaDetailsSkeleton";
+export { default as MovieDetailsSkeleton } from "./MovieDetailsSkeleton";
+export type { MovieDetailsSkeletonProps } from "./MovieDetailsSkeleton";

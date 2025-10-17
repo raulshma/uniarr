@@ -1,18 +1,23 @@
-import { QueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import { QueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 
-import { isApiError } from '@/utils/error.utils';
+import { isApiError } from "@/utils/error.utils";
 
 const shouldRetryRequest = (failureCount: number, error: unknown): boolean => {
   if (failureCount >= 3) {
     return false;
   }
 
-  if (isApiError(error) && error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+  if (
+    isApiError(error) &&
+    error.statusCode &&
+    error.statusCode >= 400 &&
+    error.statusCode < 500
+  ) {
     return false;
   }
 
-  if (axios.isAxiosError(error) && error.response) {
+  if (isAxiosError(error) && error.response) {
     const status = error.response.status;
     if (status >= 400 && status < 500) {
       return false;
@@ -38,11 +43,11 @@ export const queryClient = new QueryClient({
       // Use offline-first network mode so cached data is used and network is
       // attempted when available. Hooks that need real-time updates should
       // opt into a different networkMode.
-      networkMode: 'offlineFirst',
+      networkMode: "offlineFirst",
     },
     mutations: {
       retry: shouldRetryRequest,
-      networkMode: 'offlineFirst', // Queue mutations when offline
+      networkMode: "offlineFirst", // Queue mutations when offline
     },
   },
 });

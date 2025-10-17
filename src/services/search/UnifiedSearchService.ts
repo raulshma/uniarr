@@ -10,9 +10,6 @@ import type { Series } from "@/models/media.types";
 import type { Movie } from "@/models/movie.types";
 import type { JellyfinItem } from "@/models/jellyfin.types";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
-type JellyseerrSearchResult =
-  | components["schemas"]["MovieResult"]
-  | components["schemas"]["TvResult"];
 import type {
   SearchHistoryEntry,
   SearchableServiceSummary,
@@ -28,6 +25,9 @@ import {
   getOpenApiOperationHint,
   hasOpenApiForService,
 } from "@/connectors/openapi/OpenApiHelper";
+type JellyseerrSearchResult =
+  | components["schemas"]["MovieResult"]
+  | components["schemas"]["TvResult"];
 
 const HISTORY_STORAGE_KEY = "UnifiedSearch_history";
 const HISTORY_LIMIT = 12;
@@ -36,18 +36,18 @@ const SEARCH_TIMEOUT_MS = 2000;
 const normalizeTerm = (term: string): string => term.trim();
 
 const sortIdentifiers = <T extends string>(
-  values: readonly T[] | undefined
+  values: readonly T[] | undefined,
 ): T[] | undefined =>
   values && values.length
     ? Array.from(new Set(values)).sort((first, second) =>
-        first.localeCompare(second)
+        first.localeCompare(second),
       )
     : undefined;
 
 export const createUnifiedSearchHistoryKey = (
   term: string,
   serviceIds?: string[],
-  mediaTypes?: UnifiedSearchMediaType[]
+  mediaTypes?: UnifiedSearchMediaType[],
 ): string => {
   const normalizedTerm = normalizeTerm(term).toLowerCase();
   const servicesKey = sortIdentifiers(serviceIds)?.join(",") ?? "";
@@ -79,7 +79,7 @@ export class UnifiedSearchService {
 
   async search(
     term: string,
-    options: UnifiedSearchOptions = {}
+    options: UnifiedSearchOptions = {},
   ): Promise<UnifiedSearchResponse> {
     const normalizedTerm = normalizeTerm(term);
 
@@ -99,7 +99,7 @@ export class UnifiedSearchService {
 
     const filteredConnectors = options.serviceIds?.length
       ? connectors.filter((connector) =>
-          options.serviceIds!.includes(connector.config.id)
+          options.serviceIds!.includes(connector.config.id),
         )
       : connectors;
 
@@ -107,8 +107,8 @@ export class UnifiedSearchService {
 
     const settled = await Promise.all(
       filteredConnectors.map((connector) =>
-        this.searchConnector(normalizedTerm, connector, options)
-      )
+        this.searchConnector(normalizedTerm, connector, options),
+      ),
     );
 
     const aggregateResults: UnifiedSearchResult[] = [];
@@ -143,7 +143,7 @@ export class UnifiedSearchService {
         serviceType: connector.config.type,
       }))
       .sort((first, second) =>
-        first.serviceName.localeCompare(second.serviceName)
+        first.serviceName.localeCompare(second.serviceName),
       );
 
     return searchableServices;
@@ -155,14 +155,14 @@ export class UnifiedSearchService {
     return this.history
       .slice()
       .sort((first, second) =>
-        second.lastSearchedAt.localeCompare(first.lastSearchedAt)
+        second.lastSearchedAt.localeCompare(first.lastSearchedAt),
       );
   }
 
   async recordSearch(
     term: string,
     serviceIds?: string[],
-    mediaTypes?: UnifiedSearchMediaType[]
+    mediaTypes?: UnifiedSearchMediaType[],
   ): Promise<void> {
     const normalizedTerm = normalizeTerm(term);
     if (normalizedTerm.length < 2) {
@@ -176,7 +176,7 @@ export class UnifiedSearchService {
     const key = createUnifiedSearchHistoryKey(
       normalizedTerm,
       normalizedServices,
-      normalizedMedia
+      normalizedMedia,
     );
     const entry: SearchHistoryEntry = {
       term: normalizedTerm,
@@ -190,8 +190,8 @@ export class UnifiedSearchService {
         createUnifiedSearchHistoryKey(
           item.term,
           item.serviceIds,
-          item.mediaTypes
-        ) === key
+          item.mediaTypes,
+        ) === key,
     );
 
     if (existingIndex >= 0) {
@@ -213,15 +213,15 @@ export class UnifiedSearchService {
     const key = createUnifiedSearchHistoryKey(
       entry.term,
       entry.serviceIds,
-      entry.mediaTypes
+      entry.mediaTypes,
     );
     const nextHistory = this.history.filter(
       (item) =>
         createUnifiedSearchHistoryKey(
           item.term,
           item.serviceIds,
-          item.mediaTypes
-        ) !== key
+          item.mediaTypes,
+        ) !== key,
     );
 
     if (nextHistory.length === this.history.length) {
@@ -262,7 +262,8 @@ export class UnifiedSearchService {
           ? parsed
               .filter(
                 (entry) =>
-                  typeof entry.term === "string" && entry.term.trim().length > 0
+                  typeof entry.term === "string" &&
+                  entry.term.trim().length > 0,
               )
               .map((entry) => ({
                 term: normalizeTerm(entry.term),
@@ -288,7 +289,7 @@ export class UnifiedSearchService {
     try {
       await AsyncStorage.setItem(
         HISTORY_STORAGE_KEY,
-        JSON.stringify(this.history)
+        JSON.stringify(this.history),
       );
     } catch (error) {
       await logger.error("Failed to persist unified search history.", {
@@ -301,7 +302,7 @@ export class UnifiedSearchService {
   private async searchConnector(
     term: string,
     connector: IConnector,
-    options: UnifiedSearchOptions
+    options: UnifiedSearchOptions,
   ): Promise<ConnectorSearchResult> {
     const searchFn = connector.search?.bind(connector);
 
@@ -328,9 +329,9 @@ export class UnifiedSearchService {
       const rawResults = await this.withTimeout(
         searchFn(
           term,
-          Object.keys(searchOptions).length > 0 ? searchOptions : undefined
+          Object.keys(searchOptions).length > 0 ? searchOptions : undefined,
         ),
-        SEARCH_TIMEOUT_MS
+        SEARCH_TIMEOUT_MS,
       );
       const mapped = this.mapResults(rawResults, connector, options.mediaTypes);
       const limit = options.limitPerService ?? 25;
@@ -365,7 +366,7 @@ export class UnifiedSearchService {
             const hint = getOpenApiOperationHint(
               serviceType,
               endpoint,
-              operation
+              operation,
             );
             if (hint) {
               apiErr.details = { ...(apiErr.details ?? {}), openApiHint: hint };
@@ -424,7 +425,7 @@ export class UnifiedSearchService {
   private mapResults(
     rawResults: unknown,
     connector: IConnector,
-    mediaFilter?: UnifiedSearchMediaType[]
+    mediaFilter?: UnifiedSearchMediaType[],
   ): UnifiedSearchResult[] {
     const { config } = connector;
 
@@ -434,25 +435,25 @@ export class UnifiedSearchService {
       case "sonarr":
         mapped = this.mapSonarrResults(
           rawResults as Series[],
-          connector as SonarrConnector
+          connector as SonarrConnector,
         );
         break;
       case "radarr":
         mapped = this.mapRadarrResults(
           rawResults as Movie[],
-          connector as RadarrConnector
+          connector as RadarrConnector,
         );
         break;
       case "jellyseerr":
         mapped = this.mapJellyseerrResults(
           rawResults as JellyseerrSearchResult[],
-          connector as JellyseerrConnector
+          connector as JellyseerrConnector,
         );
         break;
       case "jellyfin":
         mapped = this.mapJellyfinResults(
           rawResults as JellyfinItem[],
-          connector as JellyfinConnector
+          connector as JellyfinConnector,
         );
         break;
       default:
@@ -470,7 +471,7 @@ export class UnifiedSearchService {
 
   private mapSonarrResults(
     seriesList: Series[],
-    connector: SonarrConnector
+    connector: SonarrConnector,
   ): UnifiedSearchResult[] {
     return seriesList.map((series) => ({
       id: `${connector.config.id}:sonarr:${
@@ -505,7 +506,7 @@ export class UnifiedSearchService {
 
   private mapRadarrResults(
     movies: Movie[],
-    connector: RadarrConnector
+    connector: RadarrConnector,
   ): UnifiedSearchResult[] {
     return movies.map((movie) => ({
       id: `${connector.config.id}:radarr:${
@@ -540,7 +541,7 @@ export class UnifiedSearchService {
 
   private mapJellyseerrResults(
     results: JellyseerrSearchResult[],
-    connector: JellyseerrConnector
+    connector: JellyseerrConnector,
   ): UnifiedSearchResult[] {
     return results.map((result) => {
       // The generated OpenAPI shapes for Jellyseerr can differ between movie
@@ -555,20 +556,20 @@ export class UnifiedSearchService {
         typeof mediaInfo?.tmdbId === "number"
           ? (mediaInfo!.tmdbId as number)
           : typeof r.tmdbId === "number"
-          ? (r.tmdbId as number)
-          : undefined;
+            ? (r.tmdbId as number)
+            : undefined;
       const tvdbId =
         typeof mediaInfo?.tvdbId === "number"
           ? (mediaInfo!.tvdbId as number)
           : typeof r.tvdbId === "number"
-          ? (r.tvdbId as number)
-          : undefined;
+            ? (r.tvdbId as number)
+            : undefined;
       const imdbId =
         typeof mediaInfo?.imdbId === "string"
           ? (mediaInfo!.imdbId as string)
           : typeof r.imdbId === "string"
-          ? (r.imdbId as string)
-          : undefined;
+            ? (r.imdbId as string)
+            : undefined;
 
       const serviceNativeId =
         typeof r.id === "number" ? (r.id as number) : undefined;
@@ -587,8 +588,8 @@ export class UnifiedSearchService {
         typeof r.overview === "string"
           ? (r.overview as string)
           : mediaInfo && typeof mediaInfo.overview === "string"
-          ? (mediaInfo.overview as string)
-          : undefined;
+            ? (mediaInfo.overview as string)
+            : undefined;
 
       const mediaType =
         typeof r.mediaType === "string" ? (r.mediaType as string) : undefined;
@@ -597,26 +598,26 @@ export class UnifiedSearchService {
           ? typeof r.releaseDate === "string"
             ? (r.releaseDate as string)
             : mediaInfo && typeof mediaInfo.releaseDate === "string"
-            ? (mediaInfo.releaseDate as string)
-            : undefined
+              ? (mediaInfo.releaseDate as string)
+              : undefined
           : typeof r.firstAirDate === "string"
-          ? (r.firstAirDate as string)
-          : mediaInfo && typeof mediaInfo.firstAirDate === "string"
-          ? (mediaInfo.firstAirDate as string)
-          : undefined;
+            ? (r.firstAirDate as string)
+            : mediaInfo && typeof mediaInfo.firstAirDate === "string"
+              ? (mediaInfo.firstAirDate as string)
+              : undefined;
 
       const poster =
         typeof r.posterPath === "string"
           ? (r.posterPath as string)
           : mediaInfo && typeof mediaInfo.posterPath === "string"
-          ? (mediaInfo.posterPath as string)
-          : undefined;
+            ? (mediaInfo.posterPath as string)
+            : undefined;
       const backdrop =
         typeof r.backdropPath === "string"
           ? (r.backdropPath as string)
           : mediaInfo && typeof mediaInfo.backdropPath === "string"
-          ? (mediaInfo.backdropPath as string)
-          : undefined;
+            ? (mediaInfo.backdropPath as string)
+            : undefined;
 
       const posterUrl = poster
         ? `https://image.tmdb.org/t/p/original${poster}`
@@ -629,29 +630,29 @@ export class UnifiedSearchService {
         typeof r.voteAverage === "number"
           ? (r.voteAverage as number)
           : mediaInfo && typeof mediaInfo.voteAverage === "number"
-          ? (mediaInfo.voteAverage as number)
-          : undefined;
+            ? (mediaInfo.voteAverage as number)
+            : undefined;
       const popularity =
         typeof r.popularity === "number"
           ? (r.popularity as number)
           : mediaInfo && typeof mediaInfo.popularity === "number"
-          ? (mediaInfo.popularity as number)
-          : undefined;
+            ? (mediaInfo.popularity as number)
+            : undefined;
 
       const isRequested = Boolean(
         (Array.isArray(r.requests as unknown) &&
           (r.requests as unknown as unknown[]).length > 0) ||
           (mediaInfo &&
             Array.isArray(mediaInfo.requests as unknown) &&
-            (mediaInfo.requests as unknown as unknown[]).length > 0)
+            (mediaInfo.requests as unknown as unknown[]).length > 0),
       );
 
       const mediaStatus =
         typeof mediaInfo?.status === "number"
           ? (mediaInfo!.status as number)
           : typeof r.mediaStatus === "number"
-          ? (r.mediaStatus as number)
-          : undefined;
+            ? (r.mediaStatus as number)
+            : undefined;
 
       return {
         id: `${connector.config.id}:jellyseerr:${tmdbId ?? serviceNativeId}`,
@@ -682,16 +683,12 @@ export class UnifiedSearchService {
 
   private mapJellyfinResults(
     items: JellyfinItem[],
-    connector: JellyfinConnector
+    connector: JellyfinConnector,
   ): UnifiedSearchResult[] {
     return items.map((item) => {
       const providerIds = item.ProviderIds ?? {};
-      const tmdbId = providerIds.Tmdb
-        ? Number(providerIds.Tmdb)
-        : undefined;
-      const tvdbId = providerIds.Tvdb
-        ? Number(providerIds.Tvdb)
-        : undefined;
+      const tmdbId = providerIds.Tmdb ? Number(providerIds.Tmdb) : undefined;
+      const tvdbId = providerIds.Tvdb ? Number(providerIds.Tvdb) : undefined;
       const imdbId = providerIds.Imdb as string | undefined;
 
       // Determine media type based on Jellyfin item type
@@ -703,15 +700,17 @@ export class UnifiedSearchService {
       }
 
       const releaseDate = item.PremiereDate ?? item.ProductionYear?.toString();
-      
+
       let posterUrl: string | undefined;
       if (item.ImageTags?.Primary && item.Id) {
         posterUrl = connector.getImageUrl(item.Id, "Primary", { width: 200 });
       }
-      
+
       let backdropUrl: string | undefined;
       if (item.ImageTags?.Backdrop && item.Id) {
-        backdropUrl = connector.getImageUrl(item.Id, "Backdrop", { width: 400 });
+        backdropUrl = connector.getImageUrl(item.Id, "Backdrop", {
+          width: 400,
+        });
       }
 
       return {
@@ -745,7 +744,7 @@ export class UnifiedSearchService {
   }
 
   private deduplicateAndSort(
-    results: UnifiedSearchResult[]
+    results: UnifiedSearchResult[],
   ): UnifiedSearchResult[] {
     const deduped = new Map<string, UnifiedSearchResult>();
 

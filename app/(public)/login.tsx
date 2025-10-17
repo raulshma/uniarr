@@ -1,17 +1,23 @@
-import { useSignIn, useSSO } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, HelperText, Text, TextInput, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
+import { useSignIn, useSSO } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  Button,
+  HelperText,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import * as AuthSession from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
 
-import { type AppTheme } from '@/constants/theme';
-import { useAuth } from '@/services/auth/AuthProvider';
-import { getClerkErrorMessage } from '@/services/auth/AuthService';
-import { logger } from '@/services/logger/LoggerService';
-import { spacing } from '@/theme/spacing';
+import { type AppTheme } from "@/constants/theme";
+import { useAuth } from "@/services/auth/AuthProvider";
+import { getClerkErrorMessage } from "@/services/auth/AuthService";
+import { logger } from "@/services/logger/LoggerService";
+import { spacing } from "@/theme/spacing";
 
 const useWarmUpBrowser = () => {
   useEffect(() => {
@@ -33,8 +39,8 @@ const LoginScreen = () => {
   const { startSSOFlow } = useSSO();
   const router = useRouter();
   const theme = useTheme<AppTheme>();
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -52,10 +58,10 @@ const LoginScreen = () => {
           paddingHorizontal: spacing.lg,
           paddingTop: spacing.xxl,
           paddingBottom: spacing.lg,
-          justifyContent: 'space-between',
+          justifyContent: "space-between",
         },
         header: {
-          alignItems: 'center',
+          alignItems: "center",
         },
         brand: {
           color: theme.colors.primary,
@@ -64,11 +70,11 @@ const LoginScreen = () => {
         welcomeTitle: {
           color: theme.colors.onBackground,
           marginBottom: spacing.xs,
-          textAlign: 'center',
+          textAlign: "center",
         },
         subtitle: {
           color: theme.colors.onSurfaceVariant,
-          textAlign: 'center',
+          textAlign: "center",
         },
         form: {
           marginTop: spacing.xl,
@@ -77,7 +83,7 @@ const LoginScreen = () => {
           marginBottom: spacing.md,
         },
         forgotPasswordContainer: {
-          alignItems: 'flex-end',
+          alignItems: "flex-end",
           marginBottom: spacing.lg,
         },
         forgotPasswordText: {
@@ -90,8 +96,8 @@ const LoginScreen = () => {
           marginBottom: spacing.md,
         },
         dividerRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           marginVertical: spacing.lg,
         },
         dividerLine: {
@@ -104,8 +110,8 @@ const LoginScreen = () => {
           color: theme.colors.onSurfaceVariant,
         },
         socialRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          justifyContent: "space-between",
           marginTop: spacing.sm,
         },
         socialButton: {
@@ -113,9 +119,9 @@ const LoginScreen = () => {
           marginHorizontal: spacing.xs,
         },
         footer: {
-          flexDirection: 'row',
-          justifyContent: 'center',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
         },
         footerText: {
           color: theme.colors.onSurfaceVariant,
@@ -133,7 +139,7 @@ const LoginScreen = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/(auth)/dashboard');
+      router.replace("/(auth)/dashboard");
     }
   }, [isAuthenticated, router]);
 
@@ -147,7 +153,9 @@ const LoginScreen = () => {
 
     try {
       if (!signIn) {
-        setErrorMessage('Authentication service is not ready. Please try again.');
+        setErrorMessage(
+          "Authentication service is not ready. Please try again.",
+        );
         return;
       }
 
@@ -156,27 +164,29 @@ const LoginScreen = () => {
         password,
       });
 
-      if (result.status !== 'complete' || !result.createdSessionId) {
-        setErrorMessage('Additional verification is required to finish signing in.');
+      if (result.status !== "complete" || !result.createdSessionId) {
+        setErrorMessage(
+          "Additional verification is required to finish signing in.",
+        );
         return;
       }
 
       if (!setActive) {
-        setErrorMessage('Unable to finalize the session. Please try again.');
+        setErrorMessage("Unable to finalize the session. Please try again.");
         return;
       }
 
       await setActive({ session: result.createdSessionId });
-      router.replace('/(auth)/dashboard');
+      router.replace("/(auth)/dashboard");
     } catch (error) {
       const message = getClerkErrorMessage(
         error,
-        'Unable to sign in. Check your credentials and try again.',
+        "Unable to sign in. Check your credentials and try again.",
       );
       setErrorMessage(message);
 
-      void logger.warn('Sign-in attempt failed.', {
-        location: 'LoginScreen.handleSignIn',
+      void logger.warn("Sign-in attempt failed.", {
+        location: "LoginScreen.handleSignIn",
         error: error instanceof Error ? error.message : String(error),
       });
     } finally {
@@ -196,11 +206,11 @@ const LoginScreen = () => {
       // Try multiple redirect URI approaches for better compatibility
       const redirectUrls = [
         AuthSession.makeRedirectUri({
-          scheme: 'uniarr',
-          path: 'auth/callback',
+          scheme: "uniarr",
+          path: "auth/callback",
         }),
         AuthSession.makeRedirectUri({
-          scheme: 'uniarr',
+          scheme: "uniarr",
         }),
         AuthSession.makeRedirectUri(),
       ];
@@ -210,18 +220,19 @@ const LoginScreen = () => {
 
       for (const redirectUrl of redirectUrls) {
         try {
-          void logger.info('Trying Google SSO flow with redirect URL', {
-            location: 'LoginScreen.handleGoogleSignIn',
+          void logger.info("Trying Google SSO flow with redirect URL", {
+            location: "LoginScreen.handleGoogleSignIn",
             redirectUrl,
           });
 
-          const { createdSessionId, setActive: setOAuthActive } = await startSSOFlow({
-            strategy: 'oauth_google',
-            redirectUrl,
-          });
+          const { createdSessionId, setActive: setOAuthActive } =
+            await startSSOFlow({
+              strategy: "oauth_google",
+              redirectUrl,
+            });
 
-          void logger.info('Google SSO flow completed', {
-            location: 'LoginScreen.handleGoogleSignIn',
+          void logger.info("Google SSO flow completed", {
+            location: "LoginScreen.handleGoogleSignIn",
             hasSessionId: Boolean(createdSessionId),
             hasSetActive: Boolean(setOAuthActive),
             redirectUrl,
@@ -229,15 +240,17 @@ const LoginScreen = () => {
 
           if (createdSessionId && setOAuthActive) {
             await setOAuthActive({ session: createdSessionId });
-            void logger.info('Google sign-in successful, navigating to dashboard');
-            router.replace('/(auth)/dashboard');
+            void logger.info(
+              "Google sign-in successful, navigating to dashboard",
+            );
+            router.replace("/(auth)/dashboard");
             success = true;
             break;
           }
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
-          void logger.warn('Google SSO flow failed with redirect URL', {
-            location: 'LoginScreen.handleGoogleSignIn',
+          void logger.warn("Google SSO flow failed with redirect URL", {
+            location: "LoginScreen.handleGoogleSignIn",
             redirectUrl,
             error: lastError.message,
           });
@@ -248,18 +261,20 @@ const LoginScreen = () => {
         if (lastError) {
           throw lastError;
         } else {
-          setErrorMessage('Unable to complete Google sign-in. Please try again.');
+          setErrorMessage(
+            "Unable to complete Google sign-in. Please try again.",
+          );
         }
       }
     } catch (error) {
       const message = getClerkErrorMessage(
         error,
-        'Unable to sign in with Google. Please try again.',
+        "Unable to sign in with Google. Please try again.",
       );
       setErrorMessage(message);
 
-      void logger.warn('Google sign-in attempt failed.', {
-        location: 'LoginScreen.handleGoogleSignIn',
+      void logger.warn("Google sign-in attempt failed.", {
+        location: "LoginScreen.handleGoogleSignIn",
         error: error instanceof Error ? error.message : String(error),
         errorStack: error instanceof Error ? error.stack : undefined,
       });
@@ -269,19 +284,19 @@ const LoginScreen = () => {
   }, [isSubmitting, router, startSSOFlow]);
 
   const handleFacebookSignIn = useCallback(() => {
-    void logger.info('Facebook sign-in pressed', {
-      location: 'LoginScreen.handleFacebookSignIn',
+    void logger.info("Facebook sign-in pressed", {
+      location: "LoginScreen.handleFacebookSignIn",
     });
   }, []);
 
   const handleForgotPassword = useCallback(() => {
-    void logger.info('Forgot password pressed', {
-      location: 'LoginScreen.handleForgotPassword',
+    void logger.info("Forgot password pressed", {
+      location: "LoginScreen.handleForgotPassword",
     });
   }, []);
 
   const handleSignUp = useCallback(() => {
-    router.push('/(public)/signup');
+    router.push("/(public)/signup");
   }, [router]);
 
   const handleContinueAsGuest = useCallback(() => {
@@ -354,7 +369,10 @@ const LoginScreen = () => {
               onPress={handleSignIn}
               loading={isSubmitting}
               disabled={
-                isSubmitting || !isLoaded || identifier.trim().length === 0 || password.length === 0
+                isSubmitting ||
+                !isLoaded ||
+                identifier.trim().length === 0 ||
+                password.length === 0
               }
               accessibilityRole="button"
               style={styles.primaryButton}

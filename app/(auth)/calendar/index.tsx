@@ -66,18 +66,28 @@ const CalendarScreen = () => {
     goToToday,
   } = useCalendar();
 
-  const VIEW_SEGMENTS: Array<{ label: string; value: Extract<CalendarView, "day" | "week" | "month" | "custom"> }> = useMemo(() => [
-    { label: "Day", value: "day" },
-    { label: "Week", value: "week" },
-    { label: "Month", value: "month" },
-    ...(state.filters.dateRange ? [{ label: "Custom", value: "custom" as const }] : []),
-  ], [state.filters.dateRange]);
+  const VIEW_SEGMENTS: {
+    label: string;
+    value: Extract<CalendarView, "day" | "week" | "month" | "custom">;
+  }[] = useMemo(
+    () => [
+      { label: "Day", value: "day" },
+      { label: "Week", value: "week" },
+      { label: "Month", value: "month" },
+      ...(state.filters.dateRange
+        ? [{ label: "Custom", value: "custom" as const }]
+        : []),
+    ],
+    [state.filters.dateRange],
+  );
 
   const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<CalendarFilters>(() =>
-    cloneFilters(state.filters)
+    cloneFilters(state.filters),
   );
-  const [activeDateField, setActiveDateField] = useState<DateField | null>(null);
+  const [activeDateField, setActiveDateField] = useState<DateField | null>(
+    null,
+  );
 
   useEffect(() => {
     if (isFilterDrawerVisible) {
@@ -249,8 +259,7 @@ const CalendarScreen = () => {
     },
   });
 
-  const handleReleasePress = useCallback((releaseId: string) => {
-  }, []);
+  const handleReleasePress = useCallback((releaseId: string) => {}, []);
 
   const handleRetry = useCallback(() => {
     goToToday();
@@ -265,7 +274,7 @@ const CalendarScreen = () => {
       }
       return a.title.localeCompare(b.title);
     },
-    []
+    [],
   );
 
   const releasesForView = useMemo(() => {
@@ -281,7 +290,7 @@ const CalendarScreen = () => {
     if (state.view === "week" && "days" in calendarData) {
       const weekData = calendarData as CalendarWeek;
       return [...weekData.days.flatMap((day) => day.releases)].sort(
-        sortByDateThenTitle
+        sortByDateThenTitle,
       );
     }
 
@@ -321,7 +330,7 @@ const CalendarScreen = () => {
       const weekData = calendarData as CalendarWeek;
       const first = parseISO(weekData.days[0]?.date ?? state.currentDate);
       const last = parseISO(
-        weekData.days[weekData.days.length - 1]?.date ?? state.currentDate
+        weekData.days[weekData.days.length - 1]?.date ?? state.currentDate,
       );
       if (isSameWeek(first, new Date())) {
         return "This Week";
@@ -339,13 +348,22 @@ const CalendarScreen = () => {
     }
 
     if (state.view === "custom" && state.filters.dateRange) {
-      const start = format(parseISO(state.filters.dateRange.start), "MMM d, yyyy");
+      const start = format(
+        parseISO(state.filters.dateRange.start),
+        "MMM d, yyyy",
+      );
       const end = format(parseISO(state.filters.dateRange.end), "MMM d, yyyy");
       return `Custom: ${start} - ${end}`;
     }
 
     return navigation.currentPeriod;
-  }, [calendarData, navigation.currentPeriod, state.currentDate, state.view, state.filters.dateRange]);
+  }, [
+    calendarData,
+    navigation.currentPeriod,
+    state.currentDate,
+    state.view,
+    state.filters.dateRange,
+  ]);
 
   const subheadingLabel = useMemo(() => {
     if (releasesForView.length === 0) {
@@ -378,7 +396,7 @@ const CalendarScreen = () => {
       if (view === state.view) return;
       setView(view);
     },
-    [setView, state.view]
+    [setView, state.view],
   );
 
   const openFilters = useCallback(() => {
@@ -404,31 +422,34 @@ const CalendarScreen = () => {
         serviceTypes: [serviceType],
       }));
     },
-    []
+    [],
   );
 
-  const handleMediaTypeSelect = useCallback((option: "all" | "tv" | "movies") => {
-    switch (option) {
-      case "all":
-        setPendingFilters((prev) => ({
-          ...prev,
-          mediaTypes: [...ALL_MEDIA_TYPES],
-        }));
-        break;
-      case "tv":
-        setPendingFilters((prev) => ({
-          ...prev,
-          mediaTypes: ["series", "episode"],
-        }));
-        break;
-      case "movies":
-        setPendingFilters((prev) => ({
-          ...prev,
-          mediaTypes: ["movie"],
-        }));
-        break;
-    }
-  }, []);
+  const handleMediaTypeSelect = useCallback(
+    (option: "all" | "tv" | "movies") => {
+      switch (option) {
+        case "all":
+          setPendingFilters((prev) => ({
+            ...prev,
+            mediaTypes: [...ALL_MEDIA_TYPES],
+          }));
+          break;
+        case "tv":
+          setPendingFilters((prev) => ({
+            ...prev,
+            mediaTypes: ["series", "episode"],
+          }));
+          break;
+        case "movies":
+          setPendingFilters((prev) => ({
+            ...prev,
+            mediaTypes: ["movie"],
+          }));
+          break;
+      }
+    },
+    [],
+  );
 
   const handleMonitoredSelect = useCallback(
     (option: CalendarFilters["monitoredStatus"]) => {
@@ -437,7 +458,7 @@ const CalendarScreen = () => {
         monitoredStatus: option,
       }));
     },
-    []
+    [],
   );
 
   const handleDateFieldPress = useCallback((field: DateField) => {
@@ -480,7 +501,7 @@ const CalendarScreen = () => {
 
       setActiveDateField(null);
     },
-    [activeDateField]
+    [activeDateField],
   );
 
   const applyFilters = useCallback(() => {
@@ -503,7 +524,7 @@ const CalendarScreen = () => {
     setFilters(normalized);
     if (normalized.dateRange?.start) {
       setCurrentDate(normalized.dateRange.start);
-      setView('custom');
+      setView("custom");
     }
     closeFilters();
   }, [pendingFilters, setFilters, setCurrentDate, setView, closeFilters]);
@@ -520,8 +541,8 @@ const CalendarScreen = () => {
       dateRange: undefined,
       searchQuery: undefined,
     }));
-    if (state.view === 'custom') {
-      setView('month');
+    if (state.view === "custom") {
+      setView("month");
     }
   }, [clearFilters, state.view, setView]);
 
@@ -562,7 +583,10 @@ const CalendarScreen = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <MediaReleaseCard release={item} onPress={() => handleReleasePress(item.id)} />
+          <MediaReleaseCard
+            release={item}
+            onPress={() => handleReleasePress(item.id)}
+          />
         )}
         showsVerticalScrollIndicator={false}
       />
@@ -573,7 +597,7 @@ const CalendarScreen = () => {
     label: string,
     isActive: boolean,
     onPress: () => void,
-    testID?: string
+    testID?: string,
   ) => (
     <Pressable
       key={label}
@@ -583,7 +607,9 @@ const CalendarScreen = () => {
       accessibilityState={{ selected: isActive }}
       testID={testID}
     >
-      <Text style={[styles.pillLabel, isActive && styles.pillLabelActive]}>{label}</Text>
+      <Text style={[styles.pillLabel, isActive && styles.pillLabelActive]}>
+        {label}
+      </Text>
     </Pressable>
   );
 
@@ -613,7 +639,10 @@ const CalendarScreen = () => {
                 accessibilityState={{ selected: isActive }}
               >
                 <Text
-                  style={[styles.segmentLabel, isActive && styles.segmentLabelActive]}
+                  style={[
+                    styles.segmentLabel,
+                    isActive && styles.segmentLabelActive,
+                  ]}
                 >
                   {segment.label}
                 </Text>
@@ -630,7 +659,10 @@ const CalendarScreen = () => {
         <View style={styles.filtersRow}>
           <Pressable
             onPress={openFilters}
-            style={[styles.filtersButton, activeFilterCount > 0 && styles.filtersButtonActive]}
+            style={[
+              styles.filtersButton,
+              activeFilterCount > 0 && styles.filtersButtonActive,
+            ]}
             accessibilityRole="button"
           >
             <Icon
@@ -671,15 +703,15 @@ const CalendarScreen = () => {
               "All",
               pendingFilters.serviceTypes.length === 0,
               () => handleServiceTypeSelect("all"),
-              "filter-service-all"
+              "filter-service-all",
             )}
             {SERVICE_TYPES.map((service) =>
               renderPill(
                 service === "sonarr" ? "Sonarr" : "Radarr",
                 pendingFilters.serviceTypes.includes(service),
                 () => handleServiceTypeSelect(service),
-                `filter-service-${service}`
-              )
+                `filter-service-${service}`,
+              ),
             )}
           </View>
         </View>
@@ -691,7 +723,7 @@ const CalendarScreen = () => {
               "All",
               pendingFilters.mediaTypes.length === ALL_MEDIA_TYPES.length,
               () => handleMediaTypeSelect("all"),
-              "filter-media-all"
+              "filter-media-all",
             )}
             {renderPill(
               "TV Shows",
@@ -699,14 +731,14 @@ const CalendarScreen = () => {
                 pendingFilters.mediaTypes.includes("series") &&
                 pendingFilters.mediaTypes.includes("episode"),
               () => handleMediaTypeSelect("tv"),
-              "filter-media-tv"
+              "filter-media-tv",
             )}
             {renderPill(
               "Movies",
               pendingFilters.mediaTypes.length === 1 &&
                 pendingFilters.mediaTypes.includes("movie"),
               () => handleMediaTypeSelect("movies"),
-              "filter-media-movies"
+              "filter-media-movies",
             )}
           </View>
         </View>
@@ -718,19 +750,19 @@ const CalendarScreen = () => {
               "All",
               pendingFilters.monitoredStatus === "all",
               () => handleMonitoredSelect("all"),
-              "filter-monitored-all"
+              "filter-monitored-all",
             )}
             {renderPill(
               "Monitored",
               pendingFilters.monitoredStatus === "monitored",
               () => handleMonitoredSelect("monitored"),
-              "filter-monitored-monitored"
+              "filter-monitored-monitored",
             )}
             {renderPill(
               "Unmonitored",
               pendingFilters.monitoredStatus === "unmonitored",
               () => handleMonitoredSelect("unmonitored"),
-              "filter-monitored-unmonitored"
+              "filter-monitored-unmonitored",
             )}
           </View>
         </View>

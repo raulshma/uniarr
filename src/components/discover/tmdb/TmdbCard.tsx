@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { IconButton, Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { IconButton, Text, useTheme } from "react-native-paper";
 
-import MediaPoster from '@/components/media/MediaPoster/MediaPoster';
-import type { DiscoverMediaItem } from '@/models/discover.types';
-import type { AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
+import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
+import type { DiscoverMediaItem } from "@/models/discover.types";
+import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
 
 interface Props {
   item: DiscoverMediaItem;
@@ -27,10 +27,10 @@ export const TmdbCard: React.FC<Props> = ({ item, onAdd, onPress }) => {
         posterWrapper: {
           marginBottom: spacing.xs,
           // Ensure absolutely positioned overlays anchor correctly
-          position: 'relative',
+          position: "relative",
         },
         addButton: {
-          position: 'absolute',
+          position: "absolute",
           top: spacing.xxxs,
           right: spacing.xxxs,
           backgroundColor: theme.colors.primary,

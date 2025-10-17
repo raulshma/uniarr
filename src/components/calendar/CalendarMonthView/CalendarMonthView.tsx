@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, Pressable } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { CalendarMonth, CalendarDay } from '@/models/calendar.types';
-import { CalendarDayCell } from '../CalendarDayCell';
+import type { AppTheme } from "@/constants/theme";
+import type { CalendarMonth } from "@/models/calendar.types";
+import { CalendarDayCell } from "../CalendarDayCell";
 
 export type CalendarMonthViewProps = {
   data: CalendarMonth;
@@ -33,13 +33,13 @@ const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       backgroundColor: theme.colors.surface,
     },
     header: {
-      flexDirection: 'row',
+      flexDirection: "row",
       backgroundColor: theme.colors.surfaceVariant,
       paddingVertical: theme.custom.spacing.sm,
     },
     headerCell: {
       flex: 1,
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: theme.custom.spacing.xs,
     },
     headerText: {
@@ -49,10 +49,10 @@ const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       lineHeight: theme.custom.typography.labelMedium.lineHeight,
       letterSpacing: theme.custom.typography.labelMedium.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      textTransform: 'uppercase',
+      textTransform: "uppercase",
     },
     week: {
-      flexDirection: 'row',
+      flexDirection: "row",
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.outlineVariant,
     },
@@ -62,8 +62,8 @@ const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
   });
 
   const dayHeaders = useMemo(() => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return days.map(day => (
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return days.map((day) => (
       <View key={day} style={styles.headerCell}>
         <Text style={styles.headerText}>{day}</Text>
       </View>
@@ -74,11 +74,14 @@ const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
     onDateSelect?.(date);
   };
 
-  const renderWeek = (week: typeof data.weeks[0], weekIndex: number) => {
+  const renderWeek = (week: (typeof data.weeks)[0], weekIndex: number) => {
     const isLastWeek = weekIndex === data.weeks.length - 1;
-    
+
     return (
-      <View key={`week-${weekIndex}`} style={[styles.week, isLastWeek && styles.weekLast]}>
+      <View
+        key={`week-${weekIndex}`}
+        style={[styles.week, isLastWeek && styles.weekLast]}
+      >
         {week.days.map((day) => (
           <CalendarDayCell
             key={day.date}
@@ -97,9 +100,7 @@ const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.header}>
-        {dayHeaders}
-      </View>
+      <View style={styles.header}>{dayHeaders}</View>
       {data.weeks.map(renderWeek)}
     </View>
   );

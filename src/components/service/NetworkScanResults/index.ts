@@ -1,2 +1,2 @@
-export { default } from './NetworkScanResults';
-export type { NetworkScanResultsProps } from './NetworkScanResults';
+export { default } from "./NetworkScanResults";
+export type { NetworkScanResultsProps } from "./NetworkScanResults";

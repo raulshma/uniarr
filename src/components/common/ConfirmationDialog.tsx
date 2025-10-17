@@ -1,5 +1,5 @@
-import React from 'react';
-import CustomConfirm from '@/components/common/CustomDialogs/CustomConfirm';
+import React from "react";
+import CustomConfirm from "@/components/common/CustomDialogs/CustomConfirm";
 
 export interface ConfirmationDialogProps {
   visible: boolean;
@@ -17,8 +17,8 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   visible,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
   onConfirm,
   onCancel,
   isDestructive = false,

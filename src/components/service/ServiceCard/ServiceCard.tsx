@@ -1,11 +1,20 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Avatar, IconButton, Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Avatar,
+  IconButton,
+  Text,
+  useTheme,
+} from "react-native-paper";
 
-import { Card } from '@/components/common/Card';
-import type { AppTheme } from '@/constants/theme';
-import { ServiceStatus, type ServiceStatusState } from '@/components/service/ServiceStatus';
+import { Card } from "@/components/common/Card";
+import type { AppTheme } from "@/constants/theme";
+import {
+  ServiceStatus,
+  type ServiceStatusState,
+} from "@/components/service/ServiceStatus";
 
 export type ServiceCardProps = {
   id: string;
@@ -14,7 +23,7 @@ export type ServiceCardProps = {
   status: ServiceStatusState;
   statusDescription?: string;
   lastCheckedAt?: Date | string;
-  icon?: React.ComponentProps<typeof Avatar.Icon>['icon'];
+  icon?: React.ComponentProps<typeof Avatar.Icon>["icon"];
   description?: string;
   onPress?: () => void;
   onEditPress?: () => void;
@@ -29,19 +38,19 @@ const formatRelativeTime = (input?: Date | string): string | undefined => {
     return undefined;
   }
 
-  const date = typeof input === 'string' ? new Date(input) : input;
+  const date = typeof input === "string" ? new Date(input) : input;
   if (Number.isNaN(date.getTime())) {
     return undefined;
   }
 
   const diff = Date.now() - date.getTime();
   if (diff < 0) {
-    return 'Just now';
+    return "Just now";
   }
 
   const minutes = Math.round(diff / 60000);
   if (minutes < 1) {
-    return 'Just now';
+    return "Just now";
   }
   if (minutes < 60) {
     return `${minutes}m ago`;
@@ -72,7 +81,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   status,
   statusDescription,
   lastCheckedAt,
-  icon = 'server',
+  icon = "server",
   description,
   onPress,
   onEditPress,
@@ -83,17 +92,20 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
-  const relativeTime = useMemo(() => formatRelativeTime(lastCheckedAt), [lastCheckedAt]);
+  const relativeTime = useMemo(
+    () => formatRelativeTime(lastCheckedAt),
+    [lastCheckedAt],
+  );
 
   const statusLabel = useMemo(() => {
     switch (status) {
-      case 'online':
-        return 'Online';
-      case 'degraded':
-        return 'Degraded';
-      case 'offline':
+      case "online":
+        return "Online";
+      case "degraded":
+        return "Degraded";
+      case "offline":
       default:
-        return 'Offline';
+        return "Offline";
     }
   }, [status]);
 
@@ -114,10 +126,10 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
       fragments.push(`Last checked ${relativeTime}`);
     }
 
-    return fragments.join('. ');
+    return fragments.join(". ");
   }, [name, relativeTime, statusDescription, statusLabel]);
 
-  const cardAccessibilityHint = onPress ? 'Open service details' : undefined;
+  const cardAccessibilityHint = onPress ? "Open service details" : undefined;
 
   return (
     <Card
@@ -139,28 +151,47 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
 
         <View style={[styles.meta, { marginLeft: theme.custom.spacing.md }]}>
           <View style={styles.titleRow}>
-            <Text variant="titleMedium" style={{ color: theme.colors.onSurface }} numberOfLines={1}>
+            <Text
+              variant="titleMedium"
+              style={{ color: theme.colors.onSurface }}
+              numberOfLines={1}
+            >
               {name}
             </Text>
             <View style={styles.statusWrapper}>
               <ServiceStatus status={status} />
             </View>
           </View>
-          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }} numberOfLines={2}>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.onSurfaceVariant }}
+            numberOfLines={2}
+          >
             {url}
           </Text>
           {description ? (
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }} numberOfLines={2}>
+            <Text
+              variant="bodySmall"
+              style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
+              numberOfLines={2}
+            >
               {description}
             </Text>
           ) : null}
           {statusDescription ? (
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }} numberOfLines={2}>
+            <Text
+              variant="bodySmall"
+              style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
+              numberOfLines={2}
+            >
               {statusDescription}
             </Text>
           ) : null}
           {relativeTime ? (
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
+            <Text
+              variant="bodySmall"
+              style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
+            >
               Last checked {relativeTime}
             </Text>
           ) : null}
@@ -200,23 +231,23 @@ export default ServiceCard;
 
 const styles = StyleSheet.create({
   root: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   meta: {
     flex: 1,
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 4,
   },
   statusWrapper: {
     marginLeft: 12,
   },
   actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginLeft: 8,
   },
   deleteSpinner: {

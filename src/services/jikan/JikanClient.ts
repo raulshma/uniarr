@@ -1,6 +1,5 @@
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 import type {
-  JikanAnime,
   JikanAnimeFull,
   JikanAnimeSearchResponse,
   JikanRecommendationsQuery,
@@ -82,12 +81,18 @@ class TokenBucket {
 }
 
 // Create token buckets for different time windows
-const secondBucket = new TokenBucket(RATE_LIMIT_PER_SECOND, RATE_LIMIT_PER_SECOND / 1000);
-const minuteBucket = new TokenBucket(RATE_LIMIT_PER_MINUTE, RATE_LIMIT_PER_MINUTE / (60 * 1000));
+const secondBucket = new TokenBucket(
+  RATE_LIMIT_PER_SECOND,
+  RATE_LIMIT_PER_SECOND / 1000,
+);
+const minuteBucket = new TokenBucket(
+  RATE_LIMIT_PER_MINUTE,
+  RATE_LIMIT_PER_MINUTE / (60 * 1000),
+);
 
 // Request queue for managing API calls
 class RequestQueue {
-  private queue: Array<() => Promise<any>> = [];
+  private queue: (() => Promise<any>)[] = [];
   private processing = false;
 
   async enqueue<T>(requestFn: () => Promise<T>): Promise<T> {
@@ -95,10 +100,7 @@ class RequestQueue {
       const executeRequest = async () => {
         try {
           // Acquire tokens from both buckets
-          await Promise.all([
-            secondBucket.acquire(1),
-            minuteBucket.acquire(1)
-          ]);
+          await Promise.all([secondBucket.acquire(1), minuteBucket.acquire(1)]);
 
           const result = await requestFn();
           resolve(result);
@@ -145,15 +147,21 @@ const client = axios.create({
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // Start with 1 second
 
-async function makeRequest<T>(requestFn: () => Promise<T>, retries = 0): Promise<T> {
+async function makeRequest<T>(
+  requestFn: () => Promise<T>,
+  retries = 0,
+): Promise<T> {
   try {
     return await requestQueue.enqueue(requestFn);
   } catch (error) {
-    if (retries < MAX_RETRIES && axios.isAxiosError(error)) {
+    if (retries < MAX_RETRIES && isAxiosError(error)) {
       // Retry on rate limit or server errors
-      if (error.response?.status === 429 || (error.response?.status && error.response.status >= 500)) {
+      if (
+        error.response?.status === 429 ||
+        (error.response?.status && error.response.status >= 500)
+      ) {
         const delay = RETRY_DELAY * Math.pow(2, retries); // Exponential backoff
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
         return makeRequest(requestFn, retries + 1);
       }
     }
@@ -207,88 +215,133 @@ export const JikanClient = {
     };
     if (filter) params.filter = filter;
     return makeRequest(() =>
-      client.get<JikanTopAnimeResponse>("/top/anime", { params }).then(r => r.data)
+      client
+        .get<JikanTopAnimeResponse>("/top/anime", { params })
+        .then((r) => r.data),
     );
   },
 
   async getRecommendations(page = 1) {
     const params: JikanRecommendationsQuery = { page };
     return makeRequest(() =>
-      client.get<JikanRecommendationResponse>("/recommendations/anime", { params }).then(r => r.data)
+      client
+        .get<JikanRecommendationResponse>("/recommendations/anime", { params })
+        .then((r) => r.data),
     );
   },
 
   async getRandomAnime() {
     return makeRequest(() =>
-      client.get<JikanRandomAnimeResponse>("/random/anime").then(r => r.data)
+      client.get<JikanRandomAnimeResponse>("/random/anime").then((r) => r.data),
     );
   },
 
   async getSeasonNow(page = 1) {
     const params: JikanSeasonNowQuery = { page };
     return makeRequest(() =>
-      client.get<JikanSeasonNowResponse>("/seasons/now", { params }).then(r => r.data)
+      client
+        .get<JikanSeasonNowResponse>("/seasons/now", { params })
+        .then((r) => r.data),
     );
   },
 
   async getSeasonUpcoming(page = 1) {
     const params: JikanSeasonUpcomingQuery = { page };
     return makeRequest(() =>
-      client.get<JikanSeasonUpcomingResponse>("/seasons/upcoming", { params }).then(r => r.data)
+      client
+        .get<JikanSeasonUpcomingResponse>("/seasons/upcoming", { params })
+        .then((r) => r.data),
     );
   },
 
   async getAnimeFullById(malId: number) {
     return makeRequest(() =>
-      client.get<{ data: JikanAnimeFull }>(`/anime/${malId}`).then(r => r.data.data)
+      client
+        .get<{ data: JikanAnimeFull }>(`/anime/${malId}`)
+        .then((r) => r.data.data),
     );
   },
 
   async getAnimeRecommendations(malId: number) {
     return makeRequest(() =>
-      client.get<{ data: { entry?: { mal_id?: number; type?: string; name?: string; url?: string } }[] }>(
-        `/anime/${malId}/recommendations`
-      ).then(r => r.data.data)
+      client
+        .get<{
+          data: {
+            entry?: {
+              mal_id?: number;
+              type?: string;
+              name?: string;
+              url?: string;
+            };
+          }[];
+        }>(`/anime/${malId}/recommendations`)
+        .then((r) => r.data.data),
     );
   },
 
   async getAnimeReviews(malId: number) {
     return makeRequest(() =>
-      client.get<{ data: { mal_id?: number; content?: string; user?: { username?: string } }[] }>(
-        `/anime/${malId}/reviews`
-      ).then(r => r.data.data)
+      client
+        .get<{
+          data: {
+            mal_id?: number;
+            content?: string;
+            user?: { username?: string };
+          }[];
+        }>(`/anime/${malId}/reviews`)
+        .then((r) => r.data.data),
     );
   },
 
   async getAnimePictures(malId: number) {
     return makeRequest(() =>
-      client.get<{ data: { jpg?: { image_url?: string; large_image_url?: string } }[] }>(
-        `/anime/${malId}/pictures`
-      ).then(r => r.data.data)
+      client
+        .get<{
+          data: { jpg?: { image_url?: string; large_image_url?: string } }[];
+        }>(`/anime/${malId}/pictures`)
+        .then((r) => r.data.data),
     );
   },
 
   async getAnimeEpisodes(malId: number) {
     return makeRequest(() =>
-      client.get<{ data: { mal_id?: number; title?: string; episode_id?: number; duration?: string }[] }>(
-        `/anime/${malId}/episodes`
-      ).then(r => r.data.data)
+      client
+        .get<{
+          data: {
+            mal_id?: number;
+            title?: string;
+            episode_id?: number;
+            duration?: string;
+          }[];
+        }>(`/anime/${malId}/episodes`)
+        .then((r) => r.data.data),
     );
   },
 
   async getAnimeStatistics(malId: number) {
     return makeRequest(() =>
-      client.get<{ data: { watching?: number; completed?: number; on_hold?: number; dropped?: number; plan_to_watch?: number; total?: number } }>(
-        `/anime/${malId}/statistics`
-      ).then(r => r.data.data)
+      client
+        .get<{
+          data: {
+            watching?: number;
+            completed?: number;
+            on_hold?: number;
+            dropped?: number;
+            plan_to_watch?: number;
+            total?: number;
+          };
+        }>(`/anime/${malId}/statistics`)
+        .then((r) => r.data.data),
     );
   },
 
   async getAnimeStreaming(malId: number) {
     return makeRequest(() =>
-      client.get<{ data: { name?: string; url?: string }[] }>(
-        `/anime/${malId}/streaming`
-      ).then(r => r.data.data)
+      client
+        .get<{
+          data: { name?: string; url?: string }[];
+        }>(`/anime/${malId}/streaming`)
+        .then((r) => r.data.data),
     );
   },
 
@@ -299,7 +352,9 @@ export const JikanClient = {
       limit,
     };
     return makeRequest(() =>
-      client.get<JikanAnimeSearchResponse>("/anime", { params }).then(r => r.data)
+      client
+        .get<JikanAnimeSearchResponse>("/anime", { params })
+        .then((r) => r.data),
     );
   },
 };

@@ -53,7 +53,7 @@ const DiscoverCard = ({
         posterWrapper: {
           marginBottom: spacing.xs,
           // anchor overlays inside the poster area so absolute elements position correctly
-          position: 'relative',
+          position: "relative",
         },
         title: {
           color: theme.colors.onBackground,
@@ -72,7 +72,7 @@ const DiscoverCard = ({
           elevation: 100,
         },
       }),
-    [theme]
+    [theme],
   );
 
   return (
@@ -116,7 +116,7 @@ const DiscoverScreen = () => {
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogItem, setDialogItem] = useState<DiscoverMediaItem | undefined>(
-    undefined
+    undefined,
   );
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
 
@@ -183,7 +183,7 @@ const DiscoverScreen = () => {
           marginTop: spacing.xl,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const isRefreshing = isFetching && !isLoading;
@@ -200,9 +200,12 @@ const DiscoverScreen = () => {
     router.push("/(auth)/discover/tmdb");
   }, [router]);
 
-  const openSectionPage = useCallback((sectionId: string) => {
-    router.push(`/(auth)/discover/section/${sectionId}`);
-  }, [router]);
+  const openSectionPage = useCallback(
+    (sectionId: string) => {
+      router.push(`/(auth)/discover/section/${sectionId}`);
+    },
+    [router],
+  );
 
   const openServicePicker = useCallback(
     (item: DiscoverMediaItem) => {
@@ -213,7 +216,7 @@ const DiscoverScreen = () => {
           "No services available",
           `Add a ${
             item.mediaType === "series" ? "Sonarr" : "Radarr"
-          } service first to request this title.`
+          } service first to request this title.`,
         );
         return;
       }
@@ -227,7 +230,7 @@ const DiscoverScreen = () => {
       });
       setDialogVisible(true);
     },
-    [services]
+    [services],
   );
 
   const handleCardPress = useCallback(
@@ -236,7 +239,7 @@ const DiscoverScreen = () => {
       // Use the discover item id so the details screen can resolve it
       router.push({ pathname: `/(auth)/discover/${item.id}` });
     },
-    [router]
+    [router],
   );
 
   const handleDialogDismiss = useCallback(() => {
@@ -277,11 +280,13 @@ const DiscoverScreen = () => {
       sectionId: string,
       sectionTitle: string,
       subtitle: string | undefined,
-      items: DiscoverMediaItem[]
+      items: DiscoverMediaItem[],
     ) => {
       // Show skeleton for placeholder sections (these should always show skeletons)
       // or when items are empty and we're currently fetching data
-      const shouldShowSkeleton = sectionId.startsWith('placeholder-') || (items.length === 0 && isFetching);
+      const shouldShowSkeleton =
+        sectionId.startsWith("placeholder-") ||
+        (items.length === 0 && isFetching);
 
       if (shouldShowSkeleton) {
         return <SectionSkeleton />;
@@ -331,9 +336,8 @@ const DiscoverScreen = () => {
       styles.sectionSubtitle,
       styles.sectionTitle,
       theme.colors.primary,
-      isLoading,
       isFetching,
-    ]
+    ],
   );
 
   return (

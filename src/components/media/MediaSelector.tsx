@@ -1,23 +1,23 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { alert } from '@/services/dialogService';
-import {
-  Button,
-  FAB,
-  IconButton,
-  Menu,
-  Portal,
-  Snackbar,
-  Text,
-  useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
+import { StyleSheet, View } from "react-native";
+import { alert } from "@/services/dialogService";
+import { IconButton, Menu, Snackbar, Text, useTheme } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import type { AppTheme } from '@/constants/theme';
-import type { Series } from '@/models/media.types';
-import type { Movie } from '@/models/movie.types';
-import { spacing } from '@/theme/spacing';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
+import type { AppTheme } from "@/constants/theme";
+import type { Series } from "@/models/media.types";
+import type { Movie } from "@/models/movie.types";
+import { spacing } from "@/theme/spacing";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
 
 export type SelectableMediaItem = Series | Movie;
 
@@ -32,12 +32,16 @@ interface MediaSelectorContextValue {
   exitSelectionMode: () => void;
 }
 
-const MediaSelectorContext = createContext<MediaSelectorContextValue | null>(null);
+const MediaSelectorContext = createContext<MediaSelectorContextValue | null>(
+  null,
+);
 
 export const useMediaSelector = (): MediaSelectorContextValue => {
   const context = useContext(MediaSelectorContext);
   if (!context) {
-    throw new Error('useMediaSelector must be used within a MediaSelectorProvider');
+    throw new Error(
+      "useMediaSelector must be used within a MediaSelectorProvider",
+    );
   }
   return context;
 };
@@ -55,10 +59,10 @@ export const MediaSelectorProvider: React.FC<MediaSelectorProviderProps> = ({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   const toggleSelection = useCallback((item: SelectableMediaItem) => {
-    setSelectedItems(prev => {
-      const isSelected = prev.some(selected => selected.id === item.id);
+    setSelectedItems((prev) => {
+      const isSelected = prev.some((selected) => selected.id === item.id);
       if (isSelected) {
-        return prev.filter(selected => selected.id !== item.id);
+        return prev.filter((selected) => selected.id !== item.id);
       } else {
         return [...prev, item];
       }
@@ -73,9 +77,12 @@ export const MediaSelectorProvider: React.FC<MediaSelectorProviderProps> = ({
     setSelectedItems(items);
   }, []);
 
-  const isItemSelected = useCallback((item: SelectableMediaItem) => {
-    return selectedItems.some(selected => selected.id === item.id);
-  }, [selectedItems]);
+  const isItemSelected = useCallback(
+    (item: SelectableMediaItem) => {
+      return selectedItems.some((selected) => selected.id === item.id);
+    },
+    [selectedItems],
+  );
 
   const enterSelectionMode = useCallback(() => {
     setIsSelectionMode(true);
@@ -106,7 +113,7 @@ export const MediaSelectorProvider: React.FC<MediaSelectorProviderProps> = ({
       isItemSelected,
       enterSelectionMode,
       exitSelectionMode,
-    ]
+    ],
   );
 
   return (
@@ -127,38 +134,43 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const getConnector = useConnectorsStore(selectGetConnector);
-  const { selectedItems, isSelectionMode, exitSelectionMode } = useMediaSelector();
+  const { selectedItems, isSelectionMode, exitSelectionMode } =
+    useMediaSelector();
   const [menuVisible, setMenuVisible] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedItems.length === 0) return;
 
-  alert(
-      'Delete Media',
+    alert(
+      "Delete Media",
       `Are you sure you want to delete ${selectedItems.length} item(s)? This action cannot be undone.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               const connector = getConnector(serviceId);
               if (!connector) return;
 
-              if (connector.config.type === 'sonarr') {
+              if (connector.config.type === "sonarr") {
                 await Promise.all(
-                  selectedItems.map(item =>
-                    (connector as any).deleteSeries(item.id, { deleteFiles: true })
-                  )
+                  selectedItems.map((item) =>
+                    (connector as any).deleteSeries(item.id, {
+                      deleteFiles: true,
+                    }),
+                  ),
                 );
-              } else if (connector.config.type === 'radarr') {
+              } else if (connector.config.type === "radarr") {
                 await Promise.all(
-                  selectedItems.map(item =>
-                    (connector as any).deleteMovie(item.id, { deleteFiles: true })
-                  )
+                  selectedItems.map((item) =>
+                    (connector as any).deleteMovie(item.id, {
+                      deleteFiles: true,
+                    }),
+                  ),
                 );
               }
 
@@ -167,43 +179,51 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
               exitSelectionMode();
               onRefresh?.();
             } catch (error) {
-              console.error('Bulk delete failed:', error);
-              alert('Error', 'Failed to delete selected items.');
+              console.error("Bulk delete failed:", error);
+              alert("Error", "Failed to delete selected items.");
             }
           },
         },
-      ]
+      ],
     );
-  }, [selectedItems, serviceId, exitSelectionMode, onRefresh]);
+  }, [selectedItems, serviceId, exitSelectionMode, onRefresh, getConnector]);
 
-  const handleBulkMonitorToggle = useCallback(async (monitored: boolean) => {
-    if (selectedItems.length === 0) return;
+  const handleBulkMonitorToggle = useCallback(
+    async (monitored: boolean) => {
+      if (selectedItems.length === 0) return;
 
-    try {
-      const connector = getConnector(serviceId);
-      if (!connector) return;
+      try {
+        const connector = getConnector(serviceId);
+        if (!connector) return;
 
-      if (connector.config.type === 'sonarr') {
-        await (connector as any).bulkUpdateSeries({
-          seriesIds: selectedItems.map(item => item.id),
-          monitored,
-        });
-      } else if (connector.config.type === 'radarr') {
-        await (connector as any).bulkUpdateMovies({
-          movieIds: selectedItems.map(item => item.id),
-          monitored,
-        });
+        if (connector.config.type === "sonarr") {
+          await (connector as any).bulkUpdateSeries({
+            seriesIds: selectedItems.map((item) => item.id),
+            monitored,
+          });
+        } else if (connector.config.type === "radarr") {
+          await (connector as any).bulkUpdateMovies({
+            movieIds: selectedItems.map((item) => item.id),
+            monitored,
+          });
+        }
+
+        setSnackbarMessage(
+          `${monitored ? "Monitored" : "Unmonitored"} ${selectedItems.length} item(s)`,
+        );
+        setSnackbarVisible(true);
+        exitSelectionMode();
+        onRefresh?.();
+      } catch (error) {
+        console.error("Bulk monitor toggle failed:", error);
+        alert(
+          "Error",
+          `Failed to ${monitored ? "monitor" : "unmonitor"} selected items.`,
+        );
       }
-
-      setSnackbarMessage(`${monitored ? 'Monitored' : 'Unmonitored'} ${selectedItems.length} item(s)`);
-      setSnackbarVisible(true);
-      exitSelectionMode();
-      onRefresh?.();
-    } catch (error) {
-  console.error('Bulk monitor toggle failed:', error);
-  alert('Error', `Failed to ${monitored ? 'monitor' : 'unmonitor'} selected items.`);
-    }
-  }, [selectedItems, serviceId, exitSelectionMode, onRefresh]);
+    },
+    [selectedItems, serviceId, exitSelectionMode, onRefresh, getConnector],
+  );
 
   const handleBulkSearch = useCallback(async () => {
     if (selectedItems.length === 0) return;
@@ -212,13 +232,17 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
       const connector = getConnector(serviceId);
       if (!connector) return;
 
-      if (connector.config.type === 'sonarr') {
+      if (connector.config.type === "sonarr") {
         await Promise.all(
-          selectedItems.map(item => (connector as any).triggerSearch(item.id))
+          selectedItems.map((item) =>
+            (connector as any).triggerSearch(item.id),
+          ),
         );
-      } else if (connector.config.type === 'radarr') {
+      } else if (connector.config.type === "radarr") {
         await Promise.all(
-          selectedItems.map(item => (connector as any).triggerSearch(item.id))
+          selectedItems.map((item) =>
+            (connector as any).triggerSearch(item.id),
+          ),
         );
       }
 
@@ -226,16 +250,16 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
       setSnackbarVisible(true);
       exitSelectionMode();
     } catch (error) {
-  console.error('Bulk search failed:', error);
-  alert('Error', 'Failed to start search for selected items.');
+      console.error("Bulk search failed:", error);
+      alert("Error", "Failed to start search for selected items.");
     }
-  }, [selectedItems, serviceId, exitSelectionMode]);
+  }, [selectedItems, serviceId, exitSelectionMode, getConnector]);
 
   const styles = StyleSheet.create({
     selectionBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       backgroundColor: theme.colors.primaryContainer,
@@ -244,12 +268,12 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
       flex: 1,
     },
     actions: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       gap: spacing.sm,
     },
     fab: {
-      position: 'absolute',
+      position: "absolute",
       margin: spacing.lg,
       right: 0,
       bottom: 0,
@@ -262,9 +286,12 @@ export const MediaSelectorActions: React.FC<MediaSelectorActionsProps> = ({
 
   return (
     <>
-      <SafeAreaView style={styles.selectionBar} edges={['bottom']}>
+      <SafeAreaView style={styles.selectionBar} edges={["bottom"]}>
         <View style={styles.selectionInfo}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onPrimaryContainer }}>
+          <Text
+            variant="titleMedium"
+            style={{ color: theme.colors.onPrimaryContainer }}
+          >
             {selectedItems.length} selected
           </Text>
         </View>
@@ -345,14 +372,15 @@ export const MediaSelectableItem: React.FC<MediaSelectableItemProps> = ({
   onPressSeries,
   onPressMovie,
 }) => {
-  const { isSelectionMode, isItemSelected, toggleSelection } = useMediaSelector();
+  const { isSelectionMode, isItemSelected, toggleSelection } =
+    useMediaSelector();
 
   const handlePress = useCallback(() => {
     if (isSelectionMode) {
       toggleSelection(item);
     } else {
       // Call specific handlers if provided, otherwise use general handler
-      if ('status' in item && typeof item.status === 'string') {
+      if ("status" in item && typeof item.status === "string") {
         // This is a Series (status is SeriesStatus which is a string)
         if (onPressSeries) {
           onPressSeries(item as Series);
@@ -368,7 +396,14 @@ export const MediaSelectableItem: React.FC<MediaSelectableItemProps> = ({
         }
       }
     }
-  }, [isSelectionMode, toggleSelection, item, onPress, onPressSeries, onPressMovie]);
+  }, [
+    isSelectionMode,
+    toggleSelection,
+    item,
+    onPress,
+    onPressSeries,
+    onPressMovie,
+  ]);
 
   const handleLongPress = useCallback(() => {
     if (!isSelectionMode) {
@@ -379,28 +414,28 @@ export const MediaSelectableItem: React.FC<MediaSelectableItemProps> = ({
 
   return (
     <View>
-      {React.isValidElement(children) ? (
-        React.cloneElement(children as React.ReactElement<any>, {
-          onPress: handlePress,
-          onLongPress: handleLongPress,
-        })
-      ) : (
-        children
-      )}
+      {React.isValidElement(children)
+        ? React.cloneElement(children as React.ReactElement<any>, {
+            onPress: handlePress,
+            onLongPress: handleLongPress,
+          })
+        : children}
       {isSelectionMode && (
-        <View style={{
-          position: 'absolute',
-          top: spacing.sm,
-          right: spacing.sm,
-          backgroundColor: isItemSelected(item) ? '#6200EE' : 'transparent',
-          borderRadius: 12,
-          width: 24,
-          height: 24,
-          borderWidth: 2,
-          borderColor: '#6200EE',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
+        <View
+          style={{
+            position: "absolute",
+            top: spacing.sm,
+            right: spacing.sm,
+            backgroundColor: isItemSelected(item) ? "#6200EE" : "transparent",
+            borderRadius: 12,
+            width: 24,
+            height: 24,
+            borderWidth: 2,
+            borderColor: "#6200EE",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           {isItemSelected(item) && (
             <IconButton icon="check" size={16} iconColor="white" />
           )}

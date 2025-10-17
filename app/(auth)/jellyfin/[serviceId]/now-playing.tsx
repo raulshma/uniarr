@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, PixelRatio, Dimensions } from "react-native";
 import {
   ActivityIndicator,
   Button,
@@ -12,15 +12,15 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
-import { PixelRatio, Dimensions } from 'react-native';
-import { imageCacheService } from '@/services/image/ImageCacheService';
-import { useThumbhash } from '@/hooks/useThumbhash';
+
+import { imageCacheService } from "@/services/image/ImageCacheService";
+import { useThumbhash } from "@/hooks/useThumbhash";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
-import { useConnectorsStore } from '@/store/connectorsStore';
+import { useConnectorsStore } from "@/store/connectorsStore";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
 import type {
@@ -33,7 +33,7 @@ import { spacing } from "@/theme/spacing";
 const TICKS_PER_SECOND = 10_000_000;
 
 const hasRunTimeTicks = (
-  obj: unknown
+  obj: unknown,
 ): obj is { RunTimeTicks?: number | null } =>
   typeof obj === "object" && obj !== null && "RunTimeTicks" in obj;
 
@@ -42,8 +42,8 @@ const computeProgress = (session: JellyfinSession | undefined): number => {
   if (!playState) return 0;
 
   const runtime = hasRunTimeTicks(playState)
-    ? playState.RunTimeTicks ?? session?.NowPlayingItem?.RunTimeTicks ?? 0
-    : session?.NowPlayingItem?.RunTimeTicks ?? 0;
+    ? (playState.RunTimeTicks ?? session?.NowPlayingItem?.RunTimeTicks ?? 0)
+    : (session?.NowPlayingItem?.RunTimeTicks ?? 0);
   const position = playState.PositionTicks ?? 0;
 
   if (runtime <= 0) return 0;
@@ -85,11 +85,12 @@ const JellyfinNowPlayingScreen = () => {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
   const connector = useConnectorsStore((s) =>
-    serviceId ? (s.getConnector(serviceId) as JellyfinConnector | undefined) : undefined,
+    serviceId
+      ? (s.getConnector(serviceId) as JellyfinConnector | undefined)
+      : undefined,
   );
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
-
 
   useEffect(() => {
     let cancelled = false;
@@ -124,7 +125,10 @@ const JellyfinNowPlayingScreen = () => {
     serviceId,
     refetchInterval: 10_000,
   });
-  const sessions = nowPlayingQuery.data ?? [];
+  const sessions = useMemo(
+    () => nowPlayingQuery.data ?? [],
+    [nowPlayingQuery.data],
+  );
 
   // Preserve the last-known active session that contains a NowPlayingItem. Some
   // Jellyfin session responses (for paused / transitioning states) may omit
@@ -160,21 +164,24 @@ const JellyfinNowPlayingScreen = () => {
     | undefined;
   const positionTicks = activePlayState?.PositionTicks ?? 0;
   const runtimeTicks = hasRunTimeTicks(activePlayState)
-    ? activePlayState?.RunTimeTicks ?? item?.RunTimeTicks ?? 0
-    : item?.RunTimeTicks ?? 0;
+    ? (activePlayState?.RunTimeTicks ?? item?.RunTimeTicks ?? 0)
+    : (item?.RunTimeTicks ?? 0);
   const volumeLevel = activePlayState?.VolumeLevel ?? 0;
 
   // Consider loading only if we're bootstrapping or the query is loading and we
   // have no cached active session to show. If we have a cached active session
   // prefer showing that instead of the loading spinner / empty state.
   const isLoading =
-    isBootstrapping || (nowPlayingQuery.isLoading && sessions.length === 0 && !cachedActiveSession);
+    isBootstrapping ||
+    (nowPlayingQuery.isLoading &&
+      sessions.length === 0 &&
+      !cachedActiveSession);
   const errorMessage =
     nowPlayingQuery.error instanceof Error
       ? nowPlayingQuery.error.message
       : nowPlayingQuery.error
-      ? "Unable to load playback status."
-      : null;
+        ? "Unable to load playback status."
+        : null;
 
   const primaryImageTag =
     (item as unknown as { PrimaryImageTag?: string })?.PrimaryImageTag ??
@@ -196,7 +203,9 @@ const JellyfinNowPlayingScreen = () => {
         })
       : undefined;
 
-  const [resolvedBackdropUri, setResolvedBackdropUri] = useState<string | undefined>(backdropUri);
+  const [resolvedBackdropUri, setResolvedBackdropUri] = useState<
+    string | undefined
+  >(backdropUri);
 
   // Use thumbhash hook for the backdrop image
   const { thumbhash: backdropThumbhash } = useThumbhash(backdropUri, {
@@ -213,7 +222,7 @@ const JellyfinNowPlayingScreen = () => {
       }
       try {
         const dpr = PixelRatio.get();
-        const w = Math.round(Dimensions.get('window').width * dpr);
+        const w = Math.round(Dimensions.get("window").width * dpr);
         const h = Math.round(360 * dpr);
         const r = await imageCacheService.resolveForSize(backdropUri, w, h);
         if (mounted) setResolvedBackdropUri(r);
@@ -222,7 +231,9 @@ const JellyfinNowPlayingScreen = () => {
       }
     };
     void resolve();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [backdropUri]);
 
   const handleNavigateBack = useCallback(() => {
@@ -249,8 +260,8 @@ const JellyfinNowPlayingScreen = () => {
     }
 
     try {
-      if (!activeSession.Id) throw new Error('Session id missing');
-      await connector.sendPlaystateCommand(activeSession.Id, 'PlayPause');
+      if (!activeSession.Id) throw new Error("Session id missing");
+      await connector.sendPlaystateCommand(activeSession.Id, "PlayPause");
       // Optimistically toggle paused state so UI remains responsive until refetch
       try {
         setCachedActiveSession((prev) => {
@@ -267,7 +278,7 @@ const JellyfinNowPlayingScreen = () => {
       }
 
       void nowPlayingQuery.refetch();
-    } catch (error) {
+    } catch {
       // swallow errors silently per request
     }
   }, [activeSession, connector, ensureControlsReady, nowPlayingQuery]);
@@ -279,7 +290,7 @@ const JellyfinNowPlayingScreen = () => {
       }
 
       try {
-        if (!activeSession.Id) throw new Error('Session id missing');
+        if (!activeSession.Id) throw new Error("Session id missing");
         await connector.sendPlaystateCommand(activeSession.Id, direction);
         // Optimistically reset position and mark unpaused so subsequent commands
         // can operate against the expected state until the server responds.
@@ -295,11 +306,11 @@ const JellyfinNowPlayingScreen = () => {
         });
 
         void nowPlayingQuery.refetch();
-      } catch (error) {
+      } catch {
         // swallow errors silently per request
       }
     },
-    [activeSession, connector, ensureControlsReady, nowPlayingQuery]
+    [activeSession, connector, ensureControlsReady, nowPlayingQuery],
   );
 
   const handleSeekRelative = useCallback(
@@ -311,12 +322,12 @@ const JellyfinNowPlayingScreen = () => {
       const deltaTicks = deltaSeconds * TICKS_PER_SECOND;
       const target = Math.min(
         Math.max((activeSession.PlayState?.PositionTicks ?? 0) + deltaTicks, 0),
-        runtimeTicks
+        runtimeTicks,
       );
 
       try {
-        if (!activeSession.Id) throw new Error('Session id missing');
-        await connector.sendPlaystateCommand(activeSession.Id, 'Seek', {
+        if (!activeSession.Id) throw new Error("Session id missing");
+        await connector.sendPlaystateCommand(activeSession.Id, "Seek", {
           seekPositionTicks: Math.round(target),
         });
         // Optimistically update position
@@ -331,7 +342,7 @@ const JellyfinNowPlayingScreen = () => {
         });
 
         void nowPlayingQuery.refetch();
-      } catch (error) {
+      } catch {
         // swallow errors silently per request
       }
     },
@@ -341,7 +352,7 @@ const JellyfinNowPlayingScreen = () => {
       ensureControlsReady,
       nowPlayingQuery,
       runtimeTicks,
-    ]
+    ],
   );
 
   const handleAdjustVolume = useCallback(
@@ -350,9 +361,12 @@ const JellyfinNowPlayingScreen = () => {
         return;
       }
 
-      const nextVolume = Math.min(100, Math.max(0, Math.round(volumeLevel + delta)));
+      const nextVolume = Math.min(
+        100,
+        Math.max(0, Math.round(volumeLevel + delta)),
+      );
       try {
-        if (!activeSession.Id) throw new Error('Session id missing');
+        if (!activeSession.Id) throw new Error("Session id missing");
         await connector.setVolume(activeSession.Id, nextVolume);
         // Optimistically update volume so repeated presses use updated value
         setCachedActiveSession((prev) => {
@@ -366,7 +380,7 @@ const JellyfinNowPlayingScreen = () => {
         });
 
         void nowPlayingQuery.refetch();
-      } catch (error) {
+      } catch {
         // swallow errors silently per request
       }
     },
@@ -376,7 +390,7 @@ const JellyfinNowPlayingScreen = () => {
       ensureControlsReady,
       nowPlayingQuery,
       volumeLevel,
-    ]
+    ],
   );
 
   if (!serviceId) {
@@ -437,7 +451,9 @@ const JellyfinNowPlayingScreen = () => {
           cachePolicy="memory-disk"
           contentFit="cover"
           priority="high"
-          placeholder={backdropThumbhash ? { thumbhash: backdropThumbhash } : undefined}
+          placeholder={
+            backdropThumbhash ? { thumbhash: backdropThumbhash } : undefined
+          }
         />
       ) : null}
       {backdropUri ? (

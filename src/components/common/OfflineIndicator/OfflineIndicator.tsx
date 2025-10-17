@@ -1,12 +1,14 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import React from "react";
+import { View, StyleSheet } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
 interface OfflineIndicatorProps {
   isVisible: boolean;
 }
 
-export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ isVisible }) => {
+export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
+  isVisible,
+}) => {
   const theme = useTheme();
 
   if (!isVisible) {
@@ -26,11 +28,11 @@ const styles = StyleSheet.create({
   container: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   text: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });

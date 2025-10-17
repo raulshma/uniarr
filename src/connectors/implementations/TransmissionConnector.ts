@@ -1,10 +1,14 @@
-import type { AxiosInstance, AxiosError } from 'axios';
+import type { AxiosInstance, AxiosError } from "axios";
 
-import { BaseConnector } from '@/connectors/base/BaseConnector';
-import { handleApiError } from '@/utils/error.utils';
-import { logger } from '@/services/logger/LoggerService';
-import type { Torrent, TorrentState, TorrentTransferInfo } from '@/models/torrent.types';
-import type { SystemHealth } from '@/connectors/base/IConnector';
+import { BaseConnector } from "@/connectors/base/BaseConnector";
+import { handleApiError } from "@/utils/error.utils";
+import { logger } from "@/services/logger/LoggerService";
+import type {
+  Torrent,
+  TorrentState,
+  TorrentTransferInfo,
+} from "@/models/torrent.types";
+import type { SystemHealth } from "@/connectors/base/IConnector";
 
 // Transmission RPC API types
 interface TransmissionTorrent {
@@ -23,7 +27,7 @@ interface TransmissionTorrent {
   readonly doneDate?: number;
   readonly seedTime?: number;
   readonly lastActivityDate?: number;
-  readonly trackerStats?: Array<{
+  readonly trackerStats?: {
     readonly id: number;
     readonly announce: string;
     readonly scrape: string;
@@ -34,21 +38,21 @@ interface TransmissionTorrent {
     readonly lastScrapeTime?: number;
     readonly leecherCount?: number;
     readonly seederCount?: number;
-  }>;
+  }[];
 }
 
 interface TransmissionTorrentResponse {
   readonly arguments: {
     readonly torrents: TransmissionTorrent[];
   };
-  readonly result: 'success' | string;
+  readonly result: "success" | string;
 }
 
 interface TransmissionSessionResponse {
   readonly arguments: {
     readonly version: string;
   };
-  readonly result: 'success' | string;
+  readonly result: "success" | string;
 }
 
 interface TransmissionSessionStatsResponse {
@@ -58,18 +62,18 @@ interface TransmissionSessionStatsResponse {
     readonly activeTorrentCount: number;
     readonly pausedTorrentCount: number;
   };
-  readonly result: 'success' | string;
+  readonly result: "success" | string;
 }
 
 // Transmission status mapping
 const TRANSMISSION_STATUS_MAP: Record<number, TorrentState> = {
-  0: 'pausedDL',    // stopped
-  1: 'queuedDL',    // check pending
-  2: 'checkingDL',  // checking
-  3: 'queuedDL',    // download pending
-  4: 'downloading', // downloading
-  5: 'queuedDL',    // seed pending
-  6: 'uploading',   // seeding
+  0: "pausedDL", // stopped
+  1: "queuedDL", // check pending
+  2: "checkingDL", // checking
+  3: "queuedDL", // download pending
+  4: "downloading", // downloading
+  5: "queuedDL", // seed pending
+  6: "uploading", // seeding
 };
 
 /**
@@ -83,7 +87,7 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
 
     instance.interceptors.request.use((config) => {
       if (this.sessionId) {
-        config.headers['X-Transmission-Session-Id'] = this.sessionId;
+        config.headers["X-Transmission-Session-Id"] = this.sessionId;
       }
       return config;
     });
@@ -97,7 +101,8 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
         // Handle Transmission's session ID requirements
         if (status === 409 && !originalRequest._retry) {
           originalRequest._retry = true;
-          const sessionId = error.response?.headers?.['x-transmission-session-id'];
+          const sessionId =
+            error.response?.headers?.["x-transmission-session-id"];
           if (sessionId) {
             this.sessionId = sessionId;
             return instance(originalRequest);
@@ -112,24 +117,34 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
   }
 
   async initialize(): Promise<void> {
-    logger.debug('[TransmissionConnector] Initializing', { serviceId: this.config.id });
+    logger.debug("[TransmissionConnector] Initializing", {
+      serviceId: this.config.id,
+    });
     await this.getSessionId();
-    logger.debug('[TransmissionConnector] Initialization completed', { serviceId: this.config.id });
+    logger.debug("[TransmissionConnector] Initialization completed", {
+      serviceId: this.config.id,
+    });
   }
 
   async getVersion(): Promise<string> {
-    logger.debug('[TransmissionConnector] Getting version', { serviceId: this.config.id });
+    logger.debug("[TransmissionConnector] Getting version", {
+      serviceId: this.config.id,
+    });
 
     try {
-      const response = await this.rpcRequest<TransmissionSessionResponse>('session-get');
+      const response =
+        await this.rpcRequest<TransmissionSessionResponse>("session-get");
       return response.arguments.version;
     } catch (error) {
-      logger.error('[TransmissionConnector] Version request failed', { serviceId: this.config.id, error });
+      logger.error("[TransmissionConnector] Version request failed", {
+        serviceId: this.config.id,
+        error,
+      });
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getVersion',
-        endpoint: '/transmission/rpc',
+        operation: "getVersion",
+        endpoint: "/transmission/rpc",
       });
     }
   }
@@ -139,24 +154,24 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
       const version = await this.getVersion();
 
       return {
-        status: 'healthy',
-        message: 'Transmission is running and accessible.',
+        status: "healthy",
+        message: "Transmission is running and accessible.",
         lastChecked: new Date(),
         details: {
           version,
-          apiVersion: 'RPC',
+          apiVersion: "RPC",
         },
       };
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getHealth',
-        endpoint: '/transmission/rpc',
+        operation: "getHealth",
+        endpoint: "/transmission/rpc",
       });
 
       return {
-        status: diagnostic.isNetworkError ? 'offline' : 'degraded',
+        status: diagnostic.isNetworkError ? "offline" : "degraded",
         message: diagnostic.message,
         lastChecked: new Date(),
         details: diagnostic.details,
@@ -164,98 +179,123 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTorrents(filters?: { category?: string; tag?: string; status?: string }): Promise<Torrent[]> {
+  async getTorrents(filters?: {
+    category?: string;
+    tag?: string;
+    status?: string;
+  }): Promise<Torrent[]> {
     try {
-      const response = await this.rpcRequest<TransmissionTorrentResponse>('torrent-get', {
-        fields: [
-          'id', 'name', 'status', 'hashString', 'totalSize', 'downloadedEver',
-          'uploadedEver', 'rateDownload', 'rateUpload', 'eta', 'percentDone',
-          'addedDate', 'doneDate', 'seedTime', 'lastActivityDate', 'trackerStats'
-        ],
-      });
+      const response = await this.rpcRequest<TransmissionTorrentResponse>(
+        "torrent-get",
+        {
+          fields: [
+            "id",
+            "name",
+            "status",
+            "hashString",
+            "totalSize",
+            "downloadedEver",
+            "uploadedEver",
+            "rateDownload",
+            "rateUpload",
+            "eta",
+            "percentDone",
+            "addedDate",
+            "doneDate",
+            "seedTime",
+            "lastActivityDate",
+            "trackerStats",
+          ],
+        },
+      );
 
-      return response.arguments.torrents.map((torrent) => this.mapTorrent(torrent));
+      return response.arguments.torrents.map((torrent) =>
+        this.mapTorrent(torrent),
+      );
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getTorrents',
-        endpoint: '/transmission/rpc',
+        operation: "getTorrents",
+        endpoint: "/transmission/rpc",
       });
     }
   }
 
   async pauseTorrent(hash: string): Promise<void> {
     try {
-      await this.rpcRequest('torrent-stop', { ids: [hash] });
+      await this.rpcRequest("torrent-stop", { ids: [hash] });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'pauseTorrent',
-        endpoint: '/transmission/rpc',
+        operation: "pauseTorrent",
+        endpoint: "/transmission/rpc",
       });
     }
   }
 
   async resumeTorrent(hash: string): Promise<void> {
     try {
-      await this.rpcRequest('torrent-start', { ids: [hash] });
+      await this.rpcRequest("torrent-start", { ids: [hash] });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'resumeTorrent',
-        endpoint: '/transmission/rpc',
+        operation: "resumeTorrent",
+        endpoint: "/transmission/rpc",
       });
     }
   }
 
   async deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
     try {
-      await this.rpcRequest('torrent-remove', {
+      await this.rpcRequest("torrent-remove", {
         ids: [hash],
-        'delete-local-data': deleteFiles
+        "delete-local-data": deleteFiles,
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'deleteTorrent',
-        endpoint: '/transmission/rpc',
+        operation: "deleteTorrent",
+        endpoint: "/transmission/rpc",
       });
     }
   }
 
   async forceRecheck(hash: string): Promise<void> {
     try {
-      await this.rpcRequest('torrent-verify', { ids: [hash] });
+      await this.rpcRequest("torrent-verify", { ids: [hash] });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'forceRecheck',
-        endpoint: '/transmission/rpc',
+        operation: "forceRecheck",
+        endpoint: "/transmission/rpc",
       });
     }
   }
 
   async getTransferInfo(): Promise<TorrentTransferInfo> {
     try {
-      const response = await this.rpcRequest<TransmissionSessionStatsResponse>('session-stats');
+      const response =
+        await this.rpcRequest<TransmissionSessionStatsResponse>(
+          "session-stats",
+        );
 
       return {
         downloadSpeed: response.arguments.downloadSpeed,
         uploadSpeed: response.arguments.uploadSpeed,
         dhtNodes: 0, // Transmission doesn't expose DHT node count in this API
-        connectionStatus: 'connected', // Transmission doesn't provide connection status in this API
+        connectionStatus: "connected", // Transmission doesn't provide connection status in this API
       };
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getTransferInfo',
-        endpoint: '/transmission/rpc',
+        operation: "getTransferInfo",
+        endpoint: "/transmission/rpc",
       });
     }
   }
@@ -268,13 +308,18 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
   private async getSessionId(): Promise<void> {
     try {
       // Make a request that will fail with 409 to get the session ID
-      await this.client.post('/transmission/rpc', { method: 'session-get' });
+      await this.client.post("/transmission/rpc", { method: "session-get" });
     } catch (error) {
       // Expected to fail, but we get the session ID from the response headers
-      const sessionId = (error as AxiosError)?.response?.headers?.['x-transmission-session-id'];
+      const sessionId = (error as AxiosError)?.response?.headers?.[
+        "x-transmission-session-id"
+      ];
       if (sessionId) {
         this.sessionId = sessionId;
-        logger.debug('[TransmissionConnector] Session ID obtained', { serviceId: this.config.id, sessionId });
+        logger.debug("[TransmissionConnector] Session ID obtained", {
+          serviceId: this.config.id,
+          sessionId,
+        });
       }
     }
   }
@@ -285,7 +330,7 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
       arguments: args || {},
     };
 
-    const response = await this.client.post('/transmission/rpc', payload);
+    const response = await this.client.post("/transmission/rpc", payload);
     return response.data;
   }
 
@@ -297,7 +342,7 @@ export class TransmissionConnector extends BaseConnector<Torrent> {
     return {
       hash: raw.hashString,
       name: raw.name,
-      state: TRANSMISSION_STATUS_MAP[raw.status] || 'unknown',
+      state: TRANSMISSION_STATUS_MAP[raw.status] || "unknown",
       progress: raw.percentDone,
       size: raw.totalSize,
       downloaded: raw.downloadedEver,

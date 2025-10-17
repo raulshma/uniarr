@@ -61,7 +61,7 @@ class ImageCacheService {
         {
           uri,
           error: this.stringifyError(error),
-        }
+        },
       );
     }
 
@@ -97,7 +97,11 @@ class ImageCacheService {
    * return a cached resized thumbnail appropriate for the device pixel ratio
    * and requested size. Falls back to resolveUri when resizing isn't possible.
    */
-  async resolveForSize(uri: string, widthPx: number, heightPx: number): Promise<string> {
+  async resolveForSize(
+    uri: string,
+    widthPx: number,
+    heightPx: number,
+  ): Promise<string> {
     await this.ensureInitialized();
 
     if (!uri) return uri;
@@ -129,7 +133,7 @@ class ImageCacheService {
             error: this.stringifyError(error),
           });
         }
-      })
+      }),
     );
   }
 
@@ -148,7 +152,9 @@ class ImageCacheService {
       }
 
       const bytesToFree = usage.size - maxSizeBytes;
-      void logger.info(`ImageCacheService: cache exceeds limit, freeing ${ImageCacheService.formatBytes(bytesToFree)}`);
+      void logger.info(
+        `ImageCacheService: cache exceeds limit, freeing ${ImageCacheService.formatBytes(bytesToFree)}`,
+      );
 
       // Get all cache files sorted by modification time (oldest first)
       const cacheFiles = await this.getCacheFilesSortedByAge();
@@ -171,17 +177,25 @@ class ImageCacheService {
         filesToDelete.map(async (path) => {
           try {
             await FileSystem.deleteAsync(path, { idempotent: true });
-            void logger.debug("ImageCacheService: deleted file during cache cleanup", { path });
+            void logger.debug(
+              "ImageCacheService: deleted file during cache cleanup",
+              { path },
+            );
           } catch (error) {
-            void logger.warn("ImageCacheService: failed to delete file during cache cleanup", {
-              path,
-              error: this.stringifyError(error),
-            });
+            void logger.warn(
+              "ImageCacheService: failed to delete file during cache cleanup",
+              {
+                path,
+                error: this.stringifyError(error),
+              },
+            );
           }
-        })
+        }),
       );
 
-      void logger.info(`ImageCacheService: freed ${ImageCacheService.formatBytes(freedBytes)} by deleting ${filesToDelete.length} files`);
+      void logger.info(
+        `ImageCacheService: freed ${ImageCacheService.formatBytes(freedBytes)} by deleting ${filesToDelete.length} files`,
+      );
     } catch (error) {
       void logger.error("ImageCacheService: failed to enforce cache limit", {
         error: this.stringifyError(error),
@@ -193,8 +207,10 @@ class ImageCacheService {
   /**
    * Get cache files sorted by modification time (oldest first).
    */
-  private async getCacheFilesSortedByAge(): Promise<Array<{ path: string; size: number; modifiedAt: number }>> {
-    const files: Array<{ path: string; size: number; modifiedAt: number }> = [];
+  private async getCacheFilesSortedByAge(): Promise<
+    { path: string; size: number; modifiedAt: number }[]
+  > {
+    const files: { path: string; size: number; modifiedAt: number }[] = [];
 
     try {
       const cacheDir = FileSystem.cacheDirectory;
@@ -214,7 +230,9 @@ class ImageCacheService {
           try {
             const info = await FileSystem.getInfoAsync(path);
             if (info.exists && !info.isDirectory && info.size) {
-              const modifiedAt = info.modificationTime ? info.modificationTime * 1000 : Date.now();
+              const modifiedAt = info.modificationTime
+                ? info.modificationTime * 1000
+                : Date.now();
               files.push({
                 path,
                 size: info.size,
@@ -244,7 +262,7 @@ class ImageCacheService {
   private async enforceCacheLimitAfterDownload(): Promise<void> {
     try {
       // Import here to avoid circular dependency
-      const { useSettingsStore } = await import('@/store/settingsStore');
+      const { useSettingsStore } = await import("@/store/settingsStore");
       const { maxImageCacheSize } = useSettingsStore.getState();
 
       // Only enforce if we have a reasonable limit set
@@ -252,9 +270,12 @@ class ImageCacheService {
         void this.enforceCacheLimit(maxImageCacheSize);
       }
     } catch (error) {
-      void logger.debug("ImageCacheService: failed to enforce cache limit after download", {
-        error: this.stringifyError(error),
-      });
+      void logger.debug(
+        "ImageCacheService: failed to enforce cache limit after download",
+        {
+          error: this.stringifyError(error),
+        },
+      );
     }
   }
 
@@ -346,7 +367,7 @@ class ImageCacheService {
               {
                 cachedPath,
                 error: this.stringifyError(deleteError),
-              }
+              },
             );
           }
           return;
@@ -355,7 +376,7 @@ class ImageCacheService {
         totalSize += fileInfo.size ?? 0;
         fileCount += 1;
         countedPaths.add(cachedPath);
-      })
+      }),
     );
 
     if (missingUris.length) {
@@ -391,12 +412,12 @@ class ImageCacheService {
                   await FileSystem.deleteAsync(path, { idempotent: true });
                   void logger.debug(
                     "ImageCacheService: removed stale fallback cached image during directory scan.",
-                    { path }
+                    { path },
                   );
                 } catch (err) {
                   void logger.warn(
                     "ImageCacheService: failed to delete stale fallback cached image during directory scan.",
-                    { path, error: this.stringifyError(err) }
+                    { path, error: this.stringifyError(err) },
                   );
                 }
                 return;
@@ -448,7 +469,7 @@ class ImageCacheService {
     } catch (err) {
       void logger.debug(
         "ImageCacheService: failed to scan cache directory for images.",
-        { error: this.stringifyError(err) }
+        { error: this.stringifyError(err) },
       );
     }
 
@@ -518,8 +539,10 @@ class ImageCacheService {
           if (info.exists && info.isDirectory) {
             const subEntries = await FileSystem.readDirectoryAsync(subPath);
             for (const subName of subEntries) {
-              if (typeof subName === "string" &&
-                  (imageExtRegex.test(subName) || subName.startsWith("image-"))) {
+              if (
+                typeof subName === "string" &&
+                (imageExtRegex.test(subName) || subName.startsWith("image-"))
+              ) {
                 work.push(this.deleteFileIfExists(`${subPath}/${subName}`));
               }
             }
@@ -531,9 +554,12 @@ class ImageCacheService {
 
       await Promise.allSettled(work);
     } catch (error) {
-      void logger.warn("ImageCacheService: failed to clear fallback cache files.", {
-        error: this.stringifyError(error),
-      });
+      void logger.warn(
+        "ImageCacheService: failed to clear fallback cache files.",
+        {
+          error: this.stringifyError(error),
+        },
+      );
     }
   }
 
@@ -544,10 +570,13 @@ class ImageCacheService {
     try {
       await FileSystem.deleteAsync(path, { idempotent: true });
     } catch (error) {
-      void logger.debug("ImageCacheService: failed to delete file during cache clear.", {
-        path,
-        error: this.stringifyError(error),
-      });
+      void logger.debug(
+        "ImageCacheService: failed to delete file during cache clear.",
+        {
+          path,
+          error: this.stringifyError(error),
+        },
+      );
     }
   }
 
@@ -559,7 +588,7 @@ class ImageCacheService {
     const units = ["B", "KB", "MB", "GB", "TB"];
     const index = Math.min(
       Math.floor(Math.log(bytes) / Math.log(1024)),
-      units.length - 1
+      units.length - 1,
     );
     const value = bytes / 1024 ** index;
 
@@ -634,7 +663,7 @@ class ImageCacheService {
       // Ensure we never persist secrets (eg. apikey query param). Persist a
       // sanitized copy of the current URIs.
       const sanitized = Array.from(this.trackedUris).map((u) =>
-        this.sanitizeUriForStorage(u)
+        this.sanitizeUriForStorage(u),
       );
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
     } catch (error) {
@@ -717,13 +746,13 @@ class ImageCacheService {
       if (!cachedPath) {
         void logger.debug(
           "ImageCacheService: prefetch succeeded but cache path missing; attempting fallback download.",
-          { uri, fetchUri }
+          { uri, fetchUri },
         );
         const downloadPath = await this.fallbackDownload(uri, fetchUri);
         if (downloadPath) {
           void logger.info(
             "ImageCacheService: fallback download succeeded after missing cache path.",
-            { uri, fetchUri, downloadPath }
+            { uri, fetchUri, downloadPath },
           );
           // Enforce cache limits after successful download (fire-and-forget)
           void this.enforceCacheLimitAfterDownload();
@@ -731,7 +760,7 @@ class ImageCacheService {
         }
         void logger.warn(
           "ImageCacheService: prefetch succeeded but no cache path available and fallback download failed.",
-          { uri, fetchUri }
+          { uri, fetchUri },
         );
         return null;
       }
@@ -745,7 +774,7 @@ class ImageCacheService {
       if (!result) {
         void logger.debug(
           "ImageCacheService: prefetch returned empty result.",
-          { uri }
+          { uri },
         );
       }
       return result;
@@ -805,7 +834,7 @@ class ImageCacheService {
             await FileSystem.deleteAsync(cachedPath, { idempotent: true });
             void logger.debug(
               "ImageCacheService: removed stale cached image.",
-              { cachedPath, uri: attemptUri }
+              { cachedPath, uri: attemptUri },
             );
           } catch (error) {
             void logger.warn(
@@ -814,7 +843,7 @@ class ImageCacheService {
                 cachedPath,
                 uri: attemptUri,
                 error: this.stringifyError(error),
-              }
+              },
             );
           }
           continue;
@@ -845,7 +874,7 @@ class ImageCacheService {
           await FileSystem.deleteAsync(dest, { idempotent: true });
           void logger.debug(
             "ImageCacheService: removed stale fallback cached image.",
-            { dest, uri }
+            { dest, uri },
           );
         } catch (error) {
           void logger.warn(
@@ -854,7 +883,7 @@ class ImageCacheService {
               dest,
               uri,
               error: this.stringifyError(error),
-            }
+            },
           );
         }
         return null;
@@ -873,12 +902,12 @@ class ImageCacheService {
    */
   private async fallbackDownload(
     originalUri: string,
-    fetchUri: string
+    fetchUri: string,
   ): Promise<string | null> {
     try {
       const ext = ImageCacheService.extractExt(originalUri || fetchUri);
       const filename = `image-${ImageCacheService.hashUri(
-        originalUri || fetchUri
+        originalUri || fetchUri,
       )}${ext}`;
       const dest = `${FileSystem.cacheDirectory}${filename}`;
       void logger.debug("ImageCacheService: attempting fallback download.", {
@@ -921,7 +950,7 @@ class ImageCacheService {
           // keep falling through to return null
           void logger.debug(
             "ImageCacheService: fallback download with originalUri failed.",
-            { originalUri, error: this.stringifyError(err2) }
+            { originalUri, error: this.stringifyError(err2) },
           );
         }
       }
@@ -935,8 +964,6 @@ class ImageCacheService {
     return null;
   }
 
-  
-  
   private trackUri(uri: string): void {
     const sanitized = this.sanitizeUriForStorage(uri);
     if (!this.trackedUris.has(sanitized)) {
@@ -945,7 +972,6 @@ class ImageCacheService {
     }
   }
 
-  
   // Remove known sensitive query parameters before persisting URIs and when
   // storing tracked URIs so we never save API keys to storage.
   private sanitizeUriForStorage(uri: string): string {
@@ -953,7 +979,7 @@ class ImageCacheService {
       const parsed = new URL(uri);
       // Remove apikey and other potentially sensitive params
       ["apikey", "token", "access_token"].forEach((p) =>
-        parsed.searchParams.delete(p)
+        parsed.searchParams.delete(p),
       );
       parsed.hash = "";
       return parsed.toString();
@@ -969,8 +995,6 @@ class ImageCacheService {
     // prefer webp extension for thumbnails
     return `image-${ImageCacheService.hashUri(uri)}-${w}x${h}.webp`;
   }
-
-  
 
   private stringifyError(error: unknown): string {
     if (error instanceof Error) {

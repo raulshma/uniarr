@@ -1,10 +1,10 @@
-import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { useTheme, Text } from 'react-native-paper';
+import React, { Component, type ErrorInfo, type ReactNode } from "react";
+import { View, StyleSheet } from "react-native";
+import { useTheme, Text } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import { EmptyState } from '@/components/common/EmptyState';
-import { logger } from '@/services/logger/LoggerService';
+import type { AppTheme } from "@/constants/theme";
+import { EmptyState } from "@/components/common/EmptyState";
+import { logger } from "@/services/logger/LoggerService";
 
 export type ErrorBoundaryFallbackProps = {
   error: Error;
@@ -16,7 +16,7 @@ export type ErrorBoundaryProps = {
   fallback?: ReactNode | ((props: ErrorBoundaryFallbackProps) => ReactNode);
   onError?: (error: Error, info: ErrorInfo) => void;
   onReset?: () => void;
-  resetKeys?: ReadonlyArray<unknown>;
+  resetKeys?: readonly unknown[];
   context?: Record<string, unknown>;
 };
 
@@ -26,28 +26,42 @@ type ErrorBoundaryState = {
 };
 
 const areResetKeysEqual = (
-  currentKeys: ReadonlyArray<unknown> | undefined,
-  previousKeys: ReadonlyArray<unknown> | undefined,
+  currentKeys: readonly unknown[] | undefined,
+  previousKeys: readonly unknown[] | undefined,
 ): boolean => {
   if (currentKeys === previousKeys) {
     return true;
   }
 
-  if (!currentKeys || !previousKeys || currentKeys.length !== previousKeys.length) {
+  if (
+    !currentKeys ||
+    !previousKeys ||
+    currentKeys.length !== previousKeys.length
+  ) {
     return false;
   }
 
-  return currentKeys.every((value, index) => Object.is(value, previousKeys[index]));
+  return currentKeys.every((value, index) =>
+    Object.is(value, previousKeys[index]),
+  );
 };
 
 const DefaultFallback = ({ error, reset }: ErrorBoundaryFallbackProps) => {
   const theme = useTheme<AppTheme>();
-  const isDevelopment = typeof __DEV__ !== 'undefined' && __DEV__;
+  const isDevelopment = typeof __DEV__ !== "undefined" && __DEV__;
 
-  const description = isDevelopment && error.message ? error.message : 'Please try again in a moment.';
+  const description =
+    isDevelopment && error.message
+      ? error.message
+      : "Please try again in a moment.";
 
   return (
-    <View style={[styles.fallbackContainer, { backgroundColor: theme.colors.background }]}> 
+    <View
+      style={[
+        styles.fallbackContainer,
+        { backgroundColor: theme.colors.background },
+      ]}
+    >
       <EmptyState
         title="Something went wrong"
         description={description}
@@ -61,10 +75,10 @@ const DefaultFallback = ({ error, reset }: ErrorBoundaryFallbackProps) => {
             style={{
               marginTop: theme.custom.spacing.sm,
               color: theme.colors.onSurfaceVariant,
-              textAlign: 'center',
+              textAlign: "center",
             }}
           >
-            {error.stack.split('\n').slice(0, 2).join('\n')}
+            {error.stack.split("\n").slice(0, 2).join("\n")}
           </Text>
         ) : null}
       </EmptyState>
@@ -72,7 +86,10 @@ const DefaultFallback = ({ error, reset }: ErrorBoundaryFallbackProps) => {
   );
 };
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   override state: ErrorBoundaryState = {
     hasError: false,
     error: null,
@@ -85,7 +102,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   override componentDidCatch(error: Error, info: ErrorInfo) {
     const { onError, context } = this.props;
 
-    void logger.error('Unhandled UI error captured', {
+    void logger.error("Unhandled UI error captured", {
       message: error.message,
       stack: error.stack,
       componentStack: info.componentStack,
@@ -99,7 +116,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override componentDidUpdate(prevProps: ErrorBoundaryProps) {
     const { resetKeys } = this.props;
-    if (this.state.hasError && !areResetKeysEqual(resetKeys, prevProps.resetKeys)) {
+    if (
+      this.state.hasError &&
+      !areResetKeysEqual(resetKeys, prevProps.resetKeys)
+    ) {
       this.resetErrorBoundary();
     }
   }
@@ -114,10 +134,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   private renderFallback(): ReactNode {
     const { fallback } = this.props;
     const { error } = this.state;
-    const currentError = error ?? new Error('Unknown error');
+    const currentError = error ?? new Error("Unknown error");
     const reset = this.resetErrorBoundary;
 
-    if (typeof fallback === 'function') {
+    if (typeof fallback === "function") {
       return fallback({ error: currentError, reset });
     }
 

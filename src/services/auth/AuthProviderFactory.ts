@@ -1,9 +1,8 @@
-import { authManager } from './AuthManager';
-import { ApiKeyAuthProvider } from './providers/ApiKeyAuthProvider';
-import { BasicAuthProvider } from './providers/BasicAuthProvider';
-import { SessionAuthProvider } from './providers/SessionAuthProvider';
-import { JellyfinAuthProvider } from './providers/JellyfinAuthProvider';
-import type { ServiceType } from '@/models/service.types';
+import { authManager } from "./AuthManager";
+import { ApiKeyAuthProvider } from "./providers/ApiKeyAuthProvider";
+import { SessionAuthProvider } from "./providers/SessionAuthProvider";
+import { JellyfinAuthProvider } from "./providers/JellyfinAuthProvider";
+import type { ServiceType } from "@/models/service.types";
 
 /**
  * Factory for registering authentication providers for different service types
@@ -20,12 +19,12 @@ export class AuthProviderFactory {
     }
 
     // Register providers for each service type
-    authManager.registerProvider('sonarr', new ApiKeyAuthProvider());
-    authManager.registerProvider('radarr', new ApiKeyAuthProvider());
-    authManager.registerProvider('jellyseerr', new ApiKeyAuthProvider());
-    authManager.registerProvider('jellyfin', new JellyfinAuthProvider());
-    authManager.registerProvider('qbittorrent', new SessionAuthProvider());
-    authManager.registerProvider('prowlarr', new ApiKeyAuthProvider());
+    authManager.registerProvider("sonarr", new ApiKeyAuthProvider());
+    authManager.registerProvider("radarr", new ApiKeyAuthProvider());
+    authManager.registerProvider("jellyseerr", new ApiKeyAuthProvider());
+    authManager.registerProvider("jellyfin", new JellyfinAuthProvider());
+    authManager.registerProvider("qbittorrent", new SessionAuthProvider());
+    authManager.registerProvider("prowlarr", new ApiKeyAuthProvider());
 
     this.initialized = true;
   }
@@ -35,7 +34,7 @@ export class AuthProviderFactory {
    */
   static getAuthMethod(serviceType: ServiceType): string {
     const provider = authManager.getProvider(serviceType);
-    return provider?.getAuthMethod() || 'none';
+    return provider?.getAuthMethod() || "none";
   }
 
   /**
@@ -43,7 +42,7 @@ export class AuthProviderFactory {
    */
   static requiresAuth(serviceType: ServiceType): boolean {
     const method = this.getAuthMethod(serviceType);
-    return method !== 'none';
+    return method !== "none";
   }
 
   /**
@@ -51,15 +50,15 @@ export class AuthProviderFactory {
    */
   static getRequiredCredentials(serviceType: ServiceType): string[] {
     const method = this.getAuthMethod(serviceType);
-    
+
     switch (method) {
-      case 'api-key':
-        return ['apiKey'];
-      case 'basic':
-      case 'session':
-        return ['username', 'password'];
-      case 'bearer':
-        return ['token'];
+      case "api-key":
+        return ["apiKey"];
+      case "basic":
+      case "session":
+        return ["username", "password"];
+      case "bearer":
+        return ["token"];
       default:
         return [];
     }

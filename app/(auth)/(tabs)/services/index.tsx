@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   IconButton,
   Text,
@@ -18,13 +18,11 @@ import { FlashList } from "@shopify/flash-list";
 
 import { TabHeader } from "@/components/common/TabHeader";
 
-import { Button } from "@/components/common/Button";
+// Button removed: unused in this file (kept minimal surface area)
 import { Card } from "@/components/common/Card";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
-import {
-  AnimatedListItem,
-} from "@/components/common/AnimatedComponents";
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { ServiceStatus } from "@/components/service/ServiceStatus";
 import type { ServiceStatusState } from "@/components/service/ServiceStatus";
 import { ServiceCardSkeleton } from "@/components/service/ServiceCard";
@@ -46,10 +44,6 @@ type ServiceOverviewItem = {
   latency?: number;
   version?: string;
 };
-
-type ServicesListItem =
-  | { type: "header" }
-  | { type: "service"; data: ServiceOverviewItem };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: "Sonarr",
@@ -99,7 +93,7 @@ const serviceIcons: Record<ServiceType, string> = {
 const deriveStatus = (
   config: ServiceConfig,
   result: ConnectionResult | undefined,
-  checkedAt: Date
+  checkedAt: Date,
 ): Pick<
   ServiceOverviewItem,
   "status" | "statusDescription" | "lastCheckedAt" | "latency" | "version"
@@ -204,7 +198,7 @@ const ServicesScreen = () => {
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch])
+    }, [refetch]),
   );
 
   const services = data ?? [];
@@ -292,7 +286,7 @@ const ServicesScreen = () => {
           paddingTop: spacing.xl,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleBackPress = useCallback(() => {
@@ -347,7 +341,7 @@ const ServicesScreen = () => {
           break;
       }
     },
-    [router]
+    [router],
   );
 
   const handleServiceMenuPress = useCallback((service: ServiceOverviewItem) => {
@@ -370,7 +364,7 @@ const ServicesScreen = () => {
 
     setServiceMenuVisible(false);
 
-  alert(
+    alert(
       "Delete Service",
       `Are you sure you want to delete "${selectedService.config.name}"? This action cannot be undone.`,
       [
@@ -392,7 +386,7 @@ const ServicesScreen = () => {
 
               alert(
                 "Service Deleted",
-                `${selectedService.config.name} has been removed.`
+                `${selectedService.config.name} has been removed.`,
               );
             } catch (error) {
               const message =
@@ -410,7 +404,7 @@ const ServicesScreen = () => {
             }
           },
         },
-      ]
+      ],
     );
   }, [selectedService, queryClient]);
 
@@ -453,8 +447,8 @@ const ServicesScreen = () => {
                         item.status === "online"
                           ? theme.colors.primary
                           : item.status === "offline"
-                          ? theme.colors.error
-                          : theme.colors.tertiary,
+                            ? theme.colors.error
+                            : theme.colors.tertiary,
                       fontSize: 14,
                       marginLeft: 4,
                     }}
@@ -462,8 +456,8 @@ const ServicesScreen = () => {
                     {item.status === "online"
                       ? "Connected"
                       : item.status === "offline"
-                      ? "Offline"
-                      : "Degraded"}
+                        ? "Offline"
+                        : "Degraded"}
                   </Text>
                 </View>
               </View>
@@ -477,19 +471,19 @@ const ServicesScreen = () => {
           </Card>
         </AnimatedListItem>
       );
-    }
+    },
   );
 
   const renderItem = useCallback(
     ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
       <ServiceCard item={item} index={index} />
     ),
-    []
+    [ServiceCard],
   );
 
   const keyExtractor = useCallback(
     (item: ServiceOverviewItem) => `service-${item.config.id}`,
-    []
+    [],
   );
 
   const getItemType = useCallback(() => "service", []);
@@ -585,9 +579,7 @@ const ServicesScreen = () => {
           { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
         ]}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            {listEmptyComponent}
-          </View>
+          <View style={styles.emptyContainer}>{listEmptyComponent}</View>
         }
         refreshControl={
           <ListRefreshControl

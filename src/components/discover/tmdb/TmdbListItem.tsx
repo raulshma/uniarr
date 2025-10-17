@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import { ImageBackground, Pressable, StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import { ImageBackground, Pressable, StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
-import MediaPoster from '@/components/media/MediaPoster/MediaPoster';
-import type { DiscoverMediaItem } from '@/models/discover.types';
-import type { AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
+import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
+import type { DiscoverMediaItem } from "@/models/discover.types";
+import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
 
 interface Props {
   item: DiscoverMediaItem;
@@ -21,13 +21,13 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
       StyleSheet.create({
         // full-width card with increased height and backdrop cover
         container: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           paddingLeft: spacing.sm,
           paddingVertical: 0,
           marginHorizontal: 0,
           marginVertical: spacing.xs,
-          backgroundColor: 'transparent',
+          backgroundColor: "transparent",
           minHeight: 240,
           height: 240,
         },
@@ -35,16 +35,16 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
         posterWrapper: {
           marginRight: spacing.md,
           borderRadius: 8,
-          overflow: 'hidden',
+          overflow: "hidden",
           width: 125,
           height: 240,
           paddingTop: spacing.none,
           paddingBottom: spacing.sm,
-          justifyContent: 'center',
+          justifyContent: "center",
         },
         contentWrapper: {
           flex: 1,
-          justifyContent: 'center',
+          justifyContent: "center",
           paddingVertical: spacing.sm,
         },
         // text shadow will be used for contrast instead of a background box
@@ -52,11 +52,16 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
         title: {
           color: theme.colors.onSurface,
           // make title larger and bolder for readability
-          fontSize: Math.max(18, theme.custom.typography.titleLarge?.fontSize ?? 18),
-          fontFamily: theme.custom.typography.titleLarge?.fontFamily ?? theme.custom.typography.titleMedium.fontFamily,
-          lineHeight: (theme.custom.typography.titleLarge?.lineHeight ?? 22),
+          fontSize: Math.max(
+            18,
+            theme.custom.typography.titleLarge?.fontSize ?? 18,
+          ),
+          fontFamily:
+            theme.custom.typography.titleLarge?.fontFamily ??
+            theme.custom.typography.titleMedium.fontFamily,
+          lineHeight: theme.custom.typography.titleLarge?.lineHeight ?? 22,
           letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-          fontWeight: '700',
+          fontWeight: "700",
           marginBottom: spacing.xs,
         },
         overview: {
@@ -64,13 +69,13 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
           fontSize: theme.custom.typography.bodySmall.fontSize,
           marginBottom: spacing.xs,
           // subtle shadow for readability over images
-          textShadowColor: 'rgba(0,0,0,0.7)',
+          textShadowColor: "rgba(0,0,0,0.7)",
           textShadowOffset: { width: 0, height: 1 },
           textShadowRadius: 2,
         },
         details: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
         },
         // spacer used between detail children since RN doesn't support gap
         detailsSpacer: {
@@ -80,7 +85,7 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
           color: theme.colors.onSurfaceVariant,
           fontSize: theme.custom.typography.bodySmall.fontSize,
           fontFamily: theme.custom.typography.bodySmall.fontFamily,
-          textShadowColor: 'rgba(0,0,0,0.6)',
+          textShadowColor: "rgba(0,0,0,0.6)",
           textShadowOffset: { width: 0, height: 1 },
           textShadowRadius: 1,
         },
@@ -89,7 +94,7 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
         },
         mediaType: {
           color: theme.colors.primary,
-          fontWeight: '600',
+          fontWeight: "600",
         },
         rating: {
           color: theme.colors.primary,
@@ -99,12 +104,12 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
           fontSize: 12,
         },
         backgroundImage: {
-          width: '100%',
+          width: "100%",
           height: 240,
         },
         backgroundImageStyle: {
           opacity: 0.12,
-          resizeMode: 'cover',
+          resizeMode: "cover",
           backgroundColor: theme.colors.surface,
         },
       }),
@@ -114,16 +119,16 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
   const handleLongPress = () => onAdd(item);
 
   const formatYear = (date: string | undefined) => {
-    if (!date) return '';
+    if (!date) return "";
     try {
       return new Date(date).getFullYear().toString();
     } catch {
-      return '';
+      return "";
     }
   };
 
   const formatRating = (rating: number | undefined) => {
-    if (rating == null) return '';
+    if (rating == null) return "";
     return rating.toFixed(1);
   };
 
@@ -137,7 +142,7 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
         accessibilityRole="button"
         style={({ pressed }) => [
           styles.container,
-          pressed && { opacity: 0.95 }
+          pressed && { opacity: 0.95 },
         ]}
         onPress={() => onPress(item)}
         onLongPress={handleLongPress}
@@ -159,29 +164,37 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
 
           {/* Short overview if available */}
           {item.overview ? (
-            <Text numberOfLines={2} style={styles.overview}>{item.overview}</Text>
+            <Text numberOfLines={2} style={styles.overview}>
+              {item.overview}
+            </Text>
           ) : null}
 
           <View style={styles.details}>
             {/* Media type (Movie / TV) */}
             <Text style={[styles.detailText, styles.mediaType]}>
-              {item.mediaType === 'series' ? 'TV Series' : 'Movie'}
+              {item.mediaType === "series" ? "TV Series" : "Movie"}
             </Text>
 
             {/* year */}
             {item.releaseDate || item.year ? (
               <>
                 <View style={styles.detailsSpacer} />
-                <Text style={[styles.detailText, styles.year]}>{item.releaseDate ? formatYear(item.releaseDate) : item.year}</Text>
+                <Text style={[styles.detailText, styles.year]}>
+                  {item.releaseDate ? formatYear(item.releaseDate) : item.year}
+                </Text>
               </>
             ) : null}
 
             {/* spacer when both year and rating present */}
-            { (item.releaseDate || item.year) && item.rating ? <View style={styles.detailsSpacer} /> : null}
+            {(item.releaseDate || item.year) && item.rating ? (
+              <View style={styles.detailsSpacer} />
+            ) : null}
 
             {/* Rating (show regardless of releaseDate) */}
             {item.rating ? (
-              <Text style={[styles.detailText, styles.rating]}>★ {formatRating(item.rating)}</Text>
+              <Text style={[styles.detailText, styles.rating]}>
+                ★ {formatRating(item.rating)}
+              </Text>
             ) : null}
 
             {/* vote count if present */}

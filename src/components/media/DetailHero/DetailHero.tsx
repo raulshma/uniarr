@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   Dimensions,
   StyleSheet,
   View,
   StyleSheet as RNStyleSheet,
+  PixelRatio,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
@@ -14,10 +15,9 @@ import Animated, {
   runOnJS,
   interpolate,
   Extrapolate,
-  Extrapolation,
 } from "react-native-reanimated";
 import { Image } from "expo-image";
-import { PixelRatio } from 'react-native';
+
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { IconButton, Text, useTheme } from "react-native-paper";
@@ -42,7 +42,7 @@ export type DetailHeroProps = {
 };
 
 const AnimatedScrollView = Animated.createAnimatedComponent(
-  Animated.ScrollView
+  Animated.ScrollView,
 );
 
 const DetailHero: React.FC<DetailHeroProps> = ({
@@ -75,7 +75,6 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   const initialTop = heroHeight - posterSize * 0.75;
   // Pin directly under the action bar
   const finalTop = insets.top + actionBarHeight;
-  const deltaY = finalTop - initialTop;
   const finalTopWithoutHeader = insets.top;
   const deltaYHidden = finalTopWithoutHeader - initialTop;
   const threshold = Math.max(1, heroHeight - finalTop);
@@ -85,7 +84,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
       scrollY.value,
       [0, threshold],
       [0, 1],
-      Extrapolation.CLAMP
+      Extrapolate.CLAMP,
     );
     // scale down a bit
     const finalScale = 0.75;
@@ -106,25 +105,25 @@ const DetailHero: React.FC<DetailHeroProps> = ({
       scrollY.value,
       [0, threshold],
       [0, 1],
-      Extrapolation.CLAMP
+      Extrapolate.CLAMP,
     );
     const opacity = interpolate(
       progress,
       [0, 0.6, 1],
       [1, 0, 0],
-      Extrapolation.CLAMP
+      Extrapolate.CLAMP,
     );
     const translateY = interpolate(
       progress,
       [0, 1],
       [0, -actionBarHeight],
-      Extrapolation.CLAMP
+      Extrapolate.CLAMP,
     );
     const height = interpolate(
       progress,
       [0, 1],
       [actionBarHeight, 0],
-      Extrapolation.CLAMP
+      Extrapolate.CLAMP,
     );
     return { opacity, transform: [{ translateY }], height } as any;
   });
@@ -135,7 +134,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
       if (state !== prev) {
         runOnJS(setIsHeaderCollapsed)(state === 1);
       }
-    }
+    },
   );
 
   const blurAnimatedStyle = useAnimatedStyle(() => {
@@ -143,7 +142,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
       scrollY.value,
       [0, threshold],
       [0, 1],
-      Extrapolation.CLAMP
+      Extrapolate.CLAMP,
     );
     return { opacity: blurOpacity } as any;
   });
@@ -153,14 +152,14 @@ const DetailHero: React.FC<DetailHeroProps> = ({
       scrollY.value,
       [0, threshold],
       [0, 1],
-      Extrapolation.CLAMP
+      Extrapolate.CLAMP,
     );
     const finalHeroHeight = finalTopWithoutHeader + posterSize * 1.25;
     const height = interpolate(
       progress,
       [0, 1],
       [heroHeight, finalHeroHeight],
-      Extrapolation.CLAMP
+      Extrapolate.CLAMP,
     );
     return { height } as any;
   });
@@ -170,7 +169,9 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   const handleMal = () => onMal?.();
 
   const heroUri = backdropUri;
-  const [resolvedHeroUri, setResolvedHeroUri] = useState<string | undefined>(heroUri);
+  const [resolvedHeroUri, setResolvedHeroUri] = useState<string | undefined>(
+    heroUri,
+  );
 
   // Use thumbhash hook for the backdrop image
   const { thumbhash: heroThumbhash } = useThumbhash(heroUri, {
@@ -187,16 +188,22 @@ const DetailHero: React.FC<DetailHeroProps> = ({
       }
       try {
         const dpr = PixelRatio.get();
-        const targetW = Math.round(Dimensions.get('window').width * dpr);
+        const targetW = Math.round(Dimensions.get("window").width * dpr);
         const targetH = Math.round(heroHeight * dpr);
-        const r = await imageCacheService.resolveForSize(heroUri, targetW, targetH);
+        const r = await imageCacheService.resolveForSize(
+          heroUri,
+          targetW,
+          targetH,
+        );
         if (mounted) setResolvedHeroUri(r);
       } catch {
         if (mounted) setResolvedHeroUri(heroUri);
       }
     };
     void resolveHero();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [heroUri, heroHeight]);
 
   return (
@@ -207,7 +214,9 @@ const DetailHero: React.FC<DetailHeroProps> = ({
             <Image
               source={{ uri: resolvedHeroUri }}
               style={RNStyleSheet.absoluteFill}
-              placeholder={heroThumbhash ? { thumbhash: heroThumbhash } : undefined}
+              placeholder={
+                heroThumbhash ? { thumbhash: heroThumbhash } : undefined
+              }
               cachePolicy="memory-disk"
               priority="high"
             />

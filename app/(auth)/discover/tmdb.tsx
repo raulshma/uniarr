@@ -29,14 +29,23 @@ import {
   type DiscoverMovieResponse,
   type DiscoverTvResponse,
 } from "@/connectors/implementations/TmdbConnector";
-import { useTmdbDiscover, type TmdbDiscoverFilters } from "@/hooks/tmdb/useTmdbDiscover";
+import {
+  useTmdbDiscover,
+  type TmdbDiscoverFilters,
+} from "@/hooks/tmdb/useTmdbDiscover";
 import { useTmdbGenres } from "@/hooks/tmdb/useTmdbGenres";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
 import type { DiscoverMediaItem } from "@/models/discover.types";
-import { useConnectorsStore, selectGetConnectorsByType } from "@/store/connectorsStore";
+import {
+  useConnectorsStore,
+  selectGetConnectorsByType,
+} from "@/store/connectorsStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { spacing } from "@/theme/spacing";
-import { mapTmdbMovieToDiscover, mapTmdbTvToDiscover } from "@/utils/tmdb.utils";
+import {
+  mapTmdbMovieToDiscover,
+  mapTmdbTvToDiscover,
+} from "@/utils/tmdb.utils";
 import { alert } from "@/services/dialogService";
 
 const createInitialFilters = (): TmdbDiscoverFilters => ({
@@ -103,12 +112,18 @@ const TmdbDiscoverScreen = () => {
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
 
-  const [filters, setFilters] = useState<TmdbDiscoverFilters>(createInitialFilters);
+  const [filters, setFilters] =
+    useState<TmdbDiscoverFilters>(createInitialFilters);
   const [servicePickerVisible, setServicePickerVisible] = useState(false);
-  const [pendingItem, setPendingItem] = useState<DiscoverMediaItem | null>(null);
+  const [pendingItem, setPendingItem] = useState<DiscoverMediaItem | null>(
+    null,
+  );
   const [filtersDrawerVisible, setFiltersDrawerVisible] = useState(false);
-  const [destinationOptions, setDestinationOptions] = useState<AddDestination[]>([]);
-  const [selectedDestinationKey, setSelectedDestinationKey] = useState<string>("");
+  const [destinationOptions, setDestinationOptions] = useState<
+    AddDestination[]
+  >([]);
+  const [selectedDestinationKey, setSelectedDestinationKey] =
+    useState<string>("");
   const [errorBannerDismissed, setErrorBannerDismissed] = useState(false);
 
   const genresQuery = useTmdbGenres(filters.mediaType, {
@@ -128,21 +143,31 @@ const TmdbDiscoverScreen = () => {
   const items = useMemo(() => {
     const pages = discoverQuery.data?.pages ?? [];
 
-    const mapped = filters.mediaType === "movie"
-      ? pages
-          .flatMap(
-            (page) => (page.results as DiscoverMovieResponse["results"] | undefined) ?? [],
-          )
-          .map(mapTmdbMovieToDiscover)
-      : pages
-          .flatMap((page) => (page.results as DiscoverTvResponse["results"] | undefined) ?? [])
-          .map(mapTmdbTvToDiscover);
+    const mapped =
+      filters.mediaType === "movie"
+        ? pages
+            .flatMap(
+              (page) =>
+                (page.results as
+                  | DiscoverMovieResponse["results"]
+                  | undefined) ?? [],
+            )
+            .map(mapTmdbMovieToDiscover)
+        : pages
+            .flatMap(
+              (page) =>
+                (page.results as DiscoverTvResponse["results"] | undefined) ??
+                [],
+            )
+            .map(mapTmdbTvToDiscover);
 
     return mapped.filter((item, index, array) => {
       if (!item.tmdbId) {
         return true;
       }
-      const firstIndex = array.findIndex((candidate) => candidate.tmdbId === item.tmdbId);
+      const firstIndex = array.findIndex(
+        (candidate) => candidate.tmdbId === item.tmdbId,
+      );
       return firstIndex === index;
     });
   }, [discoverQuery.data?.pages, filters.mediaType]);
@@ -155,9 +180,11 @@ const TmdbDiscoverScreen = () => {
 
     if (error instanceof TmdbConnectorError) {
       if (error.statusCode === 429) {
-        const wait = typeof error.retryAfterSeconds === "number" && Number.isFinite(error.retryAfterSeconds)
-          ? Math.max(1, Math.ceil(error.retryAfterSeconds))
-          : null;
+        const wait =
+          typeof error.retryAfterSeconds === "number" &&
+          Number.isFinite(error.retryAfterSeconds)
+            ? Math.max(1, Math.ceil(error.retryAfterSeconds))
+            : null;
         return wait
           ? `TMDB is rate limiting requests. Please wait about ${wait} second${wait === 1 ? "" : "s"} and try again.`
           : "TMDB is rate limiting requests. Please try again shortly.";
@@ -214,7 +241,7 @@ const TmdbDiscoverScreen = () => {
       if (!options.length) {
         alert(
           "No services available",
-          `Add a ${item.mediaType === "series" ? "Sonarr" : "Radarr"} or Jellyseerr service first to work with this title.`
+          `Add a ${item.mediaType === "series" ? "Sonarr" : "Radarr"} or Jellyseerr service first to work with this title.`,
         );
         return;
       }
@@ -244,16 +271,25 @@ const TmdbDiscoverScreen = () => {
       return;
     }
 
-    const destination = destinationOptions.find((option) => option.key === selectedDestinationKey);
+    const destination = destinationOptions.find(
+      (option) => option.key === selectedDestinationKey,
+    );
     if (!destination) {
       closeServicePicker();
       return;
     }
 
     if (destination.kind === "jellyseerr") {
-      const tmdbId = pendingItem.tmdbId ?? (typeof pendingItem.sourceId === "number" ? pendingItem.sourceId : undefined);
+      const tmdbId =
+        pendingItem.tmdbId ??
+        (typeof pendingItem.sourceId === "number"
+          ? pendingItem.sourceId
+          : undefined);
       if (!tmdbId) {
-        alert("Missing TMDB identifier", "Cannot request via Jellyseerr because this item does not have a TMDB id.");
+        alert(
+          "Missing TMDB identifier",
+          "Cannot request via Jellyseerr because this item does not have a TMDB id.",
+        );
         closeServicePicker();
         return;
       }
@@ -287,13 +323,24 @@ const TmdbDiscoverScreen = () => {
     }
 
     closeServicePicker();
-  }, [closeServicePicker, destinationOptions, pendingItem, router, selectedDestinationKey]);
+  }, [
+    closeServicePicker,
+    destinationOptions,
+    pendingItem,
+    router,
+    selectedDestinationKey,
+  ]);
 
   const handleCardPress = useCallback(
     (item: DiscoverMediaItem) => {
-      const tmdbId = item.tmdbId ?? (typeof item.sourceId === "number" ? item.sourceId : undefined);
+      const tmdbId =
+        item.tmdbId ??
+        (typeof item.sourceId === "number" ? item.sourceId : undefined);
       if (!tmdbId) {
-        alert("Details unavailable", "TMDB did not return an identifier for this title yet. Try again later.");
+        alert(
+          "Details unavailable",
+          "TMDB did not return an identifier for this title yet. Try again later.",
+        );
         return;
       }
 
@@ -310,9 +357,12 @@ const TmdbDiscoverScreen = () => {
     [router],
   );
 
-  const handleAdd = useCallback((item: DiscoverMediaItem) => {
-    openServicePicker(item);
-  }, [openServicePicker]);
+  const handleAdd = useCallback(
+    (item: DiscoverMediaItem) => {
+      openServicePicker(item);
+    },
+    [openServicePicker],
+  );
 
   const handleFiltersChange = useCallback(
     (partial: Partial<TmdbDiscoverFilters>) => {
@@ -347,7 +397,9 @@ const TmdbDiscoverScreen = () => {
     }
 
     if (filters.genreId) {
-      const genreName = (genresQuery.data ?? []).find((genre) => genre.id === filters.genreId)?.name;
+      const genreName = (genresQuery.data ?? []).find(
+        (genre) => genre.id === filters.genreId,
+      )?.name;
       chips.push(`Genre · ${genreName ?? filters.genreId}`);
     }
 
@@ -362,8 +414,15 @@ const TmdbDiscoverScreen = () => {
     return chips;
   }, [filters, genresQuery.data]);
   const isInitialLoading = discoverQuery.isLoading && !discoverQuery.isFetched;
-  const showErrorEmptyState = Boolean(!items.length && discoverQuery.isError && errorMessage);
-  const showErrorBanner = Boolean(items.length && discoverQuery.isError && errorMessage && !errorBannerDismissed);
+  const showErrorEmptyState = Boolean(
+    !items.length && discoverQuery.isError && errorMessage,
+  );
+  const showErrorBanner = Boolean(
+    items.length &&
+      discoverQuery.isError &&
+      errorMessage &&
+      !errorBannerDismissed,
+  );
 
   const renderContent = () => {
     let body: React.ReactNode;
@@ -408,46 +467,51 @@ const TmdbDiscoverScreen = () => {
       <View style={styles.content}>
         <View style={styles.inner}>
           <View style={styles.toolbar}>
-          <View style={styles.toolbarRow}>
-            <Button
-              icon="tune"
-              mode="outlined"
-              onPress={() => setFiltersDrawerVisible(true)}
-            >
-              Filters
-            </Button>
-            <IconButton
-              icon="refresh"
-              onPress={() => void discoverQuery.refetch()}
-              disabled={discoverQuery.isFetching}
-              accessibilityLabel="Refresh TMDB results"
-            />
-          </View>
-          {filterSummaryChips.length ? (
-            <View style={styles.summaryRow}>
-              {filterSummaryChips.map((chip) => (
-                <Chip key={chip} mode="outlined" style={styles.summaryChip}>
-                  {chip}
-                </Chip>
-              ))}
+            <View style={styles.toolbarRow}>
+              <Button
+                icon="tune"
+                mode="outlined"
+                onPress={() => setFiltersDrawerVisible(true)}
+              >
+                Filters
+              </Button>
+              <IconButton
+                icon="refresh"
+                onPress={() => void discoverQuery.refetch()}
+                disabled={discoverQuery.isFetching}
+                accessibilityLabel="Refresh TMDB results"
+              />
             </View>
+            {filterSummaryChips.length ? (
+              <View style={styles.summaryRow}>
+                {filterSummaryChips.map((chip) => (
+                  <Chip key={chip} mode="outlined" style={styles.summaryChip}>
+                    {chip}
+                  </Chip>
+                ))}
+              </View>
+            ) : null}
+          </View>
+
+          {showErrorBanner && errorMessage ? (
+            <Banner
+              visible
+              icon="alert-circle"
+              style={styles.banner}
+              actions={[
+                {
+                  label: "Try again",
+                  onPress: () => void discoverQuery.refetch(),
+                },
+                {
+                  label: "Dismiss",
+                  onPress: () => setErrorBannerDismissed(true),
+                },
+              ]}
+            >
+              {errorMessage}
+            </Banner>
           ) : null}
-        </View>
-
-        {showErrorBanner && errorMessage ? (
-          <Banner
-            visible
-            icon="alert-circle"
-            style={styles.banner}
-            actions={[
-              { label: "Try again", onPress: () => void discoverQuery.refetch() },
-              { label: "Dismiss", onPress: () => setErrorBannerDismissed(true) },
-            ]}
-          >
-            {errorMessage}
-          </Banner>
-        ) : null}
-
         </View>
         {body}
       </View>

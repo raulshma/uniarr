@@ -5,12 +5,12 @@ import type { AppTheme } from "@/constants/theme";
 const AuthenticatedLayout = () => {
   const theme = useTheme<AppTheme>();
   return (
-      <Stack
+    <Stack
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: theme.colors.background },
-  // Disable default navigation animations to make navigation snappy.
-  animation: 'none',
+        // Disable default navigation animations to make navigation snappy.
+        animation: "none",
       }}
     >
       <Stack.Screen name="(tabs)" />

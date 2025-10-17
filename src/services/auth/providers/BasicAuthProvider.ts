@@ -1,12 +1,12 @@
-import { BaseAuthProvider } from './BaseAuthProvider';
-import type { AuthConfig, AuthResult, AuthSession, AuthMethod } from '../types';
+import { BaseAuthProvider } from "./BaseAuthProvider";
+import type { AuthConfig, AuthResult, AuthSession, AuthMethod } from "../types";
 
 /**
  * Authentication provider for services that use basic HTTP authentication (qBittorrent)
  */
 export class BasicAuthProvider extends BaseAuthProvider {
   getAuthMethod(): AuthMethod {
-    return 'basic';
+    return "basic";
   }
 
   async authenticate(config: AuthConfig): Promise<AuthResult> {
@@ -21,7 +21,7 @@ export class BasicAuthProvider extends BaseAuthProvider {
 
     // For basic auth, we test the connection with credentials
     const testUrl = `${config.baseUrl}/api/v1/status`;
-    
+
     return this.testConnection(config, testUrl);
   }
 

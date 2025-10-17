@@ -1,17 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
   View,
-} from 'react-native';
-import { FlashList } from '@shopify/flash-list';
-import { Text, useTheme } from 'react-native-paper';
+} from "react-native";
+import { FlashList } from "@shopify/flash-list";
+import { Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { DiscoverMediaItem } from '@/models/discover.types';
-import { spacing } from '@/theme/spacing';
-import { TmdbListItem } from '@/components/discover/tmdb/TmdbListItem';
+import type { AppTheme } from "@/constants/theme";
+import type { DiscoverMediaItem } from "@/models/discover.types";
+import { spacing } from "@/theme/spacing";
+import { TmdbListItem } from "@/components/discover/tmdb/TmdbListItem";
 
 interface Props {
   items: DiscoverMediaItem[];
@@ -43,7 +43,7 @@ export const TmdbResultsGrid: React.FC<Props> = ({
         },
         emptyState: {
           paddingVertical: spacing.xl,
-          alignItems: 'center',
+          alignItems: "center",
           gap: spacing.sm,
         },
         footer: {
@@ -62,7 +62,10 @@ export const TmdbResultsGrid: React.FC<Props> = ({
       <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
         No results yet
       </Text>
-      <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+      <Text
+        variant="bodyMedium"
+        style={{ color: theme.colors.onSurfaceVariant }}
+      >
         Adjust filters or try another media type.
       </Text>
     </View>
@@ -90,15 +93,13 @@ export const TmdbResultsGrid: React.FC<Props> = ({
       onEndReachedThreshold={0.3}
       contentContainerStyle={styles.contentContainer}
       refreshControl={
-        onRefresh
-          ? (
-              <RefreshControl
-                refreshing={Boolean(refreshing)}
-                onRefresh={onRefresh}
-                tintColor={theme.colors.primary}
-              />
-            )
-          : undefined
+        onRefresh ? (
+          <RefreshControl
+            refreshing={Boolean(refreshing)}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
+        ) : undefined
       }
       showsVerticalScrollIndicator={false}
     />

@@ -7,10 +7,16 @@ import {
   RefreshControl,
   Pressable,
 } from "react-native";
-import { Text, useTheme, ActivityIndicator, IconButton, Searchbar, Chip } from "react-native-paper";
+import {
+  Text,
+  useTheme,
+  ActivityIndicator,
+  IconButton,
+  Searchbar,
+  Chip,
+} from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { strings } from '@/constants/strings';
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useAnimeDiscover } from "@/hooks/useAnimeDiscover";
@@ -21,10 +27,10 @@ import {
 import { useConnectorsStore } from "@/store/connectorsStore";
 import { AnimeCard } from "@/components/anime";
 import { EmptyState } from "@/components/common/EmptyState";
-import type { components } from '@/connectors/client-schemas/jellyseerr-openapi';
+import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
 type JellyseerrSearchResult =
-  | components['schemas']['MovieResult']
-  | components['schemas']['TvResult'];
+  | components["schemas"]["MovieResult"]
+  | components["schemas"]["TvResult"];
 
 const FILTER_CATEGORIES = [
   "All",
@@ -48,7 +54,7 @@ const AnimeHubScreen: React.FC = () => {
   const jellyseerrService = useMemo(() => {
     const allConnectors = getAllConnectors();
     return allConnectors.find(
-      (c) => c.config.type === "jellyseerr" && c.config.enabled
+      (c) => c.config.type === "jellyseerr" && c.config.enabled,
     );
   }, [getAllConnectors]);
 
@@ -68,7 +74,6 @@ const AnimeHubScreen: React.FC = () => {
   // Jikan (MyAnimeList) Discover data — public API, does not require a configured service
   const jikan = useJikanDiscover();
 
-
   const handleCardPress = useCallback(
     (item: JellyseerrSearchResult) => {
       if (!jellyseerrService) return;
@@ -82,7 +87,7 @@ const AnimeHubScreen: React.FC = () => {
         },
       });
     },
-    [jellyseerrService, router]
+    [jellyseerrService, router],
   );
 
   const handleJikanCardPress = useCallback(
@@ -92,7 +97,7 @@ const AnimeHubScreen: React.FC = () => {
         params: { malId: String(item.id) },
       });
     },
-    [router]
+    [router],
   );
 
   const handleSearch = useCallback(() => {
@@ -197,7 +202,7 @@ const AnimeHubScreen: React.FC = () => {
           margin: 0,
         },
       }),
-    [theme]
+    [theme],
   );
 
   // If Jellyseerr is not configured we still show the Jikan discover sections.
@@ -252,23 +257,23 @@ const AnimeHubScreen: React.FC = () => {
   }
 
   const getJellyTitle = (r: JellyseerrSearchResult) => {
-    if ('title' in r && r.title) return r.title as string;
-    if ('name' in r && r.name) return r.name as string;
-    return 'Untitled';
+    if ("title" in r && r.title) return r.title as string;
+    if ("name" in r && r.name) return r.name as string;
+    return "Untitled";
   };
 
   const getJellyId = (r: JellyseerrSearchResult) => {
-    if (typeof r.id === 'number') return r.id;
+    if (typeof r.id === "number") return r.id;
     return r.mediaInfo?.tmdbId ?? 0;
   };
 
   const getJellyPosterPath = (r: JellyseerrSearchResult) => {
-    if ('posterPath' in r) return r.posterPath;
+    if ("posterPath" in r) return r.posterPath;
     return undefined;
   };
 
   const getJellyVoteAverage = (r: JellyseerrSearchResult) => {
-    if ('voteAverage' in r) return r.voteAverage ?? undefined;
+    if ("voteAverage" in r) return r.voteAverage ?? undefined;
     return undefined;
   };
 
@@ -276,7 +281,9 @@ const AnimeHubScreen: React.FC = () => {
     const idNum = getJellyId(item) as number;
     const title = getJellyTitle(item);
     const poster = getJellyPosterPath(item);
-    const posterUrl = poster ? `https://image.tmdb.org/t/p/original${poster}` : undefined;
+    const posterUrl = poster
+      ? `https://image.tmdb.org/t/p/original${poster}`
+      : undefined;
     const rating = getJellyVoteAverage(item);
 
     return (
@@ -308,7 +315,7 @@ const AnimeHubScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Anime Hub</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
             <IconButton
               icon="dots-vertical"
               size={24}
@@ -428,7 +435,10 @@ const AnimeHubScreen: React.FC = () => {
                         marginBottom: spacing.xs,
                       }}
                     >
-                      {(item as any).title ?? (item as any).name ?? (item as any).mediaInfo?.title ?? 'Untitled'}
+                      {(item as any).title ??
+                        (item as any).name ??
+                        (item as any).mediaInfo?.title ??
+                        "Untitled"}
                     </Text>
                     <View style={styles.episodeInfo}>
                       <Text style={styles.episodeText}>

@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View, ScrollView } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { CalendarDay } from '@/models/calendar.types';
-import { MediaReleaseCard } from '../MediaReleaseCard';
+import type { AppTheme } from "@/constants/theme";
+import type { CalendarDay } from "@/models/calendar.types";
+import { MediaReleaseCard } from "../MediaReleaseCard";
 
 export type CalendarDayViewProps = {
   data: CalendarDay;
@@ -28,7 +28,7 @@ const CalendarDayView: React.FC<CalendarDayViewProps> = ({
     header: {
       backgroundColor: theme.colors.surfaceVariant,
       padding: theme.custom.spacing.md,
-      alignItems: 'center',
+      alignItems: "center",
     },
     dateText: {
       fontSize: theme.custom.typography.headlineMedium.fontSize,
@@ -67,7 +67,7 @@ const CalendarDayView: React.FC<CalendarDayViewProps> = ({
       gap: theme.custom.spacing.sm,
     },
     emptyState: {
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: theme.custom.spacing.xl,
     },
     emptyText: {
@@ -77,25 +77,25 @@ const CalendarDayView: React.FC<CalendarDayViewProps> = ({
       lineHeight: theme.custom.typography.bodyLarge.lineHeight,
       letterSpacing: theme.custom.typography.bodyLarge.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      textAlign: 'center',
+      textAlign: "center",
     },
   });
 
   const date = useMemo(() => {
     const dateObj = new Date(data.date);
     return {
-      weekday: dateObj.toLocaleDateString('en-US', { weekday: 'long' }),
-      month: dateObj.toLocaleDateString('en-US', { month: 'long' }),
+      weekday: dateObj.toLocaleDateString("en-US", { weekday: "long" }),
+      month: dateObj.toLocaleDateString("en-US", { month: "long" }),
       day: dateObj.getDate(),
       year: dateObj.getFullYear(),
     };
   }, [data.date]);
 
   const releasesByStatus = useMemo(() => {
-    const upcoming = data.releases.filter(r => r.status === 'upcoming');
-    const released = data.releases.filter(r => r.status === 'released');
-    const delayed = data.releases.filter(r => r.status === 'delayed');
-    const cancelled = data.releases.filter(r => r.status === 'cancelled');
+    const upcoming = data.releases.filter((r) => r.status === "upcoming");
+    const released = data.releases.filter((r) => r.status === "released");
+    const delayed = data.releases.filter((r) => r.status === "delayed");
+    const cancelled = data.releases.filter((r) => r.status === "cancelled");
 
     return { upcoming, released, delayed, cancelled };
   }, [data.releases]);
@@ -128,7 +128,7 @@ const CalendarDayView: React.FC<CalendarDayViewProps> = ({
           {date.weekday}, {date.month} {date.day}, {date.year}
         </Text>
         <Text style={styles.weekdayText}>
-          {data.releases.length} release{data.releases.length !== 1 ? 's' : ''}
+          {data.releases.length} release{data.releases.length !== 1 ? "s" : ""}
         </Text>
       </View>
 

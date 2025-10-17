@@ -1,5 +1,8 @@
-import { TmdbConnector } from '@/connectors/implementations/TmdbConnector';
-import { getStoredTmdbKey, subscribeToTmdbKey } from '@/services/tmdb/TmdbCredentialService';
+import { TmdbConnector } from "@/connectors/implementations/TmdbConnector";
+import {
+  getStoredTmdbKey,
+  subscribeToTmdbKey,
+} from "@/services/tmdb/TmdbCredentialService";
 
 let cached: {
   key: string;
@@ -34,7 +37,7 @@ export const getTmdbConnector = async (): Promise<TmdbConnector | null> => {
 export const ensureTmdbConnector = async (): Promise<TmdbConnector> => {
   const connector = await getTmdbConnector();
   if (!connector) {
-    throw new Error('TMDB API key is not configured.');
+    throw new Error("TMDB API key is not configured.");
   }
 
   return connector;

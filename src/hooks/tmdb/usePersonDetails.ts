@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
 import type {
   PersonDetailsResponse,
@@ -7,9 +7,9 @@ import type {
   PersonCombinedCreditsResponse,
   PersonImagesResponse,
   PersonExternalIdsResponse,
-} from '@/connectors/implementations/TmdbConnector';
-import { getTmdbConnector } from '@/services/tmdb/TmdbConnectorProvider';
-import { queryKeys } from '@/hooks/queryKeys';
+} from "@/connectors/implementations/TmdbConnector";
+import { getTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
+import { queryKeys } from "@/hooks/queryKeys";
 
 export interface UsePersonDetailsOptions {
   enabled?: boolean;
@@ -37,7 +37,7 @@ export const usePersonDetails = (
     language,
     includeCredits = true,
     includeImages = false,
-    includeExternalIds = false
+    includeExternalIds = false,
   } = options;
 
   return useQuery<PersonDetailsResult, Error>({
@@ -45,15 +45,15 @@ export const usePersonDetails = (
     queryKey: queryKeys.tmdb.person.details(personId ?? 0, language),
     staleTime: 30 * 60 * 1000, // 30 minutes
     gcTime: 60 * 60 * 1000, // 1 hour
-    networkMode: 'offlineFirst',
+    networkMode: "offlineFirst",
     queryFn: async () => {
       if (!personId) {
-        throw new Error('Person ID is required for details lookup.');
+        throw new Error("Person ID is required for details lookup.");
       }
 
       const connector = await getTmdbConnector();
       if (!connector) {
-        throw new Error('TMDB API key is not configured.');
+        throw new Error("TMDB API key is not configured.");
       }
 
       // Fetch basic person details
@@ -63,19 +63,20 @@ export const usePersonDetails = (
 
       // Fetch additional data if requested
       if (includeCredits) {
-        const [movieCredits, tvCredits, combinedCredits] = await Promise.allSettled([
-          connector.getPersonMovieCredits(personId, language),
-          connector.getPersonTvCredits(personId, language),
-          connector.getPersonCombinedCredits(personId, language),
-        ]);
+        const [movieCredits, tvCredits, combinedCredits] =
+          await Promise.allSettled([
+            connector.getPersonMovieCredits(personId, language),
+            connector.getPersonTvCredits(personId, language),
+            connector.getPersonCombinedCredits(personId, language),
+          ]);
 
-        if (movieCredits.status === 'fulfilled') {
+        if (movieCredits.status === "fulfilled") {
           result.movieCredits = movieCredits.value;
         }
-        if (tvCredits.status === 'fulfilled') {
+        if (tvCredits.status === "fulfilled") {
           result.tvCredits = tvCredits.value;
         }
-        if (combinedCredits.status === 'fulfilled') {
+        if (combinedCredits.status === "fulfilled") {
           result.combinedCredits = combinedCredits.value;
         }
       }
@@ -83,7 +84,7 @@ export const usePersonDetails = (
       if (includeImages) {
         try {
           result.images = await connector.getPersonImages(personId);
-        } catch (error) {
+        } catch {
           // Non-critical, continue without images
         }
       }
@@ -91,7 +92,7 @@ export const usePersonDetails = (
       if (includeExternalIds) {
         try {
           result.externalIds = await connector.getPersonExternalIds(personId);
-        } catch (error) {
+        } catch {
           // Non-critical, continue without external IDs
         }
       }
@@ -102,21 +103,24 @@ export const usePersonDetails = (
 };
 
 // Separate hooks for specific person data if needed
-export const usePersonMovieCredits = (personId: number | null, language?: string) => {
+export const usePersonMovieCredits = (
+  personId: number | null,
+  language?: string,
+) => {
   return useQuery<PersonMovieCreditsResponse, Error>({
     enabled: Boolean(personId),
     queryKey: queryKeys.tmdb.person.movieCredits(personId ?? 0, language),
     staleTime: 60 * 60 * 1000, // 1 hour
     gcTime: 24 * 60 * 60 * 1000, // 24 hours
-    networkMode: 'offlineFirst',
+    networkMode: "offlineFirst",
     queryFn: async () => {
       if (!personId) {
-        throw new Error('Person ID is required for movie credits lookup.');
+        throw new Error("Person ID is required for movie credits lookup.");
       }
 
       const connector = await getTmdbConnector();
       if (!connector) {
-        throw new Error('TMDB API key is not configured.');
+        throw new Error("TMDB API key is not configured.");
       }
 
       return await connector.getPersonMovieCredits(personId, language);
@@ -124,21 +128,24 @@ export const usePersonMovieCredits = (personId: number | null, language?: string
   });
 };
 
-export const usePersonTvCredits = (personId: number | null, language?: string) => {
+export const usePersonTvCredits = (
+  personId: number | null,
+  language?: string,
+) => {
   return useQuery<PersonTvCreditsResponse, Error>({
     enabled: Boolean(personId),
     queryKey: queryKeys.tmdb.person.tvCredits(personId ?? 0, language),
     staleTime: 60 * 60 * 1000, // 1 hour
     gcTime: 24 * 60 * 60 * 1000, // 24 hours
-    networkMode: 'offlineFirst',
+    networkMode: "offlineFirst",
     queryFn: async () => {
       if (!personId) {
-        throw new Error('Person ID is required for TV credits lookup.');
+        throw new Error("Person ID is required for TV credits lookup.");
       }
 
       const connector = await getTmdbConnector();
       if (!connector) {
-        throw new Error('TMDB API key is not configured.');
+        throw new Error("TMDB API key is not configured.");
       }
 
       return await connector.getPersonTvCredits(personId, language);
@@ -146,21 +153,24 @@ export const usePersonTvCredits = (personId: number | null, language?: string) =
   });
 };
 
-export const usePersonCombinedCredits = (personId: number | null, language?: string) => {
+export const usePersonCombinedCredits = (
+  personId: number | null,
+  language?: string,
+) => {
   return useQuery<PersonCombinedCreditsResponse, Error>({
     enabled: Boolean(personId),
     queryKey: queryKeys.tmdb.person.combinedCredits(personId ?? 0, language),
     staleTime: 60 * 60 * 1000, // 1 hour
     gcTime: 24 * 60 * 60 * 1000, // 24 hours
-    networkMode: 'offlineFirst',
+    networkMode: "offlineFirst",
     queryFn: async () => {
       if (!personId) {
-        throw new Error('Person ID is required for combined credits lookup.');
+        throw new Error("Person ID is required for combined credits lookup.");
       }
 
       const connector = await getTmdbConnector();
       if (!connector) {
-        throw new Error('TMDB API key is not configured.');
+        throw new Error("TMDB API key is not configured.");
       }
 
       return await connector.getPersonCombinedCredits(personId, language);

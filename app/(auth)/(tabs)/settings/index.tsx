@@ -1,9 +1,9 @@
 import { useRouter } from "expo-router";
-import { StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { StyleSheet, View, useColorScheme } from "react-native";
+import { alert } from "@/services/dialogService";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Constants from "expo-constants";
-import { useColorScheme } from "react-native";
+
 import {
   Text,
   useTheme,
@@ -47,7 +47,7 @@ const formatBytes = (bytes: number): string => {
   const units = ["B", "KB", "MB", "GB"];
   const index = Math.min(
     Math.floor(Math.log(bytes) / Math.log(1024)),
-    units.length - 1
+    units.length - 1,
   );
   const value = bytes / 1024 ** index;
 
@@ -63,10 +63,11 @@ const SettingsScreen = () => {
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const theme = useTheme<AppTheme>();
-  const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+  const isDev = typeof __DEV__ !== "undefined" && __DEV__;
 
   // Get dynamic app version from Expo Constants
-  const appVersion = Constants.expoConfig?.version || Constants.manifest?.version || "Unknown";
+  const appVersion =
+    Constants.expoConfig?.version || Constants.manifest?.version || "Unknown";
   const appVersionString = `UniArr v${appVersion}`;
 
   // Settings store
@@ -97,10 +98,11 @@ const SettingsScreen = () => {
     setMaxImageCacheSize,
     logLevel,
     setLogLevel,
-  // image thumbnailing controls removed
+    // image thumbnailing controls removed
   } = useSettingsStore();
   const [logLevelVisible, setLogLevelVisible] = useState(false);
-  const [jellyseerrRetriesVisible, setJellyseerrRetriesVisible] = useState(false);
+  const [jellyseerrRetriesVisible, setJellyseerrRetriesVisible] =
+    useState(false);
   const [imageCacheUsage, setImageCacheUsage] = useState<ImageCacheUsage>({
     size: 0,
     fileCount: 0,
@@ -230,7 +232,7 @@ const SettingsScreen = () => {
       void logger.error("SettingsScreen: failed to load image cache usage.", {
         error: message,
       });
-  alert("Unable to load cache usage", message);
+      alert("Unable to load cache usage", message);
     } finally {
       setIsFetchingCacheUsage(false);
     }
@@ -245,16 +247,16 @@ const SettingsScreen = () => {
     try {
       await imageCacheService.clearCache();
       await loadImageCacheUsage();
-  alert(
+      alert(
         "Image cache cleared",
-        "Poster images will be refreshed on next load."
+        "Poster images will be refreshed on next load.",
       );
     } catch (error) {
       const message = getReadableErrorMessage(error);
       void logger.error("SettingsScreen: failed to clear image cache.", {
         error: message,
       });
-  alert("Unable to clear image cache", message);
+      alert("Unable to clear image cache", message);
     } finally {
       setIsClearingImageCache(false);
     }
@@ -270,7 +272,7 @@ const SettingsScreen = () => {
           ? signOutError.message
           : "Unable to sign out. Please try again.";
 
-  alert("Sign out failed", message);
+      alert("Sign out failed", message);
     }
   };
 
@@ -304,9 +306,12 @@ const SettingsScreen = () => {
         await loadImageCacheUsage(); // Refresh the usage display
       } catch (error) {
         const message = getReadableErrorMessage(error);
-        void logger.error("SettingsScreen: failed to enforce new cache limit.", {
-          error: message,
-        });
+        void logger.error(
+          "SettingsScreen: failed to enforce new cache limit.",
+          {
+            error: message,
+          },
+        );
       }
     })();
   };
@@ -325,16 +330,17 @@ const SettingsScreen = () => {
   };
 
   // Check if current theme is dark (either directly or via system setting)
+  const colorScheme = useColorScheme();
   const isCurrentThemeDark = useMemo(() => {
-    if (themePreference === 'dark') return true;
-    if (themePreference === 'light') return false;
+    if (themePreference === "dark") return true;
+    if (themePreference === "light") return false;
     // system theme - check the actual system color scheme
-    return useColorScheme() === 'dark';
-  }, [themePreference]);
+    return colorScheme === "dark";
+  }, [themePreference, colorScheme]);
 
   const quietHoursValue = useMemo(() => {
     const enabled = Object.entries(quietHours).filter(
-      ([, config]) => config.enabled
+      ([, config]) => config.enabled,
     );
     if (enabled.length === 0) {
       return "Disabled";
@@ -342,7 +348,7 @@ const SettingsScreen = () => {
 
     const labels = enabled
       .map(([category]) =>
-        getCategoryFriendlyName(category as NotificationCategory)
+        getCategoryFriendlyName(category as NotificationCategory),
       )
       .join(", ");
 
@@ -546,7 +552,9 @@ const SettingsScreen = () => {
                       />
                     </View>
                     <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>Completed Downloads</Text>
+                      <Text style={styles.settingValue}>
+                        Completed Downloads
+                      </Text>
                     </View>
                     <Switch
                       value={downloadNotificationsEnabled}
@@ -611,7 +619,9 @@ const SettingsScreen = () => {
                 </>
               )}
 
-              <View style={[styles.notificationItem, { marginTop: spacing.xs }]}>
+              <View
+                style={[styles.notificationItem, { marginTop: spacing.xs }]}
+              >
                 <View style={styles.notificationIcon}>
                   <IconButton
                     icon="moon-waning-crescent"
@@ -620,7 +630,9 @@ const SettingsScreen = () => {
                   />
                 </View>
                 <View style={styles.settingInfo}>
-                  <Text style={styles.settingValue}>Quiet Hours: {quietHoursValue}</Text>
+                  <Text style={styles.settingValue}>
+                    Quiet Hours: {quietHoursValue}
+                  </Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
@@ -652,7 +664,9 @@ const SettingsScreen = () => {
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Refresh Interval</Text>
-                  <Text style={styles.settingValue}>{refreshIntervalMinutes} minutes</Text>
+                  <Text style={styles.settingValue}>
+                    {refreshIntervalMinutes} minutes
+                  </Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
@@ -678,7 +692,9 @@ const SettingsScreen = () => {
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Voice Assistant</Text>
-                  <Text style={styles.settingValue}>Siri & Google Assistant</Text>
+                  <Text style={styles.settingValue}>
+                    Siri & Google Assistant
+                  </Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
@@ -748,7 +764,9 @@ const SettingsScreen = () => {
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Cache Limit</Text>
-                  <Text style={styles.settingValue}>{formatBytes(maxImageCacheSize)}</Text>
+                  <Text style={styles.settingValue}>
+                    {formatBytes(maxImageCacheSize)}
+                  </Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
@@ -779,7 +797,9 @@ const SettingsScreen = () => {
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Manage Services</Text>
-                  <Text style={styles.settingValue}>Configure connected services</Text>
+                  <Text style={styles.settingValue}>
+                    Configure connected services
+                  </Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
@@ -805,7 +825,9 @@ const SettingsScreen = () => {
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>TMDB Integration</Text>
-                  <Text style={styles.settingValue}>{tmdbEnabled ? "Enabled" : "Disabled"}</Text>
+                  <Text style={styles.settingValue}>
+                    {tmdbEnabled ? "Enabled" : "Disabled"}
+                  </Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
@@ -828,7 +850,8 @@ const SettingsScreen = () => {
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Jellyseerr Retries</Text>
                   <Text style={styles.settingValue}>
-                    {jellyseerrRetryAttempts} {jellyseerrRetryAttempts !== 1 ? 'retries' : 'retry'}
+                    {jellyseerrRetryAttempts}{" "}
+                    {jellyseerrRetryAttempts !== 1 ? "retries" : "retry"}
                   </Text>
                 </View>
                 <Button
@@ -863,7 +886,9 @@ const SettingsScreen = () => {
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Backup & Restore</Text>
-                  <Text style={styles.settingValue}>Export, import & cloud backups</Text>
+                  <Text style={styles.settingValue}>
+                    Export, import & cloud backups
+                  </Text>
                 </View>
                 <IconButton
                   icon="chevron-right"
@@ -939,7 +964,9 @@ const SettingsScreen = () => {
                   </View>
                   <View style={styles.settingInfo}>
                     <Text style={styles.settingTitle}>Developer Tools</Text>
-                    <Text style={styles.settingValue}>Dev tools & playground</Text>
+                    <Text style={styles.settingValue}>
+                      Dev tools & playground
+                    </Text>
                   </View>
                   <IconButton
                     icon="chevron-right"
@@ -1039,9 +1066,13 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>Jellyseerr Retries</Dialog.Title>
+            <Dialog.Title style={styles.sectionTitle}>
+              Jellyseerr Retries
+            </Dialog.Title>
             <Dialog.Content>
-              <Text style={{ ...styles.settingValue, marginBottom: spacing.md }}>
+              <Text
+                style={{ ...styles.settingValue, marginBottom: spacing.md }}
+              >
                 Choose how many retry attempts to perform when Jellyseerr
                 returns a server error (5xx). Setting to 0 disables retries.
               </Text>
@@ -1050,7 +1081,9 @@ const SettingsScreen = () => {
                   <Button
                     key={attempts}
                     mode={
-                      jellyseerrRetryAttempts === attempts ? 'contained' : 'outlined'
+                      jellyseerrRetryAttempts === attempts
+                        ? "contained"
+                        : "outlined"
                     }
                     onPress={() => {
                       setJellyseerrRetryAttempts(attempts);
@@ -1058,13 +1091,16 @@ const SettingsScreen = () => {
                     }}
                     style={{ marginVertical: 0 }}
                   >
-                    {attempts} attempt{attempts !== 1 ? 's' : ''}
+                    {attempts} attempt{attempts !== 1 ? "s" : ""}
                   </Button>
                 ))}
               </View>
             </Dialog.Content>
             <Dialog.Actions>
-              <Button mode="outlined" onPress={() => setJellyseerrRetriesVisible(false)}>
+              <Button
+                mode="outlined"
+                onPress={() => setJellyseerrRetriesVisible(false)}
+              >
                 Cancel
               </Button>
             </Dialog.Actions>
@@ -1082,8 +1118,11 @@ const SettingsScreen = () => {
           >
             <Dialog.Title style={styles.sectionTitle}>Log Level</Dialog.Title>
             <Dialog.Content>
-              <Text style={{ ...styles.settingValue, marginBottom: spacing.md }}>
-                Select minimum log level to record and show in developer consoles.
+              <Text
+                style={{ ...styles.settingValue, marginBottom: spacing.md }}
+              >
+                Select minimum log level to record and show in developer
+                consoles.
               </Text>
               <View style={{ gap: spacing.xs }}>
                 {["DEBUG", "INFO", "WARN", "ERROR"].map((level) => (
@@ -1128,8 +1167,11 @@ const SettingsScreen = () => {
           >
             <Dialog.Title style={styles.sectionTitle}>Cache Limit</Dialog.Title>
             <Dialog.Content>
-              <Text style={{ ...styles.settingValue, marginBottom: spacing.md }}>
-                Select maximum image cache size. Oldest images will be removed automatically when this limit is exceeded:
+              <Text
+                style={{ ...styles.settingValue, marginBottom: spacing.md }}
+              >
+                Select maximum image cache size. Oldest images will be removed
+                automatically when this limit is exceeded:
               </Text>
               <View style={{ gap: spacing.xs }}>
                 {[
@@ -1144,7 +1186,9 @@ const SettingsScreen = () => {
                   <Button
                     key={option.size}
                     mode={
-                      maxImageCacheSize === option.size ? "contained" : "outlined"
+                      maxImageCacheSize === option.size
+                        ? "contained"
+                        : "outlined"
                     }
                     onPress={() => handleCacheLimitSelect(option.size)}
                     style={{ marginVertical: 0 }}

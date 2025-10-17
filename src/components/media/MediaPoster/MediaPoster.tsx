@@ -57,11 +57,11 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     DEFAULT_RADIUS;
   const width = useMemo(
     () => (typeof size === "number" ? size : sizeMap[size]),
-    [size]
+    [size],
   );
   const height = useMemo(
     () => Math.round(width / aspectRatio),
-    [width, aspectRatio]
+    [width, aspectRatio],
   );
 
   const [isLoading, setIsLoading] = useState(Boolean(uri));
@@ -69,7 +69,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
 
   // Use the new thumbhash hook for clean thumbhash management
-  const { thumbhash, isGenerating } = useThumbhash(uri, {
+  const { thumbhash } = useThumbhash(uri, {
     autoGenerate: true,
     generateDelay: 100, // Small delay to not block initial render
   });
@@ -95,11 +95,15 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
 
       try {
         // Request a sized thumbnail matching the rendered size * device DPR
-        const localUri = await imageCacheService.resolveForSize(uri, width, height);
+        const localUri = await imageCacheService.resolveForSize(
+          uri,
+          width,
+          height,
+        );
         if (isMounted) {
           setResolvedUri(localUri);
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           setResolvedUri(uri);
         }
@@ -113,7 +117,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     };
   }, [uri, width, height]);
 
-  
   const handleImageLoad = () => {
     setIsLoading(false);
   };
@@ -145,7 +148,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       theme.colors.shadow,
       theme.custom.config?.posterStyle.shadowOpacity,
       theme.custom.config?.posterStyle.shadowRadius,
-    ]
+    ],
   );
 
   const isFallback = hasError || !resolvedUri;
@@ -168,7 +171,12 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       ) : null}
     </View>
   ) : showLoadingPlaceholder ? (
-    <View style={[styles.loadingPlaceholder, { borderRadius: effectiveBorderRadius }]}>
+    <View
+      style={[
+        styles.loadingPlaceholder,
+        { borderRadius: effectiveBorderRadius },
+      ]}
+    >
       <MaterialCommunityIcons
         name="image-outline"
         size={32}
@@ -183,21 +191,21 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         // Use stored thumbhash as a placeholder when available. Expo Image accepts
         // placeholder as an object with thumbhash property for proper rendering.
         placeholder={thumbhash ? { thumbhash } : undefined}
-      style={[
-        StyleSheet.absoluteFillObject,
-        { borderRadius: effectiveBorderRadius },
-      ]}
-      accessibilityLabel={accessibilityLabel}
-      cachePolicy="memory-disk"
-      contentFit="cover"
-      transition={0}
-      onLoad={handleImageLoad}
-      onLoadEnd={handleImageLoad}
-      onError={() => {
-        setIsLoading(false);
-        setHasError(true);
-      }}
-    />
+        style={[
+          StyleSheet.absoluteFillObject,
+          { borderRadius: effectiveBorderRadius },
+        ]}
+        accessibilityLabel={accessibilityLabel}
+        cachePolicy="memory-disk"
+        contentFit="cover"
+        transition={0}
+        onLoad={handleImageLoad}
+        onLoadEnd={handleImageLoad}
+        onError={() => {
+          setIsLoading(false);
+          setHasError(true);
+        }}
+      />
     </>
   );
 

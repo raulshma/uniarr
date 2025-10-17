@@ -1,24 +1,24 @@
 export type TorrentState =
-  | 'error'
-  | 'missingFiles'
-  | 'uploading'
-  | 'stalledUP'
-  | 'queuedUP'
-  | 'pausedUP'
-  | 'checkingUP'
-  | 'checkingResumeData'
-  | 'forcedUP'
-  | 'allocating'
-  | 'downloading'
-  | 'metaDL'
-  | 'stalledDL'
-  | 'checkingDL'
-  | 'queuedDL'
-  | 'pausedDL'
-  | 'forcedDL'
-  | 'forcedMetaDL'
-  | 'moving'
-  | 'unknown';
+  | "error"
+  | "missingFiles"
+  | "uploading"
+  | "stalledUP"
+  | "queuedUP"
+  | "pausedUP"
+  | "checkingUP"
+  | "checkingResumeData"
+  | "forcedUP"
+  | "allocating"
+  | "downloading"
+  | "metaDL"
+  | "stalledDL"
+  | "checkingDL"
+  | "queuedDL"
+  | "pausedDL"
+  | "forcedDL"
+  | "forcedMetaDL"
+  | "moving"
+  | "unknown";
 
 /**
  * Normalised representation of a qBittorrent torrent.
@@ -59,5 +59,5 @@ export interface TorrentTransferInfo {
   readonly downloadSpeed: number;
   readonly uploadSpeed: number;
   readonly dhtNodes: number;
-  readonly connectionStatus: 'connected' | 'firewalled' | 'disconnected';
+  readonly connectionStatus: "connected" | "firewalled" | "disconnected";
 }

@@ -27,7 +27,7 @@ const SPEC_MAP: Record<string, OpenApiSpec> = {
 
 const tryGetOperation = (
   pathObj: Record<string, any> | undefined,
-  operationName: string
+  operationName: string,
 ) => {
   if (!pathObj) return undefined;
 
@@ -53,7 +53,7 @@ const tryGetOperation = (
 export const getOpenApiOperationHint = (
   serviceType: string,
   endpoint: string,
-  operationName: string
+  operationName: string,
 ): string | undefined => {
   const spec = SPEC_MAP[serviceType];
   if (!spec) return undefined;

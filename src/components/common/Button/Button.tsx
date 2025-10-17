@@ -1,19 +1,19 @@
-import React, { forwardRef, useMemo } from 'react';
-import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
-import { StyleSheet } from 'react-native';
+import React, { forwardRef, useMemo } from "react";
+import type { StyleProp, TextStyle, ViewStyle } from "react-native";
+import { StyleSheet } from "react-native";
 import {
   Button as PaperButton,
   type ButtonProps as PaperButtonProps,
   useTheme,
-} from 'react-native-paper';
+} from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
+import type { AppTheme } from "@/constants/theme";
 
 type PaperButtonRef = React.ComponentRef<typeof PaperButton>;
 
 export type ButtonProps = PaperButtonProps & {
   fullWidth?: boolean;
-  align?: 'left' | 'center' | 'right';
+  align?: "left" | "center" | "right";
 };
 
 const Button = forwardRef<PaperButtonRef, ButtonProps>(
@@ -24,10 +24,10 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
       contentStyle,
       labelStyle,
       fullWidth = false,
-      align = 'center',
+      align = "center",
       loading = false,
       disabled = false,
-      mode = 'contained',
+      mode = "contained",
       ...rest
     },
     ref,
@@ -35,7 +35,11 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
     const theme = useTheme<AppTheme>();
 
     const combinedContentStyle = useMemo<StyleProp<ViewStyle>>(
-      () => [styles.baseContent, { paddingHorizontal: theme.custom.spacing.lg }, contentStyle],
+      () => [
+        styles.baseContent,
+        { paddingHorizontal: theme.custom.spacing.lg },
+        contentStyle,
+      ],
       [contentStyle, theme.custom.spacing.lg],
     );
 
@@ -47,7 +51,7 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
         {
           fontFamily: labelTypography.fontFamily,
           fontSize: labelTypography.fontSize,
-          fontWeight: labelTypography.fontWeight as TextStyle['fontWeight'],
+          fontWeight: labelTypography.fontWeight as TextStyle["fontWeight"],
           letterSpacing: labelTypography.letterSpacing,
           lineHeight: labelTypography.lineHeight,
         },
@@ -60,11 +64,11 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
 
     const getAlignmentStyle = () => {
       switch (align) {
-        case 'left':
+        case "left":
           return styles.alignLeft;
-        case 'center':
+        case "center":
           return styles.alignCenter;
-        case 'right':
+        case "right":
           return styles.alignRight;
         default:
           return styles.alignCenter;
@@ -80,7 +84,7 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
         style={[
           styles.base,
           fullWidth ? styles.fullWidth : getAlignmentStyle(),
-          style
+          style,
         ]}
         contentStyle={combinedContentStyle}
         labelStyle={combinedLabelStyle}
@@ -94,7 +98,7 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
   },
 );
 
-Button.displayName = 'Button';
+Button.displayName = "Button";
 
 export default Button;
 
@@ -103,23 +107,23 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   fullWidth: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
   },
   alignLeft: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   alignCenter: {
-    alignSelf: 'center',
+    alignSelf: "center",
   },
   alignRight: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
   },
   baseContent: {
     height: 48,
     borderRadius: 999,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   baseLabel: {
-    textTransform: 'none',
+    textTransform: "none",
   },
 });

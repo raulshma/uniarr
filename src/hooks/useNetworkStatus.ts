@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import { useEffect, useState } from "react";
+import NetInfo, { NetInfoState } from "@react-native-community/netinfo";
 
 export interface NetworkStatus {
   isConnected: boolean | null;
   isInternetReachable: boolean | null;
   type: string | null;
-  details: NetInfoState['details'] | null;
+  details: NetInfoState["details"] | null;
 }
 
 export const useNetworkStatus = () => {

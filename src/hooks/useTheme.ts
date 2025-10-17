@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useColorScheme, type ColorSchemeName } from 'react-native';
+import { useMemo } from "react";
+import { useColorScheme, type ColorSchemeName } from "react-native";
 
 import {
   getAppTheme,
@@ -8,30 +8,37 @@ import {
   defaultCustomThemeConfig,
   type AppTheme,
   type CustomThemeConfig,
-} from '@/constants/theme';
-import { useSettingsStore } from '@/store/settingsStore';
+} from "@/constants/theme";
+import { useSettingsStore } from "@/store/settingsStore";
 
-const hasCustomColors = (config?: CustomThemeConfig['customColors']): boolean => {
+const hasCustomColors = (
+  config?: CustomThemeConfig["customColors"],
+): boolean => {
   if (!config) {
     return false;
   }
 
   return Object.values(config).some(
-    (color) => typeof color === 'string' && color.trim().length > 0,
+    (color) => typeof color === "string" && color.trim().length > 0,
   );
 };
 
 const hasPosterStyleOverrides = (config: CustomThemeConfig): boolean =>
-  config.posterStyle.borderRadius !== defaultCustomThemeConfig.posterStyle.borderRadius ||
-  config.posterStyle.shadowOpacity !== defaultCustomThemeConfig.posterStyle.shadowOpacity ||
-  config.posterStyle.shadowRadius !== defaultCustomThemeConfig.posterStyle.shadowRadius;
+  config.posterStyle.borderRadius !==
+    defaultCustomThemeConfig.posterStyle.borderRadius ||
+  config.posterStyle.shadowOpacity !==
+    defaultCustomThemeConfig.posterStyle.shadowOpacity ||
+  config.posterStyle.shadowRadius !==
+    defaultCustomThemeConfig.posterStyle.shadowRadius;
 
-const hasCustomThemeOverrides = (config?: CustomThemeConfig): config is CustomThemeConfig => {
+const hasCustomThemeOverrides = (
+  config?: CustomThemeConfig,
+): config is CustomThemeConfig => {
   if (!config) {
     return false;
   }
 
-  if (config.preset && config.preset !== 'uniarr') {
+  if (config.preset && config.preset !== "uniarr") {
     return true;
   }
 
@@ -39,7 +46,10 @@ const hasCustomThemeOverrides = (config?: CustomThemeConfig): config is CustomTh
     return true;
   }
 
-  if (config.oledEnabled && config.oledEnabled !== defaultCustomThemeConfig.oledEnabled) {
+  if (
+    config.oledEnabled &&
+    config.oledEnabled !== defaultCustomThemeConfig.oledEnabled
+  ) {
     return true;
   }
 
@@ -66,7 +76,9 @@ const hasCustomThemeOverrides = (config?: CustomThemeConfig): config is CustomTh
 export const useTheme = (): AppTheme => {
   const systemColorScheme = useColorScheme();
   const themePreference = useSettingsStore((state) => state.theme);
-  const customThemeConfig = useSettingsStore((state) => state.customThemeConfig);
+  const customThemeConfig = useSettingsStore(
+    (state) => state.customThemeConfig,
+  );
   const oledEnabled = useSettingsStore((state) => state.oledEnabled);
 
   return useMemo(() => {
@@ -78,27 +90,28 @@ export const useTheme = (): AppTheme => {
     let effectiveScheme: ColorSchemeName;
 
     switch (themePreference) {
-      case 'light':
-        effectiveScheme = 'light';
+      case "light":
+        effectiveScheme = "light";
         break;
-      case 'dark':
-        effectiveScheme = 'dark';
+      case "dark":
+        effectiveScheme = "dark";
         break;
-      case 'system':
+      case "system":
       default:
-        effectiveScheme = systemColorScheme ?? 'dark';
+        effectiveScheme = systemColorScheme ?? "dark";
         break;
     }
 
     // Merge OLED setting into custom theme config if OLED is enabled and we're in dark mode
-    const enhancedConfig = effectiveScheme === 'dark' && oledEnabled
-      ? { ...customThemeConfig, oledEnabled: true }
-      : customThemeConfig;
+    const enhancedConfig =
+      effectiveScheme === "dark" && oledEnabled
+        ? { ...customThemeConfig, oledEnabled: true }
+        : customThemeConfig;
 
     // Check if we have a custom theme configuration
     if (hasCustomThemeOverrides(enhancedConfig)) {
       // Use custom theme configuration
-      return createCustomTheme(enhancedConfig, effectiveScheme === 'dark');
+      return createCustomTheme(enhancedConfig, effectiveScheme === "dark");
     }
 
     // Use standard theme

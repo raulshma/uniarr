@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
-import { secureStorage } from '../storage/SecureStorage';
+import { Platform } from "react-native";
+import { secureStorage } from "../storage/SecureStorage";
 
 // Types for voice assistant integration
 export interface VoiceShortcut {
@@ -11,7 +11,7 @@ export interface VoiceShortcut {
   parameters?: Record<string, any>;
   icon?: string;
   enabled: boolean;
-  platform: 'ios' | 'android' | 'both';
+  platform: "ios" | "android" | "both";
 }
 
 export interface VoiceCommand {
@@ -40,10 +40,10 @@ export interface SiriShortcutActivity {
 export interface AppAction {
   action: string;
   intentName: string;
-  parameters: Array<{
+  parameters: {
     name: string;
     type: string;
-  }>;
+  }[];
 }
 
 export class VoiceAssistantService {
@@ -71,48 +71,54 @@ export class VoiceAssistantService {
   // Configuration management
   async loadConfig(): Promise<void> {
     try {
-      const stored = await secureStorage.getItem('voice_assistant_config');
+      const stored = await secureStorage.getItem("voice_assistant_config");
       if (stored) {
         this.config = { ...this.config, ...JSON.parse(stored) };
       }
       this.loadShortcuts();
     } catch (error) {
-      console.error('Failed to load voice assistant config:', error);
+      console.error("Failed to load voice assistant config:", error);
     }
   }
 
   async saveConfig(): Promise<void> {
     try {
-      await secureStorage.setItem('voice_assistant_config', JSON.stringify(this.config));
+      await secureStorage.setItem(
+        "voice_assistant_config",
+        JSON.stringify(this.config),
+      );
     } catch (error) {
-      console.error('Failed to save voice assistant config:', error);
+      console.error("Failed to save voice assistant config:", error);
     }
   }
 
   async loadShortcuts(): Promise<void> {
     try {
-      const stored = await secureStorage.getItem('voice_shortcuts');
+      const stored = await secureStorage.getItem("voice_shortcuts");
       if (stored) {
         const shortcutsArray: VoiceShortcut[] = JSON.parse(stored);
         this.shortcuts.clear();
-        shortcutsArray.forEach(shortcut => {
+        shortcutsArray.forEach((shortcut) => {
           this.shortcuts.set(shortcut.id, shortcut);
         });
         this.config.shortcuts = shortcutsArray;
       }
     } catch (error) {
-      console.error('Failed to load voice shortcuts:', error);
+      console.error("Failed to load voice shortcuts:", error);
     }
   }
 
   async saveShortcuts(): Promise<void> {
     try {
       const shortcutsArray = Array.from(this.shortcuts.values());
-      await secureStorage.setItem('voice_shortcuts', JSON.stringify(shortcutsArray));
+      await secureStorage.setItem(
+        "voice_shortcuts",
+        JSON.stringify(shortcutsArray),
+      );
       this.config.shortcuts = shortcutsArray;
       await this.saveConfig();
     } catch (error) {
-      console.error('Failed to save voice shortcuts:', error);
+      console.error("Failed to save voice shortcuts:", error);
     }
   }
 
@@ -134,7 +140,7 @@ export class VoiceAssistantService {
   }
 
   // Add a new voice shortcut
-  async addShortcut(shortcut: Omit<VoiceShortcut, 'id'>): Promise<string> {
+  async addShortcut(shortcut: Omit<VoiceShortcut, "id">): Promise<string> {
     const id = `shortcut_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const newShortcut: VoiceShortcut = {
       ...shortcut,
@@ -163,7 +169,10 @@ export class VoiceAssistantService {
   }
 
   // Update a voice shortcut
-  async updateShortcut(id: string, updates: Partial<VoiceShortcut>): Promise<void> {
+  async updateShortcut(
+    id: string,
+    updates: Partial<VoiceShortcut>,
+  ): Promise<void> {
     const shortcut = this.shortcuts.get(id);
     if (shortcut) {
       const updatedShortcut = { ...shortcut, ...updates };
@@ -183,25 +192,26 @@ export class VoiceAssistantService {
   }
 
   // Get shortcuts for specific platform
-  getShortcutsForPlatform(platform: 'ios' | 'android'): VoiceShortcut[] {
-    return this.getShortcuts().filter(shortcut =>
-      shortcut.platform === 'both' || shortcut.platform === platform
+  getShortcutsForPlatform(platform: "ios" | "android"): VoiceShortcut[] {
+    return this.getShortcuts().filter(
+      (shortcut) =>
+        shortcut.platform === "both" || shortcut.platform === platform,
     );
   }
 
   // Platform-specific initialization
   private async initializeVoiceAssistant(): Promise<void> {
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === "ios") {
       await this.initializeSiriShortcuts();
-    } else if (Platform.OS === 'android') {
+    } else if (Platform.OS === "android") {
       await this.initializeGoogleAssistant();
     }
   }
 
   private async cleanupVoiceAssistant(): Promise<void> {
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === "ios") {
       await this.cleanupSiriShortcuts();
-    } else if (Platform.OS === 'android') {
+    } else if (Platform.OS === "android") {
       await this.cleanupGoogleAssistant();
     }
   }
@@ -212,7 +222,7 @@ export class VoiceAssistantService {
     // For now, we'll provide the interface and note the requirement
 
     // Register all enabled iOS shortcuts
-    const iosShortcuts = this.getShortcutsForPlatform('ios');
+    const iosShortcuts = this.getShortcutsForPlatform("ios");
     for (const shortcut of iosShortcuts) {
       if (shortcut.enabled) {
         await this.registerShortcutWithPlatform(shortcut);
@@ -220,26 +230,43 @@ export class VoiceAssistantService {
     }
   }
 
-  private async cleanupSiriShortcuts(): Promise<void> {
-  }
+  private async cleanupSiriShortcuts(): Promise<void> {}
 
-  private async registerShortcutWithPlatform(shortcut: VoiceShortcut): Promise<void> {
-    if (Platform.OS === 'ios' && (shortcut.platform === 'ios' || shortcut.platform === 'both')) {
+  private async registerShortcutWithPlatform(
+    shortcut: VoiceShortcut,
+  ): Promise<void> {
+    if (
+      Platform.OS === "ios" &&
+      (shortcut.platform === "ios" || shortcut.platform === "both")
+    ) {
       await this.registerSiriShortcut(shortcut);
-    } else if (Platform.OS === 'android' && (shortcut.platform === 'android' || shortcut.platform === 'both')) {
+    } else if (
+      Platform.OS === "android" &&
+      (shortcut.platform === "android" || shortcut.platform === "both")
+    ) {
       await this.registerGoogleAssistantAction(shortcut);
     }
   }
 
-  private async unregisterShortcutFromPlatform(shortcut: VoiceShortcut): Promise<void> {
-    if (Platform.OS === 'ios' && (shortcut.platform === 'ios' || shortcut.platform === 'both')) {
+  private async unregisterShortcutFromPlatform(
+    shortcut: VoiceShortcut,
+  ): Promise<void> {
+    if (
+      Platform.OS === "ios" &&
+      (shortcut.platform === "ios" || shortcut.platform === "both")
+    ) {
       await this.unregisterSiriShortcut(shortcut);
-    } else if (Platform.OS === 'android' && (shortcut.platform === 'android' || shortcut.platform === 'both')) {
+    } else if (
+      Platform.OS === "android" &&
+      (shortcut.platform === "android" || shortcut.platform === "both")
+    ) {
       await this.unregisterGoogleAssistantAction(shortcut);
     }
   }
 
-  private async updateShortcutWithPlatform(shortcut: VoiceShortcut): Promise<void> {
+  private async updateShortcutWithPlatform(
+    shortcut: VoiceShortcut,
+  ): Promise<void> {
     await this.unregisterShortcutFromPlatform(shortcut);
     if (shortcut.enabled) {
       await this.registerShortcutWithPlatform(shortcut);
@@ -250,7 +277,6 @@ export class VoiceAssistantService {
   private async registerSiriShortcut(shortcut: VoiceShortcut): Promise<void> {
     // This would use react-native-siri-shortcut or native iOS code
     // For now, we'll log what would be registered
-
     // Example implementation would be:
     // const SiriShortcut = require('react-native-siri-shortcut');
     // await SiriShortcut.addShortcut({
@@ -268,7 +294,7 @@ export class VoiceAssistantService {
   // Google Assistant implementation (Android)
   private async initializeGoogleAssistant(): Promise<void> {
     // Register all enabled Android shortcuts
-    const androidShortcuts = this.getShortcutsForPlatform('android');
+    const androidShortcuts = this.getShortcutsForPlatform("android");
     for (const shortcut of androidShortcuts) {
       if (shortcut.enabled) {
         await this.registerShortcutWithPlatform(shortcut);
@@ -276,21 +302,22 @@ export class VoiceAssistantService {
     }
   }
 
-  private async cleanupGoogleAssistant(): Promise<void> {
-  }
+  private async cleanupGoogleAssistant(): Promise<void> {}
 
-  private async registerGoogleAssistantAction(shortcut: VoiceShortcut): Promise<void> {
+  private async registerGoogleAssistantAction(
+    shortcut: VoiceShortcut,
+  ): Promise<void> {
     // This requires Android App Actions configuration in AndroidManifest.xml
     // and shortcuts.xml resource file
-
     // Example implementation would involve:
     // 1. Adding intent filters to AndroidManifest.xml
     // 2. Creating shortcuts.xml with App Actions
     // 3. Using react-native-voice for voice recognition (optional)
   }
 
-  private async unregisterGoogleAssistantAction(shortcut: VoiceShortcut): Promise<void> {
-  }
+  private async unregisterGoogleAssistantAction(
+    shortcut: VoiceShortcut,
+  ): Promise<void> {}
 
   // Voice command processing
   async processVoiceCommand(command: string): Promise<VoiceCommand | null> {
@@ -303,50 +330,66 @@ export class VoiceAssistantService {
     const normalizedCommand = command.toLowerCase().trim();
 
     // Media search commands
-    if (normalizedCommand.includes('search for') || normalizedCommand.includes('find')) {
+    if (
+      normalizedCommand.includes("search for") ||
+      normalizedCommand.includes("find")
+    ) {
       const searchTerm = this.extractSearchTerm(normalizedCommand);
       if (searchTerm) {
         return {
-          command: 'search_media',
-          action: 'search',
+          command: "search_media",
+          action: "search",
           parameters: { query: searchTerm },
         };
       }
     }
 
     // Service status commands
-    if (normalizedCommand.includes('service status') || normalizedCommand.includes('check services')) {
+    if (
+      normalizedCommand.includes("service status") ||
+      normalizedCommand.includes("check services")
+    ) {
       return {
-        command: 'check_services',
-        action: 'get_service_status',
+        command: "check_services",
+        action: "get_service_status",
       };
     }
 
     // Download status commands
-    if (normalizedCommand.includes('downloads') || normalizedCommand.includes('downloading')) {
+    if (
+      normalizedCommand.includes("downloads") ||
+      normalizedCommand.includes("downloading")
+    ) {
       return {
-        command: 'check_downloads',
-        action: 'get_download_status',
+        command: "check_downloads",
+        action: "get_download_status",
       };
     }
 
     // Add media commands
-    if (normalizedCommand.includes('add') && (normalizedCommand.includes('series') || normalizedCommand.includes('movie'))) {
+    if (
+      normalizedCommand.includes("add") &&
+      (normalizedCommand.includes("series") ||
+        normalizedCommand.includes("movie"))
+    ) {
       const mediaName = this.extractMediaName(normalizedCommand);
       if (mediaName) {
         return {
-          command: 'add_media',
-          action: 'add_media',
+          command: "add_media",
+          action: "add_media",
           parameters: { name: mediaName },
         };
       }
     }
 
     // Request commands
-    if (normalizedCommand.includes('request') || normalizedCommand.includes('approve')) {
+    if (
+      normalizedCommand.includes("request") ||
+      normalizedCommand.includes("approve")
+    ) {
       return {
-        command: 'manage_requests',
-        action: 'get_pending_requests',
+        command: "manage_requests",
+        action: "get_pending_requests",
       };
     }
 
@@ -355,11 +398,7 @@ export class VoiceAssistantService {
 
   // Helper methods for command parsing
   private extractSearchTerm(command: string): string | null {
-    const patterns = [
-      /search for (.+)/i,
-      /find (.+)/i,
-      /look for (.+)/i,
-    ];
+    const patterns = [/search for (.+)/i, /find (.+)/i, /look for (.+)/i];
 
     for (const pattern of patterns) {
       const match = command.match(pattern);
@@ -372,10 +411,7 @@ export class VoiceAssistantService {
   }
 
   private extractMediaName(command: string): string | null {
-    const patterns = [
-      /add (.+?)(?: to | series| movie|$)/i,
-      /add (.+)/i,
-    ];
+    const patterns = [/add (.+?)(?: to | series| movie|$)/i, /add (.+)/i];
 
     for (const pattern of patterns) {
       const match = command.match(pattern);
@@ -388,36 +424,36 @@ export class VoiceAssistantService {
   }
 
   // Get available voice commands for the current context
-  getAvailableCommands(): Array<{
+  getAvailableCommands(): {
     phrase: string;
     description: string;
     action: string;
-  }> {
+  }[] {
     return [
       {
-        phrase: 'Search for [movie/series name]',
-        description: 'Search for media across all services',
-        action: 'search_media',
+        phrase: "Search for [movie/series name]",
+        description: "Search for media across all services",
+        action: "search_media",
       },
       {
-        phrase: 'Check service status',
-        description: 'Get status of all connected services',
-        action: 'check_services',
+        phrase: "Check service status",
+        description: "Get status of all connected services",
+        action: "check_services",
       },
       {
-        phrase: 'What\'s downloading?',
-        description: 'Check current download status',
-        action: 'check_downloads',
+        phrase: "What's downloading?",
+        description: "Check current download status",
+        action: "check_downloads",
       },
       {
-        phrase: 'Add [movie/series name]',
-        description: 'Add media to your services',
-        action: 'add_media',
+        phrase: "Add [movie/series name]",
+        description: "Add media to your services",
+        action: "add_media",
       },
       {
-        phrase: 'Check requests',
-        description: 'View pending Jellyseerr requests',
-        action: 'manage_requests',
+        phrase: "Check requests",
+        description: "View pending Jellyseerr requests",
+        action: "manage_requests",
       },
     ];
   }
@@ -429,8 +465,8 @@ export class VoiceAssistantService {
     voiceRecognition: boolean;
   } {
     return {
-      siriShortcuts: Platform.OS === 'ios',
-      googleAssistant: Platform.OS === 'android',
+      siriShortcuts: Platform.OS === "ios",
+      googleAssistant: Platform.OS === "android",
       voiceRecognition: false, // Requires additional native implementation
     };
   }

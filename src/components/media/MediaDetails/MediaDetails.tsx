@@ -5,9 +5,6 @@ import {
   Text,
   useTheme,
   Card,
-  Surface,
-  Portal,
-  Dialog,
   TouchableRipple,
   Button,
   Switch,
@@ -67,30 +64,7 @@ export type MediaDetailsProps = {
   testID?: string;
 };
 
-const formatRuntime = (runtimeMinutes?: number): string | undefined => {
-  if (!runtimeMinutes) {
-    return undefined;
-  }
-
-  const hours = Math.floor(runtimeMinutes / 60);
-  const minutes = runtimeMinutes % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
-  }
-
-  return `${minutes}m`;
-};
-
-const formatFileSize = (sizeInMB?: number): string => {
-  if (!sizeInMB) return "";
-
-  if (sizeInMB >= 1024) {
-    return `${(sizeInMB / 1024).toFixed(1)}GB`;
-  }
-
-  return `${sizeInMB}MB`;
-};
+// Removed top-level MB-based formatter (duplicate). Per-file helpers are defined below where needed.
 
 const MediaDetails: React.FC<MediaDetailsProps> = ({
   title,
@@ -120,7 +94,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   testID = "media-details",
 }) => {
   const theme = useTheme<AppTheme>();
-  const [episodesModalVisible, setEpisodesModalVisible] = useState(false);
+  // episodesModalVisible removed — seasons use inline selectedSeason state instead
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
 
   const handleMonitorPress = useCallback(() => {
@@ -142,8 +116,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   const showSeasons = type === "series" && seasons?.length;
   const showEpisodes = showSeasons && (selectedSeason || seasons?.length === 1);
 
-  // Format file size for display
-  const formatFileSize = (sizeInBytes?: number): string => {
+  // Helper: format bytes into a human-readable string
+  const formatFileSizeBytes = (sizeInBytes?: number): string => {
     if (!sizeInBytes) return "";
 
     const sizeInGB = sizeInBytes / (1024 * 1024 * 1024);
@@ -155,15 +129,24 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
     return `${sizeInMB.toFixed(1)} MB`;
   };
 
+  // Some data sources provide episode sizes in MB; format those as well
+  const formatFileSizeFromMB = (sizeInMB?: number): string => {
+    if (!sizeInMB) return "";
+    if (sizeInMB >= 1024) {
+      return `${(sizeInMB / 1024).toFixed(1)} GB`;
+    }
+    return `${sizeInMB.toFixed(1)} MB`;
+  };
+
   // Get quality from movie file or default
   const getQuality = (): string => {
     return movieFile?.quality?.quality?.name || "Unknown";
   };
 
-  // Get file size from movie file
+  // Get file size from movie file (movieFile.size is bytes)
   const getFileSize = (): string => {
     if (!movieFile?.size) return "Unknown";
-    return formatFileSize(movieFile.size);
+    return formatFileSizeBytes(movieFile.size);
   };
 
   const content = (
@@ -615,11 +598,11 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                         fontWeight: "500",
                       }}
                     >
-                      {formatFileSize(episode.sizeInMB)}
+                      {formatFileSizeFromMB(episode.sizeInMB)}
                     </Text>
                   )}
                 </View>
-              )
+              ),
             ) || (
               <View
                 style={{
@@ -647,8 +630,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
           <View style={{ flexDirection: "row", gap: 12 }}>
             <Button
               mode="contained"
-              onPress={() => {
-              }}
+              onPress={() => {}}
               buttonColor={theme.colors.primary}
               textColor={theme.colors.onPrimary}
               style={{ flex: 1, borderRadius: 8 }}
@@ -659,8 +641,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
             <Button
               mode="outlined"
-              onPress={() => {
-              }}
+              onPress={() => {}}
               textColor={theme.colors.onSurfaceVariant}
               style={{ flex: 1, borderRadius: 8 }}
               labelStyle={{ fontWeight: "600" }}

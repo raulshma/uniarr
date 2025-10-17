@@ -102,6 +102,8 @@ export default function ThemeEditorScreen() {
     }
   };
 
+  const insets = useSafeAreaInsets();
+
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -110,8 +112,6 @@ export default function ThemeEditorScreen() {
       </View>
     );
   }
-
-  const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView
@@ -282,7 +282,7 @@ export default function ThemeEditorScreen() {
                     onChangeText={(text) =>
                       handlePosterStyleChange(
                         "borderRadius",
-                        parseInt(text) || 0
+                        parseInt(text) || 0,
                       )
                     }
                     style={[
@@ -307,7 +307,7 @@ export default function ThemeEditorScreen() {
                     onChangeText={(text) =>
                       handlePosterStyleChange(
                         "shadowOpacity",
-                        parseFloat(text) || 0
+                        parseFloat(text) || 0,
                       )
                     }
                     style={[
@@ -332,7 +332,7 @@ export default function ThemeEditorScreen() {
                     onChangeText={(text) =>
                       handlePosterStyleChange(
                         "shadowRadius",
-                        parseInt(text) || 0
+                        parseInt(text) || 0,
                       )
                     }
                     style={[
@@ -438,12 +438,12 @@ export default function ThemeEditorScreen() {
                   showColorPicker as keyof typeof config.customColors
                 ]!
               : typeof theme.colors[
-                  showColorPicker as keyof typeof theme.colors
-                ] === "string"
-              ? (theme.colors[
-                  showColorPicker as keyof typeof theme.colors
-                ] as string)
-              : "#000000"
+                    showColorPicker as keyof typeof theme.colors
+                  ] === "string"
+                ? (theme.colors[
+                    showColorPicker as keyof typeof theme.colors
+                  ] as string)
+                : "#000000"
           }
         />
       </Portal>

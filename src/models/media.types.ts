@@ -96,12 +96,12 @@ export interface Series {
  * Sonarr series status values.
  */
 export type SeriesStatus =
-  | 'continuing'
-  | 'ended'
-  | 'upcoming'
-  | 'deleted'
-  | 'archived'
-  | 'tba'
+  | "continuing"
+  | "ended"
+  | "upcoming"
+  | "deleted"
+  | "archived"
+  | "tba"
   | string;
 
 /**
@@ -157,11 +157,17 @@ export interface AddSeriesRequest {
   readonly languageProfileId?: number;
   readonly monitored?: boolean;
   readonly seasonFolder?: boolean;
-  readonly seriesType?: 'standard' | 'anime' | 'daily';
+  readonly seriesType?: "standard" | "anime" | "daily";
   readonly tags?: number[];
   readonly searchNow?: boolean;
   readonly addOptions?: {
     readonly searchForMissingEpisodes?: boolean;
-    readonly monitor?: 'all' | 'future' | 'existing' | 'firstSeason' | 'latestSeason' | 'none';
+    readonly monitor?:
+      | "all"
+      | "future"
+      | "existing"
+      | "firstSeason"
+      | "latestSeason"
+      | "none";
   };
 }

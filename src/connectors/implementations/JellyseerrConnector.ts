@@ -1,5 +1,13 @@
 import { BaseConnector } from "@/connectors/base/BaseConnector";
 import type { SearchOptions } from "@/connectors/base/IConnector";
+import { handleApiError, ApiError } from "@/utils/error.utils";
+import { logger } from "@/services/logger/LoggerService";
+import { type AxiosRequestConfig, isAxiosError } from "axios";
+import { useSettingsStore } from "@/store/settingsStore";
+import type {
+  components,
+  paths,
+} from "@/connectors/client-schemas/jellyseerr-openapi";
 // Use generated OpenAPI types from the bundled client schema instead of the
 // legacy custom `jellyseerr.types`. We create local aliases here so the
 // rest of the connector can continue to reference familiar names while the
@@ -22,20 +30,9 @@ type JellyseerrRequest = components["schemas"]["MediaRequest"];
 type JellyseerrRequestList = JellyseerrPagedResult<JellyseerrRequest>;
 type JellyseerrRequestQueryOptions =
   paths["/request"]["get"]["parameters"]["query"];
-type JellyseerrRequestStatus = number;
 type JellyseerrSearchResult =
   | components["schemas"]["MovieResult"]
   | components["schemas"]["TvResult"];
-type JellyseerrSeasonRequestStatus = components["schemas"]["Season"];
-type JellyseerrUserSummary = components["schemas"]["User"];
-import { handleApiError, ApiError } from "@/utils/error.utils";
-import { logger } from "@/services/logger/LoggerService";
-import axios, { type AxiosResponse, type AxiosRequestConfig } from "axios";
-import { useSettingsStore } from "@/store/settingsStore";
-import type {
-  components,
-  paths,
-} from "@/connectors/client-schemas/jellyseerr-openapi";
 
 const API_PREFIX = "/api/v1";
 const REQUEST_ENDPOINT = `${API_PREFIX}/request`;
@@ -174,11 +171,6 @@ type ApiSearchResult =
       readonly mediaInfo?: ApiMedia;
     };
 
-interface ApproveRequestBody {
-  is4k?: boolean;
-  seasons?: number[];
-}
-
 // OpenAPI uses numeric status codes. Normalize incoming status (string or number)
 // to the numeric codes expected by the generated schema. Unknown values map to 0.
 
@@ -203,7 +195,7 @@ const mapRequest = (request: ApiRequest): JellyseerrRequest => {
 };
 
 const mapPagedRequests = (
-  data: ApiPaginatedResponse<ApiRequest>
+  data: ApiPaginatedResponse<ApiRequest>,
 ): JellyseerrRequestList => {
   const items = data.results.map((r) => r as unknown as JellyseerrRequest);
   const total = data.pageInfo?.results ?? data.totalResults ?? items.length;
@@ -239,17 +231,17 @@ const mapCastMember = (p: ApiCreditPerson) => ({
 });
 
 const mapSearchResults = (
-  results: ApiSearchResult[]
+  results: ApiSearchResult[],
 ): JellyseerrSearchResult[] =>
   // The OpenAPI search result schemas are the canonical shapes. Cast the
   // API response items to the generated union and return them so consumers
   // can be updated to rely on the generated properties.
   results.filter(
-    (item) => item.mediaType === "movie" || item.mediaType === "tv"
+    (item) => item.mediaType === "movie" || item.mediaType === "tv",
   ) as unknown as JellyseerrSearchResult[];
 
 const normalizeRequestQuery = (
-  options?: JellyseerrRequestQueryOptions
+  options?: JellyseerrRequestQueryOptions,
 ): Record<string, unknown> => {
   if (!options) {
     return {};
@@ -278,7 +270,7 @@ const normalizeRequestQuery = (
 };
 
 const buildCreatePayload = (
-  payload: CreateJellyseerrRequest
+  payload: CreateJellyseerrRequest,
 ): Record<string, unknown> => {
   const body: Record<string, unknown> = {
     mediaId: payload.mediaId,
@@ -352,10 +344,10 @@ export class JellyseerrConnector extends BaseConnector<
    * handleApiError which will attach context & perform logging).
    */
   private async requestWithRetry<T>(
-    requestFn: () => Promise<AxiosResponse<T>>,
+    requestFn: () => Promise<{ data: T }>,
     operation: string,
-    endpoint: string
-  ): Promise<AxiosResponse<T>> {
+    endpoint: string,
+  ): Promise<{ data: T }> {
     const settings = useSettingsStore.getState();
     const maxRetries =
       typeof settings.jellyseerrRetryAttempts === "number"
@@ -367,7 +359,7 @@ export class JellyseerrConnector extends BaseConnector<
       try {
         return await requestFn();
       } catch (error) {
-        const isAxios = axios.isAxiosError(error);
+        const isAxios = isAxiosError(error);
         const status = isAxios ? error.response?.status : undefined;
 
         // Only retry for server-side errors (5xx). Do not retry on client
@@ -405,12 +397,12 @@ export class JellyseerrConnector extends BaseConnector<
   private getWithRetry<T>(
     endpoint: string,
     config?: AxiosRequestConfig,
-    operation?: string
+    operation?: string,
   ) {
     return this.requestWithRetry<T>(
       () => this.client.get<T>(endpoint, config),
       operation ?? "get",
-      endpoint
+      endpoint,
     );
   }
 
@@ -418,24 +410,24 @@ export class JellyseerrConnector extends BaseConnector<
     endpoint: string,
     data?: unknown,
     config?: AxiosRequestConfig,
-    operation?: string
+    operation?: string,
   ) {
     return this.requestWithRetry<T>(
       () => this.client.post<T>(endpoint, data, config),
       operation ?? "post",
-      endpoint
+      endpoint,
     );
   }
 
   private deleteWithRetry<T>(
     endpoint: string,
     config?: AxiosRequestConfig,
-    operation?: string
+    operation?: string,
   ) {
     return this.requestWithRetry<T>(
       () => this.client.delete<T>(endpoint, config),
       operation ?? "delete",
-      endpoint
+      endpoint,
     );
   }
   async initialize(): Promise<void> {
@@ -450,7 +442,7 @@ export class JellyseerrConnector extends BaseConnector<
       const response = await this.getWithRetry<ApiStatusResponse>(
         STATUS_ENDPOINT,
         undefined,
-        "getVersion"
+        "getVersion",
       );
       return response.data.version ?? response.data.commitTag ?? "unknown";
     } catch (error) {
@@ -464,7 +456,7 @@ export class JellyseerrConnector extends BaseConnector<
   }
 
   async getRequests(
-    options?: JellyseerrRequestQueryOptions
+    options?: JellyseerrRequestQueryOptions,
   ): Promise<JellyseerrRequestList> {
     await this.ensureAuthenticated();
 
@@ -485,7 +477,7 @@ export class JellyseerrConnector extends BaseConnector<
             !media ||
             !(typeof media.title === "string" || typeof media.name === "string")
           );
-        }
+        },
       );
 
       if (requestsToUpdate.length > 0) {
@@ -518,7 +510,7 @@ export class JellyseerrConnector extends BaseConnector<
                 }
                 const mediaDetails = await this.getMediaDetails(
                   mediaId,
-                  mediaType
+                  mediaType,
                 );
                 return {
                   requestId: (request as unknown as Record<string, unknown>)
@@ -535,7 +527,7 @@ export class JellyseerrConnector extends BaseConnector<
               }
             }
             return null;
-          }
+          },
         );
 
         const mediaDetailsResults = await Promise.all(mediaDetailsPromises);
@@ -545,12 +537,12 @@ export class JellyseerrConnector extends BaseConnector<
             result: {
               requestId: number;
               mediaDetails: JellyseerrMediaSummary;
-            } | null
+            } | null,
           ) => {
             if (result) {
               mediaDetailsMap.set(result.requestId, result.mediaDetails);
             }
-          }
+          },
         );
 
         requests = {
@@ -583,7 +575,7 @@ export class JellyseerrConnector extends BaseConnector<
 
   async getMediaDetails(
     mediaId: number,
-    mediaType: "movie" | "tv"
+    mediaType: "movie" | "tv",
   ): Promise<JellyseerrMediaSummary> {
     await this.ensureAuthenticated();
 
@@ -596,7 +588,7 @@ export class JellyseerrConnector extends BaseConnector<
       const response = await this.getWithRetry<ApiMediaDetails>(
         endpoint,
         undefined,
-        "getMediaDetails"
+        "getMediaDetails",
       );
       return mapMediaDetails(response.data);
     } catch (error) {
@@ -614,7 +606,7 @@ export class JellyseerrConnector extends BaseConnector<
 
   async getMediaCredits(
     mediaId: number,
-    mediaType: "movie" | "tv"
+    mediaType: "movie" | "tv",
   ): Promise<
     { id?: number; name?: string; character?: string; profileUrl?: string }[]
   > {
@@ -631,7 +623,7 @@ export class JellyseerrConnector extends BaseConnector<
       const response = await this.getWithRetry<ApiMediaDetails>(
         endpoint,
         undefined,
-        "getMediaCredits"
+        "getMediaCredits",
       );
       const cast = response.data.credits?.cast ?? [];
       return cast.map(mapCastMember);
@@ -649,7 +641,7 @@ export class JellyseerrConnector extends BaseConnector<
   }
 
   async createRequest(
-    payload: CreateJellyseerrRequest
+    payload: CreateJellyseerrRequest,
   ): Promise<JellyseerrRequest> {
     await this.ensureAuthenticated();
 
@@ -658,7 +650,7 @@ export class JellyseerrConnector extends BaseConnector<
         REQUEST_ENDPOINT,
         buildCreatePayload(payload),
         undefined,
-        "createRequest"
+        "createRequest",
       );
       return mapRequest(response.data);
     } catch (error) {
@@ -673,7 +665,7 @@ export class JellyseerrConnector extends BaseConnector<
 
   async approveRequest(
     requestId: number,
-    options?: JellyseerrApprovalOptions
+    options?: JellyseerrApprovalOptions,
   ): Promise<JellyseerrRequest> {
     await this.ensureAuthenticated();
 
@@ -682,7 +674,7 @@ export class JellyseerrConnector extends BaseConnector<
         `${REQUEST_ENDPOINT}/${requestId}/approve`,
         undefined,
         undefined,
-        "approveRequest"
+        "approveRequest",
       );
       return mapRequest(response.data);
     } catch (error) {
@@ -697,7 +689,7 @@ export class JellyseerrConnector extends BaseConnector<
 
   async declineRequest(
     requestId: number,
-    options?: JellyseerrDeclineOptions
+    options?: JellyseerrDeclineOptions,
   ): Promise<JellyseerrRequest> {
     await this.ensureAuthenticated();
 
@@ -706,7 +698,7 @@ export class JellyseerrConnector extends BaseConnector<
         `${REQUEST_ENDPOINT}/${requestId}/decline`,
         undefined,
         undefined,
-        "declineRequest"
+        "declineRequest",
       );
       return mapRequest(response.data);
     } catch (error) {
@@ -726,7 +718,7 @@ export class JellyseerrConnector extends BaseConnector<
       await this.deleteWithRetry(
         `${REQUEST_ENDPOINT}/${requestId}`,
         undefined,
-        "deleteRequest"
+        "deleteRequest",
       );
       return true;
     } catch (error) {
@@ -741,7 +733,7 @@ export class JellyseerrConnector extends BaseConnector<
 
   async search(
     query: string,
-    options?: SearchOptions
+    options?: SearchOptions,
   ): Promise<JellyseerrSearchResult[]> {
     await this.ensureAuthenticated();
 
@@ -815,7 +807,7 @@ export class JellyseerrConnector extends BaseConnector<
           // Use standard axios parameter serialization
           timeout: 10000, // 10 second timeout for search requests
         },
-        "search"
+        "search",
       );
 
       const results = mapSearchResults(response.data.results);
@@ -907,7 +899,7 @@ export class JellyseerrConnector extends BaseConnector<
         {
           params,
         },
-        "getTrending"
+        "getTrending",
       );
 
       const items = mapSearchResults(response.data.results);
@@ -944,7 +936,7 @@ export class JellyseerrConnector extends BaseConnector<
             serviceId: this.config.id,
             serviceType: this.config.type,
             statusCode: apiError.statusCode,
-          }
+          },
         );
 
         return {
@@ -984,7 +976,7 @@ export class JellyseerrConnector extends BaseConnector<
         {
           params,
         },
-        "getAnimeRecommendations"
+        "getAnimeRecommendations",
       );
 
       const allItems = mapSearchResults(response.data.results);
@@ -1019,7 +1011,7 @@ export class JellyseerrConnector extends BaseConnector<
             serviceId: this.config.id,
             serviceType: this.config.type,
             statusCode: apiError.statusCode,
-          }
+          },
         );
 
         return {
@@ -1056,7 +1048,7 @@ export class JellyseerrConnector extends BaseConnector<
         {
           params,
         },
-        "getAnimeUpcoming"
+        "getAnimeUpcoming",
       );
 
       const allItems = mapSearchResults(response.data.results);
@@ -1091,7 +1083,7 @@ export class JellyseerrConnector extends BaseConnector<
             serviceId: this.config.id,
             serviceType: this.config.type,
             statusCode: apiError.statusCode,
-          }
+          },
         );
 
         return {
@@ -1121,7 +1113,7 @@ export class JellyseerrConnector extends BaseConnector<
         {
           params: options,
         },
-        "getTrendingAnime"
+        "getTrendingAnime",
       );
 
       const allResults = mapSearchResults(response.data.results);
@@ -1156,7 +1148,7 @@ export class JellyseerrConnector extends BaseConnector<
             serviceId: this.config.id,
             serviceType: this.config.type,
             statusCode: apiError.statusCode,
-          }
+          },
         );
 
         return {
@@ -1194,7 +1186,7 @@ export class JellyseerrConnector extends BaseConnector<
         {
           params,
         },
-        "getAnimeMovies"
+        "getAnimeMovies",
       );
 
       const allItems = mapSearchResults(response.data.results);
@@ -1229,7 +1221,7 @@ export class JellyseerrConnector extends BaseConnector<
             serviceId: this.config.id,
             serviceType: this.config.type,
             statusCode: apiError.statusCode,
-          }
+          },
         );
 
         return {

@@ -1,12 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, Pressable } from 'react-native';
-import { Icon, Text, useTheme } from 'react-native-paper';
+import React, { useMemo, useState } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View, Pressable } from "react-native";
+import { Icon, Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { MediaRelease } from '@/models/calendar.types';
-import { formatTimeToRelease } from '@/utils/calendar.utils';
-import { MediaPoster } from '@/components/media/MediaPoster';
+import type { AppTheme } from "@/constants/theme";
+import type { MediaRelease } from "@/models/calendar.types";
+import { formatTimeToRelease } from "@/utils/calendar.utils";
+import { MediaPoster } from "@/components/media/MediaPoster";
 
 export type MediaReleaseCardProps = {
   release: MediaRelease;
@@ -26,23 +26,29 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      backgroundColor: compact ? theme.colors.surfaceVariant : theme.colors.surface,
+      backgroundColor: compact
+        ? theme.colors.surfaceVariant
+        : theme.colors.surface,
       borderRadius: compact ? 12 : 18,
-      paddingVertical: compact ? theme.custom.spacing.xs : theme.custom.spacing.sm,
-      paddingHorizontal: compact ? theme.custom.spacing.sm : theme.custom.spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
+      paddingVertical: compact
+        ? theme.custom.spacing.xs
+        : theme.custom.spacing.sm,
+      paddingHorizontal: compact
+        ? theme.custom.spacing.sm
+        : theme.custom.spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
       gap: compact ? theme.custom.spacing.xs : theme.custom.spacing.md,
       borderWidth: compact ? StyleSheet.hairlineWidth : 0,
-      borderColor: compact ? theme.colors.outlineVariant : 'transparent',
+      borderColor: compact ? theme.colors.outlineVariant : "transparent",
       marginBottom: compact ? 0 : theme.custom.spacing.sm,
     },
     pressable: {
       flex: 1,
     },
     content: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       flex: 1,
       gap: compact ? theme.custom.spacing.xs : theme.custom.spacing.md,
     },
@@ -61,8 +67,8 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
         ? theme.custom.typography.titleSmall.fontFamily
         : theme.custom.typography.titleMedium.fontFamily,
       fontWeight: compact
-        ? theme.custom.typography.titleSmall.fontWeight as any
-        : theme.custom.typography.titleMedium.fontWeight as any,
+        ? (theme.custom.typography.titleSmall.fontWeight as any)
+        : (theme.custom.typography.titleMedium.fontWeight as any),
       lineHeight: compact
         ? theme.custom.typography.titleSmall.lineHeight
         : theme.custom.typography.titleMedium.lineHeight,
@@ -84,8 +90,8 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
       width: compact ? 32 : 40,
       height: compact ? 32 : 40,
       borderRadius: compact ? 16 : 20,
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: "center",
+      justifyContent: "center",
       backgroundColor: theme.colors.surfaceVariant,
     },
     trailingSelected: {
@@ -95,14 +101,14 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
 
   const typeConfig = useMemo(() => {
     switch (release.type) {
-      case 'movie':
-        return { label: 'Movie', icon: 'movie-open' };
-      case 'series':
-        return { label: 'TV Show', icon: 'television-classic' };
-      case 'episode':
-        return { label: 'TV Show', icon: 'play-circle' };
+      case "movie":
+        return { label: "Movie", icon: "movie-open" };
+      case "series":
+        return { label: "TV Show", icon: "television-classic" };
+      case "episode":
+        return { label: "TV Show", icon: "play-circle" };
       default:
-        return { label: 'Media', icon: 'play' };
+        return { label: "Media", icon: "play" };
     }
   }, [release.type]);
 
@@ -111,10 +117,10 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
 
     parts.push(typeConfig.label);
 
-    if (release.type === 'episode') {
+    if (release.type === "episode") {
       if (release.seasonNumber && release.episodeNumber) {
-        const season = String(release.seasonNumber).padStart(2, '0');
-        const episode = String(release.episodeNumber).padStart(2, '0');
+        const season = String(release.seasonNumber).padStart(2, "0");
+        const episode = String(release.episodeNumber).padStart(2, "0");
         parts.push(`S${season}E${episode}`);
       } else if (release.seriesTitle) {
         parts.push(release.seriesTitle);
@@ -126,15 +132,23 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
       parts.push(formatTimeToRelease(releaseDate));
     }
 
-    return parts.join(' • ');
+    return parts.join(" • ");
   }, [release, typeConfig.label]);
 
   const monitored = release.monitored ?? false;
-  const statusIcon = monitored ? 'check-circle' : 'bookmark-outline';
-  const statusColor = monitored ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant;
+  const statusIcon = monitored ? "check-circle" : "bookmark-outline";
+  const statusColor = monitored
+    ? theme.colors.onPrimaryContainer
+    : theme.colors.onSurfaceVariant;
 
   return (
-    <View style={[styles.container, isPressed && !compact ? { opacity: 0.9 } : null, style]}>
+    <View
+      style={[
+        styles.container,
+        isPressed && !compact ? { opacity: 0.9 } : null,
+        style,
+      ]}
+    >
       <Pressable
         style={styles.pressable}
         onPress={onPress}

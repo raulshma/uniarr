@@ -1,17 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
-import { pushNotificationService } from '@/services/notifications/PushNotificationService';
-import { serviceHealthMonitor } from '@/services/notifications/ServiceHealthMonitor';
-import { logger } from '@/services/logger/LoggerService';
+import { pushNotificationService } from "@/services/notifications/PushNotificationService";
+import { serviceHealthMonitor } from "@/services/notifications/ServiceHealthMonitor";
+import { logger } from "@/services/logger/LoggerService";
 import {
   selectNotificationsEnabled,
   selectServiceHealthNotificationsEnabled,
   useSettingsStore,
-} from '@/store/settingsStore';
+} from "@/store/settingsStore";
 
 export const useNotificationRegistration = (): void => {
   const notificationsEnabled = useSettingsStore(selectNotificationsEnabled);
-  const serviceHealthNotificationsEnabled = useSettingsStore(selectServiceHealthNotificationsEnabled);
+  const serviceHealthNotificationsEnabled = useSettingsStore(
+    selectServiceHealthNotificationsEnabled,
+  );
 
   useEffect(() => {
     void pushNotificationService.initialize();
@@ -20,7 +22,8 @@ export const useNotificationRegistration = (): void => {
   useEffect(() => {
     let isMounted = true;
 
-    const shouldMonitorHealth = notificationsEnabled && serviceHealthNotificationsEnabled;
+    const shouldMonitorHealth =
+      notificationsEnabled && serviceHealthNotificationsEnabled;
 
     if (!notificationsEnabled) {
       serviceHealthMonitor.stop();
@@ -33,9 +36,12 @@ export const useNotificationRegistration = (): void => {
     void (async () => {
       const token = await pushNotificationService.ensureRegistered();
       if (!token && isMounted) {
-        await logger.warn('Push notifications enabled but device token unavailable.', {
-          location: 'useNotificationRegistration.ensureRegistered',
-        });
+        await logger.warn(
+          "Push notifications enabled but device token unavailable.",
+          {
+            location: "useNotificationRegistration.ensureRegistered",
+          },
+        );
       }
     })();
 

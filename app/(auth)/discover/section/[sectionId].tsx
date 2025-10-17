@@ -2,8 +2,16 @@ import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Text, useTheme, Portal, Dialog, RadioButton, Button as PaperButton, IconButton } from "react-native-paper";
-import PagerView from 'react-native-pager-view';
+import {
+  Text,
+  useTheme,
+  Portal,
+  Dialog,
+  RadioButton,
+  Button as PaperButton,
+  IconButton,
+} from "react-native-paper";
+import PagerView from "react-native-pager-view";
 
 import DiscoverQueueItem from "@/components/discover/DiscoverQueueItem";
 import { alert } from "@/services/dialogService";
@@ -12,24 +20,25 @@ import type { DiscoverMediaItem } from "@/models/discover.types";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useConnectorsStore, selectGetConnectorsByType } from "@/store/connectorsStore";
+import {
+  useConnectorsStore,
+  selectGetConnectorsByType,
+} from "@/store/connectorsStore";
 import { getTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
-import { mapTmdbMovieToDiscover, mapTmdbTvToDiscover } from "@/utils/tmdb.utils";
+import {
+  mapTmdbMovieToDiscover,
+  mapTmdbTvToDiscover,
+} from "@/utils/tmdb.utils";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
-import type { TmdbConnector } from "@/connectors/implementations/TmdbConnector";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
-type JellyseerrSearchResultType = components["schemas"]["MovieResult"] | components["schemas"]["TvResult"];
-
-type JellyseerrPagedResult<T> = {
-  items: T[];
-  total: number;
-  pageInfo?: components["schemas"]["PageInfo"];
-};
+type JellyseerrSearchResultType =
+  | components["schemas"]["MovieResult"]
+  | components["schemas"]["TvResult"];
 
 const mapTrendingResult = (
   result: JellyseerrSearchResultType,
   mediaType: DiscoverMediaItem["mediaType"],
-  sourceServiceId?: string
+  sourceServiceId?: string,
 ): DiscoverMediaItem => {
   const tmdbCandidate = result.mediaInfo?.tmdbId ?? result.id;
   const tmdbId = typeof tmdbCandidate === "number" ? tmdbCandidate : undefined;
@@ -145,13 +154,12 @@ const SectionPage: React.FC = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
 
-  const { sections, services, isLoading, isFetching, isError, error, refetch } =
-    useUnifiedDiscover();
+  const { sections, services } = useUnifiedDiscover();
 
-  const section = useMemo(() => sections.find((s) => s.id === sectionId), [
-    sections,
-    sectionId,
-  ]);
+  const section = useMemo(
+    () => sections.find((s) => s.id === sectionId),
+    [sections, sectionId],
+  );
 
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
 
@@ -163,22 +171,39 @@ const SectionPage: React.FC = () => {
       if (section.source === "jellyseerr") {
         const sourceServiceId = section.items[0]?.sourceServiceId;
         const connector = getConnectorsByType("jellyseerr").find(
-          (c) => c.config.id === sourceServiceId
+          (c) => c.config.id === sourceServiceId,
         ) as JellyseerrConnector;
         if (!connector) throw new Error("Jellyseerr connector not found");
         const response = await connector.getTrending({ page: pageParam });
         const items = response.items.map((item) =>
-          mapTrendingResult(item, section.mediaType === "movie" ? "movie" : "series", sourceServiceId)
+          mapTrendingResult(
+            item,
+            section.mediaType === "movie" ? "movie" : "series",
+            sourceServiceId,
+          ),
         );
-        return { items, hasNextPage: (response.pageInfo?.page ?? 1) < (response.pageInfo?.pages ?? 1) };
+        return {
+          items,
+          hasNextPage:
+            (response.pageInfo?.page ?? 1) < (response.pageInfo?.pages ?? 1),
+        };
       } else if (section.source === "tmdb") {
         const tmdbConnector = await getTmdbConnector();
         if (!tmdbConnector) throw new Error("TMDB connector not available");
-        const response = section.mediaType === "movie"
-          ? await tmdbConnector.discoverMovies({ sort_by: "popularity.desc", page: pageParam })
-          : await tmdbConnector.discoverTv({ sort_by: "popularity.desc", page: pageParam });
+        const response =
+          section.mediaType === "movie"
+            ? await tmdbConnector.discoverMovies({
+                sort_by: "popularity.desc",
+                page: pageParam,
+              })
+            : await tmdbConnector.discoverTv({
+                sort_by: "popularity.desc",
+                page: pageParam,
+              });
         const items = (response.results || []).map((item) =>
-          section.mediaType === "movie" ? mapTmdbMovieToDiscover(item as any) : mapTmdbTvToDiscover(item as any)
+          section.mediaType === "movie"
+            ? mapTmdbMovieToDiscover(item as any)
+            : mapTmdbTvToDiscover(item as any),
         );
         return { items, hasNextPage: pageParam < (response.total_pages ?? 1) };
       }
@@ -205,14 +230,17 @@ const SectionPage: React.FC = () => {
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogItem, setDialogItem] = useState<DiscoverMediaItem | undefined>(
-    undefined
+    undefined,
   );
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(0);
-  const [initialPageSet, setInitialPageSet] = useState(false);
 
   useEffect(() => {
-    if (currentPage === items.length - 1 && infiniteQuery.hasNextPage && !infiniteQuery.isFetchingNextPage) {
+    if (
+      currentPage === items.length - 1 &&
+      infiniteQuery.hasNextPage &&
+      !infiniteQuery.isFetchingNextPage
+    ) {
       void infiniteQuery.fetchNextPage();
     }
   }, [currentPage, items.length, infiniteQuery]);
@@ -223,14 +251,14 @@ const SectionPage: React.FC = () => {
         safeArea: { flex: 1, backgroundColor: "transparent" },
         content: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
         floatingBackButton: {
-          position: 'absolute',
+          position: "absolute",
           top: 45, // Position below status bar
           left: spacing.lg,
           zIndex: 1000,
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: "rgba(0,0,0,0.7)",
           borderRadius: 25,
           elevation: 8,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: {
             width: 0,
             height: 4,
@@ -238,10 +266,10 @@ const SectionPage: React.FC = () => {
           shadowOpacity: 0.3,
           shadowRadius: 8,
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.2)',
+          borderColor: "rgba(255,255,255,0.2)",
         },
       }),
-    [theme]
+    [],
   );
 
   const openServicePicker = useCallback(
@@ -251,7 +279,7 @@ const SectionPage: React.FC = () => {
       if (!options.length) {
         void alert(
           "No services available",
-          `Add a ${item.mediaType === "series" ? "Sonarr" : "Radarr"} service first to request this title.`
+          `Add a ${item.mediaType === "series" ? "Sonarr" : "Radarr"} service first to request this title.`,
         );
         return;
       }
@@ -273,7 +301,7 @@ const SectionPage: React.FC = () => {
         setCurrentPage(currentPageBeforeDialog);
       }, 0);
     },
-    [services, currentPage]
+    [services, currentPage],
   );
 
   const handleConfirmAdd = useCallback(() => {
@@ -307,7 +335,7 @@ const SectionPage: React.FC = () => {
     (item: DiscoverMediaItem) => {
       router.push(`/(auth)/discover/${item.id}`);
     },
-    [router]
+    [router],
   );
 
   if (!section) {
@@ -324,7 +352,10 @@ const SectionPage: React.FC = () => {
           <Text variant="titleLarge" style={{ color: theme.colors.onSurface }}>
             Section not found
           </Text>
-          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
             The requested discover section could not be located.
           </Text>
         </View>
@@ -349,7 +380,10 @@ const SectionPage: React.FC = () => {
         initialPage={0}
       >
         {items.map((item) => (
-          <View key={item.id} style={{ flex: 1, backgroundColor: "transparent" }}>
+          <View
+            key={item.id}
+            style={{ flex: 1, backgroundColor: "transparent" }}
+          >
             <DiscoverQueueItem
               item={item}
               onAdd={openServicePicker}
@@ -371,24 +405,39 @@ const SectionPage: React.FC = () => {
           <Dialog.Title>Add to service</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium" style={{ marginBottom: spacing.sm }}>
-              Choose where to add <Text style={{ fontWeight: "600" }}>{dialogItem?.title}</Text>
+              Choose where to add{" "}
+              <Text style={{ fontWeight: "600" }}>{dialogItem?.title}</Text>
             </Text>
             <RadioButton.Group
               onValueChange={(value) => setSelectedServiceId(value)}
               value={selectedServiceId}
             >
-              {(dialogItem?.mediaType === "series" ? services.sonarr : services.radarr).map((service) => (
-                <RadioButton.Item key={service.id} value={service.id} label={service.name} />
+              {(dialogItem?.mediaType === "series"
+                ? services.sonarr
+                : services.radarr
+              ).map((service) => (
+                <RadioButton.Item
+                  key={service.id}
+                  value={service.id}
+                  label={service.name}
+                />
               ))}
             </RadioButton.Group>
           </Dialog.Content>
           <Dialog.Actions>
-            <PaperButton onPress={() => {
-              setDialogVisible(false);
-              setDialogItem(undefined);
-              setSelectedServiceId("");
-            }}>Cancel</PaperButton>
-            <PaperButton onPress={handleConfirmAdd} disabled={!selectedServiceId}>
+            <PaperButton
+              onPress={() => {
+                setDialogVisible(false);
+                setDialogItem(undefined);
+                setSelectedServiceId("");
+              }}
+            >
+              Cancel
+            </PaperButton>
+            <PaperButton
+              onPress={handleConfirmAdd}
+              disabled={!selectedServiceId}
+            >
               Add
             </PaperButton>
           </Dialog.Actions>

@@ -1,6 +1,6 @@
-import { secureStorage } from '@/services/storage/SecureStorage';
+import { secureStorage } from "@/services/storage/SecureStorage";
 
-export const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
+export const TMDB_API_KEY_STORAGE_KEY = "tmdb_api_key";
 
 type Listener = (value: string | null) => void;
 
@@ -13,7 +13,7 @@ const notify = (value: string | null) => {
       listener(value);
     } catch (error) {
       // Swallow listener errors to avoid breaking notifier fan-out.
-      console.warn('[TmdbCredentialService] listener error', error);
+      console.warn("[TmdbCredentialService] listener error", error);
     }
   });
 };
@@ -25,8 +25,10 @@ export const subscribeToTmdbKey = (listener: Listener): (() => void) => {
   };
 };
 
-export const getStoredTmdbKey = async (forceRefresh = false): Promise<string | null> => {
-  if (!forceRefresh && typeof cachedKey !== 'undefined') {
+export const getStoredTmdbKey = async (
+  forceRefresh = false,
+): Promise<string | null> => {
+  if (!forceRefresh && typeof cachedKey !== "undefined") {
     return cachedKey;
   }
 
@@ -49,5 +51,5 @@ export const removeStoredTmdbKey = async (): Promise<void> => {
 
 export const hasStoredTmdbKey = async (): Promise<boolean> => {
   const key = await getStoredTmdbKey();
-  return typeof key === 'string' && key.length > 0;
+  return typeof key === "string" && key.length > 0;
 };

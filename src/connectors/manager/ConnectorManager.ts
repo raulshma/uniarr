@@ -1,9 +1,12 @@
-import type { ConnectionResult, IConnector } from '@/connectors/base/IConnector';
-import type { ServiceConfig, ServiceType } from '@/models/service.types';
+import type {
+  ConnectionResult,
+  IConnector,
+} from "@/connectors/base/IConnector";
+import type { ServiceConfig, ServiceType } from "@/models/service.types";
 
-import { ConnectorFactory } from '@/connectors/factory/ConnectorFactory';
-import { logger } from '@/services/logger/LoggerService';
-import { secureStorage } from '@/services/storage/SecureStorage';
+import { ConnectorFactory } from "@/connectors/factory/ConnectorFactory";
+import { logger } from "@/services/logger/LoggerService";
+import { secureStorage } from "@/services/storage/SecureStorage";
 
 interface AddConnectorOptions {
   persist?: boolean;
@@ -42,7 +45,7 @@ export class ConnectorManager {
           try {
             await this.addConnector(config, { persist: false });
           } catch (error) {
-            void logger.error('Failed to load connector from storage.', {
+            void logger.error("Failed to load connector from storage.", {
               serviceId: config.id,
               serviceType: config.type,
               message: error instanceof Error ? error.message : String(error),
@@ -71,7 +74,7 @@ export class ConnectorManager {
       await secureStorage.saveServiceConfig(config);
     }
 
-    void logger.info('Connector registered.', {
+    void logger.info("Connector registered.", {
       serviceId: config.id,
       serviceType: config.type,
     });
@@ -97,7 +100,10 @@ export class ConnectorManager {
   }
 
   /** Remove a connector, dispose it, and optionally remove the persisted configuration. */
-  async removeConnector(id: string, { persist = true }: AddConnectorOptions = {}): Promise<void> {
+  async removeConnector(
+    id: string,
+    { persist = true }: AddConnectorOptions = {},
+  ): Promise<void> {
     const connector = this.connectors.get(id);
 
     if (!connector) {
@@ -112,7 +118,7 @@ export class ConnectorManager {
       await secureStorage.removeServiceConfig(id);
     }
 
-    void logger.info('Connector removed.', {
+    void logger.info("Connector removed.", {
       serviceId: id,
       serviceType: connector.config.type,
     });
@@ -128,12 +134,15 @@ export class ConnectorManager {
           const result = await connector.testConnection();
           return [id, result] as const;
         } catch (error) {
-          void logger.error('Connector test failed with unhandled error.', {
+          void logger.error("Connector test failed with unhandled error.", {
             serviceId: id,
             serviceType: connector.config.type,
             message: error instanceof Error ? error.message : String(error),
           });
-          return [id, { success: false, message: 'Unhandled connector error.' }] as const;
+          return [
+            id,
+            { success: false, message: "Unhandled connector error." },
+          ] as const;
         }
       }),
     );

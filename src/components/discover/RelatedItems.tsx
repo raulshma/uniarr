@@ -1,10 +1,10 @@
-import React, { useMemo, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Pressable } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import MediaPoster from '@/components/media/MediaPoster/MediaPoster';
-import type { DiscoverMediaItem } from '@/models/discover.types';
-import { spacing } from '@/theme/spacing';
-import { useUnifiedDiscover } from '@/hooks/useUnifiedDiscover';
+import React, { useMemo, useCallback } from "react";
+import { View, StyleSheet, FlatList, Pressable } from "react-native";
+import { Text, useTheme } from "react-native-paper";
+import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
+import type { DiscoverMediaItem } from "@/models/discover.types";
+import { spacing } from "@/theme/spacing";
+import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 
 type Props = {
   currentId: string;
@@ -27,7 +27,11 @@ const RelatedItems: React.FC<Props> = ({ currentId, onPress }) => {
       .map((c) => {
         let score = 0;
         if (c.mediaType === current.mediaType) score += 10;
-        if (c.year && current.year) score += Math.max(0, 5 - Math.abs((c.year || 0) - (current.year || 0)));
+        if (c.year && current.year)
+          score += Math.max(
+            0,
+            5 - Math.abs((c.year || 0) - (current.year || 0)),
+          );
         return { item: c, score };
       })
       .sort((a, b) => b.score - a.score)
@@ -41,25 +45,34 @@ const RelatedItems: React.FC<Props> = ({ currentId, onPress }) => {
     () =>
       StyleSheet.create({
         container: { marginTop: spacing.lg },
-        header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-        title: { color: theme.colors.onSurface, fontWeight: '700' },
+        header: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: spacing.sm,
+        },
+        title: { color: theme.colors.onSurface, fontWeight: "700" },
         list: { paddingRight: spacing.md },
         card: { width: 120, marginRight: spacing.md },
         cardTitle: { color: theme.colors.onSurface, marginTop: spacing.xs },
       }),
-    [theme]
+    [theme],
   );
 
   const renderItem = useCallback(
     ({ item }: { item: DiscoverMediaItem }) => (
-      <Pressable onPress={() => onPress?.(item.id)} style={styles.card} accessibilityRole="button">
+      <Pressable
+        onPress={() => onPress?.(item.id)}
+        style={styles.card}
+        accessibilityRole="button"
+      >
         <MediaPoster uri={item.posterUrl} size={120} borderRadius={12} />
         <Text numberOfLines={1} style={styles.cardTitle} variant="bodySmall">
           {item.title}
         </Text>
       </Pressable>
     ),
-    [onPress, styles.card, styles.cardTitle]
+    [onPress, styles.card, styles.cardTitle],
   );
 
   if (!related.length) return null;

@@ -2,13 +2,15 @@ import axios, {
   type AxiosInstance,
   type AxiosRequestConfig,
   type AxiosResponse,
-} from 'axios';
+  AxiosRequestHeaders,
+  isAxiosError,
+} from "axios";
 
-import type { operations } from '@/connectors/client-schemas/tmdb-openapi';
-import type { AxiosRequestHeaders } from 'axios';
-import { logger } from '@/services/logger/LoggerService';
+import type { operations } from "@/connectors/client-schemas/tmdb-openapi";
 
-const TMDB_API_BASE_URL = 'https://api.themoviedb.org';
+import { logger } from "@/services/logger/LoggerService";
+
+const TMDB_API_BASE_URL = "https://api.themoviedb.org";
 const RETRYABLE_STATUS = new Set<number>([429, 500, 502, 503, 504]);
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY = 500;
@@ -21,47 +23,71 @@ export class TmdbConnectorError extends Error {
     public readonly retryAfterSeconds?: number,
   ) {
     super(message);
-    this.name = 'TmdbConnectorError';
+    this.name = "TmdbConnectorError";
   }
 }
 
-export type TmdbMediaType = 'movie' | 'tv';
+export type TmdbMediaType = "movie" | "tv";
 
-export type DiscoverMovieQuery = NonNullable<operations['discover-movie']['parameters']['query']>;
-export type DiscoverTvQuery = NonNullable<operations['discover-tv']['parameters']['query']>;
-export type DiscoverMovieResponse = operations['discover-movie']['responses'][200]['content']['application/json'];
-export type DiscoverTvResponse = operations['discover-tv']['responses'][200]['content']['application/json'];
+export type DiscoverMovieQuery = NonNullable<
+  operations["discover-movie"]["parameters"]["query"]
+>;
+export type DiscoverTvQuery = NonNullable<
+  operations["discover-tv"]["parameters"]["query"]
+>;
+export type DiscoverMovieResponse =
+  operations["discover-movie"]["responses"][200]["content"]["application/json"];
+export type DiscoverTvResponse =
+  operations["discover-tv"]["responses"][200]["content"]["application/json"];
 
-export type GenreMovieResponse = operations['genre-movie-list']['responses'][200]['content']['application/json'];
-export type GenreTvResponse = operations['genre-tv-list']['responses'][200]['content']['application/json'];
+export type GenreMovieResponse =
+  operations["genre-movie-list"]["responses"][200]["content"]["application/json"];
+export type GenreTvResponse =
+  operations["genre-tv-list"]["responses"][200]["content"]["application/json"];
 
-export type MovieDetailsResponse = operations['movie-details']['responses'][200]['content']['application/json'];
-export type TvDetailsResponse = operations['tv-series-details']['responses'][200]['content']['application/json'];
+export type MovieDetailsResponse =
+  operations["movie-details"]["responses"][200]["content"]["application/json"];
+export type TvDetailsResponse =
+  operations["tv-series-details"]["responses"][200]["content"]["application/json"];
 
-export type MovieImagesResponse = operations['movie-images']['responses'][200]['content']['application/json'];
-export type TvImagesResponse = operations['tv-series-images']['responses'][200]['content']['application/json'];
+export type MovieImagesResponse =
+  operations["movie-images"]["responses"][200]["content"]["application/json"];
+export type TvImagesResponse =
+  operations["tv-series-images"]["responses"][200]["content"]["application/json"];
 
-export type MovieWatchProvidersResponse = operations['movie-watch-providers']['responses'][200]['content']['application/json'];
-export type TvWatchProvidersResponse = operations['tv-series-watch-providers']['responses'][200]['content']['application/json'];
+export type MovieWatchProvidersResponse =
+  operations["movie-watch-providers"]["responses"][200]["content"]["application/json"];
+export type TvWatchProvidersResponse =
+  operations["tv-series-watch-providers"]["responses"][200]["content"]["application/json"];
 
-export type MovieVideosResponse = operations['movie-videos']['responses'][200]['content']['application/json'];
-export type TvVideosResponse = operations['tv-series-videos']['responses'][200]['content']['application/json'];
+export type MovieVideosResponse =
+  operations["movie-videos"]["responses"][200]["content"]["application/json"];
+export type TvVideosResponse =
+  operations["tv-series-videos"]["responses"][200]["content"]["application/json"];
 
-export type MovieCreditsResponse = operations['movie-credits']['responses'][200]['content']['application/json'];
-export type TvCreditsResponse = operations['tv-series-credits']['responses'][200]['content']['application/json'];
+export type MovieCreditsResponse =
+  operations["movie-credits"]["responses"][200]["content"]["application/json"];
+export type TvCreditsResponse =
+  operations["tv-series-credits"]["responses"][200]["content"]["application/json"];
 
 // Person-related types
-export type PersonDetailsResponse = operations['person-details']['responses'][200]['content']['application/json'];
-export type PersonMovieCreditsResponse = operations['person-movie-credits']['responses'][200]['content']['application/json'];
-export type PersonTvCreditsResponse = operations['person-tv-credits']['responses'][200]['content']['application/json'];
-export type PersonCombinedCreditsResponse = operations['person-combined-credits']['responses'][200]['content']['application/json'];
-export type PersonImagesResponse = operations['person-images']['responses'][200]['content']['application/json'];
-export type PersonExternalIdsResponse = operations['person-external-ids']['responses'][200]['content']['application/json'];
+export type PersonDetailsResponse =
+  operations["person-details"]["responses"][200]["content"]["application/json"];
+export type PersonMovieCreditsResponse =
+  operations["person-movie-credits"]["responses"][200]["content"]["application/json"];
+export type PersonTvCreditsResponse =
+  operations["person-tv-credits"]["responses"][200]["content"]["application/json"];
+export type PersonCombinedCreditsResponse =
+  operations["person-combined-credits"]["responses"][200]["content"]["application/json"];
+export type PersonImagesResponse =
+  operations["person-images"]["responses"][200]["content"]["application/json"];
+export type PersonExternalIdsResponse =
+  operations["person-external-ids"]["responses"][200]["content"]["application/json"];
 
 export type MovieDetailsWithExtrasResponse = MovieDetailsResponse & {
   images?: MovieImagesResponse;
   videos?: MovieVideosResponse;
-  'watch/providers'?: MovieWatchProvidersResponse;
+  "watch/providers"?: MovieWatchProvidersResponse;
   credits?: MovieCreditsResponse;
   recommendations?: DiscoverMovieResponse;
   similar?: DiscoverMovieResponse;
@@ -70,7 +96,7 @@ export type MovieDetailsWithExtrasResponse = MovieDetailsResponse & {
 export type TvDetailsWithExtrasResponse = TvDetailsResponse & {
   images?: TvImagesResponse;
   videos?: TvVideosResponse;
-  'watch/providers'?: TvWatchProvidersResponse;
+  "watch/providers"?: TvWatchProvidersResponse;
   credits?: TvCreditsResponse;
   recommendations?: DiscoverTvResponse;
   similar?: DiscoverTvResponse;
@@ -81,8 +107,11 @@ export interface GetDetailsOptions {
   appendToResponse?: string[];
 }
 
-export type SearchMultiQuery = NonNullable<operations['search-multi']['parameters']['query']>;
-export type SearchMultiResponse = operations['search-multi']['responses'][200]['content']['application/json'];
+export type SearchMultiQuery = NonNullable<
+  operations["search-multi"]["parameters"]["query"]
+>;
+export type SearchMultiResponse =
+  operations["search-multi"]["responses"][200]["content"]["application/json"];
 
 export interface ValidateApiKeyResult {
   ok: boolean;
@@ -94,11 +123,11 @@ const normalizeCredential = (credential: string): string => credential.trim();
 
 const looksLikeV4Token = (credential: string): boolean => {
   const trimmed = credential.trim();
-  if (trimmed.startsWith('Bearer ')) {
+  if (trimmed.startsWith("Bearer ")) {
     return true;
   }
 
-  if (trimmed.length > 40 && trimmed.includes('.')) {
+  if (trimmed.length > 40 && trimmed.includes(".")) {
     return true;
   }
 
@@ -111,18 +140,18 @@ const looksLikeV4Token = (credential: string): boolean => {
 };
 
 const toBearerToken = (credential: string): string =>
-  credential.startsWith('Bearer ') ? credential : `Bearer ${credential}`;
+  credential.startsWith("Bearer ") ? credential : `Bearer ${credential}`;
 
 const parseRetryAfter = (value: unknown): number | undefined => {
   if (Array.isArray(value) && value.length) {
     return parseRetryAfter(value[0]);
   }
 
-  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
     return value;
   }
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const trimmed = value.trim();
     if (!trimmed) {
       return undefined;
@@ -154,7 +183,7 @@ export class TmdbConnector {
 
   constructor(credential: string) {
     if (!credential || !credential.trim()) {
-      throw new Error('TMDB credential is required');
+      throw new Error("TMDB credential is required");
     }
 
     this.credential = normalizeCredential(credential);
@@ -171,7 +200,7 @@ export class TmdbConnector {
     instance.interceptors.request.use((config) => {
       const headers: AxiosRequestHeaders = {
         ...(config.headers ?? {}),
-        Accept: 'application/json',
+        Accept: "application/json",
       } as AxiosRequestHeaders;
 
       if (this.useBearerAuth) {
@@ -185,7 +214,7 @@ export class TmdbConnector {
           ...(config.params ?? {}),
         } as Record<string, any>;
 
-        if (typeof params.api_key === 'undefined') {
+        if (typeof params.api_key === "undefined") {
           params.api_key = this.credential;
         }
 
@@ -205,16 +234,17 @@ export class TmdbConnector {
     try {
       return await this.client.request<T>({ ...config });
     } catch (error) {
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         const status = error.response?.status ?? 0;
         if (RETRYABLE_STATUS.has(status) && attempt < MAX_RETRIES) {
-          const retryHint = error.response?.headers?.['retry-after'];
+          const retryHint = error.response?.headers?.["retry-after"];
           const retryAfterSeconds = Array.isArray(retryHint)
-            ? Number.parseFloat(retryHint[0] ?? '')
-            : Number.parseFloat(String(retryHint ?? ''));
-          const delay = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
-            ? retryAfterSeconds * 1000
-            : RETRY_BASE_DELAY * Math.pow(2, attempt);
+            ? Number.parseFloat(retryHint[0] ?? "")
+            : Number.parseFloat(String(retryHint ?? ""));
+          const delay =
+            Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+              ? retryAfterSeconds * 1000
+              : RETRY_BASE_DELAY * Math.pow(2, attempt);
 
           await new Promise((resolve) => {
             setTimeout(resolve, delay);
@@ -234,17 +264,27 @@ export class TmdbConnector {
     code?: string;
     retryAfterSeconds?: number;
   } {
-    if (axios.isAxiosError(error)) {
+    if (isAxiosError(error)) {
       const status = error.response?.status;
       const data = error.response?.data as Record<string, unknown> | undefined;
-      const statusMessage = typeof data?.status_message === 'string' ? data.status_message : undefined;
-      const code = typeof data?.status_code === 'number' ? String(data.status_code) : error.code ?? undefined;
-      const headers = error.response?.headers as (Record<string, unknown> & { get?: (name: string) => unknown }) | undefined;
-      const rawRetryAfter = headers?.get ? headers.get('retry-after') ?? headers.get('Retry-After') : headers?.['retry-after'] ?? headers?.['Retry-After'];
+      const statusMessage =
+        typeof data?.status_message === "string"
+          ? data.status_message
+          : undefined;
+      const code =
+        typeof data?.status_code === "number"
+          ? String(data.status_code)
+          : (error.code ?? undefined);
+      const headers = error.response?.headers as
+        | (Record<string, unknown> & { get?: (name: string) => unknown })
+        | undefined;
+      const rawRetryAfter = headers?.get
+        ? (headers.get("retry-after") ?? headers.get("Retry-After"))
+        : (headers?.["retry-after"] ?? headers?.["Retry-After"]);
       const retryAfterSeconds = parseRetryAfter(rawRetryAfter);
 
       return {
-        message: statusMessage ?? error.message ?? 'TMDB request failed.',
+        message: statusMessage ?? error.message ?? "TMDB request failed.",
         statusCode: status,
         code,
         retryAfterSeconds,
@@ -255,15 +295,15 @@ export class TmdbConnector {
       return { message: error.message };
     }
 
-    return { message: 'Unexpected TMDB error.' };
+    return { message: "Unexpected TMDB error." };
   }
 
   private handleError(error: unknown, context: string): never {
     const parsed = this.parseError(error);
     const friendlyMessage = this.buildFriendlyMessage(parsed);
 
-    void logger.error('TMDB request failed.', {
-      scope: 'TmdbConnector',
+    void logger.error("TMDB request failed.", {
+      scope: "TmdbConnector",
       context,
       statusCode: parsed.statusCode,
       code: parsed.code,
@@ -286,23 +326,27 @@ export class TmdbConnector {
   }): string {
     if (error.statusCode === 429) {
       const waitSeconds = error.retryAfterSeconds;
-      if (typeof waitSeconds === 'number' && Number.isFinite(waitSeconds) && waitSeconds > 0) {
+      if (
+        typeof waitSeconds === "number" &&
+        Number.isFinite(waitSeconds) &&
+        waitSeconds > 0
+      ) {
         const rounded = Math.ceil(waitSeconds);
-        return `TMDB is rate limiting requests. Please wait about ${rounded} second${rounded === 1 ? '' : 's'} and try again.`;
+        return `TMDB is rate limiting requests. Please wait about ${rounded} second${rounded === 1 ? "" : "s"} and try again.`;
       }
-      return 'TMDB is rate limiting requests right now. Please wait a moment and try again.';
+      return "TMDB is rate limiting requests right now. Please wait a moment and try again.";
     }
 
     if (error.statusCode && error.statusCode >= 500) {
-      return 'TMDB is currently unavailable. Try again in a few moments.';
+      return "TMDB is currently unavailable. Try again in a few moments.";
     }
 
     if (!error.statusCode) {
-      return 'Unable to reach TMDB. Check your connection and try again.';
+      return "Unable to reach TMDB. Check your connection and try again.";
     }
 
     const trimmed = error.message?.trim();
-    return trimmed?.length ? trimmed : 'TMDB request failed.';
+    return trimmed?.length ? trimmed : "TMDB request failed.";
   }
 
   private removeUndefined<TParams extends Record<string, unknown> | undefined>(
@@ -312,15 +356,19 @@ export class TmdbConnector {
       return params;
     }
 
-    const entries = Object.entries(params).filter(([, value]) => value !== undefined && value !== null);
+    const entries = Object.entries(params).filter(
+      ([, value]) => value !== undefined && value !== null,
+    );
     return Object.fromEntries(entries) as TParams;
   }
 
   async validateApiKey(): Promise<ValidateApiKeyResult> {
     try {
-      await this.requestWithRetry<operations['authentication-validate-key']['responses'][200]['content']['application/json']>({
-        method: 'GET',
-        url: '/3/authentication',
+      await this.requestWithRetry<
+        operations["authentication-validate-key"]["responses"][200]["content"]["application/json"]
+      >({
+        method: "GET",
+        url: "/3/authentication",
       });
 
       return { ok: true };
@@ -330,7 +378,8 @@ export class TmdbConnector {
         return {
           ok: false,
           statusCode: parsed.statusCode,
-          message: 'TMDB rejected the provided credential. Double-check your API key or V4 token.',
+          message:
+            "TMDB rejected the provided credential. Double-check your API key or V4 token.",
         };
       }
 
@@ -342,39 +391,47 @@ export class TmdbConnector {
     }
   }
 
-  async discoverMovies(params: DiscoverMovieQuery = {}): Promise<DiscoverMovieResponse> {
+  async discoverMovies(
+    params: DiscoverMovieQuery = {},
+  ): Promise<DiscoverMovieResponse> {
     try {
       const response = await this.requestWithRetry<DiscoverMovieResponse>({
-        method: 'GET',
-        url: '/3/discover/movie',
+        method: "GET",
+        url: "/3/discover/movie",
         params: this.removeUndefined(params),
       });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'discoverMovies');
+      return this.handleError(error, "discoverMovies");
     }
   }
 
   async discoverTv(params: DiscoverTvQuery = {}): Promise<DiscoverTvResponse> {
     try {
       const response = await this.requestWithRetry<DiscoverTvResponse>({
-        method: 'GET',
-        url: '/3/discover/tv',
+        method: "GET",
+        url: "/3/discover/tv",
         params: this.removeUndefined(params),
       });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'discoverTv');
+      return this.handleError(error, "discoverTv");
     }
   }
 
-  async getGenres(mediaType: TmdbMediaType, language?: string): Promise<GenreMovieResponse | GenreTvResponse> {
+  async getGenres(
+    mediaType: TmdbMediaType,
+    language?: string,
+  ): Promise<GenreMovieResponse | GenreTvResponse> {
     try {
-      const url = mediaType === 'movie' ? '/3/genre/movie/list' : '/3/genre/tv/list';
-      const response = await this.requestWithRetry<GenreMovieResponse | GenreTvResponse>({
-        method: 'GET',
+      const url =
+        mediaType === "movie" ? "/3/genre/movie/list" : "/3/genre/tv/list";
+      const response = await this.requestWithRetry<
+        GenreMovieResponse | GenreTvResponse
+      >({
+        method: "GET",
         url,
         params: this.removeUndefined({ language }),
       });
@@ -385,38 +442,70 @@ export class TmdbConnector {
     }
   }
 
-  async getDetails(mediaType: 'movie', tmdbId: number, options?: GetDetailsOptions): Promise<MovieDetailsWithExtrasResponse>;
-  async getDetails(mediaType: 'tv', tmdbId: number, options?: GetDetailsOptions): Promise<TvDetailsWithExtrasResponse>;
+  async getDetails(
+    mediaType: "movie",
+    tmdbId: number,
+    options?: GetDetailsOptions,
+  ): Promise<MovieDetailsWithExtrasResponse>;
+  async getDetails(
+    mediaType: "tv",
+    tmdbId: number,
+    options?: GetDetailsOptions,
+  ): Promise<TvDetailsWithExtrasResponse>;
   async getDetails(
     mediaType: TmdbMediaType,
     tmdbId: number,
     options: GetDetailsOptions = {},
   ): Promise<MovieDetailsWithExtrasResponse | TvDetailsWithExtrasResponse> {
     try {
-      const url = mediaType === 'movie' ? `/3/movie/${tmdbId}` : `/3/tv/${tmdbId}`;
+      const url =
+        mediaType === "movie" ? `/3/movie/${tmdbId}` : `/3/tv/${tmdbId}`;
       const { language, appendToResponse } = options;
-      const response = await this.requestWithRetry<MovieDetailsResponse | TvDetailsResponse>({
-        method: 'GET',
+      const response = await this.requestWithRetry<
+        MovieDetailsResponse | TvDetailsResponse
+      >({
+        method: "GET",
         url,
         params: this.removeUndefined({
           language,
-          append_to_response: appendToResponse?.length ? appendToResponse.join(',') : undefined,
+          append_to_response: appendToResponse?.length
+            ? appendToResponse.join(",")
+            : undefined,
         }),
       });
 
-      return response.data as MovieDetailsWithExtrasResponse | TvDetailsWithExtrasResponse;
+      return response.data as
+        | MovieDetailsWithExtrasResponse
+        | TvDetailsWithExtrasResponse;
     } catch (error) {
       return this.handleError(error, `getDetails:${mediaType}`);
     }
   }
 
-  async getImages(mediaType: 'movie', tmdbId: number, language?: string): Promise<MovieImagesResponse>;
-  async getImages(mediaType: 'tv', tmdbId: number, language?: string): Promise<TvImagesResponse>;
-  async getImages(mediaType: TmdbMediaType, tmdbId: number, language?: string): Promise<MovieImagesResponse | TvImagesResponse> {
+  async getImages(
+    mediaType: "movie",
+    tmdbId: number,
+    language?: string,
+  ): Promise<MovieImagesResponse>;
+  async getImages(
+    mediaType: "tv",
+    tmdbId: number,
+    language?: string,
+  ): Promise<TvImagesResponse>;
+  async getImages(
+    mediaType: TmdbMediaType,
+    tmdbId: number,
+    language?: string,
+  ): Promise<MovieImagesResponse | TvImagesResponse> {
     try {
-      const url = mediaType === 'movie' ? `/3/movie/${tmdbId}/images` : `/3/tv/${tmdbId}/images`;
-      const response = await this.requestWithRetry<MovieImagesResponse | TvImagesResponse>({
-        method: 'GET',
+      const url =
+        mediaType === "movie"
+          ? `/3/movie/${tmdbId}/images`
+          : `/3/tv/${tmdbId}/images`;
+      const response = await this.requestWithRetry<
+        MovieImagesResponse | TvImagesResponse
+      >({
+        method: "GET",
         url,
         params: this.removeUndefined({ language }),
       });
@@ -427,16 +516,27 @@ export class TmdbConnector {
     }
   }
 
-  async getWatchProviders(mediaType: 'movie', tmdbId: number): Promise<MovieWatchProvidersResponse>;
-  async getWatchProviders(mediaType: 'tv', tmdbId: number): Promise<TvWatchProvidersResponse>;
+  async getWatchProviders(
+    mediaType: "movie",
+    tmdbId: number,
+  ): Promise<MovieWatchProvidersResponse>;
+  async getWatchProviders(
+    mediaType: "tv",
+    tmdbId: number,
+  ): Promise<TvWatchProvidersResponse>;
   async getWatchProviders(
     mediaType: TmdbMediaType,
     tmdbId: number,
   ): Promise<MovieWatchProvidersResponse | TvWatchProvidersResponse> {
     try {
-      const url = mediaType === 'movie' ? `/3/movie/${tmdbId}/watch/providers` : `/3/tv/${tmdbId}/watch/providers`;
-      const response = await this.requestWithRetry<MovieWatchProvidersResponse | TvWatchProvidersResponse>({
-        method: 'GET',
+      const url =
+        mediaType === "movie"
+          ? `/3/movie/${tmdbId}/watch/providers`
+          : `/3/tv/${tmdbId}/watch/providers`;
+      const response = await this.requestWithRetry<
+        MovieWatchProvidersResponse | TvWatchProvidersResponse
+      >({
+        method: "GET",
         url,
       });
 
@@ -446,13 +546,30 @@ export class TmdbConnector {
     }
   }
 
-  async getVideos(mediaType: 'movie', tmdbId: number, language?: string): Promise<MovieVideosResponse>;
-  async getVideos(mediaType: 'tv', tmdbId: number, language?: string): Promise<TvVideosResponse>;
-  async getVideos(mediaType: TmdbMediaType, tmdbId: number, language?: string): Promise<MovieVideosResponse | TvVideosResponse> {
+  async getVideos(
+    mediaType: "movie",
+    tmdbId: number,
+    language?: string,
+  ): Promise<MovieVideosResponse>;
+  async getVideos(
+    mediaType: "tv",
+    tmdbId: number,
+    language?: string,
+  ): Promise<TvVideosResponse>;
+  async getVideos(
+    mediaType: TmdbMediaType,
+    tmdbId: number,
+    language?: string,
+  ): Promise<MovieVideosResponse | TvVideosResponse> {
     try {
-      const url = mediaType === 'movie' ? `/3/movie/${tmdbId}/videos` : `/3/tv/${tmdbId}/videos`;
-      const response = await this.requestWithRetry<MovieVideosResponse | TvVideosResponse>({
-        method: 'GET',
+      const url =
+        mediaType === "movie"
+          ? `/3/movie/${tmdbId}/videos`
+          : `/3/tv/${tmdbId}/videos`;
+      const response = await this.requestWithRetry<
+        MovieVideosResponse | TvVideosResponse
+      >({
+        method: "GET",
         url,
         params: this.removeUndefined({ language }),
       });
@@ -464,103 +581,118 @@ export class TmdbConnector {
   }
 
   async searchMulti(params: SearchMultiQuery): Promise<SearchMultiResponse> {
-    if (!params || typeof params.query !== 'string' || !params.query.trim()) {
-      throw new TmdbConnectorError('Search query is required.', 400);
+    if (!params || typeof params.query !== "string" || !params.query.trim()) {
+      throw new TmdbConnectorError("Search query is required.", 400);
     }
 
     try {
       const response = await this.requestWithRetry<SearchMultiResponse>({
-        method: 'GET',
-        url: '/3/search/multi',
+        method: "GET",
+        url: "/3/search/multi",
         params: this.removeUndefined(params),
       });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'searchMulti');
+      return this.handleError(error, "searchMulti");
     }
   }
 
   // Person-related methods
-  async getPersonDetails(personId: number, language?: string): Promise<PersonDetailsResponse> {
+  async getPersonDetails(
+    personId: number,
+    language?: string,
+  ): Promise<PersonDetailsResponse> {
     try {
       const response = await this.requestWithRetry<PersonDetailsResponse>({
-        method: 'GET',
+        method: "GET",
         url: `/3/person/${personId}`,
         params: this.removeUndefined({ language }),
       });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'getPersonDetails');
+      return this.handleError(error, "getPersonDetails");
     }
   }
 
-  async getPersonMovieCredits(personId: number, language?: string): Promise<PersonMovieCreditsResponse> {
+  async getPersonMovieCredits(
+    personId: number,
+    language?: string,
+  ): Promise<PersonMovieCreditsResponse> {
     try {
       const response = await this.requestWithRetry<PersonMovieCreditsResponse>({
-        method: 'GET',
+        method: "GET",
         url: `/3/person/${personId}/movie_credits`,
         params: this.removeUndefined({ language }),
       });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'getPersonMovieCredits');
+      return this.handleError(error, "getPersonMovieCredits");
     }
   }
 
-  async getPersonTvCredits(personId: number, language?: string): Promise<PersonTvCreditsResponse> {
+  async getPersonTvCredits(
+    personId: number,
+    language?: string,
+  ): Promise<PersonTvCreditsResponse> {
     try {
       const response = await this.requestWithRetry<PersonTvCreditsResponse>({
-        method: 'GET',
+        method: "GET",
         url: `/3/person/${personId}/tv_credits`,
         params: this.removeUndefined({ language }),
       });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'getPersonTvCredits');
+      return this.handleError(error, "getPersonTvCredits");
     }
   }
 
-  async getPersonCombinedCredits(personId: number, language?: string): Promise<PersonCombinedCreditsResponse> {
+  async getPersonCombinedCredits(
+    personId: number,
+    language?: string,
+  ): Promise<PersonCombinedCreditsResponse> {
     try {
-      const response = await this.requestWithRetry<PersonCombinedCreditsResponse>({
-        method: 'GET',
-        url: `/3/person/${personId}/combined_credits`,
-        params: this.removeUndefined({ language }),
-      });
+      const response =
+        await this.requestWithRetry<PersonCombinedCreditsResponse>({
+          method: "GET",
+          url: `/3/person/${personId}/combined_credits`,
+          params: this.removeUndefined({ language }),
+        });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'getPersonCombinedCredits');
+      return this.handleError(error, "getPersonCombinedCredits");
     }
   }
 
   async getPersonImages(personId: number): Promise<PersonImagesResponse> {
     try {
       const response = await this.requestWithRetry<PersonImagesResponse>({
-        method: 'GET',
+        method: "GET",
         url: `/3/person/${personId}/images`,
       });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'getPersonImages');
+      return this.handleError(error, "getPersonImages");
     }
   }
 
-  async getPersonExternalIds(personId: number): Promise<PersonExternalIdsResponse> {
+  async getPersonExternalIds(
+    personId: number,
+  ): Promise<PersonExternalIdsResponse> {
     try {
       const response = await this.requestWithRetry<PersonExternalIdsResponse>({
-        method: 'GET',
+        method: "GET",
         url: `/3/person/${personId}/external_ids`,
       });
 
       return response.data;
     } catch (error) {
-      return this.handleError(error, 'getPersonExternalIds');
+      return this.handleError(error, "getPersonExternalIds");
     }
   }
 }

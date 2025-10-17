@@ -2,7 +2,17 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, ScrollView, StyleSheet, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Banner, Button, Chip, Dialog, Portal, RadioButton, Surface, Text, useTheme } from "react-native-paper";
+import {
+  Banner,
+  Button,
+  Chip,
+  Dialog,
+  Portal,
+  RadioButton,
+  Surface,
+  Text,
+  useTheme,
+} from "react-native-paper";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
@@ -24,14 +34,21 @@ import {
 import { useTmdbDetails } from "@/hooks/tmdb/useTmdbDetails";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
 import { useSettingsStore } from "@/store/settingsStore";
-import { useConnectorsStore, selectGetConnectorsByType } from "@/store/connectorsStore";
+import {
+  useConnectorsStore,
+  selectGetConnectorsByType,
+} from "@/store/connectorsStore";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import {
   type AddDestination,
   buildDestinationOptions,
   mapServiceSummaries,
 } from "@/utils/discover/destination.utils";
-import { buildBackdropUrl, buildPosterUrl, buildProfileUrl } from "@/utils/tmdb.utils";
+import {
+  buildBackdropUrl,
+  buildPosterUrl,
+  buildProfileUrl,
+} from "@/utils/tmdb.utils";
 import { spacing } from "@/theme/spacing";
 import { alert } from "@/services/dialogService";
 
@@ -83,23 +100,25 @@ const getProviderNames = (
   }
 
   const region =
-    watchProviders.results.US ?? watchProviders.results.GB ?? Object.values(watchProviders.results)[0];
+    watchProviders.results.US ??
+    watchProviders.results.GB ??
+    Object.values(watchProviders.results)[0];
   if (!region) {
     return undefined;
   }
 
-  const collect = (entries?: Array<{ provider_name?: string }>) =>
+  const collect = (entries?: { provider_name?: string }[]) =>
     entries?.map((entry) => entry.provider_name).filter(Boolean) as string[];
 
   const names: string[] = [];
 
-  if ('flatrate' in region && Array.isArray(region.flatrate)) {
+  if ("flatrate" in region && Array.isArray(region.flatrate)) {
     names.push(...collect(region.flatrate));
   }
-  if ('rent' in region && Array.isArray(region.rent)) {
+  if ("rent" in region && Array.isArray(region.rent)) {
     names.push(...collect(region.rent));
   }
-  if ('buy' in region && Array.isArray(region.buy)) {
+  if ("buy" in region && Array.isArray(region.buy)) {
     names.push(...collect(region.buy));
   }
 
@@ -110,19 +129,20 @@ const getProviderNames = (
   return Array.from(new Set(names)).join(", ");
 };
 
-type MovieListItem = NonNullable<DiscoverMovieResponse['results']>[number];
-type TvListItem = NonNullable<DiscoverTvResponse['results']>[number];
+type MovieListItem = NonNullable<DiscoverMovieResponse["results"]>[number];
+type TvListItem = NonNullable<DiscoverTvResponse["results"]>[number];
 
 const buildMovieDiscoverItem = (
   movie: MovieDetailsWithExtrasResponse | MovieListItem,
 ): DiscoverMediaItem => {
-  const tmdbId = typeof movie.id === "number" ? movie.id : Number(movie.id ?? 0);
+  const tmdbId =
+    typeof movie.id === "number" ? movie.id : Number(movie.id ?? 0);
   const title =
     typeof movie.title === "string"
       ? movie.title
       : typeof movie.original_title === "string"
-      ? movie.original_title
-      : "Untitled Movie";
+        ? movie.original_title
+        : "Untitled Movie";
 
   return {
     id: `movie-${tmdbId}`,
@@ -131,11 +151,14 @@ const buildMovieDiscoverItem = (
     overview: typeof movie.overview === "string" ? movie.overview : undefined,
     posterUrl: buildPosterUrl(movie.poster_path),
     backdropUrl: buildBackdropUrl(movie.backdrop_path),
-    rating: typeof movie.vote_average === "number" ? movie.vote_average : undefined,
-    releaseDate: typeof movie.release_date === "string" ? movie.release_date : undefined,
+    rating:
+      typeof movie.vote_average === "number" ? movie.vote_average : undefined,
+    releaseDate:
+      typeof movie.release_date === "string" ? movie.release_date : undefined,
     tmdbId: tmdbId || undefined,
     sourceId: tmdbId || undefined,
-    voteCount: typeof movie.vote_count === "number" ? movie.vote_count : undefined,
+    voteCount:
+      typeof movie.vote_count === "number" ? movie.vote_count : undefined,
     source: "tmdb",
   } satisfies DiscoverMediaItem;
 };
@@ -148,8 +171,8 @@ const buildTvDiscoverItem = (
     typeof tv.name === "string"
       ? tv.name
       : typeof tv.original_name === "string"
-      ? tv.original_name
-      : "Untitled Series";
+        ? tv.original_name
+        : "Untitled Series";
 
   return {
     id: `series-${tmdbId}`,
@@ -159,7 +182,8 @@ const buildTvDiscoverItem = (
     posterUrl: buildPosterUrl(tv.poster_path),
     backdropUrl: buildBackdropUrl(tv.backdrop_path),
     rating: typeof tv.vote_average === "number" ? tv.vote_average : undefined,
-    releaseDate: typeof tv.first_air_date === "string" ? tv.first_air_date : undefined,
+    releaseDate:
+      typeof tv.first_air_date === "string" ? tv.first_air_date : undefined,
     tmdbId: tmdbId || undefined,
     sourceId: tmdbId || undefined,
     voteCount: typeof tv.vote_count === "number" ? tv.vote_count : undefined,
@@ -170,11 +194,17 @@ const buildTvDiscoverItem = (
 const CAST_LIMIT = 12;
 
 const TmdbDetailPage = () => {
-  const params = useLocalSearchParams<{ mediaType?: string; tmdbId?: string }>();
+  const params = useLocalSearchParams<{
+    mediaType?: string;
+    tmdbId?: string;
+  }>();
   const router = useRouter();
   const theme = useTheme<AppTheme>();
 
-  const mediaTypeParam = params.mediaType === "movie" || params.mediaType === "tv" ? params.mediaType : null;
+  const mediaTypeParam =
+    params.mediaType === "movie" || params.mediaType === "tv"
+      ? params.mediaType
+      : null;
   const tmdbIdParam = Number(params.tmdbId);
   const tmdbId = Number.isFinite(tmdbIdParam) ? tmdbIdParam : null;
 
@@ -211,9 +241,14 @@ const TmdbDetailPage = () => {
   });
 
   const [servicePickerVisible, setServicePickerVisible] = useState(false);
-  const [destinationOptions, setDestinationOptions] = useState<AddDestination[]>([]);
-  const [selectedDestinationKey, setSelectedDestinationKey] = useState<string>("");
-  const [pendingItem, setPendingItem] = useState<DiscoverMediaItem | null>(null);
+  const [destinationOptions, setDestinationOptions] = useState<
+    AddDestination[]
+  >([]);
+  const [selectedDestinationKey, setSelectedDestinationKey] =
+    useState<string>("");
+  const [pendingItem, setPendingItem] = useState<DiscoverMediaItem | null>(
+    null,
+  );
   const [errorBannerDismissed, setErrorBannerDismissed] = useState(false);
 
   useEffect(() => {
@@ -279,9 +314,11 @@ const TmdbDetailPage = () => {
 
     if (error instanceof TmdbConnectorError) {
       if (error.statusCode === 429) {
-        const wait = typeof error.retryAfterSeconds === "number" && Number.isFinite(error.retryAfterSeconds)
-          ? Math.max(1, Math.ceil(error.retryAfterSeconds))
-          : null;
+        const wait =
+          typeof error.retryAfterSeconds === "number" &&
+          Number.isFinite(error.retryAfterSeconds)
+            ? Math.max(1, Math.ceil(error.retryAfterSeconds))
+            : null;
         return wait
           ? `TMDB is rate limiting requests. Please wait about ${wait} second${wait === 1 ? "" : "s"} and try again.`
           : "TMDB is rate limiting requests. Please try again shortly.";
@@ -306,11 +343,19 @@ const TmdbDetailPage = () => {
     return error.message ?? "TMDB request failed.";
   }, [detailsQuery.error]);
 
-  const showErrorBanner = Boolean(detailsQuery.data && detailsQuery.isError && errorMessage && !errorBannerDismissed);
-  const showErrorEmptyState = Boolean(!detailsQuery.data && detailsQuery.isError && errorMessage);
+  const showErrorBanner = Boolean(
+    detailsQuery.data &&
+      detailsQuery.isError &&
+      errorMessage &&
+      !errorBannerDismissed,
+  );
+  const showErrorEmptyState = Boolean(
+    !detailsQuery.data && detailsQuery.isError && errorMessage,
+  );
 
   const destinationForItem = useCallback(
-    (item: DiscoverMediaItem): AddDestination[] => buildDestinationOptions(item, destinationServices),
+    (item: DiscoverMediaItem): AddDestination[] =>
+      buildDestinationOptions(item, destinationServices),
     [destinationServices],
   );
 
@@ -318,8 +363,14 @@ const TmdbDetailPage = () => {
     (item: DiscoverMediaItem) => {
       const options = destinationForItem(item);
       if (!options.length) {
-        const label = item.mediaType === "series" ? "Sonarr or Jellyseerr" : "Radarr or Jellyseerr";
-        alert("No services available", `Add a ${label} service first to work with this title.`);
+        const label =
+          item.mediaType === "series"
+            ? "Sonarr or Jellyseerr"
+            : "Radarr or Jellyseerr";
+        alert(
+          "No services available",
+          `Add a ${label} service first to work with this title.`,
+        );
         return;
       }
 
@@ -348,16 +399,25 @@ const TmdbDetailPage = () => {
       return;
     }
 
-    const destination = destinationOptions.find((option) => option.key === selectedDestinationKey);
+    const destination = destinationOptions.find(
+      (option) => option.key === selectedDestinationKey,
+    );
     if (!destination) {
       closeServicePicker();
       return;
     }
 
     if (destination.kind === "jellyseerr") {
-      const tmdbIdentifier = pendingItem.tmdbId ?? (typeof pendingItem.sourceId === "number" ? pendingItem.sourceId : undefined);
+      const tmdbIdentifier =
+        pendingItem.tmdbId ??
+        (typeof pendingItem.sourceId === "number"
+          ? pendingItem.sourceId
+          : undefined);
       if (!tmdbIdentifier) {
-        alert("Missing TMDB identifier", "Cannot request via Jellyseerr because this item does not have a TMDB id.");
+        alert(
+          "Missing TMDB identifier",
+          "Cannot request via Jellyseerr because this item does not have a TMDB id.",
+        );
         closeServicePicker();
         return;
       }
@@ -391,14 +451,24 @@ const TmdbDetailPage = () => {
     }
 
     closeServicePicker();
-  }, [closeServicePicker, destinationOptions, pendingItem, router, selectedDestinationKey]);
+  }, [
+    closeServicePicker,
+    destinationOptions,
+    pendingItem,
+    router,
+    selectedDestinationKey,
+  ]);
 
-  const movieDetails = mediaTypeParam === "movie"
-    ? (detailsQuery.data?.details as MovieDetailsWithExtrasResponse | undefined)
-    : undefined;
-  const tvDetails = mediaTypeParam === "tv"
-    ? (detailsQuery.data?.details as TvDetailsWithExtrasResponse | undefined)
-    : undefined;
+  const movieDetails =
+    mediaTypeParam === "movie"
+      ? (detailsQuery.data?.details as
+          | MovieDetailsWithExtrasResponse
+          | undefined)
+      : undefined;
+  const tvDetails =
+    mediaTypeParam === "tv"
+      ? (detailsQuery.data?.details as TvDetailsWithExtrasResponse | undefined)
+      : undefined;
 
   const primaryItem = useMemo(() => {
     if (!mediaTypeParam) {
@@ -412,17 +482,25 @@ const TmdbDetailPage = () => {
     return tvDetails ? buildTvDiscoverItem(tvDetails) : undefined;
   }, [mediaTypeParam, movieDetails, tvDetails]);
 
-  const trailerUrl = useMemo(() => (detailsQuery.data ? getTrailerUrl(detailsQuery.data.videos) : undefined), [
-    detailsQuery.data,
-  ]);
+  const trailerUrl = useMemo(
+    () =>
+      detailsQuery.data ? getTrailerUrl(detailsQuery.data.videos) : undefined,
+    [detailsQuery.data],
+  );
 
   const providers = useMemo(
-    () => (detailsQuery.data ? getProviderNames(detailsQuery.data.watchProviders) : undefined),
+    () =>
+      detailsQuery.data
+        ? getProviderNames(detailsQuery.data.watchProviders)
+        : undefined,
     [detailsQuery.data],
   );
 
   const cast = useMemo(() => {
-    const credits = detailsQuery.data?.credits as MovieCreditsResponse | TvCreditsResponse | undefined;
+    const credits = detailsQuery.data?.credits as
+      | MovieCreditsResponse
+      | TvCreditsResponse
+      | undefined;
     const rawCast = credits?.cast;
     if (!Array.isArray(rawCast)) {
       return [];
@@ -431,9 +509,15 @@ const TmdbDetailPage = () => {
     return rawCast.slice(0, CAST_LIMIT).map((person) => ({
       id: String(person.id ?? Math.random()),
       personId: typeof person.id === "number" ? person.id : undefined,
-      name: typeof person.name === "string" ? person.name : person.original_name ?? "Unknown",
+      name:
+        typeof person.name === "string"
+          ? person.name
+          : (person.original_name ?? "Unknown"),
       role: typeof person.character === "string" ? person.character : undefined,
-      profilePath: typeof person.profile_path === "string" ? person.profile_path : undefined,
+      profilePath:
+        typeof person.profile_path === "string"
+          ? person.profile_path
+          : undefined,
     }));
   }, [detailsQuery.data]);
 
@@ -443,13 +527,15 @@ const TmdbDetailPage = () => {
     }
 
     if (mediaTypeParam === "movie") {
-      const results = (detailsQuery.data.recommendations?.results ?? []) as MovieListItem[];
+      const results = (detailsQuery.data.recommendations?.results ??
+        []) as MovieListItem[];
       return results
         .map((entry) => buildMovieDiscoverItem(entry))
         .filter((item) => typeof item.tmdbId === "number" && item.tmdbId > 0);
     }
 
-    const results = (detailsQuery.data.recommendations?.results ?? []) as TvListItem[];
+    const results = (detailsQuery.data.recommendations?.results ??
+      []) as TvListItem[];
     return results
       .map((entry) => buildTvDiscoverItem(entry))
       .filter((item) => typeof item.tmdbId === "number" && item.tmdbId > 0);
@@ -461,7 +547,8 @@ const TmdbDetailPage = () => {
     }
 
     if (mediaTypeParam === "movie") {
-      const results = (detailsQuery.data.similar?.results ?? []) as MovieListItem[];
+      const results = (detailsQuery.data.similar?.results ??
+        []) as MovieListItem[];
       return results
         .map((entry) => buildMovieDiscoverItem(entry))
         .filter((item) => typeof item.tmdbId === "number" && item.tmdbId > 0);
@@ -481,27 +568,39 @@ const TmdbDetailPage = () => {
     "TMDB title";
   const tagline = movieDetails?.tagline ?? tvDetails?.tagline;
   const overview = movieDetails?.overview ?? tvDetails?.overview;
-  const releaseLabel = movieDetails?.release_date ?? tvDetails?.first_air_date ?? "Unknown";
-  const runtimeLabel = mediaTypeParam === "movie"
-    ? formatRuntime(movieDetails?.runtime)
-    : formatRuntime(Array.isArray(tvDetails?.episode_run_time) ? tvDetails?.episode_run_time[0] : undefined);
+  const releaseLabel =
+    movieDetails?.release_date ?? tvDetails?.first_air_date ?? "Unknown";
+  const runtimeLabel =
+    mediaTypeParam === "movie"
+      ? formatRuntime(movieDetails?.runtime)
+      : formatRuntime(
+          Array.isArray(tvDetails?.episode_run_time)
+            ? tvDetails?.episode_run_time[0]
+            : undefined,
+        );
   const ratingValue = movieDetails?.vote_average ?? tvDetails?.vote_average;
   const statusLabel = movieDetails?.status ?? tvDetails?.status;
-  const genresList = ((mediaTypeParam === "movie" ? movieDetails?.genres : tvDetails?.genres) ?? []) as Array<{
+  const genresList = ((mediaTypeParam === "movie"
+    ? movieDetails?.genres
+    : tvDetails?.genres) ?? []) as {
     id: number;
     name?: string;
-  }>;
-  const homepageUrl = typeof movieDetails?.homepage === "string"
-    ? movieDetails.homepage
-    : typeof tvDetails?.homepage === "string"
-    ? tvDetails.homepage
-    : undefined;
+  }[];
+  const homepageUrl =
+    typeof movieDetails?.homepage === "string"
+      ? movieDetails.homepage
+      : typeof tvDetails?.homepage === "string"
+        ? tvDetails.homepage
+        : undefined;
 
   const navigateToItem = useCallback(
     (item: DiscoverMediaItem) => {
       const targetId = item.tmdbId ?? item.sourceId;
       if (!targetId) {
-        alert("Details unavailable", "TMDB did not return an identifier for this title yet. Try again later.");
+        alert(
+          "Details unavailable",
+          "TMDB did not return an identifier for this title yet. Try again later.",
+        );
         return;
       }
 
@@ -584,7 +683,9 @@ const TmdbDetailPage = () => {
     <SafeAreaView style={styles.safeArea}>
       <DetailHero
         posterUri={buildPosterUrl(detailsQuery.data?.details?.poster_path)}
-        backdropUri={buildBackdropUrl(detailsQuery.data?.details?.backdrop_path)}
+        backdropUri={buildBackdropUrl(
+          detailsQuery.data?.details?.backdrop_path,
+        )}
         onBack={() => router.back()}
         isFetching={detailsQuery.isLoading}
       >
@@ -596,7 +697,10 @@ const TmdbDetailPage = () => {
               style={styles.banner}
               actions={[
                 { label: "Retry", onPress: () => void detailsQuery.refetch() },
-                { label: "Dismiss", onPress: () => setErrorBannerDismissed(true) },
+                {
+                  label: "Dismiss",
+                  onPress: () => setErrorBannerDismissed(true),
+                },
               ]}
             >
               {errorMessage}
@@ -604,17 +708,29 @@ const TmdbDetailPage = () => {
           ) : null}
 
           <View style={styles.section}>
-            <Text variant="headlineLarge" style={{ color: theme.colors.onSurface, fontWeight: "700" }}>
+            <Text
+              variant="headlineLarge"
+              style={{ color: theme.colors.onSurface, fontWeight: "700" }}
+            >
               {title}
             </Text>
             {tagline ? (
-              <Text variant="titleMedium" style={{ color: theme.colors.onSurfaceVariant, fontStyle: "italic" }}>
+              <Text
+                variant="titleMedium"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  fontStyle: "italic",
+                }}
+              >
                 {tagline}
               </Text>
             ) : null}
 
             {overview ? (
-              <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, lineHeight: 22 }}>
+              <Text
+                variant="bodyLarge"
+                style={{ color: theme.colors.onSurfaceVariant, lineHeight: 22 }}
+              >
                 {overview}
               </Text>
             ) : null}
@@ -627,8 +743,12 @@ const TmdbDetailPage = () => {
               </Chip>
             ))}
             <Chip icon="calendar">{releaseLabel}</Chip>
-            {typeof ratingValue === "number" ? <Chip icon="star">{ratingValue.toFixed(1)}</Chip> : null}
-            {runtimeLabel ? <Chip icon="clock-outline">{runtimeLabel}</Chip> : null}
+            {typeof ratingValue === "number" ? (
+              <Chip icon="star">{ratingValue.toFixed(1)}</Chip>
+            ) : null}
+            {runtimeLabel ? (
+              <Chip icon="clock-outline">{runtimeLabel}</Chip>
+            ) : null}
             {statusLabel ? <Chip>{statusLabel}</Chip> : null}
           </View>
 
@@ -667,10 +787,16 @@ const TmdbDetailPage = () => {
 
           {providers ? (
             <View style={styles.section}>
-              <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+              <Text
+                variant="titleMedium"
+                style={{ color: theme.colors.onSurface }}
+              >
                 Watch providers
               </Text>
-              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
                 {providers}
               </Text>
             </View>
@@ -678,7 +804,10 @@ const TmdbDetailPage = () => {
 
           {cast.length ? (
             <View style={styles.section}>
-              <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+              <Text
+                variant="titleMedium"
+                style={{ color: theme.colors.onSurface }}
+              >
                 Top cast
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -686,7 +815,9 @@ const TmdbDetailPage = () => {
                   {cast.map((person) => (
                     <Pressable
                       key={person.id}
-                      onPress={() => person.personId && navigateToPerson(person.personId)}
+                      onPress={() =>
+                        person.personId && navigateToPerson(person.personId)
+                      }
                       accessibilityRole="button"
                       accessibilityLabel={`View details for ${person.name}`}
                     >
@@ -699,7 +830,10 @@ const TmdbDetailPage = () => {
                         />
                         <Text
                           variant="bodyMedium"
-                          style={{ color: theme.colors.onSurface, fontWeight: "600" }}
+                          style={{
+                            color: theme.colors.onSurface,
+                            fontWeight: "600",
+                          }}
                           numberOfLines={1}
                         >
                           {person.name}
@@ -723,7 +857,10 @@ const TmdbDetailPage = () => {
 
           {recommendations.length ? (
             <View style={styles.section}>
-              <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+              <Text
+                variant="titleMedium"
+                style={{ color: theme.colors.onSurface }}
+              >
                 Recommendations
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -752,7 +889,10 @@ const TmdbDetailPage = () => {
 
           {similar.length ? (
             <View style={styles.section}>
-              <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+              <Text
+                variant="titleMedium"
+                style={{ color: theme.colors.onSurface }}
+              >
                 Similar titles
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>

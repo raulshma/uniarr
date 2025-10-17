@@ -1,41 +1,10 @@
 import type { MediaRelease, CalendarFilters } from "@/models/calendar.types";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { secureStorage } from "@/services/storage/SecureStorage";
-import type { Series } from "@/models/media.types";
-import type { Movie } from "@/models/movie.types";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
 
 // Import SonarrEpisode type to ensure proper typing
-interface SonarrImage {
-  readonly coverType?: string | null;
-  readonly url?: string | null;
-  readonly remoteUrl?: string | null;
-}
-interface SonarrSeries {
-  readonly id?: number | null;
-  readonly title?: string | null;
-  readonly year?: number | null;
-  readonly overview?: string | null;
-  readonly network?: string | null;
-  readonly genres?: string[] | null;
-  readonly images?: SonarrImage[] | null;
-}
-
-interface SonarrEpisode {
-  readonly id?: number | null;
-  readonly seriesId?: number | null;
-  readonly seasonNumber?: number | null;
-  readonly episodeNumber?: number | null;
-  readonly title?: string | null;
-  readonly overview?: string | null;
-  readonly airDate?: string | null;
-  readonly hasFile?: boolean | null;
-  readonly monitored?: boolean | null;
-  readonly images?: SonarrImage[] | null;
-  readonly series?: SonarrSeries | null;
-}
-
 /**
  * Service for fetching and managing calendar data from various media services
  */
@@ -70,20 +39,20 @@ export class CalendarService {
       // Fetch from Sonarr services when allowed
       if (fetchAllTypes || allowedTypes.has("sonarr")) {
         const sonarrConfigs = configs.filter(
-          (config) => config.type === "sonarr" && config.enabled
+          (config) => config.type === "sonarr" && config.enabled,
         );
 
         for (const config of sonarrConfigs) {
           try {
             const sonarrReleases = await this.getSonarrReleases(
               config.id,
-              filters
+              filters,
             );
             releases.push(...sonarrReleases);
           } catch (error) {
             console.warn(
               `Failed to fetch releases from Sonarr ${config.name}:`,
-              error
+              error,
             );
           }
         }
@@ -92,20 +61,20 @@ export class CalendarService {
       // Fetch from Radarr services when allowed
       if (fetchAllTypes || allowedTypes.has("radarr")) {
         const radarrConfigs = configs.filter(
-          (config) => config.type === "radarr" && config.enabled
+          (config) => config.type === "radarr" && config.enabled,
         );
 
         for (const config of radarrConfigs) {
           try {
             const radarrReleases = await this.getRadarrReleases(
               config.id,
-              filters
+              filters,
             );
             releases.push(...radarrReleases);
           } catch (error) {
             console.warn(
               `Failed to fetch releases from Radarr ${config.name}:`,
-              error
+              error,
             );
           }
         }
@@ -123,7 +92,7 @@ export class CalendarService {
    */
   private async getSonarrReleases(
     serviceId: string,
-    filters: CalendarFilters
+    filters: CalendarFilters,
   ): Promise<MediaRelease[]> {
     const connector = this.connectorManager.getConnector(serviceId);
     if (!connector || connector.config.type !== "sonarr") {
@@ -139,7 +108,7 @@ export class CalendarService {
     const episodes = await sonarrConnector.getCalendar(
       startDate,
       endDate,
-      filters.monitoredStatus === "unmonitored"
+      filters.monitoredStatus === "unmonitored",
     );
 
     const seriesCache = new Map<
@@ -177,7 +146,7 @@ export class CalendarService {
             } catch (error) {
               console.warn(
                 `Failed to fetch series ${episode.seriesId}:`,
-                error
+                error,
               );
               // Fallback to seriesId as string
               seriesCache.set(episode.seriesId, {
@@ -196,7 +165,7 @@ export class CalendarService {
           // If series is included, extract poster URL from images (accept nullable coverType/url)
           seriesPosterUrl = this.findSonarrImageUrl(
             episode.series.images,
-            "poster"
+            "poster",
           );
         }
 
@@ -235,7 +204,7 @@ export class CalendarService {
    */
   private async getRadarrReleases(
     serviceId: string,
-    filters: CalendarFilters
+    filters: CalendarFilters,
   ): Promise<MediaRelease[]> {
     const connector = this.connectorManager.getConnector(serviceId);
     if (!connector || connector.config.type !== "radarr") {
@@ -251,7 +220,7 @@ export class CalendarService {
     const movies = await radarrConnector.getCalendar(
       startDate,
       endDate,
-      filters.monitoredStatus === "unmonitored"
+      filters.monitoredStatus === "unmonitored",
     );
 
     const releases: MediaRelease[] = [];
@@ -293,7 +262,7 @@ export class CalendarService {
    * Determine release status based on date
    */
   private determineReleaseStatus(
-    releaseDate: string
+    releaseDate: string,
   ): "upcoming" | "released" | "delayed" | "cancelled" {
     const now = new Date();
     const release = new Date(releaseDate);
@@ -310,7 +279,7 @@ export class CalendarService {
    */
   private filterReleases(
     releases: MediaRelease[],
-    filters: CalendarFilters
+    filters: CalendarFilters,
   ): MediaRelease[] {
     return releases.filter((release) => {
       // Filter by media type
@@ -460,7 +429,7 @@ export class CalendarService {
         )[]
       | null
       | undefined,
-    type: string
+    type: string,
   ): string | undefined {
     return (
       images?.find((image) => (image?.coverType ?? "") === type)?.remoteUrl ??
@@ -483,7 +452,7 @@ export class CalendarService {
         )[]
       | null
       | undefined,
-    type: string
+    type: string,
   ): string | undefined {
     return (
       images?.find((image) => (image?.coverType ?? "") === type)?.remoteUrl ??

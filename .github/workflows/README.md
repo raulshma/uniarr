@@ -15,11 +15,13 @@ This repository includes automated workflows for building and deploying the mobi
 Builds an Android APK using Expo EAS when code is pushed to the `release` branch.
 
 #### Trigger Conditions
+
 - **Branch**: Push to `release` branch only
 - **Environment**: Production environment (for accessing secrets)
 - **Manual**: Can be triggered manually via GitHub UI
 
 #### Workflow Steps
+
 1. **Checkout Code**: Retrieves the latest code from the repository
 2. **Setup Node.js**: Configures Node.js environment
 3. **Install Dependencies**: Installs npm packages in the client directory
@@ -28,6 +30,7 @@ Builds an Android APK using Expo EAS when code is pushed to the `release` branch
 6. **Upload Artifact**: Stores the APK as a GitHub artifact
 
 #### Output
+
 - **Artifact Name**: `app-release`
 - **File Type**: Android APK
 - **Distribution**: Internal testing/distribution
@@ -53,16 +56,19 @@ Configure in the production environment:
 ### Getting the EXPO_TOKEN
 
 1. **Install EAS CLI globally:**
+
    ```bash
    npm install -g eas-cli
    ```
 
 2. **Login to your Expo account:**
+
    ```bash
    eas login
    ```
 
 3. **Generate authentication token:**
+
    ```bash
    eas build:configure
    ```
@@ -89,6 +95,7 @@ The workflow uses the `preview` profile from `eas.json`:
 ```
 
 **Profile Features**:
+
 - **Output**: APK file (not AAB for easier testing)
 - **Distribution**: Internal distribution channel
 - **Gradle Command**: `:app:assembleRelease`
@@ -119,6 +126,7 @@ eas build --platform android --profile preview --local
 ```
 
 **Requirements for Local Builds**:
+
 - **Android SDK**: Properly configured Android development environment
 - **Java JDK**: Version 11 or higher
 - **EAS CLI**: Latest version installed globally
@@ -148,16 +156,18 @@ The current workflow builds APKs for internal testing:
 Consider these additional workflows:
 
 #### Production Release Workflow
+
 ```yaml
 # .github/workflows/production-release.yml
 name: Production Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 ```
 
 #### App Store Deployment
+
 ```yaml
 # For Google Play Store deployment
 - name: Deploy to Play Store
@@ -165,6 +175,7 @@ on:
 ```
 
 #### iOS Build Workflow
+
 ```yaml
 # For iOS builds
 - name: Build iOS
@@ -178,32 +189,40 @@ on:
 #### Build Failures
 
 1. **Expo Token Issues**:
+
    ```
    Error: Authentication failed
    ```
+
    - **Solution**: Regenerate `EXPO_TOKEN` and update repository secrets
 
 2. **Dependency Issues**:
+
    ```
    Error: Package not found
    ```
+
    - **Solution**: Ensure `package.json` is up to date and dependencies are correctly specified
 
 3. **EAS Configuration Issues**:
+
    ```
    Error: Invalid build profile
    ```
+
    - **Solution**: Validate `eas.json` configuration file
 
 #### Workflow Debug
 
 Enable debug logging by adding these secrets:
+
 - `ACTIONS_STEP_DEBUG`: `true`
 - `ACTIONS_RUNNER_DEBUG`: `true`
 
 ### Build Logs
 
 Access build logs through:
+
 1. **GitHub Actions**: Actions tab → Workflow run → Job logs
 2. **EAS Build**: Expo dashboard build logs
 3. **Local Build**: Terminal output during local builds

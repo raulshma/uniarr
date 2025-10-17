@@ -1,12 +1,15 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { IconButton, Text, useTheme } from 'react-native-paper';
-import { Card } from '@/components/common/Card';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { IconButton, Text, useTheme } from "react-native-paper";
+import { Card } from "@/components/common/Card";
 
-import { EmptyState } from '@/components/common/EmptyState';
-import type { AppTheme } from '@/constants/theme';
-import type { NetworkScanHistoryType, RecentIP } from '@/services/storage/SecureStorage';
+import { EmptyState } from "@/components/common/EmptyState";
+import type { AppTheme } from "@/constants/theme";
+import type {
+  NetworkScanHistoryType,
+  RecentIP,
+} from "@/services/storage/SecureStorage";
 
 export type NetworkScanHistoryProps = {
   scanHistory: NetworkScanHistoryType[];
@@ -38,7 +41,9 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
     if (diffInHours < 1) {
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+      const diffInMinutes = Math.floor(
+        (now.getTime() - date.getTime()) / (1000 * 60),
+      );
       return `${diffInMinutes}m ago`;
     } else if (diffInHours < 24) {
       return `${Math.floor(diffInHours)}h ago`;
@@ -57,15 +62,15 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
           gap: 8,
         },
         sectionHeader: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           paddingHorizontal: 16,
           paddingVertical: 8,
         },
         sectionTitle: {
           fontSize: 18,
-          fontWeight: '600',
+          fontWeight: "600",
           color: theme.colors.onSurface,
         },
         historyItem: {
@@ -79,9 +84,9 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
           padding: 16,
         },
         historyHeader: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: 8,
         },
         historyTimestamp: {
@@ -89,7 +94,7 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
           color: theme.colors.onSurfaceVariant,
         },
         historyStats: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: 16,
           marginBottom: 8,
         },
@@ -98,8 +103,8 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
           color: theme.colors.onSurfaceVariant,
         },
         historyServices: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
+          flexDirection: "row",
+          flexWrap: "wrap",
           gap: 8,
         },
         historyServiceChip: {
@@ -113,9 +118,9 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
           color: theme.colors.onSurfaceVariant,
         },
         recentIPItem: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
           paddingHorizontal: 16,
           paddingVertical: 12,
           borderBottomWidth: StyleSheet.hairlineWidth,
@@ -143,7 +148,7 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
         recentIPBadgeText: {
           fontSize: 10,
           color: theme.colors.onPrimaryContainer,
-          fontWeight: '500',
+          fontWeight: "500",
         },
         emptyStateContainer: {
           padding: 16,
@@ -166,7 +171,11 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
   }
 
   return (
-    <ScrollView style={[styles.container, style]} showsVerticalScrollIndicator={false} testID={testID}>
+    <ScrollView
+      style={[styles.container, style]}
+      showsVerticalScrollIndicator={false}
+      testID={testID}
+    >
       {/* Recent IPs Section */}
       {recentIPs.length > 0 && (
         <View style={styles.section}>
@@ -247,7 +256,13 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
                     <Text variant="bodySmall" style={styles.historyTimestamp}>
                       {formatDate(scan.timestamp)}
                     </Text>
-                    <Text variant="bodySmall" style={[styles.historyTimestamp, { color: theme.colors.primary }]}>
+                    <Text
+                      variant="bodySmall"
+                      style={[
+                        styles.historyTimestamp,
+                        { color: theme.colors.primary },
+                      ]}
+                    >
                       {formatDuration(scan.duration)}
                     </Text>
                   </View>
@@ -267,13 +282,18 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
 
                   {scan.services.length > 0 && (
                     <View style={styles.historyServices}>
-                      {scan.services.slice(0, 3).map((service, serviceIndex) => (
-                        <View key={serviceIndex} style={styles.historyServiceChip}>
-                          <Text style={styles.historyServiceText}>
-                            {service.type} ({service.port})
-                          </Text>
-                        </View>
-                      ))}
+                      {scan.services
+                        .slice(0, 3)
+                        .map((service, serviceIndex) => (
+                          <View
+                            key={serviceIndex}
+                            style={styles.historyServiceChip}
+                          >
+                            <Text style={styles.historyServiceText}>
+                              {service.type} ({service.port})
+                            </Text>
+                          </View>
+                        ))}
                       {scan.services.length > 3 && (
                         <View style={styles.historyServiceChip}>
                           <Text style={styles.historyServiceText}>

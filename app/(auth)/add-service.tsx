@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View, Pressable } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   HelperText,
   Text,
@@ -99,7 +99,7 @@ const normalizeSensitiveValue = (value?: string): string | undefined => {
 
 const buildServiceConfig = (
   values: ServiceConfigInput,
-  id: string
+  id: string,
 ): ServiceConfig => {
   const now = new Date();
   const cleanedUrl = values.url.trim().replace(/\/+$/, "");
@@ -134,11 +134,11 @@ const AddServiceScreen = () => {
 
   const supportedTypes = useMemo(
     () => ConnectorFactory.getSupportedTypes(),
-    []
+    [],
   );
   const supportedTypeSet = useMemo(
     () => new Set(supportedTypes),
-    [supportedTypes]
+    [supportedTypes],
   );
 
   const defaultType = supportedTypes[0] ?? "sonarr";
@@ -332,7 +332,7 @@ const AddServiceScreen = () => {
           borderTopColor: theme.colors.outlineVariant,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const inputTheme = useMemo(
@@ -350,7 +350,7 @@ const AddServiceScreen = () => {
       theme.colors.onSurfaceVariant,
       theme.colors.outlineVariant,
       theme.colors.primary,
-    ]
+    ],
   );
 
   const placeholderColor = theme.colors.onSurfaceVariant;
@@ -405,7 +405,7 @@ const AddServiceScreen = () => {
         connector.dispose();
       }
     },
-    []
+    [],
   );
 
   const handleTestConnection = useCallback(
@@ -417,7 +417,7 @@ const AddServiceScreen = () => {
       if (!supportedTypeSet.has(values.type)) {
         debugLogger.addError(
           "Service type not supported",
-          `Selected service type '${values.type}' is not available yet.`
+          `Selected service type '${values.type}' is not available yet.`,
         );
         setTestError("Selected service type is not available yet.");
         return;
@@ -435,12 +435,12 @@ const AddServiceScreen = () => {
           debugLogger.addApiKeyValidation(
             apiKeyTest.isValid,
             apiKeyTest.message,
-            apiKeyTest.suggestions
+            apiKeyTest.suggestions,
           );
 
           if (!apiKeyTest.isValid) {
             setTestError(
-              `${apiKeyTest.message}. ${apiKeyTest.suggestions.join(" ")}`
+              `${apiKeyTest.message}. ${apiKeyTest.suggestions.join(" ")}`,
             );
             return;
           }
@@ -452,7 +452,7 @@ const AddServiceScreen = () => {
           setTestResult(result);
         } else {
           setTestError(
-            result.message ?? "Unable to connect to the selected service."
+            result.message ?? "Unable to connect to the selected service.",
           );
         }
       } catch (error) {
@@ -473,7 +473,7 @@ const AddServiceScreen = () => {
         setIsTesting(false);
       }
     },
-    [resetDiagnostics, runConnectionTest, supportedTypeSet]
+    [resetDiagnostics, runConnectionTest, supportedTypeSet],
   );
 
   const handleSave = useCallback(
@@ -493,11 +493,11 @@ const AddServiceScreen = () => {
         if (
           existingServices.some(
             (service) =>
-              service.name.trim().toLowerCase() === config.name.toLowerCase()
+              service.name.trim().toLowerCase() === config.name.toLowerCase(),
           )
         ) {
           setFormError(
-            "A service with this name already exists. Choose a different name."
+            "A service with this name already exists. Choose a different name.",
           );
           return;
         }
@@ -506,7 +506,7 @@ const AddServiceScreen = () => {
           existingServices.some(
             (service) =>
               service.type === config.type &&
-              service.url.toLowerCase() === config.url.toLowerCase()
+              service.url.toLowerCase() === config.url.toLowerCase(),
           )
         ) {
           setFormError("This service is already configured.");
@@ -517,7 +517,7 @@ const AddServiceScreen = () => {
 
         if (!testOutcome.success) {
           setFormError(
-            testOutcome.message ?? "Unable to verify the connection."
+            testOutcome.message ?? "Unable to verify the connection.",
           );
           return;
         }
@@ -529,7 +529,7 @@ const AddServiceScreen = () => {
           queryKey: queryKeys.services.overview,
         });
 
-  alert(
+        alert(
           "Service added",
           `${serviceTypeLabels[config.type]} has been connected successfully.`,
           [
@@ -537,7 +537,7 @@ const AddServiceScreen = () => {
               text: "OK",
               onPress: () => router.back(),
             },
-          ]
+          ],
         );
 
         reset({
@@ -570,7 +570,7 @@ const AddServiceScreen = () => {
       router,
       runConnectionTest,
       supportedTypeSet,
-    ]
+    ],
   );
 
   const serviceOptions = useMemo(
@@ -581,7 +581,7 @@ const AddServiceScreen = () => {
         supported: supportedTypeSet.has(type),
         isLast: index === allServiceTypes.length - 1,
       })),
-    [supportedTypeSet]
+    [supportedTypeSet],
   );
 
   return (
@@ -702,7 +702,7 @@ const AddServiceScreen = () => {
                             </Pressable>
                             {!option.isLast && <Divider />}
                           </View>
-                        )
+                        ),
                       )}
                     </Modal>
                   </Portal>

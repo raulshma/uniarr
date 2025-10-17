@@ -1,14 +1,14 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from "expo-secure-store";
 
-import { logger } from '@/services/logger/LoggerService';
-import { type ServiceConfig } from '@/models/service.types';
+import { logger } from "@/services/logger/LoggerService";
+import { type ServiceConfig } from "@/models/service.types";
 
-const INDEX_KEY = 'SecureStorage_index';
-const SERVICE_KEY_PREFIX = 'SecureStorage_service_';
-const SCAN_HISTORY_KEY = 'SecureStorage_scan_history';
-const RECENT_IPS_KEY = 'SecureStorage_recent_ips';
+const INDEX_KEY = "SecureStorage_index";
+const SERVICE_KEY_PREFIX = "SecureStorage_service_";
+const SCAN_HISTORY_KEY = "SecureStorage_scan_history";
+const RECENT_IPS_KEY = "SecureStorage_recent_ips";
 
-type StoredServiceConfig = Omit<ServiceConfig, 'createdAt' | 'updatedAt'> & {
+type StoredServiceConfig = Omit<ServiceConfig, "createdAt" | "updatedAt"> & {
   createdAt: string;
   updatedAt: string;
 };
@@ -21,14 +21,14 @@ export interface NetworkScanHistoryType {
   servicesFound: number;
   subnet: string;
   customIp?: string;
-  services: Array<{
+  services: {
     type: string;
     name: string;
     url: string;
     port: number;
     version?: string;
     requiresAuth?: boolean;
-  }>;
+  }[];
 }
 
 export interface RecentIP {
@@ -95,7 +95,9 @@ class SecureStorage {
     await this.ensureInitialized();
 
     const ids = Array.from(this.cache.keys());
-    await Promise.all(ids.map((id) => SecureStore.deleteItemAsync(this.getServiceKey(id))));
+    await Promise.all(
+      ids.map((id) => SecureStore.deleteItemAsync(this.getServiceKey(id))),
+    );
     await SecureStore.deleteItemAsync(INDEX_KEY);
     this.cache.clear();
   }
@@ -105,10 +107,13 @@ class SecureStorage {
       const existingHistory = await this.getNetworkScanHistory();
       const updatedHistory = [history, ...existingHistory.slice(0, 19)]; // Keep only last 20 scans
 
-      await SecureStore.setItemAsync(SCAN_HISTORY_KEY, JSON.stringify(updatedHistory));
+      await SecureStore.setItemAsync(
+        SCAN_HISTORY_KEY,
+        JSON.stringify(updatedHistory),
+      );
     } catch (error) {
-      await logger.error('Failed to save network scan history.', {
-        location: 'SecureStorage.saveNetworkScanHistory',
+      await logger.error("Failed to save network scan history.", {
+        location: "SecureStorage.saveNetworkScanHistory",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -123,18 +128,22 @@ class SecureStorage {
 
       return JSON.parse(serialized) as NetworkScanHistoryType[];
     } catch (error) {
-      await logger.error('Failed to read network scan history.', {
-        location: 'SecureStorage.getNetworkScanHistory',
+      await logger.error("Failed to read network scan history.", {
+        location: "SecureStorage.getNetworkScanHistory",
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
     }
   }
 
-  async addRecentIP(ip: string, subnet?: string, servicesFound?: number): Promise<void> {
+  async addRecentIP(
+    ip: string,
+    subnet?: string,
+    servicesFound?: number,
+  ): Promise<void> {
     try {
       const recentIPs = await this.getRecentIPs();
-      const existingIndex = recentIPs.findIndex(r => r.ip === ip);
+      const existingIndex = recentIPs.findIndex((r) => r.ip === ip);
 
       const recentIP: RecentIP = {
         ip,
@@ -152,10 +161,13 @@ class SecureStorage {
       // Keep only last 10 recent IPs
       const updatedIPs = recentIPs.slice(0, 10);
 
-      await SecureStore.setItemAsync(RECENT_IPS_KEY, JSON.stringify(updatedIPs));
+      await SecureStore.setItemAsync(
+        RECENT_IPS_KEY,
+        JSON.stringify(updatedIPs),
+      );
     } catch (error) {
-      await logger.error('Failed to add recent IP.', {
-        location: 'SecureStorage.addRecentIP',
+      await logger.error("Failed to add recent IP.", {
+        location: "SecureStorage.addRecentIP",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -170,8 +182,8 @@ class SecureStorage {
 
       return JSON.parse(serialized) as RecentIP[];
     } catch (error) {
-      await logger.error('Failed to read recent IPs.', {
-        location: 'SecureStorage.getRecentIPs',
+      await logger.error("Failed to read recent IPs.", {
+        location: "SecureStorage.getRecentIPs",
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
@@ -182,8 +194,8 @@ class SecureStorage {
     try {
       await SecureStore.deleteItemAsync(SCAN_HISTORY_KEY);
     } catch (error) {
-      await logger.error('Failed to clear network scan history.', {
-        location: 'SecureStorage.clearNetworkScanHistory',
+      await logger.error("Failed to clear network scan history.", {
+        location: "SecureStorage.clearNetworkScanHistory",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -193,8 +205,8 @@ class SecureStorage {
     try {
       await SecureStore.deleteItemAsync(RECENT_IPS_KEY);
     } catch (error) {
-      await logger.error('Failed to clear recent IPs.', {
-        location: 'SecureStorage.clearRecentIPs',
+      await logger.error("Failed to clear recent IPs.", {
+        location: "SecureStorage.clearRecentIPs",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -204,8 +216,8 @@ class SecureStorage {
     try {
       return await SecureStore.getItemAsync(key);
     } catch (error) {
-      await logger.error('Failed to get item from secure storage.', {
-        location: 'SecureStorage.getItem',
+      await logger.error("Failed to get item from secure storage.", {
+        location: "SecureStorage.getItem",
         key,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -217,8 +229,8 @@ class SecureStorage {
     try {
       await SecureStore.setItemAsync(key, value);
     } catch (error) {
-      await logger.error('Failed to set item in secure storage.', {
-        location: 'SecureStorage.setItem',
+      await logger.error("Failed to set item in secure storage.", {
+        location: "SecureStorage.setItem",
         key,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -229,8 +241,8 @@ class SecureStorage {
     try {
       await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      await logger.error('Failed to remove item from secure storage.', {
-        location: 'SecureStorage.removeItem',
+      await logger.error("Failed to remove item from secure storage.", {
+        location: "SecureStorage.removeItem",
         key,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -266,8 +278,8 @@ class SecureStorage {
       const parsed = JSON.parse(serialized) as string[];
       return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
-      await logger.error('Failed to read SecureStorage index.', {
-        location: 'SecureStorage.readIndex',
+      await logger.error("Failed to read SecureStorage index.", {
+        location: "SecureStorage.readIndex",
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
@@ -279,8 +291,8 @@ class SecureStorage {
       const ids = Array.from(this.cache.keys());
       await SecureStore.setItemAsync(INDEX_KEY, JSON.stringify(ids));
     } catch (error) {
-      await logger.error('Failed to persist SecureStorage index.', {
-        location: 'SecureStorage.persistIndex',
+      await logger.error("Failed to persist SecureStorage index.", {
+        location: "SecureStorage.persistIndex",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -291,8 +303,8 @@ class SecureStorage {
       const serialized = JSON.stringify(this.serializeConfig(config));
       await SecureStore.setItemAsync(this.getServiceKey(config.id), serialized);
     } catch (error) {
-      await logger.error('Failed to persist service config.', {
-        location: 'SecureStorage.persistConfig',
+      await logger.error("Failed to persist service config.", {
+        location: "SecureStorage.persistConfig",
         serviceId: config.id,
         serviceType: config.type,
         error: error instanceof Error ? error.message : String(error),
@@ -310,8 +322,8 @@ class SecureStorage {
       const parsed = JSON.parse(serialized) as StoredServiceConfig;
       return this.deserializeConfig(parsed);
     } catch (error) {
-      await logger.warn('Failed to read service config from secure storage.', {
-        location: 'SecureStorage.readConfig',
+      await logger.warn("Failed to read service config from secure storage.", {
+        location: "SecureStorage.readConfig",
         serviceId: id,
         error: error instanceof Error ? error.message : String(error),
       });

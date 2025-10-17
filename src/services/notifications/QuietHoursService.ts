@@ -1,13 +1,13 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type {
   NotificationCategory,
   NotificationMessage,
   QuietHoursConfig,
-} from '@/models/notification.types';
-import { logger } from '@/services/logger/LoggerService';
-import { pushNotificationService } from '@/services/notifications/PushNotificationService';
-import { useSettingsStore } from '@/store/settingsStore';
+} from "@/models/notification.types";
+import { logger } from "@/services/logger/LoggerService";
+import { pushNotificationService } from "@/services/notifications/PushNotificationService";
+import { useSettingsStore } from "@/store/settingsStore";
 import {
   createDefaultQuietHoursConfig,
   formatQuietHoursRange,
@@ -15,9 +15,9 @@ import {
   getNextQuietHoursEnd,
   isQuietHoursActive,
   normalizeQuietHoursConfig,
-} from '@/utils/quietHours.utils';
+} from "@/utils/quietHours.utils";
 
-const STORAGE_KEY = 'QuietHoursService:queues';
+const STORAGE_KEY = "QuietHoursService:queues";
 const MAX_QUEUE_LENGTH = 50;
 
 interface DeferredNotificationEntry {
@@ -25,17 +25,22 @@ interface DeferredNotificationEntry {
   readonly createdAt: number;
 }
 
-type QuietHoursQueueState = Record<NotificationCategory, DeferredNotificationEntry[]>;
+type QuietHoursQueueState = Record<
+  NotificationCategory,
+  DeferredNotificationEntry[]
+>;
 
-const getDefaultConfigForCategory = (category: NotificationCategory): QuietHoursConfig => {
+const getDefaultConfigForCategory = (
+  category: NotificationCategory,
+): QuietHoursConfig => {
   switch (category) {
-    case 'downloads':
-    case 'failures':
-    case 'requests':
-      return createDefaultQuietHoursConfig('weeknights');
-    case 'serviceHealth':
+    case "downloads":
+    case "failures":
+    case "requests":
+      return createDefaultQuietHoursConfig("weeknights");
+    case "serviceHealth":
     default:
-      return createDefaultQuietHoursConfig('everyday');
+      return createDefaultQuietHoursConfig("everyday");
   }
 };
 
@@ -53,7 +58,10 @@ class QuietHoursService {
 
   private queues: QuietHoursQueueState = createEmptyQueueState();
 
-  private readonly flushTimers = new Map<NotificationCategory, ReturnType<typeof setTimeout>>();
+  private readonly flushTimers = new Map<
+    NotificationCategory,
+    ReturnType<typeof setTimeout>
+  >();
 
   static getInstance(): QuietHoursService {
     if (!QuietHoursService.instance) {
@@ -102,7 +110,7 @@ class QuietHoursService {
     message: NotificationMessage,
     summary: string,
     options?: { bypassQuietHours?: boolean },
-  ): Promise<'delivered' | 'deferred'> {
+  ): Promise<"delivered" | "deferred"> {
     await this.initialize();
 
     const config = this.getConfig(category);
@@ -111,13 +119,13 @@ class QuietHoursService {
     if (options?.bypassQuietHours) {
       await this.flushIfEligible(category, config, reference);
       await pushNotificationService.presentImmediateNotification(message);
-      return 'delivered';
+      return "delivered";
     }
 
     if (!config.enabled || !isQuietHoursActive(config, reference)) {
       await this.flushIfEligible(category, config, reference);
       await pushNotificationService.presentImmediateNotification(message);
-      return 'delivered';
+      return "delivered";
     }
 
     this.enqueue(category, summary, reference);
@@ -125,14 +133,14 @@ class QuietHoursService {
 
     this.scheduleFlush(category, config, reference);
 
-    await logger.info('Notification deferred due to quiet hours.', {
-      location: 'QuietHoursService.deliverNotification',
+    await logger.info("Notification deferred due to quiet hours.", {
+      location: "QuietHoursService.deliverNotification",
       category,
       summary,
       window: formatQuietHoursRange(config),
     });
 
-    return 'deferred';
+    return "deferred";
   }
 
   private async loadState(): Promise<void> {
@@ -149,25 +157,27 @@ class QuietHoursService {
         return;
       }
 
-      this.queues = (Object.keys(createEmptyQueueState()) as NotificationCategory[]).reduce(
-        (acc, category) => {
-          const list = parsed[category];
-          acc[category] = Array.isArray(list)
-            ? list
-                .map((item) => ({
-                  summary: typeof item.summary === 'string' ? item.summary : '',
-                  createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
-                }))
-                .slice(-MAX_QUEUE_LENGTH)
-            : [];
-          return acc;
-        },
-        createEmptyQueueState(),
-      );
+      this.queues = (
+        Object.keys(createEmptyQueueState()) as NotificationCategory[]
+      ).reduce((acc, category) => {
+        const list = parsed[category];
+        acc[category] = Array.isArray(list)
+          ? list
+              .map((item) => ({
+                summary: typeof item.summary === "string" ? item.summary : "",
+                createdAt:
+                  typeof item.createdAt === "number"
+                    ? item.createdAt
+                    : Date.now(),
+              }))
+              .slice(-MAX_QUEUE_LENGTH)
+          : [];
+        return acc;
+      }, createEmptyQueueState());
     } catch (error) {
       this.queues = createEmptyQueueState();
-      await logger.warn('Quiet hours queue failed to load.', {
-        location: 'QuietHoursService.loadState',
+      await logger.warn("Quiet hours queue failed to load.", {
+        location: "QuietHoursService.loadState",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -177,8 +187,8 @@ class QuietHoursService {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.queues));
     } catch (error) {
-      await logger.warn('Quiet hours queue failed to persist.', {
-        location: 'QuietHoursService.saveState',
+      await logger.warn("Quiet hours queue failed to persist.", {
+        location: "QuietHoursService.saveState",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -190,14 +200,21 @@ class QuietHoursService {
     return normalizeQuietHoursConfig(baseConfig);
   }
 
-  private enqueue(category: NotificationCategory, summary: string, reference: Date): void {
+  private enqueue(
+    category: NotificationCategory,
+    summary: string,
+    reference: Date,
+  ): void {
     const queue = this.queues[category] ?? [];
     const nextEntry: DeferredNotificationEntry = {
       summary,
       createdAt: reference.getTime(),
     };
 
-    this.queues[category] = [...queue.slice(-(MAX_QUEUE_LENGTH - 1)), nextEntry];
+    this.queues[category] = [
+      ...queue.slice(-(MAX_QUEUE_LENGTH - 1)),
+      nextEntry,
+    ];
   }
 
   private async flushIfEligible(
@@ -223,8 +240,8 @@ class QuietHoursService {
     const message = this.buildSummaryMessage(category, queue);
     if (message) {
       await pushNotificationService.presentImmediateNotification(message);
-      await logger.info('Quiet hours summary delivered.', {
-        location: 'QuietHoursService.flushIfEligible',
+      await logger.info("Quiet hours summary delivered.", {
+        location: "QuietHoursService.flushIfEligible",
         category,
         count: queue.length,
       });
@@ -284,10 +301,13 @@ class QuietHoursService {
       .map((entry) => entry.summary)
       .filter(Boolean)
       .reverse();
-    const previewText = preview.join(' • ');
+    const previewText = preview.join(" • ");
 
     const title = `${getCategoryFriendlyName(category)} summary (${count})`;
-    const body = previewText.length > 0 ? previewText : `${count} updates during quiet hours.`;
+    const body =
+      previewText.length > 0
+        ? previewText
+        : `${count} updates during quiet hours.`;
 
     return {
       title,

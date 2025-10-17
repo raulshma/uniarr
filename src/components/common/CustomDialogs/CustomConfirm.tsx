@@ -1,7 +1,14 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Pressable, useWindowDimensions, ScrollView } from 'react-native';
-import { Portal, Text, useTheme } from 'react-native-paper';
-import type { AppTheme } from '@/constants/theme';
+import React, { useCallback, useEffect, useRef } from "react";
+import {
+  View,
+  StyleSheet,
+  Animated,
+  Pressable,
+  useWindowDimensions,
+  ScrollView,
+} from "react-native";
+import { Portal, Text, useTheme } from "react-native-paper";
+import type { AppTheme } from "@/constants/theme";
 
 export type CustomConfirmProps = {
   visible: boolean;
@@ -20,8 +27,8 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
   visible,
   title,
   message,
-  cancelLabel = 'Cancel',
-  confirmLabel = 'Confirm',
+  cancelLabel = "Cancel",
+  confirmLabel = "Confirm",
   destructive = false,
   cancelable = true,
   onConfirm,
@@ -29,7 +36,7 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
   onDismiss,
 }) => {
   const theme = useTheme<AppTheme>();
-  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const { height: screenHeight } = useWindowDimensions();
 
   // Position the dialog so it appears 40% up from the bottom of the screen
   const bottomOffset = Math.round(screenHeight * 0.4);
@@ -43,6 +50,34 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
   const isExitingRef = useRef(false);
   const [rendered, setRendered] = React.useState<boolean>(visible);
 
+  const animateOutAndDismiss = useCallback(
+    (cb?: () => void) => {
+      if (isExitingRef.current) return;
+      isExitingRef.current = true;
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 24,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Hide from render tree then invoke callbacks so parent can update
+        setRendered(false);
+        try {
+          cb?.();
+        } finally {
+          onDismiss?.();
+        }
+      });
+    },
+    [translateY, opacity, onDismiss],
+  );
+
   useEffect(() => {
     // Show: ensure we are rendered and run entrance animation
     if (visible) {
@@ -51,8 +86,16 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
       translateY.setValue(24);
       opacity.setValue(0);
       Animated.parallel([
-        Animated.timing(translateY, { toValue: 0, duration: 300, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
       ]).start();
       return;
     }
@@ -61,25 +104,7 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
     if (!visible && rendered) {
       animateOutAndDismiss(() => setRendered(false));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
-
-  const animateOutAndDismiss = (cb?: () => void) => {
-    if (isExitingRef.current) return;
-    isExitingRef.current = true;
-    Animated.parallel([
-      Animated.timing(translateY, { toValue: 24, duration: 200, useNativeDriver: true }),
-      Animated.timing(opacity, { toValue: 0, duration: 160, useNativeDriver: true }),
-    ]).start(() => {
-      // Hide from render tree then invoke callbacks so parent can update
-      setRendered(false);
-      try {
-        cb?.();
-      } finally {
-        onDismiss?.();
-      }
-    });
-  };
+  }, [visible, animateOutAndDismiss, opacity, rendered, translateY]);
 
   if (!rendered) return null;
 
@@ -95,7 +120,12 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
           animateOutAndDismiss();
         }}
       >
-        <Animated.View style={[styles.backdrop, { backgroundColor: theme.colors.backdrop, opacity }]} />
+        <Animated.View
+          style={[
+            styles.backdrop,
+            { backgroundColor: theme.colors.backdrop, opacity },
+          ]}
+        />
       </Pressable>
 
       <Animated.View
@@ -107,7 +137,7 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
             transform: [{ translateY }],
             opacity,
             backgroundColor: theme.colors.elevation.level1,
-            shadowColor: '#000',
+            shadowColor: "#000",
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.35,
             shadowRadius: 12,
@@ -124,7 +154,8 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
                   color: theme.colors.onSurface,
                   fontSize: theme.custom.typography.titleLarge.fontSize,
                   fontFamily: theme.custom.typography.titleLarge.fontFamily,
-                  fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
+                  fontWeight: theme.custom.typography.titleLarge
+                    .fontWeight as any,
                 },
               ]}
               accessibilityRole="header"
@@ -133,10 +164,13 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
             </Text>
           ) : null}
           {message ? (
-            <ScrollView style={{ maxHeight: maxHeight - 120 }} contentContainerStyle={{ paddingVertical: 2 }}>
+            <ScrollView
+              style={{ maxHeight: maxHeight - 120 }}
+              contentContainerStyle={{ paddingVertical: 2 }}
+            >
               <Text
                 style={{
-                  textAlign: 'center',
+                  textAlign: "center",
                   color: theme.colors.onSurfaceVariant,
                   fontSize: theme.custom.typography.bodyMedium.fontSize,
                   lineHeight: theme.custom.typography.bodyMedium.lineHeight,
@@ -149,13 +183,22 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
           ) : null}
         </View>
 
-        <View style={[styles.topDivider, { backgroundColor: theme.colors.outlineVariant }]} />
+        <View
+          style={[
+            styles.topDivider,
+            { backgroundColor: theme.colors.outlineVariant },
+          ]}
+        />
 
         <View style={styles.actionsRow}>
           <Pressable
             style={({ pressed }) => [
               styles.leftAction,
-              { backgroundColor: 'transparent', opacity: pressed ? 0.6 : 1, borderRightColor: theme.colors.outlineVariant },
+              {
+                backgroundColor: "transparent",
+                opacity: pressed ? 0.6 : 1,
+                borderRightColor: theme.colors.outlineVariant,
+              },
             ]}
             onPress={() => {
               // Call cancel callback immediately then animate out and dismiss
@@ -169,8 +212,8 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
               style={{
                 color: theme.colors.onSurface,
                 fontSize: theme.custom.typography.labelLarge.fontSize,
-                fontWeight: '700',
-                textAlign: 'center',
+                fontWeight: "700",
+                textAlign: "center",
               }}
             >
               {cancelLabel}
@@ -181,7 +224,9 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
             style={({ pressed }) => [
               styles.confirmAction,
               {
-                backgroundColor: destructive ? theme.colors.error : theme.colors.primary,
+                backgroundColor: destructive
+                  ? theme.colors.error
+                  : theme.colors.primary,
                 opacity: pressed ? 0.9 : 1,
               },
             ]}
@@ -195,10 +240,12 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
           >
             <Text
               style={{
-                color: destructive ? theme.colors.onError : theme.colors.onPrimary,
+                color: destructive
+                  ? theme.colors.onError
+                  : theme.colors.onPrimary,
                 fontSize: theme.custom.typography.labelLarge.fontSize,
-                fontWeight: '700',
-                textAlign: 'center',
+                fontWeight: "700",
+                textAlign: "center",
               }}
             >
               {confirmLabel}
@@ -212,56 +259,56 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
 
 const styles = StyleSheet.create({
   backdrop: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     top: 0,
     bottom: 0,
   },
   container: {
-    position: 'absolute',
+    position: "absolute",
     left: 12,
     right: 12,
     borderRadius: 28,
-    overflow: 'hidden',
+    overflow: "hidden",
     elevation: 8,
   },
   content: {
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   title: {
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 0,
   },
   topDivider: {
     height: StyleSheet.hairlineWidth,
-    width: '100%',
+    width: "100%",
   },
   actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     height: 64,
   },
   leftAction: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
     borderRightWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     // Make the top-left corner of the far-left button flat so the action
     // row meets the content with a square corner.
     borderTopLeftRadius: 0,
-    borderRightColor: 'rgba(0,0,0,0.12)',
+    borderRightColor: "rgba(0,0,0,0.12)",
   },
   confirmAction: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
     // Keep the bottom-right rounded to match the container, but ensure
     // the top-right corner is flat so the separator line is square.
     borderBottomRightRadius: 28,

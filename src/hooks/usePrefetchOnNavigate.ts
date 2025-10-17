@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { QueryClient, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Lightweight helper to prefetch queries before navigation. Call the returned
 // function with a queryKey and fetcher; it will schedule a prefetch so the
@@ -11,7 +11,7 @@ export const usePrefetchOnNavigate = () => {
     async <TData = unknown, TError = unknown>(
       queryKey: readonly unknown[],
       fetcher: () => Promise<TData>,
-      options?: { staleTime?: number }
+      options?: { staleTime?: number },
     ) => {
       try {
         // Use queryClient.prefetchQuery which will populate the cache if not
@@ -21,11 +21,11 @@ export const usePrefetchOnNavigate = () => {
           queryFn: fetcher,
           staleTime: options?.staleTime ?? 5 * 60 * 1000,
         });
-      } catch (e) {
+      } catch {
         // Prefetch failures are non-fatal; ignore them silently.
       }
     },
-    [qc]
+    [qc],
   );
 
   return { prefetch };

@@ -1,1 +1,1 @@
-export * as AdguardHomeOpenapi from './adguard-home-openapi';
+export * as AdguardHomeOpenapi from "./adguard-home-openapi";

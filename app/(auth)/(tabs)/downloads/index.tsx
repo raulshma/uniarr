@@ -3,13 +3,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
-import { ScrollView, StyleSheet, View, TouchableOpacity } from "react-native";
-import { IconButton, ProgressBar, Text, useTheme } from "react-native-paper";
+import { StyleSheet, View, TouchableOpacity } from "react-native";
+import { ProgressBar, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TabHeader } from "@/components/common/TabHeader";
 
-import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
@@ -25,9 +24,8 @@ import type { QBittorrentConnector } from "@/connectors/implementations/QBittorr
 import type { TransmissionConnector } from "@/connectors/implementations/TransmissionConnector";
 import type { DelugeConnector } from "@/connectors/implementations/DelugeConnector";
 import type { SABnzbdConnector } from "@/connectors/implementations/SABnzbdConnector";
-import { queryKeys } from "@/hooks/queryKeys";
 import type { Torrent } from "@/models/torrent.types";
-import type { TorrentTransferInfo } from "@/models/torrent.types";
+
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
 import {
@@ -69,12 +67,12 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
   await manager.loadSavedServices();
 
   // Get all download client connectors
-  const allConnectors: Array<
+  const allConnectors: (
     | QBittorrentConnector
     | TransmissionConnector
     | DelugeConnector
     | SABnzbdConnector
-  > = [];
+  )[] = [];
 
   for (const clientType of DOWNLOAD_CLIENT_TYPES) {
     const connectors = manager.getConnectorsByType(clientType);
@@ -114,7 +112,7 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
               {
                 serviceId: connector.config.id,
                 message,
-              }
+              },
             );
             return undefined;
           }),
@@ -136,10 +134,10 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
             ? connectorError.message
             : String(connectorError);
         throw new Error(
-          `Failed to load downloads for ${connector.config.name}: ${message}`
+          `Failed to load downloads for ${connector.config.name}: ${message}`,
         );
       }
-    })
+    }),
   );
 
   // Sort torrents by download speed (active torrents first)
@@ -176,7 +174,7 @@ const DownloadsScreen = () => {
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch])
+    }, [refetch]),
   );
 
   const overview = data ?? {
@@ -266,7 +264,7 @@ const DownloadsScreen = () => {
           paddingTop: spacing.xl,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleAddService = useCallback(() => {
@@ -280,7 +278,7 @@ const DownloadsScreen = () => {
   const handleTorrentAction = useCallback(
     async (
       torrent: TorrentWithService,
-      action: "pause" | "resume" | "delete"
+      action: "pause" | "resume" | "delete",
     ) => {
       try {
         const manager = ConnectorManager.getInstance();
@@ -314,7 +312,7 @@ const DownloadsScreen = () => {
         });
       }
     },
-    [refetch]
+    [refetch],
   );
 
   const renderTorrentItem = useCallback(
@@ -330,9 +328,9 @@ const DownloadsScreen = () => {
         if (isPaused) return "Paused";
         if (isActive)
           return `${formatBytes(item.downloaded)} / ${formatBytes(
-            item.size
+            item.size,
           )} • ${formatSpeed(item.downloadSpeed)} • ~${formatEta(
-            item.eta
+            item.eta,
           )} remaining`;
         return deriveTorrentStatusLabel(item);
       };
@@ -368,8 +366,8 @@ const DownloadsScreen = () => {
                     {getActionIcon() === "check"
                       ? "✓"
                       : getActionIcon() === "play"
-                      ? "▶"
-                      : "⏸"}
+                        ? "▶"
+                        : "⏸"}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -399,7 +397,7 @@ const DownloadsScreen = () => {
         </AnimatedListItem>
       );
     },
-    [handleTorrentAction, styles, theme.colors, overview.torrents.length]
+    [handleTorrentAction, styles, theme.colors, overview.torrents.length],
   );
 
   const listEmptyComponent = useMemo(() => {

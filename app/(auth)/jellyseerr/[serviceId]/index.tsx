@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   Chip,
   Searchbar,
@@ -25,11 +25,15 @@ import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useJellyseerrRequests } from "@/hooks/useJellyseerrRequests";
-import type { components, paths } from '@/connectors/client-schemas/jellyseerr-openapi';
-type JellyseerrRequest = components['schemas']['MediaRequest'];
-type JellyseerrRequestQueryOptions = paths['/request']['get']['parameters']['query'];
+import type {
+  components,
+  paths,
+} from "@/connectors/client-schemas/jellyseerr-openapi";
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
+type JellyseerrRequest = components["schemas"]["MediaRequest"];
+type JellyseerrRequestQueryOptions =
+  paths["/request"]["get"]["parameters"]["query"];
 
 const FILTER_ALL = "all";
 const FILTER_PENDING = "pending";
@@ -52,7 +56,7 @@ type PendingAction = {
 };
 
 const deriveDownloadStatus = (
-  status: number | undefined
+  status: number | undefined,
 ): MediaDownloadStatus => {
   // OpenAPI numeric codes: 1=pending,2=approved,3=declined,4=processing,5=available
   switch (status) {
@@ -86,9 +90,6 @@ const formatRequestStatusLabel = (status: number | undefined): string => {
   }
 };
 
-const normalizeSearchTerm = (input: string): string =>
-  input.trim().toLowerCase();
-
 const JellyseerrRequestsScreen = () => {
   const { serviceId: rawServiceId, query: rawQuery } = useLocalSearchParams<{
     serviceId?: string;
@@ -104,16 +105,14 @@ const JellyseerrRequestsScreen = () => {
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterValue, setFilterValue] = useState<FilterValue>(FILTER_ALL);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
-    null
+    null,
   );
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(normalizeSearchTerm(searchTerm));
       setPage(1);
     }, 300);
 
@@ -125,7 +124,7 @@ const JellyseerrRequestsScreen = () => {
     if (initialQuery && initialQuery !== searchTerm) {
       setSearchTerm(initialQuery);
     }
-  }, [initialQuery]);
+  }, [initialQuery, searchTerm]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -182,7 +181,7 @@ const JellyseerrRequestsScreen = () => {
     } as any;
 
     return options;
-  }, [debouncedSearch, filterValue, hasValidServiceId, page]);
+  }, [filterValue, hasValidServiceId, page]);
 
   const {
     requests,
@@ -201,24 +200,30 @@ const JellyseerrRequestsScreen = () => {
     isDeleting,
   } = useJellyseerrRequests(serviceId, queryOptions);
 
+  // Helper function to safely convert unknown to Record
+  const toRecord = useCallback(
+    (v: unknown): Record<string, unknown> | null =>
+      v && typeof v === "object" ? (v as Record<string, unknown>) : null,
+    [],
+  );
+
   // Apply client-side search filtering because the Jellyseerr API /request
   // endpoint does not accept a free-text search parameter in the OpenAPI spec.
-  const toRecord = (v: unknown): Record<string, unknown> | null =>
-    v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
-
-  const getMediaTitle = (m: JellyseerrRequest['media'] | undefined): string => {
-    if (!m) return '';
-    const r = toRecord(m);
-    const t = r?.title ?? r?.originalTitle ?? r?.name ?? (r?.mediaInfo && (r.mediaInfo as any)?.title) ?? (r?.mediaInfo && (r.mediaInfo as any)?.name) ?? undefined;
-    return typeof t === 'string' ? t : '';
-  };
-
-  const filteredRequests = (requests ?? []).filter((r) => {
-    if (!debouncedSearch) return true;
-    const term = debouncedSearch.toLowerCase();
-    const title = getMediaTitle(r.media);
-    return title.toLowerCase().includes(term);
-  });
+  const getMediaTitle = useCallback(
+    (m: JellyseerrRequest["media"] | undefined): string => {
+      if (!m) return "";
+      const r = toRecord(m);
+      const t =
+        r?.title ??
+        r?.originalTitle ??
+        r?.name ??
+        (r?.mediaInfo && (r.mediaInfo as any)?.title) ??
+        (r?.mediaInfo && (r.mediaInfo as any)?.name) ??
+        undefined;
+      return typeof t === "string" ? t : "";
+    },
+    [toRecord],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -227,7 +232,7 @@ const JellyseerrRequestsScreen = () => {
       }
 
       void refetch();
-    }, [hasValidServiceId, refetch])
+    }, [hasValidServiceId, refetch]),
   );
 
   const totalPages = pageInfo?.pages ?? (total > 0 ? Math.ceil(total / 25) : 1);
@@ -304,7 +309,7 @@ const JellyseerrRequestsScreen = () => {
           marginTop: spacing.md,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleApproveRequest = useCallback(
@@ -318,17 +323,17 @@ const JellyseerrRequestsScreen = () => {
           actionError instanceof Error
             ? actionError.message
             : "Unable to approve request.";
-  alert("Approve failed", message);
+        alert("Approve failed", message);
       } finally {
         setPendingAction(null);
       }
     },
-    [approveRequestAsync]
+    [approveRequestAsync],
   );
 
   const handleDeclineRequest = useCallback(
     async (request: JellyseerrRequest) => {
-  alert(
+      alert(
         "Decline request",
         "Are you sure you want to decline this request?",
         [
@@ -351,15 +356,15 @@ const JellyseerrRequestsScreen = () => {
               }
             },
           },
-        ]
+        ],
       );
     },
-    [declineRequestAsync]
+    [declineRequestAsync],
   );
 
   const handleDeleteRequest = useCallback(
     async (request: JellyseerrRequest) => {
-  alert(
+      alert(
         "Delete request",
         "Deleting a request cannot be undone. Continue?",
         [
@@ -382,10 +387,10 @@ const JellyseerrRequestsScreen = () => {
               }
             },
           },
-        ]
+        ],
       );
     },
-    [deleteRequestAsync]
+    [deleteRequestAsync],
   );
 
   const handleLoadMore = useCallback(() => {
@@ -430,15 +435,18 @@ const JellyseerrRequestsScreen = () => {
       };
 
       const statusKey =
-        typeof status === 'number' ? formatRequestStatusLabel(status).toLowerCase() : (status ?? '').toString().toLowerCase();
+        typeof status === "number"
+          ? formatRequestStatusLabel(status).toLowerCase()
+          : (status ?? "").toString().toLowerCase();
       const toneCandidate = toneMap[statusKey];
       const selectedTone = toneCandidate ?? toneMap.unknown;
       if (!selectedTone) {
         return null;
       }
       const label =
-        (typeof status === 'number' ? formatRequestStatusLabel(status) : (status ?? 'Unknown')) +
-        (is4k ? ' • 4K' : '');
+        (typeof status === "number"
+          ? formatRequestStatusLabel(status)
+          : (status ?? "Unknown")) + (is4k ? " • 4K" : "");
 
       return (
         <Chip
@@ -454,12 +462,14 @@ const JellyseerrRequestsScreen = () => {
         </Chip>
       );
     },
-    [styles.statusChip, theme.colors]
+    [styles.statusChip, theme.colors],
   );
 
   const renderRequestItem = useCallback(
     ({ item }: { item: JellyseerrRequest }) => {
-  const downloadStatus = deriveDownloadStatus(item.media?.status as number | undefined);
+      const downloadStatus = deriveDownloadStatus(
+        item.media?.status as number | undefined,
+      );
       const requesterName =
         item.requestedBy?.username ??
         item.requestedBy?.email ??
@@ -483,34 +493,38 @@ const JellyseerrRequestsScreen = () => {
       return (
         <MediaCard
           id={item.id}
-          title={
-            (getMediaTitle(item.media) || `Untitled Media`)
-          }
-          year={
-            (() => {
-              const r = toRecord(item.media);
-              const release = r?.releaseDate ?? r?.firstAirDate ?? undefined;
-              if (typeof release === 'string' && release.length >= 4) {
-                const parsed = Number.parseInt(release.slice(0, 4), 10);
-                return Number.isFinite(parsed) ? parsed : undefined;
-              }
-              return undefined;
-            })()
-          }
+          title={getMediaTitle(item.media) || `Untitled Media`}
+          year={(() => {
+            const r = toRecord(item.media);
+            const release = r?.releaseDate ?? r?.firstAirDate ?? undefined;
+            if (typeof release === "string" && release.length >= 4) {
+              const parsed = Number.parseInt(release.slice(0, 4), 10);
+              return Number.isFinite(parsed) ? parsed : undefined;
+            }
+            return undefined;
+          })()}
           status={formatRequestStatusLabel(item.status ?? 0)}
           subtitle={`Requested by ${requesterName}`}
           downloadStatus={downloadStatus}
           posterUri={(() => {
             const r = toRecord(item.media);
-            const p = r?.posterPath ?? (r?.mediaInfo && (r.mediaInfo as any)?.posterPath) ?? undefined;
-            return typeof p === 'string' ? `https://image.tmdb.org/t/p/original${p}` : undefined;
+            const p =
+              r?.posterPath ??
+              (r?.mediaInfo && (r.mediaInfo as any)?.posterPath) ??
+              undefined;
+            return typeof p === "string"
+              ? `https://image.tmdb.org/t/p/original${p}`
+              : undefined;
           })()}
           type={(() => {
             const r = toRecord(item.media);
             const mt = r?.mediaType ?? undefined;
-            return mt === 'tv' ? 'series' : 'movie';
+            return mt === "tv" ? "series" : "movie";
           })()}
-          statusBadge={renderStatusChip(item.status as number | undefined, item.is4k)}
+          statusBadge={renderStatusChip(
+            item.status as number | undefined,
+            item.is4k,
+          )}
           footer={
             <View style={styles.actionRow}>
               {item.status === 1 ? (
@@ -574,12 +588,14 @@ const JellyseerrRequestsScreen = () => {
       renderStatusChip,
       styles.actionRow,
       theme.colors.error,
-    ]
+      getMediaTitle,
+      toRecord,
+    ],
   );
 
   const keyExtractor = useCallback(
     (item: JellyseerrRequest) => item.id.toString(),
-    []
+    [],
   );
 
   const listHeader = useMemo(
@@ -668,7 +684,7 @@ const JellyseerrRequestsScreen = () => {
       theme.colors.onSurfaceVariant,
       total,
       totalPages,
-    ]
+    ],
   );
 
   const listEmptyComponent = useMemo(
@@ -684,7 +700,7 @@ const JellyseerrRequestsScreen = () => {
         }}
       />
     ),
-    []
+    [],
   );
 
   if (!hasValidServiceId) {

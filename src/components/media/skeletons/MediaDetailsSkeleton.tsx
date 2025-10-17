@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Card, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Card, useTheme } from "react-native-paper";
 
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
-import type { AppTheme } from '@/constants/theme';
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import type { AppTheme } from "@/constants/theme";
 
 export type MediaDetailsSkeletonProps = {
   style?: StyleProp<ViewStyle>;
@@ -13,7 +13,7 @@ export type MediaDetailsSkeletonProps = {
 
 const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
   style,
-  showSeasons = true
+  showSeasons = true,
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -28,7 +28,7 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
           paddingBottom: 32,
         },
         posterContainer: {
-          alignItems: 'center',
+          alignItems: "center",
           paddingVertical: 20,
         },
         titleContainer: {
@@ -51,8 +51,8 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
           padding: 16,
         },
         detailRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          justifyContent: "space-between",
           marginBottom: 12,
         },
         fileInfoSection: {
@@ -71,35 +71,38 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
           marginTop: 32,
         },
         seasonsContainer: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
+          flexDirection: "row",
+          flexWrap: "wrap",
           gap: 16,
         },
         seasonCard: {
-          width: '48%',
+          width: "48%",
           backgroundColor: theme.colors.surfaceVariant,
           borderRadius: 12,
           padding: 12,
-          alignItems: 'center',
+          alignItems: "center",
         },
         episodesSection: {
           paddingHorizontal: 20,
           marginTop: 24,
         },
         episodeItem: {
-          flexDirection: 'row',
+          flexDirection: "row",
           backgroundColor: theme.colors.surfaceVariant,
           borderRadius: 12,
           padding: 12,
           marginBottom: 12,
-          alignItems: 'center',
+          alignItems: "center",
         },
       }),
     [theme],
   );
 
   return (
-    <ScrollView style={[styles.container, style]} contentContainerStyle={styles.contentContainer}>
+    <ScrollView
+      style={[styles.container, style]}
+      contentContainerStyle={styles.contentContainer}
+    >
       {/* Large Poster */}
       <View style={styles.posterContainer}>
         <SkeletonPlaceholder width={280} height={420} borderRadius={16} />
@@ -112,8 +115,18 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
 
       {/* Overview */}
       <View style={styles.overviewContainer}>
-        <SkeletonPlaceholder width="100%" height={16} borderRadius={6} style={{ marginBottom: 8 }} />
-        <SkeletonPlaceholder width="100%" height={16} borderRadius={6} style={{ marginBottom: 8 }} />
+        <SkeletonPlaceholder
+          width="100%"
+          height={16}
+          borderRadius={6}
+          style={{ marginBottom: 8 }}
+        />
+        <SkeletonPlaceholder
+          width="100%"
+          height={16}
+          borderRadius={6}
+          style={{ marginBottom: 8 }}
+        />
         <SkeletonPlaceholder width="70%" height={16} borderRadius={6} />
       </View>
 
@@ -139,7 +152,12 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
 
       {/* File Information */}
       <View style={styles.fileInfoSection}>
-        <SkeletonPlaceholder width="40%" height={24} borderRadius={8} style={styles.sectionTitle} />
+        <SkeletonPlaceholder
+          width="40%"
+          height={24}
+          borderRadius={8}
+          style={styles.sectionTitle}
+        />
         <Card style={styles.fileInfoCard}>
           <Card.Content style={styles.cardContent}>
             <View style={styles.detailRow}>
@@ -161,19 +179,34 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
       {/* Seasons - Only for series */}
       {showSeasons && (
         <View style={styles.seasonsSection}>
-          <SkeletonPlaceholder width="25%" height={24} borderRadius={8} style={styles.sectionTitle} />
+          <SkeletonPlaceholder
+            width="25%"
+            height={24}
+            borderRadius={8}
+            style={styles.sectionTitle}
+          />
           <View style={styles.seasonsContainer}>
             <View style={styles.seasonCard}>
               <SkeletonPlaceholder width={120} height={180} borderRadius={12} />
-              <View style={{ alignItems: 'center', marginTop: 8 }}>
-                <SkeletonPlaceholder width="60%" height={18} borderRadius={6} style={{ marginBottom: 4 }} />
+              <View style={{ alignItems: "center", marginTop: 8 }}>
+                <SkeletonPlaceholder
+                  width="60%"
+                  height={18}
+                  borderRadius={6}
+                  style={{ marginBottom: 4 }}
+                />
                 <SkeletonPlaceholder width="50%" height={14} borderRadius={6} />
               </View>
             </View>
             <View style={styles.seasonCard}>
               <SkeletonPlaceholder width={120} height={180} borderRadius={12} />
-              <View style={{ alignItems: 'center', marginTop: 8 }}>
-                <SkeletonPlaceholder width="60%" height={18} borderRadius={6} style={{ marginBottom: 4 }} />
+              <View style={{ alignItems: "center", marginTop: 8 }}>
+                <SkeletonPlaceholder
+                  width="60%"
+                  height={18}
+                  borderRadius={6}
+                  style={{ marginBottom: 4 }}
+                />
                 <SkeletonPlaceholder width="50%" height={14} borderRadius={6} />
               </View>
             </View>
@@ -184,20 +217,55 @@ const MediaDetailsSkeleton: React.FC<MediaDetailsSkeletonProps> = ({
       {/* Episodes - Only for series */}
       {showSeasons && (
         <View style={styles.episodesSection}>
-          <SkeletonPlaceholder width="25%" height={24} borderRadius={8} style={styles.sectionTitle} />
+          <SkeletonPlaceholder
+            width="25%"
+            height={24}
+            borderRadius={8}
+            style={styles.sectionTitle}
+          />
           <View style={styles.episodeItem}>
-            <SkeletonPlaceholder width={80} height={120} borderRadius={8} style={{ marginRight: 12 }} />
+            <SkeletonPlaceholder
+              width={80}
+              height={120}
+              borderRadius={8}
+              style={{ marginRight: 12 }}
+            />
             <View style={{ flex: 1 }}>
-              <SkeletonPlaceholder width="70%" height={18} borderRadius={6} style={{ marginBottom: 6 }} />
-              <SkeletonPlaceholder width="50%" height={14} borderRadius={6} style={{ marginBottom: 8 }} />
+              <SkeletonPlaceholder
+                width="70%"
+                height={18}
+                borderRadius={6}
+                style={{ marginBottom: 6 }}
+              />
+              <SkeletonPlaceholder
+                width="50%"
+                height={14}
+                borderRadius={6}
+                style={{ marginBottom: 8 }}
+              />
               <SkeletonPlaceholder width="30%" height={14} borderRadius={6} />
             </View>
           </View>
           <View style={styles.episodeItem}>
-            <SkeletonPlaceholder width={80} height={120} borderRadius={8} style={{ marginRight: 12 }} />
+            <SkeletonPlaceholder
+              width={80}
+              height={120}
+              borderRadius={8}
+              style={{ marginRight: 12 }}
+            />
             <View style={{ flex: 1 }}>
-              <SkeletonPlaceholder width="70%" height={18} borderRadius={6} style={{ marginBottom: 6 }} />
-              <SkeletonPlaceholder width="50%" height={14} borderRadius={6} style={{ marginBottom: 8 }} />
+              <SkeletonPlaceholder
+                width="70%"
+                height={18}
+                borderRadius={6}
+                style={{ marginBottom: 6 }}
+              />
+              <SkeletonPlaceholder
+                width="50%"
+                height={14}
+                borderRadius={6}
+                style={{ marginBottom: 8 }}
+              />
               <SkeletonPlaceholder width="30%" height={14} borderRadius={6} />
             </View>
           </View>

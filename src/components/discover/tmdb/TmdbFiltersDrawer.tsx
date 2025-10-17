@@ -104,7 +104,9 @@ export const TmdbFiltersDrawer: React.FC<Props> = ({
         <Text variant="titleMedium">Media Type</Text>
         <SegmentedButtons
           value={filters.mediaType}
-          onValueChange={(value) => onFiltersChange({ mediaType: value as "movie" | "tv" })}
+          onValueChange={(value) =>
+            onFiltersChange({ mediaType: value as "movie" | "tv" })
+          }
           buttons={[
             { value: "movie", label: "Movies", icon: "movie-open" },
             { value: "tv", label: "TV", icon: "television-classic" },
@@ -175,7 +177,9 @@ export const TmdbFiltersDrawer: React.FC<Props> = ({
               onFiltersChange({ year: parsed });
             }
           }}
-          placeholder={filters.mediaType === "movie" ? "Release year" : "First air year"}
+          placeholder={
+            filters.mediaType === "movie" ? "Release year" : "First air year"
+          }
         />
 
         {filters.mediaType === "movie" ? (
@@ -183,7 +187,9 @@ export const TmdbFiltersDrawer: React.FC<Props> = ({
             <Text>Include adult</Text>
             <Switch
               value={Boolean(filters.includeAdult)}
-              onValueChange={(value) => onFiltersChange({ includeAdult: value })}
+              onValueChange={(value) =>
+                onFiltersChange({ includeAdult: value })
+              }
             />
           </View>
         ) : null}

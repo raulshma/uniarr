@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   Icon,
   IconButton,
@@ -55,9 +55,6 @@ const FILTER_LABELS: Record<FilterValue, string> = {
   [FILTER_MONITORED]: "Monitored",
   [FILTER_UNMONITORED]: "Unmonitored",
 };
-
-const normalizeSearchTerm = (input: string): string =>
-  input.trim().toLowerCase();
 
 const SonarrSeriesListScreen = () => {
   const { serviceId: rawServiceId } = useLocalSearchParams<{
@@ -136,7 +133,7 @@ const SonarrSeriesListScreen = () => {
       }
 
       void refetch();
-    }, [hasValidServiceId, refetch])
+    }, [hasValidServiceId, refetch]),
   );
 
   const connector = hasValidServiceId
@@ -289,7 +286,7 @@ const SonarrSeriesListScreen = () => {
           color: theme.colors.onSurfaceVariant,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleSeriesPress = useCallback(
@@ -306,15 +303,12 @@ const SonarrSeriesListScreen = () => {
         },
       });
     },
-    [hasValidServiceId, router, serviceId]
+    [hasValidServiceId, router, serviceId],
   );
 
   const handleAddSeries = useCallback(() => {
     if (!hasValidServiceId) {
-  alert(
-        "Invalid service",
-        "The selected service identifier is not valid."
-      );
+      alert("Invalid service", "The selected service identifier is not valid.");
       return;
     }
 
@@ -339,14 +333,14 @@ const SonarrSeriesListScreen = () => {
       // The updated item is already saved via the connector in MediaEditor
       await refetch();
     },
-    [refetch]
+    [refetch],
   );
 
   const handleSeriesLongPress = useCallback(
     (item: SelectableMediaItem) => {
       handleEditSeries(item as Series);
     },
-    [handleEditSeries]
+    [handleEditSeries],
   );
 
   const handleClearFilters = useCallback(() => {
@@ -420,10 +414,10 @@ const SonarrSeriesListScreen = () => {
               </View>
             </Pressable>
           </MediaSelectableItem>
-  </View>
+        </View>
       );
     },
-    [handleSeriesPress, handleSeriesLongPress, styles]
+    [handleSeriesPress, handleSeriesLongPress, styles],
   );
 
   const keyExtractor = useCallback((item: Series) => item.id.toString(), []);
@@ -431,7 +425,7 @@ const SonarrSeriesListScreen = () => {
   const listHeader = useMemo(
     () => (
       <View style={styles.listHeader}>
-          <View style={styles.topBar}>
+        <View style={styles.topBar}>
           <View style={styles.topBarSpacer} />
           <Text variant="headlineSmall" style={styles.topBarTitle}>
             TV Series
@@ -446,7 +440,7 @@ const SonarrSeriesListScreen = () => {
             accessibilityLabel="Add series"
             onPress={handleAddSeries}
           />
-  </View>
+        </View>
         <View>
           <Searchbar
             placeholder="Search TV Series"
@@ -498,8 +492,8 @@ const SonarrSeriesListScreen = () => {
               ))}
             </Menu>
           </View>
-  </View>
-  </View>
+        </View>
+      </View>
     ),
     [
       filterValue,
@@ -509,7 +503,7 @@ const SonarrSeriesListScreen = () => {
       statusMenuVisible,
       styles,
       theme,
-    ]
+    ],
   );
 
   const listEmptyComponent = useMemo(() => {

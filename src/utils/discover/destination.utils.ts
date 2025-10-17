@@ -1,4 +1,7 @@
-import type { DiscoverMediaItem, DiscoverServiceSummary } from "@/models/discover.types";
+import type {
+  DiscoverMediaItem,
+  DiscoverServiceSummary,
+} from "@/models/discover.types";
 import type { ServiceType } from "@/models/service.types";
 
 export type AddDestinationKind = "sonarr" | "radarr" | "jellyseerr";
@@ -17,13 +20,16 @@ export interface DestinationServices {
 }
 
 export const mapServiceSummaries = (
-  connectors: Array<{ config: { id: string; name: string; type: ServiceType } }>,
+  connectors: { config: { id: string; name: string; type: ServiceType } }[],
 ): DiscoverServiceSummary[] =>
-  connectors.map((connector) => ({
-    id: connector.config.id,
-    name: connector.config.name,
-    type: connector.config.type,
-  } satisfies DiscoverServiceSummary));
+  connectors.map(
+    (connector) =>
+      ({
+        id: connector.config.id,
+        name: connector.config.name,
+        type: connector.config.type,
+      }) satisfies DiscoverServiceSummary,
+  );
 
 export const buildDestinationOptions = (
   item: DiscoverMediaItem,
@@ -51,7 +57,9 @@ export const buildDestinationOptions = (
     );
   }
 
-  const tmdbId = item.tmdbId ?? (typeof item.sourceId === "number" ? item.sourceId : undefined);
+  const tmdbId =
+    item.tmdbId ??
+    (typeof item.sourceId === "number" ? item.sourceId : undefined);
   if (tmdbId) {
     options.push(
       ...services.jellyseerr.map((service) => ({

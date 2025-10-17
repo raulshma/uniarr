@@ -1,17 +1,20 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
   useQueryClient,
   type QueryObserverResult,
   type RefetchOptions,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
-import type { AddSeriesRequest, Series } from '@/models/media.types';
-import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import { queryKeys } from '@/hooks/queryKeys';
-import { IConnector } from '@/connectors/base/IConnector';
+import type { AddSeriesRequest, Series } from "@/models/media.types";
+import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import { queryKeys } from "@/hooks/queryKeys";
+import { IConnector } from "@/connectors/base/IConnector";
 
 interface UseSonarrSeriesResult {
   series: Series[] | undefined;
@@ -19,14 +22,16 @@ interface UseSonarrSeriesResult {
   isFetching: boolean;
   isError: boolean;
   error: unknown;
-  refetch: (options?: RefetchOptions) => Promise<QueryObserverResult<Series[], Error>>;
+  refetch: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<Series[], Error>>;
   addSeries: (request: AddSeriesRequest) => void;
   addSeriesAsync: (request: AddSeriesRequest) => Promise<Series>;
   isAdding: boolean;
   addError: unknown;
 }
 
-const SONARR_SERVICE_TYPE = 'sonarr';
+const SONARR_SERVICE_TYPE = "sonarr";
 
 const ensureSonarrConnector = (
   getConnector: (id: string) => IConnector | undefined,
@@ -34,7 +39,9 @@ const ensureSonarrConnector = (
 ): SonarrConnector => {
   const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== SONARR_SERVICE_TYPE) {
-    throw new Error(`Sonarr connector not registered for service ${serviceId}.`);
+    throw new Error(
+      `Sonarr connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as SonarrConnector;
@@ -46,7 +53,10 @@ export const useSonarrSeries = (serviceId: string): UseSonarrSeriesResult => {
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === SONARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureSonarrConnector(getConnector, serviceId), [getConnector, serviceId]);
+  const resolveConnector = useCallback(
+    () => ensureSonarrConnector(getConnector, serviceId),
+    [getConnector, serviceId],
+  );
 
   const seriesQuery = useQuery({
     queryKey: queryKeys.sonarr.seriesList(serviceId),
@@ -66,8 +76,12 @@ export const useSonarrSeries = (serviceId: string): UseSonarrSeriesResult => {
       return connector.add(request);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.seriesList(serviceId) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.queue(serviceId) });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.sonarr.seriesList(serviceId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.sonarr.queue(serviceId),
+      });
     },
   });
 

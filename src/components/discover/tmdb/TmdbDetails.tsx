@@ -1,13 +1,13 @@
-import React, { useMemo } from 'react';
-import { Linking, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Dialog, Portal, Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import { Linking, ScrollView, StyleSheet, View } from "react-native";
+import { Button, Dialog, Portal, Text, useTheme } from "react-native-paper";
 
-import type { DiscoverMediaItem } from '@/models/discover.types';
-import { spacing } from '@/theme/spacing';
-import type { AppTheme } from '@/constants/theme';
-import { useTmdbDetails } from '@/hooks/tmdb/useTmdbDetails';
-import type { TmdbMediaType } from '@/connectors/implementations/TmdbConnector';
-import MediaPoster from '@/components/media/MediaPoster/MediaPoster';
+import type { DiscoverMediaItem } from "@/models/discover.types";
+import { spacing } from "@/theme/spacing";
+import type { AppTheme } from "@/constants/theme";
+import { useTmdbDetails } from "@/hooks/tmdb/useTmdbDetails";
+import type { TmdbMediaType } from "@/connectors/implementations/TmdbConnector";
+import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 
 interface Props {
   visible: boolean;
@@ -17,25 +17,25 @@ interface Props {
 }
 
 const resolveTmdbMediaType = (item: DiscoverMediaItem | null): TmdbMediaType =>
-  item?.mediaType === 'series' ? 'tv' : 'movie';
+  item?.mediaType === "series" ? "tv" : "movie";
 
 const getTrailerUrl = (videos: any): string | undefined => {
-  const results = videos?.results as Array<Record<string, unknown>> | undefined;
+  const results = videos?.results as Record<string, unknown>[] | undefined;
   if (!Array.isArray(results)) {
     return undefined;
   }
 
   const match = results.find((video) => {
-    const site = typeof video.site === 'string' ? video.site : undefined;
-    const type = typeof video.type === 'string' ? video.type : undefined;
-    return site === 'YouTube' && (type === 'Trailer' || type === 'Teaser');
+    const site = typeof video.site === "string" ? video.site : undefined;
+    const type = typeof video.type === "string" ? video.type : undefined;
+    return site === "YouTube" && (type === "Trailer" || type === "Teaser");
   });
 
   if (!match) {
     return undefined;
   }
 
-  const key = typeof match.key === 'string' ? match.key : undefined;
+  const key = typeof match.key === "string" ? match.key : undefined;
   if (!key) {
     return undefined;
   }
@@ -48,12 +48,15 @@ const getProviderNames = (watchProviders: any): string | undefined => {
     return undefined;
   }
 
-  const region = watchProviders.results.US ?? watchProviders.results.GB ?? Object.values(watchProviders.results)[0];
+  const region =
+    watchProviders.results.US ??
+    watchProviders.results.GB ??
+    Object.values(watchProviders.results)[0];
   if (!region) {
     return undefined;
   }
 
-  const collect = (entries?: Array<{ provider_name?: string }>) =>
+  const collect = (entries?: { provider_name?: string }[]) =>
     entries?.map((entry) => entry.provider_name).filter(Boolean) as string[];
 
   const names = [
@@ -66,10 +69,15 @@ const getProviderNames = (watchProviders: any): string | undefined => {
     return undefined;
   }
 
-  return Array.from(new Set(names)).join(', ');
+  return Array.from(new Set(names)).join(", ");
 };
 
-export const TmdbDetails: React.FC<Props> = ({ visible, item, onDismiss, onAdd }) => {
+export const TmdbDetails: React.FC<Props> = ({
+  visible,
+  item,
+  onDismiss,
+  onAdd,
+}) => {
   const theme = useTheme<AppTheme>();
 
   const tmdbId = item?.tmdbId ?? null;
@@ -90,7 +98,7 @@ export const TmdbDetails: React.FC<Props> = ({ visible, item, onDismiss, onAdd }
           gap: spacing.md,
         },
         header: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.md,
         },
         overview: {
@@ -98,15 +106,15 @@ export const TmdbDetails: React.FC<Props> = ({ visible, item, onDismiss, onAdd }
         },
         pill: {
           color: theme.colors.onSurfaceVariant,
-          fontStyle: 'italic',
+          fontStyle: "italic",
         },
         sectionTitle: {
           color: theme.colors.onSurface,
-          fontWeight: '600',
+          fontWeight: "600",
           marginBottom: spacing.xs,
         },
         buttonRow: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.sm,
           marginTop: spacing.md,
         },
@@ -114,29 +122,34 @@ export const TmdbDetails: React.FC<Props> = ({ visible, item, onDismiss, onAdd }
     [theme],
   );
 
-  const trailerUrl = detailsQuery.data ? getTrailerUrl(detailsQuery.data.videos) : undefined;
-  const providers = detailsQuery.data ? getProviderNames(detailsQuery.data.watchProviders) : undefined;
+  const trailerUrl = detailsQuery.data
+    ? getTrailerUrl(detailsQuery.data.videos)
+    : undefined;
+  const providers = detailsQuery.data
+    ? getProviderNames(detailsQuery.data.watchProviders)
+    : undefined;
 
   return (
     <Portal>
       <Dialog visible={visible} onDismiss={onDismiss} style={styles.dialog}>
-        <Dialog.Title>{item?.title ?? 'Details'}</Dialog.Title>
+        <Dialog.Title>{item?.title ?? "Details"}</Dialog.Title>
         <Dialog.ScrollArea>
           <ScrollView contentContainerStyle={styles.container}>
             <View style={styles.header}>
               <MediaPoster uri={item?.posterUrl} size={120} borderRadius={12} />
               <View style={{ flex: 1, gap: spacing.xs }}>
                 <Text variant="titleMedium" style={styles.pill}>
-                  {item?.mediaType === 'series' ? 'TV Series' : 'Movie'}
+                  {item?.mediaType === "series" ? "TV Series" : "Movie"}
                 </Text>
                 {item?.releaseDate ? (
                   <Text variant="bodyMedium" style={styles.pill}>
                     Released {item.releaseDate}
                   </Text>
                 ) : null}
-                {typeof item?.rating === 'number' ? (
+                {typeof item?.rating === "number" ? (
                   <Text variant="bodyMedium" style={styles.pill}>
-                    Rating {item.rating.toFixed(1)} ({item.voteCount ?? 0} votes)
+                    Rating {item.rating.toFixed(1)} ({item.voteCount ?? 0}{" "}
+                    votes)
                   </Text>
                 ) : null}
               </View>

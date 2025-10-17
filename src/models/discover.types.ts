@@ -1,8 +1,8 @@
-import type { ServiceType } from '@/models/service.types';
+import type { ServiceType } from "@/models/service.types";
 
-export type DiscoverMediaKind = 'series' | 'movie';
+export type DiscoverMediaKind = "series" | "movie";
 
-export type DiscoverSource = 'jellyseerr' | 'sonarr' | 'radarr' | 'tmdb';
+export type DiscoverSource = "jellyseerr" | "sonarr" | "radarr" | "tmdb";
 
 export interface DiscoverServiceSummary {
   id: string;

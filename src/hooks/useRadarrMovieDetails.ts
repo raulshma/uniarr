@@ -1,17 +1,20 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
   useQueryClient,
   type QueryObserverResult,
   type RefetchOptions,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
-import type { IConnector } from '@/connectors/base/IConnector';
-import type { Movie } from '@/models/movie.types';
-import { queryKeys } from '@/hooks/queryKeys';
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
+import type { IConnector } from "@/connectors/base/IConnector";
+import type { Movie } from "@/models/movie.types";
+import { queryKeys } from "@/hooks/queryKeys";
 
 interface UseRadarrMovieDetailsParams {
   serviceId: string;
@@ -24,7 +27,9 @@ export interface UseRadarrMovieDetailsResult {
   isFetching: boolean;
   isError: boolean;
   error: unknown;
-  refetch: (options?: RefetchOptions) => Promise<QueryObserverResult<Movie, Error>>;
+  refetch: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<Movie, Error>>;
   toggleMonitor: (nextState: boolean) => void;
   toggleMonitorAsync: (nextState: boolean) => Promise<void>;
   isTogglingMonitor: boolean;
@@ -33,13 +38,19 @@ export interface UseRadarrMovieDetailsResult {
   triggerSearchAsync: () => Promise<void>;
   isTriggeringSearch: boolean;
   triggerSearchError: unknown;
-  deleteMovie: (options?: { deleteFiles?: boolean; addImportListExclusion?: boolean }) => void;
-  deleteMovieAsync: (options?: { deleteFiles?: boolean; addImportListExclusion?: boolean }) => Promise<void>;
+  deleteMovie: (options?: {
+    deleteFiles?: boolean;
+    addImportListExclusion?: boolean;
+  }) => void;
+  deleteMovieAsync: (options?: {
+    deleteFiles?: boolean;
+    addImportListExclusion?: boolean;
+  }) => Promise<void>;
   isDeleting: boolean;
   deleteError: unknown;
 }
 
-const RADARR_SERVICE_TYPE = 'radarr';
+const RADARR_SERVICE_TYPE = "radarr";
 
 const ensureRadarrConnector = (
   getConnector: (id: string) => IConnector | undefined,
@@ -47,7 +58,9 @@ const ensureRadarrConnector = (
 ): RadarrConnector => {
   const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== RADARR_SERVICE_TYPE) {
-    throw new Error(`Radarr connector not registered for service ${serviceId}.`);
+    throw new Error(
+      `Radarr connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as RadarrConnector;
@@ -62,7 +75,10 @@ export const useRadarrMovieDetails = ({
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureRadarrConnector(getConnector, serviceId), [getConnector, serviceId]);
+  const resolveConnector = useCallback(
+    () => ensureRadarrConnector(getConnector, serviceId),
+    [getConnector, serviceId],
+  );
 
   const detailsQuery = useQuery({
     queryKey: queryKeys.radarr.movieDetail(serviceId, movieId),
@@ -76,22 +92,34 @@ export const useRadarrMovieDetails = ({
   });
 
   const toggleMonitorMutation = useMutation({
-    mutationKey: [...queryKeys.radarr.movieDetail(serviceId, movieId), 'monitor'],
+    mutationKey: [
+      ...queryKeys.radarr.movieDetail(serviceId, movieId),
+      "monitor",
+    ],
     mutationFn: async (nextState: boolean) => {
       const connector = resolveConnector();
       await connector.setMonitored(movieId, nextState);
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.radarr.movieDetail(serviceId, movieId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.radarr.moviesList(serviceId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.radarr.queue(serviceId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.radarr.movieDetail(serviceId, movieId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.radarr.moviesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.radarr.queue(serviceId),
+        }),
       ]);
     },
   });
 
   const triggerSearchMutation = useMutation({
-    mutationKey: [...queryKeys.radarr.movieDetail(serviceId, movieId), 'search'],
+    mutationKey: [
+      ...queryKeys.radarr.movieDetail(serviceId, movieId),
+      "search",
+    ],
     mutationFn: async () => {
       const connector = resolveConnector();
       await connector.triggerSearch(movieId);
@@ -99,18 +127,32 @@ export const useRadarrMovieDetails = ({
   });
 
   const deleteMovieMutation = useMutation({
-    mutationKey: [...queryKeys.radarr.movieDetail(serviceId, movieId), 'delete'],
-    mutationFn: async (options?: { deleteFiles?: boolean; addImportListExclusion?: boolean }) => {
+    mutationKey: [
+      ...queryKeys.radarr.movieDetail(serviceId, movieId),
+      "delete",
+    ],
+    mutationFn: async (options?: {
+      deleteFiles?: boolean;
+      addImportListExclusion?: boolean;
+    }) => {
       const connector = resolveConnector();
       await connector.deleteMovie(movieId, options);
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.radarr.movieDetail(serviceId, movieId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.radarr.moviesList(serviceId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.radarr.queue(serviceId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.radarr.movieDetail(serviceId, movieId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.radarr.moviesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.radarr.queue(serviceId),
+        }),
       ]);
-      queryClient.removeQueries({ queryKey: queryKeys.radarr.movieDetail(serviceId, movieId) });
+      queryClient.removeQueries({
+        queryKey: queryKeys.radarr.movieDetail(serviceId, movieId),
+      });
     },
   });
 

@@ -1,15 +1,15 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import { StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
+import type { AppTheme } from "@/constants/theme";
 
-export type ServiceStatusState = 'online' | 'offline' | 'degraded';
+export type ServiceStatusState = "online" | "offline" | "degraded";
 
 export type ServiceStatusProps = {
   status: ServiceStatusState;
   label?: string;
-  size?: 'sm' | 'md';
+  size?: "sm" | "md";
   showLabel?: boolean;
   testID?: string;
 };
@@ -20,27 +20,27 @@ const sizeMap = {
 } as const;
 
 const statusText: Record<ServiceStatusState, string> = {
-  online: 'Online',
-  offline: 'Offline',
-  degraded: 'Degraded',
+  online: "Online",
+  offline: "Offline",
+  degraded: "Degraded",
 };
 
 const ServiceStatus: React.FC<ServiceStatusProps> = ({
   status,
   label,
-  size = 'md',
+  size = "md",
   showLabel = true,
-  testID = 'service-status',
+  testID = "service-status",
 }) => {
   const theme = useTheme<AppTheme>();
 
   const color = useMemo(() => {
     switch (status) {
-      case 'online':
+      case "online":
         return theme.colors.primary;
-      case 'degraded':
+      case "degraded":
         return theme.colors.tertiary;
-      case 'offline':
+      case "offline":
       default:
         return theme.colors.error;
     }
@@ -82,13 +82,13 @@ export default ServiceStatus;
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   indicator: {
     marginRight: 6,
   },
   label: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

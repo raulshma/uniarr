@@ -1,13 +1,24 @@
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Text, useTheme, Button, Checkbox, TextInput, ActivityIndicator, Portal, Dialog } from "react-native-paper";
+import {
+  Text,
+  useTheme,
+  Button,
+  Checkbox,
+  TextInput,
+  Portal,
+  Dialog,
+} from "react-native-paper";
 
 import { TabHeader } from "@/components/common/TabHeader";
 import { Card } from "@/components/common/Card";
 import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
-import { backupRestoreService, type BackupExportOptions, type BackupSelectionConfig } from "@/services/backup/BackupRestoreService";
+import {
+  backupRestoreService,
+  type BackupExportOptions,
+} from "@/services/backup/BackupRestoreService";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useRouter } from "expo-router";
@@ -24,7 +35,7 @@ const BackupExportScreen = () => {
   // Get default configuration
   const config = backupRestoreService.getBackupSelectionConfig();
   const [options, setOptions] = useState<BackupExportOptions>(
-    backupRestoreService.getDefaultExportOptions()
+    backupRestoreService.getDefaultExportOptions(),
   );
 
   const styles = StyleSheet.create({
@@ -113,8 +124,11 @@ const BackupExportScreen = () => {
     },
   });
 
-  const handleOptionChange = (key: keyof BackupExportOptions, value: boolean) => {
-    setOptions(prev => ({ ...prev, [key]: value }));
+  const handleOptionChange = (
+    key: keyof BackupExportOptions,
+    value: boolean,
+  ) => {
+    setOptions((prev) => ({ ...prev, [key]: value }));
   };
 
   const handlePasswordConfirm = async () => {
@@ -140,14 +154,16 @@ const BackupExportScreen = () => {
       setIsCreating(true);
 
       const backupOptions = { ...options, password: backupPassword };
-      const validation = backupRestoreService.validateExportOptions(backupOptions);
+      const validation =
+        backupRestoreService.validateExportOptions(backupOptions);
 
       if (!validation.isValid) {
         await alert("Validation Error", validation.errors.join("\n"));
         return;
       }
 
-      const backupPath = await backupRestoreService.createSelectiveBackup(backupOptions);
+      const backupPath =
+        await backupRestoreService.createSelectiveBackup(backupOptions);
       const fileSize = await backupRestoreService.getBackupFileSize(backupPath);
       const fileSizeMB = (fileSize / 1024 / 1024).toFixed(2);
 
@@ -162,7 +178,12 @@ const BackupExportScreen = () => {
               try {
                 await backupRestoreService.shareBackup(backupPath);
               } catch (error) {
-                await alert("Share Failed", error instanceof Error ? error.message : "Failed to share backup");
+                await alert(
+                  "Share Failed",
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to share backup",
+                );
               }
             },
           },
@@ -170,7 +191,7 @@ const BackupExportScreen = () => {
             text: "Done",
             style: "cancel",
           },
-        ]
+        ],
       );
 
       await logger.info("Encrypted backup created successfully", {
@@ -179,7 +200,10 @@ const BackupExportScreen = () => {
         encrypted: true,
       });
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Failed to create encrypted backup";
+      const errorMsg =
+        error instanceof Error
+          ? error.message
+          : "Failed to create encrypted backup";
       await alert("Backup Failed", errorMsg);
       await logger.error("Failed to create encrypted backup", {
         location: "BackupExportScreen.createBackupWithPassword",
@@ -206,28 +230,38 @@ const BackupExportScreen = () => {
         return;
       }
 
-      const backupPath = await backupRestoreService.createSelectiveBackup(options);
+      const backupPath =
+        await backupRestoreService.createSelectiveBackup(options);
       const fileSize = await backupRestoreService.getBackupFileSize(backupPath);
       const fileSizeMB = (fileSize / 1024 / 1024).toFixed(2);
 
       // Show share dialog
-      await alert("Backup Created", `Your backup is ready (${fileSizeMB} MB).`, [
-        {
-          text: "Share",
-          style: "default",
-          onPress: async () => {
-            try {
-              await backupRestoreService.shareBackup(backupPath);
-            } catch (error) {
-              await alert("Share Failed", error instanceof Error ? error.message : "Failed to share backup");
-            }
+      await alert(
+        "Backup Created",
+        `Your backup is ready (${fileSizeMB} MB).`,
+        [
+          {
+            text: "Share",
+            style: "default",
+            onPress: async () => {
+              try {
+                await backupRestoreService.shareBackup(backupPath);
+              } catch (error) {
+                await alert(
+                  "Share Failed",
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to share backup",
+                );
+              }
+            },
           },
-        },
-        {
-          text: "Done",
-          style: "cancel",
-        },
-      ]);
+          {
+            text: "Done",
+            style: "cancel",
+          },
+        ],
+      );
 
       await logger.info("Backup created successfully", {
         location: "BackupExportScreen.handleCreateBackup",
@@ -235,7 +269,8 @@ const BackupExportScreen = () => {
         encrypted: false,
       });
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Failed to create backup";
+      const errorMsg =
+        error instanceof Error ? error.message : "Failed to create backup";
       await alert("Backup Failed", errorMsg);
       await logger.error("Failed to create backup", {
         location: "BackupExportScreen.handleCreateBackup",
@@ -273,12 +308,19 @@ const BackupExportScreen = () => {
             <View style={styles.checkboxContainer}>
               <Checkbox
                 status={options.includeSettings ? "checked" : "unchecked"}
-                onPress={() => handleOptionChange("includeSettings", !options.includeSettings)}
+                onPress={() =>
+                  handleOptionChange(
+                    "includeSettings",
+                    !options.includeSettings,
+                  )
+                }
               />
               <View style={{ flex: 1, marginLeft: spacing.md }}>
                 <Text style={styles.checkboxLabel}>App Settings</Text>
                 {config.settings.sensitive && (
-                  <Text style={styles.sensitiveLabel}>May contain sensitive preferences</Text>
+                  <Text style={styles.sensitiveLabel}>
+                    May contain sensitive preferences
+                  </Text>
                 )}
               </View>
             </View>
@@ -287,26 +329,44 @@ const BackupExportScreen = () => {
             <View style={styles.checkboxContainer}>
               <Checkbox
                 status={options.includeServiceConfigs ? "checked" : "unchecked"}
-                onPress={() => handleOptionChange("includeServiceConfigs", !options.includeServiceConfigs)}
+                onPress={() =>
+                  handleOptionChange(
+                    "includeServiceConfigs",
+                    !options.includeServiceConfigs,
+                  )
+                }
               />
               <View style={{ flex: 1, marginLeft: spacing.md }}>
                 <Text style={styles.checkboxLabel}>Service Configurations</Text>
                 {config.serviceConfigs.sensitive && (
-                  <Text style={styles.sensitiveLabel}>Contains connection details</Text>
+                  <Text style={styles.sensitiveLabel}>
+                    Contains connection details
+                  </Text>
                 )}
               </View>
             </View>
 
             {/* Service Credentials */}
             {options.includeServiceConfigs && (
-              <View style={[styles.checkboxContainer, { marginLeft: spacing.lg }]}>
+              <View
+                style={[styles.checkboxContainer, { marginLeft: spacing.lg }]}
+              >
                 <Checkbox
-                  status={options.includeServiceCredentials ? "checked" : "unchecked"}
-                  onPress={() => handleOptionChange("includeServiceCredentials", !options.includeServiceCredentials)}
+                  status={
+                    options.includeServiceCredentials ? "checked" : "unchecked"
+                  }
+                  onPress={() =>
+                    handleOptionChange(
+                      "includeServiceCredentials",
+                      !options.includeServiceCredentials,
+                    )
+                  }
                 />
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
                   <Text style={styles.checkboxLabel}>Include Credentials</Text>
-                  <Text style={styles.sensitiveLabel}>API keys, usernames, passwords</Text>
+                  <Text style={styles.sensitiveLabel}>
+                    API keys, usernames, passwords
+                  </Text>
                 </View>
               </View>
             )}
@@ -314,13 +374,22 @@ const BackupExportScreen = () => {
             {/* TMDB Credentials */}
             <View style={styles.checkboxContainer}>
               <Checkbox
-                status={options.includeTmdbCredentials ? "checked" : "unchecked"}
-                onPress={() => handleOptionChange("includeTmdbCredentials", !options.includeTmdbCredentials)}
+                status={
+                  options.includeTmdbCredentials ? "checked" : "unchecked"
+                }
+                onPress={() =>
+                  handleOptionChange(
+                    "includeTmdbCredentials",
+                    !options.includeTmdbCredentials,
+                  )
+                }
               />
               <View style={{ flex: 1, marginLeft: spacing.md }}>
                 <Text style={styles.checkboxLabel}>TMDB API Key</Text>
                 {config.tmdbCredentials.sensitive && (
-                  <Text style={styles.sensitiveLabel}>Sensitive API credential</Text>
+                  <Text style={styles.sensitiveLabel}>
+                    Sensitive API credential
+                  </Text>
                 )}
               </View>
             </View>
@@ -329,7 +398,12 @@ const BackupExportScreen = () => {
             <View style={styles.checkboxContainer}>
               <Checkbox
                 status={options.includeNetworkHistory ? "checked" : "unchecked"}
-                onPress={() => handleOptionChange("includeNetworkHistory", !options.includeNetworkHistory)}
+                onPress={() =>
+                  handleOptionChange(
+                    "includeNetworkHistory",
+                    !options.includeNetworkHistory,
+                  )
+                }
               />
               <View style={{ flex: 1, marginLeft: spacing.md }}>
                 <Text style={styles.checkboxLabel}>Network Scan History</Text>
@@ -340,7 +414,12 @@ const BackupExportScreen = () => {
             <View style={styles.checkboxContainer}>
               <Checkbox
                 status={options.includeRecentIPs ? "checked" : "unchecked"}
-                onPress={() => handleOptionChange("includeRecentIPs", !options.includeRecentIPs)}
+                onPress={() =>
+                  handleOptionChange(
+                    "includeRecentIPs",
+                    !options.includeRecentIPs,
+                  )
+                }
               />
               <View style={{ flex: 1, marginLeft: spacing.md }}>
                 <Text style={styles.checkboxLabel}>Recent IPs</Text>
@@ -360,18 +439,28 @@ const BackupExportScreen = () => {
             <Card style={styles.encryptionCard}>
               <Text style={styles.encryptionTitle}>🔐 Password Protection</Text>
               <Text style={styles.dialogContent}>
-                When enabled, sensitive data (credentials, API keys) will be encrypted with your password.
-                You'll need this password to restore the backup.
+                When enabled, sensitive data (credentials, API keys) will be
+                encrypted with your password. You'll need this password to
+                restore the backup.
               </Text>
 
               <View style={styles.checkboxContainer}>
                 <Checkbox
                   status={options.encryptSensitive ? "checked" : "unchecked"}
-                  onPress={() => handleOptionChange("encryptSensitive", !options.encryptSensitive)}
+                  onPress={() =>
+                    handleOptionChange(
+                      "encryptSensitive",
+                      !options.encryptSensitive,
+                    )
+                  }
                 />
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
-                  <Text style={styles.checkboxLabel}>Encrypt sensitive data</Text>
-                  <Text style={styles.sensitiveLabel}>Recommended for security</Text>
+                  <Text style={styles.checkboxLabel}>
+                    Encrypt sensitive data
+                  </Text>
+                  <Text style={styles.sensitiveLabel}>
+                    Recommended for security
+                  </Text>
                 </View>
               </View>
             </Card>
@@ -385,10 +474,21 @@ const BackupExportScreen = () => {
               mode="contained"
               icon={options.encryptSensitive ? "lock" : "backup-restore"}
               loading={isCreating}
-              disabled={isCreating || (!options.includeSettings && !options.includeServiceConfigs && !options.includeTmdbCredentials && !options.includeNetworkHistory && !options.includeRecentIPs)}
+              disabled={
+                isCreating ||
+                (!options.includeSettings &&
+                  !options.includeServiceConfigs &&
+                  !options.includeTmdbCredentials &&
+                  !options.includeNetworkHistory &&
+                  !options.includeRecentIPs)
+              }
               onPress={handleCreateBackup}
             >
-              {isCreating ? "Creating Backup..." : (options.encryptSensitive ? "Create Encrypted Backup" : "Create Backup")}
+              {isCreating
+                ? "Creating Backup..."
+                : options.encryptSensitive
+                  ? "Create Encrypted Backup"
+                  : "Create Backup"}
             </Button>
           </View>
         </View>
@@ -396,11 +496,18 @@ const BackupExportScreen = () => {
 
       {/* Password Dialog */}
       <Portal>
-        <Dialog visible={showPasswordDialog} onDismiss={() => setShowPasswordDialog(false)} style={styles.dialog}>
-          <Dialog.Title style={styles.dialogTitle}>Set Backup Password</Dialog.Title>
+        <Dialog
+          visible={showPasswordDialog}
+          onDismiss={() => setShowPasswordDialog(false)}
+          style={styles.dialog}
+        >
+          <Dialog.Title style={styles.dialogTitle}>
+            Set Backup Password
+          </Dialog.Title>
           <Dialog.Content>
             <Text style={styles.dialogContent}>
-              Create a strong password to encrypt your sensitive data. You'll need this password to restore the backup.
+              Create a strong password to encrypt your sensitive data. You'll
+              need this password to restore the backup.
             </Text>
 
             <TextInput

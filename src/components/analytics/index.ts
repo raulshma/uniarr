@@ -1,1 +1,1 @@
-export { AnalyticsChart } from './AnalyticsChart';
+export { AnalyticsChart } from "./AnalyticsChart";

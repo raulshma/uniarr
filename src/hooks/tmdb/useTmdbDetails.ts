@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
 import type {
   DiscoverMovieResponse,
@@ -14,9 +14,9 @@ import type {
   TvImagesResponse,
   TvVideosResponse,
   TvWatchProvidersResponse,
-} from '@/connectors/implementations/TmdbConnector';
-import { ensureTmdbConnector } from '@/services/tmdb/TmdbConnectorProvider';
-import { queryKeys } from '@/hooks/queryKeys';
+} from "@/connectors/implementations/TmdbConnector";
+import { ensureTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
+import { queryKeys } from "@/hooks/queryKeys";
 
 type MediaDetailsMap = {
   movie: {
@@ -56,24 +56,24 @@ export const useTmdbDetails = <TType extends TmdbMediaType>(
     queryKey: queryKeys.tmdb.details(mediaType, tmdbId ?? 0, language),
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
-    networkMode: 'offlineFirst',
+    networkMode: "offlineFirst",
     queryFn: async () => {
       if (!tmdbId) {
-        throw new Error('TMDB id is required for details lookup.');
+        throw new Error("TMDB id is required for details lookup.");
       }
 
       const connector = await ensureTmdbConnector();
       const appendExtras = [
-        'images',
-        'videos',
-        'watch/providers',
-        'credits',
-        'recommendations',
-        'similar',
+        "images",
+        "videos",
+        "watch/providers",
+        "credits",
+        "recommendations",
+        "similar",
       ];
 
-      if (mediaType === 'movie') {
-        const details = await connector.getDetails('movie', tmdbId, {
+      if (mediaType === "movie") {
+        const details = await connector.getDetails("movie", tmdbId, {
           language,
           appendToResponse: appendExtras,
         });
@@ -83,14 +83,14 @@ export const useTmdbDetails = <TType extends TmdbMediaType>(
           details: movieDetails,
           images: movieDetails.images,
           videos: movieDetails.videos,
-          watchProviders: movieDetails['watch/providers'],
+          watchProviders: movieDetails["watch/providers"],
           credits: movieDetails.credits,
           recommendations: movieDetails.recommendations,
           similar: movieDetails.similar,
         } as MediaDetailsMap[TType];
       }
 
-      const details = await connector.getDetails('tv', tmdbId, {
+      const details = await connector.getDetails("tv", tmdbId, {
         language,
         appendToResponse: appendExtras,
       });
@@ -100,7 +100,7 @@ export const useTmdbDetails = <TType extends TmdbMediaType>(
         details: tvDetails,
         images: tvDetails.images,
         videos: tvDetails.videos,
-        watchProviders: tvDetails['watch/providers'],
+        watchProviders: tvDetails["watch/providers"],
         credits: tvDetails.credits,
         recommendations: tvDetails.recommendations,
         similar: tvDetails.similar,

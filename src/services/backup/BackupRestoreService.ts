@@ -1,13 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import * as DocumentPicker from 'expo-document-picker';
-import * as Crypto from 'expo-crypto';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import * as DocumentPicker from "expo-document-picker";
+import * as Crypto from "expo-crypto";
 
-import { logger } from '@/services/logger/LoggerService';
-import { secureStorage } from '@/services/storage/SecureStorage';
-import { type ServiceConfig, type ServiceType } from '@/models/service.types';
-import { getStoredTmdbKey, setStoredTmdbKey } from '@/services/tmdb/TmdbCredentialService';
+import { logger } from "@/services/logger/LoggerService";
+import { secureStorage } from "@/services/storage/SecureStorage";
+import { type ServiceConfig, type ServiceType } from "@/models/service.types";
+import {
+  getStoredTmdbKey,
+  setStoredTmdbKey,
+} from "@/services/tmdb/TmdbCredentialService";
 
 export interface BackupExportOptions {
   includeSettings: boolean;
@@ -45,17 +48,17 @@ export interface BackupSelectionConfig {
 }
 
 export interface EncryptedBackupData {
-  version: '1.2';
+  version: "1.2";
   timestamp: string;
   encrypted: true;
   encryptionInfo: {
-    algorithm: 'XOR-PBKDF2';
+    algorithm: "XOR-PBKDF2";
     salt: string;
     iv: string;
   };
   appData: {
     settings?: Record<string, unknown>;
-    serviceConfigs?: Array<{
+    serviceConfigs?: {
       id: string;
       type: ServiceType;
       name: string;
@@ -68,9 +71,9 @@ export interface EncryptedBackupData {
       enabled: boolean;
       createdAt: string;
       updatedAt: string;
-    }>;
+    }[];
     encryptedData?: string; // Contains sensitive data (credentials, API keys, etc.)
-    networkScanHistory?: Array<{
+    networkScanHistory?: {
       id: string;
       timestamp: string;
       duration: number;
@@ -78,21 +81,21 @@ export interface EncryptedBackupData {
       servicesFound: number;
       subnet: string;
       customIp?: string;
-      services: Array<{
+      services: {
         type: string;
         name: string;
         url: string;
         port: number;
         version?: string;
         requiresAuth?: boolean;
-      }>;
-    }>;
-    recentIPs?: Array<{
+      }[];
+    }[];
+    recentIPs?: {
       ip: string;
       timestamp: string;
       subnet?: string;
       servicesFound?: number;
-    }>;
+    }[];
     tmdbCredentials?: {
       apiKey?: string;
     };
@@ -100,17 +103,17 @@ export interface EncryptedBackupData {
 }
 
 export interface BackupData {
-  version: '1.1' | '1.2';
+  version: "1.1" | "1.2";
   timestamp: string;
   encrypted?: boolean;
   encryptionInfo?: {
-    algorithm: 'XOR-PBKDF2';
+    algorithm: "XOR-PBKDF2";
     salt: string;
     iv: string;
   };
   appData: {
     settings?: Record<string, unknown>;
-    serviceConfigs?: Array<{
+    serviceConfigs?: {
       id: string;
       type: ServiceType;
       name: string;
@@ -123,9 +126,9 @@ export interface BackupData {
       enabled: boolean;
       createdAt: string;
       updatedAt: string;
-    }>;
+    }[];
     encryptedData?: string; // For encrypted sensitive data
-    networkScanHistory?: Array<{
+    networkScanHistory?: {
       id: string;
       timestamp: string;
       duration: number;
@@ -133,21 +136,21 @@ export interface BackupData {
       servicesFound: number;
       subnet: string;
       customIp?: string;
-      services: Array<{
+      services: {
         type: string;
         name: string;
         url: string;
         port: number;
         version?: string;
         requiresAuth?: boolean;
-      }>;
-    }>;
-    recentIPs?: Array<{
+      }[];
+    }[];
+    recentIPs?: {
       ip: string;
       timestamp: string;
       subnet?: string;
       servicesFound?: number;
-    }>;
+    }[];
     tmdbCredentials?: {
       apiKey?: string;
     };
@@ -173,12 +176,12 @@ class BackupRestoreService {
     try {
       const randomBytes = await Crypto.getRandomBytesAsync(length);
       return Array.from(randomBytes)
-        .map(byte => byte.toString(16).padStart(2, '0'))
-        .join('');
-    } catch (error) {
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+    } catch {
       // Fallback to a simpler random generator
-      const chars = '0123456789abcdef';
-      let result = '';
+      const chars = "0123456789abcdef";
+      let result = "";
       for (let i = 0; i < length * 2; i++) {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
       }
@@ -206,11 +209,11 @@ class BackupRestoreService {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     // Pad to 8 characters to ensure consistent length
-    return Math.abs(hash).toString(16).padStart(8, '0');
+    return Math.abs(hash).toString(16).padStart(8, "0");
   }
 
   /**
@@ -218,11 +221,12 @@ class BackupRestoreService {
    */
   private base64Encode(str: string): string {
     try {
-      return Buffer.from(str, 'utf8').toString('base64');
-    } catch (error) {
+      return Buffer.from(str, "utf8").toString("base64");
+    } catch {
       // Fallback manual base64 encoding
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-      let result = '';
+      const chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      let result = "";
       let i = 0;
 
       while (i < str.length) {
@@ -234,8 +238,8 @@ class BackupRestoreService {
 
         result += chars.charAt((bitmap >> 18) & 63);
         result += chars.charAt((bitmap >> 12) & 63);
-        result += i - 2 < str.length ? chars.charAt((bitmap >> 6) & 63) : '=';
-        result += i - 1 < str.length ? chars.charAt(bitmap & 63) : '=';
+        result += i - 2 < str.length ? chars.charAt((bitmap >> 6) & 63) : "=";
+        result += i - 1 < str.length ? chars.charAt(bitmap & 63) : "=";
       }
 
       return result;
@@ -247,14 +251,15 @@ class BackupRestoreService {
    */
   private base64Decode(str: string): string {
     try {
-      return Buffer.from(str, 'base64').toString('utf8');
-    } catch (error) {
+      return Buffer.from(str, "base64").toString("utf8");
+    } catch {
       // Fallback manual base64 decoding
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-      let result = '';
+      const chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      let result = "";
       let i = 0;
 
-      str = str.replace(/[^A-Za-z0-9+/]/g, '');
+      str = str.replace(/[^A-Za-z0-9+/]/g, "");
 
       while (i < str.length) {
         const encoded1 = chars.indexOf(str.charAt(i++));
@@ -267,7 +272,8 @@ class BackupRestoreService {
           continue; // Skip invalid base64 characters
         }
 
-        const bitmap = (encoded1 << 18) | (encoded2 << 12) | (encoded3 << 6) | encoded4;
+        const bitmap =
+          (encoded1 << 18) | (encoded2 << 12) | (encoded3 << 6) | encoded4;
 
         result += String.fromCharCode((bitmap >> 16) & 255);
         if (encoded3 !== 64) result += String.fromCharCode((bitmap >> 8) & 255);
@@ -282,7 +288,7 @@ class BackupRestoreService {
    * Simple XOR encryption for React Native compatibility
    */
   private xorEncrypt(text: string, key: string): string {
-    let result = '';
+    let result = "";
     for (let i = 0; i < text.length; i++) {
       const charCode = text.charCodeAt(i);
       const keyChar = key.charCodeAt(i % key.length);
@@ -296,7 +302,7 @@ class BackupRestoreService {
    */
   private xorDecrypt(encryptedText: string, key: string): string {
     const text = this.base64Decode(encryptedText); // Base64 decode
-    let result = '';
+    let result = "";
     for (let i = 0; i < text.length; i++) {
       const charCode = text.charCodeAt(i);
       const keyChar = key.charCodeAt(i % key.length);
@@ -308,7 +314,10 @@ class BackupRestoreService {
   /**
    * Encrypt sensitive data using simple XOR encryption with password
    */
-  private async encryptSensitiveData(data: any, password: string): Promise<{
+  private async encryptSensitiveData(
+    data: any,
+    password: string,
+  ): Promise<{
     encryptedData: string;
     salt: string;
     iv: string;
@@ -331,7 +340,9 @@ class BackupRestoreService {
         iv,
       };
     } catch (error) {
-      throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Encryption failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -342,11 +353,11 @@ class BackupRestoreService {
     encryptedData: string,
     password: string,
     salt: string,
-    iv: string
+    iv: string,
   ): Promise<any> {
     try {
-      await logger.info('Starting sensitive data decryption', {
-        location: 'BackupRestoreService.decryptSensitiveData',
+      await logger.info("Starting sensitive data decryption", {
+        location: "BackupRestoreService.decryptSensitiveData",
         encryptedDataLength: encryptedData.length,
         saltLength: salt.length,
         ivLength: iv.length,
@@ -359,11 +370,13 @@ class BackupRestoreService {
       let decryptedText = this.xorDecrypt(encryptedData, key);
 
       if (!decryptedText) {
-        throw new Error('Decryption produced empty result - possibly wrong password');
+        throw new Error(
+          "Decryption produced empty result - possibly wrong password",
+        );
       }
 
-      await logger.info('Data decrypted successfully, parsing JSON', {
-        location: 'BackupRestoreService.decryptSensitiveData',
+      await logger.info("Data decrypted successfully, parsing JSON", {
+        location: "BackupRestoreService.decryptSensitiveData",
         decryptedTextLength: decryptedText.length,
         decryptedTextPreview: decryptedText.substring(0, 50),
       });
@@ -373,51 +386,72 @@ class BackupRestoreService {
         let cleanedText = decryptedText.trim();
 
         // Remove potential BOM or other invisible characters
-        cleanedText = cleanedText.replace(/^\uFEFF/, ''); // Remove BOM
+        cleanedText = cleanedText.replace(/^\uFEFF/, ""); // Remove BOM
         // Only remove truly invalid control characters (not tabs, newlines in JSON strings)
-        cleanedText = cleanedText.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '');
+        cleanedText = cleanedText.replace(
+          /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g,
+          "",
+        );
 
         // Log character codes for debugging
-        const charCodes = cleanedText.substring(0, 10).split('').map(c => c.charCodeAt(0));
-        await logger.info('JSON parsing attempt', {
-          location: 'BackupRestoreService.decryptSensitiveData',
+        const charCodes = cleanedText
+          .substring(0, 10)
+          .split("")
+          .map((c) => c.charCodeAt(0));
+        await logger.info("JSON parsing attempt", {
+          location: "BackupRestoreService.decryptSensitiveData",
           first10Chars: cleanedText.substring(0, 10),
           charCodes: charCodes,
           textLength: cleanedText.length,
         });
 
         // Check if it looks like valid JSON before parsing
-        if (!cleanedText.startsWith('{') && !cleanedText.startsWith('[')) {
-          throw new Error(`Invalid JSON structure - decrypted data doesn't start with { or [ (starts with "${cleanedText.substring(0, 1)}", code: ${cleanedText.charCodeAt(0)}). This likely indicates an incorrect password or corrupted backup.`);
+        if (!cleanedText.startsWith("{") && !cleanedText.startsWith("[")) {
+          throw new Error(
+            `Invalid JSON structure - decrypted data doesn't start with { or [ (starts with "${cleanedText.substring(0, 1)}", code: ${cleanedText.charCodeAt(0)}). This likely indicates an incorrect password or corrupted backup.`,
+          );
         }
 
         const parsed = JSON.parse(cleanedText);
-        await logger.info('JSON parsed successfully', {
-          location: 'BackupRestoreService.decryptSensitiveData',
+        await logger.info("JSON parsed successfully", {
+          location: "BackupRestoreService.decryptSensitiveData",
           parsedKeys: Object.keys(parsed),
         });
         return parsed;
       } catch (parseError) {
-        await logger.error('JSON parse failed during decryption', {
-          location: 'BackupRestoreService.decryptSensitiveData',
-          error: parseError instanceof Error ? parseError.message : String(parseError),
+        await logger.error("JSON parse failed during decryption", {
+          location: "BackupRestoreService.decryptSensitiveData",
+          error:
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError),
           decryptedTextFirstChars: decryptedText.substring(0, 20),
           textLength: decryptedText.length,
-          charCodes: decryptedText.substring(0, 10).split('').map(c => c.charCodeAt(0)),
+          charCodes: decryptedText
+            .substring(0, 10)
+            .split("")
+            .map((c) => c.charCodeAt(0)),
         });
-        throw new Error(`JSON Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        throw new Error(
+          `JSON Parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+        );
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
       // Provide more helpful error message
       let helpfulMessage = errorMessage;
-      if (errorMessage.includes('Unexpected character') || errorMessage.includes('wrong password') || errorMessage.includes('Invalid JSON structure')) {
+      if (
+        errorMessage.includes("Unexpected character") ||
+        errorMessage.includes("wrong password") ||
+        errorMessage.includes("Invalid JSON structure")
+      ) {
         helpfulMessage = `${errorMessage} Please verify your backup password is correct.`;
       }
 
-      await logger.error('Decryption failed', {
-        location: 'BackupRestoreService.decryptSensitiveData',
+      await logger.error("Decryption failed", {
+        location: "BackupRestoreService.decryptSensitiveData",
         error: helpfulMessage,
       });
       throw new Error(`Decryption failed: ${helpfulMessage}`);
@@ -429,8 +463,8 @@ class BackupRestoreService {
    */
   async createSelectiveBackup(options: BackupExportOptions): Promise<string> {
     try {
-      await logger.info('Starting selective backup creation', {
-        location: 'BackupRestoreService.createSelectiveBackup',
+      await logger.info("Starting selective backup creation", {
+        location: "BackupRestoreService.createSelectiveBackup",
         options: {
           includeSettings: options.includeSettings,
           includeServiceConfigs: options.includeServiceConfigs,
@@ -443,7 +477,7 @@ class BackupRestoreService {
       });
 
       const backupData: any = {
-        version: options.encryptSensitive ? '1.2' : '1.1',
+        version: options.encryptSensitive ? "1.2" : "1.1",
         timestamp: new Date().toISOString(),
         appData: {},
       };
@@ -452,9 +486,9 @@ class BackupRestoreService {
       if (options.encryptSensitive) {
         backupData.encrypted = true;
         backupData.encryptionInfo = {
-          algorithm: 'XOR-PBKDF2',
-          salt: '', // Will be filled during encryption
-          iv: '',   // Will be filled during encryption
+          algorithm: "XOR-PBKDF2",
+          salt: "", // Will be filled during encryption
+          iv: "", // Will be filled during encryption
         };
       }
 
@@ -462,7 +496,7 @@ class BackupRestoreService {
 
       // Collect settings
       if (options.includeSettings) {
-        const settingsKey = 'SettingsStore:v1';
+        const settingsKey = "SettingsStore:v1";
         const settingsData = await AsyncStorage.getItem(settingsKey);
         if (settingsData) {
           const settings = JSON.parse(settingsData);
@@ -478,7 +512,7 @@ class BackupRestoreService {
       if (options.includeServiceConfigs) {
         const serviceConfigs = await secureStorage.getServiceConfigs();
 
-        const nonSensitiveConfigs = serviceConfigs.map(config => ({
+        const nonSensitiveConfigs = serviceConfigs.map((config) => ({
           id: config.id,
           type: config.type,
           name: config.name,
@@ -488,7 +522,7 @@ class BackupRestoreService {
           updatedAt: config.updatedAt.toISOString(),
         }));
 
-        const sensitiveConfigs = serviceConfigs.map(config => ({
+        const sensitiveConfigs = serviceConfigs.map((config) => ({
           id: config.id,
           type: config.type,
           name: config.name,
@@ -542,33 +576,44 @@ class BackupRestoreService {
       }
 
       // Encrypt sensitive data if needed
-      if (options.encryptSensitive && (options.includeServiceCredentials || options.includeTmdbCredentials || options.includeSettings)) {
+      if (
+        options.encryptSensitive &&
+        (options.includeServiceCredentials ||
+          options.includeTmdbCredentials ||
+          options.includeSettings)
+      ) {
         if (!options.password) {
-          throw new Error('Password is required for encrypted backup');
+          throw new Error("Password is required for encrypted backup");
         }
 
-        const { encryptedData, salt, iv } = await this.encryptSensitiveData(sensitiveData, options.password);
+        const { encryptedData, salt, iv } = await this.encryptSensitiveData(
+          sensitiveData,
+          options.password,
+        );
         backupData.appData.encryptedData = encryptedData;
         backupData.encryptionInfo!.salt = salt;
         backupData.encryptionInfo!.iv = iv;
 
-        await logger.info('Sensitive data encrypted for backup', {
-          location: 'BackupRestoreService.createSelectiveBackup',
+        await logger.info("Sensitive data encrypted for backup", {
+          location: "BackupRestoreService.createSelectiveBackup",
           hasServiceCredentials: !!sensitiveData.serviceConfigs,
           hasTmdbCredentials: !!sensitiveData.tmdbCredentials,
           hasSettings: !!sensitiveData.settings,
-          encryptionMethod: 'XOR encryption with PBKDF2 key derivation',
+          encryptionMethod: "XOR encryption with PBKDF2 key derivation",
         });
       }
 
       // Create backup file
-      const fileName = `uniarr-backup-${new Date().toISOString().split('T')[0]}${options.encryptSensitive ? '-encrypted' : ''}.json`;
+      const fileName = `uniarr-backup-${new Date().toISOString().split("T")[0]}${options.encryptSensitive ? "-encrypted" : ""}.json`;
       const filePath = `${FileSystem.documentDirectory}${fileName}`;
 
-      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(backupData, null, 2));
+      await FileSystem.writeAsStringAsync(
+        filePath,
+        JSON.stringify(backupData, null, 2),
+      );
 
-      await logger.info('Selective backup file created', {
-        location: 'BackupRestoreService.createSelectiveBackup',
+      await logger.info("Selective backup file created", {
+        location: "BackupRestoreService.createSelectiveBackup",
         fileName,
         encrypted: options.encryptSensitive,
         version: backupData.version,
@@ -576,8 +621,8 @@ class BackupRestoreService {
 
       return filePath;
     } catch (error) {
-      await logger.error('Failed to create selective backup', {
-        location: 'BackupRestoreService.createSelectiveBackup',
+      await logger.error("Failed to create selective backup", {
+        location: "BackupRestoreService.createSelectiveBackup",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -590,12 +635,12 @@ class BackupRestoreService {
    */
   async createBackup(): Promise<string> {
     try {
-      await logger.info('Starting backup creation', {
-        location: 'BackupRestoreService.createBackup',
+      await logger.info("Starting backup creation", {
+        location: "BackupRestoreService.createBackup",
       });
 
       // Fetch settings from AsyncStorage
-      const settingsKey = 'SettingsStore:v1';
+      const settingsKey = "SettingsStore:v1";
       const settingsData = await AsyncStorage.getItem(settingsKey);
       const settings = settingsData ? JSON.parse(settingsData) : {};
 
@@ -609,7 +654,7 @@ class BackupRestoreService {
 
       // Prepare backup data structure
       const backupData: BackupData = {
-        version: '1.1',
+        version: "1.1",
         timestamp: new Date().toISOString(),
         appData: {
           settings,
@@ -642,13 +687,16 @@ class BackupRestoreService {
       };
 
       // Create backup file
-      const fileName = `uniarr-backup-${new Date().toISOString().split('T')[0]}.json`;
+      const fileName = `uniarr-backup-${new Date().toISOString().split("T")[0]}.json`;
       const filePath = `${FileSystem.documentDirectory}${fileName}`;
 
-      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(backupData, null, 2));
+      await FileSystem.writeAsStringAsync(
+        filePath,
+        JSON.stringify(backupData, null, 2),
+      );
 
-      await logger.info('Backup file created', {
-        location: 'BackupRestoreService.createBackup',
+      await logger.info("Backup file created", {
+        location: "BackupRestoreService.createBackup",
         fileName,
         configCount: serviceConfigs.length,
         hasNetworkHistory: networkScanHistory.length > 0,
@@ -658,8 +706,8 @@ class BackupRestoreService {
 
       return filePath;
     } catch (error) {
-      await logger.error('Failed to create backup', {
-        location: 'BackupRestoreService.createBackup',
+      await logger.error("Failed to create backup", {
+        location: "BackupRestoreService.createBackup",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -673,20 +721,20 @@ class BackupRestoreService {
     try {
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) {
-        throw new Error('Sharing is not available on this device');
+        throw new Error("Sharing is not available on this device");
       }
 
       await Sharing.shareAsync(backupFilePath, {
-        mimeType: 'application/json',
-        UTI: 'public.json',
+        mimeType: "application/json",
+        UTI: "public.json",
       });
 
-      await logger.info('Backup shared successfully', {
-        location: 'BackupRestoreService.shareBackup',
+      await logger.info("Backup shared successfully", {
+        location: "BackupRestoreService.shareBackup",
       });
     } catch (error) {
-      await logger.error('Failed to share backup', {
-        location: 'BackupRestoreService.shareBackup',
+      await logger.error("Failed to share backup", {
+        location: "BackupRestoreService.shareBackup",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -698,39 +746,41 @@ class BackupRestoreService {
    */
   async selectAndRestoreBackup(): Promise<AnyBackupData> {
     try {
-      await logger.info('Starting backup restore selection', {
-        location: 'BackupRestoreService.selectAndRestoreBackup',
+      await logger.info("Starting backup restore selection", {
+        location: "BackupRestoreService.selectAndRestoreBackup",
       });
 
       const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*', // Allow all file types, will validate later
+        type: "*/*", // Allow all file types, will validate later
         copyToCacheDirectory: true,
         multiple: false,
       });
 
-      await logger.info('DocumentPicker result received', {
-        location: 'BackupRestoreService.selectAndRestoreBackup',
+      await logger.info("DocumentPicker result received", {
+        location: "BackupRestoreService.selectAndRestoreBackup",
         canceled: result.canceled,
         hasAssets: result.assets && result.assets.length > 0,
         assetCount: result.assets?.length || 0,
       });
 
       if (result.canceled) {
-        await logger.info('Backup restore cancelled by user', {
-          location: 'BackupRestoreService.selectAndRestoreBackup',
+        await logger.info("Backup restore cancelled by user", {
+          location: "BackupRestoreService.selectAndRestoreBackup",
         });
-        throw new Error('Restore cancelled');
+        throw new Error("Restore cancelled");
       }
 
       const fileUri = result.assets[0]?.uri;
       const fileName = result.assets[0]?.name;
       if (!fileUri) {
-        throw new Error('No file selected');
+        throw new Error("No file selected");
       }
 
       // Validate file extension
-      if (fileName && !fileName.toLowerCase().endsWith('.json')) {
-        throw new Error('Selected file is not a JSON file. Please select a valid backup file with .json extension.');
+      if (fileName && !fileName.toLowerCase().endsWith(".json")) {
+        throw new Error(
+          "Selected file is not a JSON file. Please select a valid backup file with .json extension.",
+        );
       }
 
       // Read the file
@@ -740,32 +790,35 @@ class BackupRestoreService {
       let backupData: AnyBackupData;
       try {
         backupData = JSON.parse(fileContent);
-      } catch (parseError) {
-        throw new Error('Selected file is not a valid JSON file. The file may be corrupted or not in the correct format.');
+      } catch {
+        throw new Error(
+          "Selected file is not a valid JSON file. The file may be corrupted or not in the correct format.",
+        );
       }
 
       // Validate backup structure
-      if (
-        !backupData.version ||
-        !backupData.timestamp ||
-        !backupData.appData
-      ) {
-        throw new Error('Invalid backup file format');
+      if (!backupData.version || !backupData.timestamp || !backupData.appData) {
+        throw new Error("Invalid backup file format");
       }
 
       // Validate service configs array if it exists (older versions require it)
-      if (backupData.appData.serviceConfigs && !Array.isArray(backupData.appData.serviceConfigs)) {
-        throw new Error('Invalid backup file format: serviceConfigs must be an array');
+      if (
+        backupData.appData.serviceConfigs &&
+        !Array.isArray(backupData.appData.serviceConfigs)
+      ) {
+        throw new Error(
+          "Invalid backup file format: serviceConfigs must be an array",
+        );
       }
 
       // Check version compatibility
-      const supportedVersions = ['1.0', '1.1', '1.2'];
+      const supportedVersions = ["1.0", "1.1", "1.2"];
       if (!supportedVersions.includes(backupData.version)) {
         throw new Error(`Unsupported backup version: ${backupData.version}`);
       }
 
-      await logger.info('Backup file loaded and validated', {
-        location: 'BackupRestoreService.selectAndRestoreBackup',
+      await logger.info("Backup file loaded and validated", {
+        location: "BackupRestoreService.selectAndRestoreBackup",
         fileName,
         version: backupData.version,
         encrypted: backupData.encrypted || false,
@@ -774,8 +827,8 @@ class BackupRestoreService {
 
       return backupData;
     } catch (error) {
-      await logger.error('Failed to load backup file', {
-        location: 'BackupRestoreService.selectAndRestoreBackup',
+      await logger.error("Failed to load backup file", {
+        location: "BackupRestoreService.selectAndRestoreBackup",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -787,26 +840,32 @@ class BackupRestoreService {
    * Pass skipSettings=true to restore only service configs
    * Pass skipServices=true to restore only settings
    */
-  async restoreBackup(backupData: AnyBackupData, options?: {
-    skipSettings?: boolean;
-    skipServices?: boolean;
-  }): Promise<void> {
+  async restoreBackup(
+    backupData: AnyBackupData,
+    options?: {
+      skipSettings?: boolean;
+      skipServices?: boolean;
+    },
+  ): Promise<void> {
     const { skipSettings = false, skipServices = false } = options ?? {};
 
     try {
-      await logger.info('Starting backup restore', {
-        location: 'BackupRestoreService.restoreBackup',
+      await logger.info("Starting backup restore", {
+        location: "BackupRestoreService.restoreBackup",
         skipSettings,
         skipServices,
       });
 
       // Restore settings
       if (!skipSettings && backupData.appData.settings) {
-        const settingsKey = 'SettingsStore:v1';
-        await AsyncStorage.setItem(settingsKey, JSON.stringify(backupData.appData.settings));
+        const settingsKey = "SettingsStore:v1";
+        await AsyncStorage.setItem(
+          settingsKey,
+          JSON.stringify(backupData.appData.settings),
+        );
 
-        await logger.info('Settings restored', {
-          location: 'BackupRestoreService.restoreBackup',
+        await logger.info("Settings restored", {
+          location: "BackupRestoreService.restoreBackup",
         });
       }
 
@@ -834,8 +893,8 @@ class BackupRestoreService {
 
           await secureStorage.saveServiceConfig(fullConfig);
 
-          await logger.info('Service config restored', {
-            location: 'BackupRestoreService.restoreBackup',
+          await logger.info("Service config restored", {
+            location: "BackupRestoreService.restoreBackup",
             serviceType: configData.type,
             serviceName: configData.name,
             hasCredentials: !!(configData.apiKey || configData.username),
@@ -844,36 +903,48 @@ class BackupRestoreService {
       }
 
       // Restore network scan history if available
-      if (backupData.appData.networkScanHistory && Array.isArray(backupData.appData.networkScanHistory)) {
+      if (
+        backupData.appData.networkScanHistory &&
+        Array.isArray(backupData.appData.networkScanHistory)
+      ) {
         // Clear existing history first
         await secureStorage.clearNetworkScanHistory();
 
         // The saveNetworkScanHistory method expects individual entries, but it's designed to save one at a time
         // and manage the list internally. We need to add each entry but the current implementation
         // overwrites the entire history. Let's add them in reverse order to maintain the original order.
-        const reversedHistory = [...backupData.appData.networkScanHistory].reverse();
+        const reversedHistory = [
+          ...backupData.appData.networkScanHistory,
+        ].reverse();
         for (const historyEntry of reversedHistory) {
           await secureStorage.saveNetworkScanHistory(historyEntry);
         }
 
-        await logger.info('Network scan history restored', {
-          location: 'BackupRestoreService.restoreBackup',
+        await logger.info("Network scan history restored", {
+          location: "BackupRestoreService.restoreBackup",
           entryCount: backupData.appData.networkScanHistory.length,
         });
       }
 
       // Restore recent IPs if available
-      if (backupData.appData.recentIPs && Array.isArray(backupData.appData.recentIPs)) {
+      if (
+        backupData.appData.recentIPs &&
+        Array.isArray(backupData.appData.recentIPs)
+      ) {
         // Clear existing recent IPs first
         await secureStorage.clearRecentIPs();
 
         // Add each recent IP
         for (const recentIP of backupData.appData.recentIPs) {
-          await secureStorage.addRecentIP(recentIP.ip, recentIP.subnet, recentIP.servicesFound);
+          await secureStorage.addRecentIP(
+            recentIP.ip,
+            recentIP.subnet,
+            recentIP.servicesFound,
+          );
         }
 
-        await logger.info('Recent IPs restored', {
-          location: 'BackupRestoreService.restoreBackup',
+        await logger.info("Recent IPs restored", {
+          location: "BackupRestoreService.restoreBackup",
           ipCount: backupData.appData.recentIPs.length,
         });
       }
@@ -882,18 +953,18 @@ class BackupRestoreService {
       if (backupData.appData.tmdbCredentials?.apiKey) {
         await setStoredTmdbKey(backupData.appData.tmdbCredentials.apiKey);
 
-        await logger.info('TMDB credentials restored', {
-          location: 'BackupRestoreService.restoreBackup',
+        await logger.info("TMDB credentials restored", {
+          location: "BackupRestoreService.restoreBackup",
           hasApiKey: !!backupData.appData.tmdbCredentials.apiKey,
         });
       }
 
-      await logger.info('Backup restore completed successfully', {
-        location: 'BackupRestoreService.restoreBackup',
+      await logger.info("Backup restore completed successfully", {
+        location: "BackupRestoreService.restoreBackup",
       });
     } catch (error) {
-      await logger.error('Failed to restore backup', {
-        location: 'BackupRestoreService.restoreBackup',
+      await logger.error("Failed to restore backup", {
+        location: "BackupRestoreService.restoreBackup",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -903,16 +974,22 @@ class BackupRestoreService {
   /**
    * Select and restore from an encrypted backup file with password
    */
-  async selectAndRestoreEncryptedBackup(password: string): Promise<AnyBackupData> {
+  async selectAndRestoreEncryptedBackup(
+    password: string,
+  ): Promise<AnyBackupData> {
     try {
-      await logger.info('Starting encrypted backup restore selection', {
-        location: 'BackupRestoreService.selectAndRestoreEncryptedBackup',
+      await logger.info("Starting encrypted backup restore selection", {
+        location: "BackupRestoreService.selectAndRestoreEncryptedBackup",
       });
 
       const backupData = await this.selectAndRestoreBackup();
 
-      if (!backupData.encrypted || !backupData.encryptionInfo || !backupData.appData.encryptedData) {
-        throw new Error('Selected backup is not encrypted');
+      if (
+        !backupData.encrypted ||
+        !backupData.encryptionInfo ||
+        !backupData.appData.encryptedData
+      ) {
+        throw new Error("Selected backup is not encrypted");
       }
 
       // Decrypt sensitive data
@@ -920,7 +997,7 @@ class BackupRestoreService {
         backupData.appData.encryptedData,
         password,
         backupData.encryptionInfo.salt,
-        backupData.encryptionInfo.iv
+        backupData.encryptionInfo.iv,
       );
 
       // Merge decrypted data with backup data
@@ -930,7 +1007,8 @@ class BackupRestoreService {
           ...backupData.appData,
           ...decryptedData,
           // Keep non-encrypted data as is
-          serviceConfigs: decryptedData.serviceConfigs || backupData.appData.serviceConfigs,
+          serviceConfigs:
+            decryptedData.serviceConfigs || backupData.appData.serviceConfigs,
           networkScanHistory: backupData.appData.networkScanHistory,
           recentIPs: backupData.appData.recentIPs,
         },
@@ -939,8 +1017,8 @@ class BackupRestoreService {
       // Remove encrypted data after decryption
       delete restoredBackup.appData.encryptedData;
 
-      await logger.info('Encrypted backup decrypted successfully', {
-        location: 'BackupRestoreService.selectAndRestoreEncryptedBackup',
+      await logger.info("Encrypted backup decrypted successfully", {
+        location: "BackupRestoreService.selectAndRestoreEncryptedBackup",
         hasServiceCredentials: !!decryptedData.serviceConfigs,
         hasTmdbCredentials: !!decryptedData.tmdbCredentials,
         hasSettings: !!decryptedData.settings,
@@ -948,8 +1026,8 @@ class BackupRestoreService {
 
       return restoredBackup;
     } catch (error) {
-      await logger.error('Failed to load and decrypt backup file', {
-        location: 'BackupRestoreService.selectAndRestoreEncryptedBackup',
+      await logger.error("Failed to load and decrypt backup file", {
+        location: "BackupRestoreService.selectAndRestoreEncryptedBackup",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -1003,19 +1081,24 @@ class BackupRestoreService {
   /**
    * Validate export options
    */
-  validateExportOptions(options: BackupExportOptions): { isValid: boolean; errors: string[] } {
+  validateExportOptions(options: BackupExportOptions): {
+    isValid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     if (options.encryptSensitive && !options.password) {
-      errors.push('Password is required when encryption is enabled');
+      errors.push("Password is required when encryption is enabled");
     }
 
     if (options.password && options.password.length < 8) {
-      errors.push('Password must be at least 8 characters long');
+      errors.push("Password must be at least 8 characters long");
     }
 
     if (options.includeServiceCredentials && !options.includeServiceConfigs) {
-      errors.push('Service configurations must be included to include service credentials');
+      errors.push(
+        "Service configurations must be included to include service credentials",
+      );
     }
 
     return {
@@ -1035,8 +1118,8 @@ class BackupRestoreService {
       }
       return (fileInfo as any).size ?? 0;
     } catch (error) {
-      await logger.error('Failed to get backup file size', {
-        location: 'BackupRestoreService.getBackupFileSize',
+      await logger.error("Failed to get backup file size", {
+        location: "BackupRestoreService.getBackupFileSize",
         error: error instanceof Error ? error.message : String(error),
       });
       return 0;
@@ -1050,12 +1133,12 @@ class BackupRestoreService {
     try {
       await FileSystem.deleteAsync(filePath, { idempotent: true });
 
-      await logger.info('Backup file deleted', {
-        location: 'BackupRestoreService.deleteBackup',
+      await logger.info("Backup file deleted", {
+        location: "BackupRestoreService.deleteBackup",
       });
     } catch (error) {
-      await logger.error('Failed to delete backup file', {
-        location: 'BackupRestoreService.deleteBackup',
+      await logger.error("Failed to delete backup file", {
+        location: "BackupRestoreService.deleteBackup",
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -1065,7 +1148,9 @@ class BackupRestoreService {
   /**
    * List all backup files in the documents directory
    */
-  async listBackupFiles(): Promise<Array<{ name: string; path: string; modificationTime: number }>> {
+  async listBackupFiles(): Promise<
+    { name: string; path: string; modificationTime: number }[]
+  > {
     try {
       const docDir = FileSystem.documentDirectory;
       if (!docDir) {
@@ -1073,10 +1158,17 @@ class BackupRestoreService {
       }
 
       const files = await FileSystem.readDirectoryAsync(docDir);
-      const backupFiles: Array<{ name: string; path: string; modificationTime: number }> = [];
+      const backupFiles: {
+        name: string;
+        path: string;
+        modificationTime: number;
+      }[] = [];
 
       for (const fileName of files) {
-        if (fileName.startsWith('uniarr-backup-') && fileName.endsWith('.json')) {
+        if (
+          fileName.startsWith("uniarr-backup-") &&
+          fileName.endsWith(".json")
+        ) {
           const filePath = `${docDir}${fileName}`;
           const fileInfo = await FileSystem.getInfoAsync(filePath);
 
@@ -1084,7 +1176,8 @@ class BackupRestoreService {
             backupFiles.push({
               name: fileName,
               path: filePath,
-              modificationTime: ((fileInfo as any).modificationTime ?? 0) * 1000,
+              modificationTime:
+                ((fileInfo as any).modificationTime ?? 0) * 1000,
             });
           }
         }
@@ -1095,8 +1188,8 @@ class BackupRestoreService {
 
       return backupFiles;
     } catch (error) {
-      await logger.error('Failed to list backup files', {
-        location: 'BackupRestoreService.listBackupFiles',
+      await logger.error("Failed to list backup files", {
+        location: "BackupRestoreService.listBackupFiles",
         error: error instanceof Error ? error.message : String(error),
       });
       return [];

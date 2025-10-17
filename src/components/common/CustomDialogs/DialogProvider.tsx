@@ -1,14 +1,25 @@
-import React, { createContext, useCallback, useContext, useEffect, useState, useRef, useMemo } from 'react';
-import type { ReactNode } from 'react';
-import { Portal } from 'react-native-paper';
-import CustomConfirm from './CustomConfirm';
-import CustomAlert from './CustomAlert';
-import { registerDialogPresenter, unregisterDialogPresenter } from '@/services/dialogService';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+} from "react";
+import type { ReactNode } from "react";
+import { Portal } from "react-native-paper";
+import CustomConfirm from "./CustomConfirm";
+import CustomAlert from "./CustomAlert";
+import {
+  registerDialogPresenter,
+  unregisterDialogPresenter,
+} from "@/services/dialogService";
 
 type DialogPayload = {
   title: string;
   message?: string;
-  buttons?: Array<{ text: string; onPress?: () => void; style?: string }>;
+  buttons?: { text: string; onPress?: () => void; style?: string }[];
   options?: { cancelable?: boolean; onDismiss?: () => void };
 };
 
@@ -19,7 +30,13 @@ const DialogContext = createContext({
 export const useDialog = () => useContext(DialogContext);
 
 // Separate component to render dialogs using Portal to avoid affecting the provider tree
-const DialogRenderer = ({ current, onDismiss }: { current: DialogPayload | null; onDismiss: () => void }) => {
+const DialogRenderer = ({
+  current,
+  onDismiss,
+}: {
+  current: DialogPayload | null;
+  onDismiss: () => void;
+}) => {
   if (!current) return null;
 
   const buttons = current.buttons ?? [];
@@ -30,8 +47,9 @@ const DialogRenderer = ({ current, onDismiss }: { current: DialogPayload | null;
   };
 
   if (buttons.length === 2) {
-    const cancelBtn = buttons.find((b) => b.style === 'cancel') ?? buttons[0];
-    const confirmBtn = buttons.find((b) => b.style !== 'cancel') ?? buttons[1] ?? buttons[0];
+    const cancelBtn = buttons.find((b) => b.style === "cancel") ?? buttons[0];
+    const confirmBtn =
+      buttons.find((b) => b.style !== "cancel") ?? buttons[1] ?? buttons[0];
 
     return (
       <Portal>
@@ -41,7 +59,7 @@ const DialogRenderer = ({ current, onDismiss }: { current: DialogPayload | null;
           message={current.message}
           cancelLabel={cancelBtn?.text}
           confirmLabel={confirmBtn?.text}
-          destructive={confirmBtn?.style === 'destructive'}
+          destructive={confirmBtn?.style === "destructive"}
           // Call only the developer-provided onPress here; the component will
           // animate out and call onDismiss after the exit animation completes.
           onCancel={() => cancelBtn?.onPress?.()}
@@ -66,7 +84,7 @@ const DialogRenderer = ({ current, onDismiss }: { current: DialogPayload | null;
         message={current.message}
         tertiaryLabel={tertiary?.text}
         secondaryLabel={secondary?.text}
-        primaryLabel={primary?.text ?? 'OK'}
+        primaryLabel={primary?.text ?? "OK"}
         // Only trigger callbacks here; the components are responsible for
         // animating out and will call onDismiss after the exit animation.
         onTertiary={() => tertiary?.onPress?.()}

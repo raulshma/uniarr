@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useQuery, useQueryClient, type QueryObserverResult, type RefetchOptions } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  useQuery,
+  useQueryClient,
+  type QueryObserverResult,
+  type RefetchOptions,
+} from "@tanstack/react-query";
 
 import type {
   SearchHistoryEntry,
@@ -9,9 +14,12 @@ import type {
   UnifiedSearchOptions,
   UnifiedSearchResponse,
   UnifiedSearchResult,
-} from '@/models/search.types';
-import { queryKeys } from '@/hooks/queryKeys';
-import { UnifiedSearchService, createUnifiedSearchHistoryKey } from '@/services/search/UnifiedSearchService';
+} from "@/models/search.types";
+import { queryKeys } from "@/hooks/queryKeys";
+import {
+  UnifiedSearchService,
+  createUnifiedSearchHistoryKey,
+} from "@/services/search/UnifiedSearchService";
 
 interface UseUnifiedSearchConfig {
   readonly serviceIds?: string[];
@@ -29,20 +37,24 @@ interface UseUnifiedSearchResult {
   readonly isFetching: boolean;
   readonly isError: boolean;
   readonly error: unknown;
-  readonly refetch: (options?: RefetchOptions) => Promise<QueryObserverResult<UnifiedSearchResponse, Error>>;
+  readonly refetch: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<UnifiedSearchResponse, Error>>;
   readonly history: SearchHistoryEntry[];
   readonly isHistoryLoading: boolean;
   readonly searchableServices: SearchableServiceSummary[];
   readonly areServicesLoading: boolean;
   readonly recordSearch: (
     term?: string,
-    overrides?: Pick<UnifiedSearchOptions, 'serviceIds' | 'mediaTypes'>,
+    overrides?: Pick<UnifiedSearchOptions, "serviceIds" | "mediaTypes">,
   ) => Promise<void>;
   readonly removeHistoryEntry: (entry: SearchHistoryEntry) => Promise<void>;
   readonly clearHistory: () => Promise<void>;
 }
 
-const normalizeArray = <T extends string>(values?: readonly T[]): T[] | undefined => {
+const normalizeArray = <T extends string>(
+  values?: readonly T[],
+): T[] | undefined => {
   if (!values || values.length === 0) {
     return undefined;
   }
@@ -51,13 +63,22 @@ const normalizeArray = <T extends string>(values?: readonly T[]): T[] | undefine
   return deduped.length > 0 ? deduped : undefined;
 };
 
-export const useUnifiedSearch = (term: string, config: UseUnifiedSearchConfig = {}): UseUnifiedSearchResult => {
+export const useUnifiedSearch = (
+  term: string,
+  config: UseUnifiedSearchConfig = {},
+): UseUnifiedSearchResult => {
   const service = useMemo(() => UnifiedSearchService.getInstance(), []);
   const queryClient = useQueryClient();
 
   const normalizedTerm = useMemo(() => term.trim(), [term]);
-  const normalizedServiceIds = useMemo(() => normalizeArray(config.serviceIds), [config.serviceIds]);
-  const normalizedMediaTypes = useMemo(() => normalizeArray(config.mediaTypes), [config.mediaTypes]);
+  const normalizedServiceIds = useMemo(
+    () => normalizeArray(config.serviceIds),
+    [config.serviceIds],
+  );
+  const normalizedMediaTypes = useMemo(
+    () => normalizeArray(config.mediaTypes),
+    [config.mediaTypes],
+  );
 
   const searchOptions = useMemo<UnifiedSearchOptions>(
     () => ({
@@ -108,7 +129,11 @@ export const useUnifiedSearch = (term: string, config: UseUnifiedSearchConfig = 
       return;
     }
 
-    const historyKey = createUnifiedSearchHistoryKey(normalizedTerm, normalizedServiceIds, normalizedMediaTypes);
+    const historyKey = createUnifiedSearchHistoryKey(
+      normalizedTerm,
+      normalizedServiceIds,
+      normalizedMediaTypes,
+    );
     if (historyKey === recordedKeyRef.current) {
       return;
     }
@@ -117,7 +142,11 @@ export const useUnifiedSearch = (term: string, config: UseUnifiedSearchConfig = 
 
     void service
       .recordSearch(normalizedTerm, normalizedServiceIds, normalizedMediaTypes)
-      .then(() => queryClient.invalidateQueries({ queryKey: queryKeys.unifiedSearch.history }))
+      .then(() =>
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.unifiedSearch.history,
+        }),
+      )
       .catch(() => {
         // ignore history persistence failures at the hook level
       });
@@ -131,38 +160,66 @@ export const useUnifiedSearch = (term: string, config: UseUnifiedSearchConfig = 
     service,
   ]);
 
-  const recordSearch = useCallback<UseUnifiedSearchResult['recordSearch']>(
+  const recordSearch = useCallback<UseUnifiedSearchResult["recordSearch"]>(
     async (overrideTerm, overrides) => {
       const nextTerm = (overrideTerm ?? normalizedTerm).trim();
       if (nextTerm.length < 2) {
         return;
       }
 
-      const serviceIds = normalizeArray(overrides?.serviceIds ?? config.serviceIds);
-      const mediaTypes = normalizeArray(overrides?.mediaTypes ?? config.mediaTypes);
+      const serviceIds = normalizeArray(
+        overrides?.serviceIds ?? config.serviceIds,
+      );
+      const mediaTypes = normalizeArray(
+        overrides?.mediaTypes ?? config.mediaTypes,
+      );
 
       await service.recordSearch(nextTerm, serviceIds, mediaTypes);
-      recordedKeyRef.current = createUnifiedSearchHistoryKey(nextTerm, serviceIds, mediaTypes);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.unifiedSearch.history });
+      recordedKeyRef.current = createUnifiedSearchHistoryKey(
+        nextTerm,
+        serviceIds,
+        mediaTypes,
+      );
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.unifiedSearch.history,
+      });
     },
-    [config.mediaTypes, config.serviceIds, normalizedTerm, queryClient, service],
+    [
+      config.mediaTypes,
+      config.serviceIds,
+      normalizedTerm,
+      queryClient,
+      service,
+    ],
   );
 
-  const removeHistoryEntry = useCallback<UseUnifiedSearchResult['removeHistoryEntry']>(
+  const removeHistoryEntry = useCallback<
+    UseUnifiedSearchResult["removeHistoryEntry"]
+  >(
     async (entry) => {
       await service.removeHistoryEntry(entry);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.unifiedSearch.history });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.unifiedSearch.history,
+      });
     },
     [queryClient, service],
   );
 
-  const clearHistory = useCallback<UseUnifiedSearchResult['clearHistory']>(async () => {
+  const clearHistory = useCallback<
+    UseUnifiedSearchResult["clearHistory"]
+  >(async () => {
     await service.clearHistory();
     recordedKeyRef.current = null;
-    await queryClient.invalidateQueries({ queryKey: queryKeys.unifiedSearch.history });
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.unifiedSearch.history,
+    });
   }, [queryClient, service]);
 
-  const response = searchQuery.data ?? { results: [], errors: [], durationMs: 0 };
+  const response = searchQuery.data ?? {
+    results: [],
+    errors: [],
+    durationMs: 0,
+  };
 
   return {
     results: response.results,

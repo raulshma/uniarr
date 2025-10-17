@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   ActivityIndicator,
   HelperText,
@@ -121,7 +121,7 @@ const RadarrAddMovieScreen = () => {
   const ensureConnector = useCallback(() => {
     if (!connector) {
       throw new Error(
-        `Radarr connector not registered for service ${serviceKey}.`
+        `Radarr connector not registered for service ${serviceKey}.`,
       );
     }
     return connector;
@@ -130,7 +130,7 @@ const RadarrAddMovieScreen = () => {
   const [searchTerm, setSearchTerm] = useState(initialQuery);
   const [debouncedTerm, setDebouncedTerm] = useState(initialQuery);
   const [selectedMovie, setSelectedMovie] = useState<Movie | undefined>(
-    undefined
+    undefined,
   );
   const prefillAppliedRef = useRef(false);
 
@@ -140,10 +140,10 @@ const RadarrAddMovieScreen = () => {
     }
 
     setSearchTerm((current) =>
-      current.trim().length === 0 ? initialQuery : current
+      current.trim().length === 0 ? initialQuery : current,
     );
     setDebouncedTerm((current) =>
-      current.trim().length === 0 ? initialQuery : current
+      current.trim().length === 0 ? initialQuery : current,
     );
   }, [initialQuery]);
 
@@ -202,9 +202,18 @@ const RadarrAddMovieScreen = () => {
     gcTime: 5 * 60 * 1000,
   });
 
-  const qualityProfiles = qualityProfilesQuery.data ?? [];
-  const rootFolders = rootFoldersQuery.data ?? [];
-  const searchResults = searchQuery.data ?? [];
+  const qualityProfiles = useMemo(
+    () => qualityProfilesQuery.data ?? [],
+    [qualityProfilesQuery.data],
+  );
+  const rootFolders = useMemo(
+    () => rootFoldersQuery.data ?? [],
+    [rootFoldersQuery.data],
+  );
+  const searchResults = useMemo(
+    () => searchQuery.data ?? [],
+    [searchQuery.data],
+  );
 
   useEffect(() => {
     prefillAppliedRef.current = false;
@@ -357,7 +366,7 @@ const RadarrAddMovieScreen = () => {
       theme.colors.error,
       theme.colors.onSurface,
       theme.colors.primary,
-    ]
+    ],
   );
 
   const handleSelectMovie = useCallback((movie: Movie) => {
@@ -367,9 +376,9 @@ const RadarrAddMovieScreen = () => {
   const onSubmit = useCallback(
     async (values: AddMovieFormValues) => {
       if (!selectedMovie) {
-  alert(
+        alert(
           "Select a movie",
-          "Choose a movie from the search results before adding."
+          "Choose a movie from the search results before adding.",
         );
         return;
       }
@@ -377,7 +386,7 @@ const RadarrAddMovieScreen = () => {
       if (!selectedMovie.tmdbId) {
         alert(
           "Missing TMDb ID",
-          "The selected movie is missing a TMDb identifier and cannot be added automatically."
+          "The selected movie is missing a TMDb identifier and cannot be added automatically.",
         );
         return;
       }
@@ -412,10 +421,10 @@ const RadarrAddMovieScreen = () => {
           error instanceof Error
             ? error.message
             : "Unable to add movie at this time.";
-  alert("Add movie failed", message);
+        alert("Add movie failed", message);
       }
     },
-    [addMovieMutation, router, selectedMovie, serviceKey]
+    [addMovieMutation, router, selectedMovie, serviceKey],
   );
 
   if (!serviceId) {

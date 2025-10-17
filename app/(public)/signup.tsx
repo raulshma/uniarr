@@ -1,16 +1,22 @@
-import { useSignUp } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, HelperText, Text, TextInput, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as WebBrowser from 'expo-web-browser';
+import { useSignUp } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  Button,
+  HelperText,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import * as WebBrowser from "expo-web-browser";
 
-import { type AppTheme } from '@/constants/theme';
-import { useAuth } from '@/services/auth/AuthProvider';
-import { getClerkErrorMessage } from '@/services/auth/AuthService';
-import { logger } from '@/services/logger/LoggerService';
-import { spacing } from '@/theme/spacing';
+import { type AppTheme } from "@/constants/theme";
+import { useAuth } from "@/services/auth/AuthProvider";
+import { getClerkErrorMessage } from "@/services/auth/AuthService";
+import { logger } from "@/services/logger/LoggerService";
+import { spacing } from "@/theme/spacing";
 
 const useWarmUpBrowser = () => {
   useEffect(() => {
@@ -31,11 +37,11 @@ const SignupScreen = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
   const theme = useTheme<AppTheme>();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -54,10 +60,10 @@ const SignupScreen = () => {
           paddingHorizontal: spacing.lg,
           paddingTop: spacing.xxl,
           paddingBottom: spacing.lg,
-          justifyContent: 'space-between',
+          justifyContent: "space-between",
         },
         header: {
-          alignItems: 'center',
+          alignItems: "center",
         },
         brand: {
           color: theme.colors.primary,
@@ -66,11 +72,11 @@ const SignupScreen = () => {
         welcomeTitle: {
           color: theme.colors.onBackground,
           marginBottom: spacing.xs,
-          textAlign: 'center',
+          textAlign: "center",
         },
         subtitle: {
           color: theme.colors.onSurfaceVariant,
-          textAlign: 'center',
+          textAlign: "center",
         },
         form: {
           marginTop: spacing.xl,
@@ -79,7 +85,7 @@ const SignupScreen = () => {
           marginBottom: spacing.md,
         },
         nameRow: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.sm,
         },
         nameInput: {
@@ -92,8 +98,8 @@ const SignupScreen = () => {
           marginBottom: spacing.md,
         },
         dividerRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           marginVertical: spacing.lg,
         },
         dividerLine: {
@@ -106,9 +112,9 @@ const SignupScreen = () => {
           color: theme.colors.onSurfaceVariant,
         },
         footer: {
-          flexDirection: 'row',
-          justifyContent: 'center',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
         },
         footerText: {
           color: theme.colors.onSurfaceVariant,
@@ -118,11 +124,11 @@ const SignupScreen = () => {
           color: theme.colors.primary,
         },
         verificationContainer: {
-          alignItems: 'center',
+          alignItems: "center",
           paddingVertical: spacing.lg,
         },
         verificationText: {
-          textAlign: 'center',
+          textAlign: "center",
           marginBottom: spacing.md,
         },
         guestButton: {
@@ -134,29 +140,29 @@ const SignupScreen = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/(auth)/dashboard');
+      router.replace("/(auth)/dashboard");
     }
   }, [isAuthenticated, router]);
 
   const validateForm = useCallback(() => {
     if (!email.trim()) {
-      setErrorMessage('Email is required');
+      setErrorMessage("Email is required");
       return false;
     }
     if (!password) {
-      setErrorMessage('Password is required');
+      setErrorMessage("Password is required");
       return false;
     }
     if (password.length < 8) {
-      setErrorMessage('Password must be at least 8 characters long');
+      setErrorMessage("Password must be at least 8 characters long");
       return false;
     }
     if (password !== confirmPassword) {
-      setErrorMessage('Passwords do not match');
+      setErrorMessage("Passwords do not match");
       return false;
     }
     if (!firstName.trim()) {
-      setErrorMessage('First name is required');
+      setErrorMessage("First name is required");
       return false;
     }
     return true;
@@ -176,7 +182,9 @@ const SignupScreen = () => {
 
     try {
       if (!signUp) {
-        setErrorMessage('Authentication service is not ready. Please try again.');
+        setErrorMessage(
+          "Authentication service is not ready. Please try again.",
+        );
         return;
       }
 
@@ -187,39 +195,51 @@ const SignupScreen = () => {
         lastName: lastName.trim(),
       });
 
-      if (result.status === 'missing_requirements') {
+      if (result.status === "missing_requirements") {
         // Email verification required
         setIsVerifying(true);
         setIsSubmitting(false);
         return;
       }
 
-      if (result.status === 'complete' && result.createdSessionId) {
+      if (result.status === "complete" && result.createdSessionId) {
         if (!setActive) {
-          setErrorMessage('Unable to finalize the session. Please try again.');
+          setErrorMessage("Unable to finalize the session. Please try again.");
           return;
         }
 
         await setActive({ session: result.createdSessionId });
-        router.replace('/(auth)/dashboard');
+        router.replace("/(auth)/dashboard");
       } else {
-        setErrorMessage('Unable to create account. Please try again.');
+        setErrorMessage("Unable to create account. Please try again.");
       }
     } catch (error) {
       const message = getClerkErrorMessage(
         error,
-        'Unable to create account. Please check your information and try again.',
+        "Unable to create account. Please check your information and try again.",
       );
       setErrorMessage(message);
 
-      void logger.warn('Sign-up attempt failed.', {
-        location: 'SignupScreen.handleSignUp',
+      void logger.warn("Sign-up attempt failed.", {
+        location: "SignupScreen.handleSignUp",
         error: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setIsSubmitting(false);
     }
-  }, [email, password, firstName, lastName, isLoaded, isSubmitting, isVerifying, validateForm, signUp, setActive, router]);
+  }, [
+    email,
+    password,
+    firstName,
+    lastName,
+    isLoaded,
+    isSubmitting,
+    isVerifying,
+    validateForm,
+    signUp,
+    setActive,
+    router,
+  ]);
 
   const handleResendVerification = useCallback(async () => {
     if (!signUp || isSubmitting) {
@@ -230,11 +250,11 @@ const SignupScreen = () => {
     setErrorMessage(null);
 
     try {
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
     } catch (error) {
       const message = getClerkErrorMessage(
         error,
-        'Unable to resend verification email. Please try again.',
+        "Unable to resend verification email. Please try again.",
       );
       setErrorMessage(message);
     } finally {
@@ -243,7 +263,7 @@ const SignupScreen = () => {
   }, [signUp, isSubmitting]);
 
   const handleSignIn = useCallback(() => {
-    router.replace('/(public)/login');
+    router.replace("/(public)/login");
   }, [router]);
 
   const handleContinueAsGuest = useCallback(() => {
@@ -259,7 +279,8 @@ const SignupScreen = () => {
               Check Your Email
             </Text>
             <Text variant="bodyLarge" style={styles.verificationText}>
-              We've sent a verification link to {email}. Please check your email and click the link to verify your account.
+              We've sent a verification link to {email}. Please check your email
+              and click the link to verify your account.
             </Text>
             <Button
               mode="outlined"
@@ -391,10 +412,10 @@ const SignupScreen = () => {
               onPress={handleSignUp}
               loading={isSubmitting}
               disabled={
-                isSubmitting || 
-                !isLoaded || 
-                !email.trim() || 
-                !password || 
+                isSubmitting ||
+                !isLoaded ||
+                !email.trim() ||
+                !password ||
                 !firstName.trim() ||
                 password !== confirmPassword
               }

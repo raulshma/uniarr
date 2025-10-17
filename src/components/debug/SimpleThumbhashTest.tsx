@@ -1,29 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Button } from 'react-native';
-import { Image } from 'expo-image';
-import { Text } from 'react-native-paper';
-import { thumbhashService } from '@/services/image/ThumbhashService';
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, Button } from "react-native";
+import { Image } from "expo-image";
+import { Text } from "react-native-paper";
+import { thumbhashService } from "@/services/image/ThumbhashService";
 
 const SimpleThumbhashTest = () => {
   const [thumbhash, setThumbhash] = useState<string | undefined>();
   const [logs, setLogs] = useState<string[]>([]);
 
   const addLog = (message: string) => {
-    setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+    setLogs((prev) => [
+      ...prev,
+      `${new Date().toLocaleTimeString()}: ${message}`,
+    ]);
   };
 
   // Use a simple, reliable image URL for testing
-  const testImageUrl = 'https://picsum.photos/200/300';
+  const testImageUrl = "https://picsum.photos/200/300";
 
   useEffect(() => {
-    addLog('Component mounted');
+    addLog("Component mounted");
   }, []);
 
   const testDirectThumbhash = async () => {
     try {
-      addLog('Testing direct thumbhash generation...');
+      addLog("Testing direct thumbhash generation...");
       const hash = await Image.generateThumbhashAsync(testImageUrl);
-      addLog(`Direct generation result: ${hash ? 'SUCCESS' : 'FAILED'}`);
+      addLog(`Direct generation result: ${hash ? "SUCCESS" : "FAILED"}`);
       if (hash) {
         setThumbhash(hash);
         addLog(`Thumbhash length: ${hash.length}`);
@@ -36,9 +39,9 @@ const SimpleThumbhashTest = () => {
 
   const testThumbhashService = async () => {
     try {
-      addLog('Testing ThumbhashService...');
+      addLog("Testing ThumbhashService...");
       const hash = await thumbhashService.generateThumbhash(testImageUrl);
-      addLog(`ThumbhashService result: ${hash ? 'SUCCESS' : 'FAILED'}`);
+      addLog(`ThumbhashService result: ${hash ? "SUCCESS" : "FAILED"}`);
       if (hash) {
         setThumbhash(hash);
         addLog(`Stored thumbhash length: ${hash.length}`);
@@ -51,7 +54,7 @@ const SimpleThumbhashTest = () => {
 
   const checkStoredThumbhash = () => {
     const stored = thumbhashService.getThumbhash(testImageUrl);
-    addLog(`Stored thumbhash: ${stored ? 'FOUND' : 'NOT FOUND'}`);
+    addLog(`Stored thumbhash: ${stored ? "FOUND" : "NOT FOUND"}`);
     if (stored && stored !== thumbhash) {
       setThumbhash(stored);
       addLog(`Updated thumbhash from storage`);
@@ -74,7 +77,10 @@ const SimpleThumbhashTest = () => {
 
       <View style={styles.section}>
         <Text variant="titleMedium">Actions</Text>
-        <Button title="Generate Direct Thumbhash" onPress={testDirectThumbhash} />
+        <Button
+          title="Generate Direct Thumbhash"
+          onPress={testDirectThumbhash}
+        />
         <Button title="Test ThumbhashService" onPress={testThumbhashService} />
         <Button title="Check Stored Thumbhash" onPress={checkStoredThumbhash} />
       </View>
@@ -90,7 +96,9 @@ const SimpleThumbhashTest = () => {
               style={styles.thumbhashTest}
               contentFit="cover"
             />
-            <Text variant="bodySmall">This should show a thumbhash placeholder</Text>
+            <Text variant="bodySmall">
+              This should show a thumbhash placeholder
+            </Text>
           </>
         ) : (
           <Text variant="bodyMedium">No thumbhash generated yet</Text>
@@ -100,7 +108,9 @@ const SimpleThumbhashTest = () => {
       <View style={styles.section}>
         <Text variant="titleMedium">Logs</Text>
         {logs.slice(-10).map((log, index) => (
-          <Text key={index} variant="bodySmall">{log}</Text>
+          <Text key={index} variant="bodySmall">
+            {log}
+          </Text>
         ))}
       </View>
     </View>

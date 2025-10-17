@@ -1,11 +1,10 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import { ConnectorFactory } from '@/connectors/factory/ConnectorFactory';
-import type { ServiceConfig } from '@/models/service.types';
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import type { ServiceConfig } from "@/models/service.types";
 
 // Mock all the dependencies
-jest.mock('axios', () => ({
+jest.mock("axios", () => ({
   __esModule: true,
   default: {
     create: jest.fn(() => ({
@@ -22,13 +21,13 @@ jest.mock('axios', () => ({
   },
 }));
 
-jest.mock('@react-native-async-storage/async-storage', () => ({
+jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn(async () => null),
   setItem: jest.fn(async () => undefined),
   removeItem: jest.fn(async () => undefined),
 }));
 
-jest.mock('@/services/logger/LoggerService', () => ({
+jest.mock("@/services/logger/LoggerService", () => ({
   logger: {
     debug: jest.fn(async () => undefined),
     info: jest.fn(async () => undefined),
@@ -37,8 +36,8 @@ jest.mock('@/services/logger/LoggerService', () => ({
   },
 }));
 
-jest.mock('@/utils/error.utils', () => {
-  const actual = jest.requireActual<typeof import('@/utils/error.utils')>('@/utils/error.utils');
+jest.mock("@/utils/error.utils", () => {
+  const actual = jest.requireActual("@/utils/error.utils");
   return {
     ...actual,
     handleApiError: jest.fn((error: unknown) => {
@@ -52,14 +51,14 @@ jest.mock('@/utils/error.utils', () => {
         });
       }
       return new actual.ApiError({
-        message: 'Mock error',
+        message: "Mock error",
         cause: error,
       });
     }),
   };
 });
 
-jest.mock('@/services/storage/SecureStorage', () => ({
+jest.mock("@/services/storage/SecureStorage", () => ({
   secureStorage: {
     getServiceConfigs: jest.fn(async () => []),
     saveServiceConfig: jest.fn(async () => undefined),
@@ -70,12 +69,12 @@ jest.mock('@/services/storage/SecureStorage', () => ({
 
 // Mock connector implementations
 // @ts-ignore - Jest mock typing issues
-jest.mock('@/connectors/implementations/SonarrConnector', () => ({
+jest.mock("@/connectors/implementations/SonarrConnector", () => ({
   SonarrConnector: jest.fn().mockImplementation(() => ({
     // @ts-ignore
     testConnection: jest.fn().mockResolvedValue({
       success: true,
-      version: '4.0.0',
+      version: "4.0.0",
       latency: 100,
     }),
     // @ts-ignore
@@ -83,7 +82,7 @@ jest.mock('@/connectors/implementations/SonarrConnector', () => ({
     // @ts-ignore
     search: jest.fn().mockResolvedValue([]),
     // @ts-ignore
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Series' }),
+    add: jest.fn().mockResolvedValue({ id: 1, title: "Test Series" }),
     // @ts-ignore
     initialize: jest.fn().mockResolvedValue(undefined),
     // @ts-ignore
@@ -92,12 +91,12 @@ jest.mock('@/connectors/implementations/SonarrConnector', () => ({
 }));
 
 // @ts-ignore - Jest mock typing issues
-jest.mock('@/connectors/implementations/RadarrConnector', () => ({
+jest.mock("@/connectors/implementations/RadarrConnector", () => ({
   RadarrConnector: jest.fn().mockImplementation(() => ({
     // @ts-ignore
     testConnection: jest.fn().mockResolvedValue({
       success: true,
-      version: '5.0.0',
+      version: "5.0.0",
       latency: 150,
     }),
     // @ts-ignore
@@ -105,7 +104,7 @@ jest.mock('@/connectors/implementations/RadarrConnector', () => ({
     // @ts-ignore
     search: jest.fn().mockResolvedValue([]),
     // @ts-ignore
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Movie' }),
+    add: jest.fn().mockResolvedValue({ id: 1, title: "Test Movie" }),
     // @ts-ignore
     initialize: jest.fn().mockResolvedValue(undefined),
     // @ts-ignore
@@ -113,18 +112,21 @@ jest.mock('@/connectors/implementations/RadarrConnector', () => ({
   })),
 }));
 
-const createTestServiceConfig = (id: string, type: 'sonarr' | 'radarr' | 'jellyseerr' | 'qbittorrent' | 'prowlarr'): ServiceConfig => ({
+const createTestServiceConfig = (
+  id: string,
+  type: "sonarr" | "radarr" | "jellyseerr" | "qbittorrent" | "prowlarr",
+): ServiceConfig => ({
   id,
   name: `Test ${type} Service`,
   type,
   url: `http://${type}.local`,
-  apiKey: 'test-api-key',
+  apiKey: "test-api-key",
   enabled: true,
-  createdAt: new Date('2025-01-01T00:00:00Z'),
-  updatedAt: new Date('2025-01-01T00:00:00Z'),
+  createdAt: new Date("2025-01-01T00:00:00Z"),
+  updatedAt: new Date("2025-01-01T00:00:00Z"),
 });
 
-describe('ConnectorManager Integration Tests', () => {
+describe("ConnectorManager Integration Tests", () => {
   let manager: ConnectorManager;
 
   beforeEach(() => {
@@ -132,16 +134,18 @@ describe('ConnectorManager Integration Tests', () => {
     jest.clearAllMocks();
   });
 
-  describe('Multi-Service Management', () => {
-    it('should handle multiple services of different types', async () => {
+  describe("Multi-Service Management", () => {
+    it("should handle multiple services of different types", async () => {
       const services: ServiceConfig[] = [
-        createTestServiceConfig('sonarr-1', 'sonarr'),
-        createTestServiceConfig('radarr-1', 'radarr'),
-        createTestServiceConfig('sonarr-2', 'sonarr'),
+        createTestServiceConfig("sonarr-1", "sonarr"),
+        createTestServiceConfig("radarr-1", "radarr"),
+        createTestServiceConfig("sonarr-2", "sonarr"),
       ];
 
       // Mock secure storage to return our test services
-      const { secureStorage } = require('@/services/storage/SecureStorage');
+      const secureStorage = jest.requireMock(
+        "@/services/storage/SecureStorage",
+      ).secureStorage;
       secureStorage.getServiceConfigs.mockResolvedValue(services);
 
       await manager.loadSavedServices();
@@ -149,20 +153,22 @@ describe('ConnectorManager Integration Tests', () => {
       const connectors = manager.getAllConnectors();
       expect(connectors).toHaveLength(3);
 
-      const sonarrConnectors = manager.getConnectorsByType('sonarr');
-      const radarrConnectors = manager.getConnectorsByType('radarr');
+      const sonarrConnectors = manager.getConnectorsByType("sonarr");
+      const radarrConnectors = manager.getConnectorsByType("radarr");
 
       expect(sonarrConnectors).toHaveLength(2);
       expect(radarrConnectors).toHaveLength(1);
     });
 
-    it('should test all connections in parallel', async () => {
+    it("should test all connections in parallel", async () => {
       const services: ServiceConfig[] = [
-        createTestServiceConfig('sonarr-1', 'sonarr'),
-        createTestServiceConfig('radarr-1', 'radarr'),
+        createTestServiceConfig("sonarr-1", "sonarr"),
+        createTestServiceConfig("radarr-1", "radarr"),
       ];
 
-      const { secureStorage } = require('@/services/storage/SecureStorage');
+      const secureStorage = jest.requireMock(
+        "@/services/storage/SecureStorage",
+      ).secureStorage;
       secureStorage.getServiceConfigs.mockResolvedValue(services);
 
       await manager.loadSavedServices();
@@ -170,29 +176,33 @@ describe('ConnectorManager Integration Tests', () => {
       const results = await manager.testAllConnections();
 
       expect(results.size).toBe(2);
-      expect(results.get('sonarr-1')?.success).toBe(true);
-      expect(results.get('radarr-1')?.success).toBe(true);
+      expect(results.get("sonarr-1")?.success).toBe(true);
+      expect(results.get("radarr-1")?.success).toBe(true);
     });
 
-    it('should handle mixed success/failure scenarios', async () => {
+    it("should handle mixed success/failure scenarios", async () => {
       const services: ServiceConfig[] = [
-        createTestServiceConfig('sonarr-1', 'sonarr'),
-        createTestServiceConfig('radarr-1', 'radarr'),
+        createTestServiceConfig("sonarr-1", "sonarr"),
+        createTestServiceConfig("radarr-1", "radarr"),
       ];
 
       // Mock one service to fail
-      const { SonarrConnector } = require('@/connectors/implementations/SonarrConnector');
+      const { SonarrConnector } = jest.requireMock(
+        "@/connectors/implementations/SonarrConnector",
+      );
       const failingConnector = {
         // @ts-ignore
         testConnection: jest.fn().mockResolvedValue({
           success: false,
-          message: 'Connection failed',
+          message: "Connection failed",
           latency: 0,
         }),
       };
       SonarrConnector.mockImplementationOnce(() => failingConnector);
 
-      const { secureStorage } = require('@/services/storage/SecureStorage');
+      const secureStorage = jest.requireMock(
+        "@/services/storage/SecureStorage",
+      ).secureStorage;
       secureStorage.getServiceConfigs.mockResolvedValue(services);
 
       await manager.loadSavedServices();
@@ -200,14 +210,14 @@ describe('ConnectorManager Integration Tests', () => {
       const results = await manager.testAllConnections();
 
       expect(results.size).toBe(2);
-      expect(results.get('sonarr-1')?.success).toBe(false);
-      expect(results.get('radarr-1')?.success).toBe(true);
+      expect(results.get("sonarr-1")?.success).toBe(false);
+      expect(results.get("radarr-1")?.success).toBe(true);
     });
   });
 
-  describe('Service Lifecycle Management', () => {
-    it('should properly initialize and dispose connectors', async () => {
-      const service = createTestServiceConfig('sonarr-1', 'sonarr');
+  describe("Service Lifecycle Management", () => {
+    it("should properly initialize and dispose connectors", async () => {
+      const service = createTestServiceConfig("sonarr-1", "sonarr");
 
       await manager.addConnector(service);
 
@@ -221,54 +231,69 @@ describe('ConnectorManager Integration Tests', () => {
       expect(removedConnector).toBeUndefined();
     });
 
-    it('should handle service configuration updates', async () => {
-      const originalService = createTestServiceConfig('sonarr-1', 'sonarr');
-      const updatedService = { ...originalService, name: 'Updated Sonarr Service' };
+    it("should handle service configuration updates", async () => {
+      const originalService = createTestServiceConfig("sonarr-1", "sonarr");
+      const updatedService = {
+        ...originalService,
+        name: "Updated Sonarr Service",
+      };
 
       await manager.addConnector(originalService);
 
-      const { secureStorage } = require('@/services/storage/SecureStorage');
-      secureStorage.saveServiceConfig.mockResolvedValue(undefined);
+      const secureStorage = jest.requireMock(
+        "@/services/storage/SecureStorage",
+      ).secureStorage;
+      secureStorage.saveServiceConfig.mockResolvedValue();
 
       // Simulate configuration update
       await manager.addConnector(updatedService);
 
       const connector = manager.getConnector(originalService.id);
-      expect(connector?.config.name).toBe('Updated Sonarr Service');
+      expect(connector?.config.name).toBe("Updated Sonarr Service");
     });
   });
 
-  describe('Error Handling and Resilience', () => {
-    it('should gracefully handle connector initialization failures', async () => {
-      const service = createTestServiceConfig('sonarr-1', 'sonarr');
+  describe("Error Handling and Resilience", () => {
+    it("should gracefully handle connector initialization failures", async () => {
+      const service = createTestServiceConfig("sonarr-1", "sonarr");
 
       // Mock connector creation to fail
-      const { SonarrConnector } = require('@/connectors/implementations/SonarrConnector');
+      const { SonarrConnector } = jest.requireMock(
+        "@/connectors/implementations/SonarrConnector",
+      );
       SonarrConnector.mockImplementationOnce(() => {
-        throw new Error('Failed to create connector');
+        throw new Error("Failed to create connector");
       });
 
-      await expect(manager.addConnector(service)).rejects.toThrow('Failed to create connector');
+      await expect(manager.addConnector(service)).rejects.toThrow(
+        "Failed to create connector",
+      );
 
       const connector = manager.getConnector(service.id);
       expect(connector).toBeUndefined();
     });
 
-    it('should continue operation when individual services fail', async () => {
+    it("should continue operation when individual services fail", async () => {
       const services: ServiceConfig[] = [
-        createTestServiceConfig('sonarr-1', 'sonarr'),
-        createTestServiceConfig('radarr-1', 'radarr'),
+        createTestServiceConfig("sonarr-1", "sonarr"),
+        createTestServiceConfig("radarr-1", "radarr"),
       ];
 
       // Mock one service to fail during connection test
-      const { RadarrConnector } = require('@/connectors/implementations/RadarrConnector');
+      const { RadarrConnector } = jest.requireMock(
+        "@/connectors/implementations/RadarrConnector",
+      );
       const failingConnector = {
         // @ts-ignore
-        testConnection: jest.fn().mockRejectedValue(new Error('Connection failed')),
+        testConnection: jest
+          .fn()
+          .mockRejectedValue(new Error("Connection failed")),
       };
       RadarrConnector.mockImplementationOnce(() => failingConnector);
 
-      const { secureStorage } = require('@/services/storage/SecureStorage');
+      const secureStorage = jest.requireMock(
+        "@/services/storage/SecureStorage",
+      ).secureStorage;
       secureStorage.getServiceConfigs.mockResolvedValue(services);
 
       await manager.loadSavedServices();
@@ -278,22 +303,33 @@ describe('ConnectorManager Integration Tests', () => {
       expect(results.size).toBe(2);
 
       // One should succeed, one should fail
-      const successCount = Array.from(results.values()).filter(r => r.success).length;
-      const failureCount = Array.from(results.values()).filter(r => !r.success).length;
+      const successCount = Array.from(results.values()).filter(
+        (r) => r.success,
+      ).length;
+      const failureCount = Array.from(results.values()).filter(
+        (r) => !r.success,
+      ).length;
 
       expect(successCount).toBe(1);
       expect(failureCount).toBe(1);
     });
   });
 
-  describe('Performance and Resource Management', () => {
-    it('should efficiently handle large numbers of services', async () => {
+  describe("Performance and Resource Management", () => {
+    it("should efficiently handle large numbers of services", async () => {
       const services: ServiceConfig[] = [];
       for (let i = 0; i < 10; i++) {
-        services.push(createTestServiceConfig(`service-${i}`, i % 2 === 0 ? 'sonarr' : 'radarr'));
+        services.push(
+          createTestServiceConfig(
+            `service-${i}`,
+            i % 2 === 0 ? "sonarr" : "radarr",
+          ),
+        );
       }
 
-      const { secureStorage } = require('@/services/storage/SecureStorage');
+      const secureStorage = jest.requireMock(
+        "@/services/storage/SecureStorage",
+      ).secureStorage;
       secureStorage.getServiceConfigs.mockResolvedValue(services);
 
       const startTime = Date.now();
@@ -304,8 +340,8 @@ describe('ConnectorManager Integration Tests', () => {
       expect(manager.getAllConnectors()).toHaveLength(10);
     });
 
-    it('should properly clean up resources on disposal', async () => {
-      const service = createTestServiceConfig('sonarr-1', 'sonarr');
+    it("should properly clean up resources on disposal", async () => {
+      const service = createTestServiceConfig("sonarr-1", "sonarr");
       await manager.addConnector(service);
 
       // Verify connector exists

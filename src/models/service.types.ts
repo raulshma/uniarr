@@ -1,16 +1,16 @@
 export type ServiceType =
-  | 'sonarr'
-  | 'radarr'
-  | 'jellyseerr'
-  | 'jellyfin'
-  | 'qbittorrent'
-  | 'transmission'
-  | 'deluge'
-  | 'sabnzbd'
-  | 'nzbget'
-  | 'rtorrent'
-  | 'prowlarr'
-  | 'bazarr';
+  | "sonarr"
+  | "radarr"
+  | "jellyseerr"
+  | "jellyfin"
+  | "qbittorrent"
+  | "transmission"
+  | "deluge"
+  | "sabnzbd"
+  | "nzbget"
+  | "rtorrent"
+  | "prowlarr"
+  | "bazarr";
 
 export interface ServiceConfig {
   id: string;

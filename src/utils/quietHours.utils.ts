@@ -3,16 +3,16 @@ import type {
   QuietHoursConfig,
   QuietHoursDay,
   QuietHoursPreset,
-} from '@/models/notification.types';
+} from "@/models/notification.types";
 
 export const QUIET_HOURS_DAYS: readonly QuietHoursDay[] = [
-  'sun',
-  'mon',
-  'tue',
-  'wed',
-  'thu',
-  'fri',
-  'sat',
+  "sun",
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
 ];
 
 const DEFAULT_CUSTOM_DAYS: QuietHoursDay[] = [...QUIET_HOURS_DAYS];
@@ -31,13 +31,13 @@ const dayOrder: Record<QuietHoursDay, number> = {
 };
 
 export const QUIET_HOURS_DAY_LABELS: Record<QuietHoursDay, string> = {
-  sun: 'Sun',
-  mon: 'Mon',
-  tue: 'Tue',
-  wed: 'Wed',
-  thu: 'Thu',
-  fri: 'Fri',
-  sat: 'Sat',
+  sun: "Sun",
+  mon: "Mon",
+  tue: "Tue",
+  wed: "Wed",
+  thu: "Thu",
+  fri: "Fri",
+  sat: "Sat",
 };
 
 const ensureValidTime = (value: string): string => {
@@ -45,12 +45,12 @@ const ensureValidTime = (value: string): string => {
     return value;
   }
 
-  return '00:00';
+  return "00:00";
 };
 
 const parseTimeToMinutes = (value: string): number => {
   const sanitized = ensureValidTime(value);
-  const [hourText, minuteText] = sanitized.split(':');
+  const [hourText, minuteText] = sanitized.split(":");
   const hours = Number(hourText);
   const minutes = Number(minuteText);
   return hours * 60 + minutes;
@@ -58,7 +58,7 @@ const parseTimeToMinutes = (value: string): number => {
 
 const getDayFromDate = (date: Date): QuietHoursDay => {
   const index = date.getDay();
-  return QUIET_HOURS_DAYS[index] ?? 'sun';
+  return QUIET_HOURS_DAYS[index] ?? "sun";
 };
 
 const cloneWithTime = (source: Date, minutes: number): Date => {
@@ -76,33 +76,35 @@ const addDays = (date: Date, days: number): Date => {
 
 export const getPresetDays = (preset: QuietHoursPreset): QuietHoursDay[] => {
   switch (preset) {
-    case 'weeknights':
-      return ['sun', 'mon', 'tue', 'wed', 'thu'];
-    case 'weekends':
-      return ['fri', 'sat'];
-    case 'everyday':
+    case "weeknights":
+      return ["sun", "mon", "tue", "wed", "thu"];
+    case "weekends":
+      return ["fri", "sat"];
+    case "everyday":
       return [...QUIET_HOURS_DAYS];
-    case 'custom':
+    case "custom":
     default:
       return [...DEFAULT_CUSTOM_DAYS];
   }
 };
 
 export const createDefaultQuietHoursConfig = (
-  preset: QuietHoursPreset = 'weeknights',
+  preset: QuietHoursPreset = "weeknights",
 ): QuietHoursConfig => ({
   enabled: false,
-  start: '22:00',
-  end: '07:00',
+  start: "22:00",
+  end: "07:00",
   preset,
-  days: preset === 'custom' ? [...DEFAULT_CUSTOM_DAYS] : getPresetDays(preset),
+  days: preset === "custom" ? [...DEFAULT_CUSTOM_DAYS] : getPresetDays(preset),
 });
 
-export const normalizeQuietHoursConfig = (config: QuietHoursConfig): QuietHoursConfig => {
+export const normalizeQuietHoursConfig = (
+  config: QuietHoursConfig,
+): QuietHoursConfig => {
   const sanitizedStart = ensureValidTime(config.start);
   const sanitizedEnd = ensureValidTime(config.end);
-  const uniqueDays = Array.from(new Set(config.days)).filter((day): day is QuietHoursDay =>
-    QUIET_HOURS_DAYS.includes(day),
+  const uniqueDays = Array.from(new Set(config.days)).filter(
+    (day): day is QuietHoursDay => QUIET_HOURS_DAYS.includes(day),
   );
 
   uniqueDays.sort((left, right) => dayOrder[left] - dayOrder[right]);
@@ -115,9 +117,13 @@ export const normalizeQuietHoursConfig = (config: QuietHoursConfig): QuietHoursC
   };
 };
 
-const getMinutesOfDay = (date: Date): number => date.getHours() * 60 + date.getMinutes();
+const getMinutesOfDay = (date: Date): number =>
+  date.getHours() * 60 + date.getMinutes();
 
-export const isQuietHoursActive = (config: QuietHoursConfig, reference: Date = new Date()): boolean => {
+export const isQuietHoursActive = (
+  config: QuietHoursConfig,
+  reference: Date = new Date(),
+): boolean => {
   if (!config.enabled) {
     return false;
   }
@@ -146,8 +152,10 @@ export const isQuietHoursActive = (config: QuietHoursConfig, reference: Date = n
     );
   }
 
-  const isLateDay = normalized.days.includes(today) && currentMinutes >= startMinutes;
-  const isEarlyDay = normalized.days.includes(yesterday) && currentMinutes < endMinutes;
+  const isLateDay =
+    normalized.days.includes(today) && currentMinutes >= startMinutes;
+  const isEarlyDay =
+    normalized.days.includes(yesterday) && currentMinutes < endMinutes;
 
   return isLateDay || isEarlyDay;
 };
@@ -194,17 +202,19 @@ export const getNextQuietHoursEnd = (
 export const formatQuietHoursRange = (config: QuietHoursConfig): string =>
   `${ensureValidTime(config.start)} – ${ensureValidTime(config.end)}`;
 
-export const getCategoryFriendlyName = (category: NotificationCategory): string => {
+export const getCategoryFriendlyName = (
+  category: NotificationCategory,
+): string => {
   switch (category) {
-    case 'downloads':
-      return 'Downloads';
-    case 'failures':
-      return 'Failures';
-    case 'requests':
-      return 'Requests';
-    case 'serviceHealth':
-      return 'Service health';
+    case "downloads":
+      return "Downloads";
+    case "failures":
+      return "Failures";
+    case "requests":
+      return "Requests";
+    case "serviceHealth":
+      return "Service health";
     default:
-      return 'Notifications';
+      return "Notifications";
   }
 };

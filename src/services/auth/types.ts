@@ -2,7 +2,7 @@
  * Core authentication types and interfaces for the service authentication system
  */
 
-export type AuthMethod = 'api-key' | 'basic' | 'session' | 'bearer' | 'none';
+export type AuthMethod = "api-key" | "basic" | "session" | "bearer" | "none";
 
 export interface AuthCredentials {
   username?: string;
@@ -90,7 +90,11 @@ export interface IAuthManager {
   /**
    * Authenticate a service
    */
-  authenticate(serviceId: string, serviceType: string, config: AuthConfig): Promise<AuthResult>;
+  authenticate(
+    serviceId: string,
+    serviceType: string,
+    config: AuthConfig,
+  ): Promise<AuthResult>;
 
   /**
    * Get current session for a service

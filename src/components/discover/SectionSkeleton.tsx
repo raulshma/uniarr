@@ -1,14 +1,13 @@
-import React, { useMemo } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
-import { useTheme, Text } from 'react-native-paper';
+import React, { useMemo } from "react";
+import { FlatList, StyleSheet, View } from "react-native";
 
-import DiscoverCardSkeleton from './DiscoverCardSkeleton';
-import type { AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
+import DiscoverCardSkeleton from "./DiscoverCardSkeleton";
+import { spacing } from "@/theme/spacing";
+
+// Import SkeletonPlaceholder locally to avoid circular imports
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 
 const SectionSkeleton = () => {
-  const theme = useTheme<AppTheme>();
-
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -16,9 +15,9 @@ const SectionSkeleton = () => {
           gap: spacing.lg,
         },
         sectionHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: spacing.sm,
         },
         titleSkeleton: {
@@ -33,7 +32,7 @@ const SectionSkeleton = () => {
           paddingRight: spacing.md,
         },
       }),
-    []
+    [],
   );
 
   const skeletonCards = Array(6).fill(null);
@@ -55,8 +54,5 @@ const SectionSkeleton = () => {
     </View>
   );
 };
-
-// Import SkeletonPlaceholder locally to avoid circular imports
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
 
 export default SectionSkeleton;

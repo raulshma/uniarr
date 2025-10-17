@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Button,
@@ -11,17 +11,19 @@ import {
   Text,
   TextInput,
   useTheme,
-} from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { alert } from '@/services/dialogService';
+} from "react-native-paper";
+import { alert } from "@/services/dialogService";
 
-import { MediaPoster } from './MediaPoster';
-import type { AppTheme } from '@/constants/theme';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { Series } from '@/models/media.types';
-import type { Movie } from '@/models/movie.types';
-import type { QualityProfile } from '@/models/media.types';
-import { spacing } from '@/theme/spacing';
+import { MediaPoster } from "./MediaPoster";
+import type { AppTheme } from "@/constants/theme";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { Series, QualityProfile } from "@/models/media.types";
+import type { Movie } from "@/models/movie.types";
+
+import { spacing } from "@/theme/spacing";
 
 export type MediaItem = Series | Movie;
 
@@ -54,14 +56,6 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
   const [editedItem, setEditedItem] = useState<MediaItem | null>(null);
 
   const connector = getConnector(serviceId);
-
-  useEffect(() => {
-    if (visible && mediaItem) {
-      setEditedItem(mediaItem);
-      loadMetadata();
-    }
-  }, [visible, mediaItem]);
-
   const loadMetadata = useCallback(async () => {
     if (!connector) return;
 
@@ -75,19 +69,26 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
       setQualityProfiles(profiles);
       setTags(tagList);
     } catch (error) {
-      console.error('Failed to load metadata:', error);
-      alert('Error', 'Failed to load metadata for editing.');
+      console.error("Failed to load metadata:", error);
+      alert("Error", "Failed to load metadata for editing.");
     } finally {
       setIsLoading(false);
     }
   }, [connector]);
+
+  useEffect(() => {
+    if (visible && mediaItem) {
+      setEditedItem(mediaItem);
+      loadMetadata();
+    }
+  }, [visible, mediaItem, loadMetadata]);
 
   const handleSave = useCallback(async () => {
     if (!editedItem || !connector) return;
 
     setIsSaving(true);
     try {
-      if (connector.config.type === 'sonarr') {
+      if (connector.config.type === "sonarr") {
         const series = editedItem as Series;
         await (connector as any).updateSeries(editedItem.id, {
           title: series.title,
@@ -95,7 +96,7 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
           qualityProfileId: series.qualityProfileId,
           tags: series.tags,
         });
-      } else if (connector.config.type === 'radarr') {
+      } else if (connector.config.type === "radarr") {
         const movie = editedItem as Movie;
         await (connector as any).updateMovie(editedItem.id, {
           title: movie.title,
@@ -108,8 +109,8 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
       await onSave(editedItem);
       onDismiss();
     } catch (error) {
-      console.error('Failed to save media:', error);
-      alert('Error', 'Failed to save changes.');
+      console.error("Failed to save media:", error);
+      alert("Error", "Failed to save changes.");
     } finally {
       setIsSaving(false);
     }
@@ -119,21 +120,23 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
     if (!editedItem || !connector) return;
 
     try {
-      if (connector.config.type === 'sonarr') {
+      if (connector.config.type === "sonarr") {
         await (connector as any).refreshSeries(editedItem.id);
-      } else if (connector.config.type === 'radarr') {
+      } else if (connector.config.type === "radarr") {
         await (connector as any).refreshMovie(editedItem.id);
       }
 
-  alert('Success', 'Metadata refresh started.');
+      alert("Success", "Metadata refresh started.");
     } catch (error) {
-      console.error('Failed to refresh metadata:', error);
-      alert('Error', 'Failed to refresh metadata.');
+      console.error("Failed to refresh metadata:", error);
+      alert("Error", "Failed to refresh metadata.");
     }
   }, [editedItem, connector]);
 
   const [moveDialogVisible, setMoveDialogVisible] = useState(false);
-  const [moveDestination, setMoveDestination] = useState<string | undefined>(undefined);
+  const [moveDestination, setMoveDestination] = useState<string | undefined>(
+    undefined,
+  );
 
   const handleMoveFiles = useCallback(async () => {
     if (!editedItem) return;
@@ -142,19 +145,24 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
   }, [editedItem]);
 
   const updateEditedItem = useCallback((updates: Partial<MediaItem>) => {
-    setEditedItem(prev => prev ? { ...prev, ...updates } as MediaItem : null);
+    setEditedItem((prev) =>
+      prev ? ({ ...prev, ...updates } as MediaItem) : null,
+    );
   }, []);
 
-  const toggleTag = useCallback((tagId: number) => {
-    if (!editedItem) return;
+  const toggleTag = useCallback(
+    (tagId: number) => {
+      if (!editedItem) return;
 
-    const currentTags = (editedItem as any).tags || [];
-    const newTags = currentTags.includes(tagId)
-      ? currentTags.filter((id: number) => id !== tagId)
-      : [...currentTags, tagId];
+      const currentTags = (editedItem as any).tags || [];
+      const newTags = currentTags.includes(tagId)
+        ? currentTags.filter((id: number) => id !== tagId)
+        : [...currentTags, tagId];
 
-    updateEditedItem({ tags: newTags } as Partial<MediaItem>);
-  }, [editedItem, updateEditedItem]);
+      updateEditedItem({ tags: newTags } as Partial<MediaItem>);
+    },
+    [editedItem, updateEditedItem],
+  );
 
   const styles = StyleSheet.create({
     container: {
@@ -165,11 +173,11 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
       padding: spacing.lg,
     },
     poster: {
-      alignSelf: 'center',
+      alignSelf: "center",
       marginBottom: spacing.lg,
     },
     title: {
-      textAlign: 'center',
+      textAlign: "center",
       marginBottom: spacing.md,
     },
     section: {
@@ -182,14 +190,14 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
       marginBottom: spacing.sm,
     },
     switchRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       paddingVertical: spacing.sm,
     },
     tagsContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+      flexDirection: "row",
+      flexWrap: "wrap",
       gap: spacing.sm,
     },
     tagChip: {
@@ -197,12 +205,12 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
     },
     loadingContainer: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
     },
     actions: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      justifyContent: "space-between",
       marginTop: spacing.lg,
     },
     actionButton: {
@@ -217,9 +225,13 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
 
   return (
     <Portal>
-      <Dialog visible={visible} onDismiss={onDismiss} style={{ maxHeight: '90%' }}>
+      <Dialog
+        visible={visible}
+        onDismiss={onDismiss}
+        style={{ maxHeight: "90%" }}
+      >
         <Dialog.Title>Edit Media</Dialog.Title>
-        <Dialog.ScrollArea style={{ maxHeight: '70%' }}>
+        <Dialog.ScrollArea style={{ maxHeight: "70%" }}>
           <ScrollView style={styles.scrollContent}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
@@ -257,7 +269,11 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
                     <Text variant="bodyMedium">Monitored</Text>
                     <Switch
                       value={(editedItem as any).monitored}
-                      onValueChange={(value) => updateEditedItem({ monitored: value } as Partial<MediaItem>)}
+                      onValueChange={(value) =>
+                        updateEditedItem({
+                          monitored: value,
+                        } as Partial<MediaItem>)
+                      }
                     />
                   </View>
                 </View>
@@ -270,7 +286,11 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
                     <List.Item
                       key={profile.id}
                       title={profile.name}
-                      onPress={() => updateEditedItem({ qualityProfileId: profile.id } as Partial<MediaItem>)}
+                      onPress={() =>
+                        updateEditedItem({
+                          qualityProfileId: profile.id,
+                        } as Partial<MediaItem>)
+                      }
                       right={() =>
                         (editedItem as any).qualityProfileId === profile.id ? (
                           <List.Icon icon="check" />
@@ -286,7 +306,8 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
                   </Text>
                   <View style={styles.tagsContainer}>
                     {tags.map((tag) => {
-                      const isSelected = (editedItem as any).tags?.includes(tag.id) || false;
+                      const isSelected =
+                        (editedItem as any).tags?.includes(tag.id) || false;
                       return (
                         <Chip
                           key={tag.id}
@@ -344,7 +365,10 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
       </Dialog>
       {/* Move files prompt dialog (replacement for Alert.prompt) */}
       <Portal>
-        <Dialog visible={moveDialogVisible} onDismiss={() => setMoveDialogVisible(false)}>
+        <Dialog
+          visible={moveDialogVisible}
+          onDismiss={() => setMoveDialogVisible(false)}
+        >
           <Dialog.Title>Move Files</Dialog.Title>
           <Dialog.Content>
             <Text>Enter the new path for the media files:</Text>
@@ -361,13 +385,13 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
               onPress={async () => {
                 if (!moveDestination?.trim()) return;
                 try {
-                  if (connector?.config.type === 'sonarr') {
+                  if (connector?.config.type === "sonarr") {
                     await (connector as any).moveSeries({
                       seriesId: editedItem.id,
                       destinationPath: moveDestination.trim(),
                       moveFiles: true,
                     });
-                  } else if (connector?.config.type === 'radarr') {
+                  } else if (connector?.config.type === "radarr") {
                     await (connector as any).moveMovie({
                       movieId: editedItem.id,
                       destinationPath: moveDestination.trim(),
@@ -375,10 +399,10 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
                     });
                   }
 
-                  alert('Success', 'Files move operation started.');
+                  alert("Success", "Files move operation started.");
                 } catch (error) {
-                  console.error('Failed to move files:', error);
-                  alert('Error', 'Failed to move files.');
+                  console.error("Failed to move files:", error);
+                  alert("Error", "Failed to move files.");
                 } finally {
                   setMoveDialogVisible(false);
                 }

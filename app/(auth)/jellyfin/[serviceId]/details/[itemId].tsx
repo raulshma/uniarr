@@ -64,7 +64,7 @@ const formatRuntimeMinutes = (ticks?: number): number | undefined => {
 
 const deriveYear = (
   itemPremiere?: string,
-  productionYear?: number
+  productionYear?: number,
 ): number | undefined => {
   if (productionYear) {
     return productionYear;
@@ -109,7 +109,6 @@ const JellyfinItemDetailsScreen = () => {
   const initialTop = HERO_HEIGHT - POSTER_SIZE * 0.75;
   // Pin directly under the header/action row so there is no extra gap.
   const finalTop = insets.top + ACTION_BAR_HEIGHT;
-  const deltaY = finalTop - initialTop;
   // Also compute target translateY when the header is hidden so the poster
   // can pin directly under the status bar. We'll animate the poster to this
   // value in the same progress curve so the header can hide while the poster
@@ -123,7 +122,7 @@ const JellyfinItemDetailsScreen = () => {
       scrollY.value,
       [0, threshold],
       [0, 1],
-      Extrapolate.CLAMP
+      Extrapolate.CLAMP,
     );
     // Animated scale value (1 -> finalScale)
     const finalScale = 0.75;
@@ -151,25 +150,25 @@ const JellyfinItemDetailsScreen = () => {
       scrollY.value,
       [0, threshold],
       [0, 1],
-      Extrapolate.CLAMP
+      Extrapolate.CLAMP,
     );
     const opacity = interpolate(
       progress,
       [0, 0.6, 1],
       [1, 0, 0],
-      Extrapolate.CLAMP
+      Extrapolate.CLAMP,
     );
     const translateY = interpolate(
       progress,
       [0, 1],
       [0, -ACTION_BAR_HEIGHT],
-      Extrapolate.CLAMP
+      Extrapolate.CLAMP,
     );
     const height = interpolate(
       progress,
       [0, 1],
       [ACTION_BAR_HEIGHT, 0],
-      Extrapolate.CLAMP
+      Extrapolate.CLAMP,
     );
     return { opacity, transform: [{ translateY }], height } as any;
   });
@@ -180,7 +179,7 @@ const JellyfinItemDetailsScreen = () => {
       if (state !== prev) {
         runOnJS(setIsHeaderCollapsed)(state === 1);
       }
-    }
+    },
   );
 
   // Animate a blur overlay on the hero image instead of fully hiding it.
@@ -189,7 +188,7 @@ const JellyfinItemDetailsScreen = () => {
       scrollY.value,
       [0, threshold],
       [0, 1],
-      Extrapolate.CLAMP
+      Extrapolate.CLAMP,
     );
     return { opacity: blurOpacity } as any;
   });
@@ -203,14 +202,14 @@ const JellyfinItemDetailsScreen = () => {
       scrollY.value,
       [0, threshold],
       [0, 1],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     const finalHeroHeight = finalTopWithoutHeader + POSTER_SIZE * 1.25;
     const height = interpolate(
       progress,
       [0, 1],
       [HERO_HEIGHT, finalHeroHeight],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     return { height } as any;
   });
@@ -265,20 +264,20 @@ const JellyfinItemDetailsScreen = () => {
     detailsQuery.error instanceof Error
       ? detailsQuery.error.message
       : detailsQuery.error
-      ? "Unable to load item details."
-      : null;
+        ? "Unable to load item details."
+        : null;
 
   const runtimeMinutes = useMemo(
     () => formatRuntimeMinutes(item?.RunTimeTicks ?? undefined),
-    [item?.RunTimeTicks]
+    [item?.RunTimeTicks],
   );
   const releaseYear = useMemo(
     () =>
       deriveYear(
         item?.PremiereDate ?? undefined,
-        item?.ProductionYear ?? undefined
+        item?.ProductionYear ?? undefined,
       ),
-    [item?.PremiereDate, item?.ProductionYear]
+    [item?.PremiereDate, item?.ProductionYear],
   );
   const ratingLabel =
     item?.OfficialRating ??
@@ -295,7 +294,7 @@ const JellyfinItemDetailsScreen = () => {
     item?.Id && connector
       ? connector.getImageUrl(item.Id, "Primary", {
           tag: (typeof item === "object" && item !== null
-            ? (item as any).PrimaryImageTag ?? item.ImageTags?.Primary
+            ? ((item as any).PrimaryImageTag ?? item.ImageTags?.Primary)
             : undefined) as string | undefined,
           width: 720,
         })
@@ -305,7 +304,7 @@ const JellyfinItemDetailsScreen = () => {
       (item?.People ?? [])
         .filter((person) => person?.Type === "Actor")
         .slice(0, 12),
-    [item?.People]
+    [item?.People],
   );
   const genres = item?.Genres ?? [];
 
@@ -372,7 +371,7 @@ const JellyfinItemDetailsScreen = () => {
         await connector.refreshItemMetadata(item.Id, false);
       }
       setSyncStatus(
-        "Metadata refresh requested. Jellyfin will update this item shortly."
+        "Metadata refresh requested. Jellyfin will update this item shortly.",
       );
       await detailsQuery.refetch();
     } catch (error) {
@@ -392,8 +391,8 @@ const JellyfinItemDetailsScreen = () => {
       const personIdentifier = person?.Name || person?.Id;
       const personPrimaryTag =
         person && typeof person === "object"
-          ? (person as any).PrimaryImageTag ??
-            (person as any).ImageTags?.Primary
+          ? ((person as any).PrimaryImageTag ??
+            (person as any).ImageTags?.Primary)
           : undefined;
       const avatarUri =
         personIdentifier &&
@@ -436,7 +435,7 @@ const JellyfinItemDetailsScreen = () => {
         </View>
       );
     },
-    [connector, styles, theme]
+    [connector, styles, theme],
   );
 
   if (!serviceId || !itemId) {

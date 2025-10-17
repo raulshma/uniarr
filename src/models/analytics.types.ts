@@ -64,15 +64,15 @@ export interface ExportData {
   version: string;
 }
 
-export type ChartType = 'line' | 'bar' | 'pie' | 'doughnut';
+export type ChartType = "line" | "bar" | "pie" | "doughnut";
 
 export interface ChartData {
   labels: string[];
-  datasets: Array<{
+  datasets: {
     data: number[];
     color?: (opacity: number) => string;
     strokeWidth?: number;
-  }>;
+  }[];
 }
 
 export interface ChartConfig {

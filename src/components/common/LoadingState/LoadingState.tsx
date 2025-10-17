@@ -1,8 +1,8 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { ActivityIndicator, Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
+import type { AppTheme } from "@/constants/theme";
 
 const sizeMap = {
   small: 24,
@@ -18,23 +18,31 @@ export type LoadingStateProps = {
 
 const LoadingState: React.FC<LoadingStateProps> = ({
   message,
-  size = 'large',
-  testID = 'loading-state',
+  size = "large",
+  testID = "loading-state",
 }) => {
   const theme = useTheme<AppTheme>();
 
-  const indicatorSize = typeof size === 'number' ? size : sizeMap[size];
+  const indicatorSize = typeof size === "number" ? size : sizeMap[size];
 
   return (
     <View
       style={[styles.container, { padding: theme.custom.spacing.lg }]}
       accessibilityRole="progressbar"
-      accessibilityLabel={message ?? 'Loading'}
+      accessibilityLabel={message ?? "Loading"}
       testID={testID}
     >
-      <ActivityIndicator size={indicatorSize} color={theme.colors.primary} animating />
+      <ActivityIndicator
+        size={indicatorSize}
+        color={theme.colors.primary}
+        animating
+      />
       {message ? (
-        <Text style={[styles.message, { color: theme.colors.onSurfaceVariant }]}>{message}</Text>
+        <Text
+          style={[styles.message, { color: theme.colors.onSurfaceVariant }]}
+        >
+          {message}
+        </Text>
       ) : null}
     </View>
   );
@@ -45,11 +53,11 @@ export default LoadingState;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   message: {
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

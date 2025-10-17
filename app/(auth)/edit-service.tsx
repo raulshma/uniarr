@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View, Pressable } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   HelperText,
   Text,
@@ -85,7 +85,7 @@ const normalizeSensitiveValue = (value?: string): string | undefined => {
 
 const buildServiceConfig = (
   values: ServiceConfigInput,
-  existingConfig: ServiceConfig
+  existingConfig: ServiceConfig,
 ): ServiceConfig => {
   const now = new Date();
   const cleanedUrl = values.url.trim().replace(/\/+$/, "");
@@ -116,23 +116,23 @@ const EditServiceScreen = () => {
   const { serviceId } = useLocalSearchParams<{ serviceId: string }>();
 
   const [existingConfig, setExistingConfig] = useState<ServiceConfig | null>(
-    null
+    null,
   );
   const [isLoading, setIsLoading] = useState(true);
 
   const supportedTypes = useMemo(
     () => ConnectorFactory.getSupportedTypes(),
-    []
+    [],
   );
   const supportedTypeSet = useMemo(
     () => new Set(supportedTypes),
-    [supportedTypes]
+    [supportedTypes],
   );
 
   useEffect(() => {
     const loadServiceConfig = async () => {
       if (!serviceId) {
-  alert("Error", "Service ID is required", [
+        alert("Error", "Service ID is required", [
           { text: "OK", onPress: () => router.back() },
         ]);
         return;
@@ -150,8 +150,8 @@ const EditServiceScreen = () => {
         }
 
         setExistingConfig(config);
-      } catch (error) {
-  alert("Error", "Failed to load service configuration", [
+      } catch {
+        alert("Error", "Failed to load service configuration", [
           { text: "OK", onPress: () => router.back() },
         ]);
       } finally {
@@ -329,7 +329,7 @@ const EditServiceScreen = () => {
           color: theme.colors.onPrimary,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const inputTheme = useMemo(
@@ -347,7 +347,7 @@ const EditServiceScreen = () => {
       theme.colors.onSurfaceVariant,
       theme.colors.outlineVariant,
       theme.colors.primary,
-    ]
+    ],
   );
 
   const placeholderColor = theme.colors.onSurfaceVariant;
@@ -375,7 +375,7 @@ const EditServiceScreen = () => {
         connector.dispose();
       }
     },
-    []
+    [],
   );
 
   const handleTestConnection = useCallback(
@@ -383,7 +383,7 @@ const EditServiceScreen = () => {
       if (!existingConfig) {
         debugLogger.addError(
           "No existing config",
-          "Cannot test connection without existing service configuration"
+          "Cannot test connection without existing service configuration",
         );
         return;
       }
@@ -395,7 +395,7 @@ const EditServiceScreen = () => {
       if (!supportedTypeSet.has(values.type)) {
         debugLogger.addError(
           "Service type not supported",
-          `Selected service type '${values.type}' is not available yet.`
+          `Selected service type '${values.type}' is not available yet.`,
         );
         setTestError("Selected service type is not available yet.");
         return;
@@ -413,12 +413,12 @@ const EditServiceScreen = () => {
           debugLogger.addApiKeyValidation(
             apiKeyTest.isValid,
             apiKeyTest.message,
-            apiKeyTest.suggestions
+            apiKeyTest.suggestions,
           );
 
           if (!apiKeyTest.isValid) {
             setTestError(
-              `${apiKeyTest.message}. ${apiKeyTest.suggestions.join(" ")}`
+              `${apiKeyTest.message}. ${apiKeyTest.suggestions.join(" ")}`,
             );
             return;
           }
@@ -430,7 +430,7 @@ const EditServiceScreen = () => {
           setTestResult(result);
         } else {
           setTestError(
-            result.message ?? "Unable to connect to the selected service."
+            result.message ?? "Unable to connect to the selected service.",
           );
         }
       } catch (error) {
@@ -450,7 +450,7 @@ const EditServiceScreen = () => {
         setIsTesting(false);
       }
     },
-    [existingConfig, resetDiagnostics, runConnectionTest, supportedTypeSet]
+    [existingConfig, resetDiagnostics, runConnectionTest, supportedTypeSet],
   );
 
   const handleSave = useCallback(
@@ -476,11 +476,11 @@ const EditServiceScreen = () => {
           existingServices.some(
             (service) =>
               service.id !== config.id &&
-              service.name.trim().toLowerCase() === config.name.toLowerCase()
+              service.name.trim().toLowerCase() === config.name.toLowerCase(),
           )
         ) {
           setFormError(
-            "A service with this name already exists. Choose a different name."
+            "A service with this name already exists. Choose a different name.",
           );
           return;
         }
@@ -491,7 +491,7 @@ const EditServiceScreen = () => {
             (service) =>
               service.id !== config.id &&
               service.type === config.type &&
-              service.url.toLowerCase() === config.url.toLowerCase()
+              service.url.toLowerCase() === config.url.toLowerCase(),
           )
         ) {
           setFormError("This service is already configured.");
@@ -502,7 +502,7 @@ const EditServiceScreen = () => {
 
         if (!testOutcome.success) {
           setFormError(
-            testOutcome.message ?? "Unable to verify the connection."
+            testOutcome.message ?? "Unable to verify the connection.",
           );
           return;
         }
@@ -514,7 +514,7 @@ const EditServiceScreen = () => {
           queryKey: queryKeys.services.overview,
         });
 
-  alert(
+        alert(
           "Service updated",
           `${serviceTypeLabels[config.type]} has been updated successfully.`,
           [
@@ -522,7 +522,7 @@ const EditServiceScreen = () => {
               text: "OK",
               onPress: () => router.back(),
             },
-          ]
+          ],
         );
       } catch (error) {
         console.error("❌ [Edit] Save service error:", error);
@@ -546,7 +546,7 @@ const EditServiceScreen = () => {
       router,
       runConnectionTest,
       supportedTypeSet,
-    ]
+    ],
   );
 
   const serviceOptions = useMemo(
@@ -557,7 +557,7 @@ const EditServiceScreen = () => {
         supported: supportedTypeSet.has(type),
         isLast: index === allServiceTypes.length - 1,
       })),
-    [supportedTypeSet]
+    [supportedTypeSet],
   );
 
   if (isLoading) {

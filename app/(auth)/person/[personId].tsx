@@ -2,15 +2,7 @@ import { useMemo } from "react";
 import { View, ScrollView, StyleSheet, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  Text,
-  useTheme,
-  Card,
-  Surface,
-  Chip,
-  Divider,
-  Appbar,
-} from "react-native-paper";
+import { Text, useTheme, Card, Chip, Appbar } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { AppTheme } from "@/constants/theme";
@@ -81,7 +73,7 @@ const PersonDetails = () => {
         },
         profileContainer: {
           alignItems: "center",
-          paddingTop: spacing.md
+          paddingTop: spacing.md,
         },
         profileImage: {
           width: 120,
@@ -177,7 +169,7 @@ const PersonDetails = () => {
           alignItems: "center",
         },
       }),
-    [theme]
+    [theme],
   );
 
   if (!tmdbKey) {
@@ -285,7 +277,10 @@ const PersonDetails = () => {
     }
   };
 
-  const getAge = (birthday?: string | null, deathday?: string | null): number | null => {
+  const getAge = (
+    birthday?: string | null,
+    deathday?: string | null,
+  ): number | null => {
     if (!birthday) return null;
     try {
       const birth = new Date(birthday);
@@ -318,11 +313,7 @@ const PersonDetails = () => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <Appbar.Header
-        mode="small"
-        elevated={false}
-        style={styles.header}
-      >
+      <Appbar.Header mode="small" elevated={false} style={styles.header}>
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content
           title={details.name || "Actor Details"}
@@ -399,7 +390,11 @@ const PersonDetails = () => {
                 Age
               </Text>
               <Text variant="bodyMedium" style={styles.detailValue}>
-                {getAge(details.birthday as string | null, details.deathday as string | null | undefined)} years
+                {getAge(
+                  details.birthday as string | null,
+                  details.deathday as string | null | undefined,
+                )}{" "}
+                years
               </Text>
             </View>
           )}

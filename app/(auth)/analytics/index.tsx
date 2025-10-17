@@ -19,7 +19,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { AnalyticsService } from "@/services/analytics/AnalyticsService";
 import { spacing } from "@/theme/spacing";
 import type { AppTheme } from "@/constants/theme";
-import type { ChartData, AnalyticsSummary } from "@/models/analytics.types";
+import type { ChartData } from "@/models/analytics.types";
 import * as FileSystem from "expo-file-system";
 import { writeAsStringAsync } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -68,7 +68,7 @@ const AnalyticsScreen = () => {
     queryFn: () =>
       analyticsService.generateAnalyticsSummary(
         dateRange.startDate,
-        dateRange.endDate
+        dateRange.endDate,
       ),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
@@ -122,7 +122,7 @@ const AnalyticsScreen = () => {
 
     return {
       labels: analyticsData.qualityDistribution.map(
-        (item) => item.qualityProfile
+        (item) => item.qualityProfile,
       ),
       datasets: [
         {
@@ -145,7 +145,7 @@ const AnalyticsScreen = () => {
       datasets: [
         {
           data: analyticsData.indexerPerformance.map(
-            (item) => item.successRate
+            (item) => item.successRate,
           ),
           color: (opacity = 1) => `rgba(156, 39, 176, ${opacity})`,
           strokeWidth: 2,
@@ -162,12 +162,12 @@ const AnalyticsScreen = () => {
 
     return {
       labels: analyticsData.activityTimes.map(
-        (item) => `${item.hour.toString().padStart(2, "0")}:00`
+        (item) => `${item.hour.toString().padStart(2, "0")}:00`,
       ),
       datasets: [
         {
           data: analyticsData.activityTimes.map(
-            (item) => item.downloads + item.requests
+            (item) => item.downloads + item.requests,
           ),
           color: (opacity = 1) => `rgba(255, 87, 34, ${opacity})`,
           strokeWidth: 2,
@@ -184,7 +184,7 @@ const AnalyticsScreen = () => {
       const csvContent = await analyticsService.exportToCSV(analyticsData);
       const fileName = `uniarr-analytics-${format(
         new Date(),
-        "yyyy-MM-dd"
+        "yyyy-MM-dd",
       )}.csv`;
       const docDir = (FileSystem as any).documentDirectory ?? "";
       const fileUri = `${docDir}${fileName}`;
@@ -304,10 +304,10 @@ const AnalyticsScreen = () => {
                   {range === "7d"
                     ? "7 Days"
                     : range === "30d"
-                    ? "30 Days"
-                    : range === "90d"
-                    ? "90 Days"
-                    : "1 Year"}
+                      ? "30 Days"
+                      : range === "90d"
+                        ? "90 Days"
+                        : "1 Year"}
                 </Chip>
               ))}
             </View>
@@ -365,7 +365,7 @@ const AnalyticsScreen = () => {
               >
                 {analyticsData.downloadStats.reduce(
                   (sum, stat) => sum + stat.completed,
-                  0
+                  0,
                 )}
               </Text>
             </Card.Content>

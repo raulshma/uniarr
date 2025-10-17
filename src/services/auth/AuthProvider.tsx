@@ -1,4 +1,4 @@
-import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-expo';
+import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-expo";
 import {
   createContext,
   useCallback,
@@ -7,10 +7,14 @@ import {
   useState,
   type PropsWithChildren,
   type ReactElement,
-} from 'react';
+} from "react";
 
-import { getClerkErrorMessage, mapClerkUser, type AuthUser } from '@/services/auth/AuthService';
-import { logger } from '@/services/logger/LoggerService';
+import {
+  getClerkErrorMessage,
+  mapClerkUser,
+  type AuthUser,
+} from "@/services/auth/AuthService";
+import { logger } from "@/services/logger/LoggerService";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -24,7 +28,11 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: PropsWithChildren): ReactElement => {
-  const { isLoaded: isAuthLoaded, isSignedIn, signOut: clerkSignOut } = useClerkAuth();
+  const {
+    isLoaded: isAuthLoaded,
+    isSignedIn,
+    signOut: clerkSignOut,
+  } = useClerkAuth();
   const { isLoaded: isUserLoaded, user: clerkUser } = useUser();
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
@@ -50,11 +58,11 @@ export const AuthProvider = ({ children }: PropsWithChildren): ReactElement => {
     } catch (error) {
       const message = getClerkErrorMessage(
         error,
-        'Unable to sign out. Please try again in a moment.',
+        "Unable to sign out. Please try again in a moment.",
       );
 
-      void logger.error('Failed to sign out.', {
-        location: 'AuthProvider.signOut',
+      void logger.error("Failed to sign out.", {
+        location: "AuthProvider.signOut",
         error: error instanceof Error ? error.message : String(error),
       });
 
@@ -68,19 +76,22 @@ export const AuthProvider = ({ children }: PropsWithChildren): ReactElement => {
   const user = useMemo(() => {
     if (isGuest) {
       return {
-        id: 'guest',
+        id: "guest",
         email: null,
         firstName: null,
         lastName: null,
         imageUrl: null,
-        displayName: 'Guest',
+        displayName: "Guest",
       } satisfies AuthUser;
     }
 
     return mapClerkUser(clerkUser);
   }, [clerkUser, isGuest]);
 
-  const isLoading = (!isAuthLoaded && !isGuest) || (!isUserLoaded && !isGuest) || isTransitioning;
+  const isLoading =
+    (!isAuthLoaded && !isGuest) ||
+    (!isUserLoaded && !isGuest) ||
+    isTransitioning;
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -101,7 +112,7 @@ export const useAuth = (): AuthContextValue => {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
 
   return context;

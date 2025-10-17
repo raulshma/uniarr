@@ -1,12 +1,12 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 
-import { logger } from '@/services/logger/LoggerService';
-import type { NotificationMessage } from '@/models/notification.types';
+import { logger } from "@/services/logger/LoggerService";
+import type { NotificationMessage } from "@/models/notification.types";
 
-const TOKEN_STORAGE_KEY = 'PushNotificationService:expoPushToken';
+const TOKEN_STORAGE_KEY = "PushNotificationService:expoPushToken";
 
 class PushNotificationService {
   private static instance: PushNotificationService | null = null;
@@ -38,21 +38,22 @@ class PushNotificationService {
       }),
     });
 
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'General',
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "General",
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FFFFFF',
-        sound: 'default',
+        lightColor: "#FFFFFF",
+        sound: "default",
       });
     }
 
     try {
-      this.expoPushToken = (await AsyncStorage.getItem(TOKEN_STORAGE_KEY)) ?? null;
+      this.expoPushToken =
+        (await AsyncStorage.getItem(TOKEN_STORAGE_KEY)) ?? null;
     } catch (error) {
-      await logger.warn('Failed to load stored Expo push token.', {
-        location: 'PushNotificationService.initialize',
+      await logger.warn("Failed to load stored Expo push token.", {
+        location: "PushNotificationService.initialize",
         error: error instanceof Error ? error.message : String(error),
       });
       this.expoPushToken = null;
@@ -86,14 +87,14 @@ class PushNotificationService {
       this.expoPushToken = tokenResponse.data;
       await AsyncStorage.setItem(TOKEN_STORAGE_KEY, tokenResponse.data);
 
-      await logger.info('Expo push token acquired.', {
-        location: 'PushNotificationService.ensureRegistered',
+      await logger.info("Expo push token acquired.", {
+        location: "PushNotificationService.ensureRegistered",
       });
 
       return tokenResponse.data;
     } catch (error) {
-      await logger.error('Unable to register for push notifications.', {
-        location: 'PushNotificationService.ensureRegistered',
+      await logger.error("Unable to register for push notifications.", {
+        location: "PushNotificationService.ensureRegistered",
         error: error instanceof Error ? error.message : String(error),
       });
       return null;
@@ -106,14 +107,16 @@ class PushNotificationService {
     try {
       await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
     } catch (error) {
-      await logger.warn('Failed to clear stored Expo push token.', {
-        location: 'PushNotificationService.unregister',
+      await logger.warn("Failed to clear stored Expo push token.", {
+        location: "PushNotificationService.unregister",
         error: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
-  async presentImmediateNotification(message: NotificationMessage): Promise<void> {
+  async presentImmediateNotification(
+    message: NotificationMessage,
+  ): Promise<void> {
     await this.initialize();
 
     try {
@@ -125,13 +128,13 @@ class PushNotificationService {
             category: message.category,
             ...(message.data ?? {}),
           },
-          sound: 'default',
+          sound: "default",
         },
         trigger: null,
       });
     } catch (error) {
-      await logger.error('Failed to schedule notification.', {
-        location: 'PushNotificationService.presentImmediateNotification',
+      await logger.error("Failed to schedule notification.", {
+        location: "PushNotificationService.presentImmediateNotification",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -147,16 +150,16 @@ class PushNotificationService {
 
       const requested = await Notifications.requestPermissionsAsync();
       if (!requested.granted) {
-        await logger.warn('Push notification permission denied by user.', {
-          location: 'PushNotificationService.requestPermissions',
+        await logger.warn("Push notification permission denied by user.", {
+          location: "PushNotificationService.requestPermissions",
         });
         return false;
       }
 
       return true;
     } catch (error) {
-      await logger.error('Failed to request push notification permissions.', {
-        location: 'PushNotificationService.requestPermissions',
+      await logger.error("Failed to request push notification permissions.", {
+        location: "PushNotificationService.requestPermissions",
         error: error instanceof Error ? error.message : String(error),
       });
       return false;
@@ -165,12 +168,15 @@ class PushNotificationService {
 
   private resolveProjectId(): string | undefined {
     const easProjectId = Constants?.expoConfig?.extra?.eas?.projectId;
-    if (typeof easProjectId === 'string' && easProjectId.length > 0) {
+    if (typeof easProjectId === "string" && easProjectId.length > 0) {
       return easProjectId;
     }
 
     const constantsProjectId = Constants?.easConfig?.projectId;
-    if (typeof constantsProjectId === 'string' && constantsProjectId.length > 0) {
+    if (
+      typeof constantsProjectId === "string" &&
+      constantsProjectId.length > 0
+    ) {
       return constantsProjectId;
     }
 

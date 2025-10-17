@@ -1,4 +1,4 @@
-import type { ServiceConfig, ServiceType } from '@/models/service.types';
+import type { ServiceConfig, ServiceType } from "@/models/service.types";
 
 /**
  * Options supported by connector-level search operations. Specific connectors can extend this shape.
@@ -41,7 +41,7 @@ export interface ConnectionResult {
  * Represents the health state returned by a connector's health endpoint.
  */
 export interface SystemHealth {
-  readonly status: 'healthy' | 'degraded' | 'offline';
+  readonly status: "healthy" | "degraded" | "offline";
   readonly message?: string;
   readonly lastChecked: Date;
   readonly details?: Record<string, unknown>;

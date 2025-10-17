@@ -71,14 +71,16 @@ class ThumbhashService {
   /**
    * Generate thumbhash for multiple URIs in parallel.
    */
-  async generateThumbhashes(uris: string[]): Promise<Map<string, string | null>> {
+  async generateThumbhashes(
+    uris: string[],
+  ): Promise<Map<string, string | null>> {
     const results = new Map<string, string | null>();
 
     await Promise.all(
       uris.map(async (uri) => {
         const thumbhash = await this.generateThumbhash(uri);
         results.set(uri, thumbhash);
-      })
+      }),
     );
 
     return results;
@@ -148,7 +150,10 @@ class ThumbhashService {
     this.isInitialized = true;
   }
 
-  private async doGenerateThumbhash(uri: string, key: string): Promise<string | null> {
+  private async doGenerateThumbhash(
+    uri: string,
+    key: string,
+  ): Promise<string | null> {
     await this.ensureInitialized();
 
     try {
@@ -164,7 +169,10 @@ class ThumbhashService {
       if (thumbhash && typeof thumbhash === "string" && thumbhash.length) {
         this.thumbhashes.set(key, thumbhash);
         void this.persistThumbhashes();
-        void logger.debug("ThumbhashService: generated thumbhash successfully", { uri });
+        void logger.debug(
+          "ThumbhashService: generated thumbhash successfully",
+          { uri },
+        );
         return thumbhash;
       }
 
@@ -200,7 +208,7 @@ class ThumbhashService {
       const parsed = new URL(uri);
       // Remove apikey and other potentially sensitive params
       ["apikey", "token", "access_token"].forEach((param) =>
-        parsed.searchParams.delete(param)
+        parsed.searchParams.delete(param),
       );
       parsed.hash = "";
       return parsed.toString();

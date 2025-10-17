@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from "react";
 
 import {
   getStoredTmdbKey,
   removeStoredTmdbKey,
   setStoredTmdbKey,
   subscribeToTmdbKey,
-} from '@/services/tmdb/TmdbCredentialService';
+} from "@/services/tmdb/TmdbCredentialService";
 
 export const useTmdbKey = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);

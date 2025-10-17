@@ -1,5 +1,5 @@
-import { BaseConnector } from '@/connectors/base/BaseConnector';
-import type { SearchOptions } from '@/connectors/base/IConnector';
+import { BaseConnector } from "@/connectors/base/BaseConnector";
+import type { SearchOptions } from "@/connectors/base/IConnector";
 import type {
   BazarrMovie,
   BazarrEpisode,
@@ -8,15 +8,14 @@ import type {
   BazarrLanguage,
   BazarrProvider,
   BazarrProfile,
-  BazarrSystemStatus,
   BazarrQueueItem,
   BazarrHistoryItem,
   BazarrSearchResult,
   BazarrSearchRequest,
   BazarrDownloadRequest,
   BazarrStatistics,
-} from '@/models/bazarr.types';
-import { handleApiError } from '@/utils/error.utils';
+} from "@/models/bazarr.types";
+import { handleApiError } from "@/utils/error.utils";
 
 /**
  * Bazarr connector for subtitle management
@@ -33,13 +32,15 @@ export class BazarrConnector extends BaseConnector<
 
   async getVersion(): Promise<string> {
     try {
-      const response = await this.client.get('/api/system/status');
-      return response.data?.bazarrVersion || response.data?.version || 'Unknown';
+      const response = await this.client.get("/api/system/status");
+      return (
+        response.data?.bazarrVersion || response.data?.version || "Unknown"
+      );
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getVersion',
+        operation: "getVersion",
       });
 
       throw new Error(`Failed to get Bazarr version: ${diagnostic.message}`);
@@ -53,13 +54,13 @@ export class BazarrConnector extends BaseConnector<
    */
   async getMovies(): Promise<BazarrMovie[]> {
     try {
-      const response = await this.client.get('/api/movies');
+      const response = await this.client.get("/api/movies");
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getMovies',
+        operation: "getMovies",
       });
 
       throw new Error(`Failed to get movies: ${diagnostic.message}`);
@@ -77,7 +78,7 @@ export class BazarrConnector extends BaseConnector<
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getMovieById',
+        operation: "getMovieById",
       });
 
       throw new Error(`Failed to get movie ${id}: ${diagnostic.message}`);
@@ -91,13 +92,13 @@ export class BazarrConnector extends BaseConnector<
    */
   async getEpisodes(): Promise<BazarrEpisode[]> {
     try {
-      const response = await this.client.get('/api/episodes');
+      const response = await this.client.get("/api/episodes");
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getEpisodes',
+        operation: "getEpisodes",
       });
 
       throw new Error(`Failed to get episodes: ${diagnostic.message}`);
@@ -109,16 +110,20 @@ export class BazarrConnector extends BaseConnector<
    */
   async getEpisodesBySeriesId(seriesId: number): Promise<BazarrEpisode[]> {
     try {
-      const response = await this.client.get(`/api/episodes/series/${seriesId}`);
+      const response = await this.client.get(
+        `/api/episodes/series/${seriesId}`,
+      );
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getEpisodesBySeriesId',
+        operation: "getEpisodesBySeriesId",
       });
 
-      throw new Error(`Failed to get episodes for series ${seriesId}: ${diagnostic.message}`);
+      throw new Error(
+        `Failed to get episodes for series ${seriesId}: ${diagnostic.message}`,
+      );
     }
   }
 
@@ -133,7 +138,7 @@ export class BazarrConnector extends BaseConnector<
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getEpisodeById',
+        operation: "getEpisodeById",
       });
 
       throw new Error(`Failed to get episode ${id}: ${diagnostic.message}`);
@@ -147,13 +152,13 @@ export class BazarrConnector extends BaseConnector<
    */
   async getSubtitles(): Promise<BazarrSubtitle[]> {
     try {
-      const response = await this.client.get('/api/subtitles');
+      const response = await this.client.get("/api/subtitles");
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getSubtitles',
+        operation: "getSubtitles",
       });
 
       throw new Error(`Failed to get subtitles: ${diagnostic.message}`);
@@ -171,10 +176,12 @@ export class BazarrConnector extends BaseConnector<
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getSubtitlesByMovieId',
+        operation: "getSubtitlesByMovieId",
       });
 
-      throw new Error(`Failed to get subtitles for movie ${movieId}: ${diagnostic.message}`);
+      throw new Error(
+        `Failed to get subtitles for movie ${movieId}: ${diagnostic.message}`,
+      );
     }
   }
 
@@ -183,31 +190,40 @@ export class BazarrConnector extends BaseConnector<
    */
   async getSubtitlesByEpisodeId(episodeId: number): Promise<BazarrSubtitle[]> {
     try {
-      const response = await this.client.get(`/api/subtitles/episode/${episodeId}`);
+      const response = await this.client.get(
+        `/api/subtitles/episode/${episodeId}`,
+      );
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getSubtitlesByEpisodeId',
+        operation: "getSubtitlesByEpisodeId",
       });
 
-      throw new Error(`Failed to get subtitles for episode ${episodeId}: ${diagnostic.message}`);
+      throw new Error(
+        `Failed to get subtitles for episode ${episodeId}: ${diagnostic.message}`,
+      );
     }
   }
 
   /**
    * Search for subtitles for a movie/episode
    */
-  async searchSubtitles(searchRequest: BazarrSearchRequest): Promise<BazarrSearchResult[]> {
+  async searchSubtitles(
+    searchRequest: BazarrSearchRequest,
+  ): Promise<BazarrSearchResult[]> {
     try {
-      const response = await this.client.post('/api/subtitles/search', searchRequest);
+      const response = await this.client.post(
+        "/api/subtitles/search",
+        searchRequest,
+      );
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'searchSubtitles',
+        operation: "searchSubtitles",
       });
 
       throw new Error(`Failed to search subtitles: ${diagnostic.message}`);
@@ -217,15 +233,17 @@ export class BazarrConnector extends BaseConnector<
   /**
    * Download a subtitle
    */
-  async downloadSubtitle(downloadRequest: BazarrDownloadRequest): Promise<boolean> {
+  async downloadSubtitle(
+    downloadRequest: BazarrDownloadRequest,
+  ): Promise<boolean> {
     try {
-      await this.client.post('/api/subtitles/download', downloadRequest);
+      await this.client.post("/api/subtitles/download", downloadRequest);
       return true;
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'downloadSubtitle',
+        operation: "downloadSubtitle",
       });
 
       throw new Error(`Failed to download subtitle: ${diagnostic.message}`);
@@ -239,13 +257,13 @@ export class BazarrConnector extends BaseConnector<
    */
   async getLanguages(): Promise<BazarrLanguage[]> {
     try {
-      const response = await this.client.get('/api/languages');
+      const response = await this.client.get("/api/languages");
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getLanguages',
+        operation: "getLanguages",
       });
 
       throw new Error(`Failed to get languages: ${diagnostic.message}`);
@@ -258,12 +276,12 @@ export class BazarrConnector extends BaseConnector<
   async getEnabledLanguages(): Promise<BazarrLanguage[]> {
     try {
       const languages = await this.getLanguages();
-      return languages.filter(lang => lang.enabled);
+      return languages.filter((lang) => lang.enabled);
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getEnabledLanguages',
+        operation: "getEnabledLanguages",
       });
 
       throw new Error(`Failed to get enabled languages: ${diagnostic.message}`);
@@ -277,13 +295,13 @@ export class BazarrConnector extends BaseConnector<
    */
   async getProviders(): Promise<BazarrProvider[]> {
     try {
-      const response = await this.client.get('/api/providers');
+      const response = await this.client.get("/api/providers");
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getProviders',
+        operation: "getProviders",
       });
 
       throw new Error(`Failed to get providers: ${diagnostic.message}`);
@@ -296,12 +314,12 @@ export class BazarrConnector extends BaseConnector<
   async getEnabledProviders(): Promise<BazarrProvider[]> {
     try {
       const providers = await this.getProviders();
-      return providers.filter(provider => provider.enabled);
+      return providers.filter((provider) => provider.enabled);
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getEnabledProviders',
+        operation: "getEnabledProviders",
       });
 
       throw new Error(`Failed to get enabled providers: ${diagnostic.message}`);
@@ -315,13 +333,13 @@ export class BazarrConnector extends BaseConnector<
    */
   async getProfiles(): Promise<BazarrProfile[]> {
     try {
-      const response = await this.client.get('/api/profiles');
+      const response = await this.client.get("/api/profiles");
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getProfiles',
+        operation: "getProfiles",
       });
 
       throw new Error(`Failed to get profiles: ${diagnostic.message}`);
@@ -335,13 +353,13 @@ export class BazarrConnector extends BaseConnector<
    */
   async getQueue(): Promise<BazarrQueueItem[]> {
     try {
-      const response = await this.client.get('/api/queue');
+      const response = await this.client.get("/api/queue");
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getQueue',
+        operation: "getQueue",
       });
 
       throw new Error(`Failed to get queue: ${diagnostic.message}`);
@@ -353,13 +371,13 @@ export class BazarrConnector extends BaseConnector<
    */
   async getHistory(): Promise<BazarrHistoryItem[]> {
     try {
-      const response = await this.client.get('/api/history');
+      const response = await this.client.get("/api/history");
       return response.data || [];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getHistory',
+        operation: "getHistory",
       });
 
       throw new Error(`Failed to get history: ${diagnostic.message}`);
@@ -379,9 +397,9 @@ export class BazarrConnector extends BaseConnector<
         this.getSubtitles(),
       ]);
 
-      const missingSubtitles = [...movies, ...episodes]
-        .flatMap(item => item.missingSubtitles || [])
-        .length;
+      const missingSubtitles = [...movies, ...episodes].flatMap(
+        (item) => item.missingSubtitles || [],
+      ).length;
 
       return {
         moviesTotal: movies.length,
@@ -393,7 +411,7 @@ export class BazarrConnector extends BaseConnector<
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getStatistics',
+        operation: "getStatistics",
       });
 
       throw new Error(`Failed to get statistics: ${diagnostic.message}`);
@@ -413,14 +431,14 @@ export class BazarrConnector extends BaseConnector<
       ]);
 
       return [
-        ...(movies.flatMap(movie => movie.missingSubtitles || [])),
-        ...(episodes.flatMap(episode => episode.missingSubtitles || [])),
+        ...movies.flatMap((movie) => movie.missingSubtitles || []),
+        ...episodes.flatMap((episode) => episode.missingSubtitles || []),
       ];
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getAllMissingSubtitles',
+        operation: "getAllMissingSubtitles",
       });
 
       throw new Error(`Failed to get missing subtitles: ${diagnostic.message}`);
@@ -430,7 +448,10 @@ export class BazarrConnector extends BaseConnector<
   /**
    * Search functionality for unified search integration
    */
-  async search(query: string, options?: SearchOptions): Promise<Array<BazarrMovie | BazarrEpisode>> {
+  async search(
+    query: string,
+    options?: SearchOptions,
+  ): Promise<(BazarrMovie | BazarrEpisode)[]> {
     // Bazarr doesn't have traditional search like Sonarr/Radarr
     // Return empty array for now - could be extended to search movies/episodes by title
     return [];

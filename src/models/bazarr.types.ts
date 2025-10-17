@@ -46,7 +46,7 @@ export interface BazarrSubtitle {
   readonly dateAdded?: string;
   readonly movieFileId?: number;
   readonly episodeFileId?: number;
-  readonly type?: 'movie' | 'episode';
+  readonly type?: "movie" | "episode";
   readonly forced?: boolean;
   readonly hi?: boolean; // Hearing Impaired
 }
@@ -55,7 +55,7 @@ export interface BazarrMissingSubtitle {
   readonly id: number;
   readonly language: BazarrLanguage;
   readonly provider?: string;
-  readonly type?: 'movie' | 'episode';
+  readonly type?: "movie" | "episode";
   readonly forced?: boolean;
   readonly hi?: boolean;
   readonly movieFileId?: number;
@@ -98,7 +98,7 @@ export interface BazarrQueueItem {
   readonly language: BazarrLanguage;
   readonly provider: string;
   readonly timestamp: string;
-  readonly type: 'movie' | 'episode';
+  readonly type: "movie" | "episode";
   readonly forced?: boolean;
   readonly hi?: boolean;
 }

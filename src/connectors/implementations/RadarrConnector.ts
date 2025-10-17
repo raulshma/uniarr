@@ -70,7 +70,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       });
 
       const response = await this.client.get<RadarrSystemStatus>(
-        `${RADARR_API_PREFIX}/system/status`
+        `${RADARR_API_PREFIX}/system/status`,
       );
       const version = (response.data?.version as string) ?? "unknown";
       logger.debug("[RadarrConnector] Version retrieved", {
@@ -116,7 +116,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async getMovies(): Promise<Movie[]> {
     try {
       const response = await this.client.get<RadarrMovie[]>(
-        `${RADARR_API_PREFIX}/movie`
+        `${RADARR_API_PREFIX}/movie`,
       );
       return (response.data ?? []).map((item) => this.mapMovie(item));
     } catch (error) {
@@ -141,7 +141,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         `${RADARR_API_PREFIX}/movie/lookup`,
         {
           params,
-        }
+        },
       );
 
       return (response.data ?? []).map((item) => this.mapMovie(item));
@@ -158,7 +158,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async getById(id: number): Promise<Movie> {
     try {
       const response = await this.client.get<RadarrMovie>(
-        `${RADARR_API_PREFIX}/movie/${id}`
+        `${RADARR_API_PREFIX}/movie/${id}`,
       );
       return this.mapMovie(response.data as RadarrMovie);
     } catch (error) {
@@ -176,7 +176,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       const payload = this.buildAddPayload(request);
       const response = await this.client.post<RadarrMovie>(
         `${RADARR_API_PREFIX}/movie`,
-        payload
+        payload,
       );
       return this.mapMovie(response.data as RadarrMovie);
     } catch (error) {
@@ -208,7 +208,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async setMonitored(movieId: number, monitored: boolean): Promise<void> {
     try {
       const existing = await this.client.get<RadarrMovie>(
-        `${RADARR_API_PREFIX}/movie/${movieId}`
+        `${RADARR_API_PREFIX}/movie/${movieId}`,
       );
       const payload = {
         ...(existing.data as RadarrMovie),
@@ -217,7 +217,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
       await this.client.put(
         `${RADARR_API_PREFIX}/movie/${movieId}`,
-        payload as unknown as RadarrMovie
+        payload as unknown as RadarrMovie,
       );
     } catch (error) {
       throw handleApiError(error, {
@@ -231,7 +231,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
   async deleteMovie(
     movieId: number,
-    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {}
+    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
   ): Promise<void> {
     try {
       const params = {
@@ -259,12 +259,12 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         RadarrMovie,
         "id" | "movieFile" | "ratings" | "statistics" | "images"
       >
-    >
+    >,
   ): Promise<Movie> {
     try {
       const response = await this.client.put<RadarrMovie>(
         `${RADARR_API_PREFIX}/movie/${movieId}`,
-        updates
+        updates,
       );
       return this.mapMovie(response.data);
     } catch (error) {
@@ -328,7 +328,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async getTags(): Promise<RadarrTag[]> {
     try {
       const response = await this.client.get<RadarrTag[]>(
-        `${RADARR_API_PREFIX}/tag`
+        `${RADARR_API_PREFIX}/tag`,
       );
       return response.data ?? [];
     } catch (error) {
@@ -345,7 +345,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     try {
       const response = await this.client.post<RadarrTag>(
         `${RADARR_API_PREFIX}/tag`,
-        { label }
+        { label },
       );
       return response.data as RadarrTag;
     } catch (error) {
@@ -362,7 +362,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     try {
       const response = await this.client.put<RadarrTag>(
         `${RADARR_API_PREFIX}/tag/${tagId}`,
-        { id: tagId, label }
+        { id: tagId, label },
       );
       return response.data as RadarrTag;
     } catch (error) {
@@ -410,9 +410,8 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
     for (const endpoint of candidateEndpoints) {
       try {
-        const response = await this.client.get<RadarrQualityProfile[]>(
-          endpoint
-        );
+        const response =
+          await this.client.get<RadarrQualityProfile[]>(endpoint);
 
         // Check if response contains an error
         if (
@@ -425,14 +424,14 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         }
 
         return (response.data ?? []).map((profile) =>
-          this.mapQualityProfile(profile as RadarrQualityProfile)
+          this.mapQualityProfile(profile as RadarrQualityProfile),
         );
       } catch (error) {
         const axiosError = error as any;
         const status = axiosError?.response?.status;
         if (status !== 404) {
           const enhancedError = new Error(
-            "Failed to load quality profiles. This may be due to corrupted custom formats in Radarr. Please check your Radarr quality profiles and custom formats, then try again."
+            "Failed to load quality profiles. This may be due to corrupted custom formats in Radarr. Please check your Radarr quality profiles and custom formats, then try again.",
           );
           throw handleApiError(enhancedError, {
             serviceId: this.config.id,
@@ -446,7 +445,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
 
     const enhancedError = new Error(
-      "Failed to load quality profiles. Tried several Radarr endpoints but none responded. This may be due to API changes or server configuration."
+      "Failed to load quality profiles. Tried several Radarr endpoints but none responded. This may be due to API changes or server configuration.",
     );
     throw handleApiError(enhancedError, {
       serviceId: this.config.id,
@@ -459,10 +458,10 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async getRootFolders(): Promise<RootFolder[]> {
     try {
       const response = await this.client.get<RadarrRootFolder[]>(
-        `${RADARR_API_PREFIX}/rootfolder`
+        `${RADARR_API_PREFIX}/rootfolder`,
       );
       return (response.data ?? []).map((folder) =>
-        this.mapRootFolder(folder as RadarrRootFolder)
+        this.mapRootFolder(folder as RadarrRootFolder),
       );
     } catch (error) {
       throw handleApiError(error, {
@@ -477,7 +476,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async getCalendar(
     start?: string,
     end?: string,
-    unmonitored?: boolean
+    unmonitored?: boolean,
   ): Promise<RadarrMovie[]> {
     try {
       const params: Record<string, unknown> = {};
@@ -487,7 +486,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
       const response = await this.client.get<RadarrMovie[]>(
         `${RADARR_API_PREFIX}/calendar`,
-        { params }
+        { params },
       );
       return (response.data ?? []) as RadarrMovie[];
     } catch (error) {
@@ -503,7 +502,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   async getQueue(): Promise<RadarrQueueItem[]> {
     try {
       const response = await this.client.get<RadarrQueueResponse>(
-        `${RADARR_API_PREFIX}/queue`
+        `${RADARR_API_PREFIX}/queue`,
       );
       const records = (response.data?.records ?? []) as RadarrQueueRecord[];
       return records.map((record) => this.mapQueueRecord(record));
@@ -517,7 +516,10 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getHistory(options?: { page?: number; pageSize?: number }): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
+  async getHistory(options?: {
+    page?: number;
+    pageSize?: number;
+  }): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
     try {
       const params: Record<string, unknown> = {};
       if (options?.page) params.page = options.page;
@@ -587,14 +589,14 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     const posterUrl = this.resolveImageUrl(
       this.findImageUrl(
         (data?.images as RadarrMovieImage[] | undefined) ?? [],
-        "poster"
-      )
+        "poster",
+      ),
     );
     const backdropUrl = this.resolveImageUrl(
       this.findImageUrl(
         (data?.images as RadarrMovieImage[] | undefined) ?? [],
-        "fanart"
-      )
+        "fanart",
+      ),
     );
     return {
       id: (data?.id ?? 0) as number,
@@ -630,10 +632,10 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       backdropUrl,
       ratings: this.mapRatings(data?.ratings as RadarrRatings | undefined),
       statistics: this.mapStatistics(
-        data?.statistics as RadarrMovieStatistics | undefined
+        data?.statistics as RadarrMovieStatistics | undefined,
       ),
       movieFile: this.mapMovieFile(
-        data?.movieFile as RadarrMovieFile | undefined
+        data?.movieFile as RadarrMovieFile | undefined,
       ),
       images: (data?.images ?? []).map((image) => ({
         coverType: (image?.coverType ?? "") as string,
@@ -644,18 +646,13 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   }
 
   private mapRatings(
-    ratings?: RadarrRatings | undefined
+    ratings?: RadarrRatings | undefined,
   ): MovieRatings | undefined {
     if (!ratings) {
       return undefined;
     }
 
     // Ratings in Radarr are nested (imdb/tmdb/etc). Prefer imdb, then tmdb, then others.
-    const pick = (r?: { value?: number; votes?: number } | null) => ({
-      value: r?.value,
-      votes: r?.votes,
-    });
-
     const imdb = ratings.imdb ?? undefined;
     const tmdb = ratings.tmdb ?? undefined;
     const mc = ratings.metacritic ?? undefined;
@@ -682,7 +679,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   }
 
   private mapStatistics(
-    statistics?: RadarrMovieStatistics | undefined
+    statistics?: RadarrMovieStatistics | undefined,
   ): MovieStatistics | undefined {
     if (!statistics) {
       return undefined;
@@ -697,7 +694,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   }
 
   private mapMovieFile(
-    movieFile?: RadarrMovieFile | undefined
+    movieFile?: RadarrMovieFile | undefined,
   ): MovieFile | undefined {
     if (!movieFile) {
       return undefined;
@@ -713,7 +710,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         ? {
             quality: movieFile.quality.quality
               ? this.mapQualityResource(
-                  movieFile.quality.quality as RadarrQualityItem
+                  movieFile.quality.quality as RadarrQualityItem,
                 )
               : undefined,
             revision: movieFile.quality.revision as any,
@@ -738,7 +735,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   }
 
   private mapQualityProfile(
-    profile: RadarrQualityProfile | undefined
+    profile: RadarrQualityProfile | undefined,
   ): QualityProfile {
     const items = (profile?.items ?? []) as RadarrQualityProfileItem[];
     return {
@@ -752,7 +749,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
   private findQualityById(
     items: RadarrQualityProfileItem[],
-    qualityId: number
+    qualityId: number,
   ): Quality {
     // Flatten all qualities from the nested structure
     const allQualities: RadarrQualityItem[] = [];
@@ -784,7 +781,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
   }
 
   private mapQualityProfileItem(
-    item: RadarrQualityProfileItem | undefined
+    item: RadarrQualityProfileItem | undefined,
   ): QualityProfileItem {
     const quality = item?.quality || {
       id: (item?.id ?? 0) as number,
@@ -821,7 +818,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
 
   private findImageUrl(
     images: (RadarrMovieImage | undefined)[] | undefined,
-    type: string
+    type: string,
   ): string | undefined {
     if (!images?.length) {
       return undefined;
@@ -853,7 +850,7 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
       }
 
       return resolved.toString();
-    } catch (_error) {
+    } catch {
       return url;
     }
   }

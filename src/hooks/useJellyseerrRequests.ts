@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   keepPreviousData,
   useMutation,
@@ -6,22 +6,35 @@ import {
   useQueryClient,
   type QueryObserverResult,
   type RefetchOptions,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
-import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { IConnector } from '@/connectors/base/IConnector';
-import { queryKeys } from '@/hooks/queryKeys';
-import type { components, paths } from '@/connectors/client-schemas/jellyseerr-openapi';
-type CreateJellyseerrRequest = paths['/request']['post']['requestBody']['content']['application/json'];
-type JellyseerrApprovalOptions = paths['/request/{requestId}']['put']['requestBody']['content']['application/json'];
+import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { IConnector } from "@/connectors/base/IConnector";
+import { queryKeys } from "@/hooks/queryKeys";
+import type {
+  components,
+  paths,
+} from "@/connectors/client-schemas/jellyseerr-openapi";
+import { notificationEventService } from "@/services/notifications/NotificationEventService";
+type CreateJellyseerrRequest =
+  paths["/request"]["post"]["requestBody"]["content"]["application/json"];
+type JellyseerrApprovalOptions =
+  paths["/request/{requestId}"]["put"]["requestBody"]["content"]["application/json"];
 type JellyseerrDeclineOptions = JellyseerrApprovalOptions;
-type JellyseerrRequest = components['schemas']['MediaRequest'];
-type JellyseerrRequestList = { items: JellyseerrRequest[]; total: number; pageInfo?: components['schemas']['PageInfo'] };
-type JellyseerrRequestQueryOptions = paths['/request']['get']['parameters']['query'];
-import { notificationEventService } from '@/services/notifications/NotificationEventService';
+type JellyseerrRequest = components["schemas"]["MediaRequest"];
+type JellyseerrRequestList = {
+  items: JellyseerrRequest[];
+  total: number;
+  pageInfo?: components["schemas"]["PageInfo"];
+};
+type JellyseerrRequestQueryOptions =
+  paths["/request"]["get"]["parameters"]["query"];
 
-const JELLYSEERR_SERVICE_TYPE = 'jellyseerr';
+const JELLYSEERR_SERVICE_TYPE = "jellyseerr";
 
 type ApproveVariables = {
   requestId: number;
@@ -39,11 +52,16 @@ type DeleteVariables = {
 
 type CreateVariables = CreateJellyseerrRequest;
 
-const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): JellyseerrConnector => {
+const ensureConnector = (
+  getConnector: (id: string) => IConnector | undefined,
+  serviceId: string,
+): JellyseerrConnector => {
   const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== JELLYSEERR_SERVICE_TYPE) {
-    throw new Error(`Jellyseerr connector not registered for service ${serviceId}.`);
+    throw new Error(
+      `Jellyseerr connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as JellyseerrConnector;
@@ -60,12 +78,14 @@ const sanitizeQueryOptions = (
 
   // Only include query parameters that are present in the OpenAPI spec for
   // the /request endpoint.
-  if (typeof options.take === 'number') sanitized.take = options.take;
-  if (typeof options.skip === 'number') sanitized.skip = options.skip;
-  if (options.filter && options.filter !== 'all') sanitized.filter = options.filter;
+  if (typeof options.take === "number") sanitized.take = options.take;
+  if (typeof options.skip === "number") sanitized.skip = options.skip;
+  if (options.filter && options.filter !== "all")
+    sanitized.filter = options.filter;
   if (options.sort) sanitized.sort = options.sort;
   if (options.sortDirection) sanitized.sortDirection = options.sortDirection;
-  if (typeof options.requestedBy === 'number') sanitized.requestedBy = options.requestedBy;
+  if (typeof options.requestedBy === "number")
+    sanitized.requestedBy = options.requestedBy;
   if (options.mediaType) sanitized.mediaType = options.mediaType;
 
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
@@ -74,18 +94,26 @@ const sanitizeQueryOptions = (
 interface UseJellyseerrRequestsResult {
   readonly requests: JellyseerrRequest[] | undefined;
   readonly total: number;
-  readonly pageInfo: JellyseerrRequestList['pageInfo'];
+  readonly pageInfo: JellyseerrRequestList["pageInfo"];
   readonly isLoading: boolean;
   readonly isFetching: boolean;
   readonly isError: boolean;
   readonly error: unknown;
-  readonly refetch: (options?: RefetchOptions) => Promise<QueryObserverResult<JellyseerrRequestList, Error>>;
+  readonly refetch: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<JellyseerrRequestList, Error>>;
   readonly createRequest: (variables: CreateVariables) => void;
-  readonly createRequestAsync: (variables: CreateVariables) => Promise<JellyseerrRequest>;
+  readonly createRequestAsync: (
+    variables: CreateVariables,
+  ) => Promise<JellyseerrRequest>;
   readonly approveRequest: (variables: ApproveVariables) => void;
-  readonly approveRequestAsync: (variables: ApproveVariables) => Promise<JellyseerrRequest>;
+  readonly approveRequestAsync: (
+    variables: ApproveVariables,
+  ) => Promise<JellyseerrRequest>;
   readonly declineRequest: (variables: DeclineVariables) => void;
-  readonly declineRequestAsync: (variables: DeclineVariables) => Promise<JellyseerrRequest>;
+  readonly declineRequestAsync: (
+    variables: DeclineVariables,
+  ) => Promise<JellyseerrRequest>;
   readonly deleteRequest: (variables: DeleteVariables) => void;
   readonly deleteRequestAsync: (variables: DeleteVariables) => Promise<boolean>;
   readonly isCreating: boolean;
@@ -109,22 +137,20 @@ export const useJellyseerrRequests = (
   const previousRequestIdsRef = useRef<Set<number>>(new Set());
   const hasHydratedRef = useRef(false);
 
-  const normalizedOptions = useMemo(() => sanitizeQueryOptions(options), [
-    options?.take,
-    options?.skip,
-    options?.filter,
-    options?.sort,
-    options?.sortDirection,
-    options?.requestedBy,
-    options?.mediaType,
-  ]);
+  const normalizedOptions = useMemo(
+    () => sanitizeQueryOptions(options),
+    [options],
+  );
 
   const queryKeyParams = useMemo(
     () => (normalizedOptions ? { ...normalizedOptions } : undefined),
     [normalizedOptions],
   );
 
-  const resolveConnector = useCallback(() => ensureConnector(getConnector, serviceId), [getConnector, serviceId]);
+  const resolveConnector = useCallback(
+    () => ensureConnector(getConnector, serviceId),
+    [getConnector, serviceId],
+  );
 
   const requestsQuery = useQuery<JellyseerrRequestList, Error>({
     queryKey: queryKeys.jellyseerr.requestsList(serviceId, queryKeyParams),
@@ -139,20 +165,28 @@ export const useJellyseerrRequests = (
   });
 
   const invalidateRequests = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.jellyseerr.service(serviceId) });
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.jellyseerr.service(serviceId),
+    });
   }, [queryClient, serviceId]);
 
-  const createMutation = useMutation<JellyseerrRequest, Error, CreateVariables>({
-    mutationFn: async (payload) => {
-      const connector = resolveConnector();
-      return connector.createRequest(payload);
+  const createMutation = useMutation<JellyseerrRequest, Error, CreateVariables>(
+    {
+      mutationFn: async (payload) => {
+        const connector = resolveConnector();
+        return connector.createRequest(payload);
+      },
+      onSuccess: async () => {
+        await invalidateRequests();
+      },
     },
-    onSuccess: async () => {
-      await invalidateRequests();
-    },
-  });
+  );
 
-  const approveMutation = useMutation<JellyseerrRequest, Error, ApproveVariables>({
+  const approveMutation = useMutation<
+    JellyseerrRequest,
+    Error,
+    ApproveVariables
+  >({
     mutationFn: async ({ requestId, options: mutationOptions }) => {
       const connector = resolveConnector();
       return connector.approveRequest(requestId, mutationOptions);
@@ -162,7 +196,11 @@ export const useJellyseerrRequests = (
     },
   });
 
-  const declineMutation = useMutation<JellyseerrRequest, Error, DeclineVariables>({
+  const declineMutation = useMutation<
+    JellyseerrRequest,
+    Error,
+    DeclineVariables
+  >({
     mutationFn: async ({ requestId, options: mutationOptions }) => {
       const connector = resolveConnector();
       return connector.declineRequest(requestId, mutationOptions);
@@ -193,8 +231,10 @@ export const useJellyseerrRequests = (
       return;
     }
 
-    const connector = getConnector(serviceId) as JellyseerrConnector | undefined;
-    const serviceName = connector?.config.name ?? 'Jellyseerr';
+    const connector = getConnector(serviceId) as
+      | JellyseerrConnector
+      | undefined;
+    const serviceName = connector?.config.name ?? "Jellyseerr";
     const previousIds = previousRequestIdsRef.current;
     const hasHydrated = hasHydratedRef.current;
     const nextIds = new Set<number>();

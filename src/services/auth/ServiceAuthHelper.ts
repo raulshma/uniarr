@@ -1,8 +1,8 @@
-import { authManager } from './AuthManager';
-import { AuthProviderFactory } from './AuthProviderFactory';
-import type { ServiceConfig } from '@/models/service.types';
-import type { AuthConfig, AuthResult, AuthSession } from './types';
-import { SERVICE_DETECTION_CONFIGS } from '@/services/network/NetworkScannerService';
+import { authManager } from "./AuthManager";
+import { AuthProviderFactory } from "./AuthProviderFactory";
+import type { ServiceConfig } from "@/models/service.types";
+import type { AuthConfig, AuthResult, AuthSession } from "./types";
+import { SERVICE_DETECTION_CONFIGS } from "@/services/network/NetworkScannerService";
 
 /**
  * Helper class for managing service authentication
@@ -13,8 +13,9 @@ export class ServiceAuthHelper {
    */
   static createAuthConfig(serviceConfig: ServiceConfig): AuthConfig {
     const authMethod = AuthProviderFactory.getAuthMethod(serviceConfig.type);
-    
-    const detectionEndpoint = SERVICE_DETECTION_CONFIGS[serviceConfig.type]?.detectionEndpoint;
+
+    const detectionEndpoint =
+      SERVICE_DETECTION_CONFIGS[serviceConfig.type]?.detectionEndpoint;
 
     return {
       method: authMethod as any,
@@ -34,15 +35,23 @@ export class ServiceAuthHelper {
   /**
    * Authenticate a service using its configuration
    */
-  static async authenticateService(serviceConfig: ServiceConfig): Promise<AuthResult> {
+  static async authenticateService(
+    serviceConfig: ServiceConfig,
+  ): Promise<AuthResult> {
     const authConfig = this.createAuthConfig(serviceConfig);
-    return authManager.authenticate(serviceConfig.id, serviceConfig.type, authConfig);
+    return authManager.authenticate(
+      serviceConfig.id,
+      serviceConfig.type,
+      authConfig,
+    );
   }
 
   /**
    * Get authentication headers for a service
    */
-  static getServiceAuthHeaders(serviceConfig: ServiceConfig): Record<string, string> {
+  static getServiceAuthHeaders(
+    serviceConfig: ServiceConfig,
+  ): Record<string, string> {
     return authManager.getAuthHeaders(serviceConfig.id);
   }
 
@@ -57,7 +66,9 @@ export class ServiceAuthHelper {
   /**
    * Get current session for a service
    */
-  static getServiceSession(serviceConfig: ServiceConfig): AuthSession | undefined {
+  static getServiceSession(
+    serviceConfig: ServiceConfig,
+  ): AuthSession | undefined {
     return authManager.getSession(serviceConfig.id);
   }
 
@@ -78,7 +89,9 @@ export class ServiceAuthHelper {
   /**
    * Refresh authentication for a service
    */
-  static async refreshServiceAuth(serviceConfig: ServiceConfig): Promise<AuthResult> {
+  static async refreshServiceAuth(
+    serviceConfig: ServiceConfig,
+  ): Promise<AuthResult> {
     const authConfig = this.createAuthConfig(serviceConfig);
     return authManager.refreshAuthentication(serviceConfig.id, authConfig);
   }
@@ -86,29 +99,34 @@ export class ServiceAuthHelper {
   /**
    * Validate service configuration for authentication
    */
-  static validateServiceConfig(serviceConfig: ServiceConfig): { valid: boolean; errors: string[] } {
+  static validateServiceConfig(serviceConfig: ServiceConfig): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
-    
+
     if (!serviceConfig.url) {
-      errors.push('Service URL is required');
+      errors.push("Service URL is required");
     }
 
     if (!serviceConfig.type) {
-      errors.push('Service type is required');
+      errors.push("Service type is required");
     }
 
     if (AuthProviderFactory.requiresAuth(serviceConfig.type)) {
-      const requiredCredentials = AuthProviderFactory.getRequiredCredentials(serviceConfig.type);
-      
+      const requiredCredentials = AuthProviderFactory.getRequiredCredentials(
+        serviceConfig.type,
+      );
+
       for (const credential of requiredCredentials) {
-        if (credential === 'apiKey' && !serviceConfig.apiKey) {
-          errors.push('API key is required for this service type');
+        if (credential === "apiKey" && !serviceConfig.apiKey) {
+          errors.push("API key is required for this service type");
         }
-        if (credential === 'username' && !serviceConfig.username) {
-          errors.push('Username is required for this service type');
+        if (credential === "username" && !serviceConfig.username) {
+          errors.push("Username is required for this service type");
         }
-        if (credential === 'password' && !serviceConfig.password) {
-          errors.push('Password is required for this service type');
+        if (credential === "password" && !serviceConfig.password) {
+          errors.push("Password is required for this service type");
         }
       }
     }

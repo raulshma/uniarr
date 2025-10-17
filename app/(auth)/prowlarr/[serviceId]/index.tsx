@@ -1,5 +1,4 @@
 import { FlashList } from "@shopify/flash-list";
-import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -23,13 +22,11 @@ import BottomDrawer, { DrawerItem } from "@/components/common/BottomDrawer";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
-import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { components } from "@/connectors/client-schemas/prowlarr-openapi";
-
-type ProwlarrIndexerResource = components["schemas"]["IndexerResource"];
-import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
 import { useProwlarrIndexers } from "@/hooks/useProwlarrIndexers";
+
+type ProwlarrIndexerResource = components["schemas"]["IndexerResource"];
 
 const FILTER_ALL = "all";
 const FILTER_ENABLED = "enabled";
@@ -91,7 +88,6 @@ const ProwlarrIndexerListScreen = () => {
     serviceId?: string;
   }>();
   const serviceId = typeof rawServiceId === "string" ? rawServiceId : "";
-  const hasValidServiceId = serviceId.length > 0;
 
   const router = useRouter();
   const theme = useTheme<AppTheme>();
@@ -111,17 +107,17 @@ const ProwlarrIndexerListScreen = () => {
   // Indexer IDs are optional on the generated schema, allow undefined in the
   // selection set locally and filter when calling APIs that require numbers.
   const [selectedIds, setSelectedIds] = useState<Set<number | undefined>>(
-    new Set()
+    new Set(),
   );
   const multiSelectActive = selectedIds.size > 0;
   const [isAddDialogVisible, setIsAddDialogVisible] = useState(false);
   const [isAppsDialogVisible, setIsAppsDialogVisible] = useState(false);
   const [schemaOptions, setSchemaOptions] = useState<ProwlarrIndexerResource[]>(
-    []
+    [],
   );
   const [isSchemaLoading, setIsSchemaLoading] = useState(false);
   const [selectedSchemaIdx, setSelectedSchemaIdx] = useState<number | null>(
-    null
+    null,
   );
   const [syncStatus, setSyncStatus] = useState<{
     connectedApps: string[];
@@ -187,11 +183,11 @@ const ProwlarrIndexerListScreen = () => {
     // Apply filter
     if (selectedFilter === FILTER_ENABLED) {
       filtered = filtered.filter((indexer: ProwlarrIndexerResource) =>
-        Boolean(indexer.enable)
+        Boolean(indexer.enable),
       );
     } else if (selectedFilter === FILTER_DISABLED) {
       filtered = filtered.filter(
-        (indexer: ProwlarrIndexerResource) => !Boolean(indexer.enable)
+        (indexer: ProwlarrIndexerResource) => !Boolean(indexer.enable),
       );
     }
 
@@ -202,9 +198,11 @@ const ProwlarrIndexerListScreen = () => {
         (indexer: ProwlarrIndexerResource) =>
           normalizeSearchTerm(indexer.name ?? "").includes(searchTerm) ||
           normalizeSearchTerm(indexer.implementationName ?? "").includes(
-            searchTerm
+            searchTerm,
           ) ||
-          normalizeSearchTerm(indexer.implementation ?? "").includes(searchTerm)
+          normalizeSearchTerm(indexer.implementation ?? "").includes(
+            searchTerm,
+          ),
       );
     }
 
@@ -214,10 +212,10 @@ const ProwlarrIndexerListScreen = () => {
   // Handle indexer actions
   const handleToggleIndexer = useCallback(
     async (indexer: ProwlarrIndexerResource) => {
-      const success = await toggleIndexer(indexer);
+      await toggleIndexer(indexer);
       // Errors are surfaced via the API banner; no alert popup.
     },
-    [toggleIndexer]
+    [toggleIndexer],
   );
 
   const handleTestIndexer = useCallback(
@@ -225,7 +223,7 @@ const ProwlarrIndexerListScreen = () => {
       // Trigger test; any success/error is shown in the API banner.
       await testIndexer(indexer);
     },
-    [testIndexer]
+    [testIndexer],
   );
 
   const handleDeleteIndexer = useCallback(
@@ -248,10 +246,10 @@ const ProwlarrIndexerListScreen = () => {
               await deleteIndexer(indexer.id);
             },
           },
-        ]
+        ],
       );
     },
-    [deleteIndexer]
+    [deleteIndexer],
   );
 
   // Handle sync actions
@@ -263,7 +261,7 @@ const ProwlarrIndexerListScreen = () => {
     } else {
       alert("Error", "Failed to sync indexers");
     }
-  }, [syncIndexersToApps]);
+  }, [syncIndexersToApps, refreshSyncStatus]);
 
   const handleRescanIndexers = useCallback(async () => {
     const success = await rescanIndexers();
@@ -317,8 +315,8 @@ const ProwlarrIndexerListScreen = () => {
                   ? theme.colors.primary
                   : theme.colors.onSurfaceVariant
                 : item.enable
-                ? theme.colors.primary
-                : theme.colors.outline
+                  ? theme.colors.primary
+                  : theme.colors.outline
             }
           />
           <View style={styles.indexerInfo}>
@@ -697,7 +695,7 @@ const ProwlarrIndexerListScreen = () => {
         onDismiss={() => setBottomDrawer(null)}
         title={
           bottomDrawer?.type === "item"
-            ? bottomDrawer.item?.name ?? undefined
+            ? (bottomDrawer.item?.name ?? undefined)
             : "Filter"
         }
         maxHeight={"60%"}
@@ -790,7 +788,7 @@ const ProwlarrIndexerListScreen = () => {
                   onPress: async () => {
                     setIsFabMenuVisible(false);
                     const ids = Array.from(selectedIds).filter(
-                      (id): id is number => typeof id === "number"
+                      (id): id is number => typeof id === "number",
                     );
                     if (ids.length === 0) return;
                     await bulkEnableDisable(ids, true);
@@ -803,7 +801,7 @@ const ProwlarrIndexerListScreen = () => {
                   onPress: async () => {
                     setIsFabMenuVisible(false);
                     const ids = Array.from(selectedIds).filter(
-                      (id): id is number => typeof id === "number"
+                      (id): id is number => typeof id === "number",
                     );
                     if (ids.length === 0) return;
                     await bulkEnableDisable(ids, false);
@@ -816,7 +814,7 @@ const ProwlarrIndexerListScreen = () => {
                   onPress: async () => {
                     setIsFabMenuVisible(false);
                     const ids = Array.from(selectedIds).filter(
-                      (id): id is number => typeof id === "number"
+                      (id): id is number => typeof id === "number",
                     );
                     if (ids.length === 0) return;
                     await bulkDelete(ids);

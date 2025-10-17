@@ -1,6 +1,6 @@
-import { BaseConnector } from '@/connectors/base/BaseConnector';
-import type { SearchOptions } from '@/connectors/base/IConnector';
-import type { ServiceConfig } from '@/models/service.types';
+import { BaseConnector } from "@/connectors/base/BaseConnector";
+import type { SearchOptions } from "@/connectors/base/IConnector";
+import type { ServiceConfig } from "@/models/service.types";
 import type {
   JellyfinItem,
   JellyfinItemsResponse,
@@ -13,27 +13,27 @@ import type {
   JellyfinSession,
   JellyfinSearchHintResult,
   JellyfinSearchOptions,
-} from '@/models/jellyfin.types';
-import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
-import { logger } from '@/services/logger/LoggerService';
+} from "@/models/jellyfin.types";
+import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
+import { logger } from "@/services/logger/LoggerService";
 
-const DEFAULT_RESUME_TYPES = ['Movie', 'Episode'];
-const DEFAULT_SEARCH_TYPES = ['Movie', 'Series', 'Episode'];
+const DEFAULT_RESUME_TYPES = ["Movie", "Episode"];
+const DEFAULT_SEARCH_TYPES = ["Movie", "Series", "Episode"];
 const DEFAULT_ITEM_FIELDS = [
-  'PrimaryImageAspectRatio',
-  'Overview',
-  'ParentId',
-  'SeriesInfo',
-  'ProviderIds',
-  'Genres',
-  'Taglines',
-  'People',
-  'Studios',
-  'RunTimeTicks',
-  'PremiereDate',
-  'ProductionYear',
-  'OfficialRating',
-].join(',');
+  "PrimaryImageAspectRatio",
+  "Overview",
+  "ParentId",
+  "SeriesInfo",
+  "ProviderIds",
+  "Genres",
+  "Taglines",
+  "People",
+  "Studios",
+  "RunTimeTicks",
+  "PremiereDate",
+  "ProductionYear",
+  "OfficialRating",
+].join(",");
 
 export class JellyfinConnector extends BaseConnector<JellyfinItem> {
   private userId?: string;
@@ -69,7 +69,7 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     }
 
     await this.fetchServerInfo();
-    return this.serverVersion ?? 'Unknown';
+    return this.serverVersion ?? "Unknown";
   }
 
   async getLibraries(): Promise<JellyfinLibraryView[]> {
@@ -77,11 +77,14 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     const userId = await this.ensureUserId();
 
     try {
-      const response = await this.client.get<{ Items?: JellyfinLibraryView[] }>(`/Users/${userId}/Views`, {
-        params: {
-          IncludeHidden: false,
+      const response = await this.client.get<{ Items?: JellyfinLibraryView[] }>(
+        `/Users/${userId}/Views`,
+        {
+          params: {
+            IncludeHidden: false,
+          },
         },
-      });
+      );
 
       return response.data?.Items ?? [];
     } catch (error) {
@@ -89,48 +92,60 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     }
   }
 
-  async getResumeItems(limit = 20, includeTypes: string[] = DEFAULT_RESUME_TYPES): Promise<JellyfinResumeItem[]> {
+  async getResumeItems(
+    limit = 20,
+    includeTypes: string[] = DEFAULT_RESUME_TYPES,
+  ): Promise<JellyfinResumeItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
     const params: Record<string, unknown> = {
       UserId: userId,
       Limit: limit,
-      Fields: 'PrimaryImageAspectRatio,MediaSources,Overview,ParentId,SeriesInfo',
-      IncludeItemTypes: includeTypes.join(','),
+      Fields:
+        "PrimaryImageAspectRatio,MediaSources,Overview,ParentId,SeriesInfo",
+      IncludeItemTypes: includeTypes.join(","),
       EnableImages: true,
-      MediaTypes: 'Video',
+      MediaTypes: "Video",
     };
 
     try {
-      const response = await this.client.get<JellyfinItemsResponse<JellyfinResumeItem>>(
+      const response = await this.client.get<JellyfinItemsResponse>(
         `/Users/${userId}/Items/Resume`,
         { params },
       );
 
-      return Array.isArray(response.data?.Items) ? [...response.data.Items] : [];
+      return Array.isArray(response.data?.Items)
+        ? [...response.data.Items]
+        : [];
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
     }
   }
 
-  async getLatestItems(parentId: string, limit = 12): Promise<JellyfinLatestItem[]> {
+  async getLatestItems(
+    parentId: string,
+    limit = 12,
+  ): Promise<JellyfinLatestItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
     const params: Record<string, unknown> = {
       ParentId: parentId,
       Limit: limit,
-      Fields: 'PrimaryImageAspectRatio,Overview,ParentId,ProviderIds',
-      IncludeItemTypes: DEFAULT_RESUME_TYPES.join(','),
+      Fields: "PrimaryImageAspectRatio,Overview,ParentId,ProviderIds",
+      IncludeItemTypes: DEFAULT_RESUME_TYPES.join(","),
       EnableImages: true,
       UserId: userId,
     };
 
     try {
-      const response = await this.client.get<readonly JellyfinLatestItem[]>(`/Users/${userId}/Items/Latest`, {
-        params,
-      });
+      const response = await this.client.get<readonly JellyfinLatestItem[]>(
+        `/Users/${userId}/Items/Latest`,
+        {
+          params,
+        },
+      );
 
       return Array.isArray(response.data) ? [...response.data] : [];
     } catch (error) {
@@ -145,7 +160,7 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
       readonly includeItemTypes?: readonly string[];
       readonly mediaTypes?: readonly string[];
       readonly sortBy?: string;
-      readonly sortOrder?: 'Ascending' | 'Descending';
+      readonly sortOrder?: "Ascending" | "Descending";
       readonly limit?: number;
       readonly startIndex?: number;
     } = {},
@@ -158,11 +173,17 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
       Recursive: true,
       EnableImages: true,
       Fields: DEFAULT_ITEM_FIELDS,
-      SortBy: options.sortBy ?? 'SortName',
-      SortOrder: options.sortOrder ?? 'Ascending',
-      IncludeItemTypes: options.includeItemTypes?.length ? options.includeItemTypes.join(',') : undefined,
-      MediaTypes: options.mediaTypes?.length ? options.mediaTypes.join(',') : undefined,
-      SearchTerm: options.searchTerm?.trim().length ? options.searchTerm.trim() : undefined,
+      SortBy: options.sortBy ?? "SortName",
+      SortOrder: options.sortOrder ?? "Ascending",
+      IncludeItemTypes: options.includeItemTypes?.length
+        ? options.includeItemTypes.join(",")
+        : undefined,
+      MediaTypes: options.mediaTypes?.length
+        ? options.mediaTypes.join(",")
+        : undefined,
+      SearchTerm: options.searchTerm?.trim().length
+        ? options.searchTerm.trim()
+        : undefined,
       Limit: options.limit,
       StartIndex: options.startIndex,
     };
@@ -174,8 +195,13 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     });
 
     try {
-      const response = await this.client.get<JellyfinItemsResponse>(`/Users/${userId}/Items`, { params });
-      return Array.isArray(response.data?.Items) ? [...response.data.Items] : [];
+      const response = await this.client.get<JellyfinItemsResponse>(
+        `/Users/${userId}/Items`,
+        { params },
+      );
+      return Array.isArray(response.data?.Items)
+        ? [...response.data.Items]
+        : [];
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
     }
@@ -186,15 +212,18 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     const userId = await this.ensureUserId();
 
     try {
-      const response = await this.client.get<JellyfinItem>(`/Users/${userId}/Items/${itemId}`, {
-        params: {
-          Fields: DEFAULT_ITEM_FIELDS,
-          EnableImages: true,
+      const response = await this.client.get<JellyfinItem>(
+        `/Users/${userId}/Items/${itemId}`,
+        {
+          params: {
+            Fields: DEFAULT_ITEM_FIELDS,
+            EnableImages: true,
+          },
         },
-      });
+      );
 
       if (!response.data) {
-        throw new Error('Jellyfin did not return item details.');
+        throw new Error("Jellyfin did not return item details.");
       }
 
       return response.data;
@@ -203,7 +232,10 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     }
   }
 
-  async refreshItemMetadata(itemId: string, replaceAllMetadata = false): Promise<void> {
+  async refreshItemMetadata(
+    itemId: string,
+    replaceAllMetadata = false,
+  ): Promise<void> {
     await this.ensureAuthenticated();
 
     try {
@@ -218,7 +250,10 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     }
   }
 
-  async search(query: string, options?: SearchOptions): Promise<JellyfinItem[]> {
+  async search(
+    query: string,
+    options?: SearchOptions,
+  ): Promise<JellyfinItem[]> {
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
@@ -230,9 +265,10 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
       searchTerm: query,
       userId, // Optional. Supply a user id to search within a user's library
       limit,
-      startIndex: options?.pagination?.page && options.pagination.page > 1
-        ? (options.pagination.page - 1) * limit
-        : undefined,
+      startIndex:
+        options?.pagination?.page && options.pagination.page > 1
+          ? (options.pagination.page - 1) * limit
+          : undefined,
       includeItemTypes: DEFAULT_SEARCH_TYPES as any,
       includePeople: false,
       includeMedia: true,
@@ -250,24 +286,31 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     });
 
     try {
-      const response = await this.client.get<JellyfinSearchHintResult>(`/Search/Hints`, { params });
-      
+      const response = await this.client.get<JellyfinSearchHintResult>(
+        `/Search/Hints`,
+        { params },
+      );
+
       // Convert search hints back to JellyfinItem-like format for compatibility
       // SearchHint has limited info, so we map available fields and cast to JellyfinItem
-      const items: JellyfinItem[] = (response.data?.SearchHints ?? []).map((hint) => {
-        const item: Partial<JellyfinItem> = {
-          Id: hint.Id || hint.ItemId,
-          Name: hint.Name,
-          Type: hint.Type as any,
-          MediaType: hint.MediaType as any,
-          ProductionYear: hint.ProductionYear ?? undefined,
-          ImageTags: hint.PrimaryImageTag ? { Primary: hint.PrimaryImageTag } : undefined,
-          RunTimeTicks: hint.RunTimeTicks ?? undefined,
-          // SearchHint doesn't include ProviderIds, Overview, or Genres
-          // These will be undefined but that's acceptable for search results
-        };
-        return item as JellyfinItem;
-      });
+      const items: JellyfinItem[] = (response.data?.SearchHints ?? []).map(
+        (hint) => {
+          const item: Partial<JellyfinItem> = {
+            Id: hint.Id || hint.ItemId,
+            Name: hint.Name,
+            Type: hint.Type as any,
+            MediaType: hint.MediaType as any,
+            ProductionYear: hint.ProductionYear ?? undefined,
+            ImageTags: hint.PrimaryImageTag
+              ? { Primary: hint.PrimaryImageTag }
+              : undefined,
+            RunTimeTicks: hint.RunTimeTicks ?? undefined,
+            // SearchHint doesn't include ProviderIds, Overview, or Genres
+            // These will be undefined but that's acceptable for search results
+          };
+          return item as JellyfinItem;
+        },
+      );
 
       return items;
     } catch (error) {
@@ -275,45 +318,56 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     }
   }
 
-  getImageUrl(itemId: string, imageType: 'Primary' | 'Backdrop' | 'Thumb' = 'Primary', options: JellyfinImageOptions = {}): string {
+  getImageUrl(
+    itemId: string,
+    imageType: "Primary" | "Backdrop" | "Thumb" = "Primary",
+    options: JellyfinImageOptions = {},
+  ): string {
     const base = this.getBaseUrl();
     const params = new URLSearchParams();
 
-    if (options.tag) params.append('tag', options.tag);
-    if (options.width) params.append('width', String(options.width));
-    if (options.height) params.append('height', String(options.height));
-    if (options.quality) params.append('quality', String(options.quality));
-    if (options.fillWidth) params.append('fillWidth', String(options.fillWidth));
-    if (options.fillHeight) params.append('fillHeight', String(options.fillHeight));
-    if (options.blur) params.append('blur', String(options.blur));
+    if (options.tag) params.append("tag", options.tag);
+    if (options.width) params.append("width", String(options.width));
+    if (options.height) params.append("height", String(options.height));
+    if (options.quality) params.append("quality", String(options.quality));
+    if (options.fillWidth)
+      params.append("fillWidth", String(options.fillWidth));
+    if (options.fillHeight)
+      params.append("fillHeight", String(options.fillHeight));
+    if (options.blur) params.append("blur", String(options.blur));
 
     const query = params.toString();
-    return `${base}/Items/${itemId}/Images/${imageType}${query.length ? `?${query}` : ''}`;
+    return `${base}/Items/${itemId}/Images/${imageType}${query.length ? `?${query}` : ""}`;
   }
 
-  getPersonImageUrl(personId: string, tag?: string, options: JellyfinImageOptions = {}): string {
+  getPersonImageUrl(
+    personId: string,
+    tag?: string,
+    options: JellyfinImageOptions = {},
+  ): string {
     // The OpenAPI spec exposes person images at: /Persons/{name}/Images/{imageType}
     // Clients may supply a person name or identifier. Ensure the identifier
     // is URL-encoded so names with spaces or special characters are valid.
     const base = this.getBaseUrl();
     const params = new URLSearchParams();
 
-    if (tag) params.append('tag', tag);
-    if (options.width) params.append('width', String(options.width));
-    if (options.height) params.append('height', String(options.height));
-    if (options.quality) params.append('quality', String(options.quality));
-    if (options.fillWidth) params.append('fillWidth', String(options.fillWidth));
-    if (options.fillHeight) params.append('fillHeight', String(options.fillHeight));
-    if (options.blur) params.append('blur', String(options.blur));
+    if (tag) params.append("tag", tag);
+    if (options.width) params.append("width", String(options.width));
+    if (options.height) params.append("height", String(options.height));
+    if (options.quality) params.append("quality", String(options.quality));
+    if (options.fillWidth)
+      params.append("fillWidth", String(options.fillWidth));
+    if (options.fillHeight)
+      params.append("fillHeight", String(options.fillHeight));
+    if (options.blur) params.append("blur", String(options.blur));
 
     const query = params.toString();
     const encodedPerson = encodeURIComponent(personId);
-    return `${base}/Persons/${encodedPerson}/Images/Primary${query.length ? `?${query}` : ''}`;
+    return `${base}/Persons/${encodedPerson}/Images/Primary${query.length ? `?${query}` : ""}`;
   }
 
   async getNowPlayingSessions(): Promise<JellyfinSession[]> {
     await this.ensureAuthenticated();
-    const userId = await this.ensureUserId();
 
     try {
       // Request recent sessions from the server. Previously we filtered by
@@ -322,13 +376,16 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
       // excluded by the server. Instead, request sessions in general and
       // perform client-side filtering to include sessions that belong to the
       // current user (or list them as active).
-      const response = await this.client.get<readonly JellyfinSession[]>('/Sessions', {
-        params: {
-          ActiveWithinSeconds: 600,
-          EnableImages: true,
-          Fields: DEFAULT_ITEM_FIELDS,
+      const response = await this.client.get<readonly JellyfinSession[]>(
+        "/Sessions",
+        {
+          params: {
+            ActiveWithinSeconds: 600,
+            EnableImages: true,
+            Fields: DEFAULT_ITEM_FIELDS,
+          },
         },
-      });
+      );
 
       if (!Array.isArray(response.data)) {
         return [];
@@ -343,7 +400,6 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
       // stable across refetches and avoids transient "Nothing is playing"
       // UX when the server omits certain filters).
       return response.data.map((session) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const s = { ...session } as any;
         if (!s.NowPlayingItem && s.NowViewingItem) {
           s.NowPlayingItem = s.NowViewingItem;
@@ -357,8 +413,20 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
 
   async sendPlaystateCommand(
     sessionId: string,
-    command: 'Stop' | 'Pause' | 'Unpause' | 'NextTrack' | 'PreviousTrack' | 'Seek' | 'Rewind' | 'FastForward' | 'PlayPause',
-    options: { readonly seekPositionTicks?: number; readonly controllingUserId?: string } = {},
+    command:
+      | "Stop"
+      | "Pause"
+      | "Unpause"
+      | "NextTrack"
+      | "PreviousTrack"
+      | "Seek"
+      | "Rewind"
+      | "FastForward"
+      | "PlayPause",
+    options: {
+      readonly seekPositionTicks?: number;
+      readonly controllingUserId?: string;
+    } = {},
   ): Promise<void> {
     await this.ensureAuthenticated();
 
@@ -371,7 +439,11 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     }
 
     try {
-      await this.client.post(`/Sessions/${sessionId}/Playing/${command}`, undefined, { params });
+      await this.client.post(
+        `/Sessions/${sessionId}/Playing/${command}`,
+        undefined,
+        { params },
+      );
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
     }
@@ -384,7 +456,7 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
 
     try {
       await this.client.post(`/Sessions/${sessionId}/Command`, {
-        Name: 'SetVolume',
+        Name: "SetVolume",
         Arguments: {
           Volume: String(clamped),
         },
@@ -403,11 +475,11 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
 
     const context = session?.context ?? {};
 
-    if (typeof context.userId === 'string' && context.userId.length > 0) {
+    if (typeof context.userId === "string" && context.userId.length > 0) {
       this.userId = context.userId;
     }
 
-    if (typeof context.userName === 'string' && context.userName.length > 0) {
+    if (typeof context.userName === "string" && context.userName.length > 0) {
       this.userName = context.userName;
     }
 
@@ -415,7 +487,7 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
       const profile = await this.fetchCurrentUser();
       if (profile?.Id) {
         this.userId = profile.Id;
-        if (typeof profile.Name === 'string' && profile.Name.length > 0) {
+        if (typeof profile.Name === "string" && profile.Name.length > 0) {
           this.userName = profile.Name;
         }
       }
@@ -424,13 +496,20 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
 
   private async fetchServerInfo(): Promise<void> {
     try {
-  const response = await this.client.get<JellyfinServerInfo>('/System/Info/Public');
-  // ProductVersion may be present under different keys depending on server; coerce nulls to undefined
-  const productVersion = (response.data as any)?.ProductVersion ?? undefined;
-  this.serverVersion = response.data?.Version ?? productVersion ?? this.serverVersion;
-      this.serverName = response.data?.ServerName ?? response.data?.ProductName ?? this.serverName;
+      const response = await this.client.get<JellyfinServerInfo>(
+        "/System/Info/Public",
+      );
+      // ProductVersion may be present under different keys depending on server; coerce nulls to undefined
+      const productVersion =
+        (response.data as any)?.ProductVersion ?? undefined;
+      this.serverVersion =
+        response.data?.Version ?? productVersion ?? this.serverVersion;
+      this.serverName =
+        response.data?.ServerName ??
+        response.data?.ProductName ??
+        this.serverName;
     } catch (error) {
-      void logger.debug('Failed to fetch Jellyfin server info.', {
+      void logger.debug("Failed to fetch Jellyfin server info.", {
         serviceId: this.config.id,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -439,15 +518,15 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
 
   private async fetchCurrentUser(): Promise<JellyfinUserProfile | undefined> {
     try {
-      const response = await this.client.get<JellyfinUserProfile>('/Users/Me', {
+      const response = await this.client.get<JellyfinUserProfile>("/Users/Me", {
         params: {
-          Fields: 'PrimaryImageAspectRatio',
+          Fields: "PrimaryImageAspectRatio",
         },
       });
 
       return response.data;
     } catch (error) {
-      void logger.debug('Failed to fetch Jellyfin user profile.', {
+      void logger.debug("Failed to fetch Jellyfin user profile.", {
         serviceId: this.config.id,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -463,19 +542,21 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     await this.bootstrapUserContext();
 
     if (!this.userId) {
-      throw new Error('Unable to resolve Jellyfin user context. Re-authenticate and try again.');
+      throw new Error(
+        "Unable to resolve Jellyfin user context. Re-authenticate and try again.",
+      );
     }
 
     return this.userId;
   }
 
   private getBaseUrl(): string {
-    return this.config.url.replace(/\/$/, '');
+    return this.config.url.replace(/\/$/, "");
   }
 
   protected override getDefaultHeaders(): Record<string, string> {
     const headers = super.getDefaultHeaders();
-    delete headers['X-Api-Key'];
+    delete headers["X-Api-Key"];
     const authHeaders = ServiceAuthHelper.getServiceAuthHeaders(this.config);
     return {
       ...headers,
@@ -483,7 +564,9 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
     };
   }
 
-  protected override getAuthConfig(): { auth?: { username: string; password: string } } {
+  protected override getAuthConfig(): {
+    auth?: { username: string; password: string };
+  } {
     // Jellyfin manages authentication via tokens, so no basic auth configuration is required here.
     return {};
   }

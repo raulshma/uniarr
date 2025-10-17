@@ -1,15 +1,15 @@
-import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
-import { Button, Text, useTheme, IconButton } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { Dimensions, StyleSheet, View } from "react-native";
+import { Button, Text, useTheme, IconButton } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { type AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
+import { type AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 
 type OnboardingStep = {
   id: string;
@@ -22,36 +22,40 @@ type OnboardingStep = {
 
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
-    id: 'welcome',
-    title: 'Welcome to UniArr',
-    subtitle: 'Your Media Management Hub',
-    description: 'Manage all your media servers in one place with a beautiful, intuitive interface.',
-    icon: 'view-dashboard',
-    backgroundColor: '#F5E6A3',
+    id: "welcome",
+    title: "Welcome to UniArr",
+    subtitle: "Your Media Management Hub",
+    description:
+      "Manage all your media servers in one place with a beautiful, intuitive interface.",
+    icon: "view-dashboard",
+    backgroundColor: "#F5E6A3",
   },
   {
-    id: 'services',
-    title: 'Connect Your Services',
-    subtitle: 'Sonarr • Radarr • qBittorrent',
-    description: 'Easily connect and monitor your favorite media management tools from a single dashboard.',
-    icon: 'connection',
-    backgroundColor: '#DDE8C8',
+    id: "services",
+    title: "Connect Your Services",
+    subtitle: "Sonarr • Radarr • qBittorrent",
+    description:
+      "Easily connect and monitor your favorite media management tools from a single dashboard.",
+    icon: "connection",
+    backgroundColor: "#DDE8C8",
   },
   {
-    id: 'monitor',
-    title: 'Monitor Everything',
-    subtitle: 'Real-time Status Updates',
-    description: 'Keep track of downloads, recently added content, and service health all in real-time.',
-    icon: 'monitor-dashboard',
-    backgroundColor: '#F2E5D4',
+    id: "monitor",
+    title: "Monitor Everything",
+    subtitle: "Real-time Status Updates",
+    description:
+      "Keep track of downloads, recently added content, and service health all in real-time.",
+    icon: "monitor-dashboard",
+    backgroundColor: "#F2E5D4",
   },
   {
-    id: 'organize',
-    title: 'Stay Organized',
-    subtitle: 'Everything in One Place',
-    description: 'No more switching between multiple apps. UniArr brings everything together for you.',
-    icon: 'folder-multiple',
-    backgroundColor: '#E8E2D4',
+    id: "organize",
+    title: "Stay Organized",
+    subtitle: "Everything in One Place",
+    description:
+      "No more switching between multiple apps. UniArr brings everything together for you.",
+    icon: "folder-multiple",
+    backgroundColor: "#E8E2D4",
   },
 ];
 
@@ -72,25 +76,25 @@ const OnboardingScreen = () => {
         },
         content: {
           flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.xl,
         },
         stepContainer: {
           width: screenWidth,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           paddingHorizontal: spacing.lg,
         },
         iconContainer: {
           width: 120,
           height: 120,
           borderRadius: 60,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           marginBottom: spacing.xl,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: {
             width: 0,
             height: 4,
@@ -98,30 +102,30 @@ const OnboardingScreen = () => {
           shadowOpacity: 0.1,
           shadowRadius: 8,
           elevation: 8,
-          backgroundColor: 'transparent',
+          backgroundColor: "transparent",
         },
         title: {
           color: theme.colors.onBackground,
-          textAlign: 'center',
+          textAlign: "center",
           marginBottom: spacing.sm,
           lineHeight: 36,
         },
         subtitle: {
           color: theme.colors.primary,
-          textAlign: 'center',
+          textAlign: "center",
           marginBottom: spacing.md,
         },
         description: {
           color: theme.colors.onSurfaceVariant,
-          textAlign: 'center',
+          textAlign: "center",
           lineHeight: 24,
           marginBottom: spacing.xl,
           maxWidth: 280,
         },
         pagination: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
           marginBottom: spacing.xl,
           gap: spacing.sm,
         },
@@ -136,10 +140,10 @@ const OnboardingScreen = () => {
           width: 24,
         },
         buttonContainer: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
           maxWidth: 280,
           gap: spacing.md,
         },
@@ -159,13 +163,22 @@ const OnboardingScreen = () => {
     [theme],
   );
 
+  const handleComplete = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem("onboarding_completed", "true");
+    } catch (error) {
+      console.error("Error saving onboarding completion status:", error);
+    }
+    router.replace("/login");
+  }, [router]);
+
   const handleNext = useCallback(() => {
     if (currentStep < ONBOARDING_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       handleComplete();
     }
-  }, [currentStep]);
+  }, [currentStep, handleComplete]);
 
   const handlePrevious = useCallback(() => {
     if (currentStep > 0) {
@@ -173,22 +186,13 @@ const OnboardingScreen = () => {
     }
   }, [currentStep]);
 
-  const handleComplete = useCallback(async () => {
-    try {
-      await AsyncStorage.setItem('onboarding_completed', 'true');
-    } catch (error) {
-      console.error('Error saving onboarding completion status:', error);
-    }
-    router.replace('/login');
-  }, [router]);
-
   const handleSkip = useCallback(async () => {
     try {
-      await AsyncStorage.setItem('onboarding_completed', 'true');
+      await AsyncStorage.setItem("onboarding_completed", "true");
     } catch (error) {
-      console.error('Error saving onboarding completion status:', error);
+      console.error("Error saving onboarding completion status:", error);
     }
-    router.replace('/login');
+    router.replace("/login");
   }, [router]);
 
   const currentStepData = ONBOARDING_STEPS[currentStep];
@@ -198,11 +202,14 @@ const OnboardingScreen = () => {
       <View
         style={[
           styles.iconContainer,
-          { backgroundColor: currentStepData?.backgroundColor || theme.colors.primaryContainer },
+          {
+            backgroundColor:
+              currentStepData?.backgroundColor || theme.colors.primaryContainer,
+          },
         ]}
       >
         <IconButton
-          icon={currentStepData?.icon || 'view-dashboard'}
+          icon={currentStepData?.icon || "view-dashboard"}
           size={48}
           iconColor={theme.colors.primary}
         />
@@ -224,7 +231,7 @@ const OnboardingScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style={theme.dark ? 'light' : 'dark'} />
+      <StatusBar style={theme.dark ? "light" : "dark"} />
 
       <View style={styles.scrollView}>
         <View style={styles.content}>
@@ -259,7 +266,9 @@ const OnboardingScreen = () => {
               onPress={handleNext}
               style={[styles.button, styles.primaryButton]}
             >
-              {currentStep === ONBOARDING_STEPS.length - 1 ? 'Get Started' : 'Next'}
+              {currentStep === ONBOARDING_STEPS.length - 1
+                ? "Get Started"
+                : "Next"}
             </Button>
           </View>
 

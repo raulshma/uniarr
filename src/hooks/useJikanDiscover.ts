@@ -1,6 +1,10 @@
 import { useMemo, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { JikanClient, subscribeJikanThrottle, isJikanThrottled } from "@/services/jikan/JikanClient";
+import {
+  JikanClient,
+  subscribeJikanThrottle,
+  isJikanThrottled,
+} from "@/services/jikan/JikanClient";
 import type { JikanAnime } from "@/models/jikan.types";
 import { queryKeys } from "@/hooks/queryKeys";
 
@@ -65,8 +69,8 @@ export const useJikanTopAnime = ({
       const list = Array.isArray(d?.data)
         ? (d!.data as unknown[]).map((i) => i as JikanAnime)
         : d
-        ? [d as unknown as JikanAnime]
-        : [];
+          ? [d as unknown as JikanAnime]
+          : [];
       const mapped = list.map(mapAnime);
       return uniqueById(mapped);
     },
@@ -92,8 +96,8 @@ export const useJikanRecommendations = ({
       const list = Array.isArray(d?.data)
         ? (d!.data as unknown[])
         : d
-        ? [d as unknown]
-        : [];
+          ? [d as unknown]
+          : [];
       // recommendations endpoints return a different shape; try to locate the anime object
       const mapped = list
         .map((r) => {
@@ -154,15 +158,15 @@ export const useJikanRecommendations = ({
                 typeof aRec.from === "string"
                   ? (aRec.from as string)
                   : typeof aRec.start_date === "string"
-                  ? (aRec.start_date as string)
-                  : undefined
+                    ? (aRec.start_date as string)
+                    : undefined
               ) as string | null | undefined;
               const to = (
                 typeof aRec.to === "string"
                   ? (aRec.to as string)
                   : typeof aRec.end_date === "string"
-                  ? (aRec.end_date as string)
-                  : undefined
+                    ? (aRec.end_date as string)
+                    : undefined
               ) as string | null | undefined;
               return { from: from ?? null, to: to ?? null };
             })(),
@@ -189,8 +193,8 @@ export const useJikanSeasonNow = ({ enabled = true }: { enabled?: boolean }) =>
       const list = Array.isArray(d?.data)
         ? (d!.data as unknown[]).map((i) => i as JikanAnime)
         : d
-        ? [d as unknown as JikanAnime]
-        : [];
+          ? [d as unknown as JikanAnime]
+          : [];
       const mapped = list.map(mapAnime);
       return uniqueById(mapped);
     },
@@ -214,8 +218,8 @@ export const useJikanSeasonUpcoming = ({
       const list = Array.isArray(d?.data)
         ? (d!.data as unknown[]).map((i) => i as JikanAnime)
         : d
-        ? [d as unknown as JikanAnime]
-        : [];
+          ? [d as unknown as JikanAnime]
+          : [];
       const mapped = list.map(mapAnime);
       return uniqueById(mapped);
     },
@@ -230,7 +234,9 @@ export const useJikanDiscover = () => {
   const now = useJikanSeasonNow({});
   const upcoming = useJikanSeasonUpcoming({});
 
-  const [isThrottled, setIsThrottled] = useState<boolean>(() => isJikanThrottled());
+  const [isThrottled, setIsThrottled] = useState<boolean>(() =>
+    isJikanThrottled(),
+  );
 
   useEffect(() => {
     const unsub = subscribeJikanThrottle((v) => setIsThrottled(v));
@@ -248,12 +254,12 @@ export const useJikanDiscover = () => {
       recommendations.isLoading,
       now.isLoading,
       upcoming.isLoading,
-    ]
+    ],
   );
   const isError = useMemo(
     () =>
       top.isError || recommendations.isError || now.isError || upcoming.isError,
-    [top.isError, recommendations.isError, now.isError, upcoming.isError]
+    [top.isError, recommendations.isError, now.isError, upcoming.isError],
   );
 
   return {

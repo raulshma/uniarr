@@ -13,7 +13,7 @@ import { Button } from "@/components/common/Button";
 import { alert } from "@/services/dialogService";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
-import useJellyseerrMediaCredits from "@/hooks/useJellyseerrMediaCredits";
+import { useJellyseerrMediaCredits } from "@/hooks/useJellyseerrMediaCredits";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 import type { AppTheme } from "@/constants/theme";
 import { buildProfileUrl } from "@/utils/tmdb.utils";
@@ -39,10 +39,11 @@ const DiscoverItemDetails = () => {
 
     // If not found, try to find by TMDB ID or source ID
     for (const section of sections) {
-      const found = section.items.find((i) =>
-        (i.tmdbId && `movie-${i.tmdbId}` === id) ||
-        (i.tmdbId && `series-${i.tmdbId}` === id) ||
-        (i.sourceId && `${i.mediaType}-${i.sourceId}` === id)
+      const found = section.items.find(
+        (i) =>
+          (i.tmdbId && `movie-${i.tmdbId}` === id) ||
+          (i.tmdbId && `series-${i.tmdbId}` === id) ||
+          (i.sourceId && `${i.mediaType}-${i.sourceId}` === id),
       );
       if (found) return found;
     }
@@ -63,7 +64,7 @@ const DiscoverItemDetails = () => {
         "No services available",
         `Add a ${
           item.mediaType === "series" ? "Sonarr" : "Radarr"
-        } service first to add this title.`
+        } service first to add this title.`,
       );
       return;
     }
@@ -94,22 +95,8 @@ const DiscoverItemDetails = () => {
     (relatedId: string) => {
       router.push(`/(auth)/discover/${relatedId}`);
     },
-    [router]
+    [router],
   );
-
-  if (!item) {
-    return (
-      <SafeAreaView
-        style={{ flex: 1, backgroundColor: theme.colors.background }}
-      >
-        <View style={{ padding: spacing.lg }}>
-          <Text variant="titleLarge" style={{ color: theme.colors.onSurface }}>
-            Item not found
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   const styles = useMemo(
     () =>
@@ -125,8 +112,22 @@ const DiscoverItemDetails = () => {
         },
         addButton: { marginVertical: spacing.lg },
       }),
-    [theme]
+    [theme.colors.background],
   );
+
+  if (!item) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: theme.colors.background }}
+      >
+        <View style={{ padding: spacing.lg }}>
+          <Text variant="titleLarge" style={{ color: theme.colors.onSurface }}>
+            Item not found
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
@@ -242,7 +243,9 @@ const DiscoverItemDetails = () => {
 
 export default DiscoverItemDetails;
 
-  const CastRow: React.FC<{ item: import("@/models/discover.types").DiscoverMediaItem }> = ({ item }) => {
+const CastRow: React.FC<{
+  item: import("@/models/discover.types").DiscoverMediaItem;
+}> = ({ item }) => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
 
@@ -251,28 +254,45 @@ export default DiscoverItemDetails;
   const MAX_VISIBLE = 5; // show up to 5 avatars, then a +N badge
   const OVERLAP = Math.round(AVATAR_SIZE * 0.35);
 
+  // Fetch credits from Jellyseerr for Jellyseerr items
+  const jellyseerrCreditsQuery = useJellyseerrMediaCredits(
+    item.sourceServiceId!,
+    item.mediaType === "series" ? "tv" : "movie",
+    item.sourceId!,
+  );
+
+  // Fetch credits from TMDB for TMDB items
+  const tmdbDetailsQuery = useTmdbDetails(
+    item.mediaType === "series" ? "tv" : "movie",
+    item.tmdbId!,
+    { enabled: item.source === "tmdb" && !!item.tmdbId },
+  );
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        row: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
-        avatars: { flexDirection: 'row', alignItems: 'center' },
-        avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, overflow: 'hidden' },
-        moreBadge: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, alignItems: 'center', justifyContent: 'center' },
+        row: {
+          flexDirection: "row",
+          alignItems: "center",
+          marginBottom: spacing.lg,
+        },
+        avatars: { flexDirection: "row", alignItems: "center" },
+        avatar: {
+          width: AVATAR_SIZE,
+          height: AVATAR_SIZE,
+          borderRadius: AVATAR_SIZE / 2,
+          overflow: "hidden",
+        },
+        moreBadge: {
+          width: AVATAR_SIZE,
+          height: AVATAR_SIZE,
+          borderRadius: AVATAR_SIZE / 2,
+          alignItems: "center",
+          justifyContent: "center",
+        },
       }),
-    [theme],
+    [],
   );
-
-  // Fetch credits from Jellyseerr for Jellyseerr items
-  const shouldFetchJellyseerrCredits = item.source === 'jellyseerr' && item.sourceServiceId && item.sourceId;
-  const jellyseerrCreditsQuery = shouldFetchJellyseerrCredits
-    ? useJellyseerrMediaCredits(item.sourceServiceId!, item.mediaType === 'series' ? 'tv' : 'movie', item.sourceId!)
-    : undefined;
-
-  // Fetch credits from TMDB for TMDB items
-  const shouldFetchTmdbCredits = item.source === 'tmdb' && item.tmdbId;
-  const tmdbDetailsQuery = shouldFetchTmdbCredits
-    ? useTmdbDetails(item.mediaType === 'series' ? 'tv' : 'movie', item.tmdbId!, { enabled: true })
-    : undefined;
 
   // Map TMDB cast data to match Jellyseerr structure for consistent rendering
   const tmdbCast = useMemo(() => {
@@ -283,31 +303,50 @@ export default DiscoverItemDetails;
 
     return rawCast.slice(0, MAX_VISIBLE).map((person) => ({
       id: person.id,
-      name: typeof person.name === "string" ? person.name : person.original_name ?? "Unknown",
-      profilePath: typeof person.profile_path === "string" ? person.profile_path : undefined,
+      name:
+        typeof person.name === "string"
+          ? person.name
+          : (person.original_name ?? "Unknown"),
+      profilePath:
+        typeof person.profile_path === "string"
+          ? person.profile_path
+          : undefined,
     }));
   }, [tmdbDetailsQuery?.data?.credits?.cast]);
 
   // Use either Jellyseerr or TMDB cast data
-  const cast = jellyseerrCreditsQuery?.data ?? tmdbCast ?? [];
+  const shouldFetchJellyseerrCredits =
+    item.source === "jellyseerr" && item.sourceServiceId && item.sourceId;
+  const cast = shouldFetchJellyseerrCredits
+    ? (jellyseerrCreditsQuery?.data ?? [])
+    : (tmdbCast ?? []);
 
   const openPersonDetails = (personId?: number, name?: string) => {
     if (personId) {
-      router.push({ pathname: '/(auth)/person/[personId]', params: { personId: String(personId) } });
+      router.push({
+        pathname: "/(auth)/person/[personId]",
+        params: { personId: String(personId) },
+      });
     } else if (name) {
       // Fallback to search if no person ID is available
-      router.push({ pathname: '/(auth)/search', params: { query: name } });
+      router.push({ pathname: "/(auth)/search", params: { query: name } });
     }
   };
 
   if (!cast.length) {
     return (
       <View style={styles.row}>
-        <Text variant="titleMedium" style={{ color: theme.colors.onSurface, fontWeight: '700' }}>
+        <Text
+          variant="titleMedium"
+          style={{ color: theme.colors.onSurface, fontWeight: "700" }}
+        >
           Cast
         </Text>
         <View style={{ flex: 1 }} />
-        <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+        <Text
+          variant="bodyMedium"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
           No cast information
         </Text>
       </View>
@@ -319,7 +358,10 @@ export default DiscoverItemDetails;
 
   return (
     <View style={styles.row}>
-      <Text variant="titleMedium" style={{ color: theme.colors.onSurface, fontWeight: '700' }}>
+      <Text
+        variant="titleMedium"
+        style={{ color: theme.colors.onSurface, fontWeight: "700" }}
+      >
         Cast
       </Text>
       <View style={{ flex: 1 }} />
@@ -329,7 +371,11 @@ export default DiscoverItemDetails;
           <Pressable
             key={String(person.id ?? person.name ?? idx)}
             accessibilityRole="button"
-            accessibilityLabel={person.name ? `View details for ${person.name}` : 'View cast member details'}
+            accessibilityLabel={
+              person.name
+                ? `View details for ${person.name}`
+                : "View cast member details"
+            }
             onPress={() => openPersonDetails(person.id, person.name)}
             style={{ marginLeft: idx === 0 ? 0 : -OVERLAP, zIndex: idx + 1 }}
           >
@@ -359,7 +405,11 @@ export default DiscoverItemDetails;
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`View ${extras} more cast members`}
-            onPress={() => router.push(`/(auth)/search?query=${encodeURIComponent(item.title)}`)}
+            onPress={() =>
+              router.push(
+                `/(auth)/search?query=${encodeURIComponent(item.title)}`,
+              )
+            }
             style={{ marginLeft: -OVERLAP, zIndex: visibleCast.length + 1 }}
           >
             <View
@@ -377,7 +427,10 @@ export default DiscoverItemDetails;
                 },
               ]}
             >
-              <Text variant="labelLarge" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+              <Text
+                variant="labelLarge"
+                style={{ color: theme.colors.primary, fontWeight: "700" }}
+              >
                 {`+${extras}`}
               </Text>
             </View>

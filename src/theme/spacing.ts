@@ -1,4 +1,4 @@
-export type DensityMode = 'compact' | 'comfortable' | 'spacious';
+export type DensityMode = "compact" | "comfortable" | "spacious";
 
 export const spacing = {
   none: 0,
@@ -19,7 +19,9 @@ export type SpacingScale = typeof spacing;
 /**
  * Generate spacing scale with density mode adjustments
  */
-export const generateSpacingScale = (density: DensityMode = 'comfortable'): SpacingScale => {
+export const generateSpacingScale = (
+  density: DensityMode = "comfortable",
+): SpacingScale => {
   const densityFactors = {
     compact: 0.75,
     comfortable: 1.0,

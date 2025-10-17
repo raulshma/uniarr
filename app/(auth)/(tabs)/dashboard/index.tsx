@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, View, Dimensions } from "react-native";
-import type { ViewStyle } from 'react-native';
+import React, { useCallback, useMemo, useState } from "react";
+import { StyleSheet, View, Dimensions, TouchableOpacity } from "react-native";
+import type { ViewStyle } from "react-native";
 import { Text, useTheme, IconButton, Modal, Portal } from "react-native-paper";
-import { TouchableOpacity } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 
@@ -17,14 +17,10 @@ import {
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
-import {
-  SkeletonPlaceholder,
-} from "@/components/common/Skeleton";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 // Unified search has been moved to its own page. Navigate to the search route from the dashboard.
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
-import React from "react";
-
 
 type StatisticsData = {
   shows: number;
@@ -45,7 +41,7 @@ type RecentActivityItem = {
 type ContinueWatchingItem = {
   id: string;
   title: string;
-  type: 'movie' | 'episode';
+  type: "movie" | "episode";
   show?: string;
   season?: number;
   episode?: number;
@@ -71,7 +67,7 @@ type TrendingTVItem = {
 type UpcomingReleaseItem = {
   id: string;
   title: string;
-  type: 'movie' | 'episode';
+  type: "movie" | "episode";
   releaseDate: string;
   posterUri?: string;
   show?: string;
@@ -96,47 +92,11 @@ type DashboardListItem =
   | { type: "activity" }
   | { type: "empty" };
 
+// Note: relative time formatting is provided by components where needed.
 
-
-const formatRelativeTime = (input?: Date): string | undefined => {
-  if (!input) {
-    return undefined;
-  }
-
-  const diffMs = Date.now() - input.getTime();
-  if (diffMs < 0) {
-    return "Just now";
-  }
-
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) {
-    return "Just now";
-  }
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-
-  const days = Math.floor(hours / 24);
-  if (days < 7) {
-    return `${days}d ago`;
-  }
-
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) {
-    return `${weeks}w ago`;
-  }
-
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-};
-
-
-const fetchStatistics = async (filter: 'all' | 'recent' | 'month' = 'all'): Promise<StatisticsData> => {
+const fetchStatistics = async (
+  filter: "all" | "recent" | "month" = "all",
+): Promise<StatisticsData> => {
   // Since we removed services functionality, return placeholder statistics
   // This could be enhanced later to fetch from a local database or other sources
   return {
@@ -159,12 +119,7 @@ const fetchContinueWatching = async (): Promise<ContinueWatchingItem[]> => {
   return [];
 };
 
-// Helper function to calculate progress percentage
-const calculateProgress = (positionTicks?: number, totalTicks?: number): number => {
-  if (!positionTicks || !totalTicks) return 0;
-  const progress = (positionTicks / totalTicks) * 100;
-  return Math.round(Math.min(Math.max(progress, 0), 100));
-};
+// progress calculation is handled inline where used
 
 const fetchTrendingTV = async (): Promise<TrendingTVItem[]> => {
   // Since we removed services functionality, return empty array
@@ -182,7 +137,9 @@ const DashboardScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const [filterVisible, setFilterVisible] = useState(false);
-  const [statsFilter, setStatsFilter] = useState<'all' | 'recent' | 'month'>('all');
+  const [statsFilter, setStatsFilter] = useState<"all" | "recent" | "month">(
+    "all",
+  );
 
   const { data: statisticsData, refetch: refetchStatistics } = useQuery({
     queryKey: ["statistics", statsFilter],
@@ -198,15 +155,16 @@ const DashboardScreen = () => {
     staleTime: 10 * 60 * 1000, // 10 minutes - activity doesn't need real-time
   });
 
-  const { data: continueWatchingData, isLoading: isLoadingContinueWatching } = useQuery({
-    queryKey: ["continue-watching"],
-    queryFn: fetchContinueWatching,
-    refetchInterval: false,
-    staleTime: 10 * 60 * 1000, // 10 minutes - cache continue watching
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    enabled: true,
-  });
+  const { data: continueWatchingData, isLoading: isLoadingContinueWatching } =
+    useQuery({
+      queryKey: ["continue-watching"],
+      queryFn: fetchContinueWatching,
+      refetchInterval: false,
+      staleTime: 10 * 60 * 1000, // 10 minutes - cache continue watching
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      enabled: true,
+    });
 
   const { data: trendingTVData, isLoading: isLoadingTrendingTV } = useQuery({
     queryKey: ["trending-tv"],
@@ -218,19 +176,23 @@ const DashboardScreen = () => {
     enabled: true,
   });
 
-  const { data: upcomingReleasesData, isLoading: isLoadingUpcomingReleases } = useQuery({
-    queryKey: ["upcoming-releases"],
-    queryFn: fetchUpcomingReleases,
-    refetchInterval: false,
-    staleTime: 15 * 60 * 1000, // 15 minutes - upcoming releases don't change often
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    enabled: true,
-  });
+  const { data: upcomingReleasesData, isLoading: isLoadingUpcomingReleases } =
+    useQuery({
+      queryKey: ["upcoming-releases"],
+      queryFn: fetchUpcomingReleases,
+      refetchInterval: false,
+      staleTime: 15 * 60 * 1000, // 15 minutes - upcoming releases don't change often
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      enabled: true,
+    });
 
-  
   const listData: DashboardListItem[] = useMemo(() => {
-    const items: DashboardListItem[] = [{ type: "header" }, { type: "welcome-section" }, { type: "shortcuts" }];
+    const items: DashboardListItem[] = [
+      { type: "header" },
+      { type: "welcome-section" },
+      { type: "shortcuts" },
+    ];
 
     // Always show statistics section
     if (statisticsData) {
@@ -265,9 +227,14 @@ const DashboardScreen = () => {
     }
 
     // Only show empty state if no dynamic content is loading/available
-    if (!isLoadingContinueWatching && !continueWatchingData &&
-        !isLoadingTrendingTV && !trendingTVData &&
-        !isLoadingUpcomingReleases && !upcomingReleasesData) {
+    if (
+      !isLoadingContinueWatching &&
+      !continueWatchingData &&
+      !isLoadingTrendingTV &&
+      !trendingTVData &&
+      !isLoadingUpcomingReleases &&
+      !upcomingReleasesData
+    ) {
       items.push({ type: "empty" });
     }
 
@@ -283,7 +250,7 @@ const DashboardScreen = () => {
     isLoadingUpcomingReleases,
   ]);
 
-  const screenWidth = Dimensions.get('window').width;
+  const screenWidth = Dimensions.get("window").width;
 
   const styles = useMemo(
     () =>
@@ -303,19 +270,19 @@ const DashboardScreen = () => {
           marginBottom: spacing.md,
         },
         welcomeHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
         },
         welcomeTitle: {
           fontSize: 28,
-          fontWeight: '700',
+          fontWeight: "700",
           color: theme.colors.onBackground,
           letterSpacing: -0.5,
         },
         seeAllButton: {
           fontSize: 16,
-          fontWeight: '500',
+          fontWeight: "500",
           color: theme.colors.primary,
         },
 
@@ -325,9 +292,9 @@ const DashboardScreen = () => {
           marginBottom: spacing.xl,
         },
         shortcutsGrid: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
         },
         shortcutCard: {
           width: (screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4,
@@ -337,8 +304,8 @@ const DashboardScreen = () => {
           marginBottom: spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
-          alignItems: 'center',
-          shadowColor: '#000',
+          alignItems: "center",
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
@@ -349,50 +316,49 @@ const DashboardScreen = () => {
           height: 40,
           borderRadius: 20,
           backgroundColor: theme.colors.primaryContainer,
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: "center",
+          justifyContent: "center",
           marginBottom: spacing.xs,
         },
         shortcutLabel: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: "600",
           color: theme.colors.onSurface,
-          textAlign: 'center',
+          textAlign: "center",
         },
         shortcutSubtitle: {
           fontSize: 10,
           color: theme.colors.onSurfaceVariant,
-          textAlign: 'center',
+          textAlign: "center",
           marginTop: 2,
         },
 
-        
         // Statistics Section
         statisticsSection: {
           paddingHorizontal: spacing.lg,
           marginBottom: spacing.xl,
         },
         statisticsHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: spacing.lg,
         },
         statisticsTitle: {
           fontSize: 20,
-          fontWeight: '700',
+          fontWeight: "700",
           color: theme.colors.onBackground,
           letterSpacing: -0.5,
         },
         filterButton: {
           fontSize: 14,
-          fontWeight: '500',
+          fontWeight: "500",
           color: theme.colors.primary,
         },
         statisticsGrid: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
         },
         statCard: {
           width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
@@ -402,8 +368,8 @@ const DashboardScreen = () => {
           marginBottom: spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
-          alignItems: 'center',
-          shadowColor: '#000',
+          alignItems: "center",
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
@@ -411,15 +377,15 @@ const DashboardScreen = () => {
         },
         statNumber: {
           fontSize: 28,
-          fontWeight: '700',
+          fontWeight: "700",
           color: theme.colors.primary,
           marginBottom: spacing.xs,
         },
         statLabel: {
           fontSize: 14,
-          fontWeight: '500',
+          fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
-          textAlign: 'center',
+          textAlign: "center",
         },
 
         // Continue Watching Section
@@ -428,26 +394,26 @@ const DashboardScreen = () => {
           marginBottom: spacing.xl,
         },
         continueWatchingHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: spacing.lg,
         },
         continueWatchingTitle: {
           fontSize: 20,
-          fontWeight: '700',
+          fontWeight: "700",
           color: theme.colors.onBackground,
           letterSpacing: -0.5,
         },
         seeAllButtonSmall: {
           fontSize: 14,
-          fontWeight: '500',
+          fontWeight: "500",
           color: theme.colors.primary,
         },
         continueWatchingList: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
         },
         continueWatchingCard: {
           width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
@@ -456,35 +422,35 @@ const DashboardScreen = () => {
           marginBottom: spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
           elevation: 3,
-          overflow: 'hidden',
+          overflow: "hidden",
         },
         continueWatchingPoster: {
-          width: '100%',
+          width: "100%",
           height: 120,
           backgroundColor: theme.colors.surfaceVariant,
-          position: 'relative',
+          position: "relative",
         },
         continueWatchingOverlay: {
-          position: 'absolute',
+          position: "absolute",
           bottom: 0,
           left: 0,
           right: 0,
           padding: spacing.sm,
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: "rgba(0,0,0,0.7)",
         },
         progressBar: {
           height: 3,
-          backgroundColor: 'rgba(255,255,255,0.3)',
+          backgroundColor: "rgba(255,255,255,0.3)",
           borderRadius: 1.5,
-          overflow: 'hidden',
+          overflow: "hidden",
         },
         progressFill: {
-          height: '100%',
+          height: "100%",
           backgroundColor: theme.colors.primary,
         },
         continueWatchingContent: {
@@ -492,7 +458,7 @@ const DashboardScreen = () => {
         },
         continueWatchingCardTitle: {
           fontSize: 14,
-          fontWeight: '600',
+          fontWeight: "600",
           color: theme.colors.onSurface,
           marginBottom: spacing.xs,
         },
@@ -507,21 +473,21 @@ const DashboardScreen = () => {
           marginBottom: spacing.xl,
         },
         trendingTVHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: spacing.lg,
         },
         trendingTVSectionTitle: {
           fontSize: 20,
-          fontWeight: '700',
+          fontWeight: "700",
           color: theme.colors.onBackground,
           letterSpacing: -0.5,
         },
         trendingTVList: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
         },
         trendingTVCard: {
           width: (screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4,
@@ -530,15 +496,15 @@ const DashboardScreen = () => {
           marginBottom: spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
           elevation: 3,
-          overflow: 'hidden',
+          overflow: "hidden",
         },
         trendingTVPoster: {
-          width: '100%',
+          width: "100%",
           height: 160,
           backgroundColor: theme.colors.surfaceVariant,
         },
@@ -547,14 +513,14 @@ const DashboardScreen = () => {
         },
         trendingTVTitle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: "600",
           color: theme.colors.onSurface,
-          textAlign: 'center',
+          textAlign: "center",
         },
         trendingTVRating: {
           fontSize: 10,
           color: theme.colors.onSurfaceVariant,
-          textAlign: 'center',
+          textAlign: "center",
           marginTop: 2,
         },
 
@@ -564,21 +530,21 @@ const DashboardScreen = () => {
           marginBottom: spacing.xl,
         },
         upcomingReleasesHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: spacing.lg,
         },
         upcomingReleasesTitle: {
           fontSize: 20,
-          fontWeight: '700',
+          fontWeight: "700",
           color: theme.colors.onBackground,
           letterSpacing: -0.5,
         },
         upcomingReleasesList: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
         },
         upcomingReleaseCard: {
           width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
@@ -587,15 +553,15 @@ const DashboardScreen = () => {
           marginBottom: spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
           elevation: 3,
-          overflow: 'hidden',
+          overflow: "hidden",
         },
         upcomingReleasePoster: {
-          width: '100%',
+          width: "100%",
           height: 100,
           backgroundColor: theme.colors.surfaceVariant,
         },
@@ -604,7 +570,7 @@ const DashboardScreen = () => {
         },
         upcomingReleaseTitle: {
           fontSize: 14,
-          fontWeight: '600',
+          fontWeight: "600",
           color: theme.colors.onSurface,
           marginBottom: spacing.xs,
         },
@@ -614,13 +580,13 @@ const DashboardScreen = () => {
         },
         releaseDateBadge: {
           fontSize: 10,
-          fontWeight: '500',
+          fontWeight: "500",
           color: theme.colors.onPrimary,
           backgroundColor: theme.colors.primary,
           paddingHorizontal: spacing.xs,
           paddingVertical: 2,
           borderRadius: 4,
-          alignSelf: 'flex-start',
+          alignSelf: "flex-start",
           marginTop: spacing.xs,
         },
 
@@ -631,7 +597,7 @@ const DashboardScreen = () => {
         },
         recentActivityTitle: {
           fontSize: 20,
-          fontWeight: '700',
+          fontWeight: "700",
           color: theme.colors.onBackground,
           letterSpacing: -0.5,
         },
@@ -639,14 +605,14 @@ const DashboardScreen = () => {
           paddingHorizontal: spacing.lg,
         },
         activityCard: {
-          flexDirection: 'row',
+          flexDirection: "row",
           backgroundColor: theme.colors.surface,
           borderRadius: 12,
           padding: spacing.md,
           marginBottom: spacing.md,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
@@ -661,11 +627,11 @@ const DashboardScreen = () => {
         },
         activityContent: {
           flex: 1,
-          justifyContent: 'center',
+          justifyContent: "center",
         },
         activityTitle: {
           fontSize: 16,
-          fontWeight: '600',
+          fontWeight: "600",
           color: theme.colors.onSurface,
           marginBottom: 4,
         },
@@ -701,17 +667,16 @@ const DashboardScreen = () => {
           paddingTop: spacing.xl,
         },
       }),
-    [theme, screenWidth]
+    [theme, screenWidth],
   );
 
-  
   const renderHeader = useCallback(
     () => (
       <AnimatedHeader>
         <TabHeader />
       </AnimatedHeader>
     ),
-    []
+    [],
   );
 
   const handleOpenSearch = useCallback(() => {
@@ -726,385 +691,423 @@ const DashboardScreen = () => {
     router.push("/(auth)/discover");
   }, [router]);
 
-  const handleStatsFilter = useCallback((filter: 'all' | 'recent' | 'month') => {
-    setStatsFilter(filter);
-    setFilterVisible(false);
-    void refetchStatistics();
-  }, [refetchStatistics]);
+  const handleStatsFilter = useCallback(
+    (filter: "all" | "recent" | "month") => {
+      setStatsFilter(filter);
+      setFilterVisible(false);
+      void refetchStatistics();
+    },
+    [refetchStatistics],
+  );
 
-  const handleContinueWatchingPress = useCallback((item: ContinueWatchingItem) => {
-    // Navigate to the media details page
-    if (item.type === 'movie') {
-      // For movies, try to navigate to Jellyfin details
-      router.push(`/(auth)/jellyfin/${item.id}`);
-    } else if (item.type === 'episode') {
-      // For episodes, try to navigate to Jellyfin details
-      router.push(`/(auth)/jellyfin/${item.id}`);
-    }
-  }, [router]);
+  const handleContinueWatchingPress = useCallback(
+    (item: ContinueWatchingItem) => {
+      // Navigate to the media details page
+      if (item.type === "movie") {
+        // For movies, try to navigate to Jellyfin details
+        router.push(`/(auth)/jellyfin/${item.id}`);
+      } else if (item.type === "episode") {
+        // For episodes, try to navigate to Jellyfin details
+        router.push(`/(auth)/jellyfin/${item.id}`);
+      }
+    },
+    [router],
+  );
 
-  const handleTrendingTVPress = useCallback((item: TrendingTVItem) => {
-    // Navigate to TV show details in discover
-    if (item.tmdbId) {
-      router.push(`/(auth)/discover/tmdb/tv/${item.tmdbId}`);
-    } else {
-      // Fallback: navigate to general discover page if no tmdbId
-      router.push("/(auth)/discover");
-    }
-  }, [router]);
+  const handleTrendingTVPress = useCallback(
+    (item: TrendingTVItem) => {
+      // Navigate to TV show details in discover
+      if (item.tmdbId) {
+        router.push(`/(auth)/discover/tmdb/tv/${item.tmdbId}`);
+      } else {
+        // Fallback: navigate to general discover page if no tmdbId
+        router.push("/(auth)/discover");
+      }
+    },
+    [router],
+  );
 
-  const handleUpcomingReleasePress = useCallback((item: UpcomingReleaseItem) => {
-    // Navigate to calendar or details based on type
-    router.push(`/(auth)/calendar`);
-  }, [router]);
+  const handleUpcomingReleasePress = useCallback(
+    (item: UpcomingReleaseItem) => {
+      // Navigate to calendar or details based on type
+      router.push(`/(auth)/calendar`);
+    },
+    [router],
+  );
 
-  const handleRecentActivityPress = useCallback((item: RecentActivityItem) => {
-    // Navigate to appropriate service page based on the activity source
-    // Extract service type from the item ID
-    if (item.id.startsWith('sonarr-')) {
-      // Navigate to Sonarr series list
-      router.push(`/(auth)/sonarr/${item.id.split('-')[1]}`);
-    } else if (item.id.startsWith('radarr-')) {
-      // Navigate to Radarr movies list
-      router.push(`/(auth)/radarr/${item.id.split('-')[1]}`);
-    }
-  }, [router]);
+  const handleRecentActivityPress = useCallback(
+    (item: RecentActivityItem) => {
+      // Navigate to appropriate service page based on the activity source
+      // Extract service type from the item ID
+      if (item.id.startsWith("sonarr-")) {
+        // Navigate to Sonarr series list
+        router.push(`/(auth)/sonarr/${item.id.split("-")[1]}`);
+      } else if (item.id.startsWith("radarr-")) {
+        // Navigate to Radarr movies list
+        router.push(`/(auth)/radarr/${item.id.split("-")[1]}`);
+      }
+    },
+    [router],
+  );
 
-  const ShortcutCard = React.memo(({
-    label,
-    subtitle,
-    icon,
-    onPress,
-    testID,
-  }: {
-    label: string;
-    subtitle?: string;
-    icon: string;
-    onPress: () => void;
-    testID?: string;
-  }) => (
-    <TouchableOpacity
-      style={styles.shortcutCard}
-      onPress={onPress}
-      activeOpacity={0.7}
-      testID={testID}
-    >
-      <View style={styles.shortcutIconContainer}>
-        <IconButton
-          icon={icon}
-          size={20}
-          iconColor={theme.colors.primary}
-        />
+  const ShortcutCard = React.memo(
+    ({
+      label,
+      subtitle,
+      icon,
+      onPress,
+      testID,
+    }: {
+      label: string;
+      subtitle?: string;
+      icon: string;
+      onPress: () => void;
+      testID?: string;
+    }) => (
+      <TouchableOpacity
+        style={styles.shortcutCard}
+        onPress={onPress}
+        activeOpacity={0.7}
+        testID={testID}
+      >
+        <View style={styles.shortcutIconContainer}>
+          <IconButton icon={icon} size={20} iconColor={theme.colors.primary} />
+        </View>
+        <Text style={styles.shortcutLabel}>{label}</Text>
+        {subtitle ? (
+          <Text style={styles.shortcutSubtitle}>{subtitle}</Text>
+        ) : null}
+      </TouchableOpacity>
+    ),
+  );
+
+  const StatCard = React.memo(
+    ({ number, label }: { number: number; label: string }) => (
+      <View style={styles.statCard}>
+        <Text style={styles.statNumber}>{number}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
       </View>
-      <Text style={styles.shortcutLabel}>{label}</Text>
-      {subtitle ? (
-        <Text style={styles.shortcutSubtitle}>{subtitle}</Text>
-      ) : null}
-    </TouchableOpacity>
+    ),
+  );
+
+  const ContinueWatchingCardSkeleton = React.memo(() => (
+    <View style={styles.continueWatchingCard}>
+      <SkeletonPlaceholder
+        width="100%"
+        height={120}
+        borderRadius={0}
+        style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+      />
+      <View style={styles.continueWatchingContent}>
+        <SkeletonPlaceholder
+          width="80%"
+          height={16}
+          borderRadius={4}
+          style={{ marginBottom: spacing.xs }}
+        />
+        <SkeletonPlaceholder width="60%" height={12} borderRadius={4} />
+      </View>
+    </View>
   ));
 
-
-  
-  const StatCard = React.memo(({
-  number,
-  label,
-}: {
-  number: number;
-  label: string;
-}) => (
-  <View
-    style={styles.statCard}
-  >
-    <Text style={styles.statNumber}>{number}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
-));
-
-const ContinueWatchingCardSkeleton = React.memo(() => (
-  <View style={styles.continueWatchingCard}>
-    <SkeletonPlaceholder
-      width="100%"
-      height={120}
-      borderRadius={0}
-      style={{ position: 'absolute', top: 0, left: 0, right: 0 }}
-    />
-    <View style={styles.continueWatchingContent}>
-      <SkeletonPlaceholder width="80%" height={16} borderRadius={4} style={{ marginBottom: spacing.xs }} />
-      <SkeletonPlaceholder width="60%" height={12} borderRadius={4} />
-    </View>
-  </View>
-));
-
-const TrendingTVCardSkeleton = React.memo(() => (
-  <View style={styles.trendingTVCard}>
-    <SkeletonPlaceholder
-      width="100%"
-      height={160}
-      borderRadius={0}
-      style={{ marginBottom: spacing.sm }}
-    />
-    <View style={styles.trendingTVContent}>
-      <SkeletonPlaceholder width="90%" height={12} borderRadius={4} style={{ marginBottom: 2 }} />
-      <SkeletonPlaceholder width="40%" height={10} borderRadius={4} />
-    </View>
-  </View>
-));
-
-const UpcomingReleaseCardSkeleton = React.memo(() => (
-  <View style={styles.upcomingReleaseCard}>
-    <SkeletonPlaceholder
-      width="100%"
-      height={100}
-      borderRadius={0}
-      style={{ marginBottom: spacing.md }}
-    />
-    <View style={styles.upcomingReleaseContent}>
-      <SkeletonPlaceholder width="85%" height={14} borderRadius={4} style={{ marginBottom: spacing.xs }} />
-      <SkeletonPlaceholder width="50%" height={12} borderRadius={4} style={{ marginBottom: spacing.xs }} />
-      <SkeletonPlaceholder width={40} height={16} borderRadius={4} />
-    </View>
-  </View>
-));
-
-const ContinueWatchingCard = React.memo(({
-  item,
-  onPress
-}: {
-  item: ContinueWatchingItem;
-  onPress?: (item: ContinueWatchingItem) => void;
-}) => {
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
-
-  const formatDate = (date: Date) => {
-    const releaseDate = new Date(date);
-    const today = new Date();
-    const diffTime = Math.abs(today.getTime() - releaseDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return releaseDate.toLocaleDateString();
-  };
-
-  return (
-    <TouchableOpacity
-      style={styles.continueWatchingCard}
-      onPress={() => onPress?.(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.continueWatchingPoster}>
-        {item.posterUri ? (
-          <MediaPoster
-            uri={item.posterUri}
-            size={((screenWidth - spacing.lg * 2 - spacing.sm) / 2) * 0.5}
-            borderRadius={0}
-            style={{ width: '100%', height: '100%' }}
-          />
-        ) : null}
-        <View style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          padding: spacing.sm,
-        }}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${item.progress}%` }]} />
-          </View>
-        </View>
-      </View>
-      <View style={styles.continueWatchingContent}>
-        <Text style={styles.continueWatchingCardTitle} numberOfLines={2}>
-          {item.type === 'episode' ? item.show : item.title}
-        </Text>
-        <Text style={styles.continueWatchingMeta} numberOfLines={1}>
-          {item.type === 'episode' ? `S${item.season}E${item.episode}` : `${formatTime(item.duration)}`}
-          {' • '}{Math.round(item.progress)}% watched
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-const TrendingTVCard = React.memo(({
-  item,
-  onPress,
-  style,
-  posterSize,
-}: {
-  item: TrendingTVItem;
-  onPress?: (item: TrendingTVItem) => void;
-  style?: ViewStyle | ViewStyle[];
-  posterSize?: number;
-}) => (
-  <TouchableOpacity
-    style={[styles.trendingTVCard, style]}
-    onPress={() => onPress?.(item)}
-    activeOpacity={0.7}
-  >
-    <View style={styles.trendingTVPoster}>
-      {item.posterUri ? (
-        <MediaPoster
-          uri={item.posterUri}
-          size={posterSize ?? ((screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4)}
-          borderRadius={0}
-          style={{ width: '100%', height: '100%' }}
+  const TrendingTVCardSkeleton = React.memo(() => (
+    <View style={styles.trendingTVCard}>
+      <SkeletonPlaceholder
+        width="100%"
+        height={160}
+        borderRadius={0}
+        style={{ marginBottom: spacing.sm }}
+      />
+      <View style={styles.trendingTVContent}>
+        <SkeletonPlaceholder
+          width="90%"
+          height={12}
+          borderRadius={4}
+          style={{ marginBottom: 2 }}
         />
-      ) : null}
-    </View>
-    <View style={styles.trendingTVContent}>
-      <Text style={styles.trendingTVTitle} numberOfLines={2}>
-        {item.title}
-      </Text>
-      <Text style={styles.trendingTVRating} numberOfLines={1}>
-        {item.rating ? `★ ${item.rating.toFixed(1)}` : ''}
-      </Text>
-    </View>
-  </TouchableOpacity>
-));
-
-const UpcomingReleaseCard = React.memo(({
-  item,
-  onPress
-}: {
-  item: UpcomingReleaseItem;
-  onPress?: (item: UpcomingReleaseItem) => void;
-}) => {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
-    });
-  };
-
-  const getTimeToRelease = (dateString: string) => {
-    const releaseDate = new Date(dateString);
-    const now = new Date();
-    const diffMs = releaseDate.getTime() - now.getTime();
-
-    if (diffMs < 0) return 'Released';
-
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMinutes / 60);
-    const remainingMinutes = diffMinutes % 60;
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffDays === 0) {
-      if (diffHours === 0) {
-        if (diffMinutes <= 1) return 'In 1 min';
-        return `In ${diffMinutes} min`;
-      }
-      if (diffHours === 1) {
-        return remainingMinutes > 0 ? `In 1h ${remainingMinutes}m` : 'In 1h';
-      }
-      return remainingMinutes > 0 ? `In ${diffHours}h ${remainingMinutes}m` : `In ${diffHours}h`;
-    }
-    if (diffDays === 1) return 'Tomorrow';
-    if (diffDays <= 7) return `In ${diffDays} days`;
-    if (diffDays <= 30) return `In ${Math.floor(diffDays / 7)} weeks`;
-    return `In ${Math.floor(diffDays / 30)} months`;
-  };
-
-  const getReleaseDisplay = (dateString: string) => {
-    const releaseDate = new Date(dateString);
-    const now = new Date();
-    const diffMs = releaseDate.getTime() - now.getTime();
-
-    if (diffMs < 0) return formatDate(dateString);
-
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    // For releases today, show only the time to release
-    if (diffDays === 0) {
-      return getTimeToRelease(dateString);
-    }
-
-    // For other releases, show the date
-    return formatDate(dateString);
-  };
-
-  return (
-    <TouchableOpacity
-      style={styles.upcomingReleaseCard}
-      onPress={() => onPress?.(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.upcomingReleasePoster}>
-        {item.posterUri ? (
-          <MediaPoster
-            uri={item.posterUri}
-            size={(screenWidth - spacing.lg * 2 - spacing.sm) / 2}
-            borderRadius={0}
-            style={{ width: '100%', height: '100%' }}
-          />
-        ) : null}
+        <SkeletonPlaceholder width="40%" height={10} borderRadius={4} />
       </View>
+    </View>
+  ));
+
+  const UpcomingReleaseCardSkeleton = React.memo(() => (
+    <View style={styles.upcomingReleaseCard}>
+      <SkeletonPlaceholder
+        width="100%"
+        height={100}
+        borderRadius={0}
+        style={{ marginBottom: spacing.md }}
+      />
       <View style={styles.upcomingReleaseContent}>
-        <Text style={styles.upcomingReleaseTitle} numberOfLines={2}>
-          {item.type === 'episode' ? item.show : item.title}
-        </Text>
-        <Text style={styles.upcomingReleaseMeta} numberOfLines={1}>
-          {item.type === 'episode' ? `S${item.season}E${item.episode}` : 'Movie'}
-        </Text>
-        <View style={styles.releaseDateBadge}>
-          <Text style={{ color: theme.colors.onPrimary, fontSize: 10 }}>
-            {getReleaseDisplay(item.releaseDate)}
+        <SkeletonPlaceholder
+          width="85%"
+          height={14}
+          borderRadius={4}
+          style={{ marginBottom: spacing.xs }}
+        />
+        <SkeletonPlaceholder
+          width="50%"
+          height={12}
+          borderRadius={4}
+          style={{ marginBottom: spacing.xs }}
+        />
+        <SkeletonPlaceholder width={40} height={16} borderRadius={4} />
+      </View>
+    </View>
+  ));
+
+  const ContinueWatchingCard = React.memo(
+    ({
+      item,
+      onPress,
+    }: {
+      item: ContinueWatchingItem;
+      onPress?: (item: ContinueWatchingItem) => void;
+    }) => {
+      const formatTime = (minutes: number) => {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+      };
+
+      return (
+        <TouchableOpacity
+          style={styles.continueWatchingCard}
+          onPress={() => onPress?.(item)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.continueWatchingPoster}>
+            {item.posterUri ? (
+              <MediaPoster
+                uri={item.posterUri}
+                size={((screenWidth - spacing.lg * 2 - spacing.sm) / 2) * 0.5}
+                borderRadius={0}
+                style={{ width: "100%", height: "100%" }}
+              />
+            ) : null}
+            <View
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: "rgba(0,0,0,0.7)",
+                padding: spacing.sm,
+              }}
+            >
+              <View style={styles.progressBar}>
+                <View
+                  style={[styles.progressFill, { width: `${item.progress}%` }]}
+                />
+              </View>
+            </View>
+          </View>
+          <View style={styles.continueWatchingContent}>
+            <Text style={styles.continueWatchingCardTitle} numberOfLines={2}>
+              {item.type === "episode" ? item.show : item.title}
+            </Text>
+            <Text style={styles.continueWatchingMeta} numberOfLines={1}>
+              {item.type === "episode"
+                ? `S${item.season}E${item.episode}`
+                : `${formatTime(item.duration)}`}
+              {" • "}
+              {Math.round(item.progress)}% watched
+            </Text>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+  );
+
+  const TrendingTVCard = React.memo(
+    ({
+      item,
+      onPress,
+      style,
+      posterSize,
+    }: {
+      item: TrendingTVItem;
+      onPress?: (item: TrendingTVItem) => void;
+      style?: ViewStyle | ViewStyle[];
+      posterSize?: number;
+    }) => (
+      <TouchableOpacity
+        style={[styles.trendingTVCard, style]}
+        onPress={() => onPress?.(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.trendingTVPoster}>
+          {item.posterUri ? (
+            <MediaPoster
+              uri={item.posterUri}
+              size={
+                posterSize ??
+                (screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4
+              }
+              borderRadius={0}
+              style={{ width: "100%", height: "100%" }}
+            />
+          ) : null}
+        </View>
+        <View style={styles.trendingTVContent}>
+          <Text style={styles.trendingTVTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={styles.trendingTVRating} numberOfLines={1}>
+            {item.rating ? `★ ${item.rating.toFixed(1)}` : ""}
           </Text>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    ),
   );
-});
 
-const RecentActivityCard = React.memo(({
-  item,
-  onPress
-}: {
-  item: RecentActivityItem;
-  onPress?: (item: RecentActivityItem) => void;
-}) => (
-  <TouchableOpacity
-    style={styles.activityCard}
-    onPress={() => onPress?.(item)}
-    activeOpacity={0.7}
-  >
-    {item.image ? (
-      <MediaPoster
-        uri={item.image}
-        size={50}
-        borderRadius={8}
-        style={styles.activityImage}
-      />
-    ) : (
-      <View style={styles.activityImage} />
-    )}
-    <View style={styles.activityContent}>
-      <Text style={styles.activityTitle}>{item.title}</Text>
-      <Text style={styles.activityShow}>{item.show} • {item.episode}</Text>
-      <Text style={styles.activityDate}>{item.date}</Text>
-    </View>
-  </TouchableOpacity>
-));
+  const UpcomingReleaseCard = React.memo(
+    ({
+      item,
+      onPress,
+    }: {
+      item: UpcomingReleaseItem;
+      onPress?: (item: UpcomingReleaseItem) => void;
+    }) => {
+      const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
 
+        if (date.toDateString() === today.toDateString()) return "Today";
+        if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
 
-  
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year:
+            date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+        });
+      };
+
+      const getTimeToRelease = (dateString: string) => {
+        const releaseDate = new Date(dateString);
+        const now = new Date();
+        const diffMs = releaseDate.getTime() - now.getTime();
+
+        if (diffMs < 0) return "Released";
+
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMinutes / 60);
+        const remainingMinutes = diffMinutes % 60;
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffDays === 0) {
+          if (diffHours === 0) {
+            if (diffMinutes <= 1) return "In 1 min";
+            return `In ${diffMinutes} min`;
+          }
+          if (diffHours === 1) {
+            return remainingMinutes > 0
+              ? `In 1h ${remainingMinutes}m`
+              : "In 1h";
+          }
+          return remainingMinutes > 0
+            ? `In ${diffHours}h ${remainingMinutes}m`
+            : `In ${diffHours}h`;
+        }
+        if (diffDays === 1) return "Tomorrow";
+        if (diffDays <= 7) return `In ${diffDays} days`;
+        if (diffDays <= 30) return `In ${Math.floor(diffDays / 7)} weeks`;
+        return `In ${Math.floor(diffDays / 30)} months`;
+      };
+
+      const getReleaseDisplay = (dateString: string) => {
+        const releaseDate = new Date(dateString);
+        const now = new Date();
+        const diffMs = releaseDate.getTime() - now.getTime();
+
+        if (diffMs < 0) return formatDate(dateString);
+
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMinutes / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        // For releases today, show only the time to release
+        if (diffDays === 0) {
+          return getTimeToRelease(dateString);
+        }
+
+        // For other releases, show the date
+        return formatDate(dateString);
+      };
+
+      return (
+        <TouchableOpacity
+          style={styles.upcomingReleaseCard}
+          onPress={() => onPress?.(item)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.upcomingReleasePoster}>
+            {item.posterUri ? (
+              <MediaPoster
+                uri={item.posterUri}
+                size={(screenWidth - spacing.lg * 2 - spacing.sm) / 2}
+                borderRadius={0}
+                style={{ width: "100%", height: "100%" }}
+              />
+            ) : null}
+          </View>
+          <View style={styles.upcomingReleaseContent}>
+            <Text style={styles.upcomingReleaseTitle} numberOfLines={2}>
+              {item.type === "episode" ? item.show : item.title}
+            </Text>
+            <Text style={styles.upcomingReleaseMeta} numberOfLines={1}>
+              {item.type === "episode"
+                ? `S${item.season}E${item.episode}`
+                : "Movie"}
+            </Text>
+            <View style={styles.releaseDateBadge}>
+              <Text style={{ color: theme.colors.onPrimary, fontSize: 10 }}>
+                {getReleaseDisplay(item.releaseDate)}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+  );
+
+  const RecentActivityCard = React.memo(
+    ({
+      item,
+      onPress,
+    }: {
+      item: RecentActivityItem;
+      onPress?: (item: RecentActivityItem) => void;
+    }) => (
+      <TouchableOpacity
+        style={styles.activityCard}
+        onPress={() => onPress?.(item)}
+        activeOpacity={0.7}
+      >
+        {item.image ? (
+          <MediaPoster
+            uri={item.image}
+            size={50}
+            borderRadius={8}
+            style={styles.activityImage}
+          />
+        ) : (
+          <View style={styles.activityImage} />
+        )}
+        <View style={styles.activityContent}>
+          <Text style={styles.activityTitle}>{item.title}</Text>
+          <Text style={styles.activityShow}>
+            {item.show} • {item.episode}
+          </Text>
+          <Text style={styles.activityDate}>{item.date}</Text>
+        </View>
+      </TouchableOpacity>
+    ),
+  );
+
   const emptyStateContent = useMemo(() => {
     return (
       <EmptyState
@@ -1135,10 +1138,7 @@ const RecentActivityCard = React.memo(({
           return (
             <View style={styles.shortcutsSection}>
               <AnimatedSection style={styles.shortcutsGrid} delay={40}>
-                <AnimatedListItem
-                  index={0}
-                  totalItems={4}
-                >
+                <AnimatedListItem index={0} totalItems={4}>
                   <ShortcutCard
                     testID="shortcut-discover"
                     label="Discover"
@@ -1147,10 +1147,7 @@ const RecentActivityCard = React.memo(({
                     onPress={handleOpenDiscover}
                   />
                 </AnimatedListItem>
-                <AnimatedListItem
-                  index={1}
-                  totalItems={4}
-                >
+                <AnimatedListItem index={1} totalItems={4}>
                   <ShortcutCard
                     testID="shortcut-search"
                     label="Search"
@@ -1159,10 +1156,7 @@ const RecentActivityCard = React.memo(({
                     onPress={handleOpenSearch}
                   />
                 </AnimatedListItem>
-                <AnimatedListItem
-                  index={2}
-                  totalItems={4}
-                >
+                <AnimatedListItem index={2} totalItems={4}>
                   <ShortcutCard
                     testID="shortcut-calendar"
                     label="Calendar"
@@ -1171,10 +1165,7 @@ const RecentActivityCard = React.memo(({
                     onPress={handleOpenCalendar}
                   />
                 </AnimatedListItem>
-                <AnimatedListItem
-                  index={3}
-                  totalItems={4}
-                >
+                <AnimatedListItem index={3} totalItems={4}>
                   <ShortcutCard
                     testID="shortcut-animehub"
                     label="Anime"
@@ -1187,7 +1178,6 @@ const RecentActivityCard = React.memo(({
             </View>
           );
 
-        
         case "statistics":
           return (
             <View style={styles.statisticsSection}>
@@ -1195,34 +1185,26 @@ const RecentActivityCard = React.memo(({
                 <Text style={styles.statisticsTitle}>Statistics</Text>
                 <TouchableOpacity onPress={() => setFilterVisible(true)}>
                   <Text style={styles.filterButton}>
-                    {statsFilter === 'all' ? 'All' : statsFilter === 'recent' ? 'Recent' : 'Month'}
+                    {statsFilter === "all"
+                      ? "All"
+                      : statsFilter === "recent"
+                        ? "Recent"
+                        : "Month"}
                   </Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.statisticsGrid}>
                 <AnimatedListItem index={0} totalItems={4}>
-                  <StatCard
-                    number={item.data.shows}
-                    label="Shows"
-                  />
+                  <StatCard number={item.data.shows} label="Shows" />
                 </AnimatedListItem>
                 <AnimatedListItem index={1} totalItems={4}>
-                  <StatCard
-                    number={item.data.movies}
-                    label="Movies"
-                  />
+                  <StatCard number={item.data.movies} label="Movies" />
                 </AnimatedListItem>
                 <AnimatedListItem index={2} totalItems={4}>
-                  <StatCard
-                    number={item.data.episodes}
-                    label="Episodes"
-                  />
+                  <StatCard number={item.data.episodes} label="Episodes" />
                 </AnimatedListItem>
                 <AnimatedListItem index={3} totalItems={4}>
-                  <StatCard
-                    number={item.data.watched}
-                    label="Watched"
-                  />
+                  <StatCard number={item.data.watched} label="Watched" />
                 </AnimatedListItem>
               </View>
             </View>
@@ -1232,8 +1214,12 @@ const RecentActivityCard = React.memo(({
           return (
             <View style={styles.continueWatchingSection}>
               <View style={styles.continueWatchingHeader}>
-                <Text style={styles.continueWatchingTitle}>Continue Watching</Text>
-                <TouchableOpacity onPress={() => router.push("/(auth)/continue-watching")}>
+                <Text style={styles.continueWatchingTitle}>
+                  Continue Watching
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(auth)/continue-watching")}
+                >
                   <Text style={styles.seeAllButtonSmall}>See all</Text>
                 </TouchableOpacity>
               </View>
@@ -1258,14 +1244,22 @@ const RecentActivityCard = React.memo(({
           return (
             <View style={styles.continueWatchingSection}>
               <View style={styles.continueWatchingHeader}>
-                <Text style={styles.continueWatchingTitle}>Continue Watching</Text>
-                <TouchableOpacity onPress={() => router.push("/(auth)/continue-watching")}>
+                <Text style={styles.continueWatchingTitle}>
+                  Continue Watching
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(auth)/continue-watching")}
+                >
                   <Text style={styles.seeAllButtonSmall}>See all</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.continueWatchingList}>
                 {Array.from({ length: 4 }).map((_, index) => (
-                  <AnimatedListItem key={`continue-watching-loading-${index}`} index={index} totalItems={4}>
+                  <AnimatedListItem
+                    key={`continue-watching-loading-${index}`}
+                    index={index}
+                    totalItems={4}
+                  >
                     <ContinueWatchingCardSkeleton />
                   </AnimatedListItem>
                 ))}
@@ -1284,8 +1278,12 @@ const RecentActivityCard = React.memo(({
           return (
             <View style={styles.trendingTVSection}>
               <View style={styles.trendingTVHeader}>
-                <Text style={styles.trendingTVSectionTitle}>Trending TV Shows</Text>
-                <TouchableOpacity onPress={() => router.push("/(auth)/discover")}>
+                <Text style={styles.trendingTVSectionTitle}>
+                  Trending TV Shows
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(auth)/discover")}
+                >
                   <Text style={styles.seeAllButtonSmall}>See all</Text>
                 </TouchableOpacity>
               </View>
@@ -1313,14 +1311,22 @@ const RecentActivityCard = React.memo(({
           return (
             <View style={styles.trendingTVSection}>
               <View style={styles.trendingTVHeader}>
-                <Text style={styles.trendingTVSectionTitle}>Trending TV Shows</Text>
-                <TouchableOpacity onPress={() => router.push("/(auth)/discover")}>
+                <Text style={styles.trendingTVSectionTitle}>
+                  Trending TV Shows
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(auth)/discover")}
+                >
                   <Text style={styles.seeAllButtonSmall}>See all</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.trendingTVList}>
                 {Array.from({ length: 8 }).map((_, index) => (
-                  <AnimatedListItem key={`trending-tv-loading-${index}`} index={index} totalItems={8}>
+                  <AnimatedListItem
+                    key={`trending-tv-loading-${index}`}
+                    index={index}
+                    totalItems={8}
+                  >
                     <TrendingTVCardSkeleton />
                   </AnimatedListItem>
                 ))}
@@ -1332,8 +1338,12 @@ const RecentActivityCard = React.memo(({
           return (
             <View style={styles.upcomingReleasesSection}>
               <View style={styles.upcomingReleasesHeader}>
-                <Text style={styles.upcomingReleasesTitle}>Upcoming Releases</Text>
-                <TouchableOpacity onPress={() => router.push("/(auth)/calendar")}>
+                <Text style={styles.upcomingReleasesTitle}>
+                  Upcoming Releases
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(auth)/calendar")}
+                >
                   <Text style={styles.seeAllButtonSmall}>See all</Text>
                 </TouchableOpacity>
               </View>
@@ -1358,14 +1368,22 @@ const RecentActivityCard = React.memo(({
           return (
             <View style={styles.upcomingReleasesSection}>
               <View style={styles.upcomingReleasesHeader}>
-                <Text style={styles.upcomingReleasesTitle}>Upcoming Releases</Text>
-                <TouchableOpacity onPress={() => router.push("/(auth)/calendar")}>
+                <Text style={styles.upcomingReleasesTitle}>
+                  Upcoming Releases
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(auth)/calendar")}
+                >
                   <Text style={styles.seeAllButtonSmall}>See all</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.upcomingReleasesList}>
                 {Array.from({ length: 4 }).map((_, index) => (
-                  <AnimatedListItem key={`upcoming-releases-loading-${index}`} index={index} totalItems={4}>
+                  <AnimatedListItem
+                    key={`upcoming-releases-loading-${index}`}
+                    index={index}
+                    totalItems={4}
+                  >
                     <UpcomingReleaseCardSkeleton />
                   </AnimatedListItem>
                 ))}
@@ -1397,28 +1415,34 @@ const RecentActivityCard = React.memo(({
                   </AnimatedListItem>
                 ))
               ) : (
-                <View style={{
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: 12,
-                  padding: spacing.lg,
-                  borderWidth: 1,
-                  borderColor: theme.colors.outlineVariant,
-                  alignItems: 'center',
-                }}>
-                  <Text style={{
-                    fontSize: 16,
-                    color: theme.colors.onSurfaceVariant,
-                    textAlign: 'center',
-                  }}>
+                <View
+                  style={{
+                    backgroundColor: theme.colors.surface,
+                    borderRadius: 12,
+                    padding: spacing.lg,
+                    borderWidth: 1,
+                    borderColor: theme.colors.outlineVariant,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: theme.colors.onSurfaceVariant,
+                      textAlign: "center",
+                    }}
+                  >
                     No recent activity found
                   </Text>
-                  <Text style={{
-                    fontSize: 14,
-                    color: theme.colors.onSurfaceVariant,
-                    textAlign: 'center',
-                    marginTop: spacing.xs,
-                    opacity: 0.7,
-                  }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      color: theme.colors.onSurfaceVariant,
+                      textAlign: "center",
+                      marginTop: spacing.xs,
+                      opacity: 0.7,
+                    }}
+                  >
                     Recent downloads and imports will appear here
                   </Text>
                 </View>
@@ -1442,18 +1466,28 @@ const RecentActivityCard = React.memo(({
       renderHeader,
       router,
       styles,
-      continueWatchingData,
-      trendingTVData,
-      upcomingReleasesData,
-      isLoadingContinueWatching,
-      isLoadingTrendingTV,
-      isLoadingUpcomingReleases,
       handleContinueWatchingPress,
       handleTrendingTVPress,
       handleUpcomingReleasePress,
       handleRecentActivityPress,
       statsFilter,
-    ]
+      ContinueWatchingCard,
+      ContinueWatchingCardSkeleton,
+      RecentActivityCard,
+      ShortcutCard,
+      StatCard,
+      TrendingTVCard,
+      TrendingTVCardSkeleton,
+      UpcomingReleaseCard,
+      UpcomingReleaseCardSkeleton,
+      handleOpenCalendar,
+      handleOpenDiscover,
+      handleOpenSearch,
+      screenWidth,
+      theme.colors.onSurfaceVariant,
+      theme.colors.outlineVariant,
+      theme.colors.surface,
+    ],
   );
 
   const keyExtractor = useCallback((item: DashboardListItem) => {
@@ -1464,7 +1498,7 @@ const RecentActivityCard = React.memo(({
         return "welcome-section";
       case "shortcuts":
         return "shortcuts";
-            case "statistics":
+      case "statistics":
         return "statistics";
       case "continue-watching":
         return `continue-watching-${item.data.length}`;
@@ -1491,25 +1525,24 @@ const RecentActivityCard = React.memo(({
 
   const getItemType = useCallback((item: DashboardListItem) => item.type, []);
 
-  
   return (
     <Portal.Host>
       <SafeAreaView style={styles.container}>
         <FlashList
-        data={listData}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
-        ListEmptyComponent={
-          <AnimatedSection style={styles.emptyContainer}>
-            {emptyStateContent}
-          </AnimatedSection>
-        }
-        showsVerticalScrollIndicator={false}
-        getItemType={getItemType}
-        removeClippedSubviews={true}
-      />
+          data={listData}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.listSpacer} />}
+          ListEmptyComponent={
+            <AnimatedSection style={styles.emptyContainer}>
+              {emptyStateContent}
+            </AnimatedSection>
+          }
+          showsVerticalScrollIndicator={false}
+          getItemType={getItemType}
+          removeClippedSubviews={true}
+        />
         <Portal>
           <Modal
             visible={filterVisible}
@@ -1521,7 +1554,14 @@ const RecentActivityCard = React.memo(({
               borderRadius: 12,
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: spacing.md, color: theme.colors.onSurface }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "600",
+                marginBottom: spacing.md,
+                color: theme.colors.onSurface,
+              }}
+            >
               Filter Statistics
             </Text>
 
@@ -1529,16 +1569,21 @@ const RecentActivityCard = React.memo(({
               style={{
                 padding: spacing.md,
                 borderRadius: 8,
-                backgroundColor: statsFilter === 'all' ? theme.colors.primaryContainer : 'transparent',
+                backgroundColor:
+                  statsFilter === "all"
+                    ? theme.colors.primaryContainer
+                    : "transparent",
                 marginBottom: spacing.sm,
               }}
-              onPress={() => handleStatsFilter('all')}
+              onPress={() => handleStatsFilter("all")}
             >
-              <Text style={{
-                color: theme.colors.onSurface,
-                fontWeight: statsFilter === 'all' ? '600' : '400',
-                fontSize: 16,
-              }}>
+              <Text
+                style={{
+                  color: theme.colors.onSurface,
+                  fontWeight: statsFilter === "all" ? "600" : "400",
+                  fontSize: 16,
+                }}
+              >
                 All Time
               </Text>
             </TouchableOpacity>
@@ -1547,16 +1592,21 @@ const RecentActivityCard = React.memo(({
               style={{
                 padding: spacing.md,
                 borderRadius: 8,
-                backgroundColor: statsFilter === 'recent' ? theme.colors.primaryContainer : 'transparent',
+                backgroundColor:
+                  statsFilter === "recent"
+                    ? theme.colors.primaryContainer
+                    : "transparent",
                 marginBottom: spacing.sm,
               }}
-              onPress={() => handleStatsFilter('recent')}
+              onPress={() => handleStatsFilter("recent")}
             >
-              <Text style={{
-                color: theme.colors.onSurface,
-                fontWeight: statsFilter === 'recent' ? '600' : '400',
-                fontSize: 16,
-              }}>
+              <Text
+                style={{
+                  color: theme.colors.onSurface,
+                  fontWeight: statsFilter === "recent" ? "600" : "400",
+                  fontSize: 16,
+                }}
+              >
                 Recent (7 days)
               </Text>
             </TouchableOpacity>
@@ -1565,16 +1615,21 @@ const RecentActivityCard = React.memo(({
               style={{
                 padding: spacing.md,
                 borderRadius: 8,
-                backgroundColor: statsFilter === 'month' ? theme.colors.primaryContainer : 'transparent',
+                backgroundColor:
+                  statsFilter === "month"
+                    ? theme.colors.primaryContainer
+                    : "transparent",
                 marginBottom: spacing.sm,
               }}
-              onPress={() => handleStatsFilter('month')}
+              onPress={() => handleStatsFilter("month")}
             >
-              <Text style={{
-                color: theme.colors.onSurface,
-                fontWeight: statsFilter === 'month' ? '600' : '400',
-                fontSize: 16,
-              }}>
+              <Text
+                style={{
+                  color: theme.colors.onSurface,
+                  fontWeight: statsFilter === "month" ? "600" : "400",
+                  fontSize: 16,
+                }}
+              >
                 This Month
               </Text>
             </TouchableOpacity>

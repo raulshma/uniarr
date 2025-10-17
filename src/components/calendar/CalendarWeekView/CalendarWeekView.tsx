@@ -1,11 +1,11 @@
-import React from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import React from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View, ScrollView } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { CalendarWeek } from '@/models/calendar.types';
-import { CalendarDayCell } from '../CalendarDayCell';
+import type { AppTheme } from "@/constants/theme";
+import type { CalendarWeek } from "@/models/calendar.types";
+import { CalendarDayCell } from "../CalendarDayCell";
 
 export type CalendarWeekViewProps = {
   data: CalendarWeek;
@@ -29,13 +29,13 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
       backgroundColor: theme.colors.surface,
     },
     header: {
-      flexDirection: 'row',
+      flexDirection: "row",
       backgroundColor: theme.colors.surfaceVariant,
       paddingVertical: theme.custom.spacing.sm,
     },
     headerCell: {
       flex: 1,
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: theme.custom.spacing.xs,
     },
     headerText: {
@@ -45,10 +45,10 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
       lineHeight: theme.custom.typography.labelMedium.lineHeight,
       letterSpacing: theme.custom.typography.labelMedium.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      textTransform: 'uppercase',
+      textTransform: "uppercase",
     },
     week: {
-      flexDirection: 'row',
+      flexDirection: "row",
       minHeight: 200,
     },
     timeColumn: {
@@ -58,7 +58,7 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
     },
     timeSlot: {
       height: 40,
-      justifyContent: 'center',
+      justifyContent: "center",
       paddingHorizontal: theme.custom.spacing.xs,
     },
     timeText: {
@@ -68,7 +68,7 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
       lineHeight: theme.custom.typography.labelSmall.lineHeight,
       letterSpacing: theme.custom.typography.labelSmall.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      textAlign: 'center',
+      textAlign: "center",
     },
     dayColumn: {
       flex: 1,
@@ -80,11 +80,11 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
     },
   });
 
-  const dayHeaders = data.days.map(day => {
+  const dayHeaders = data.days.map((day) => {
     const date = new Date(day.date);
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+    const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
     const dayNumber = date.getDate();
-    
+
     return (
       <View key={day.date} style={styles.headerCell}>
         <Text style={styles.headerText}>{dayName}</Text>
@@ -97,8 +97,15 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
 
   const timeSlots = Array.from({ length: 24 }, (_, i) => {
     const hour = i;
-    const timeString = hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
-    
+    const timeString =
+      hour === 0
+        ? "12 AM"
+        : hour < 12
+          ? `${hour} AM`
+          : hour === 12
+            ? "12 PM"
+            : `${hour - 12} PM`;
+
     return (
       <View key={hour} style={styles.timeSlot}>
         <Text style={styles.timeText}>{timeString}</Text>
@@ -121,10 +128,8 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={styles.week}>
-          <View style={styles.timeColumn}>
-            {timeSlots}
-          </View>
-          
+          <View style={styles.timeColumn}>{timeSlots}</View>
+
           {data.days.map((day, index) => (
             <View
               key={day.date}

@@ -2,17 +2,22 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Text, useTheme, Button, ActivityIndicator, Icon } from "react-native-paper";
+import {
+  Text,
+  useTheme,
+  Button,
+  ActivityIndicator,
+  Icon,
+} from "react-native-paper";
 import * as Sharing from "expo-sharing";
 
 import { TabHeader } from "@/components/common/TabHeader";
 import { Card } from "@/components/common/Card";
 import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
-import { backupRestoreService, type AnyBackupData } from "@/services/backup/BackupRestoreService";
+import { backupRestoreService } from "@/services/backup/BackupRestoreService";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
-import { useSettingsStore } from "@/store/settingsStore";
 
 const BackupRestoreScreen = () => {
   const router = useRouter();
@@ -20,7 +25,7 @@ const BackupRestoreScreen = () => {
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [recentBackups, setRecentBackups] = useState<
-    Array<{ name: string; path: string; modificationTime: number }>
+    { name: string; path: string; modificationTime: number }[]
   >([]);
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
 
@@ -55,25 +60,37 @@ const BackupRestoreScreen = () => {
       // Show share dialog
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        await alert("Backup Created", `Your backup is ready (${fileSizeMB} MB). Share it to save or store locally.`, [
-          {
-            text: "Share",
-            style: "default",
-            onPress: async () => {
-              try {
-                await backupRestoreService.shareBackup(backupPath);
-              } catch (error) {
-                await alert("Share Failed", error instanceof Error ? error.message : "Failed to share backup");
-              }
+        await alert(
+          "Backup Created",
+          `Your backup is ready (${fileSizeMB} MB). Share it to save or store locally.`,
+          [
+            {
+              text: "Share",
+              style: "default",
+              onPress: async () => {
+                try {
+                  await backupRestoreService.shareBackup(backupPath);
+                } catch (error) {
+                  await alert(
+                    "Share Failed",
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to share backup",
+                  );
+                }
+              },
             },
-          },
-          {
-            text: "Done",
-            style: "cancel",
-          },
-        ]);
+            {
+              text: "Done",
+              style: "cancel",
+            },
+          ],
+        );
       } else {
-        await alert("Backup Created", `Backup saved successfully (${fileSizeMB} MB)`);
+        await alert(
+          "Backup Created",
+          `Backup saved successfully (${fileSizeMB} MB)`,
+        );
       }
 
       // Refresh backups list
@@ -85,7 +102,8 @@ const BackupRestoreScreen = () => {
         fileSizeMB: parseFloat(fileSizeMB),
       });
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Failed to create backup";
+      const errorMsg =
+        error instanceof Error ? error.message : "Failed to create backup";
       await alert("Backup Failed", errorMsg);
       await logger.error("Failed to create backup", {
         location: "BackupRestoreScreen.handleCreateBackup",
@@ -107,7 +125,7 @@ const BackupRestoreScreen = () => {
         await alert(
           "Encrypted Backup Detected",
           "This backup is encrypted. Please use the 'Restore Encrypted Backup' option to restore it.",
-          [{ text: "OK", onPress: () => setIsRestoring(false) }]
+          [{ text: "OK", onPress: () => setIsRestoring(false) }],
         );
         return;
       }
@@ -116,7 +134,7 @@ const BackupRestoreScreen = () => {
       const hasTmdbCredentials = !!backupData.appData.tmdbCredentials?.apiKey;
       const servicesCount = backupData.appData.serviceConfigs?.length || 0;
       const servicesText = `${servicesCount} service configuration(s)`;
-      const additionalText = hasTmdbCredentials ? ' and TMDB credentials' : '';
+      const additionalText = hasTmdbCredentials ? " and TMDB credentials" : "";
 
       await alert(
         "Restore Backup?",
@@ -133,13 +151,19 @@ const BackupRestoreScreen = () => {
             onPress: async () => {
               try {
                 await backupRestoreService.restoreBackup(backupData);
-                await alert("Restore Complete", "Your backup has been restored successfully. The app will now refresh.");
+                await alert(
+                  "Restore Complete",
+                  "Your backup has been restored successfully. The app will now refresh.",
+                );
 
                 // Reload the settings store to reflect restored settings
                 await new Promise((resolve) => setTimeout(resolve, 1000));
                 router.replace("/(auth)/(tabs)/settings");
               } catch (error) {
-                const errorMsg = error instanceof Error ? error.message : "Failed to restore backup";
+                const errorMsg =
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to restore backup";
                 await alert("Restore Failed", errorMsg);
                 await logger.error("Failed to restore backup", {
                   location: "BackupRestoreScreen.handleRestoreBackup",
@@ -155,7 +179,10 @@ const BackupRestoreScreen = () => {
     } catch (error) {
       // User cancelled or error occurred
       if (!(error instanceof Error && error.message === "Restore cancelled")) {
-        const errorMsg = error instanceof Error ? error.message : "Failed to select backup file";
+        const errorMsg =
+          error instanceof Error
+            ? error.message
+            : "Failed to select backup file";
         await alert("Restore Failed", errorMsg);
         await logger.error("Failed to select backup", {
           location: "BackupRestoreScreen.handleRestoreBackup",
@@ -190,7 +217,10 @@ const BackupRestoreScreen = () => {
                   backupName,
                 });
               } catch (error) {
-                const errorMsg = error instanceof Error ? error.message : "Failed to delete backup";
+                const errorMsg =
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to delete backup";
                 await alert("Delete Failed", errorMsg);
                 await logger.error("Failed to delete backup", {
                   location: "BackupRestoreScreen.handleDeleteBackup",
@@ -310,7 +340,8 @@ const BackupRestoreScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Local Backup</Text>
           <Text style={styles.sectionDescription}>
-            Create a backup of your settings, service configurations, credentials, and TMDB API key. You can store it locally or share it.
+            Create a backup of your settings, service configurations,
+            credentials, and TMDB API key. You can store it locally or share it.
           </Text>
 
           <Card style={styles.card}>
@@ -352,7 +383,9 @@ const BackupRestoreScreen = () => {
                 mode="contained-tonal"
                 icon="lock-open-variant"
                 disabled={isCreatingBackup || isRestoring}
-                onPress={() => router.push("/(auth)/settings/backup-restore-encrypted")}
+                onPress={() =>
+                  router.push("/(auth)/settings/backup-restore-encrypted")
+                }
               >
                 Restore Encrypted Backup
               </Button>
@@ -369,11 +402,19 @@ const BackupRestoreScreen = () => {
 
           {isLoadingBackups ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator animating size="large" color={theme.colors.primary} />
+              <ActivityIndicator
+                animating
+                size="large"
+                color={theme.colors.primary}
+              />
             </View>
           ) : recentBackups.length === 0 ? (
             <View style={styles.emptyState}>
-              <Icon source="backup-restore" size={48} color={theme.colors.onSurfaceVariant} />
+              <Icon
+                source="backup-restore"
+                size={48}
+                color={theme.colors.onSurfaceVariant}
+              />
               <Text style={styles.emptyStateText}>No local backups yet</Text>
             </View>
           ) : (
@@ -381,8 +422,12 @@ const BackupRestoreScreen = () => {
               {recentBackups.map((backup) => (
                 <View key={backup.path} style={styles.backupItem}>
                   <View style={styles.backupInfo}>
-                    <Text style={styles.backupName}>{formatFileName(backup.name)}</Text>
-                    <Text style={styles.backupDate}>{formatDate(backup.modificationTime)}</Text>
+                    <Text style={styles.backupName}>
+                      {formatFileName(backup.name)}
+                    </Text>
+                    <Text style={styles.backupDate}>
+                      {formatDate(backup.modificationTime)}
+                    </Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: spacing.xs }}>
                     <Button
@@ -392,7 +437,10 @@ const BackupRestoreScreen = () => {
                       disabled={isCreatingBackup || isRestoring}
                       onPress={() => {
                         // Load and restore from local backup
-                        alert("Restore Feature", "Use 'Restore from File' button to restore this backup.");
+                        alert(
+                          "Restore Feature",
+                          "Use 'Restore from File' button to restore this backup.",
+                        );
                       }}
                     >
                       Use
@@ -402,7 +450,9 @@ const BackupRestoreScreen = () => {
                       compact
                       icon="delete"
                       disabled={isCreatingBackup || isRestoring}
-                      onPress={() => handleDeleteBackup(backup.path, backup.name)}
+                      onPress={() =>
+                        handleDeleteBackup(backup.path, backup.name)
+                      }
                     >
                       Delete
                     </Button>
@@ -418,12 +468,14 @@ const BackupRestoreScreen = () => {
           <Text style={styles.sectionTitle}>About Backups</Text>
           <Card style={styles.card}>
             <Text style={styles.sectionDescription}>
-              • Standard backups include your app settings, service configurations with credentials, TMDB API key, and network scan history{"\n"}
-              • Custom backups allow you to select exactly what to export{"\n"}
-              • Encrypted backups protect sensitive data with password encryption (XOR-PBKDF2){"\n"}
-              • Backups are stored in JSON format for compatibility{"\n"}
-              • You can share backups via email, cloud storage, or other apps{"\n"}
-              • Restoring a backup will replace your current settings, services, and TMDB configuration
+              • Standard backups include your app settings, service
+              configurations with credentials, TMDB API key, and network scan
+              history{"\n"}• Custom backups allow you to select exactly what to
+              export{"\n"}• Encrypted backups protect sensitive data with
+              password encryption (XOR-PBKDF2){"\n"}• Backups are stored in JSON
+              format for compatibility{"\n"}• You can share backups via email,
+              cloud storage, or other apps{"\n"}• Restoring a backup will
+              replace your current settings, services, and TMDB configuration
             </Text>
           </Card>
         </View>

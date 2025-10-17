@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
-import type { TmdbMediaType } from '@/connectors/implementations/TmdbConnector';
-import { ensureTmdbConnector } from '@/services/tmdb/TmdbConnectorProvider';
-import { queryKeys } from '@/hooks/queryKeys';
+import type { TmdbMediaType } from "@/connectors/implementations/TmdbConnector";
+import { ensureTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
+import { queryKeys } from "@/hooks/queryKeys";
 
 type Genre = {
   id: number;
@@ -25,7 +25,7 @@ export const useTmdbGenres = (
     queryKey: queryKeys.tmdb.genres(mediaType, language),
     staleTime: 12 * 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    networkMode: 'offlineFirst',
+    networkMode: "offlineFirst",
     queryFn: async () => {
       const connector = await ensureTmdbConnector();
       const response = await connector.getGenres(mediaType, language);

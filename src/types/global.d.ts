@@ -1,26 +1,26 @@
-import type { ImageSourcePropType } from 'react-native';
+import type { ImageSourcePropType } from "react-native";
 
-declare module '*.png' {
+declare module "*.png" {
   const content: ImageSourcePropType;
   export default content;
 }
 
-declare module '*.jpg' {
+declare module "*.jpg" {
   const content: ImageSourcePropType;
   export default content;
 }
 
-declare module '*.jpeg' {
+declare module "*.jpeg" {
   const content: ImageSourcePropType;
   export default content;
 }
 
-declare module '*.gif' {
+declare module "*.gif" {
   const content: ImageSourcePropType;
   export default content;
 }
 
-declare module '*.webp' {
+declare module "*.webp" {
   const content: ImageSourcePropType;
   export default content;
 }

@@ -35,7 +35,7 @@ class NotificationEventService {
   }
 
   async notifyDownloadCompleted(
-    payload: DownloadNotificationPayload
+    payload: DownloadNotificationPayload,
   ): Promise<void> {
     const state = useSettingsStore.getState();
     if (
@@ -60,12 +60,12 @@ class NotificationEventService {
     await quietHoursService.deliverNotification(
       COMPLETED_CATEGORY,
       message,
-      `${payload.torrent.name} • ${sizeLabel}`
+      `${payload.torrent.name} • ${sizeLabel}`,
     );
   }
 
   async notifyDownloadFailed(
-    payload: FailedDownloadNotificationPayload
+    payload: FailedDownloadNotificationPayload,
   ): Promise<void> {
     const state = useSettingsStore.getState();
     if (
@@ -90,7 +90,7 @@ class NotificationEventService {
     await quietHoursService.deliverNotification(
       FAILURE_CATEGORY,
       message,
-      `${payload.torrent.name} → ${reason}`
+      `${payload.torrent.name} → ${reason}`,
     );
   }
 
@@ -144,12 +144,12 @@ class NotificationEventService {
     await quietHoursService.deliverNotification(
       REQUEST_CATEGORY,
       message,
-      `${requestedBy} → ${mediaTitle}`
+      `${requestedBy} → ${mediaTitle}`,
     );
   }
 
   async notifyServiceStatusChange(
-    payload: ServiceHealthNotificationPayload
+    payload: ServiceHealthNotificationPayload,
   ): Promise<void> {
     const state = useSettingsStore.getState();
     if (
@@ -190,7 +190,7 @@ class NotificationEventService {
         SERVICE_CATEGORY,
         notification,
         `${payload.serviceName}: ${label}`,
-        { bypassQuietHours }
+        { bypassQuietHours },
       );
       return;
     }
@@ -209,7 +209,7 @@ class NotificationEventService {
       await quietHoursService.deliverNotification(
         SERVICE_CATEGORY,
         notification,
-        `${payload.serviceName}: restored`
+        `${payload.serviceName}: restored`,
       );
       return;
     }

@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   IconButton,
   ProgressBar,
@@ -63,9 +63,6 @@ const QBittorrentServiceScreen = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterValue, setFilterValue] = useState<FilterValue>(FILTER_ALL);
-  const [pendingAction, setPendingAction] = useState<TorrentAction | null>(
-    null
-  );
   const [pendingHash, setPendingHash] = useState<string | null>(null);
 
   const {
@@ -147,7 +144,7 @@ const QBittorrentServiceScreen = () => {
 
       void refetch();
       void refreshTransferInfo();
-    }, [hasValidServiceId, refetch, refreshTransferInfo])
+    }, [hasValidServiceId, refetch, refreshTransferInfo]),
   );
 
   const connector = hasValidServiceId
@@ -176,7 +173,7 @@ const QBittorrentServiceScreen = () => {
       serviceId,
       message,
     });
-  alert("Action failed", message);
+    alert("Action failed", message);
   }, [combinedError, serviceId]);
 
   const filteredTorrents = useMemo(() => {
@@ -220,7 +217,7 @@ const QBittorrentServiceScreen = () => {
     const total = list.length;
     const active = list.filter((torrent) => isTorrentActive(torrent)).length;
     const completed = list.filter((torrent) =>
-      isTorrentCompleted(torrent)
+      isTorrentCompleted(torrent),
     ).length;
     const paused = list.filter((torrent) => isTorrentPaused(torrent)).length;
 
@@ -331,7 +328,7 @@ const QBittorrentServiceScreen = () => {
           fontWeight: "600",
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleViewDownloads = useCallback(() => {
@@ -349,7 +346,6 @@ const QBittorrentServiceScreen = () => {
         return;
       }
 
-      setPendingAction(action);
       setPendingHash(torrent.hash);
       try {
         if (action === "pause") {
@@ -361,7 +357,7 @@ const QBittorrentServiceScreen = () => {
         setPendingHash(null);
       }
     },
-    [isMutating, pauseTorrentAsync, resumeTorrentAsync]
+    [isMutating, pauseTorrentAsync, resumeTorrentAsync],
   );
 
   const confirmDeleteTorrent = useCallback(
@@ -370,7 +366,7 @@ const QBittorrentServiceScreen = () => {
         return;
       }
 
-  alert(
+      alert(
         "Remove torrent",
         `Do you want to remove "${torrent.name}" from qBittorrent?`,
         [
@@ -392,10 +388,10 @@ const QBittorrentServiceScreen = () => {
                 deleteFiles: false,
               }),
           },
-        ]
+        ],
       );
     },
-    [deleteTorrentAsync, isMutating]
+    [deleteTorrentAsync, isMutating],
   );
 
   const handleForceRecheck = useCallback(
@@ -406,7 +402,7 @@ const QBittorrentServiceScreen = () => {
 
       await forceRecheckAsync(torrent.hash);
     },
-    [forceRecheckAsync, isMutating]
+    [forceRecheckAsync, isMutating],
   );
 
   const renderTorrentItem = useCallback(
@@ -486,11 +482,11 @@ const QBittorrentServiceScreen = () => {
       confirmDeleteTorrent,
       handleForceRecheck,
       isMutating,
-      pendingAction,
+      pendingHash,
       performPauseResume,
       theme.colors.primary,
       themeStyles,
-    ]
+    ],
   );
 
   const keyExtractor = useCallback((item: Torrent) => item.hash, []);
@@ -588,7 +584,7 @@ const QBittorrentServiceScreen = () => {
       summary,
       themeStyles,
       transferInfo,
-    ]
+    ],
   );
 
   const listEmptyComponent = useMemo(() => {

@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+// no direct React hooks used
+import { useQuery } from "@tanstack/react-query";
 
-import type { JellyfinConnector } from '@/connectors/implementations/JellyfinConnector';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { IConnector } from '@/connectors/base/IConnector';
-import { queryKeys } from '@/hooks/queryKeys';
-import type { JellyfinLatestItem } from '@/models/jellyfin.types';
+import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { IConnector } from "@/connectors/base/IConnector";
+import { queryKeys } from "@/hooks/queryKeys";
+import type { JellyfinLatestItem } from "@/models/jellyfin.types";
 
 interface UseJellyfinLatestOptions {
   readonly serviceId?: string;
@@ -13,17 +16,26 @@ interface UseJellyfinLatestOptions {
   readonly limit?: number;
 }
 
-const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): JellyfinConnector => {
+const ensureConnector = (
+  getConnector: (id: string) => IConnector | undefined,
+  serviceId: string,
+): JellyfinConnector => {
   const connector = getConnector(serviceId);
 
-  if (!connector || connector.config.type !== 'jellyfin') {
-    throw new Error(`Jellyfin connector not registered for service ${serviceId}.`);
+  if (!connector || connector.config.type !== "jellyfin") {
+    throw new Error(
+      `Jellyfin connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as JellyfinConnector;
 };
 
-export const useJellyfinLatestItems = ({ serviceId, libraryId, limit = 20 }: UseJellyfinLatestOptions) => {
+export const useJellyfinLatestItems = ({
+  serviceId,
+  libraryId,
+  limit = 20,
+}: UseJellyfinLatestOptions) => {
   const getConnector = useConnectorsStore(selectGetConnector);
 
   const enabled = Boolean(serviceId && libraryId);

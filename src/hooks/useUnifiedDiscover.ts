@@ -5,8 +5,11 @@ import type { JellyseerrConnector } from "@/connectors/implementations/Jellyseer
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import type { IConnector } from "@/connectors/base/IConnector";
-import type { ServiceType } from "@/models/service.types";
-import { useConnectorsStore, selectGetConnectorsByType } from "@/store/connectorsStore";
+import type { ServiceType, ServiceConfig } from "@/models/service.types";
+import {
+  useConnectorsStore,
+  selectGetConnectorsByType,
+} from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 import type {
   DiscoverMediaItem,
@@ -15,15 +18,17 @@ import type {
   UnifiedDiscoverServices,
 } from "@/models/discover.types";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
+
+import { useSettingsStore } from "@/store/settingsStore";
+import { getTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
+import {
+  mapTmdbMovieToDiscover,
+  mapTmdbTvToDiscover,
+} from "@/utils/tmdb.utils";
+import { logger } from "@/services/logger/LoggerService";
 type JellyseerrSearchResult =
   | components["schemas"]["MovieResult"]
   | components["schemas"]["TvResult"];
-
-import type { ServiceConfig } from "@/models/service.types";
-import { useSettingsStore } from "@/store/settingsStore";
-import { getTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
-import { mapTmdbMovieToDiscover, mapTmdbTvToDiscover } from "@/utils/tmdb.utils";
-import { logger } from "@/services/logger/LoggerService";
 
 const emptyServices: UnifiedDiscoverServices = {
   sonarr: [],
@@ -58,7 +63,7 @@ const mapServiceSummaries = (configs: ServiceConfig[]) =>
 const mapTrendingResult = (
   result: JellyseerrSearchResult,
   mediaType: DiscoverMediaItem["mediaType"],
-  sourceServiceId?: string
+  sourceServiceId?: string,
 ): DiscoverMediaItem => {
   // Explicitly handle the MovieResult | TvResult union and fallback to mediaInfo
 
@@ -172,23 +177,23 @@ const mapTrendingResult = (
 
 const fetchUnifiedDiscover = async (
   getConnectorsByType: (type: ServiceType) => IConnector[],
-  options: { tmdbEnabled: boolean }
+  options: { tmdbEnabled: boolean },
 ): Promise<UnifiedDiscoverPayload> => {
   const jellyConnectors = getConnectorsByType(
-    "jellyseerr"
+    "jellyseerr",
   ) as JellyseerrConnector[];
   const sonarrConnectors = getConnectorsByType("sonarr") as SonarrConnector[];
   const radarrConnectors = getConnectorsByType("radarr") as RadarrConnector[];
 
   const services: UnifiedDiscoverServices = {
     sonarr: mapServiceSummaries(
-      sonarrConnectors.map((connector) => connector.config)
+      sonarrConnectors.map((connector) => connector.config),
     ),
     radarr: mapServiceSummaries(
-      radarrConnectors.map((connector) => connector.config)
+      radarrConnectors.map((connector) => connector.config),
     ),
     jellyseerr: mapServiceSummaries(
-      jellyConnectors.map((connector) => connector.config)
+      jellyConnectors.map((connector) => connector.config),
     ),
   };
 
@@ -203,14 +208,14 @@ const fetchUnifiedDiscover = async (
       } catch (error) {
         console.warn(
           `Failed to load trending titles from ${connector.config.name}:`,
-          error
+          error,
         );
         return {
           connectorId: connector.config.id,
           items: [] as JellyseerrSearchResult[],
         } as const;
       }
-    })
+    }),
   );
 
   // Flatten while keeping a reference to which connector the item came from so
@@ -221,8 +226,10 @@ const fetchUnifiedDiscover = async (
         ({
           ...it,
           __sourceServiceId: r.connectorId,
-        } as unknown as JellyseerrSearchResult & { __sourceServiceId?: string })
-    )
+        }) as unknown as JellyseerrSearchResult & {
+          __sourceServiceId?: string;
+        },
+    ),
   );
 
   const deduped = new Map<
@@ -237,13 +244,13 @@ const fetchUnifiedDiscover = async (
       typeof r.tmdbId === "number"
         ? (r.tmdbId as number)
         : r.mediaInfo && typeof (r.mediaInfo as any).tmdbId === "number"
-        ? ((r.mediaInfo as any).tmdbId as number)
-        : undefined;
+          ? ((r.mediaInfo as any).tmdbId as number)
+          : undefined;
     const key = tmdb ? `tmdb-${tmdb}` : `${item.mediaType}-${item.id}`;
     if (!deduped.has(key)) {
       deduped.set(
         key,
-        item as JellyseerrSearchResult & { __sourceServiceId?: string }
+        item as JellyseerrSearchResult & { __sourceServiceId?: string },
       );
     }
   }
@@ -303,7 +310,7 @@ const fetchUnifiedDiscover = async (
         ]);
 
         const mapWithDedupe = (
-          items: Array<unknown>,
+          items: unknown[],
           mapper: (item: any) => DiscoverMediaItem,
         ) =>
           items
@@ -395,11 +402,11 @@ export const useUnifiedDiscover = () => {
 
   const services = useMemo(
     () => query.data?.services ?? emptyServices,
-    [query.data?.services]
+    [query.data?.services],
   );
   const sections = useMemo(
     () => query.data?.sections ?? [],
-    [query.data?.sections]
+    [query.data?.sections],
   );
 
   return {

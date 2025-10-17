@@ -1,10 +1,10 @@
 // Jest setup file to handle mock typing issues
-import 'jest';
+import "jest";
 
 // Extend Jest mock types to be more permissive
 declare global {
   namespace jest {
-    interface Mock<T = any> {
+    interface Mock {
       mockResolvedValue(value: any): this;
       mockRejectedValue(value: any): this;
       mockImplementation(fn: any): this;

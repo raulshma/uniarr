@@ -1,11 +1,11 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from "react";
 import {
   useMutation,
   useQuery,
   useQueryClient,
   type QueryObserverResult,
   type RefetchOptions,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
 import type {
   BazarrMovie,
@@ -15,11 +15,14 @@ import type {
   BazarrStatistics,
   BazarrSearchRequest,
   BazarrDownloadRequest,
-} from '@/models/bazarr.types';
-import type { BazarrConnector } from '@/connectors/implementations/BazarrConnector';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { IConnector } from '@/connectors/base/IConnector';
-import { queryKeys } from '@/hooks/queryKeys';
+} from "@/models/bazarr.types";
+import type { BazarrConnector } from "@/connectors/implementations/BazarrConnector";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { IConnector } from "@/connectors/base/IConnector";
+import { queryKeys } from "@/hooks/queryKeys";
 
 interface UseBazarrSubtitlesResult {
   movies: BazarrMovie[] | undefined;
@@ -42,7 +45,7 @@ interface UseBazarrSubtitlesResult {
   downloadError: unknown;
 }
 
-const BAZARR_SERVICE_TYPE = 'bazarr';
+const BAZARR_SERVICE_TYPE = "bazarr";
 
 const ensureBazarrConnector = (
   getConnector: (id: string) => IConnector | undefined,
@@ -50,19 +53,26 @@ const ensureBazarrConnector = (
 ): BazarrConnector => {
   const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== BAZARR_SERVICE_TYPE) {
-    throw new Error(`Bazarr connector not registered for service ${serviceId}.`);
+    throw new Error(
+      `Bazarr connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as BazarrConnector;
 };
 
-export const useBazarrSubtitles = (serviceId: string): UseBazarrSubtitlesResult => {
+export const useBazarrSubtitles = (
+  serviceId: string,
+): UseBazarrSubtitlesResult => {
   const queryClient = useQueryClient();
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === BAZARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureBazarrConnector(getConnector, serviceId), [getConnector, serviceId]);
+  const resolveConnector = useCallback(
+    () => ensureBazarrConnector(getConnector, serviceId),
+    [getConnector, serviceId],
+  );
 
   // Movies query
   const moviesQuery = useQuery({
@@ -116,7 +126,9 @@ export const useBazarrSubtitles = (serviceId: string): UseBazarrSubtitlesResult 
     },
     onSuccess: (data, variables) => {
       // Optionally update cache or trigger other queries
-      queryClient.invalidateQueries({ queryKey: queryKeys.bazarr.subtitlesList(serviceId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.bazarr.subtitlesList(serviceId),
+      });
     },
   });
 
@@ -128,37 +140,62 @@ export const useBazarrSubtitles = (serviceId: string): UseBazarrSubtitlesResult 
     },
     onSuccess: (data, variables) => {
       // Invalidate subtitles and statistics after download
-      queryClient.invalidateQueries({ queryKey: queryKeys.bazarr.subtitlesList(serviceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.bazarr.statistics(serviceId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.bazarr.subtitlesList(serviceId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.bazarr.statistics(serviceId),
+      });
     },
   });
 
   // Combined loading state
-  const isLoading = moviesQuery.isLoading || episodesQuery.isLoading || subtitlesQuery.isLoading || statisticsQuery.isLoading;
-  const isFetching = moviesQuery.isFetching || episodesQuery.isFetching || subtitlesQuery.isFetching || statisticsQuery.isFetching;
-  const isError = moviesQuery.isError || episodesQuery.isError || subtitlesQuery.isError || statisticsQuery.isError;
+  const isLoading =
+    moviesQuery.isLoading ||
+    episodesQuery.isLoading ||
+    subtitlesQuery.isLoading ||
+    statisticsQuery.isLoading;
+  const isFetching =
+    moviesQuery.isFetching ||
+    episodesQuery.isFetching ||
+    subtitlesQuery.isFetching ||
+    statisticsQuery.isFetching;
+  const isError =
+    moviesQuery.isError ||
+    episodesQuery.isError ||
+    subtitlesQuery.isError ||
+    statisticsQuery.isError;
 
   // Combined error state (using first error)
-  const error = moviesQuery.error || episodesQuery.error || subtitlesQuery.error || statisticsQuery.error;
+  const error =
+    moviesQuery.error ||
+    episodesQuery.error ||
+    subtitlesQuery.error ||
+    statisticsQuery.error;
 
   // Combined refetch function
-  const refetch = useCallback(async (options?: RefetchOptions) => {
-    const results = await Promise.all([
-      moviesQuery.refetch(options),
-      episodesQuery.refetch(options),
-      subtitlesQuery.refetch(options),
-      statisticsQuery.refetch(options),
-    ]);
-    return results[0]; // Return first result for compatibility
-  }, [moviesQuery, episodesQuery, subtitlesQuery, statisticsQuery]);
+  const refetch = useCallback(
+    async (options?: RefetchOptions) => {
+      const results = await Promise.all([
+        moviesQuery.refetch(options),
+        episodesQuery.refetch(options),
+        subtitlesQuery.refetch(options),
+        statisticsQuery.refetch(options),
+      ]);
+      return results[0]; // Return first result for compatibility
+    },
+    [moviesQuery, episodesQuery, subtitlesQuery, statisticsQuery],
+  );
 
   // Get missing subtitles from movies and episodes
   const missingSubtitles = useMemo(() => {
     if (!moviesQuery.data || !episodesQuery.data) return undefined;
 
     return [
-      ...(moviesQuery.data.flatMap(movie => movie.missingSubtitles || [])),
-      ...(episodesQuery.data.flatMap(episode => episode.missingSubtitles || [])),
+      ...moviesQuery.data.flatMap((movie) => movie.missingSubtitles || []),
+      ...episodesQuery.data.flatMap(
+        (episode) => episode.missingSubtitles || [],
+      ),
     ];
   }, [moviesQuery.data, episodesQuery.data]);
 

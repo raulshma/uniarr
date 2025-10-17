@@ -1,10 +1,10 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 // Export shallow equality helper for components to use when selecting parts of the store
-export { shallow } from 'zustand/shallow';
+export { shallow } from "zustand/shallow";
 
-export type ServicesViewMode = 'grid' | 'list';
-export type ServicesSortKey = 'name' | 'status' | 'type';
-export type SortDirection = 'asc' | 'desc';
+export type ServicesViewMode = "grid" | "list";
+export type ServicesSortKey = "name" | "status" | "type";
+export type SortDirection = "asc" | "desc";
 
 type ServicesData = {
   activeServiceId: string | null;
@@ -27,9 +27,9 @@ export interface ServicesState extends ServicesData {
 const defaultServicesState: ServicesData = {
   activeServiceId: null,
   selectedServiceIds: [],
-  viewMode: 'grid',
-  sortKey: 'name',
-  sortDirection: 'asc',
+  viewMode: "grid",
+  sortKey: "name",
+  sortDirection: "asc",
 };
 
 export const useServicesStore = create<ServicesState>((set, get) => ({
@@ -59,15 +59,21 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
 
     const { sortKey, sortDirection } = get();
     const isSameKey = key === sortKey;
-    const nextDirection: SortDirection = isSameKey && sortDirection === 'asc' ? 'desc' : 'asc';
+    const nextDirection: SortDirection =
+      isSameKey && sortDirection === "asc" ? "desc" : "asc";
 
     set({ sortKey: key, sortDirection: nextDirection });
   },
   reset: () => set({ ...defaultServicesState }),
 }));
 
-export const selectActiveServiceId = (state: ServicesState): string | null => state.activeServiceId;
-export const selectSelectedServiceIds = (state: ServicesState): string[] => state.selectedServiceIds;
-export const selectViewMode = (state: ServicesState): ServicesViewMode => state.viewMode;
-export const selectSortKey = (state: ServicesState): ServicesSortKey => state.sortKey;
-export const selectSortDirection = (state: ServicesState): SortDirection => state.sortDirection;
+export const selectActiveServiceId = (state: ServicesState): string | null =>
+  state.activeServiceId;
+export const selectSelectedServiceIds = (state: ServicesState): string[] =>
+  state.selectedServiceIds;
+export const selectViewMode = (state: ServicesState): ServicesViewMode =>
+  state.viewMode;
+export const selectSortKey = (state: ServicesState): ServicesSortKey =>
+  state.sortKey;
+export const selectSortDirection = (state: ServicesState): SortDirection =>
+  state.sortDirection;

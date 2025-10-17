@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Text, useTheme, Button, TextInput, ActivityIndicator } from "react-native-paper";
+import { Text, useTheme, Button, TextInput } from "react-native-paper";
 
 import { TabHeader } from "@/components/common/TabHeader";
 import { Card } from "@/components/common/Card";
 import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
-import { backupRestoreService, type AnyBackupData } from "@/services/backup/BackupRestoreService";
+import {
+  backupRestoreService,
+  type AnyBackupData,
+} from "@/services/backup/BackupRestoreService";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useRouter } from "expo-router";
@@ -18,7 +21,9 @@ const EncryptedBackupRestoreScreen = () => {
   const [isRestoring, setIsRestoring] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [selectedBackup, setSelectedBackup] = useState<AnyBackupData | null>(null);
+  const [selectedBackup, setSelectedBackup] = useState<AnyBackupData | null>(
+    null,
+  );
 
   const styles = StyleSheet.create({
     container: {
@@ -143,7 +148,7 @@ const EncryptedBackupRestoreScreen = () => {
         await alert(
           "Not an Encrypted Backup",
           "The selected backup is not encrypted. Please use the regular restore function.",
-          [{ text: "OK", onPress: () => router.back() }]
+          [{ text: "OK", onPress: () => router.back() }],
         );
         return;
       }
@@ -156,7 +161,8 @@ const EncryptedBackupRestoreScreen = () => {
         hasEncryptionInfo: !!backupData.encryptionInfo,
       });
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Failed to select backup";
+      const errorMsg =
+        error instanceof Error ? error.message : "Failed to select backup";
       setPasswordError(errorMsg);
       await logger.error("Failed to select encrypted backup", {
         location: "EncryptedBackupRestoreScreen.handleSelectBackup",
@@ -178,15 +184,18 @@ const EncryptedBackupRestoreScreen = () => {
       setPasswordError("");
 
       // Decrypt the selected backup using the service's public method
-      if (!selectedBackup.encryptionInfo || !selectedBackup.appData.encryptedData) {
-        throw new Error('Invalid encrypted backup format');
+      if (
+        !selectedBackup.encryptionInfo ||
+        !selectedBackup.appData.encryptedData
+      ) {
+        throw new Error("Invalid encrypted backup format");
       }
 
       const decryptedData = await backupRestoreService.decryptSensitiveData(
         selectedBackup.appData.encryptedData,
         password,
         selectedBackup.encryptionInfo.salt,
-        selectedBackup.encryptionInfo.iv
+        selectedBackup.encryptionInfo.iv,
       );
 
       // Merge decrypted data with backup data
@@ -196,7 +205,9 @@ const EncryptedBackupRestoreScreen = () => {
           ...selectedBackup.appData,
           ...decryptedData,
           // Keep non-encrypted data as is
-          serviceConfigs: decryptedData.serviceConfigs || selectedBackup.appData.serviceConfigs,
+          serviceConfigs:
+            decryptedData.serviceConfigs ||
+            selectedBackup.appData.serviceConfigs,
           networkScanHistory: selectedBackup.appData.networkScanHistory,
           recentIPs: selectedBackup.appData.recentIPs,
         },
@@ -205,10 +216,11 @@ const EncryptedBackupRestoreScreen = () => {
       // Remove encrypted data after decryption
       delete (decryptedBackup as any).appData.encryptedData;
 
-      const hasTmdbCredentials = !!decryptedBackup.appData.tmdbCredentials?.apiKey;
+      const hasTmdbCredentials =
+        !!decryptedBackup.appData.tmdbCredentials?.apiKey;
       const servicesCount = decryptedBackup.appData.serviceConfigs?.length || 0;
       const servicesText = `${servicesCount} service configuration(s)`;
-      const additionalText = hasTmdbCredentials ? ' and TMDB credentials' : '';
+      const additionalText = hasTmdbCredentials ? " and TMDB credentials" : "";
 
       await alert(
         "Restore Encrypted Backup?",
@@ -224,14 +236,20 @@ const EncryptedBackupRestoreScreen = () => {
             onPress: async () => {
               try {
                 await backupRestoreService.restoreBackup(decryptedBackup);
-                await alert("Restore Complete", "Your encrypted backup has been restored successfully. The app will now refresh.");
+                await alert(
+                  "Restore Complete",
+                  "Your encrypted backup has been restored successfully. The app will now refresh.",
+                );
 
                 // Reload the app to reflect restored settings
                 setTimeout(() => {
                   router.replace("/(auth)/(tabs)/settings");
                 }, 1000);
               } catch (error) {
-                const errorMsg = error instanceof Error ? error.message : "Failed to restore backup";
+                const errorMsg =
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to restore backup";
                 await alert("Restore Failed", errorMsg);
                 await logger.error("Failed to restore encrypted backup", {
                   location: "EncryptedBackupRestoreScreen.handleRestoreBackup",
@@ -240,7 +258,7 @@ const EncryptedBackupRestoreScreen = () => {
               }
             },
           },
-        ]
+        ],
       );
 
       await logger.info("Encrypted backup restore completed successfully", {
@@ -249,10 +267,18 @@ const EncryptedBackupRestoreScreen = () => {
         hasTmdbCredentials,
       });
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Failed to restore encrypted backup";
+      const errorMsg =
+        error instanceof Error
+          ? error.message
+          : "Failed to restore encrypted backup";
 
-      if (errorMsg.includes("Invalid password") || errorMsg.includes("Decryption failed")) {
-        setPasswordError("Invalid password. Please check your password and try again.");
+      if (
+        errorMsg.includes("Invalid password") ||
+        errorMsg.includes("Decryption failed")
+      ) {
+        setPasswordError(
+          "Invalid password. Please check your password and try again.",
+        );
       } else {
         setPasswordError(errorMsg);
       }
@@ -285,14 +311,16 @@ const EncryptedBackupRestoreScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🔐 Encrypted Backup Restore</Text>
           <Text style={styles.sectionDescription}>
-            Select an encrypted backup file (.json) and enter the password you used when creating it.
+            Select an encrypted backup file (.json) and enter the password you
+            used when creating it.
           </Text>
 
           <Card style={styles.encryptionCard}>
             <Text style={styles.encryptionTitle}>Security Notice</Text>
             <Text style={styles.sectionDescription}>
-              Encrypted backups contain sensitive data that is protected with a password.
-              Make sure you have the correct password before proceeding.
+              Encrypted backups contain sensitive data that is protected with a
+              password. Make sure you have the correct password before
+              proceeding.
             </Text>
           </Card>
         </View>
@@ -329,11 +357,14 @@ const EncryptedBackupRestoreScreen = () => {
               <View style={styles.backupInfo}>
                 <Text style={styles.backupInfoTitle}>📁 Backup Details</Text>
                 <Text style={styles.backupInfoText}>
-                  • Version: {selectedBackup.version}{"\n"}
-                  • Created: {formatBackupDate(selectedBackup.timestamp)}{"\n"}
-                  • Encryption: XOR-PBKDF2{"\n"}
-                  • Services: {selectedBackup.appData.serviceConfigs?.length || 0} configured{"\n"}
-                  • Has TMDB: {selectedBackup.appData.tmdbCredentials?.apiKey ? "Yes" : "No"}
+                  • Version: {selectedBackup.version}
+                  {"\n"}• Created: {formatBackupDate(selectedBackup.timestamp)}
+                  {"\n"}• Encryption: XOR-PBKDF2{"\n"}• Services:{" "}
+                  {selectedBackup.appData.serviceConfigs?.length || 0}{" "}
+                  configured{"\n"}• Has TMDB:{" "}
+                  {selectedBackup.appData.tmdbCredentials?.apiKey
+                    ? "Yes"
+                    : "No"}
                 </Text>
               </View>
             </Card>
@@ -393,12 +424,15 @@ const EncryptedBackupRestoreScreen = () => {
           <Text style={styles.sectionTitle}>Need Help?</Text>
           <Card style={styles.card}>
             <Text style={styles.sectionDescription}>
-              <Text style={{ fontWeight: "600" }}>Forgot your password?</Text>{"\n"}
-              Unfortunately, encrypted backups cannot be restored without the correct password.
-              You'll need to create a new backup instead.
+              <Text style={{ fontWeight: "600" }}>Forgot your password?</Text>
+              {"\n"}
+              Unfortunately, encrypted backups cannot be restored without the
+              correct password. You'll need to create a new backup instead.
               {"\n\n"}
-              <Text style={{ fontWeight: "600" }}>Backup not encrypted?</Text>{"\n"}
-              If your backup is not encrypted, use the regular "Restore from File" option instead.
+              <Text style={{ fontWeight: "600" }}>Backup not encrypted?</Text>
+              {"\n"}
+              If your backup is not encrypted, use the regular "Restore from
+              File" option instead.
             </Text>
           </Card>
         </View>

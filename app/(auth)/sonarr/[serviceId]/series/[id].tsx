@@ -1,16 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  Layout,
-} from "react-native-reanimated";
+import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -97,7 +91,7 @@ const SonarrSeriesDetailsScreen = () => {
           color: theme.colors.onSurfaceVariant,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const runtimeMinutes = useMemo(() => findEpisodeRuntime(series), [series]);
@@ -106,7 +100,7 @@ const SonarrSeriesDetailsScreen = () => {
     (nextState: boolean) => {
       toggleMonitor(nextState);
     },
-    [toggleMonitor]
+    [toggleMonitor],
   );
 
   const handleTriggerSearch = useCallback(() => {
@@ -114,7 +108,7 @@ const SonarrSeriesDetailsScreen = () => {
   }, [triggerSearch]);
 
   const handleDeleteSeries = useCallback(() => {
-  alert(
+    alert(
       "Remove Series",
       "Are you sure you want to remove this series from Sonarr? Existing files will be kept.",
       [
@@ -140,7 +134,7 @@ const SonarrSeriesDetailsScreen = () => {
           },
         },
       ],
-      { cancelable: true }
+      { cancelable: true },
     );
   }, [deleteSeriesAsync, router]);
 

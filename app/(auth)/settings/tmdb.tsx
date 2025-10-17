@@ -65,7 +65,7 @@ const TmdbSettingsScreen = () => {
           gap: spacing.sm,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const { apiKey, isLoading: isKeyLoading, saveKey, clearKey } = useTmdbKey();
@@ -94,9 +94,9 @@ const TmdbSettingsScreen = () => {
       try {
         // setInitialLoad is defined below; guard in case of ordering during edits.
         // We'll check at runtime via typeof.
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
         // @ts-ignore
-        if (typeof setInitialLoad === 'function') setInitialLoad(false);
+        if (typeof setInitialLoad === "function") setInitialLoad(false);
       } catch {
         // noop
       }
@@ -144,7 +144,7 @@ const TmdbSettingsScreen = () => {
       } else {
         alert(
           "Validation failed",
-          result.message ?? "TMDB rejected the credential."
+          result.message ?? "TMDB rejected the credential.",
         );
       }
     } catch (error) {
@@ -178,7 +178,7 @@ const TmdbSettingsScreen = () => {
             })();
           },
         },
-      ]
+      ],
     );
   };
 
@@ -186,7 +186,7 @@ const TmdbSettingsScreen = () => {
     if (!apiKey && !watch("apiKey")) {
       alert(
         "Add a key first",
-        "Provide a TMDB API key or token before enabling the integration."
+        "Provide a TMDB API key or token before enabling the integration.",
       );
       return;
     }
@@ -196,7 +196,13 @@ const TmdbSettingsScreen = () => {
   // Only show the full-page loader during initial key load. Avoid showing it
   // for transient changes (save/test/remove) which would cause the entire page
   // to flash when the hook updates.
-  const showLoader = isKeyLoading && initialLoad && !apiKey && !isSaving && !isTesting && !isRemoving;
+  const showLoader =
+    isKeyLoading &&
+    initialLoad &&
+    !apiKey &&
+    !isSaving &&
+    !isTesting &&
+    !isRemoving;
 
   return (
     <SafeAreaView style={styles.container}>

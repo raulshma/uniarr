@@ -26,7 +26,7 @@ const UnifiedSearchScreen = () => {
           marginHorizontal: spacing.sm,
         },
       }),
-    [theme]
+    [theme],
   );
 
   return (

@@ -21,7 +21,7 @@
     "noUncheckedIndexedAccess": true,
     "jsx": "react-jsx",
     "module": "ESNext", // or "NodeNext"
-    "moduleResolution": "Bundler", // or "NodeNext"
+    "moduleResolution": "Bundler" // or "NodeNext"
   },
   "include": [
     "app",

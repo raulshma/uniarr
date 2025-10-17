@@ -1,4 +1,8 @@
-import { useConnectorsStore, selectConnectorIds, selectConnectorsCount } from '@/store/connectorsStore';
+import {
+  useConnectorsStore,
+  selectConnectorIds,
+  selectConnectorsCount,
+} from "@/store/connectorsStore";
 
 /**
  * Returns connector ids and count as a small selector-based hook.

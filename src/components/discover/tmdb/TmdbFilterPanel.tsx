@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useMemo } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Chip,
@@ -7,12 +7,10 @@ import {
   Switch,
   Text,
   TextInput,
-  useTheme,
-} from 'react-native-paper';
+} from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
-import type { TmdbDiscoverFilters } from '@/hooks/tmdb/useTmdbDiscover';
+import { spacing } from "@/theme/spacing";
+import type { TmdbDiscoverFilters } from "@/hooks/tmdb/useTmdbDiscover";
 
 interface TmdbGenre {
   id: number;
@@ -27,9 +25,9 @@ interface Props {
 }
 
 const sortOptions = [
-  { label: 'Popularity', value: 'popularity.desc' },
-  { label: 'Rating', value: 'vote_average.desc' },
-  { label: 'Release Date', value: 'primary_release_date.desc' },
+  { label: "Popularity", value: "popularity.desc" },
+  { label: "Rating", value: "vote_average.desc" },
+  { label: "Release Date", value: "primary_release_date.desc" },
 ];
 
 export const TmdbFilterPanel: React.FC<Props> = ({
@@ -38,8 +36,6 @@ export const TmdbFilterPanel: React.FC<Props> = ({
   genres,
   genresLoading,
 }) => {
-  const theme = useTheme<AppTheme>();
-
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -49,20 +45,20 @@ export const TmdbFilterPanel: React.FC<Props> = ({
         },
         segmentedWrapper: {
           borderRadius: 16,
-          overflow: 'hidden',
+          overflow: "hidden",
         },
         labelRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
         },
         chipRow: {
-          flexDirection: 'row',
+          flexDirection: "row",
           gap: spacing.xs,
         },
         yearRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           gap: spacing.sm,
         },
       }),
@@ -76,18 +72,18 @@ export const TmdbFilterPanel: React.FC<Props> = ({
         <SegmentedButtons
           value={filters.mediaType}
           onValueChange={(value) =>
-            onFiltersChange({ mediaType: value as 'movie' | 'tv' })
+            onFiltersChange({ mediaType: value as "movie" | "tv" })
           }
           buttons={[
             {
-              value: 'movie',
-              label: 'Movies',
-              icon: 'movie-open',
+              value: "movie",
+              label: "Movies",
+              icon: "movie-open",
             },
             {
-              value: 'tv',
-              label: 'TV',
-              icon: 'television-classic',
+              value: "tv",
+              label: "TV",
+              icon: "television-classic",
             },
           ]}
           style={styles.segmentedWrapper}
@@ -104,9 +100,7 @@ export const TmdbFilterPanel: React.FC<Props> = ({
               <Chip
                 key={option.value}
                 selected={filters.sortBy === option.value}
-                onPress={() =>
-                  onFiltersChange({ sortBy: option.value })
-                }
+                onPress={() => onFiltersChange({ sortBy: option.value })}
               >
                 {option.label}
               </Chip>
@@ -133,7 +127,10 @@ export const TmdbFilterPanel: React.FC<Props> = ({
                 key={genre.id}
                 selected={filters.genreId === genre.id}
                 onPress={() =>
-                  onFiltersChange({ genreId: filters.genreId === genre.id ? undefined : genre.id })
+                  onFiltersChange({
+                    genreId:
+                      filters.genreId === genre.id ? undefined : genre.id,
+                  })
                 }
               >
                 {genre.name ?? `Genre ${genre.id}`}
@@ -150,9 +147,9 @@ export const TmdbFilterPanel: React.FC<Props> = ({
             mode="outlined"
             keyboardType="number-pad"
             maxLength={4}
-            value={filters.year ? String(filters.year) : ''}
+            value={filters.year ? String(filters.year) : ""}
             onChangeText={(text) => {
-              const numeric = text.replace(/[^0-9]/g, '');
+              const numeric = text.replace(/[^0-9]/g, "");
               if (!numeric) {
                 onFiltersChange({ year: undefined });
                 return;
@@ -162,11 +159,19 @@ export const TmdbFilterPanel: React.FC<Props> = ({
                 onFiltersChange({ year: parsed });
               }
             }}
-            placeholder={filters.mediaType === 'movie' ? 'Release year' : 'First air year'}
+            placeholder={
+              filters.mediaType === "movie" ? "Release year" : "First air year"
+            }
           />
         </View>
-        {filters.mediaType === 'movie' ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        {filters.mediaType === "movie" ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.xs,
+            }}
+          >
             <Text>Include adult</Text>
             <Switch
               value={Boolean(filters.includeAdult)}

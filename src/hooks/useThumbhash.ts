@@ -20,11 +20,14 @@ export interface UseThumbhashOptions {
  * Hook for managing thumbhash for a given URI.
  * Provides thumbhash value and generation state.
  */
-export const useThumbhash = (uri: string | undefined, options: UseThumbhashOptions = {}) => {
+export const useThumbhash = (
+  uri: string | undefined,
+  options: UseThumbhashOptions = {},
+) => {
   const { autoGenerate = true, generateDelay = 0 } = options;
 
   const [thumbhash, setThumbhash] = useState<string | undefined>(() =>
-    uri ? thumbhashService.getThumbhash(uri) : undefined
+    uri ? thumbhashService.getThumbhash(uri) : undefined,
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -58,7 +61,8 @@ export const useThumbhash = (uri: string | undefined, options: UseThumbhashOptio
           setIsGenerating(true);
           setHasError(false);
 
-          const generatedThumbhash = await thumbhashService.generateThumbhash(uri);
+          const generatedThumbhash =
+            await thumbhashService.generateThumbhash(uri);
 
           if (generatedThumbhash) {
             setThumbhash(generatedThumbhash);
@@ -66,7 +70,7 @@ export const useThumbhash = (uri: string | undefined, options: UseThumbhashOptio
           } else {
             setHasError(true);
           }
-        } catch (error) {
+        } catch {
           setHasError(true);
         } finally {
           setIsGenerating(false);

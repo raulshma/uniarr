@@ -1,13 +1,12 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { renderHook, act } from '@testing-library/react-native';
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import { useSonarrSeries } from '@/hooks/useSonarrSeries';
-import { queryKeys } from '@/hooks/queryKeys';
-import type { ServiceConfig } from '@/models/service.types';
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import type { ServiceConfig } from "@/models/service.types";
+import { secureStorage } from "@/services/storage/SecureStorage";
+import { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 
 // Mock all dependencies
-jest.mock('axios', () => ({
+jest.mock("axios", () => ({
   __esModule: true,
   default: {
     create: jest.fn(() => ({
@@ -24,13 +23,13 @@ jest.mock('axios', () => ({
   },
 }));
 
-jest.mock('@react-native-async-storage/async-storage', () => ({
+jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn(async () => null),
   setItem: jest.fn(async () => undefined),
   removeItem: jest.fn(async () => undefined),
 }));
 
-jest.mock('@/services/logger/LoggerService', () => ({
+jest.mock("@/services/logger/LoggerService", () => ({
   logger: {
     debug: jest.fn(async () => undefined),
     info: jest.fn(async () => undefined),
@@ -39,8 +38,10 @@ jest.mock('@/services/logger/LoggerService', () => ({
   },
 }));
 
-jest.mock('@/utils/error.utils', () => {
-  const actual = jest.requireActual<typeof import('@/utils/error.utils')>('@/utils/error.utils');
+jest.mock("@/utils/error.utils", () => {
+  const actual = jest.requireActual<typeof import("@/utils/error.utils")>(
+    "@/utils/error.utils",
+  );
   return {
     ...actual,
     handleApiError: jest.fn((error: unknown) => {
@@ -54,14 +55,14 @@ jest.mock('@/utils/error.utils', () => {
         });
       }
       return new actual.ApiError({
-        message: 'Mock error',
+        message: "Mock error",
         cause: error,
       });
     }),
   };
 });
 
-jest.mock('@/services/storage/SecureStorage', () => ({
+jest.mock("@/services/storage/SecureStorage", () => ({
   secureStorage: {
     getServiceConfigs: jest.fn(async () => []),
     saveServiceConfig: jest.fn(async () => undefined),
@@ -71,38 +72,42 @@ jest.mock('@/services/storage/SecureStorage', () => ({
 }));
 
 // Mock connector implementations
-const mockSonarrConnector = jest.fn().mockImplementation(() => ({
+jest.mock("@/connectors/implementations/SonarrConnector", () => ({
+  SonarrConnector: jest.fn().mockImplementation(() => ({
     testConnection: jest.fn().mockResolvedValue({
       success: true,
-      version: '4.0.0',
+      version: "4.0.0",
       latency: 100,
     }),
     getSeries: jest.fn().mockResolvedValue([
-      { id: 1, title: 'Test Series 1', status: 'continuing' },
-      { id: 2, title: 'Test Series 2', status: 'ended' },
+      { id: 1, title: "Test Series 1", status: "continuing" },
+      { id: 2, title: "Test Series 2", status: "ended" },
     ]),
     search: jest.fn().mockResolvedValue([]),
-    add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Series' }),
+    add: jest.fn().mockResolvedValue({ id: 1, title: "Test Series" }),
     initialize: jest.fn().mockResolvedValue(undefined),
     dispose: jest.fn().mockResolvedValue(undefined),
-    getHealth: jest.fn().mockResolvedValue({ status: 'healthy', lastChecked: new Date() }),
-    getVersion: jest.fn().mockResolvedValue('4.0.0'),
-  }));
+    getHealth: jest
+      .fn()
+      .mockResolvedValue({ status: "healthy", lastChecked: new Date() }),
+    getVersion: jest.fn().mockResolvedValue("4.0.0"),
+  })),
+}));
 
 const mockRadarrConnector = jest.fn().mockImplementation(() => ({
   testConnection: jest.fn().mockResolvedValue({
     success: true,
-    version: '5.0.0',
+    version: "5.0.0",
     latency: 150,
   }),
   getMovies: jest.fn().mockResolvedValue([]),
   search: jest.fn().mockResolvedValue([]),
-  add: jest.fn().mockResolvedValue({ id: 1, title: 'Test Movie' }),
+  add: jest.fn().mockResolvedValue({ id: 1, title: "Test Movie" }),
   initialize: jest.fn().mockResolvedValue(undefined),
   dispose: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/connectors/implementations/RadarrConnector', () => ({
+jest.mock("@/connectors/implementations/RadarrConnector", () => ({
   RadarrConnector: mockRadarrConnector,
 }));
 
@@ -114,11 +119,11 @@ const mockQueryClient = {
   removeQueries: jest.fn(),
 };
 
-jest.mock('@tanstack/react-query', () => ({
+jest.mock("@tanstack/react-query", () => ({
   useQueryClient: () => mockQueryClient,
 }));
 
-describe('Service Management Integration Tests', () => {
+describe("Service Management Integration Tests", () => {
   let manager: ConnectorManager;
 
   beforeEach(() => {
@@ -126,14 +131,14 @@ describe('Service Management Integration Tests', () => {
     jest.clearAllMocks();
   });
 
-  describe('Service Addition Flow', () => {
-    it('should successfully add a new service and make it available for queries', async () => {
+  describe("Service Addition Flow", () => {
+    it("should successfully add a new service and make it available for queries", async () => {
       const serviceConfig: ServiceConfig = {
-        id: 'new-sonarr-service',
-        name: 'New Sonarr Instance',
-        type: 'sonarr',
-        url: 'http://new-sonarr.local',
-        apiKey: 'new-api-key',
+        id: "new-sonarr-service",
+        name: "New Sonarr Instance",
+        type: "sonarr",
+        url: "http://new-sonarr.local",
+        apiKey: "new-api-key",
         enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -148,36 +153,37 @@ describe('Service Management Integration Tests', () => {
       expect(connector?.config).toEqual(serviceConfig);
 
       // Verify secure storage was called
-      const { secureStorage } = require('@/services/storage/SecureStorage');
-      expect(secureStorage.saveServiceConfig).toHaveBeenCalledWith(serviceConfig);
+      expect(secureStorage.saveServiceConfig).toHaveBeenCalledWith(
+        serviceConfig,
+      );
 
       // Test that queries work with the new service
-      const { SonarrConnector } = require('@/connectors/implementations/SonarrConnector');
       const mockSeries = await (connector as any)?.getSeries();
 
       expect(mockSeries).toHaveLength(2);
-      expect(mockSeries?.[0]?.title).toBe('Test Series 1');
+      expect(mockSeries?.[0]?.title).toBe("Test Series 1");
     });
 
-    it('should handle service addition failures gracefully', async () => {
+    it("should handle service addition failures gracefully", async () => {
       const serviceConfig: ServiceConfig = {
-        id: 'failing-service',
-        name: 'Failing Service',
-        type: 'sonarr',
-        url: 'http://failing.local',
-        apiKey: 'test-key',
+        id: "failing-service",
+        name: "Failing Service",
+        type: "sonarr",
+        url: "http://failing.local",
+        apiKey: "test-key",
         enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
       // Mock connector creation to fail
-      const { SonarrConnector } = require('@/connectors/implementations/SonarrConnector');
       SonarrConnector.mockImplementationOnce(() => {
-        throw new Error('Invalid configuration');
+        throw new Error("Invalid configuration");
       });
 
-      await expect(manager.addConnector(serviceConfig)).rejects.toThrow('Invalid configuration');
+      await expect(manager.addConnector(serviceConfig)).rejects.toThrow(
+        "Invalid configuration",
+      );
 
       // Verify service was not added
       const connector = manager.getConnector(serviceConfig.id);
@@ -185,14 +191,14 @@ describe('Service Management Integration Tests', () => {
     });
   });
 
-  describe('Service Removal Flow', () => {
-    it('should successfully remove a service and clean up resources', async () => {
+  describe("Service Removal Flow", () => {
+    it("should successfully remove a service and clean up resources", async () => {
       const serviceConfig: ServiceConfig = {
-        id: 'service-to-remove',
-        name: 'Service to Remove',
-        type: 'sonarr',
-        url: 'http://remove.local',
-        apiKey: 'test-key',
+        id: "service-to-remove",
+        name: "Service to Remove",
+        type: "sonarr",
+        url: "http://remove.local",
+        apiKey: "test-key",
         enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -210,43 +216,47 @@ describe('Service Management Integration Tests', () => {
       expect(connector).toBeUndefined();
 
       // Verify secure storage was called for removal
-      const { secureStorage } = require('@/services/storage/SecureStorage');
-      expect(secureStorage.removeServiceConfig).toHaveBeenCalledWith(serviceConfig.id);
+      expect(secureStorage.removeServiceConfig).toHaveBeenCalledWith(
+        serviceConfig.id,
+      );
     });
 
-    it('should handle removal of non-existent service gracefully', async () => {
-      const nonExistentId = 'non-existent-service';
+    it("should handle removal of non-existent service gracefully", async () => {
+      const nonExistentId = "non-existent-service";
 
       // Should not throw
-      await expect(manager.removeConnector(nonExistentId)).resolves.toBeUndefined();
+      await expect(
+        manager.removeConnector(nonExistentId),
+      ).resolves.toBeUndefined();
 
       // Verify secure storage was still called (even for non-existent)
-      const { secureStorage } = require('@/services/storage/SecureStorage');
-      expect(secureStorage.removeServiceConfig).toHaveBeenCalledWith(nonExistentId);
+      expect(secureStorage.removeServiceConfig).toHaveBeenCalledWith(
+        nonExistentId,
+      );
     });
   });
 
-  describe('Service State Synchronization', () => {
-    it('should maintain consistent state across manager and storage', async () => {
+  describe("Service State Synchronization", () => {
+    it("should maintain consistent state across manager and storage", async () => {
       const serviceConfig: ServiceConfig = {
-        id: 'sync-test-service',
-        name: 'Sync Test Service',
-        type: 'sonarr',
-        url: 'http://sync.local',
-        apiKey: 'test-key',
+        id: "sync-test-service",
+        name: "Sync Test Service",
+        type: "sonarr",
+        url: "http://sync.local",
+        apiKey: "test-key",
         enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-
-      const { secureStorage } = require('@/services/storage/SecureStorage');
 
       // Add service
       await manager.addConnector(serviceConfig);
 
       // Verify both manager and storage have the service
       expect(manager.getConnector(serviceConfig.id)).toBeDefined();
-      expect(secureStorage.saveServiceConfig).toHaveBeenCalledWith(serviceConfig);
+      expect(secureStorage.saveServiceConfig).toHaveBeenCalledWith(
+        serviceConfig,
+      );
 
       // Simulate storage returning the service on load
       secureStorage.getServiceConfigs.mockResolvedValue([serviceConfig]);
@@ -258,37 +268,40 @@ describe('Service Management Integration Tests', () => {
       expect(manager.getConnector(serviceConfig.id)).toBeDefined();
     });
 
-    it('should handle storage failures during service operations', async () => {
+    it("should handle storage failures during service operations", async () => {
       const serviceConfig: ServiceConfig = {
-        id: 'storage-fail-service',
-        name: 'Storage Fail Service',
-        type: 'sonarr',
-        url: 'http://storage-fail.local',
-        apiKey: 'test-key',
+        id: "storage-fail-service",
+        name: "Storage Fail Service",
+        type: "sonarr",
+        url: "http://storage-fail.local",
+        apiKey: "test-key",
         enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      const { secureStorage } = require('@/services/storage/SecureStorage');
-      secureStorage.saveServiceConfig.mockRejectedValue(new Error('Storage failure'));
+      secureStorage.saveServiceConfig.mockRejectedValue(
+        new Error("Storage failure"),
+      );
 
       // Should handle storage failure gracefully
-      await expect(manager.addConnector(serviceConfig)).rejects.toThrow('Storage failure');
+      await expect(manager.addConnector(serviceConfig)).rejects.toThrow(
+        "Storage failure",
+      );
 
       // Service should not be in manager after storage failure
       expect(manager.getConnector(serviceConfig.id)).toBeUndefined();
     });
   });
 
-  describe('Query Integration', () => {
-    it('should invalidate queries when services are added or removed', async () => {
+  describe("Query Integration", () => {
+    it("should invalidate queries when services are added or removed", async () => {
       const serviceConfig: ServiceConfig = {
-        id: 'query-test-service',
-        name: 'Query Test Service',
-        type: 'sonarr',
-        url: 'http://query.local',
-        apiKey: 'test-key',
+        id: "query-test-service",
+        name: "Query Test Service",
+        type: "sonarr",
+        url: "http://query.local",
+        apiKey: "test-key",
         enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -307,20 +320,20 @@ describe('Service Management Integration Tests', () => {
       expect(mockQueryClient.invalidateQueries).toHaveBeenCalledTimes(2);
     });
 
-    it('should handle query data consistency across service changes', async () => {
+    it("should handle query data consistency across service changes", async () => {
       const serviceConfig: ServiceConfig = {
-        id: 'consistency-service',
-        name: 'Consistency Service',
-        type: 'sonarr',
-        url: 'http://consistency.local',
-        apiKey: 'test-key',
+        id: "consistency-service",
+        name: "Consistency Service",
+        type: "sonarr",
+        url: "http://consistency.local",
+        apiKey: "test-key",
         enabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
       // Mock query data
-      const mockSeriesData = [{ id: 1, title: 'Series 1' }];
+      const mockSeriesData = [{ id: 1, title: "Series 1" }];
       mockQueryClient.getQueryData.mockReturnValue(mockSeriesData);
 
       // Add service
@@ -337,25 +350,25 @@ describe('Service Management Integration Tests', () => {
     });
   });
 
-  describe('Error Recovery', () => {
-    it('should recover from partial failures during multi-service operations', async () => {
+  describe("Error Recovery", () => {
+    it("should recover from partial failures during multi-service operations", async () => {
       const services: ServiceConfig[] = [
         {
-          id: 'service-1',
-          name: 'Service 1',
-          type: 'sonarr',
-          url: 'http://service1.local',
-          apiKey: 'test-key',
+          id: "service-1",
+          name: "Service 1",
+          type: "sonarr",
+          url: "http://service1.local",
+          apiKey: "test-key",
           enabled: true,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         {
-          id: 'service-2',
-          name: 'Service 2',
-          type: 'radarr',
-          url: 'http://service2.local',
-          apiKey: 'test-key',
+          id: "service-2",
+          name: "Service 2",
+          type: "radarr",
+          url: "http://service2.local",
+          apiKey: "test-key",
           enabled: true,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -364,11 +377,12 @@ describe('Service Management Integration Tests', () => {
 
       // Mock one service to fail during connection test
       const failingConnector = {
-        testConnection: jest.fn().mockRejectedValue(new Error('Connection failed')),
+        testConnection: jest
+          .fn()
+          .mockRejectedValue(new Error("Connection failed")),
       };
       mockRadarrConnector.mockImplementationOnce(() => failingConnector);
 
-      const { secureStorage } = require('@/services/storage/SecureStorage');
       secureStorage.getServiceConfigs.mockResolvedValue(services);
 
       // Load services (should succeed despite one failure)
@@ -381,7 +395,9 @@ describe('Service Management Integration Tests', () => {
       const results = await manager.testAllConnections();
       expect(results.size).toBe(2);
 
-      const successCount = Array.from(results.values()).filter(r => r.success).length;
+      const successCount = Array.from(results.values()).filter(
+        (r) => r.success,
+      ).length;
       expect(successCount).toBe(1); // One success, one failure
     });
   });

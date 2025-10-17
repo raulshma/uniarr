@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-import { QBittorrentConnector } from '@/connectors/implementations/QBittorrentConnector';
-import type { ServiceConfig } from '@/models/service.types';
-import type { Torrent } from '@/models/torrent.types';
-import { ApiError, handleApiError } from '@/utils/error.utils';
+import { QBittorrentConnector } from "@/connectors/implementations/QBittorrentConnector";
+import type { ServiceConfig } from "@/models/service.types";
+import type { Torrent } from "@/models/torrent.types";
+import { ApiError, handleApiError } from "@/utils/error.utils";
 
 // Mock network utilities
-jest.mock('@/utils/network.utils', () => ({
+jest.mock("@/utils/network.utils", () => ({
   testNetworkConnectivity: jest.fn().mockResolvedValue({
     success: true,
     latency: 50,
@@ -15,7 +15,7 @@ jest.mock('@/utils/network.utils', () => ({
 }));
 
 // Mock API test utilities
-jest.mock('@/utils/api-test.utils', () => ({
+jest.mock("@/utils/api-test.utils", () => ({
   testSonarrApi: jest.fn().mockResolvedValue({
     success: true,
   }),
@@ -62,7 +62,7 @@ const createMockAxiosInstance = (): MockAxiosInstance => ({
   },
 });
 
-jest.mock('axios', () => ({
+jest.mock("axios", () => ({
   __esModule: true,
   default: {
     create: jest.fn(),
@@ -72,13 +72,13 @@ jest.mock('axios', () => ({
   isAxiosError: jest.fn(),
 }));
 
-jest.mock('@react-native-async-storage/async-storage', () => ({
+jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn(async () => null),
   setItem: jest.fn(async () => undefined),
   removeItem: jest.fn(async () => undefined),
 }));
 
-jest.mock('@/services/logger/LoggerService', () => ({
+jest.mock("@/services/logger/LoggerService", () => ({
   logger: {
     debug: jest.fn(async () => undefined),
     info: jest.fn(async () => undefined),
@@ -87,8 +87,10 @@ jest.mock('@/services/logger/LoggerService', () => ({
   },
 }));
 
-jest.mock('@/utils/error.utils', () => {
-  const actual = jest.requireActual<typeof import('@/utils/error.utils')>('@/utils/error.utils');
+jest.mock("@/utils/error.utils", () => {
+  const actual = jest.requireActual<typeof import("@/utils/error.utils")>(
+    "@/utils/error.utils",
+  );
   const mockHandleApiError = jest.fn((error: unknown) => {
     if (error instanceof actual.ApiError) {
       return error;
@@ -102,7 +104,7 @@ jest.mock('@/utils/error.utils', () => {
     }
 
     return new actual.ApiError({
-      message: 'Mock error',
+      message: "Mock error",
       cause: error,
     });
   });
@@ -113,18 +115,20 @@ jest.mock('@/utils/error.utils', () => {
   };
 });
 
-const mockedHandleApiError = handleApiError as unknown as jest.MockedFunction<typeof handleApiError>;
+const mockedHandleApiError = handleApiError as unknown as jest.MockedFunction<
+  typeof handleApiError
+>;
 
 const baseConfig: ServiceConfig = {
-  id: 'qbittorrent-1',
-  name: 'Primary qBittorrent',
-  type: 'qbittorrent',
-  url: 'http://qbittorrent.local:8080',
-  username: 'admin',
-  password: 'password123',
+  id: "qbittorrent-1",
+  name: "Primary qBittorrent",
+  type: "qbittorrent",
+  url: "http://qbittorrent.local:8080",
+  username: "admin",
+  password: "password123",
   enabled: true,
-  createdAt: new Date('2025-01-01T00:00:00Z'),
-  updatedAt: new Date('2025-01-01T00:00:00Z'),
+  createdAt: new Date("2025-01-01T00:00:00Z"),
+  updatedAt: new Date("2025-01-01T00:00:00Z"),
 };
 
 const createConnector = () => new QBittorrentConnector(baseConfig);
@@ -142,20 +146,23 @@ const defaultErrorHandler = (error: unknown): ApiError => {
   }
 
   return new ApiError({
-    message: 'Mock error',
+    message: "Mock error",
     cause: error,
   });
 };
 
-describe('QBittorrentConnector', () => {
+describe("QBittorrentConnector", () => {
   let mockAxiosInstance: MockAxiosInstance;
 
   beforeEach(() => {
     mockAxiosInstance = createMockAxiosInstance();
     mockAxiosInstance.defaults.baseURL = baseConfig.url;
 
-    const mockedAxios = jest.requireMock('axios') as {
-      default: { create: jest.MockedFunction<any>; isAxiosError: jest.MockedFunction<any> };
+    const mockedAxios = jest.requireMock("axios") as {
+      default: {
+        create: jest.MockedFunction<any>;
+        isAxiosError: jest.MockedFunction<any>;
+      };
     };
 
     mockedAxios.default.create.mockReset();
@@ -166,107 +173,111 @@ describe('QBittorrentConnector', () => {
     mockedHandleApiError.mockImplementation(defaultErrorHandler);
   });
 
-  it('authenticates with username and password', async () => {
+  it("authenticates with username and password", async () => {
     const connector = createConnector();
 
     // Mock successful authentication
     mockAxiosInstance.post.mockResolvedValueOnce({
-      data: 'Ok.',
+      data: "Ok.",
       headers: {
-        'set-cookie': ['SID=abc123; Path=/; HttpOnly'],
+        "set-cookie": ["SID=abc123; Path=/; HttpOnly"],
       },
     });
 
     // Mock version check after authentication
     mockAxiosInstance.get.mockResolvedValueOnce({
-      data: 'v4.6.2',
+      data: "v4.6.2",
     });
 
     await connector.initialize();
     const version = await connector.getVersion();
 
     expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      '/api/v2/auth/login',
-      'username=admin&password=password123',
+      "/api/v2/auth/login",
+      "username=admin&password=password123",
       expect.objectContaining({
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Referer': 'http://qbittorrent.local:8080',
+          "Content-Type": "application/x-www-form-urlencoded",
+          Referer: "http://qbittorrent.local:8080",
         },
       }),
     );
-    expect(version).toBe('v4.6.2');
+    expect(version).toBe("v4.6.2");
   });
 
-  it('authenticates even when no set-cookie header is present', async () => {
+  it("authenticates even when no set-cookie header is present", async () => {
     const connector = createConnector();
 
     // Mock successful authentication without set-cookie header
     mockAxiosInstance.post.mockResolvedValueOnce({
-      data: 'Ok.',
+      data: "Ok.",
       headers: {}, // No set-cookie header
     });
 
     // Mock version check after authentication
     mockAxiosInstance.get.mockResolvedValueOnce({
-      data: 'v4.6.2',
+      data: "v4.6.2",
     });
 
     await connector.initialize();
     const version = await connector.getVersion();
 
     expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      '/api/v2/auth/login',
-      'username=admin&password=password123',
+      "/api/v2/auth/login",
+      "username=admin&password=password123",
       expect.objectContaining({
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Referer': 'http://qbittorrent.local:8080',
+          "Content-Type": "application/x-www-form-urlencoded",
+          Referer: "http://qbittorrent.local:8080",
         },
       }),
     );
-    expect(version).toBe('v4.6.2');
+    expect(version).toBe("v4.6.2");
   });
 
-  it('throws error when authentication fails', async () => {
+  it("throws error when authentication fails", async () => {
     const connector = createConnector();
-    
+
     // Mock failed authentication - qBittorrent returns "Fails." when credentials are wrong
     mockAxiosInstance.post.mockResolvedValueOnce({
-      data: 'Fails.',
+      data: "Fails.",
       headers: {}, // No set-cookie header means no session cookie
     });
 
-    await expect(connector.initialize()).rejects.toThrow('qBittorrent authentication failed. Server responded with: "Fails." This usually means incorrect username or password. Default credentials are admin/adminadmin.');
+    await expect(connector.initialize()).rejects.toThrow(
+      'qBittorrent authentication failed. Server responded with: "Fails." This usually means incorrect username or password. Default credentials are admin/adminadmin.',
+    );
   });
 
-  it('throws error when credentials are missing', async () => {
+  it("throws error when credentials are missing", async () => {
     const configWithoutCredentials: ServiceConfig = {
       ...baseConfig,
       username: undefined,
       password: undefined,
     };
-    
+
     const connector = new QBittorrentConnector(configWithoutCredentials);
 
-    await expect(connector.initialize()).rejects.toThrow('qBittorrent credentials are required.');
+    await expect(connector.initialize()).rejects.toThrow(
+      "qBittorrent credentials are required.",
+    );
   });
 
-  it('returns mapped torrents from getTorrents', async () => {
+  it("returns mapped torrents from getTorrents", async () => {
     const connector = createConnector();
 
     // Mock authentication
     mockAxiosInstance.post.mockResolvedValueOnce({
-      data: 'Ok.',
+      data: "Ok.",
       headers: {}, // No set-cookie header needed
     });
 
     const torrentResponse = {
-      hash: 'abc123def456',
-      name: 'Ubuntu 22.04 LTS',
-      state: 'downloading',
-      category: 'linux',
-      tags: 'iso,ubuntu',
+      hash: "abc123def456",
+      name: "Ubuntu 22.04 LTS",
+      state: "downloading",
+      category: "linux",
+      tags: "iso,ubuntu",
       progress: 0.75,
       total_size: 4_000_000_000,
       downloaded: 3_000_000_000,
@@ -290,21 +301,24 @@ describe('QBittorrentConnector', () => {
 
     const result = await connector.getTorrents();
 
-    expect(mockAxiosInstance.get).toHaveBeenCalledWith('/api/v2/torrents/info', {
-      params: {
-        category: undefined,
-        tag: undefined,
-        filter: undefined,
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+      "/api/v2/torrents/info",
+      {
+        params: {
+          category: undefined,
+          tag: undefined,
+          filter: undefined,
+        },
       },
-    });
+    );
     expect(result).toHaveLength(1);
     const torrent: Torrent = result[0]!;
     expect(torrent).toMatchObject({
-      hash: 'abc123def456',
-      name: 'Ubuntu 22.04 LTS',
-      state: 'downloading',
-      category: 'linux',
-      tags: ['iso', 'ubuntu'],
+      hash: "abc123def456",
+      name: "Ubuntu 22.04 LTS",
+      state: "downloading",
+      category: "linux",
+      tags: ["iso", "ubuntu"],
       progress: 0.75,
       size: 4_000_000_000,
       downloaded: 3_000_000_000,
@@ -329,65 +343,65 @@ describe('QBittorrentConnector', () => {
     });
   });
 
-  it('handles torrent operations correctly', async () => {
+  it("handles torrent operations correctly", async () => {
     const connector = createConnector();
 
     // Mock authentication
     mockAxiosInstance.post.mockResolvedValueOnce({
-      data: 'Ok.',
+      data: "Ok.",
       headers: {}, // No set-cookie header needed
     });
 
-    const hash = 'abc123def456';
+    const hash = "abc123def456";
 
     // Test pause torrent
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: 'Ok.' });
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: "Ok." });
     await connector.pauseTorrent(hash);
     expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      '/api/v2/torrents/pause',
-      'hashes=abc123def456',
+      "/api/v2/torrents/pause",
+      "hashes=abc123def456",
       expect.objectContaining({
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
       }),
     );
 
     // Test resume torrent
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: 'Ok.' });
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: "Ok." });
     await connector.resumeTorrent(hash);
     expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      '/api/v2/torrents/resume',
-      'hashes=abc123def456',
+      "/api/v2/torrents/resume",
+      "hashes=abc123def456",
       expect.objectContaining({
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
       }),
     );
 
     // Test delete torrent
-    mockAxiosInstance.post.mockResolvedValueOnce({ data: 'Ok.' });
+    mockAxiosInstance.post.mockResolvedValueOnce({ data: "Ok." });
     await connector.deleteTorrent(hash, true);
     expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-      '/api/v2/torrents/delete',
-      'hashes=abc123def456&deleteFiles=true',
+      "/api/v2/torrents/delete",
+      "hashes=abc123def456&deleteFiles=true",
       expect.objectContaining({
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
       }),
     );
   });
 
-  it('propagates ApiError when operations fail', async () => {
+  it("propagates ApiError when operations fail", async () => {
     const connector = createConnector();
-    const underlying = new Error('qBittorrent unavailable');
-    const diagnostic = new ApiError({ message: 'Failed to get torrents' });
+    const underlying = new Error("qBittorrent unavailable");
+    const diagnostic = new ApiError({ message: "Failed to get torrents" });
 
     // Mock authentication
     mockAxiosInstance.post.mockResolvedValueOnce({
-      data: 'Ok.',
+      data: "Ok.",
       headers: {}, // No set-cookie header needed
     });
 
@@ -398,8 +412,8 @@ describe('QBittorrentConnector', () => {
     expect(mockedHandleApiError).toHaveBeenCalledWith(
       underlying,
       expect.objectContaining({
-        operation: 'getTorrents',
-        endpoint: '/api/v2/torrents/info',
+        operation: "getTorrents",
+        endpoint: "/api/v2/torrents/info",
       }),
     );
   });

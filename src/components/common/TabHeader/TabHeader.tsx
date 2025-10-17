@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { IconButton, Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import { StyleSheet, View } from "react-native";
+import { IconButton, Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import { spacing } from '@/theme/spacing';
+import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
 
 export type TabHeaderAction = {
   icon: string;
@@ -33,40 +33,44 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
-  const styles = useMemo(() => StyleSheet.create({
-    container: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.sm,
-      paddingTop: 0,
-      paddingBottom: spacing.xxs,
-      backgroundColor: theme.colors.background,
-      borderBottomWidth: 0.5,
-      borderBottomColor: theme.colors.elevation.level1,
-      minHeight: 30,
-    },
-    leftSection: {
-      width: 48,
-      alignItems: 'flex-start',
-    },
-    centerSection: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    rightSection: {
-      width: 48,
-      alignItems: 'flex-end',
-    },
-    title: {
-      color: theme.colors.onBackground,
-      fontSize: theme.custom.typography.titleMedium.fontSize,
-      fontFamily: theme.custom.typography.titleMedium.fontFamily,
-      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
-      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-      lineHeight: theme.custom.typography.titleMedium.lineHeight,
-    },
-  }), [theme]);
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: spacing.sm,
+          paddingTop: 0,
+          paddingBottom: spacing.xxs,
+          backgroundColor: theme.colors.background,
+          borderBottomWidth: 0.5,
+          borderBottomColor: theme.colors.elevation.level1,
+          minHeight: 30,
+        },
+        leftSection: {
+          width: 48,
+          alignItems: "flex-start",
+        },
+        centerSection: {
+          flex: 1,
+          alignItems: "center",
+        },
+        rightSection: {
+          width: 48,
+          alignItems: "flex-end",
+        },
+        title: {
+          color: theme.colors.onBackground,
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontFamily: theme.custom.typography.titleMedium.fontFamily,
+          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          lineHeight: theme.custom.typography.titleMedium.lineHeight,
+        },
+      }),
+    [theme],
+  );
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -89,7 +93,11 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
           <IconButton
             icon={leftAction.icon}
             size={18}
-            iconColor={leftAction.disabled ? theme.colors.onSurfaceDisabled : theme.colors.onBackground}
+            iconColor={
+              leftAction.disabled
+                ? theme.colors.onSurfaceDisabled
+                : theme.colors.onBackground
+            }
             onPress={leftAction.onPress}
             accessibilityLabel={leftAction.accessibilityLabel}
             disabled={leftAction.disabled}
@@ -112,7 +120,11 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
           <IconButton
             icon={rightAction.icon}
             size={18}
-            iconColor={rightAction.disabled ? theme.colors.onSurfaceDisabled : theme.colors.primary}
+            iconColor={
+              rightAction.disabled
+                ? theme.colors.onSurfaceDisabled
+                : theme.colors.primary
+            }
             onPress={rightAction.onPress}
             accessibilityLabel={rightAction.accessibilityLabel}
             disabled={rightAction.disabled}

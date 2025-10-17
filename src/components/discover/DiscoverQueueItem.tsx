@@ -1,10 +1,9 @@
 import React from "react";
 import { View, StyleSheet, Dimensions } from "react-native";
 import { Image, ImageBackground } from "expo-image";
-import { Text, Button, useTheme, IconButton } from "react-native-paper";
+import { Text, Button } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import type { DiscoverMediaItem } from "@/models/discover.types";
-import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 
 const { width, height } = Dimensions.get("window");
@@ -20,8 +19,6 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
   onAdd,
   onDetails,
 }) => {
-  const theme = useTheme<AppTheme>();
-
   const styles = StyleSheet.create({
     container: {
       width,
@@ -29,14 +26,14 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
       justifyContent: "flex-end",
     },
     background: {
-      position: 'absolute',
+      position: "absolute",
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
     },
     overlay: {
-      position: 'absolute',
+      position: "absolute",
       top: 0,
       left: 0,
       right: 0,
@@ -62,7 +59,7 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
     },
     poster: {
       width: width * 0.55,
-      height: (width * 0.55) * 1.5,
+      height: width * 0.55 * 1.5,
       borderRadius: 12,
       borderWidth: 2,
       borderColor: "rgba(255,255,255,0.2)",
@@ -132,7 +129,7 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
           "rgba(0,0,0,0.1)",
           "rgba(0,0,0,0.3)",
           "rgba(0,0,0,0.6)",
-          "rgba(0,0,0,0.85)"
+          "rgba(0,0,0,0.85)",
         ]}
         locations={[0, 0.3, 0.7, 1]}
         style={StyleSheet.absoluteFillObject}
