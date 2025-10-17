@@ -29,6 +29,7 @@ import { queryKeys } from "@/hooks/queryKeys";
 import type { AppTheme } from "@/constants/theme";
 import type { ServiceConfig, ServiceType } from "@/models/service.types";
 import { secureStorage } from "@/services/storage/SecureStorage";
+import { CalendarService } from "@/services/calendar/CalendarService";
 import { spacing } from "@/theme/spacing";
 
 // Memoize manager initialization to prevent multiple loadSavedServices calls
@@ -316,8 +317,6 @@ const fetchStatistics = async (
   filter: "all" | "recent" | "month" = "all",
 ): Promise<StatisticsData> => {
   try {
-    const { secureStorage } = await import("@/services/storage/SecureStorage");
-
     const manager = await getInitializedManager();
     const configs = await secureStorage.getServiceConfigs();
     const enabledConfigs = configs.filter((config) => config.enabled);
@@ -400,8 +399,6 @@ const fetchStatistics = async (
 
 const fetchRecentActivity = async (): Promise<RecentActivityItem[]> => {
   try {
-    const { secureStorage } = await import("@/services/storage/SecureStorage");
-
     const manager = await getInitializedManager();
     const configs = await secureStorage.getServiceConfigs();
     const enabledConfigs = configs.filter((config) => config.enabled);
@@ -560,8 +557,6 @@ const fetchRecentActivity = async (): Promise<RecentActivityItem[]> => {
 
 const fetchContinueWatching = async (): Promise<ContinueWatchingItem[]> => {
   try {
-    const { secureStorage } = await import("@/services/storage/SecureStorage");
-
     const manager = await getInitializedManager();
     const configs = await secureStorage.getServiceConfigs();
     const jellyfinConfigs = configs.filter(
@@ -675,8 +670,6 @@ const calculateProgress = (
 
 const fetchTrendingTV = async (): Promise<TrendingTVItem[]> => {
   try {
-    const { secureStorage } = await import("@/services/storage/SecureStorage");
-
     const manager = await getInitializedManager();
     const configs = await secureStorage.getServiceConfigs();
     const jellyseerrConfigs = configs.filter(
@@ -745,10 +738,6 @@ const fetchTrendingTV = async (): Promise<TrendingTVItem[]> => {
 
 const fetchUpcomingReleases = async (): Promise<UpcomingReleaseItem[]> => {
   try {
-    const { CalendarService } = await import(
-      "@/services/calendar/CalendarService"
-    );
-
     const calendarService = CalendarService.getInstance();
 
     // Set filters for upcoming releases (next 30 days)
