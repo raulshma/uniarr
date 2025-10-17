@@ -53,6 +53,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
     () => ({
       sonarr: "server",
       radarr: "movie",
+      lidarr: "music-note",
       jellyseerr: "monitor",
       jellyfin: "play-circle",
       qbittorrent: "download",
@@ -72,6 +73,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
     () => ({
       sonarr: theme.colors.primary,
       radarr: theme.colors.secondary,
+      lidarr: theme.colors.tertiary,
       jellyseerr: theme.colors.tertiary,
       jellyfin: theme.colors.primaryContainer,
       qbittorrent: theme.colors.error,

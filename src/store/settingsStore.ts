@@ -47,6 +47,8 @@ type SettingsData = {
   maxImageCacheSize: number;
   // Minimum log level for the application's logger
   logLevel: LogLevel;
+  // Haptic feedback setting
+  hapticFeedback: boolean;
   // (thumbnail generation removed)
 };
 
@@ -75,6 +77,7 @@ interface SettingsState extends SettingsData {
   setJellyseerrRetryAttempts: (attempts: number) => void;
   setMaxImageCacheSize: (size: number) => void;
   setLogLevel: (level: LogLevel) => void;
+  setHapticFeedback: (enabled: boolean) => void;
   // (thumbnail setters removed)
 }
 
@@ -146,6 +149,7 @@ const createDefaultSettings = (): SettingsData => ({
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
   maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
   logLevel: LogLevel.DEBUG,
+  hapticFeedback: true,
   // (thumbnail defaults removed)
 });
 
@@ -197,6 +201,7 @@ export const useSettingsStore = create<SettingsState>()(
         set({ jellyseerrRetryAttempts: clampRetryAttempts(attempts) }),
       setMaxImageCacheSize: (size: number) =>
         set({ maxImageCacheSize: clampMaxImageCacheSize(size) }),
+      setHapticFeedback: (enabled: boolean) => set({ hapticFeedback: enabled }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -227,6 +232,7 @@ export const useSettingsStore = create<SettingsState>()(
         jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
         maxImageCacheSize: state.maxImageCacheSize,
         logLevel: state.logLevel,
+        hapticFeedback: state.hapticFeedback,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields

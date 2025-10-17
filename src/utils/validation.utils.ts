@@ -5,6 +5,7 @@ import { type ServiceType } from "@/models/service.types";
 const serviceTypeValues = [
   "sonarr",
   "radarr",
+  "lidarr",
   "jellyseerr",
   "jellyfin",
   "qbittorrent",
@@ -101,13 +102,17 @@ export const serviceConfigSchema = z
       return;
     }
 
-    // For Sonarr and Radarr, only API key is required
-    if (data.type === "sonarr" || data.type === "radarr") {
+    // For Sonarr, Radarr, and Lidarr, only API key is required
+    if (
+      data.type === "sonarr" ||
+      data.type === "radarr" ||
+      data.type === "lidarr"
+    ) {
       if (!data.apiKey || data.apiKey.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["apiKey"],
-          message: "API key is required for Sonarr and Radarr",
+          message: "API key is required for Sonarr, Radarr, and Lidarr",
         });
       }
       return;

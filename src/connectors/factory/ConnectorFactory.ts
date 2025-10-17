@@ -3,6 +3,7 @@ import type { ServiceConfig, ServiceType } from "@/models/service.types";
 
 import { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
+import { LidarrConnector } from "@/connectors/implementations/LidarrConnector";
 import { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { QBittorrentConnector } from "@/connectors/implementations/QBittorrentConnector";
@@ -23,6 +24,7 @@ const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
   // generic constructor type expected by the registry.
   sonarr: SonarrConnector as ConnectorConstructor,
   radarr: RadarrConnector as ConnectorConstructor,
+  lidarr: LidarrConnector as ConnectorConstructor,
   jellyseerr: JellyseerrConnector as ConnectorConstructor,
   jellyfin: JellyfinConnector as ConnectorConstructor,
   qbittorrent: QBittorrentConnector as ConnectorConstructor,

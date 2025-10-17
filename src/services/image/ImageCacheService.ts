@@ -24,6 +24,11 @@ class ImageCacheService {
   private trackedUris: Set<string> = new Set();
   private isInitialized = false;
   private inFlightPrefetches = new Map<string, Promise<string | null>>();
+  private prefetchQueue: string[] = [];
+  private isProcessingQueue = false;
+  private memoryCacheHits = 0;
+  private diskCacheHits = 0;
+  private cacheMisses = 0;
 
   static getInstance(): ImageCacheService {
     if (!ImageCacheService.instance) {
@@ -48,7 +53,16 @@ class ImageCacheService {
       const cachedPath = await this.getCachedPath(uri);
       if (cachedPath) {
         this.trackUri(uri);
+        this.diskCacheHits++;
         return cachedPath;
+      }
+
+      // Check if image is in memory cache (fast path)
+      const memoryCachePath = await this.checkMemoryCache(uri);
+      if (memoryCachePath) {
+        this.trackUri(uri);
+        this.memoryCacheHits++;
+        return memoryCachePath;
       }
 
       const localPath = await this.prefetchInternal(uri);
@@ -56,6 +70,8 @@ class ImageCacheService {
         this.trackUri(uri);
         return localPath;
       }
+
+      this.cacheMisses++;
     } catch (error) {
       void logger.warn(
         "ImageCacheService: resolveUri failed, falling back to remote URI.",
@@ -255,6 +271,163 @@ class ImageCacheService {
     }
 
     return files;
+  }
+
+  /**
+   * Check if image is available in expo-image memory cache
+   */
+  private async checkMemoryCache(uri: string): Promise<string | null> {
+    try {
+      // expo-image doesn't expose direct memory cache access, but we can check
+      // if it can provide a cache path immediately (indicating it's in memory)
+      const cachePath = await Image.getCachePathAsync(uri);
+      return cachePath;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Smart prefetching for lists - prefetch visible and nearby items
+   */
+  async prefetchList(
+    urls: string[],
+    options: {
+      visibleRange?: { start: number; end: number };
+      priority?: "immediate" | "low" | "background";
+      maxConcurrent?: number;
+    } = {},
+  ): Promise<void> {
+    const { visibleRange, priority = "low", maxConcurrent = 3 } = options;
+
+    if (!urls.length) return;
+
+    // Prioritize visible items
+    let urlsToPrefetch: string[] = [];
+    if (visibleRange) {
+      // Add visible items immediately
+      urlsToPrefetch.push(
+        ...urls.slice(visibleRange.start, visibleRange.end + 1),
+      );
+
+      // Add nearby items (next 3, previous 1)
+      const beforeStart = Math.max(0, visibleRange.start - 1);
+      const afterEnd = Math.min(urls.length, visibleRange.end + 4);
+
+      urlsToPrefetch.push(
+        ...urls.slice(beforeStart, visibleRange.start),
+        ...urls.slice(visibleRange.end + 1, afterEnd),
+      );
+    } else {
+      urlsToPrefetch = urls;
+    }
+
+    // Remove duplicates and filter invalid URLs
+    const uniqueUrls = [...new Set(urlsToPrefetch.filter(Boolean))];
+
+    if (priority === "immediate") {
+      // High priority - prefetch immediately with higher concurrency
+      await this.prefetchConcurrent(uniqueUrls, maxConcurrent * 2);
+    } else {
+      // Low priority - add to queue for background processing
+      this.addToPrefetchQueue(uniqueUrls);
+    }
+  }
+
+  /**
+   * Concurrent prefetching with limit
+   */
+  private async prefetchConcurrent(
+    urls: string[],
+    concurrency: number,
+  ): Promise<void> {
+    const chunks: string[][] = [];
+    for (let i = 0; i < urls.length; i += concurrency) {
+      chunks.push(urls.slice(i, i + concurrency));
+    }
+
+    for (const chunk of chunks) {
+      await Promise.allSettled(
+        chunk.map((url) =>
+          this.prefetch(url).catch((error) => {
+            void logger.debug("Prefetch failed for URL", {
+              url,
+              error: this.stringifyError(error),
+            });
+          }),
+        ),
+      );
+    }
+  }
+
+  /**
+   * Add URLs to background prefetch queue
+   */
+  private addToPrefetchQueue(urls: string[]): void {
+    this.prefetchQueue.push(...urls);
+    void this.processPrefetchQueue();
+  }
+
+  /**
+   * Process background prefetch queue
+   */
+  private async processPrefetchQueue(): Promise<void> {
+    if (this.isProcessingQueue || this.prefetchQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessingQueue = true;
+
+    try {
+      // Process queue in small batches to avoid blocking UI
+      while (this.prefetchQueue.length > 0) {
+        const batch = this.prefetchQueue.splice(0, 2); // Process 2 at a time
+
+        await Promise.allSettled(
+          batch.map((url) =>
+            this.prefetch(url).catch((error) => {
+              void logger.debug("Background prefetch failed", {
+                url,
+                error: this.stringifyError(error),
+              });
+            }),
+          ),
+        );
+
+        // Small delay between batches to allow UI work
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    } finally {
+      this.isProcessingQueue = false;
+    }
+  }
+
+  /**
+   * Get cache performance statistics
+   */
+  getCacheStats() {
+    return {
+      memoryHits: this.memoryCacheHits,
+      diskHits: this.diskCacheHits,
+      misses: this.cacheMisses,
+      totalRequests:
+        this.memoryCacheHits + this.diskCacheHits + this.cacheMisses,
+      hitRate:
+        this.memoryCacheHits + this.diskCacheHits > 0
+          ? ((this.memoryCacheHits + this.diskCacheHits) /
+              (this.memoryCacheHits + this.diskCacheHits + this.cacheMisses)) *
+            100
+          : 0,
+    };
+  }
+
+  /**
+   * Reset cache statistics
+   */
+  resetCacheStats(): void {
+    this.memoryCacheHits = 0;
+    this.diskCacheHits = 0;
+    this.cacheMisses = 0;
   }
 
   /**

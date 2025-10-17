@@ -1,6 +1,7 @@
 export type ServiceType =
   | "sonarr"
   | "radarr"
+  | "lidarr"
   | "jellyseerr"
   | "jellyfin"
   | "qbittorrent"

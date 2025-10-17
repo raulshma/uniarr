@@ -39,6 +39,7 @@ import { debugLogger } from "@/utils/debug-logger";
 const allServiceTypes: ServiceType[] = [
   "sonarr",
   "radarr",
+  "lidarr",
   "jellyseerr",
   "jellyfin",
   "qbittorrent",
@@ -54,6 +55,7 @@ const allServiceTypes: ServiceType[] = [
 const apiKeyServiceTypes = [
   "sonarr",
   "radarr",
+  "lidarr",
   "jellyseerr",
   "jellyfin",
   "prowlarr",
@@ -67,6 +69,7 @@ const isApiKeyService = (type: ServiceType): type is ApiKeyServiceType =>
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: "Sonarr",
   radarr: "Radarr",
+  lidarr: "Lidarr",
   jellyseerr: "Jellyseerr",
   jellyfin: "Jellyfin",
   qbittorrent: "qBittorrent",

@@ -159,7 +159,7 @@ export const useOfflineSync = (options: OfflineSyncOptions = {}) => {
   };
 
   return {
-    isOnline: isConnected && isInternetReachable,
+    isOnline: isConnected === true && isInternetReachable === true,
     queueMutationForOffline,
     processQueuedMutations,
   };

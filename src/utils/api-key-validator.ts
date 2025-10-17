@@ -6,6 +6,7 @@ export function validateApiKey(
   serviceType:
     | "sonarr"
     | "radarr"
+    | "lidarr"
     | "qbittorrent"
     | "jellyseerr"
     | "jellyfin"
@@ -47,10 +48,11 @@ export function validateApiKey(
   if (
     serviceType === "sonarr" ||
     serviceType === "radarr" ||
+    serviceType === "lidarr" ||
     serviceType === "prowlarr" ||
     serviceType === "bazarr"
   ) {
-    // Sonarr/Radarr/Prowlarr/Bazarr API keys are typically 32 characters
+    // Sonarr/Radarr/Lidarr/Prowlarr/Bazarr API keys are typically 32 characters
     if (trimmedKey.length !== 32) {
       issues.push(
         `${serviceType} API key should be 32 characters long (current: ${trimmedKey.length})`,
@@ -98,6 +100,7 @@ export function getApiKeyInstructions(
   serviceType:
     | "sonarr"
     | "radarr"
+    | "lidarr"
     | "qbittorrent"
     | "jellyseerr"
     | "jellyfin"
@@ -114,6 +117,8 @@ export function getApiKeyInstructions(
       return "Go to Sonarr → Settings → General → Security → API Key";
     case "radarr":
       return "Go to Radarr → Settings → General → Security → API Key";
+    case "lidarr":
+      return "Go to Lidarr → Settings → General → Security → API Key";
     case "jellyseerr":
       return "Go to Jellyseerr → Settings → General → API Key";
     case "jellyfin":
@@ -147,6 +152,7 @@ export function testApiKeyFormat(
   serviceType:
     | "sonarr"
     | "radarr"
+    | "lidarr"
     | "qbittorrent"
     | "jellyseerr"
     | "jellyfin"

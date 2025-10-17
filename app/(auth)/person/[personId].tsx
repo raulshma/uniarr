@@ -312,7 +312,7 @@ const PersonDetails = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView style={styles.safeArea}>
       <Appbar.Header mode="small" elevated={false} style={styles.header}>
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content

@@ -19,6 +19,8 @@ import { defaultTheme } from "@/constants/theme";
 import { ErrorBoundary, DialogProvider } from "@/components/common";
 import { OfflineIndicator } from "@/components/common/OfflineIndicator";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { useOfflineAwareActions } from "@/hooks/useOfflineAwareActions";
 import { useNotificationRegistration } from "@/hooks/useNotificationRegistration";
 import { useNotificationResponseHandler } from "@/hooks/useNotificationResponseHandler";
 import { useQuietHoursManager } from "@/hooks/useQuietHoursManager";
@@ -88,6 +90,8 @@ const RootNavigator = () => {
 
 const AppContent = () => {
   const { isOnline } = useOfflineSync();
+  const { type: networkType } = useNetworkStatus();
+  const { queuedCount, isSyncing, forceSync } = useOfflineAwareActions();
   const theme = useTheme();
   useNotificationRegistration();
   useNotificationResponseHandler();
@@ -102,7 +106,14 @@ const AppContent = () => {
         are initializing; treating `null` as "unknown" prevents flicker of the
         offline banner when the status is not yet resolved.
       */}
-      <OfflineIndicator isVisible={isOnline === false} />
+      <OfflineIndicator
+        isVisible={isOnline === false}
+        networkType={networkType || undefined}
+        showRetry={true}
+        isSyncing={isSyncing}
+        queuedCount={queuedCount}
+        onRetry={forceSync}
+      />
       <RootNavigator />
     </View>
   );

@@ -48,6 +48,7 @@ type ServiceOverviewItem = {
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: "Sonarr",
   radarr: "Radarr",
+  lidarr: "Lidarr",
   jellyseerr: "Jellyseerr",
   jellyfin: "Jellyfin",
   qbittorrent: "qBittorrent",
@@ -64,6 +65,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
 const serviceDisplayNames: Record<ServiceType, string> = {
   sonarr: "TV Shows",
   radarr: "Movie Library",
+  lidarr: "Music Library",
   jellyseerr: "Request Service",
   jellyfin: "Media Server",
   qbittorrent: "Torrent Client",
@@ -80,6 +82,7 @@ const serviceDisplayNames: Record<ServiceType, string> = {
 const serviceIcons: Record<ServiceType, string> = {
   sonarr: "television-classic",
   radarr: "movie-open",
+  lidarr: "music-note",
   jellyseerr: "account-search",
   jellyfin: "play-circle",
   qbittorrent: "download-network",
@@ -312,6 +315,12 @@ const ServicesScreen = () => {
         case "radarr":
           router.push({
             pathname: "/(auth)/radarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "lidarr":
+          router.push({
+            pathname: "/(auth)/lidarr/[serviceId]",
             params: { serviceId: service.config.id },
           });
           break;
