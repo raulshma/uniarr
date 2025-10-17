@@ -16,6 +16,11 @@ import {
 import { debugLogger } from "@/utils/debug-logger";
 import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
 import { base64Encode } from "@/utils/base64";
+import {
+  withRetry,
+  networkRetryCondition,
+  type RetryOptions,
+} from "@/utils/retry.utils";
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -393,5 +398,30 @@ export abstract class BaseConnector<
       serviceId: this.config.id,
       serviceType: this.config.type,
     }).message;
+  }
+
+  /**
+   * Execute an operation with standardized retry logic for network errors
+   */
+  protected async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    endpoint?: string,
+    options: Partial<RetryOptions> = {},
+  ): Promise<T> {
+    const retryOptions: RetryOptions = {
+      maxRetries: 2,
+      baseDelay: 1000,
+      retryCondition: networkRetryCondition,
+      context: {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: operationName,
+        endpoint,
+      },
+      ...options,
+    };
+
+    return withRetry(operation, retryOptions);
   }
 }

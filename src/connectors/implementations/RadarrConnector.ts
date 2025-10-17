@@ -84,7 +84,11 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         serviceId: this.config.id,
         error,
       });
-      const axiosError = error as any;
+      const axiosError = error as unknown as {
+        message?: string;
+        code?: string;
+        response?: { status?: number; statusText?: string };
+      };
       logger.debug("[RadarrConnector] Error details", {
         serviceId: this.config.id,
         message: axiosError?.message,
@@ -420,14 +424,17 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
           !Array.isArray(response.data) &&
           "error" in response.data
         ) {
-          throw new Error((response.data as any).error as string);
+          const errObj = response.data as unknown as { error?: string };
+          throw new Error(errObj.error ?? "Unknown error");
         }
 
         return (response.data ?? []).map((profile) =>
           this.mapQualityProfile(profile as RadarrQualityProfile),
         );
       } catch (error) {
-        const axiosError = error as any;
+        const axiosError = error as unknown as {
+          response?: { status?: number };
+        };
         const status = axiosError?.response?.status;
         if (status !== 404) {
           const enhancedError = new Error(

@@ -3,12 +3,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { Text, Button, Switch, useTheme, Divider } from "react-native-paper";
 import { useRouter } from "expo-router";
 
-import {
-  CustomAlert,
-  CustomConfirm,
-  ConfirmationDialog,
-  useDialog,
-} from "@/components/common";
+import { CustomAlert, CustomConfirm, useDialog } from "@/components/common";
 import { alert as dialogServiceAlert } from "@/services/dialogService";
 
 const isDev = typeof __DEV__ !== "undefined" && __DEV__;
@@ -34,8 +29,6 @@ const DevComponentsScreen: React.FC = () => {
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmDestructive, setConfirmDestructive] = useState(false);
-
-  const [confirmationVisible, setConfirmationVisible] = useState(false);
 
   if (!isDev) {
     // Render nothing (effect above will redirect). Keep component tiny in production.
@@ -103,12 +96,6 @@ const DevComponentsScreen: React.FC = () => {
               onValueChange={setConfirmDestructive}
             />
           </View>
-        </View>
-
-        <View style={{ marginTop: 8 }}>
-          <Button mode="outlined" onPress={() => setConfirmationVisible(true)}>
-            Show ConfirmationDialog (wrapper)
-          </Button>
         </View>
       </View>
 
@@ -233,22 +220,6 @@ const DevComponentsScreen: React.FC = () => {
         onCancel={() => setLastAction("confirm: cancel")}
         onConfirm={() => setLastAction("confirm: confirm")}
         onDismiss={() => setConfirmVisible(false)}
-      />
-
-      <ConfirmationDialog
-        visible={confirmationVisible}
-        title="Wrapped confirmation"
-        message="This uses the ConfirmationDialog wrapper over CustomConfirm"
-        confirmLabel="Do it"
-        cancelLabel="Nah"
-        onConfirm={() => {
-          setLastAction("wrapped: confirm");
-          setConfirmationVisible(false);
-        }}
-        onCancel={() => {
-          setLastAction("wrapped: cancel");
-          setConfirmationVisible(false);
-        }}
       />
 
       <View style={{ height: 64 }} />

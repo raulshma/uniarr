@@ -7,7 +7,6 @@ export type { CardProps } from "./Card";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
 
-export { default as ConfirmationDialog } from "./ConfirmationDialog";
 export { default as CustomConfirm } from "./CustomDialogs/CustomConfirm";
 export { default as CustomAlert } from "./CustomDialogs/CustomAlert";
 export { DialogProvider, useDialog } from "./CustomDialogs/DialogProvider";

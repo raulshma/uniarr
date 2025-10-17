@@ -14,7 +14,10 @@ const AuthenticatedLayout = () => {
       }}
     >
       <Stack.Screen name="(tabs)" />
+      {/* Only explicitly declare routes that have special configurations or don't follow standard file-based routing */}
       <Stack.Screen name="add-service" />
+      <Stack.Screen name="edit-service" />
+      <Stack.Screen name="network-scan" />
     </Stack>
   );
 };

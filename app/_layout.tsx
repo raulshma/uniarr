@@ -69,10 +69,15 @@ const RootNavigator = () => {
     const inAuthGroup = segments[0] === "(auth)";
     const inPublicGroup = segments[0] === "(public)";
 
-    if (isAuthenticated && !inAuthGroup) {
+    // Prevent infinite redirects by checking if we're already on the correct route
+    const currentRoute = segments.join("/");
+    const isOnDashboard = currentRoute.includes("(auth)/dashboard");
+    const isOnLogin = currentRoute.includes("(public)/login");
+
+    if (isAuthenticated && !inAuthGroup && !isOnDashboard) {
       // User is authenticated but not in auth group, redirect to dashboard
       router.replace("/(auth)/dashboard");
-    } else if (!isAuthenticated && !inPublicGroup) {
+    } else if (!isAuthenticated && !inPublicGroup && !isOnLogin) {
       // User is not authenticated and not in public group, redirect to login
       router.replace("/(public)/login");
     }
