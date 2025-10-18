@@ -15,6 +15,7 @@ import { spacing } from "@/theme/spacing";
 import * as Haptics from "expo-haptics";
 import { useCurrentDownloadSpeed } from "@/store/downloadStore";
 import { formatSpeed } from "@/utils/torrent.utils";
+import EpisodeSelectionDialog from "./EpisodeSelectionDialog";
 
 interface DownloadButtonProps {
   /** Service configuration */
@@ -57,6 +58,7 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
 
   // Menu state
   const [menuVisible, setMenuVisible] = useState(false);
+  const [episodeDialogVisible, setEpisodeDialogVisible] = useState(false);
 
   // Animation
   const scaleAnimation = useSharedValue(1);
@@ -70,6 +72,8 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
     qualityOptions,
     selectQuality,
     startDownload,
+    episodes,
+    setSelectedEpisodes,
   } = useContentDownload({
     serviceConfig,
     contentId,
@@ -93,11 +97,24 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
       return;
     }
 
+    // If this is a series, show episode selection dialog
+    if (downloadCapability?.isSeries && episodes && episodes.length > 0) {
+      setEpisodeDialogVisible(true);
+      return;
+    }
+
     if (showQuality && qualityOptions.length > 1) {
       setMenuVisible(true);
     } else {
       handleDownloadAction();
     }
+  };
+
+  // Handle episode selection
+  const handleEpisodeSelection = (selectedEpisodeIds: string[]) => {
+    setSelectedEpisodes(selectedEpisodeIds);
+    setEpisodeDialogVisible(false);
+    handleDownloadAction();
   };
 
   // Handle download action
@@ -224,6 +241,16 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
             ))}
           </Menu>
         )}
+
+        {episodes && episodes.length > 0 && (
+          <EpisodeSelectionDialog
+            visible={episodeDialogVisible}
+            episodes={episodes}
+            title={downloadCapability?.restrictions?.[0] || "Select Episodes"}
+            onConfirm={handleEpisodeSelection}
+            onDismiss={() => setEpisodeDialogVisible(false)}
+          />
+        )}
       </>
     );
   }
@@ -315,6 +342,16 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
               </View>
             ))}
           </Menu>
+        )}
+
+        {episodes && episodes.length > 0 && (
+          <EpisodeSelectionDialog
+            visible={episodeDialogVisible}
+            episodes={episodes}
+            title={downloadCapability?.restrictions?.[0] || "Select Episodes"}
+            onConfirm={handleEpisodeSelection}
+            onDismiss={() => setEpisodeDialogVisible(false)}
+          />
         )}
       </>
     );
@@ -424,6 +461,16 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
             ))}
           </Menu>
         )}
+
+        {episodes && episodes.length > 0 && (
+          <EpisodeSelectionDialog
+            visible={episodeDialogVisible}
+            episodes={episodes}
+            title={downloadCapability?.restrictions?.[0] || "Select Episodes"}
+            onConfirm={handleEpisodeSelection}
+            onDismiss={() => setEpisodeDialogVisible(false)}
+          />
+        )}
       </>
     );
   }
@@ -432,49 +479,61 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
   if (variant === "navbar-circle") {
     const buttonSize = 48;
     return (
-      <Animated.View style={[animatedStyle, style]}>
-        <Pressable
-          style={[
-            styles.navbarCircle,
-            {
-              width: buttonSize,
-              height: buttonSize,
-              backgroundColor: canDownload
-                ? theme.colors.primary
-                : theme.colors.surfaceVariant,
-            },
-          ]}
-          onPress={handlePress}
-          disabled={isLoading || !canDownload}
-        >
-          <View style={styles.navbarCircleContent}>
-            {currentDownloadSpeed > 0 ? (
-              <Text
-                variant="labelSmall"
-                style={[
-                  styles.navbarCircleSpeed,
-                  {
-                    color: theme.colors.onPrimary,
-                  },
-                ]}
-              >
-                {formatSpeed(currentDownloadSpeed)}
-              </Text>
-            ) : (
-              <IconButton
-                icon={isLoading ? "loading" : "download"}
-                size={20}
-                iconColor={
-                  canDownload
-                    ? theme.colors.onPrimary
-                    : theme.colors.onSurfaceDisabled
-                }
-                style={styles.navbarCircleIcon}
-              />
-            )}
-          </View>
-        </Pressable>
-      </Animated.View>
+      <>
+        <Animated.View style={[animatedStyle, style]}>
+          <Pressable
+            style={[
+              styles.navbarCircle,
+              {
+                width: buttonSize,
+                height: buttonSize,
+                backgroundColor: canDownload
+                  ? theme.colors.primary
+                  : theme.colors.surfaceVariant,
+              },
+            ]}
+            onPress={handlePress}
+            disabled={isLoading || !canDownload}
+          >
+            <View style={styles.navbarCircleContent}>
+              {currentDownloadSpeed > 0 ? (
+                <Text
+                  variant="labelSmall"
+                  style={[
+                    styles.navbarCircleSpeed,
+                    {
+                      color: theme.colors.onPrimary,
+                    },
+                  ]}
+                >
+                  {formatSpeed(currentDownloadSpeed)}
+                </Text>
+              ) : (
+                <IconButton
+                  icon={isLoading ? "loading" : "download"}
+                  size={20}
+                  iconColor={
+                    canDownload
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceDisabled
+                  }
+                  style={styles.navbarCircleIcon}
+                />
+              )}
+            </View>
+          </Pressable>
+        </Animated.View>
+
+        {episodes && episodes.length > 0 && (
+          <EpisodeSelectionDialog
+            visible={episodeDialogVisible}
+            episodes={episodes}
+            title={downloadCapability?.restrictions?.[0] || "Select Episodes"}
+            onConfirm={handleEpisodeSelection}
+            onDismiss={() => setEpisodeDialogVisible(false)}
+          />
+        )}
+      </>
     );
   }
 

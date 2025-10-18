@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import { Alert } from "react-native";
 import * as Haptics from "expo-haptics";
-import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useDownloadService } from "@/services/download";
 import { logger } from "@/services/logger/LoggerService";
 import type { ServiceConfig } from "@/models/service.types";
@@ -31,7 +30,6 @@ export interface DownloadActionOptions {
  * Hook for managing download actions
  */
 export const useDownloadActions = () => {
-  const connectorManager = ConnectorManager.getInstance();
   const {
     isReady,
     getManager,
@@ -444,16 +442,3 @@ export const useDownloadActions = () => {
     performDownloadAction,
   };
 };
-
-/**
- * Generate a download path for a file
- */
-function generateDownloadPath(fileName: string): string {
-  // Sanitize filename for file system
-  const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-_]/g, "_");
-
-  // Use a relative path - in a real implementation you'd use proper file system paths
-  const downloadDir = "./downloads/";
-
-  return `${downloadDir}${sanitizedName}`;
-}

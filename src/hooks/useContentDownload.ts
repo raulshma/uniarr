@@ -10,6 +10,7 @@ import type {
   DownloadCapability,
   QualityOption,
 } from "@/connectors/base/IDownloadConnector";
+import type { JellyfinItem } from "@/models/jellyfin.types";
 
 interface UseContentDownloadOptions {
   /** Service configuration for the content */
@@ -31,6 +32,10 @@ interface DownloadCapabilityState {
   selectedQuality: string | null;
   /** Error information */
   error: string | null;
+  /** Episodes for series */
+  episodes: JellyfinItem[] | null;
+  /** Selected episodes for download */
+  selectedEpisodes: string[];
 }
 
 /**
@@ -53,6 +58,8 @@ export const useContentDownload = ({
     qualityOptions: [],
     selectedQuality: null,
     error: null,
+    episodes: null,
+    selectedEpisodes: [],
   });
 
   // Track when download manager becomes available
@@ -74,6 +81,8 @@ export const useContentDownload = ({
       qualityOptions: [],
       selectedQuality: null,
       error: null,
+      episodes: null,
+      selectedEpisodes: [],
     });
   }, []);
 
@@ -103,6 +112,23 @@ export const useContentDownload = ({
         ];
       }
 
+      // Get episodes if this is a series
+      let episodes: JellyfinItem[] | null = null;
+      if (capability.isSeries && downloadConnector.getSeriesEpisodes) {
+        try {
+          const fetchedEpisodes =
+            await downloadConnector.getSeriesEpisodes(contentId);
+          episodes = Array.isArray(fetchedEpisodes)
+            ? [...(fetchedEpisodes as JellyfinItem[])]
+            : null;
+        } catch (error) {
+          logger.warn("Failed to fetch episodes", {
+            contentId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       setState({
         isLoading: false,
         capability,
@@ -110,6 +136,8 @@ export const useContentDownload = ({
         selectedQuality:
           qualityOptions.length > 0 ? (qualityOptions[0]?.value ?? null) : null,
         error: null,
+        episodes,
+        selectedEpisodes: [],
       });
 
       return { capability, qualityOptions };
@@ -134,6 +162,11 @@ export const useContentDownload = ({
   // Select quality
   const selectQuality = useCallback((qualityValue: string) => {
     setState((prev) => ({ ...prev, selectedQuality: qualityValue }));
+  }, []);
+
+  // Select episodes
+  const setSelectedEpisodes = useCallback((episodeIds: string[]) => {
+    setState((prev) => ({ ...prev, selectedEpisodes: episodeIds }));
   }, []);
 
   // Start download
@@ -236,10 +269,13 @@ export const useContentDownload = ({
     qualityOptions: state.qualityOptions,
     selectedQuality: state.selectedQuality,
     error: state.error,
+    episodes: state.episodes,
+    selectedEpisodes: state.selectedEpisodes,
 
     // Actions
     checkDownloadCapability,
     selectQuality,
+    setSelectedEpisodes,
     startDownload: startContentDownload,
     showDownloadConfirmation,
     resetState,

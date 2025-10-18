@@ -13,7 +13,9 @@ import Animated, { FadeIn } from "react-native-reanimated";
 
 import type { AppTheme } from "@/constants/theme";
 import type { Season } from "@/models/media.types";
+import type { ServiceConfig } from "@/models/service.types";
 import { MediaPoster } from "@/components/media/MediaPoster";
+import { DownloadButton } from "@/components/downloads";
 import type { MediaKind } from "@/components/media/MediaCard";
 
 export type MediaDetailsProps = {
@@ -45,6 +47,10 @@ export type MediaDetailsProps = {
   isUpdatingMonitor?: boolean;
   isSearching?: boolean;
   isDeleting?: boolean;
+  /** Service configuration for download functionality */
+  serviceConfig?: ServiceConfig;
+  /** Content ID for download functionality */
+  contentId?: string;
   /**
    * When rendered inside a page-level hero (DetailHero) the poster and
    * scroll container are provided by the hero. Set showPoster=false to
@@ -92,6 +98,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   contentInsetTop = 0,
   disableScroll = false,
   testID = "media-details",
+  serviceConfig,
+  contentId,
 }) => {
   const theme = useTheme<AppTheme>();
   // episodesModalVisible removed — seasons use inline selectedSeason state instead
@@ -628,12 +636,25 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
           {/* Action Buttons for Episodes */}
           <View style={{ flexDirection: "row", gap: 12 }}>
+            {serviceConfig && contentId && (
+              <DownloadButton
+                serviceConfig={serviceConfig}
+                contentId={contentId}
+                size="medium"
+                variant="button"
+                style={{ flex: 1 }}
+              />
+            )}
+
             <Button
               mode="contained"
               onPress={() => {}}
               buttonColor={theme.colors.primary}
               textColor={theme.colors.onPrimary}
-              style={{ flex: 1, borderRadius: 8 }}
+              style={{
+                flex: serviceConfig && contentId ? 1 : 2,
+                borderRadius: 8,
+              }}
               labelStyle={{ fontWeight: "600" }}
             >
               Search Missing

@@ -16,6 +16,10 @@ export interface DownloadCapability {
   readonly resumable: boolean;
   /** Any restrictions or requirements */
   readonly restrictions?: readonly string[];
+  /** Whether this is a series that requires episode selection */
+  readonly isSeries?: boolean;
+  /** Number of episodes available for series */
+  readonly episodeCount?: number;
 }
 
 /**
@@ -140,6 +144,15 @@ export interface IDownloadConnector {
   readonly getDownloadQualities?: (
     contentId: string,
   ) => Promise<readonly QualityOption[]>;
+
+  /**
+   * Get episodes for a TV series
+   * @param seriesId - The series identifier from the service
+   * @returns Promise resolving to list of episodes
+   */
+  readonly getSeriesEpisodes?: (
+    seriesId: string,
+  ) => Promise<readonly unknown[]>;
 
   /**
    * Validate that a download URL is still valid and accessible

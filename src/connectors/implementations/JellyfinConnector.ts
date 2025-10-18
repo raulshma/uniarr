@@ -597,14 +597,41 @@ export class JellyfinConnector
       // Get the item details to check if it can be downloaded
       const item = await this.getItem(contentId);
 
-      // Only movies and episodes can be downloaded for now
-      if (item.Type !== "Movie" && item.Type !== "Episode") {
+      // Movies, episodes, and series can be downloaded
+      if (
+        item.Type !== "Movie" &&
+        item.Type !== "Episode" &&
+        item.Type !== "Series"
+      ) {
         return {
           canDownload: false,
           resumable: false,
           restrictions: [
             `Content type '${item.Type}' is not supported for download`,
           ],
+        };
+      }
+
+      // For series, check if there are episodes available
+      if (item.Type === "Series") {
+        const episodes = await this.getSeriesEpisodes(contentId);
+        if (!episodes || episodes.length === 0) {
+          return {
+            canDownload: false,
+            resumable: false,
+            restrictions: ["No episodes available for download"],
+            isSeries: true,
+          };
+        }
+
+        return {
+          canDownload: true,
+          format: "Multiple Episodes",
+          estimatedSize: undefined,
+          resumable: true,
+          restrictions: [],
+          isSeries: true,
+          episodeCount: episodes.length,
         };
       }
 
@@ -671,6 +698,13 @@ export class JellyfinConnector
     try {
       // Get item details
       const item = await this.getItem(contentId);
+
+      // Ensure this is not a Series (should only be called for Movies/Episodes)
+      if (item.Type === "Series") {
+        throw new Error(
+          "Cannot download series container. Download individual episodes instead.",
+        );
+      }
 
       // Get media sources
       const mediaSources = await this.getMediaSources(contentId);
@@ -920,14 +954,63 @@ export class JellyfinConnector
 
   /**
    * Get media sources for an item
+   * Note: This endpoint only works for playable items (movies, episodes).
+   * Series and other container types will return an empty array.
    */
   private async getMediaSources(itemId: string): Promise<any[]> {
     try {
+      // First check if the item is a Series or other non-playable type
+      const item = await this.getItem(itemId);
+
+      // Series and other container types don't have media sources
+      if (
+        item.Type === "Series" ||
+        item.Type === "Folder" ||
+        item.Type === "BoxSet"
+      ) {
+        return [];
+      }
+
+      // Only playable items (Movie, Episode, etc.) have PlaybackInfo
       const response = await this.client.get(`/Items/${itemId}/PlaybackInfo`);
       return response.data?.MediaSources ?? [];
     } catch (error) {
       logger.error("Failed to get media sources", {
         itemId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Get episodes for a TV series
+   */
+  async getSeriesEpisodes(seriesId: string): Promise<JellyfinItem[]> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    try {
+      const response = await this.client.get<JellyfinItemsResponse>(
+        `/Users/${userId}/Items`,
+        {
+          params: {
+            ParentId: seriesId,
+            IncludeItemTypes: "Episode",
+            SortBy: "SortName",
+            SortOrder: "Ascending",
+            Fields: DEFAULT_ITEM_FIELDS,
+            Recursive: false,
+          },
+        },
+      );
+
+      return Array.isArray(response.data?.Items)
+        ? [...response.data.Items]
+        : [];
+    } catch (error) {
+      logger.error("Failed to get series episodes", {
+        seriesId,
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
