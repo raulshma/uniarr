@@ -203,9 +203,11 @@ const LoginScreen = () => {
     setErrorMessage(null);
 
     try {
-      // Use a simple redirect URI that points to the app root
+      // Use an explicit redirect URI with path to ensure proper deep linking in production APKs.
+      // The path prevents issues where the redirect URI might not be properly recognized.
       const redirectUrl = AuthSession.makeRedirectUri({
         scheme: "uniarr",
+        path: "/auth/callback",
       });
 
       void logger.info("Starting Google SSO flow", {
