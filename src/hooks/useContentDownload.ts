@@ -1,0 +1,283 @@
+import { useState, useCallback, useEffect } from "react";
+import { Alert } from "react-native";
+import * as Haptics from "expo-haptics";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { useDownloadActions } from "./useDownloadActions";
+import { useDownloadPortal } from "@/providers/DownloadPortalProvider";
+import { logger } from "@/services/logger/LoggerService";
+import type { ServiceConfig } from "@/models/service.types";
+import type {
+  DownloadCapability,
+  QualityOption,
+} from "@/connectors/base/IDownloadConnector";
+
+interface UseContentDownloadOptions {
+  /** Service configuration for the content */
+  serviceConfig: ServiceConfig;
+  /** Content ID from the service */
+  contentId: string;
+  /** Optional initial download check */
+  checkDownloadCapabilityOnMount?: boolean;
+}
+
+interface DownloadCapabilityState {
+  /** Whether download capability is being checked */
+  isLoading: boolean;
+  /** Download capability information */
+  capability: DownloadCapability | null;
+  /** Available quality options */
+  qualityOptions: QualityOption[];
+  /** Selected quality */
+  selectedQuality: string | null;
+  /** Error information */
+  error: string | null;
+}
+
+/**
+ * Hook for managing content downloads from services
+ */
+export const useContentDownload = ({
+  serviceConfig,
+  contentId,
+  checkDownloadCapabilityOnMount = false,
+}: UseContentDownloadOptions) => {
+  const { downloadManager } = useDownloadPortal();
+  const { startDownload } = useDownloadActions();
+  const connectorManager = ConnectorManager.getInstance();
+
+  // State
+  const [state, setState] = useState<DownloadCapabilityState>({
+    isLoading: false,
+    capability: null,
+    qualityOptions: [],
+    selectedQuality: null,
+    error: null,
+  });
+
+  // Reset state
+  const resetState = useCallback(() => {
+    setState({
+      isLoading: false,
+      capability: null,
+      qualityOptions: [],
+      selectedQuality: null,
+      error: null,
+    });
+  }, []);
+
+  // Check if content can be downloaded
+  const checkDownloadCapability = useCallback(async () => {
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      // Get download connector
+      const downloadConnector = connectorManager.getDownloadConnector(
+        serviceConfig.id,
+      );
+      if (!downloadConnector) {
+        throw new Error(
+          `Service ${serviceConfig.name} does not support downloads`,
+        );
+      }
+
+      // Check capability
+      const capability = await downloadConnector.canDownload(contentId);
+
+      // Get quality options if download is supported
+      let qualityOptions: QualityOption[] = [];
+      if (capability.canDownload && downloadConnector.getDownloadQualities) {
+        qualityOptions = [
+          ...(await downloadConnector.getDownloadQualities(contentId)),
+        ];
+      }
+
+      setState({
+        isLoading: false,
+        capability,
+        qualityOptions,
+        selectedQuality:
+          qualityOptions.length > 0 ? (qualityOptions[0]?.value ?? null) : null,
+        error: null,
+      });
+
+      return { capability, qualityOptions };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: message,
+      }));
+
+      logger.error("Failed to check download capability", {
+        serviceId: serviceConfig.id,
+        contentId,
+        error: message,
+      });
+
+      throw error;
+    }
+  }, [connectorManager, serviceConfig, contentId]);
+
+  // Select quality
+  const selectQuality = useCallback((qualityValue: string) => {
+    setState((prev) => ({ ...prev, selectedQuality: qualityValue }));
+  }, []);
+
+  // Start download
+  const startContentDownload = useCallback(async () => {
+    if (!downloadManager) {
+      throw new Error("Download manager not available");
+    }
+
+    if (!state.capability?.canDownload) {
+      throw new Error("Content cannot be downloaded");
+    }
+
+    try {
+      // Start the download with haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      const downloadId = await startDownload(
+        serviceConfig,
+        contentId,
+        state.selectedQuality || undefined,
+        {
+          haptics: true,
+        },
+      );
+
+      logger.info("Content download started", {
+        downloadId,
+        contentId,
+        service: serviceConfig.name,
+        quality: state.selectedQuality,
+      });
+
+      return downloadId;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
+      logger.error("Failed to start content download", {
+        serviceId: serviceConfig.id,
+        contentId,
+        error: message,
+      });
+
+      throw error;
+    }
+  }, [
+    downloadManager,
+    startDownload,
+    serviceConfig,
+    contentId,
+    state.capability,
+    state.selectedQuality,
+  ]);
+
+  // Show download confirmation dialog
+  const showDownloadConfirmation = useCallback(() => {
+    if (!state.capability?.canDownload) {
+      return;
+    }
+
+    const estimatedSize = state.capability.estimatedSize
+      ? `${(state.capability.estimatedSize / 1024 / 1024).toFixed(1)} MB`
+      : "Unknown size";
+
+    Alert.alert(
+      "Download Content",
+      `Download ${state.capability.format || "content"} (${estimatedSize})?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Download",
+          style: "default",
+          onPress: () => void startContentDownload(),
+        },
+      ],
+    );
+  }, [state.capability, startContentDownload]);
+
+  // Check capability on mount if requested
+  useEffect(() => {
+    if (checkDownloadCapabilityOnMount) {
+      void checkDownloadCapability();
+    }
+  }, [checkDownloadCapabilityOnMount, checkDownloadCapability]);
+
+  // Return state and actions
+  return {
+    // State
+    isLoading: state.isLoading,
+    canDownload: state.capability?.canDownload ?? false,
+    downloadCapability: state.capability,
+    qualityOptions: state.qualityOptions,
+    selectedQuality: state.selectedQuality,
+    error: state.error,
+
+    // Actions
+    checkDownloadCapability,
+    selectQuality,
+    startDownload: startContentDownload,
+    showDownloadConfirmation,
+    resetState,
+
+    // Convenience getters
+    hasQualities: state.qualityOptions.length > 0,
+    isReadyToDownload: state.capability?.canDownload && !state.isLoading,
+    selectedQualityLabel: state.qualityOptions.find(
+      (q) => q.value === state.selectedQuality,
+    )?.label,
+  };
+};
+
+/**
+ * Hook for quickly checking if content can be downloaded
+ */
+export const useQuickDownloadCheck = (
+  serviceConfig: ServiceConfig,
+  contentId: string,
+) => {
+  const [canDownload, setCanDownload] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const connectorManager = ConnectorManager.getInstance();
+
+  const checkCapability = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const downloadConnector = connectorManager.getDownloadConnector(
+        serviceConfig.id,
+      );
+      if (!downloadConnector) {
+        setCanDownload(false);
+        return;
+      }
+
+      const capability = await downloadConnector.canDownload(contentId);
+      setCanDownload(capability.canDownload);
+    } catch (error) {
+      logger.warn("Quick download check failed", {
+        serviceId: serviceConfig.id,
+        contentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      setCanDownload(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [connectorManager, serviceConfig, contentId]);
+
+  return {
+    canDownload,
+    isLoading,
+    checkCapability,
+  };
+};
+
+export default useContentDownload;

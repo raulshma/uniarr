@@ -1,0 +1,494 @@
+import React, { useState, useMemo } from "react";
+import { View, StyleSheet, Pressable } from "react-native";
+import { IconButton, Text, Menu, Divider, useTheme } from "react-native-paper";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+} from "react-native-reanimated";
+import type { AppTheme } from "@/constants/theme";
+import { useContentDownload } from "@/hooks/useContentDownload";
+import type { ServiceConfig } from "@/models/service.types";
+import type { QualityOption } from "@/connectors/base/IDownloadConnector";
+import { spacing } from "@/theme/spacing";
+import * as Haptics from "expo-haptics";
+
+interface DownloadButtonProps {
+  /** Service configuration */
+  serviceConfig: ServiceConfig;
+  /** Content ID from the service */
+  contentId: string;
+  /** Button size variant */
+  size?: "small" | "medium" | "large";
+  /** Button variant */
+  variant?: "icon" | "button" | "card";
+  /** Whether to show quality selection */
+  showQuality?: boolean;
+  /** Custom styles */
+  style?: any;
+  /** Callback when download starts */
+  onDownloadStart?: (downloadId: string) => void;
+  /** Callback when download fails */
+  onDownloadError?: (error: string) => void;
+}
+
+/**
+ * Download button component with quality selection and capability checking
+ */
+const DownloadButton: React.FC<DownloadButtonProps> = ({
+  serviceConfig,
+  contentId,
+  size = "medium",
+  variant = "icon",
+  showQuality = false,
+  style,
+  onDownloadStart,
+  onDownloadError,
+}) => {
+  const theme = useTheme<AppTheme>();
+  const styles = useMemo(
+    () => createStyles(theme, size, variant),
+    [theme, size, variant],
+  );
+
+  // Menu state
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  // Animation
+  const scaleAnimation = useSharedValue(1);
+  const rotateAnimation = useSharedValue(0);
+
+  // Download hook
+  const {
+    isLoading,
+    canDownload,
+    downloadCapability,
+    qualityOptions,
+    selectQuality,
+    startDownload,
+  } = useContentDownload({
+    serviceConfig,
+    contentId,
+    checkDownloadCapabilityOnMount: variant !== "icon", // Auto-check for non-icon variants
+  });
+
+  // Animated styles
+  const animatedStyle = useAnimatedStyle(() => {
+    const scale = interpolate(scaleAnimation.value, [0, 1], [0.8, 1]);
+    const rotate = interpolate(rotateAnimation.value, [0, 1], [0, 180]);
+    return {
+      transform: [{ scale: scale as any }, { rotate: rotate as any }],
+    };
+  });
+
+  // Handle button press
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (!canDownload) {
+      return;
+    }
+
+    if (showQuality && qualityOptions.length > 1) {
+      setMenuVisible(true);
+    } else {
+      handleDownloadAction();
+    }
+  };
+
+  // Handle download action
+  const handleDownloadAction = async () => {
+    try {
+      scaleAnimation.value = withSpring(0.9, { damping: 15, stiffness: 100 });
+      rotateAnimation.value = withSpring(1, { damping: 15, stiffness: 100 });
+
+      const downloadId = await startDownload();
+
+      scaleAnimation.value = withSpring(1, { damping: 15, stiffness: 100 });
+      rotateAnimation.value = withSpring(0, { damping: 15, stiffness: 100 });
+
+      onDownloadStart?.(downloadId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      onDownloadError?.(message);
+    }
+  };
+
+  // Handle quality selection
+  const handleQualitySelect = (quality: QualityOption) => {
+    selectQuality(quality.value);
+    setMenuVisible(false);
+    handleDownloadAction();
+  };
+
+  // Size configurations
+  const sizeConfig = useMemo(() => {
+    switch (size) {
+      case "small":
+        return {
+          iconSize: 18,
+          buttonHeight: 32,
+          fontSize: 12,
+          padding: spacing.xs,
+        };
+      case "large":
+        return {
+          iconSize: 28,
+          buttonHeight: 48,
+          fontSize: 16,
+          padding: spacing.md,
+        };
+      default: // medium
+        return {
+          iconSize: 24,
+          buttonHeight: 40,
+          fontSize: 14,
+          padding: spacing.sm,
+        };
+    }
+  }, [size]);
+
+  // Don't render if download capability is not available and not loading
+  if (!isLoading && canDownload === false && variant === "icon") {
+    return null;
+  }
+
+  if (variant === "icon") {
+    return (
+      <>
+        <Animated.View style={[animatedStyle, styles.iconContainer, style]}>
+          <IconButton
+            icon={isLoading ? "download" : "download"}
+            size={sizeConfig.iconSize}
+            onPress={handlePress}
+            disabled={isLoading || !canDownload}
+            mode={canDownload ? "contained" : "outlined"}
+            iconColor={
+              canDownload
+                ? theme.colors.onPrimary
+                : theme.colors.onSurfaceDisabled
+            }
+            style={[
+              styles.iconButton,
+              {
+                backgroundColor: canDownload
+                  ? theme.colors.primary
+                  : "transparent",
+              },
+            ]}
+          />
+        </Animated.View>
+
+        {showQuality && qualityOptions.length > 1 && (
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={
+              <View style={styles.menuAnchor}>
+                <IconButton
+                  icon="chevron-down"
+                  size={16}
+                  onPress={() => setMenuVisible(true)}
+                  disabled={!canDownload}
+                  iconColor={
+                    canDownload
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceDisabled
+                  }
+                />
+              </View>
+            }
+          >
+            {qualityOptions.map((quality) => (
+              <View key={quality.value}>
+                <Pressable
+                  style={styles.qualityItem}
+                  onPress={() => handleQualitySelect(quality)}
+                >
+                  <Text variant="bodyMedium" style={styles.qualityLabel}>
+                    {quality.label}
+                  </Text>
+                  {quality.estimatedSize && (
+                    <Text variant="bodySmall" style={styles.qualitySize}>
+                      {`${(quality.estimatedSize / 1024 / 1024).toFixed(1)} MB`}
+                    </Text>
+                  )}
+                </Pressable>
+                {qualityOptions.indexOf(quality) <
+                  qualityOptions.length - 1 && <Divider />}
+              </View>
+            ))}
+          </Menu>
+        )}
+      </>
+    );
+  }
+
+  if (variant === "button") {
+    return (
+      <>
+        <Animated.View style={[animatedStyle, style]}>
+          <Pressable
+            style={[
+              styles.button,
+              {
+                height: sizeConfig.buttonHeight,
+                backgroundColor: canDownload
+                  ? theme.colors.primary
+                  : theme.colors.surfaceVariant,
+                paddingHorizontal: sizeConfig.padding,
+              },
+            ]}
+            onPress={handlePress}
+            disabled={isLoading || !canDownload}
+          >
+            <View style={styles.buttonContent}>
+              <IconButton
+                icon={isLoading ? "loading" : "download"}
+                size={sizeConfig.iconSize}
+                iconColor={
+                  canDownload
+                    ? theme.colors.onPrimary
+                    : theme.colors.onSurfaceVariant
+                }
+                style={styles.buttonIcon}
+              />
+              <Text
+                variant="labelMedium"
+                style={[
+                  styles.buttonText,
+                  {
+                    color: canDownload
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceVariant,
+                    fontSize: sizeConfig.fontSize,
+                  },
+                ]}
+              >
+                {isLoading ? "Preparing..." : "Download"}
+              </Text>
+            </View>
+          </Pressable>
+        </Animated.View>
+
+        {showQuality && qualityOptions.length > 1 && (
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={
+              <View style={styles.menuAnchor}>
+                <IconButton
+                  icon="chevron-down"
+                  size={sizeConfig.iconSize}
+                  onPress={() => setMenuVisible(true)}
+                  disabled={!canDownload}
+                  iconColor={
+                    canDownload
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceVariant
+                  }
+                />
+              </View>
+            }
+          >
+            {qualityOptions.map((quality) => (
+              <View key={quality.value}>
+                <Pressable
+                  style={styles.qualityItem}
+                  onPress={() => handleQualitySelect(quality)}
+                >
+                  <Text variant="bodyMedium" style={styles.qualityLabel}>
+                    {quality.label}
+                  </Text>
+                  {quality.estimatedSize && (
+                    <Text variant="bodySmall" style={styles.qualitySize}>
+                      {`${(quality.estimatedSize / 1024 / 1024).toFixed(1)} MB`}
+                    </Text>
+                  )}
+                </Pressable>
+                {qualityOptions.indexOf(quality) <
+                  qualityOptions.length - 1 && <Divider />}
+              </View>
+            ))}
+          </Menu>
+        )}
+      </>
+    );
+  }
+
+  // Card variant
+  return (
+    <>
+      <Animated.View style={[animatedStyle, styles.card, style]}>
+        <Pressable
+          style={[
+            styles.cardContent,
+            {
+              backgroundColor: canDownload
+                ? theme.colors.surface
+                : theme.colors.surfaceDisabled,
+              opacity: isLoading ? 0.7 : 1,
+            },
+          ]}
+          onPress={handlePress}
+          disabled={isLoading || !canDownload}
+        >
+          <View style={styles.cardInfo}>
+            <Text
+              variant="titleSmall"
+              style={[
+                styles.cardTitle,
+                {
+                  color: canDownload
+                    ? theme.colors.onSurface
+                    : theme.colors.onSurfaceDisabled,
+                },
+              ]}
+            >
+              Download Content
+            </Text>
+            {downloadCapability?.format && (
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.cardFormat,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {downloadCapability.format}
+              </Text>
+            )}
+            {downloadCapability?.estimatedSize && (
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.cardSize,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {`${(downloadCapability.estimatedSize / 1024 / 1024).toFixed(1)} MB`}
+              </Text>
+            )}
+          </View>
+          <IconButton
+            icon={isLoading ? "loading" : "download"}
+            size={sizeConfig.iconSize}
+            iconColor={
+              canDownload
+                ? theme.colors.primary
+                : theme.colors.onSurfaceDisabled
+            }
+          />
+        </Pressable>
+      </Animated.View>
+
+      {showQuality && qualityOptions.length > 1 && (
+        <Menu
+          visible={menuVisible}
+          onDismiss={() => setMenuVisible(false)}
+          anchor={
+            <View style={styles.menuAnchor}>
+              <IconButton
+                icon="chevron-down"
+                size={sizeConfig.iconSize}
+                onPress={() => setMenuVisible(true)}
+                disabled={!canDownload}
+                iconColor={theme.colors.onSurfaceVariant}
+              />
+            </View>
+          }
+        >
+          {qualityOptions.map((quality) => (
+            <View key={quality.value}>
+              <Pressable
+                style={styles.qualityItem}
+                onPress={() => handleQualitySelect(quality)}
+              >
+                <Text variant="bodyMedium" style={styles.qualityLabel}>
+                  {quality.label}
+                </Text>
+                {quality.estimatedSize && (
+                  <Text variant="bodySmall" style={styles.qualitySize}>
+                    {`${(quality.estimatedSize / 1024 / 1024).toFixed(1)} MB`}
+                  </Text>
+                )}
+              </Pressable>
+              {qualityOptions.indexOf(quality) < qualityOptions.length - 1 && (
+                <Divider />
+              )}
+            </View>
+          ))}
+        </Menu>
+      )}
+    </>
+  );
+};
+
+const createStyles = (
+  theme: AppTheme,
+  size: "small" | "medium" | "large",
+  variant: "icon" | "button" | "card",
+) =>
+  StyleSheet.create({
+    iconContainer: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    iconButton: {
+      margin: 0,
+    },
+    button: {
+      borderRadius: spacing.md,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    buttonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    buttonIcon: {
+      margin: 0,
+    },
+    buttonText: {
+      fontWeight: "600",
+    },
+    card: {
+      borderRadius: spacing.md,
+      overflow: "hidden",
+    },
+    cardContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: spacing.md,
+    },
+    cardInfo: {
+      flex: 1,
+    },
+    cardTitle: {
+      fontWeight: "600",
+      marginBottom: spacing.xs,
+    },
+    cardFormat: {
+      marginBottom: spacing.xs / 2,
+    },
+    cardSize: {
+      fontSize: 12,
+    },
+    menuAnchor: {
+      marginLeft: -spacing.xs,
+    },
+    qualityItem: {
+      padding: spacing.md,
+    },
+    qualityLabel: {
+      fontWeight: "500",
+    },
+    qualitySize: {
+      color: theme.colors.onSurfaceVariant,
+      marginTop: spacing.xs / 2,
+    },
+  });
+
+export default DownloadButton;
