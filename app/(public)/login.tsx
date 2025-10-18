@@ -203,68 +203,34 @@ const LoginScreen = () => {
     setErrorMessage(null);
 
     try {
-      // Try multiple redirect URI approaches for better compatibility
-      const redirectUrls = [
-        AuthSession.makeRedirectUri({
-          scheme: "uniarr",
-          path: "auth/callback",
-        }),
-        AuthSession.makeRedirectUri({
-          scheme: "uniarr",
-        }),
-        AuthSession.makeRedirectUri(),
-      ];
+      // Use a simple redirect URI that points to the app root
+      const redirectUrl = AuthSession.makeRedirectUri({
+        scheme: "uniarr",
+      });
 
-      let lastError: Error | null = null;
-      let success = false;
+      void logger.info("Starting Google SSO flow", {
+        location: "LoginScreen.handleGoogleSignIn",
+        redirectUrl,
+      });
 
-      for (const redirectUrl of redirectUrls) {
-        try {
-          void logger.info("Trying Google SSO flow with redirect URL", {
-            location: "LoginScreen.handleGoogleSignIn",
-            redirectUrl,
-          });
+      const { createdSessionId, setActive: setOAuthActive } =
+        await startSSOFlow({
+          strategy: "oauth_google",
+          redirectUrl,
+        });
 
-          const { createdSessionId, setActive: setOAuthActive } =
-            await startSSOFlow({
-              strategy: "oauth_google",
-              redirectUrl,
-            });
+      void logger.info("Google SSO flow completed", {
+        location: "LoginScreen.handleGoogleSignIn",
+        hasSessionId: Boolean(createdSessionId),
+        hasSetActive: Boolean(setOAuthActive),
+      });
 
-          void logger.info("Google SSO flow completed", {
-            location: "LoginScreen.handleGoogleSignIn",
-            hasSessionId: Boolean(createdSessionId),
-            hasSetActive: Boolean(setOAuthActive),
-            redirectUrl,
-          });
-
-          if (createdSessionId && setOAuthActive) {
-            await setOAuthActive({ session: createdSessionId });
-            void logger.info(
-              "Google sign-in successful, navigating to dashboard",
-            );
-            router.replace("/(auth)/dashboard");
-            success = true;
-            break;
-          }
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error));
-          void logger.warn("Google SSO flow failed with redirect URL", {
-            location: "LoginScreen.handleGoogleSignIn",
-            redirectUrl,
-            error: lastError.message,
-          });
-        }
-      }
-
-      if (!success) {
-        if (lastError) {
-          throw lastError;
-        } else {
-          setErrorMessage(
-            "Unable to complete Google sign-in. Please try again.",
-          );
-        }
+      if (createdSessionId && setOAuthActive) {
+        await setOAuthActive({ session: createdSessionId });
+        void logger.info("Google sign-in successful, navigating to dashboard");
+        router.replace("/(auth)/dashboard");
+      } else {
+        setErrorMessage("Unable to complete Google sign-in. Please try again.");
       }
     } catch (error) {
       const message = getClerkErrorMessage(
