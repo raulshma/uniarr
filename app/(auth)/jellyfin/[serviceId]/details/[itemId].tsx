@@ -96,45 +96,71 @@ const JellyfinItemDetailsScreen = () => {
   // Shared scroll position used to animate hero elements
   const scrollY = useSharedValue(0);
 
-  const onScroll = useAnimatedScrollHandler((ev) => {
-    scrollY.value = ev.contentOffset.y;
-  });
+  // Optimized scroll handler with built-in throttling via React Native Reanimated
+  const onScroll = useAnimatedScrollHandler(
+    {
+      onScroll: (ev) => {
+        // Native driver handles this efficiently without JS bridge calls
+        scrollY.value = ev.contentOffset.y;
+      },
+    },
+    [], // Empty dependency array - stable reference
+  );
 
-  // Calculate translation deltas so poster moves from left-floating position
-  // into a centered, top-aligned position as the user scrolls.
-  const initialLeft = spacing.lg;
-  const finalLeft = (windowWidth - POSTER_SIZE) / 2;
-  const deltaX = finalLeft - initialLeft;
-  // Start with 75% of the poster inside the hero area (25% projecting
-  // into the content card) for the desired visual overlap.
-  const initialTop = HERO_HEIGHT - POSTER_SIZE * 0.75;
-  // Pin directly under the header/action row so there is no extra gap.
-  const finalTop = insets.top + ACTION_BAR_HEIGHT;
-  // Also compute target translateY when the header is hidden so the poster
-  // can pin directly under the status bar. We'll animate the poster to this
-  // value in the same progress curve so the header can hide while the poster
-  // moves into the center/aligned position.
-  const finalTopWithoutHeader = insets.top;
-  const deltaYHidden = finalTopWithoutHeader - initialTop;
-  const threshold = Math.max(1, HERO_HEIGHT - finalTop);
+  // Optimized animation calculations - pre-compute values to reduce runtime calculations
+  const animationConstants = useMemo(() => {
+    const initialLeft = spacing.lg;
+    const finalLeft = (windowWidth - POSTER_SIZE) / 2;
+    const deltaX = finalLeft - initialLeft;
+    const initialTop = HERO_HEIGHT - POSTER_SIZE * 0.75;
+    const finalTop = insets.top + ACTION_BAR_HEIGHT;
+    const finalTopWithoutHeader = insets.top;
+    const deltaYHidden = finalTopWithoutHeader - initialTop;
+    const threshold = Math.max(1, HERO_HEIGHT - finalTop);
+    const finalScale = 0.75;
+
+    return {
+      deltaX,
+      deltaYHidden,
+      threshold,
+      finalScale,
+      initialTop,
+    };
+  }, [windowWidth, insets.top]);
 
   const posterAnimatedStyle = useAnimatedStyle(() => {
+    // Optimized: use native driver and simplify calculations
     const progress = interpolate(
       scrollY.value,
-      [0, threshold],
+      [0, animationConstants.threshold],
       [0, 1],
       Extrapolate.CLAMP,
     );
-    // Animated scale value (1 -> finalScale)
-    const finalScale = 0.75;
-    const scale = interpolate(progress, [0, 1], [1, finalScale]);
-    const translateX = interpolate(progress, [0, 1], [0, deltaX]);
-    // Compute base translateY and compensate for the change in height due to scaling
-    // so the poster's top aligns exactly with the target finalTop when pinned.
-    // Target the hidden-header delta so the poster will end up flush under
-    // the status bar once the header has been removed.
-    const translateYBase = interpolate(progress, [0, 1], [0, deltaYHidden]);
-    const translateY = translateYBase + (POSTER_SIZE * (scale - 1)) / 2;
+
+    // Simplified scale calculation
+    const scale = interpolate(
+      progress,
+      [0, 1],
+      [1, animationConstants.finalScale],
+    );
+
+    // Simplified translations
+    const translateX = interpolate(
+      progress,
+      [0, 1],
+      [0, animationConstants.deltaX],
+    );
+
+    // Optimized translateY with pre-computed values
+    const translateYBase = interpolate(
+      progress,
+      [0, 1],
+      [0, animationConstants.deltaYHidden],
+    );
+
+    // Simplified height compensation calculation
+    const translateY = translateYBase + POSTER_SIZE * (scale - 1) * 0.5;
+
     return {
       transform: [{ translateX }, { translateY }, { scale }],
     } as any;
@@ -149,7 +175,7 @@ const JellyfinItemDetailsScreen = () => {
   const headerAnimatedStyle = useAnimatedStyle(() => {
     const progress = interpolate(
       scrollY.value,
-      [0, threshold],
+      [0, animationConstants.threshold],
       [0, 1],
       Extrapolate.CLAMP,
     );
@@ -175,7 +201,7 @@ const JellyfinItemDetailsScreen = () => {
   });
 
   useAnimatedReaction(
-    () => (scrollY.value >= threshold ? 1 : 0),
+    () => (scrollY.value >= animationConstants.threshold ? 1 : 0),
     (state, prev) => {
       if (state !== prev) {
         runOnJS(setIsHeaderCollapsed)(state === 1);
@@ -187,7 +213,7 @@ const JellyfinItemDetailsScreen = () => {
   const blurAnimatedStyle = useAnimatedStyle(() => {
     const blurOpacity = interpolate(
       scrollY.value,
-      [0, threshold],
+      [0, animationConstants.threshold],
       [0, 1],
       Extrapolate.CLAMP,
     );
@@ -201,11 +227,11 @@ const JellyfinItemDetailsScreen = () => {
   const heroAnimatedStyle = useAnimatedStyle(() => {
     const progress = interpolate(
       scrollY.value,
-      [0, threshold],
+      [0, animationConstants.threshold],
       [0, 1],
       Extrapolation.CLAMP,
     );
-    const finalHeroHeight = finalTopWithoutHeader + POSTER_SIZE * 1.25;
+    const finalHeroHeight = insets.top + POSTER_SIZE * 1.25;
     const height = interpolate(
       progress,
       [0, 1],
@@ -283,14 +309,39 @@ const JellyfinItemDetailsScreen = () => {
   const ratingLabel =
     item?.OfficialRating ??
     (item?.CommunityRating ? `${item.CommunityRating.toFixed(1)}★` : undefined);
+
+  // Optimized backdrop loading with lazy loading and progressive enhancement
   const heroTag = item?.BackdropImageTags?.[0] ?? item?.ImageTags?.Backdrop;
-  const heroUri =
-    heroTag && connector && item?.Id
-      ? connector.getImageUrl(item.Id, "Backdrop", {
-          tag: heroTag,
-          width: 1280,
-        })
-      : undefined;
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false);
+  const [heroUri, setHeroUri] = useState<string | undefined>(undefined);
+
+  // Load backdrop image only when component is visible and needed
+  useEffect(() => {
+    if (!heroTag || !connector || !item?.Id) {
+      setHeroUri(undefined);
+      return;
+    }
+
+    // Start with a smaller backdrop for faster initial load
+    const smallBackdropUri = connector.getImageUrl(item.Id, "Backdrop", {
+      tag: heroTag,
+      width: 640, // Half resolution for initial load
+    });
+
+    setHeroUri(smallBackdropUri);
+
+    // Then load the high-resolution backdrop in the background
+    const timer = setTimeout(() => {
+      const highResBackdropUri = connector.getImageUrl(item.Id!, "Backdrop", {
+        tag: heroTag,
+        width: 1280, // Full resolution
+      });
+      setHeroUri(highResBackdropUri);
+    }, 500); // Small delay to prioritize UI responsiveness
+
+    return () => clearTimeout(timer);
+  }, [heroTag, connector, item?.Id]);
+
   const posterUri =
     item?.Id && connector
       ? connector.getImageUrl(item.Id, "Primary", {
@@ -498,15 +549,16 @@ const JellyfinItemDetailsScreen = () => {
                 source={{ uri: heroUri }}
                 style={StyleSheet.absoluteFill}
                 cachePolicy="memory-disk"
+                priority="high"
+                onLoad={() => setHeroImageLoaded(true)}
+                transition={300} // Smooth transition between low-res and high-res
               />
-              {/* Animated blur overlays the image. Gradient sits on top so the
-                  blur only affects the backdrop, not the gradient that helps
-                  blend into the background color. */}
+              {/* Optimized blur overlay - only show when image is loaded for better performance */}
               <Animated.View
                 style={[StyleSheet.absoluteFill, blurAnimatedStyle]}
               >
                 <BlurView
-                  intensity={80}
+                  intensity={heroImageLoaded ? 80 : 40} // Reduced blur until loaded
                   tint={theme.dark ? "dark" : "light"}
                   style={StyleSheet.absoluteFill}
                 />

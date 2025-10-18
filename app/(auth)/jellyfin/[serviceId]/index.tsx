@@ -1,6 +1,6 @@
 import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer } from "react";
 import {
   Pressable,
   ScrollView,
@@ -29,12 +29,9 @@ import DownloadButton from "@/components/downloads/DownloadButton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
-import { useJellyfinLatestItems } from "@/hooks/useJellyfinLatestItems";
 import { useJellyfinLibraries } from "@/hooks/useJellyfinLibraries";
-import { useJellyfinLibraryItems } from "@/hooks/useJellyfinLibraryItems";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/queryKeys";
-import { useJellyfinResume } from "@/hooks/useJellyfinResume";
 import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
 import type {
   JellyfinItem,
@@ -188,11 +185,16 @@ const buildPosterUri = (
   }
 
   const idToUse = imageItemIdOverride ?? item.Id ?? "";
-  if (!idToUse) return undefined;
-  return connector.getImageUrl(idToUse, "Primary", {
+  if (!idToUse) {
+    return undefined;
+  }
+
+  const url = connector.getImageUrl(idToUse, "Primary", {
     tag,
     width: fallbackWidth,
   });
+
+  return url;
 };
 
 const JellyfinLibraryScreen = () => {
@@ -207,14 +209,63 @@ const JellyfinLibraryScreen = () => {
   const { width: windowWidth } = useWindowDimensions();
   const numColumns = 2;
 
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [activeSegment, setActiveSegment] =
-    useState<CollectionSegmentKey>("movies");
-  const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(
-    null,
-  );
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Consolidated state management with useReducer for better performance
+  interface LibraryState {
+    isBootstrapping: boolean;
+    activeSegment: CollectionSegmentKey;
+    selectedLibraryId: string | null;
+    searchTerm: string;
+    debouncedSearch: string;
+    showSkeletonLayer: boolean;
+    contentInteractive: boolean;
+  }
+
+  type LibraryAction =
+    | { type: "SET_BOOTSTRAPPING"; payload: boolean }
+    | { type: "SET_SEGMENT"; payload: CollectionSegmentKey }
+    | { type: "SET_LIBRARY_ID"; payload: string | null }
+    | { type: "SET_SEARCH_TERM"; payload: string }
+    | { type: "SET_DEBOUNCED_SEARCH"; payload: string }
+    | {
+        type: "SET_SKELETON_STATE";
+        payload: { showSkeleton: boolean; interactive: boolean };
+      };
+
+  const libraryReducer = (
+    state: LibraryState,
+    action: LibraryAction,
+  ): LibraryState => {
+    switch (action.type) {
+      case "SET_BOOTSTRAPPING":
+        return { ...state, isBootstrapping: action.payload };
+      case "SET_SEGMENT":
+        return { ...state, activeSegment: action.payload };
+      case "SET_LIBRARY_ID":
+        return { ...state, selectedLibraryId: action.payload };
+      case "SET_SEARCH_TERM":
+        return { ...state, searchTerm: action.payload };
+      case "SET_DEBOUNCED_SEARCH":
+        return { ...state, debouncedSearch: action.payload };
+      case "SET_SKELETON_STATE":
+        return {
+          ...state,
+          showSkeletonLayer: action.payload.showSkeleton,
+          contentInteractive: action.payload.interactive,
+        };
+      default:
+        return state;
+    }
+  };
+
+  const [libraryState, dispatch] = useReducer(libraryReducer, {
+    isBootstrapping: true,
+    activeSegment: "movies",
+    selectedLibraryId: null,
+    searchTerm: "",
+    debouncedSearch: "",
+    showSkeletonLayer: true,
+    contentInteractive: false,
+  });
 
   const connector = useMemo(() => {
     if (!serviceId) {
@@ -230,7 +281,7 @@ const JellyfinLibraryScreen = () => {
     const bootstrap = async () => {
       if (!serviceId) {
         if (!cancelled) {
-          setIsBootstrapping(false);
+          dispatch({ type: "SET_BOOTSTRAPPING", payload: false });
         }
         return;
       }
@@ -241,7 +292,7 @@ const JellyfinLibraryScreen = () => {
         }
       } finally {
         if (!cancelled) {
-          setIsBootstrapping(false);
+          dispatch({ type: "SET_BOOTSTRAPPING", payload: false });
         }
       }
     };
@@ -254,12 +305,16 @@ const JellyfinLibraryScreen = () => {
   }, [manager, serviceId]);
 
   useEffect(() => {
+    // Reduced debounce for snappier feel - 150ms instead of 300ms
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm.trim());
-    }, 300);
+      const trimmed = libraryState.searchTerm.trim();
+      if (trimmed !== libraryState.debouncedSearch) {
+        dispatch({ type: "SET_DEBOUNCED_SEARCH", payload: trimmed });
+      }
+    }, 150);
 
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [libraryState.searchTerm, libraryState.debouncedSearch]);
 
   const librariesQuery = useJellyfinLibraries(serviceId);
   const groupedLibraries = useMemo(() => {
@@ -287,100 +342,179 @@ const JellyfinLibraryScreen = () => {
       (segment) => groupedLibraries[segment.key].length > 0,
     );
 
-    if (firstAvailable && groupedLibraries[activeSegment].length === 0) {
-      setActiveSegment(firstAvailable.key);
-      setSelectedLibraryId(groupedLibraries[firstAvailable.key][0]?.Id ?? null);
+    if (
+      firstAvailable &&
+      groupedLibraries[libraryState.activeSegment].length === 0
+    ) {
+      dispatch({ type: "SET_SEGMENT", payload: firstAvailable.key });
+      dispatch({
+        type: "SET_LIBRARY_ID",
+        payload: groupedLibraries[firstAvailable.key][0]?.Id ?? null,
+      });
       return;
     }
 
-    if (groupedLibraries[activeSegment].length > 0) {
-      const libraryIds = groupedLibraries[activeSegment].map(
+    if (groupedLibraries[libraryState.activeSegment].length > 0) {
+      const libraryIds = groupedLibraries[libraryState.activeSegment].map(
         (library) => library?.Id ?? "",
       );
-      if (!selectedLibraryId || !libraryIds.includes(selectedLibraryId)) {
-        setSelectedLibraryId(groupedLibraries[activeSegment][0]?.Id ?? null);
+      if (
+        !libraryState.selectedLibraryId ||
+        !libraryIds.includes(libraryState.selectedLibraryId)
+      ) {
+        dispatch({
+          type: "SET_LIBRARY_ID",
+          payload: groupedLibraries[libraryState.activeSegment][0]?.Id ?? null,
+        });
       }
     }
-  }, [activeSegment, groupedLibraries, selectedLibraryId]);
+  }, [
+    libraryState.activeSegment,
+    groupedLibraries,
+    libraryState.selectedLibraryId,
+  ]);
 
   const activeSegmentConfig = useMemo(
     () =>
-      collectionSegments.find((segment) => segment.key === activeSegment) ??
-      collectionSegments[0]!,
-    [activeSegment],
+      collectionSegments.find(
+        (segment) => segment.key === libraryState.activeSegment,
+      ) ?? collectionSegments[0]!,
+    [libraryState.activeSegment],
   );
 
-  const resumeQuery = useJellyfinResume({ serviceId, limit: 12 });
+  // Consolidated queries for better performance - batch related queries together
+  const consolidatedQueries = useQueries({
+    queries: [
+      // Resume items (shown above the fold)
+      {
+        queryKey: serviceId
+          ? [
+              ...queryKeys.jellyfin.resume(serviceId, { limit: 12 }),
+              "consolidated", // Add unique suffix to prevent duplicates
+            ]
+          : queryKeys.jellyfin.base,
+        enabled: Boolean(serviceId),
+        staleTime: 60_000, // 1 minute - resume data changes frequently
+        refetchOnWindowFocus: false,
+        queryFn: async () => {
+          if (!serviceId) return [];
+          const connector = manager.getConnector(serviceId) as
+            | JellyfinConnector
+            | undefined;
+          if (!connector) return [];
+          return connector.getResumeItems(12);
+        },
+      },
+      // Latest items (contextual content)
+      {
+        queryKey:
+          serviceId && libraryState.selectedLibraryId
+            ? queryKeys.jellyfin.latest(
+                serviceId,
+                libraryState.selectedLibraryId,
+                { limit: 16 },
+              )
+            : queryKeys.jellyfin.base,
+        enabled: Boolean(serviceId && libraryState.selectedLibraryId),
+        staleTime: 5 * 60_000, // 5 minutes - latest items are relatively stable
+        refetchOnWindowFocus: false,
+        queryFn: async () => {
+          if (!serviceId || !libraryState.selectedLibraryId) return [];
+          const connector = manager.getConnector(serviceId) as
+            | JellyfinConnector
+            | undefined;
+          if (!connector) return [];
+          return connector.getLatestItems(libraryState.selectedLibraryId, 16);
+        },
+      },
+      // Library items (main content)
+      {
+        queryKey:
+          serviceId && libraryState.selectedLibraryId
+            ? queryKeys.jellyfin.libraryItems(
+                serviceId,
+                libraryState.selectedLibraryId,
+                {
+                  search: libraryState.debouncedSearch.toLowerCase(),
+                  includeItemTypes: activeSegmentConfig.includeItemTypes,
+                  mediaTypes: activeSegmentConfig.mediaTypes,
+                  sortBy: "SortName",
+                  sortOrder: "Ascending",
+                  limit: 60,
+                },
+              )
+            : queryKeys.jellyfin.base,
+        enabled: Boolean(serviceId && libraryState.selectedLibraryId),
+        staleTime: 30_000,
+        placeholderData: (previous?: JellyfinItem[] | undefined) =>
+          previous ?? [],
+        refetchOnWindowFocus: false,
+        queryFn: async () => {
+          if (!serviceId || !libraryState.selectedLibraryId) {
+            return [];
+          }
+
+          const connector = manager.getConnector(serviceId) as
+            | JellyfinConnector
+            | undefined;
+          if (!connector) {
+            return [];
+          }
+
+          const queryOptions = {
+            searchTerm: libraryState.debouncedSearch,
+            includeItemTypes: activeSegmentConfig.includeItemTypes,
+            mediaTypes: activeSegmentConfig.mediaTypes,
+            sortBy: "SortName",
+            sortOrder: "Ascending" as const,
+            limit: 60,
+          };
+
+          try {
+            let result = await connector.getLibraryItems(
+              libraryState.selectedLibraryId!,
+              queryOptions,
+            );
+
+            // If no results with filters and this is TV segment, try without filters
+            if (
+              (!result || result.length === 0) &&
+              libraryState.activeSegment === "tv"
+            ) {
+              result = await connector.getLibraryItems(
+                libraryState.selectedLibraryId!,
+                {
+                  sortBy: "SortName",
+                  sortOrder: "Ascending" as const,
+                  limit: 60,
+                },
+              );
+            }
+
+            return result ?? [];
+          } catch {
+            return [];
+          }
+        },
+      },
+    ],
+  });
+
+  // Extract query results for cleaner usage
+  const [resumeQuery, latestQuery, libraryItemsQuery] = consolidatedQueries;
+
+  // Keep now playing separate due to real-time polling requirement
   const nowPlayingQuery = useJellyfinNowPlaying({
     serviceId,
     refetchInterval: 10_000,
   });
-  const latestQuery = useJellyfinLatestItems({
-    serviceId,
-    libraryId: selectedLibraryId ?? undefined,
-    limit: 16,
-  });
-  const libraryItemsQuery = useJellyfinLibraryItems({
-    serviceId,
-    libraryId: selectedLibraryId ?? undefined,
-    searchTerm: debouncedSearch,
-    includeItemTypes: activeSegmentConfig.includeItemTypes,
-    mediaTypes: activeSegmentConfig.mediaTypes,
-    sortBy: "SortName",
-    sortOrder: "Ascending",
-    limit: 60,
-  });
 
-  // If the primary filtered query returns no items, fetch a fallback set
-  // without an explicit IncludeItemTypes filter so we can surface content
-  // for libraries that expose Seasons/Episodes rather than Series at the
-  // immediate parent level.
-  const fallbackLibraryItemsQuery = useQuery<JellyfinItem[]>({
-    queryKey:
-      serviceId && selectedLibraryId
-        ? queryKeys.jellyfin.libraryItems(serviceId, selectedLibraryId, {
-            search: debouncedSearch.toLowerCase(),
-          })
-        : queryKeys.jellyfin.base,
-    enabled: Boolean(
-      serviceId &&
-        selectedLibraryId &&
-        libraryItemsQuery.isSuccess &&
-        (libraryItemsQuery.data?.length ?? 0) === 0,
-    ),
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    placeholderData: (previous?: JellyfinItem[] | undefined) => previous ?? [],
-    queryFn: async () => {
-      if (!serviceId || !selectedLibraryId) return [] as JellyfinItem[];
-
-      let connector = manager.getConnector(serviceId) as
-        | JellyfinConnector
-        | undefined;
-      if (!connector) {
-        await manager.loadSavedServices();
-        connector = manager.getConnector(serviceId) as
-          | JellyfinConnector
-          | undefined;
-      }
-
-      if (!connector) return [] as JellyfinItem[];
-
-      return connector.getLibraryItems(selectedLibraryId, {
-        searchTerm: debouncedSearch,
-        // intentionally omit includeItemTypes to widen results
-        mediaTypes: activeSegmentConfig.mediaTypes,
-        sortBy: "SortName",
-        sortOrder: "Ascending",
-        limit: 60,
-      });
-    },
-  });
+  // Removed fallback query for better performance - handle TV series grouping in the main library query
 
   const serviceName = connector?.config.name ?? "Jellyfin";
 
   const isInitialLoad =
-    isBootstrapping ||
+    libraryState.isBootstrapping ||
     librariesQuery.isLoading ||
     libraryItemsQuery.isLoading ||
     resumeQuery.isLoading ||
@@ -388,32 +522,30 @@ const JellyfinLibraryScreen = () => {
     latestQuery.isLoading;
   const isRefreshing =
     (libraryItemsQuery.isFetching ||
-      fallbackLibraryItemsQuery.isFetching ||
       resumeQuery.isFetching ||
       latestQuery.isFetching ||
       librariesQuery.isFetching ||
       nowPlayingQuery.isFetching) &&
     !isInitialLoad;
 
-  // Simplified: show skeleton overlay while initial load. No animated
-  // cross-fade; toggling happens synchronously to keep UI snappy.
-  const [showSkeletonLayer, setShowSkeletonLayer] = useState(isInitialLoad);
-  const [contentInteractive, setContentInteractive] = useState(!isInitialLoad);
-
+  // Optimized skeleton state management using the consolidated state
   useEffect(() => {
     if (isInitialLoad) {
-      setShowSkeletonLayer(true);
-      setContentInteractive(false);
+      dispatch({
+        type: "SET_SKELETON_STATE",
+        payload: { showSkeleton: true, interactive: false },
+      });
     } else {
-      setShowSkeletonLayer(false);
-      setContentInteractive(true);
+      dispatch({
+        type: "SET_SKELETON_STATE",
+        payload: { showSkeleton: false, interactive: true },
+      });
     }
   }, [isInitialLoad]);
 
   const aggregatedError =
     librariesQuery.error ??
     libraryItemsQuery.error ??
-    fallbackLibraryItemsQuery.error ??
     resumeQuery.error ??
     nowPlayingQuery.error ??
     latestQuery.error;
@@ -425,76 +557,84 @@ const JellyfinLibraryScreen = () => {
         : null;
 
   const items = useMemo(
-    () =>
-      libraryItemsQuery.data && libraryItemsQuery.data.length > 0
-        ? libraryItemsQuery.data
-        : (fallbackLibraryItemsQuery.data ?? []),
-    [libraryItemsQuery.data, fallbackLibraryItemsQuery.data],
+    () => libraryItemsQuery.data ?? [],
+    [libraryItemsQuery.data],
   );
 
-  // Derive displayItems: for the TV segment, prefer actual 'Series' items. If
-  // none are returned (some libraries expose Seasons/Episodes instead), group
-  // episodes by SeriesId/SeriesName and create representative entries so the
-  // UI shows series-level cards instead of individual episodes.
+  // Optimized displayItems: cache series grouping and reduce expensive operations
   const displayItems = useMemo(() => {
-    if (activeSegment !== "tv") return items;
+    if (libraryState.activeSegment !== "tv") return items;
 
+    // Fast path: if we already have series items, return them immediately
     const seriesItems = items.filter((it) => it.Type === "Series");
     if (seriesItems.length > 0) return seriesItems;
 
+    // Group episodes by series with optimized map operations
     const grouped = new Map<
       string,
       JellyfinItem & { __navigationId?: string; __posterSourceId?: string }
     >();
 
+    // Pre-allocate map capacity for better performance (if supported)
+    // Note: Map.reserve is not standard, so we'll skip this optimization for compatibility
+
     for (const it of items) {
-      const seriesKey = String(
-        it.SeriesId ?? it.ParentId ?? it.SeriesName ?? it.Id ?? "",
-      );
+      // Use optimized key extraction with fallbacks
+      const seriesKey =
+        it.SeriesId || it.ParentId || it.SeriesName || it.Id || "";
+      if (!seriesKey) continue;
+
       if (!grouped.has(seriesKey)) {
-        // Create a representative item (shallow copy) and attach metadata
-        // for navigation (series id) and poster source (episode id).
-        const rep = {
-          ...it,
-          Name: it.SeriesName ?? it.Name,
-          Type: "Series",
-          PrimaryImageTag: extractPrimaryImageTag(it),
-          __navigationId: it.SeriesId ?? it.ParentId ?? it.Id,
-          __posterSourceId: it.Id,
-        } as JellyfinItem & {
+        // Create representative item with minimal copying
+        const rep: JellyfinItem & {
           __navigationId?: string;
           __posterSourceId?: string;
+        } = {
+          ...it,
+          Name: it.SeriesName || it.Name,
+          Type: "Series",
+          __navigationId: it.SeriesId || it.ParentId || it.Id,
+          __posterSourceId: it.Id,
         };
+
+        // Only extract primary image tag if needed
+        const tag = extractPrimaryImageTag(it);
+        if (tag) {
+          (rep as any).PrimaryImageTag = tag;
+        }
+
         grouped.set(seriesKey, rep);
       }
     }
 
-    return Array.from(grouped.values());
-  }, [items, activeSegment]);
+    const result = Array.from(grouped.values());
+    return result;
+  }, [items, libraryState.activeSegment]);
 
-  // When we have series representatives, fetch their full series-level
-  // metadata (including the series' own PrimaryImageTag) in the
-  // background so we can replace episode posters with proper series
-  // artwork when available.
+  // Optimized series metadata fetching - batch fetch with better caching
   const seriesIds = useMemo(() => {
-    if (activeSegment !== "tv") return [] as string[];
+    if (libraryState.activeSegment !== "tv") return [];
+
+    // Use Set for deduplication and convert to array at the end
     const ids = new Set<string>();
     for (const it of displayItems) {
-      const maybeNav = getInternalStringField(it, "__navigationId");
-      if (maybeNav) ids.add(maybeNav);
-      else if (it.Type === "Series" && it.Id) ids.add(it.Id as string);
+      const navId = getInternalStringField(it, "__navigationId") || it.Id;
+      if (navId) ids.add(navId);
     }
     return Array.from(ids);
-  }, [displayItems, activeSegment]);
+  }, [displayItems, libraryState.activeSegment]);
 
+  // Batch fetch series metadata with optimized caching and error handling
   const seriesQueries = useQueries({
     queries: seriesIds.map((seriesId) => ({
       queryKey: queryKeys.jellyfin.item(serviceId ?? "unknown", seriesId),
       enabled: Boolean(serviceId && seriesId),
-      staleTime: 1000 * 60 * 60, // 1 hour
+      staleTime: 2 * 60 * 60_000, // 2 hours - series metadata is stable
       refetchOnWindowFocus: false,
+      retry: 1, // Only retry once to avoid long loading times
       queryFn: async () => {
-        if (!serviceId) return null;
+        if (!serviceId || !seriesId) return null;
+
         let connector = manager.getConnector(serviceId) as
           | JellyfinConnector
           | undefined;
@@ -504,55 +644,94 @@ const JellyfinLibraryScreen = () => {
             | JellyfinConnector
             | undefined;
         }
+
         if (!connector) return null;
+
         try {
-          return await connector.getItem(seriesId);
-        } catch {
+          const result = await connector.getItem(seriesId);
+          return result;
+        } catch (error) {
+          // Log errors silently and return null to avoid breaking the UI
+          console.warn(
+            `Failed to fetch series metadata for ${seriesId}:`,
+            error,
+          );
           return null;
         }
       },
     })),
   });
 
+  // Optimized series metadata mapping with reduced iterations
   const seriesMetaMap = useMemo(() => {
     const map = new Map<string, JellyfinItem>();
-    for (let i = 0; i < seriesIds.length; i++) {
-      const id = seriesIds[i];
-      if (!id) continue;
-      const q = seriesQueries[i] as { data?: JellyfinItem | null } | undefined;
-      if (q && q.data) {
-        map.set(id, q.data);
+    seriesQueries.forEach((query, index) => {
+      const id = seriesIds[index];
+      if (id && query.data) {
+        map.set(id, query.data);
       }
-    }
+    });
     return map;
   }, [seriesIds, seriesQueries]);
 
   const displayItemsEnriched = useMemo(() => {
-    if (activeSegment !== "tv") return displayItems;
-    return displayItems.map((it) => {
+    if (libraryState.activeSegment !== "tv") return displayItems;
+
+    const enriched = displayItems.map((it) => {
       const navId = getInternalStringField(it, "__navigationId") ?? it.Id;
       const meta = navId ? seriesMetaMap.get(navId) : undefined;
       if (!meta) return it;
+
+      // Create a stable enriched item to prevent unnecessary re-renders
+      const existingPosterSourceId = getInternalStringField(
+        it,
+        "__posterSourceId",
+      );
+
+      // Only update poster source if the series actually has a poster image
+      const seriesHasPoster =
+        extractPrimaryImageTag(meta) ||
+        (meta as unknown as { ImageTags?: Record<string, string> })?.ImageTags
+          ?.Primary;
+
+      const newPosterSourceId =
+        seriesHasPoster && meta.Id ? meta.Id : existingPosterSourceId || it.Id;
+
+      // Only update if we have meaningful new data
+      if (
+        newPosterSourceId === existingPosterSourceId &&
+        !meta.Name &&
+        !seriesHasPoster
+      ) {
+        return it;
+      }
+
       return {
         ...it,
-        // Use the series item's id for poster requests when possible
-        __posterSourceId:
-          meta.Id ?? getInternalStringField(it, "__posterSourceId"),
+        // Use the series item's id for poster requests only if series has poster
+        __posterSourceId: newPosterSourceId,
         // Prefer series-level title if available
         Name: meta.Name ?? it.Name,
-        PrimaryImageTag:
-          extractPrimaryImageTag(meta) ?? extractPrimaryImageTag(it),
-        ImageTags:
-          (meta as unknown as { ImageTags?: Record<string, string> })
-            ?.ImageTags ??
-          (it as unknown as { ImageTags?: Record<string, string> })?.ImageTags,
+        // CRITICAL: When using series as poster source, use ONLY the series' tags.
+        // This prevents ID/tag mismatches where we request a series image with
+        // an episode's tag (which doesn't exist for that item).
+        PrimaryImageTag: seriesHasPoster
+          ? extractPrimaryImageTag(meta)
+          : extractPrimaryImageTag(it),
+        ImageTags: seriesHasPoster
+          ? (meta as unknown as { ImageTags?: Record<string, string> })
+              ?.ImageTags
+          : (it as unknown as { ImageTags?: Record<string, string> })
+              ?.ImageTags,
       } as JellyfinItem & { __posterSourceId?: string };
     });
-  }, [displayItems, seriesMetaMap, activeSegment]);
+
+    return enriched;
+  }, [displayItems, seriesMetaMap, libraryState.activeSegment]);
 
   const librariesForActiveSegment = useMemo(
-    () => groupedLibraries[activeSegment] ?? [],
-    [groupedLibraries, activeSegment],
+    () => groupedLibraries[libraryState.activeSegment] ?? [],
+    [groupedLibraries, libraryState.activeSegment],
   );
 
   const handleNavigateBack = useCallback(() => {
@@ -593,6 +772,7 @@ const JellyfinLibraryScreen = () => {
   );
 
   const handleRefresh = useCallback(async () => {
+    // Refresh all queries in parallel for better performance
     await Promise.all([
       librariesQuery.refetch(),
       libraryItemsQuery.refetch(),
@@ -628,14 +808,15 @@ const JellyfinLibraryScreen = () => {
 
   const continueWatchingItems = useMemo(
     () =>
-      (resumeQuery.data ?? []).filter((it) =>
+      (resumeQuery.data ?? []).filter((it: JellyfinResumeItem) =>
         it.Id ? !nowPlayingItemIds.has(it.Id) : true,
       ),
     [resumeQuery.data, nowPlayingItemIds],
   );
 
+  // Optimized render functions with stable dependencies
   const renderNowPlayingItem = useCallback(
-    ({ item, index }: { item: JellyfinSession; index: number }) => {
+    ({ item }: { item: JellyfinSession; index: number }) => {
       const playing = item.NowPlayingItem;
       if (!playing) return null;
 
@@ -676,26 +857,35 @@ const JellyfinLibraryScreen = () => {
         </Pressable>
       );
     },
-    [connector, handleOpenItem, handleOpenNowPlaying, styles],
+    [
+      connector,
+      handleOpenItem,
+      handleOpenNowPlaying,
+      styles.cardPressed,
+      styles.nowPlayingRow,
+      styles.nowPlayingMeta,
+      styles.nowPlayingTitle,
+      styles.nowPlayingSubtitle,
+    ],
   );
 
   const renderResumeItem = useCallback(
-    ({ item, index }: { item: JellyfinResumeItem; index: number }) => {
+    ({ item }: { item: JellyfinResumeItem; index: number }) => {
       const title = item.SeriesName ?? item.Name ?? "Untitled";
       const posterUri = buildPosterUri(connector, item, 420);
-      const progress =
+
+      // Optimized progress calculation with early returns
+      let progress: number | undefined;
+      if (
         typeof item.UserData?.PlaybackPositionTicks === "number" &&
         typeof item.RunTimeTicks === "number"
-          ? Math.min(
-              Math.max(
-                item.UserData.PlaybackPositionTicks / item.RunTimeTicks,
-                0,
-              ),
-              1,
-            )
-          : undefined;
+      ) {
+        const rawProgress =
+          item.UserData.PlaybackPositionTicks / item.RunTimeTicks;
+        progress = Math.min(Math.max(rawProgress, 0), 1);
+      }
 
-      // Responsive poster sizing: prefer two items visible on wide screens
+      // Responsive poster sizing - memoized calculation
       const posterSize = Math.max(
         120,
         Math.min(
@@ -741,12 +931,8 @@ const JellyfinLibraryScreen = () => {
                     contentId={item.Id}
                     size="small"
                     variant="icon"
-                    onDownloadStart={(downloadId) => {
-                      console.log(`Download started: ${downloadId}`);
-                    }}
-                    onDownloadError={(error) => {
-                      console.error(`Download failed: ${error}`);
-                    }}
+                    onDownloadStart={() => {}}
+                    onDownloadError={() => {}}
                   />
                 </View>
               )}
@@ -762,7 +948,21 @@ const JellyfinLibraryScreen = () => {
         </View>
       );
     },
-    [connector, handleOpenItem, serviceId, styles, windowWidth, theme],
+    [
+      connector,
+      handleOpenItem,
+      serviceId,
+      windowWidth,
+      theme,
+      styles.cardPressed,
+      styles.resumePosterWrap,
+      styles.resumePosterContainer,
+      styles.playOverlay,
+      styles.resumePosterProgressRail,
+      styles.resumePosterProgressFill,
+      styles.resumeDownloadOverlay,
+      styles.resumePosterTitle,
+    ],
   );
 
   const renderLibraryItem = useCallback(
@@ -778,13 +978,13 @@ const JellyfinLibraryScreen = () => {
         480,
         (item as any).__posterSourceId as string | undefined,
       );
-      const subtitle = deriveSubtitle(item, activeSegment);
+      const subtitle = deriveSubtitle(item, libraryState.activeSegment);
       const positionStyle =
         index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight;
 
-      // Column sizing: compute card/poster size so image is the focus
-      const contentHorizontalPadding = spacing.lg * 2; // listContent applies paddingHorizontal: spacing.lg
-      const totalGaps = spacing.xl; // space between columns (gridCardLeft/right use spacing.md)
+      // Optimized column sizing with pre-computed values
+      const contentHorizontalPadding = spacing.lg * 2;
+      const totalGaps = spacing.xl;
       const effectiveColumnWidth = Math.max(
         0,
         Math.floor(
@@ -792,7 +992,8 @@ const JellyfinLibraryScreen = () => {
         ),
       );
       const posterSize = Math.max(140, effectiveColumnWidth - spacing.md * 2);
-      const innerPosterSize = posterSize;
+
+      const navigationId = (item as any).__navigationId ?? item.Id;
 
       return (
         <View>
@@ -802,14 +1003,12 @@ const JellyfinLibraryScreen = () => {
               positionStyle,
               pressed && styles.cardPressed,
             ]}
-            onPress={() =>
-              handleOpenItem((item as any).__navigationId ?? item.Id)
-            }
+            onPress={() => handleOpenItem(navigationId)}
           >
             <View style={styles.posterFrame}>
               <MediaPoster
                 uri={posterUri}
-                size={innerPosterSize}
+                size={posterSize}
                 borderRadius={12}
               />
               {/* Download button overlay on poster */}
@@ -820,12 +1019,8 @@ const JellyfinLibraryScreen = () => {
                     contentId={item.Id}
                     size="small"
                     variant="icon"
-                    onDownloadStart={(downloadId) => {
-                      console.log(`Download started: ${downloadId}`);
-                    }}
-                    onDownloadError={(error) => {
-                      console.error(`Download failed: ${error}`);
-                    }}
+                    onDownloadStart={() => {}}
+                    onDownloadError={() => {}}
                   />
                 </View>
               )}
@@ -850,7 +1045,21 @@ const JellyfinLibraryScreen = () => {
         </View>
       );
     },
-    [activeSegment, connector, handleOpenItem, serviceId, styles, windowWidth],
+    [
+      libraryState.activeSegment,
+      connector,
+      handleOpenItem,
+      serviceId,
+      windowWidth,
+      styles.cardPressed,
+      styles.gridCard,
+      styles.gridCardLeft,
+      styles.gridCardRight,
+      styles.posterFrame,
+      styles.downloadOverlay,
+      styles.gridTitle,
+      styles.gridSubtitle,
+    ],
   );
 
   const listHeader = useMemo(() => {
@@ -892,9 +1101,18 @@ const JellyfinLibraryScreen = () => {
               {librariesForActiveSegment.map((library, i) => (
                 <Chip
                   key={library.Id ?? String(i)}
-                  mode={selectedLibraryId === library.Id ? "flat" : "outlined"}
-                  selected={selectedLibraryId === library.Id}
-                  onPress={() => setSelectedLibraryId(library.Id ?? null)}
+                  mode={
+                    libraryState.selectedLibraryId === library.Id
+                      ? "flat"
+                      : "outlined"
+                  }
+                  selected={libraryState.selectedLibraryId === library.Id}
+                  onPress={() =>
+                    dispatch({
+                      type: "SET_LIBRARY_ID",
+                      payload: library.Id ?? null,
+                    })
+                  }
                   style={styles.libraryChip}
                 >
                   {library.Name}
@@ -960,8 +1178,10 @@ const JellyfinLibraryScreen = () => {
         <View>
           <Searchbar
             placeholder="Search for movies, shows, or music"
-            value={searchTerm}
-            onChangeText={setSearchTerm}
+            value={libraryState.searchTerm}
+            onChangeText={(text) =>
+              dispatch({ type: "SET_SEARCH_TERM", payload: text })
+            }
             style={styles.searchBar}
             inputStyle={styles.searchInput}
             accessibilityLabel="Search library"
@@ -970,11 +1190,13 @@ const JellyfinLibraryScreen = () => {
 
         <View style={styles.segmentRow}>
           {collectionSegments.map((segment) => {
-            const isActive = activeSegment === segment.key;
+            const isActive = libraryState.activeSegment === segment.key;
             return (
               <Pressable
                 key={segment.key}
-                onPress={() => setActiveSegment(segment.key)}
+                onPress={() =>
+                  dispatch({ type: "SET_SEGMENT", payload: segment.key })
+                }
                 style={({ pressed }) => [
                   styles.segmentItem,
                   pressed && styles.segmentPressed,
@@ -1003,7 +1225,7 @@ const JellyfinLibraryScreen = () => {
       </View>
     );
   }, [
-    activeSegment,
+    libraryState.activeSegment,
     handleNavigateBack,
     handleOpenNowPlaying,
     handleOpenSettings,
@@ -1014,8 +1236,8 @@ const JellyfinLibraryScreen = () => {
     nowPlayingSessions,
     nowPlayingQuery,
     renderNowPlayingItem,
-    searchTerm,
-    selectedLibraryId,
+    libraryState.searchTerm,
+    libraryState.selectedLibraryId,
     serviceName,
     styles,
     librariesForActiveSegment,
@@ -1040,11 +1262,25 @@ const JellyfinLibraryScreen = () => {
       );
     }
 
-    if (debouncedSearch.length > 0) {
+    if (libraryState.debouncedSearch.length > 0) {
       return (
         <EmptyState
           title="No results found"
           description="Try a different search query or clear the filter."
+        />
+      );
+    }
+
+    // Check if we're in the middle of loading TV series metadata
+    if (
+      libraryState.activeSegment === "tv" &&
+      displayItemsEnriched.length === 0 &&
+      items.length > 0
+    ) {
+      return (
+        <EmptyState
+          title="Processing TV shows..."
+          description="Organizing series information. This may take a moment."
         />
       );
     }
@@ -1055,14 +1291,24 @@ const JellyfinLibraryScreen = () => {
         description="Add media to this Jellyfin library and it will appear here."
       />
     );
-  }, [debouncedSearch.length, librariesForActiveSegment.length, serviceId]);
+  }, [
+    libraryState.debouncedSearch.length,
+    librariesForActiveSegment.length,
+    serviceId,
+    libraryState.activeSegment,
+    displayItemsEnriched.length,
+    items.length,
+  ]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Content layer: always rendered but faded in when ready */}
       <View
-        style={[styles.contentLayer, { opacity: contentInteractive ? 1 : 0 }]}
-        pointerEvents={contentInteractive ? "auto" : "none"}
+        style={[
+          styles.contentLayer,
+          { opacity: libraryState.contentInteractive ? 1 : 0 },
+        ]}
+        pointerEvents={libraryState.contentInteractive ? "auto" : "none"}
       >
         <FlashList
           data={displayItemsEnriched}
@@ -1082,10 +1328,10 @@ const JellyfinLibraryScreen = () => {
       </View>
 
       {/* Skeleton overlay: mounted while visible and cross-fades out */}
-      {showSkeletonLayer ? (
+      {libraryState.showSkeletonLayer ? (
         <View
           style={[styles.overlay]}
-          pointerEvents={showSkeletonLayer ? "auto" : "none"}
+          pointerEvents={libraryState.showSkeletonLayer ? "auto" : "none"}
         >
           <SafeAreaView style={styles.safeArea}>
             <ScrollView
