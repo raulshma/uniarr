@@ -471,7 +471,7 @@ const DashboardScreen = () => {
               <View style={styles.profileSection}>
                 <Avatar.Text
                   size={48}
-                  label="JD"
+                  label="arr"
                   style={styles.profileAvatar}
                   labelStyle={{ color: theme.colors.onPrimaryContainer }}
                 />
