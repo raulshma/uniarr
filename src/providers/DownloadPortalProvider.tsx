@@ -45,6 +45,7 @@ interface DownloadPortalProviderProps {
   autoShowOnActive?: boolean;
   /** Position of the download indicator */
   indicatorPosition?: "header" | "floating";
+  indicatorSize?: "small" | "large";
 }
 
 /**
@@ -55,6 +56,7 @@ export const DownloadPortalProvider: React.FC<DownloadPortalProviderProps> = ({
   downloadManager: initialDownloadManager = null,
   autoShowOnActive = false,
   indicatorPosition = "header",
+  indicatorSize = "small",
 }) => {
   const [isDownloadsVisible, setIsDownloadsVisible] = useState(false);
   const [downloadManager, setDownloadManager] =
@@ -167,7 +169,7 @@ export const DownloadPortalProvider: React.FC<DownloadPortalProviderProps> = ({
         <DownloadIndicator
           onPress={showDownloads}
           showSpeed={true}
-          size="medium"
+          size={indicatorSize}
           position={indicatorPosition}
         />
       )}

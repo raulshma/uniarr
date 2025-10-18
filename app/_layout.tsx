@@ -56,6 +56,7 @@ const RootLayout = () => {
                         progressUpdateInterval: 1000,
                         enablePersistence: true,
                       }}
+                      indicatorPosition="floating"
                       onInitialized={(success) => {
                         console.log("Download manager initialized:", success);
                       }}

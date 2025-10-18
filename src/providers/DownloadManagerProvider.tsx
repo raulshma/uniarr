@@ -20,6 +20,8 @@ interface DownloadManagerProviderProps {
   autoShowOnActive?: boolean;
   /** Position of the download indicator */
   indicatorPosition?: "header" | "floating";
+
+  indicatorSize?: "small" | "large";
 }
 
 /**
@@ -62,8 +64,9 @@ export const DownloadManagerProvider: React.FC<
   onError,
   autoShowOnActive = false,
   indicatorPosition = "header",
+  indicatorSize = "small",
 }) => {
-  const { isReady, error, initialize } = useDownloadManagerInit({
+  const { isReady } = useDownloadManagerInit({
     managerOptions,
     initializeOnMount,
     onInitialized: (success) => {
@@ -103,6 +106,7 @@ export const DownloadManagerProvider: React.FC<
       downloadManager={downloadManager}
       autoShowOnActive={autoShowOnActive}
       indicatorPosition={indicatorPosition}
+      indicatorSize={indicatorSize}
     >
       {children}
     </DownloadPortalProvider>
