@@ -2,15 +2,15 @@
  * Calendar and media release types for the universal calendar feature
  */
 
-export type MediaType = 'movie' | 'series' | 'episode';
+export type MediaType = "movie" | "series" | "episode";
 
-export type ReleaseStatus = 'upcoming' | 'released' | 'delayed' | 'cancelled';
+export type ReleaseStatus = "upcoming" | "released" | "delayed" | "cancelled";
 
-export type CalendarView = 'month' | 'week' | 'day' | 'list' | 'custom';
+export type CalendarView = "month" | "week" | "day" | "list" | "custom";
 
-export type CalendarServiceType = 'sonarr' | 'radarr' | 'jellyseerr';
+export type CalendarServiceType = "sonarr" | "radarr" | "jellyseerr";
 
-export type CalendarMonitoredFilter = 'all' | 'monitored' | 'unmonitored';
+export type CalendarMonitoredFilter = "all" | "monitored" | "unmonitored";
 
 export interface MediaRelease {
   readonly id: string;
@@ -35,7 +35,12 @@ export interface MediaRelease {
   readonly seriesId?: string;
   readonly seriesTitle?: string;
   readonly monitored?: boolean;
-  readonly downloadStatus?: 'missing' | 'queued' | 'downloading' | 'available' | 'unknown';
+  readonly downloadStatus?:
+    | "missing"
+    | "queued"
+    | "downloading"
+    | "available"
+    | "unknown";
   readonly serviceId?: string;
   readonly serviceType?: CalendarServiceType;
 }
@@ -93,7 +98,12 @@ export interface CalendarEvent {
   readonly posterUrl?: string;
   readonly description?: string;
   readonly isMonitored?: boolean;
-  readonly downloadStatus?: 'missing' | 'queued' | 'downloading' | 'available' | 'unknown';
+  readonly downloadStatus?:
+    | "missing"
+    | "queued"
+    | "downloading"
+    | "available"
+    | "unknown";
 }
 
 export interface CalendarNavigation {

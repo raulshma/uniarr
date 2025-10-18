@@ -1,8 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { LogEntry, LogFilterOptions, LogLevel } from '@/models/logger.types';
+import { LogEntry, LogFilterOptions, LogLevel } from "@/models/logger.types";
 
-const STORAGE_KEY = 'LoggerService:entries';
+const STORAGE_KEY = "LoggerService:entries";
+const LEVEL_STORAGE_KEY = "LoggerService:level";
 const MAX_ENTRIES = 1_000;
 
 const levelPriority: Record<LogLevel, number> = {
@@ -12,11 +13,13 @@ const levelPriority: Record<LogLevel, number> = {
   [LogLevel.ERROR]: 40,
 };
 
-const isDevelopment = typeof __DEV__ !== 'undefined' && __DEV__;
+const isDevelopment = typeof __DEV__ !== "undefined" && __DEV__;
 
-const createEntryId = () => `${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
+const createEntryId = () =>
+  `${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
 
-const serializeEntries = (entries: LogEntry[]): string => JSON.stringify(entries);
+const serializeEntries = (entries: LogEntry[]): string =>
+  JSON.stringify(entries);
 
 const deserializeEntries = (serialized: string | null): LogEntry[] => {
   if (!serialized) {
@@ -30,11 +33,16 @@ const deserializeEntries = (serialized: string | null): LogEntry[] => {
     }
 
     return parsed.filter((entry) =>
-      Boolean(entry && entry.id && entry.level && entry.message && entry.timestamp),
+      Boolean(
+        entry && entry.id && entry.level && entry.message && entry.timestamp,
+      ),
     );
   } catch (error) {
     if (isDevelopment) {
-      console.warn('[LoggerService] Failed to parse stored log entries.', error);
+      console.warn(
+        "[LoggerService] Failed to parse stored log entries.",
+        error,
+      );
     }
     return [];
   }
@@ -46,16 +54,18 @@ const deserializeEntries = (serialized: string | null): LogEntry[] => {
  * the object as an Error. We intentionally avoid deep cloning to keep
  * performance reasonable for logging.
  */
-const sanitizeConsoleContext = (context: Record<string, unknown>): Record<string, unknown> => {
+const sanitizeConsoleContext = (
+  context: Record<string, unknown>,
+): Record<string, unknown> => {
   const copy: Record<string, unknown> = { ...context };
 
-  if (Object.prototype.hasOwnProperty.call(copy, 'message')) {
+  if (Object.prototype.hasOwnProperty.call(copy, "message")) {
     // Preserve original message under a non-conflicting key.
     copy.contextMessage = copy.message;
     delete copy.message;
   }
 
-  if (Object.prototype.hasOwnProperty.call(copy, 'stack')) {
+  if (Object.prototype.hasOwnProperty.call(copy, "stack")) {
     copy.contextStack = copy.stack;
     delete copy.stack;
   }
@@ -71,6 +81,8 @@ class LoggerService {
   private isInitialized = false;
 
   private minimumLevel: LogLevel = LogLevel.DEBUG;
+
+  private levelInitialized = false;
 
   static getInstance(): LoggerService {
     if (!LoggerService.instance) {
@@ -90,9 +102,31 @@ class LoggerService {
       this.entries = deserializeEntries(serializedEntries);
     } catch (error) {
       if (isDevelopment) {
-        console.error('[LoggerService] Failed to load persisted log entries.', error);
+        console.error(
+          "[LoggerService] Failed to load persisted log entries.",
+          error,
+        );
       }
       this.entries = [];
+    }
+
+    // Try to load a small persisted minimum level to apply earlier than
+    // any external rehydration of the settings store.
+    try {
+      const storedLevel = await AsyncStorage.getItem(LEVEL_STORAGE_KEY);
+      if (
+        storedLevel &&
+        Object.values(LogLevel).includes(storedLevel as LogLevel)
+      ) {
+        this.minimumLevel = storedLevel as LogLevel;
+      }
+    } catch (error) {
+      if (isDevelopment) {
+        console.warn(
+          "[LoggerService] Failed to load persisted log level.",
+          error,
+        );
+      }
     }
 
     this.isInitialized = true;
@@ -100,6 +134,15 @@ class LoggerService {
 
   setMinimumLevel(level: LogLevel): void {
     this.minimumLevel = level;
+    // Persist small key for faster startup next time
+    void AsyncStorage.setItem(LEVEL_STORAGE_KEY, level).catch((error) => {
+      if (isDevelopment) {
+        console.warn(
+          "[LoggerService] Failed to persist minimum log level.",
+          error,
+        );
+      }
+    });
   }
 
   async clear(): Promise<void> {
@@ -107,7 +150,11 @@ class LoggerService {
     await AsyncStorage.removeItem(STORAGE_KEY);
   }
 
-  async log(level: LogLevel, message: string, context?: Record<string, unknown>): Promise<void> {
+  async log(
+    level: LogLevel,
+    message: string,
+    context?: Record<string, unknown>,
+  ): Promise<void> {
     await this.ensureInitialized();
 
     if (levelPriority[level] < levelPriority[this.minimumLevel]) {
@@ -132,7 +179,9 @@ class LoggerService {
       // Sanitize context before sending to console to avoid Metro / HMR
       // interpreting objects with top-level `message` or `stack` properties
       // as Error-like and producing a redbox or stack trace.
-      const sanitizedContext = context ? sanitizeConsoleContext(context) : undefined;
+      const sanitizedContext = context
+        ? sanitizeConsoleContext(context)
+        : undefined;
 
       if (sanitizedContext) {
         consoleMethod(`[${level}] ${message}`, sanitizedContext);
@@ -141,19 +190,31 @@ class LoggerService {
       }
     }
   }
-  async debug(message: string, context?: Record<string, unknown>): Promise<void> {
+  async debug(
+    message: string,
+    context?: Record<string, unknown>,
+  ): Promise<void> {
     await this.log(LogLevel.DEBUG, message, context);
   }
 
-  async info(message: string, context?: Record<string, unknown>): Promise<void> {
+  async info(
+    message: string,
+    context?: Record<string, unknown>,
+  ): Promise<void> {
     await this.log(LogLevel.INFO, message, context);
   }
 
-  async warn(message: string, context?: Record<string, unknown>): Promise<void> {
+  async warn(
+    message: string,
+    context?: Record<string, unknown>,
+  ): Promise<void> {
     await this.log(LogLevel.WARN, message, context);
   }
 
-  async error(message: string, context?: Record<string, unknown>): Promise<void> {
+  async error(
+    message: string,
+    context?: Record<string, unknown>,
+  ): Promise<void> {
     await this.log(LogLevel.ERROR, message, context);
   }
 
@@ -166,7 +227,9 @@ class LoggerService {
 
     const threshold = levelPriority[options.minimumLevel];
 
-    return this.entries.filter((entry) => levelPriority[entry.level] >= threshold);
+    return this.entries.filter(
+      (entry) => levelPriority[entry.level] >= threshold,
+    );
   }
 
   private getConsoleMethod(level: LogLevel): (...args: unknown[]) => void {
@@ -186,7 +249,7 @@ class LoggerService {
       await AsyncStorage.setItem(STORAGE_KEY, serializeEntries(this.entries));
     } catch (error) {
       if (isDevelopment) {
-        console.error('[LoggerService] Failed to persist log entries.', error);
+        console.error("[LoggerService] Failed to persist log entries.", error);
       }
     }
   }

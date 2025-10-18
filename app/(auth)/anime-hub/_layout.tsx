@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Slot } from 'expo-router';
-import { View } from 'react-native';
-import { Snackbar } from 'react-native-paper';
+import React, { useEffect, useState } from "react";
+import { Slot } from "expo-router";
+import { View } from "react-native";
+import { Snackbar } from "react-native-paper";
 
-import { subscribeJikanThrottle, isJikanThrottled } from '@/services/jikan/JikanClient';
-import { strings } from '@/constants/strings';
+import {
+  subscribeJikanThrottle,
+  isJikanThrottled,
+} from "@/services/jikan/JikanClient";
+import { strings } from "@/constants/strings";
 
 const AnimeHubLayout: React.FC = () => {
   const [visible, setVisible] = useState<boolean>(() => isJikanThrottled());
@@ -23,7 +26,7 @@ const AnimeHubLayout: React.FC = () => {
       <Snackbar
         visible={visible}
         onDismiss={() => setVisible(false)}
-        action={{ label: 'Dismiss', onPress: () => setVisible(false) }}
+        action={{ label: "Dismiss", onPress: () => setVisible(false) }}
         duration={5000}
       >
         {strings.jikanRateLimited}

@@ -1,21 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+// no direct React hooks used
+import { useCallback, useEffect, useRef } from "react";
 import {
   useMutation,
   useQuery,
   useQueryClient,
   type QueryObserverResult,
   type RefetchOptions,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { TransmissionConnector } from '@/connectors/implementations/TransmissionConnector';
-import { queryKeys } from '@/hooks/queryKeys';
-import type { Torrent, TorrentTransferInfo } from '@/models/torrent.types';
-import { isTorrentCompleted } from '@/utils/torrent.utils';
-import { notificationEventService } from '@/services/notifications/NotificationEventService';
-import { IConnector } from '@/connectors/base/IConnector';
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { TransmissionConnector } from "@/connectors/implementations/TransmissionConnector";
+import { queryKeys } from "@/hooks/queryKeys";
+import type { Torrent, TorrentTransferInfo } from "@/models/torrent.types";
+import { isTorrentCompleted } from "@/utils/torrent.utils";
+import { notificationEventService } from "@/services/notifications/NotificationEventService";
+import { IConnector } from "@/connectors/base/IConnector";
 
-const TRANSMISSION_SERVICE_TYPE = 'transmission';
+const TRANSMISSION_SERVICE_TYPE = "transmission";
 
 type TorrentFilters = {
   readonly category?: string;
@@ -34,8 +38,12 @@ export interface UseTransmissionResult {
   isFetching: boolean;
   isError: boolean;
   error: unknown;
-  refetch: (options?: RefetchOptions) => Promise<QueryObserverResult<Torrent[], Error>>;
-  refreshTransferInfo: (options?: RefetchOptions) => Promise<QueryObserverResult<TorrentTransferInfo, Error>>;
+  refetch: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<Torrent[], Error>>;
+  refreshTransferInfo: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<TorrentTransferInfo, Error>>;
   pauseTorrent: (hash: string) => void;
   pauseTorrentAsync: (hash: string) => Promise<void>;
   isPausing: boolean;
@@ -45,7 +53,10 @@ export interface UseTransmissionResult {
   isResuming: boolean;
   resumeError: unknown;
   deleteTorrent: (variables: { hash: string; deleteFiles?: boolean }) => void;
-  deleteTorrentAsync: (variables: { hash: string; deleteFiles?: boolean }) => Promise<void>;
+  deleteTorrentAsync: (variables: {
+    hash: string;
+    deleteFiles?: boolean;
+  }) => Promise<void>;
   isDeleting: boolean;
   deleteError: unknown;
   forceRecheck: (hash: string) => void;
@@ -57,11 +68,16 @@ export interface UseTransmissionResult {
   transferError: unknown;
 }
 
-const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): TransmissionConnector => {
+const ensureConnector = (
+  getConnector: (id: string) => IConnector | undefined,
+  serviceId: string,
+): TransmissionConnector => {
   const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== TRANSMISSION_SERVICE_TYPE) {
-    throw new Error(`Transmission connector not registered for service ${serviceId}.`);
+    throw new Error(
+      `Transmission connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as TransmissionConnector;
@@ -75,10 +91,15 @@ export const useTransmissionTorrents = (
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === TRANSMISSION_SERVICE_TYPE;
-  const previousTorrentsRef = useRef<Map<string, { progress: number; state: Torrent['state'] }>>(new Map());
+  const previousTorrentsRef = useRef<
+    Map<string, { progress: number; state: Torrent["state"] }>
+  >(new Map());
   const hasHydratedRef = useRef(false);
 
-  const resolveConnector = useCallback(() => ensureConnector(getConnector, serviceId), [getConnector, serviceId]);
+  const resolveConnector = useCallback(
+    () => ensureConnector(getConnector, serviceId),
+    [getConnector, serviceId],
+  );
 
   const torrentsQuery = useQuery({
     queryKey: queryKeys.transmission.torrents(serviceId, options.filters),
@@ -106,13 +127,17 @@ export const useTransmissionTorrents = (
 
   const invalidateData = useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.transmission.service(serviceId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.transmission.transferInfo(serviceId) }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.transmission.service(serviceId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.transmission.transferInfo(serviceId),
+      }),
     ]);
   }, [queryClient, serviceId]);
 
   const pauseMutation = useMutation({
-    mutationKey: ['transmission', serviceId, 'pause'],
+    mutationKey: ["transmission", serviceId, "pause"],
     mutationFn: async (hash: string) => {
       const connector = resolveConnector();
       await connector.pauseTorrent(hash);
@@ -123,7 +148,7 @@ export const useTransmissionTorrents = (
   });
 
   const resumeMutation = useMutation({
-    mutationKey: ['transmission', serviceId, 'resume'],
+    mutationKey: ["transmission", serviceId, "resume"],
     mutationFn: async (hash: string) => {
       const connector = resolveConnector();
       await connector.resumeTorrent(hash);
@@ -134,8 +159,14 @@ export const useTransmissionTorrents = (
   });
 
   const deleteMutation = useMutation({
-    mutationKey: ['transmission', serviceId, 'delete'],
-    mutationFn: async ({ hash, deleteFiles }: { hash: string; deleteFiles?: boolean }) => {
+    mutationKey: ["transmission", serviceId, "delete"],
+    mutationFn: async ({
+      hash,
+      deleteFiles,
+    }: {
+      hash: string;
+      deleteFiles?: boolean;
+    }) => {
       const connector = resolveConnector();
       await connector.deleteTorrent(hash, deleteFiles ?? false);
     },
@@ -145,13 +176,15 @@ export const useTransmissionTorrents = (
   });
 
   const recheckMutation = useMutation({
-    mutationKey: ['transmission', serviceId, 'recheck'],
+    mutationKey: ["transmission", serviceId, "recheck"],
     mutationFn: async (hash: string) => {
       const connector = resolveConnector();
       await connector.forceRecheck(hash);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.transmission.service(serviceId) });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.transmission.service(serviceId),
+      });
     },
   });
 
@@ -164,11 +197,16 @@ export const useTransmissionTorrents = (
       return;
     }
 
-    const connector = getConnector(serviceId) as TransmissionConnector | undefined;
-    const serviceName = connector?.config.name ?? 'Transmission';
+    const connector = getConnector(serviceId) as
+      | TransmissionConnector
+      | undefined;
+    const serviceName = connector?.config.name ?? "Transmission";
     const previous = previousTorrentsRef.current;
     const hasHydrated = hasHydratedRef.current;
-    const nextState = new Map<string, { progress: number; state: Torrent['state'] }>();
+    const nextState = new Map<
+      string,
+      { progress: number; state: Torrent["state"] }
+    >();
 
     for (const torrent of torrents) {
       if (hasHydrated) {
@@ -194,7 +232,10 @@ export const useTransmissionTorrents = (
         }
       }
 
-      nextState.set(torrent.hash, { progress: torrent.progress, state: torrent.state });
+      nextState.set(torrent.hash, {
+        progress: torrent.progress,
+        state: torrent.state,
+      });
     }
 
     previousTorrentsRef.current = nextState;
@@ -232,4 +273,7 @@ export const useTransmissionTorrents = (
   };
 };
 
-const FAILED_TORRENT_STATES: ReadonlySet<Torrent['state']> = new Set(['error', 'missingFiles']);
+const FAILED_TORRENT_STATES: ReadonlySet<Torrent["state"]> = new Set([
+  "error",
+  "missingFiles",
+]);

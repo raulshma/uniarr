@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   ActivityIndicator,
   HelperText,
@@ -48,35 +48,6 @@ const addSeriesSchema = z.object({
 });
 
 type AddSeriesFormValues = z.infer<typeof addSeriesSchema>;
-
-const formatByteSize = (bytes?: number): string | undefined => {
-  if (bytes === undefined || bytes === null) {
-    return undefined;
-  }
-
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = bytes;
-  let unitIndex = 0;
-
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-
-  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-};
-
-const rootFolderDescription = (folder: RootFolder): string | undefined => {
-  const parts: string[] = [];
-  if (folder.accessible !== undefined) {
-    parts.push(folder.accessible ? "Accessible" : "Unavailable");
-  }
-  const sizeLabel = formatByteSize(folder.freeSpace);
-  if (sizeLabel) {
-    parts.push(`${sizeLabel} free`);
-  }
-  return parts.length ? parts.join(" • ") : undefined;
-};
 
 const buildTitleSlug = (series: Series): string | undefined => {
   if (series.titleSlug) {
@@ -130,7 +101,7 @@ const SonarrAddSeriesScreen = () => {
   const ensureConnector = useCallback(() => {
     if (!connector) {
       throw new Error(
-        `Sonarr connector not registered for service ${serviceKey}.`
+        `Sonarr connector not registered for service ${serviceKey}.`,
       );
     }
     return connector;
@@ -139,7 +110,7 @@ const SonarrAddSeriesScreen = () => {
   const [searchTerm, setSearchTerm] = useState(initialQuery);
   const [debouncedTerm, setDebouncedTerm] = useState(initialQuery);
   const [selectedSeries, setSelectedSeries] = useState<Series | undefined>(
-    undefined
+    undefined,
   );
   const prefillAppliedRef = useRef(false);
 
@@ -149,10 +120,10 @@ const SonarrAddSeriesScreen = () => {
     }
 
     setSearchTerm((current) =>
-      current.trim().length === 0 ? initialQuery : current
+      current.trim().length === 0 ? initialQuery : current,
     );
     setDebouncedTerm((current) =>
-      current.trim().length === 0 ? initialQuery : current
+      current.trim().length === 0 ? initialQuery : current,
     );
   }, [initialQuery]);
 
@@ -211,9 +182,18 @@ const SonarrAddSeriesScreen = () => {
     gcTime: 5 * 60 * 1000,
   });
 
-  const qualityProfiles = qualityProfilesQuery.data ?? [];
-  const rootFolders = rootFoldersQuery.data ?? [];
-  const searchResults = searchQuery.data ?? [];
+  const qualityProfiles = useMemo(
+    () => qualityProfilesQuery.data ?? [],
+    [qualityProfilesQuery.data],
+  );
+  const rootFolders = useMemo(
+    () => rootFoldersQuery.data ?? [],
+    [rootFoldersQuery.data],
+  );
+  const searchResults = useMemo(
+    () => searchQuery.data ?? [],
+    [searchQuery.data],
+  );
 
   useEffect(() => {
     prefillAppliedRef.current = false;
@@ -374,7 +354,7 @@ const SonarrAddSeriesScreen = () => {
       theme.colors.error,
       theme.colors.onSurface,
       theme.colors.primary,
-    ]
+    ],
   );
 
   const handleSelectSeries = useCallback((series: Series) => {
@@ -384,9 +364,9 @@ const SonarrAddSeriesScreen = () => {
   const onSubmit = useCallback(
     async (values: AddSeriesFormValues) => {
       if (!selectedSeries) {
-  alert(
+        alert(
           "Select a series",
-          "Choose a series from the search results before adding."
+          "Choose a series from the search results before adding.",
         );
         return;
       }
@@ -422,10 +402,10 @@ const SonarrAddSeriesScreen = () => {
           error instanceof Error
             ? error.message
             : "Unable to add series at this time.";
-  alert("Add series failed", message);
+        alert("Add series failed", message);
       }
     },
-    [addSeriesMutation, router, selectedSeries, serviceKey]
+    [addSeriesMutation, router, selectedSeries, serviceKey],
   );
 
   if (!serviceId) {

@@ -22,14 +22,106 @@ async function run() {
 
   fs.mkdirSync(outDir, { recursive: true });
 
-  const files = fs.readdirSync(specsDir).filter((f) => /\.ya?ml$|\.json$/i.test(f));
+  let files = fs
+    .readdirSync(specsDir)
+    .filter((f) => /\.ya?ml$|\.json$/i.test(f));
 
   if (files.length === 0) {
     console.warn(`No OpenAPI spec files found in ${specsDir}`);
     process.exit(0);
   }
 
-  console.log(`Found ${files.length} spec(s) in ${specsDir}. Generating types to ${outDir}`);
+  console.log(`Found ${files.length} spec(s) in ${specsDir}.`);
+
+  // Helper to parse a user selection like "1,3-5,7" into zero-based indices
+  function parseSelection(input, max) {
+    const seen = new Set();
+    const parts = input
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    for (const part of parts) {
+      if (/^\d+$/.test(part)) {
+        const n = Number(part);
+        if (n >= 1 && n <= max) seen.add(n - 1);
+        continue;
+      }
+      const m = part.match(/^(\d+)-(\d+)$/);
+      if (m) {
+        let a = Number(m[1]);
+        let b = Number(m[2]);
+        if (a > b) [a, b] = [b, a];
+        for (let i = a; i <= b; i++) {
+          if (i >= 1 && i <= max) seen.add(i - 1);
+        }
+        continue;
+      }
+      // allow filenames directly
+      const idx = files.indexOf(part);
+      if (idx !== -1) seen.add(idx);
+    }
+    return Array.from(seen).sort((a, b) => a - b);
+  }
+
+  // Prompt the user to choose which files to generate
+  async function promptUserToSelectFiles(files) {
+    // If not a TTY (CI or piping), default to all files
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      console.log(
+        "Non-interactive shell detected; defaulting to generating all specs.",
+      );
+      return files.slice();
+    }
+
+    // If only one file exists, auto-select it
+    if (files.length === 1) {
+      console.log(
+        `Only one spec found: ${files[0]} — selecting it automatically.`,
+      );
+      return files.slice();
+    }
+
+    console.log("Available OpenAPI spec files:");
+    files.forEach((f, i) => {
+      console.log(`  ${String(i + 1).padStart(2, " ")}. ${f}`);
+    });
+    console.log(
+      '\nEnter numbers (e.g. "1,3-5"), filenames, or "all" to generate for all files. Leave blank to cancel.',
+    );
+
+    const readline = require("readline");
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const answer = await new Promise((resolve) => {
+      rl.question("Select files to generate: ", (ans) => {
+        rl.close();
+        resolve(String(ans || "").trim());
+      });
+    });
+
+    if (!answer) {
+      console.log("No selection made — aborting.");
+      process.exit(0);
+    }
+
+    if (/^all$|^\*$|^a$/i.test(answer)) {
+      return files.slice();
+    }
+
+    const indices = parseSelection(answer, files.length);
+    if (indices.length === 0) {
+      console.log("No valid selections parsed — aborting.");
+      process.exit(0);
+    }
+    return indices.map((i) => files[i]);
+  }
+
+  files = await promptUserToSelectFiles(files);
+
+  console.log(`Generating types to ${outDir}`);
 
   // Try to use the programmatic API if available so we can capture errors directly.
   let openapiTS = null;
@@ -38,7 +130,9 @@ async function run() {
     openapiTS = mod && (mod.default || mod);
   } catch (err) {
     // Not installed locally — we'll fall back to CLI later.
-    console.warn("openapi-typescript not available as a module; falling back to CLI (npx). Install devDependencies to use the programmatic API.");
+    console.warn(
+      "openapi-typescript not available as a module; falling back to CLI (npx). Install devDependencies to use the programmatic API.",
+    );
   }
 
   // Try to use swagger2openapi to convert swagger 2.0 specs -> openapi 3.x for the programmatic API.
@@ -58,7 +152,9 @@ async function run() {
     const base = path.basename(file, path.extname(file));
     const outFile = path.join(outDir, `${base}.ts`);
 
-    console.log(`\nGenerating ${path.relative(repoRoot, outFile)} from ${path.relative(repoRoot, inputPath)}...`);
+    console.log(
+      `\nGenerating ${path.relative(repoRoot, outFile)} from ${path.relative(repoRoot, inputPath)}...`,
+    );
 
     // Try programmatic API first
     if (openapiTS) {
@@ -121,11 +217,20 @@ async function run() {
         // If the spec is Swagger 2.0 and we have a converter, convert it to OpenAPI 3.x first.
         let useInput = inputPath;
         let converted = null;
-        if (parsedSpec && parsedSpec.swagger && String(parsedSpec.swagger).startsWith("2") && swagger2openapi) {
+        if (
+          parsedSpec &&
+          parsedSpec.swagger &&
+          String(parsedSpec.swagger).startsWith("2") &&
+          swagger2openapi
+        ) {
           try {
             // If we've already parsed the spec, convert the parsed object
             const res = await new Promise((resolve, reject) => {
-              swagger2openapi.convertObj(parsedSpec, { patch: true }, (err, out) => (err ? reject(err) : resolve(out)));
+              swagger2openapi.convertObj(
+                parsedSpec,
+                { patch: true },
+                (err, out) => (err ? reject(err) : resolve(out)),
+              );
             });
             converted = res && (res.openapi || res);
           } catch (e) {
@@ -135,7 +240,11 @@ async function run() {
           // For YAML specs, try convertFile if available (it will read and parse the file)
           try {
             const res = await new Promise((resolve, reject) => {
-              swagger2openapi.convertFile(inputPath, { patch: true }, (err, out) => (err ? reject(err) : resolve(out)));
+              swagger2openapi.convertFile(
+                inputPath,
+                { patch: true },
+                (err, out) => (err ? reject(err) : resolve(out)),
+              );
             });
             converted = res && (res.openapi || res);
           } catch (e) {
@@ -146,8 +255,14 @@ async function run() {
         if (Object.keys(operationIdMap).length > 0) {
           // If we mutated operationIds, write a small mapping file for the user to inspect
           const mapPath = outFile + ".operationid-map.json";
-          fs.writeFileSync(mapPath, JSON.stringify(operationIdMap, null, 2), "utf8");
-          console.log(`Wrote operationId mapping to ${path.relative(repoRoot, mapPath)}`);
+          fs.writeFileSync(
+            mapPath,
+            JSON.stringify(operationIdMap, null, 2),
+            "utf8",
+          );
+          console.log(
+            `Wrote operationId mapping to ${path.relative(repoRoot, mapPath)}`,
+          );
         }
 
         if (converted) {
@@ -156,7 +271,9 @@ async function run() {
           const specToUse = converted || parsedSpec || inputPath;
           const ts = await openapiTS(specToUse);
           fs.writeFileSync(outFile, ts, "utf8");
-          console.log(`Wrote ${path.relative(repoRoot, outFile)} (converted from swagger 2.0)`);
+          console.log(
+            `Wrote ${path.relative(repoRoot, outFile)} (converted from swagger 2.0)`,
+          );
           generated.push({ file: base, outFile });
           continue;
         }
@@ -168,16 +285,27 @@ async function run() {
         generated.push({ file: base, outFile });
         continue;
       } catch (err) {
-        console.error(`Programmatic openapi-typescript failed for ${file}: ${err && err.message ? err.message : err}`);
+        console.error(
+          `Programmatic openapi-typescript failed for ${file}: ${err && err.message ? err.message : err}`,
+        );
         if (err && err.stack) {
           console.error(err.stack);
         }
         // write a helpful error log next to the intended output
         try {
-          fs.writeFileSync(outFile + ".error.log", String(err && (err.stack || err.message || err)), "utf8");
-          console.error(`Wrote error log to ${path.relative(repoRoot, outFile + ".error.log")}`);
+          fs.writeFileSync(
+            outFile + ".error.log",
+            String(err && (err.stack || err.message || err)),
+            "utf8",
+          );
+          console.error(
+            `Wrote error log to ${path.relative(repoRoot, outFile + ".error.log")}`,
+          );
         } catch (e) {
-          console.error("Failed to write error log:", e && e.message ? e.message : e);
+          console.error(
+            "Failed to write error log:",
+            e && e.message ? e.message : e,
+          );
         }
         console.log("Attempting CLI fallback via npx...");
         // fallthrough to CLI fallback
@@ -189,14 +317,27 @@ async function run() {
       const { spawnSync } = require("child_process");
 
       // Prefer a locally installed binary at node_modules/.bin when available.
-      const localBinName = process.platform === "win32" ? "openapi-typescript.cmd" : "openapi-typescript";
-      const localBin = path.join(repoRoot, "node_modules", ".bin", localBinName);
+      const localBinName =
+        process.platform === "win32"
+          ? "openapi-typescript.cmd"
+          : "openapi-typescript";
+      const localBin = path.join(
+        repoRoot,
+        "node_modules",
+        ".bin",
+        localBinName,
+      );
       let res;
 
       if (fs.existsSync(localBin)) {
-        console.log(`Using local openapi-typescript binary: ${path.relative(repoRoot, localBin)}`);
+        console.log(
+          `Using local openapi-typescript binary: ${path.relative(repoRoot, localBin)}`,
+        );
         // Use shell on Windows to allow .cmd to be executed correctly
-        res = spawnSync(localBin, [inputPath, "--output", outFile], { encoding: "utf8", shell: process.platform === "win32" });
+        res = spawnSync(localBin, [inputPath, "--output", outFile], {
+          encoding: "utf8",
+          shell: process.platform === "win32",
+        });
       } else {
         const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
         const args = ["openapi-typescript", inputPath, "--output", outFile];
@@ -205,7 +346,11 @@ async function run() {
 
       if (res.error) {
         console.error(`Failed to run CLI for ${file}: ${res.error.message}`);
-        fs.appendFileSync(outFile + ".error.log", `\nCLI error: ${String(res.error && (res.error.stack || res.error.message || res.error))}\n`, "utf8");
+        fs.appendFileSync(
+          outFile + ".error.log",
+          `\nCLI error: ${String(res.error && (res.error.stack || res.error.message || res.error))}\n`,
+          "utf8",
+        );
         hadFailures = true;
         continue;
       }
@@ -214,20 +359,35 @@ async function run() {
       if (res.stderr) process.stderr.write(res.stderr);
 
       if (res.status !== 0) {
-        console.error(`CLI generation failed for ${file} (exit code ${res.status}).`);
-        fs.appendFileSync(outFile + ".error.log", `\nCLI output:\n${res.stdout || ""}\n${res.stderr || ""}\n`, "utf8");
+        console.error(
+          `CLI generation failed for ${file} (exit code ${res.status}).`,
+        );
+        fs.appendFileSync(
+          outFile + ".error.log",
+          `\nCLI output:\n${res.stdout || ""}\n${res.stderr || ""}\n`,
+          "utf8",
+        );
         hadFailures = true;
         continue;
       }
 
       generated.push({ file: base, outFile });
     } catch (err) {
-      console.error(`Unexpected error while running CLI fallback for ${file}: ${err && err.message ? err.message : err}`);
+      console.error(
+        `Unexpected error while running CLI fallback for ${file}: ${err && err.message ? err.message : err}`,
+      );
       if (err && err.stack) console.error(err.stack);
       try {
-        fs.appendFileSync(outFile + ".error.log", `\nUnexpected CLI fallback error:\n${String(err && (err.stack || err.message || err))}\n`, "utf8");
+        fs.appendFileSync(
+          outFile + ".error.log",
+          `\nUnexpected CLI fallback error:\n${String(err && (err.stack || err.message || err))}\n`,
+          "utf8",
+        );
       } catch (e) {
-        console.error("Failed to write error log:", e && e.message ? e.message : e);
+        console.error(
+          "Failed to write error log:",
+          e && e.message ? e.message : e,
+        );
       }
       hadFailures = true;
     }
@@ -235,15 +395,20 @@ async function run() {
 
   // Create (or update) an index.ts that re-exports generated schemas
   const indexPath = path.join(outDir, "index.ts");
-  const indexLines = generated
-    .map((g) => `export * as ${toPascalCase(g.file)} from './${g.file}';`)
-    .join("\n") + "\n";
+  const indexLines =
+    generated
+      .map((g) => `export * as ${toPascalCase(g.file)} from './${g.file}';`)
+      .join("\n") + "\n";
 
   fs.writeFileSync(indexPath, indexLines, "utf8");
-  console.log(`\nWrote ${path.relative(repoRoot, indexPath)} with ${generated.length} exports.`);
+  console.log(
+    `\nWrote ${path.relative(repoRoot, indexPath)} with ${generated.length} exports.`,
+  );
 
   if (hadFailures) {
-    console.error("Some specs failed to generate — check the corresponding .error.log files and the console output above.");
+    console.error(
+      "Some specs failed to generate — check the corresponding .error.log files and the console output above.",
+    );
     process.exit(2);
   }
 
@@ -251,6 +416,9 @@ async function run() {
 }
 
 run().catch((err) => {
-  console.error("Unexpected error while generating OpenAPI types:", err && (err.stack || err.message) ? (err.stack || err.message) : err);
+  console.error(
+    "Unexpected error while generating OpenAPI types:",
+    err && (err.stack || err.message) ? err.stack || err.message : err,
+  );
   process.exit(1);
 });

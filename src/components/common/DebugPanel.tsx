@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Card, Text, Button, useTheme, Divider, Chip } from 'react-native-paper';
-import { spacing } from '@/theme/spacing';
+import React from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import {
+  Card,
+  Text,
+  Button,
+  useTheme,
+  Divider,
+  Chip,
+} from "react-native-paper";
+import { spacing } from "@/theme/spacing";
 
 export interface DebugStep {
   id: string;
   title: string;
-  status: 'pending' | 'running' | 'success' | 'error' | 'warning';
+  status: "pending" | "running" | "success" | "error" | "warning";
   message?: string;
   details?: string;
   timestamp: Date;
@@ -29,35 +36,35 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
 
   if (!isVisible) return null;
 
-  const getStatusColor = (status: DebugStep['status']) => {
+  const getStatusColor = (status: DebugStep["status"]) => {
     switch (status) {
-      case 'success':
+      case "success":
         return theme.colors.primary;
-      case 'error':
+      case "error":
         return theme.colors.error;
-      case 'warning':
+      case "warning":
         return theme.colors.tertiary;
-      case 'running':
+      case "running":
         return theme.colors.tertiary;
-      case 'pending':
+      case "pending":
       default:
         return theme.colors.onSurfaceVariant;
     }
   };
 
-  const getStatusIcon = (status: DebugStep['status']) => {
+  const getStatusIcon = (status: DebugStep["status"]) => {
     switch (status) {
-      case 'success':
-        return 'check-circle';
-      case 'error':
-        return 'alert-circle';
-      case 'warning':
-        return 'alert';
-      case 'running':
-        return 'loading';
-      case 'pending':
+      case "success":
+        return "check-circle";
+      case "error":
+        return "alert-circle";
+      case "warning":
+        return "alert";
+      case "running":
+        return "loading";
+      case "pending":
       default:
-        return 'circle-outline';
+        return "circle-outline";
     }
   };
 
@@ -77,12 +84,22 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
             </Button>
           </View>
         </View>
-        
+
         <Divider style={styles.divider} />
-        
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
           {steps.length === 0 ? (
-            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', padding: spacing.lg }}>
+            <Text
+              variant="bodyMedium"
+              style={{
+                color: theme.colors.onSurfaceVariant,
+                textAlign: "center",
+                padding: spacing.lg,
+              }}
+            >
               No debug information available. Try testing a connection.
             </Text>
           ) : (
@@ -91,34 +108,57 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({
                 <View style={styles.stepHeader}>
                   <Chip
                     icon={getStatusIcon(step.status)}
-                    style={[styles.statusChip, { backgroundColor: getStatusColor(step.status) + '20' }]}
+                    style={[
+                      styles.statusChip,
+                      { backgroundColor: getStatusColor(step.status) + "20" },
+                    ]}
                     textStyle={{ color: getStatusColor(step.status) }}
                     compact
                   >
                     {step.status.toUpperCase()}
                   </Chip>
-                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                    {step.timestamp?.toLocaleTimeString() || 'Now'}
+                  <Text
+                    variant="bodySmall"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    {step.timestamp?.toLocaleTimeString() || "Now"}
                   </Text>
                 </View>
-                
-                <Text variant="titleSmall" style={[styles.stepTitle, { color: theme.colors.onSurface }]}>
+
+                <Text
+                  variant="titleSmall"
+                  style={[styles.stepTitle, { color: theme.colors.onSurface }]}
+                >
                   {step.title}
                 </Text>
-                
+
                 {step.message && (
-                  <Text variant="bodyMedium" style={[styles.stepMessage, { color: theme.colors.onSurface }]}>
+                  <Text
+                    variant="bodyMedium"
+                    style={[
+                      styles.stepMessage,
+                      { color: theme.colors.onSurface },
+                    ]}
+                  >
                     {step.message}
                   </Text>
                 )}
-                
+
                 {step.details && (
-                  <Text variant="bodySmall" style={[styles.stepDetails, { color: theme.colors.onSurfaceVariant }]}>
+                  <Text
+                    variant="bodySmall"
+                    style={[
+                      styles.stepDetails,
+                      { color: theme.colors.onSurfaceVariant },
+                    ]}
+                  >
                     {step.details}
                   </Text>
                 )}
-                
-                {index < steps.length - 1 && <Divider style={styles.stepDivider} />}
+
+                {index < steps.length - 1 && (
+                  <Divider style={styles.stepDivider} />
+                )}
               </View>
             ))
           )}
@@ -134,13 +174,13 @@ const styles = StyleSheet.create({
     maxHeight: 400,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.sm,
   },
   headerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.xs,
   },
   divider: {
@@ -153,23 +193,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   stepHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.xs,
   },
   statusChip: {
     height: 24,
   },
   stepTitle: {
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: spacing.xs,
   },
   stepMessage: {
     marginBottom: spacing.xs,
   },
   stepDetails: {
-    fontFamily: 'monospace',
+    fontFamily: "monospace",
     fontSize: 12,
     lineHeight: 16,
   },

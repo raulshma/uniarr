@@ -1,14 +1,13 @@
 import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect } from "@react-navigation/native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { alert } from "@/services/dialogService";
 import {
   FAB,
   Icon,
   IconButton,
-  Menu,
   Searchbar,
   SegmentedButtons,
   Text,
@@ -22,13 +21,12 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
-import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type {
   BazarrMovie,
   BazarrEpisode,
   BazarrMissingSubtitle,
 } from "@/models/bazarr.types";
-import { logger } from "@/services/logger/LoggerService";
+// logger intentionally omitted — avoid logging secrets in UI components
 import { spacing } from "@/theme/spacing";
 import { useBazarrSubtitles } from "@/hooks/useBazarrSubtitles";
 
@@ -42,20 +40,6 @@ type FilterValue =
   | typeof FILTER_MOVIES
   | typeof FILTER_EPISODES
   | typeof FILTER_MISSING;
-
-const FILTER_OPTIONS: FilterValue[] = [
-  FILTER_ALL,
-  FILTER_MOVIES,
-  FILTER_EPISODES,
-  FILTER_MISSING,
-];
-
-const FILTER_LABELS: Record<FilterValue, string> = {
-  [FILTER_ALL]: "All Items",
-  [FILTER_MOVIES]: "Movies",
-  [FILTER_EPISODES]: "Episodes",
-  [FILTER_MISSING]: "Missing Subs",
-};
 
 const normalizeSearchTerm = (input: string): string =>
   input.trim().toLowerCase();
@@ -137,7 +121,7 @@ const MediaItem = ({
           </View>
         </>
       </TouchableRipple>
-  </View>
+    </View>
   );
 };
 
@@ -171,7 +155,7 @@ const MissingSubtitleItem = ({
           </View>
         </>
       </TouchableRipple>
-  </View>
+    </View>
   );
 };
 
@@ -182,7 +166,6 @@ const BazarrSubtitlesScreen = () => {
   const serviceId = typeof rawServiceId === "string" ? rawServiceId : "";
   const hasValidServiceId = serviceId.length > 0;
 
-  const router = useRouter();
   const theme = useTheme<AppTheme>();
 
   // State management
@@ -200,7 +183,6 @@ const BazarrSubtitlesScreen = () => {
     error,
     refetch,
     searchSubtitles,
-    downloadSubtitle,
   } = useBazarrSubtitles(serviceId);
 
   // Handle refresh
@@ -216,15 +198,18 @@ const BazarrSubtitlesScreen = () => {
       if (hasValidServiceId) {
         refetch();
       }
-    }, [hasValidServiceId, refetch])
+    }, [hasValidServiceId, refetch]),
   );
 
   // Filter and search items
   const filteredItems = useMemo(() => {
     if (!movies || !episodes || !missingSubtitles) return [];
 
-    const allItems: Array<BazarrMovie | BazarrEpisode | BazarrMissingSubtitle> =
-      [...movies, ...episodes, ...missingSubtitles];
+    const allItems: (BazarrMovie | BazarrEpisode | BazarrMissingSubtitle)[] = [
+      ...movies,
+      ...episodes,
+      ...missingSubtitles,
+    ];
 
     // Apply filter
     let filtered = allItems;
@@ -271,8 +256,8 @@ const BazarrSubtitlesScreen = () => {
               "radarrId" in item
                 ? item.radarrId!
                 : "sonarrEpisodeId" in item
-                ? item.sonarrEpisodeId!
-                : 0,
+                  ? item.sonarrEpisodeId!
+                  : 0,
             language: missingSub.language.code2,
             forced: missingSub.forced,
             hi: missingSub.hi,
@@ -281,7 +266,7 @@ const BazarrSubtitlesScreen = () => {
         }
       }
     },
-    [searchSubtitles]
+    [searchSubtitles],
   );
 
   // Handle item press
@@ -289,14 +274,14 @@ const BazarrSubtitlesScreen = () => {
     (item: BazarrMovie | BazarrEpisode | BazarrMissingSubtitle) => {
       // For now, just show item details in alert
       // In the future, this could navigate to a detail screen
-  alert(
+      alert(
         "title" in item ? item.title : item.language.name,
         `Type: ${"radarrId" in item ? "Movie" : "Episode"}\nMonitored: ${
           "monitored" in item ? item.monitored : "Unknown"
-        }`
+        }`,
       );
     },
-    []
+    [],
   );
 
   // Render item based on type
@@ -331,7 +316,7 @@ const BazarrSubtitlesScreen = () => {
         />
       );
     },
-    [handleItemPress, handleSearchSubtitles]
+    [handleItemPress, handleSearchSubtitles],
   );
 
   // Show error state
@@ -402,8 +387,8 @@ const BazarrSubtitlesScreen = () => {
               searchQuery
                 ? `No items match "${searchQuery}"`
                 : selectedFilter === FILTER_MISSING
-                ? "No missing subtitles found. All items have subtitles!"
-                : "No movies or episodes found. Check your Bazarr configuration."
+                  ? "No missing subtitles found. All items have subtitles!"
+                  : "No movies or episodes found. Check your Bazarr configuration."
             }
             actionLabel={searchQuery ? "Clear Search" : "Refresh"}
             onActionPress={
@@ -494,7 +479,7 @@ const BazarrSubtitlesScreen = () => {
           // TODO: Open manual search dialog
           alert(
             "Manual Search",
-            "Manual search functionality will be implemented in a future update."
+            "Manual search functionality will be implemented in a future update.",
           );
         }}
         style={[styles.fab, { backgroundColor: theme.colors.primaryContainer }]}

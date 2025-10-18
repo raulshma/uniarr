@@ -1,17 +1,20 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
   useQueryClient,
   type QueryObserverResult,
   type RefetchOptions,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import type { IConnector } from '@/connectors/base/IConnector';
-import type { Series } from '@/models/media.types';
-import { queryKeys } from '@/hooks/queryKeys';
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
+import type { IConnector } from "@/connectors/base/IConnector";
+import type { Series } from "@/models/media.types";
+import { queryKeys } from "@/hooks/queryKeys";
 
 interface UseSonarrSeriesDetailsParams {
   serviceId: string;
@@ -24,7 +27,9 @@ export interface UseSonarrSeriesDetailsResult {
   isFetching: boolean;
   isError: boolean;
   error: unknown;
-  refetch: (options?: RefetchOptions) => Promise<QueryObserverResult<Series, Error>>;
+  refetch: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<Series, Error>>;
   toggleMonitor: (nextState: boolean) => void;
   toggleMonitorAsync: (nextState: boolean) => Promise<void>;
   isTogglingMonitor: boolean;
@@ -45,7 +50,7 @@ export interface UseSonarrSeriesDetailsResult {
   deleteError: unknown;
 }
 
-const SONARR_SERVICE_TYPE = 'sonarr';
+const SONARR_SERVICE_TYPE = "sonarr";
 
 const ensureSonarrConnector = (
   getConnector: (id: string) => IConnector | undefined,
@@ -53,7 +58,9 @@ const ensureSonarrConnector = (
 ): SonarrConnector => {
   const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== SONARR_SERVICE_TYPE) {
-    throw new Error(`Sonarr connector not registered for service ${serviceId}.`);
+    throw new Error(
+      `Sonarr connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as SonarrConnector;
@@ -68,7 +75,10 @@ export const useSonarrSeriesDetails = ({
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === SONARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureSonarrConnector(getConnector, serviceId), [getConnector, serviceId]);
+  const resolveConnector = useCallback(
+    () => ensureSonarrConnector(getConnector, serviceId),
+    [getConnector, serviceId],
+  );
 
   const detailsQuery = useQuery({
     queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
@@ -82,22 +92,34 @@ export const useSonarrSeriesDetails = ({
   });
 
   const toggleMonitorMutation = useMutation({
-    mutationKey: [...queryKeys.sonarr.seriesDetail(serviceId, seriesId), 'monitor'],
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "monitor",
+    ],
     mutationFn: async (nextState: boolean) => {
       const connector = resolveConnector();
       await connector.setMonitored(seriesId, nextState);
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.seriesList(serviceId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.queue(serviceId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceId),
+        }),
       ]);
     },
   });
 
   const triggerSearchMutation = useMutation({
-    mutationKey: [...queryKeys.sonarr.seriesDetail(serviceId, seriesId), 'search'],
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "search",
+    ],
     mutationFn: async () => {
       const connector = resolveConnector();
       await connector.triggerSearch(seriesId);
@@ -105,18 +127,32 @@ export const useSonarrSeriesDetails = ({
   });
 
   const deleteSeriesMutation = useMutation({
-    mutationKey: [...queryKeys.sonarr.seriesDetail(serviceId, seriesId), 'delete'],
-    mutationFn: async (options?: { deleteFiles?: boolean; addImportListExclusion?: boolean }) => {
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "delete",
+    ],
+    mutationFn: async (options?: {
+      deleteFiles?: boolean;
+      addImportListExclusion?: boolean;
+    }) => {
       const connector = resolveConnector();
       await connector.deleteSeries(seriesId, options);
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.seriesList(serviceId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.sonarr.queue(serviceId) }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceId),
+        }),
       ]);
-      queryClient.removeQueries({ queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId) });
+      queryClient.removeQueries({
+        queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      });
     },
   });
 

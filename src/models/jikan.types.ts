@@ -1,4 +1,7 @@
-import type { components, operations } from "@/connectors/client-schemas/jikan-openapi";
+import type {
+  components,
+  operations,
+} from "@/connectors/client-schemas/jikan-openapi";
 
 // Re-export generated OpenAPI types so callers can keep importing from
 // `@/models/jikan.types` while we source definitions directly from the spec.
@@ -78,4 +81,5 @@ export type JikanAnimeFull = JikanAnimeFullResponse["data"];
 // Trailer type: some endpoints include `trailer.images`, others only include the
 // base trailer fields. Export a union/intersection type so callers can opt-in to
 // the richer shape when available.
-export type JikanTrailer = components["schemas"]["trailer_base"] & components["schemas"]["trailer_images"];
+export type JikanTrailer = components["schemas"]["trailer_base"] &
+  components["schemas"]["trailer_images"];

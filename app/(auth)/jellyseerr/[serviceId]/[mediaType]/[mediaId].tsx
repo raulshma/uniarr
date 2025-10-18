@@ -22,13 +22,15 @@ import { spacing } from "@/theme/spacing";
 import { useJellyseerrMediaDetails } from "@/hooks/useJellyseerrMediaDetails";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
-import type { components } from '@/connectors/client-schemas/jellyseerr-openapi';
-type MovieDetails = components['schemas']['MovieDetails'];
-type TvDetails = components['schemas']['TvDetails'];
+import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
+type MovieDetails = components["schemas"]["MovieDetails"];
+type TvDetails = components["schemas"]["TvDetails"];
 type JellyDetails = MovieDetails | TvDetails;
 
-const isMovieDetails = (d?: JellyDetails): d is MovieDetails => Boolean(d && 'title' in d);
-const isTvDetails = (d?: JellyDetails): d is TvDetails => Boolean(d && 'name' in d);
+const isMovieDetails = (d?: JellyDetails): d is MovieDetails =>
+  Boolean(d && "title" in d);
+const isTvDetails = (d?: JellyDetails): d is TvDetails =>
+  Boolean(d && "name" in d);
 
 const JellyseerrMediaDetailScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
@@ -51,53 +53,53 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
       : undefined;
   const mediaId = Number.parseInt(
     typeof rawMediaId === "string" ? rawMediaId : "",
-    10
+    10,
   );
 
   const { data, isLoading, isError, refetch } = useJellyseerrMediaDetails(
     serviceId,
     mediaType ?? "movie",
-    mediaId
+    mediaId,
   );
   // Typed accessors for the generated MovieDetails | TvDetails union
   const getTitle = (d?: JellyDetails) => {
     if (!d) return "Unknown Title";
-    if ('title' in d && d.title) return d.title;
-    if ('name' in d && d.name) return d.name;
+    if ("title" in d && d.title) return d.title;
+    if ("name" in d && d.name) return d.name;
     return "Unknown Title";
   };
 
   const toRecord = (v: unknown): Record<string, unknown> | null =>
-    v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+    v && typeof v === "object" ? (v as Record<string, unknown>) : null;
 
   const getOriginalTitle = (d?: JellyDetails) => {
     const r = toRecord(d);
     const val = r?.originalTitle ?? undefined;
-    return typeof val === 'string' ? val : undefined;
+    return typeof val === "string" ? val : undefined;
   };
 
   const getPosterPath = (d?: JellyDetails) => {
     const r = toRecord(d);
-    const p = r?.posterPath ?? (r?.mediaInfo && (r.mediaInfo as any)?.posterPath) ?? undefined;
-    return typeof p === 'string' ? p : undefined;
-  };
-
-  const getBackdropPath = (d?: JellyDetails) => {
-    const r = toRecord(d);
-    const p = r?.backdropPath ?? (r?.mediaInfo && (r.mediaInfo as any)?.backdropPath) ?? undefined;
-    return typeof p === 'string' ? p : undefined;
+    const p =
+      r?.posterPath ??
+      (r?.mediaInfo && (r.mediaInfo as any)?.posterPath) ??
+      undefined;
+    return typeof p === "string" ? p : undefined;
   };
 
   const getExternalUrl = (d?: JellyDetails) => {
     const r = toRecord(d);
-    const v = r?.externalUrl ?? (r?.mediaInfo && (r.mediaInfo as any)?.externalUrl) ?? undefined;
-    return typeof v === 'string' ? v : undefined;
+    const v =
+      r?.externalUrl ??
+      (r?.mediaInfo && (r.mediaInfo as any)?.externalUrl) ??
+      undefined;
+    return typeof v === "string" ? v : undefined;
   };
 
   const getTagline = (d?: JellyDetails) => {
     const r = toRecord(d);
     const v = r?.tagline ?? undefined;
-    return typeof v === 'string' ? v : undefined;
+    return typeof v === "string" ? v : undefined;
   };
   const getReleaseDate = (d?: JellyDetails) => {
     if (!d) return undefined;
@@ -108,24 +110,39 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
 
   // Local convenience values used in render
   const posterPath = getPosterPath(data);
-  const backdropPath = getBackdropPath(data);
   const title = getTitle(data);
   const originalTitle = getOriginalTitle(data);
   const tagline = getTagline(data);
   const releaseDate = getReleaseDate(data);
   const isMovie = isMovieDetails(data);
   const isTv = isTvDetails(data);
-  const runtime = isMovie ? data?.runtime : isTv ? (data.episodeRunTime?.[0] ?? undefined) : undefined;
+  const runtime = isMovie
+    ? data?.runtime
+    : isTv
+      ? (data.episodeRunTime?.[0] ?? undefined)
+      : undefined;
   const rating = data?.voteAverage;
   const voteCount = data?.voteCount;
   const popularity = data?.popularity;
-  const networkName = isTv ? data.networks?.[0]?.name ?? data.productionCompanies?.[0]?.name : isMovie ? data.productionCompanies?.[0]?.name : undefined;
+  const networkName = isTv
+    ? (data.networks?.[0]?.name ?? data.productionCompanies?.[0]?.name)
+    : isMovie
+      ? data.productionCompanies?.[0]?.name
+      : undefined;
   const certification = undefined; // not reliably present in generated schema
-  const studios = (isMovie ? data.productionCompanies?.map((s) => s.name).filter(Boolean) : isTv ? data.networks?.map((n) => n.name).filter(Boolean) : []) ?? [];
+  const studios =
+    (isMovie
+      ? data.productionCompanies?.map((s) => s.name).filter(Boolean)
+      : isTv
+        ? data.networks?.map((n) => n.name).filter(Boolean)
+        : []) ?? [];
   const getGenres = (d?: JellyDetails) => {
     const r = toRecord(d);
-    const g = r?.genres ?? (r?.mediaInfo && (r.mediaInfo as any)?.genres) ?? undefined;
-    return Array.isArray(g) ? (g as (string | { id?: number; name?: string })[]) : [];
+    const g =
+      r?.genres ?? (r?.mediaInfo && (r.mediaInfo as any)?.genres) ?? undefined;
+    return Array.isArray(g)
+      ? (g as (string | { id?: number; name?: string })[])
+      : [];
   };
 
   const getAlternateTitles = (d?: JellyDetails) => {
@@ -211,7 +228,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
           marginTop: spacing.lg,
         },
       }),
-    [theme, insets]
+    [theme, insets],
   );
 
   const openInJellyseerr = async () => {
@@ -290,7 +307,11 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
             entering={FadeIn.delay(400)}
           >
             <MediaPoster
-              uri={posterPath ? `https://image.tmdb.org/t/p/original${posterPath}` : undefined}
+              uri={
+                posterPath
+                  ? `https://image.tmdb.org/t/p/original${posterPath}`
+                  : undefined
+              }
               size="large"
               borderRadius={12}
             />
@@ -301,17 +322,17 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
             style={styles.titleContainer}
             entering={FadeIn.delay(500)}
           >
-              <Text
-                variant="headlineLarge"
-                style={{
-                  color: theme.colors.onSurface,
-                  fontWeight: "bold",
-                  textAlign: "center",
-                }}
-              >
-                {title}
-              </Text>
-            {(originalTitle && originalTitle !== title) ? (
+            <Text
+              variant="headlineLarge"
+              style={{
+                color: theme.colors.onSurface,
+                fontWeight: "bold",
+                textAlign: "center",
+              }}
+            >
+              {title}
+            </Text>
+            {originalTitle && originalTitle !== title ? (
               <Text
                 variant="titleMedium"
                 style={{
@@ -371,7 +392,9 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                 {releaseDate ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
-                      {mediaType === 'movie' ? 'Release Date' : 'First Air Date'}
+                      {mediaType === "movie"
+                        ? "Release Date"
+                        : "First Air Date"}
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
                       {new Date(releaseDate).getFullYear()}
@@ -394,7 +417,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                       Rating
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {rating?.toFixed?.(1) ?? ''}/10
+                      {rating?.toFixed?.(1) ?? ""}/10
                     </Text>
                   </View>
                 ) : null}
@@ -404,7 +427,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                       Votes
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {voteCount?.toLocaleString?.() ?? ''}
+                      {voteCount?.toLocaleString?.() ?? ""}
                     </Text>
                   </View>
                 ) : null}
@@ -414,7 +437,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                       Popularity
                     </Text>
                     <Text variant="bodyLarge" style={styles.value}>
-                      {popularity?.toFixed?.(1) ?? ''}
+                      {popularity?.toFixed?.(1) ?? ""}
                     </Text>
                   </View>
                 ) : null}
@@ -451,7 +474,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                     </Chip>
                   </View>
                 ) : null}
-                {(studios.length) ? (
+                {studios.length ? (
                   <View style={styles.detailRow}>
                     <Text variant="labelMedium" style={styles.label}>
                       Studios
@@ -466,7 +489,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
           </Animated.View>
 
           {/* Genres */}
-          {(genres.length) ? (
+          {genres.length ? (
             <Animated.View entering={FadeIn.delay(800)}>
               <Card style={styles.card}>
                 <Card.Content style={styles.cardContent}>
@@ -481,9 +504,16 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   </Text>
                   <View style={styles.genresContainer}>
                     {genres.map((genreOrObj) => {
-                      const name = typeof genreOrObj === 'string' ? genreOrObj : genreOrObj?.name ?? String(genreOrObj?.id ?? '');
+                      const name =
+                        typeof genreOrObj === "string"
+                          ? genreOrObj
+                          : (genreOrObj?.name ?? String(genreOrObj?.id ?? ""));
                       return (
-                        <Chip key={name} mode="outlined" style={{ borderColor: theme.colors.outline }}>
+                        <Chip
+                          key={name}
+                          mode="outlined"
+                          style={{ borderColor: theme.colors.outline }}
+                        >
                           {name}
                         </Chip>
                       );
@@ -508,15 +538,17 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   >
                     Also Known As
                   </Text>
-                  {(alternateTitles ?? []).map((title: string, index: number) => (
-                    <Text
-                      key={index}
-                      variant="bodyMedium"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      {title}
-                    </Text>
-                  ))}
+                  {(alternateTitles ?? []).map(
+                    (title: string, index: number) => (
+                      <Text
+                        key={index}
+                        variant="bodyMedium"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        {title}
+                      </Text>
+                    ),
+                  )}
                 </Card.Content>
               </Card>
             </Animated.View>

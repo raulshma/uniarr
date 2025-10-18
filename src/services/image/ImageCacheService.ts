@@ -7,6 +7,7 @@ import { Image } from "expo-image";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 import { logger } from "@/services/logger/LoggerService";
+import { useSettingsStore } from "@/store/settingsStore";
 
 export type ImageCacheUsage = {
   size: number;
@@ -15,28 +16,19 @@ export type ImageCacheUsage = {
 };
 
 const STORAGE_KEY = "ImageCacheService:trackedUris";
-const STORAGE_KEY_VARIANT_STATS = "ImageCacheService:variantStats";
-const STORAGE_KEY_THUMBHASH = "ImageCacheService:thumbhashes";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
 class ImageCacheService {
   private static instance: ImageCacheService | null = null;
 
   private trackedUris: Set<string> = new Set();
-  // Telemetry: track how often each URI variant resolves to a cache path.
-  // Map keys are descriptive variant labels (eg. 'original', 'encoded', 'decoded', 'stripped').
-  private variantStats: Map<string, number> = new Map();
-  // Map of sanitized URI -> thumbhash string
-  private thumbhashes: Map<string, string> = new Map();
-
   private isInitialized = false;
-
   private inFlightPrefetches = new Map<string, Promise<string | null>>();
-  // Semaphore to limit concurrent image manipulations/downloads
-  private concurrentOps = 0;
-  // default, overridden dynamically from settings store
-  private readonly DEFAULT_MAX_CONCURRENT_OPS = 3;
-  private opQueue: Array<() => void> = [];
+  private prefetchQueue: string[] = [];
+  private isProcessingQueue = false;
+  private memoryCacheHits = 0;
+  private diskCacheHits = 0;
+  private cacheMisses = 0;
 
   static getInstance(): ImageCacheService {
     if (!ImageCacheService.instance) {
@@ -61,7 +53,16 @@ class ImageCacheService {
       const cachedPath = await this.getCachedPath(uri);
       if (cachedPath) {
         this.trackUri(uri);
+        this.diskCacheHits++;
         return cachedPath;
+      }
+
+      // Check if image is in memory cache (fast path)
+      const memoryCachePath = await this.checkMemoryCache(uri);
+      if (memoryCachePath) {
+        this.trackUri(uri);
+        this.memoryCacheHits++;
+        return memoryCachePath;
       }
 
       const localPath = await this.prefetchInternal(uri);
@@ -69,13 +70,15 @@ class ImageCacheService {
         this.trackUri(uri);
         return localPath;
       }
+
+      this.cacheMisses++;
     } catch (error) {
       void logger.warn(
         "ImageCacheService: resolveUri failed, falling back to remote URI.",
         {
           uri,
           error: this.stringifyError(error),
-        }
+        },
       );
     }
 
@@ -111,7 +114,11 @@ class ImageCacheService {
    * return a cached resized thumbnail appropriate for the device pixel ratio
    * and requested size. Falls back to resolveUri when resizing isn't possible.
    */
-  async resolveForSize(uri: string, widthPx: number, heightPx: number): Promise<string> {
+  async resolveForSize(
+    uri: string,
+    widthPx: number,
+    heightPx: number,
+  ): Promise<string> {
     await this.ensureInitialized();
 
     if (!uri) return uri;
@@ -143,8 +150,305 @@ class ImageCacheService {
             error: this.stringifyError(error),
           });
         }
-      })
+      }),
     );
+  }
+
+  /**
+   * Enforce cache size limits by removing oldest files when exceeding max size.
+   */
+  async enforceCacheLimit(maxSizeBytes: number): Promise<void> {
+    await this.ensureInitialized();
+
+    try {
+      const usage = await this.getCacheUsage();
+
+      if (usage.size <= maxSizeBytes) {
+        // Cache is within limits, no cleanup needed
+        return;
+      }
+
+      const bytesToFree = usage.size - maxSizeBytes;
+      void logger.info(
+        `ImageCacheService: cache exceeds limit, freeing ${ImageCacheService.formatBytes(bytesToFree)}`,
+      );
+
+      // Get all cache files sorted by modification time (oldest first)
+      const cacheFiles = await this.getCacheFilesSortedByAge();
+
+      let freedBytes = 0;
+      const filesToDelete: string[] = [];
+
+      // Select oldest files to delete until we've freed enough space
+      for (const { path, size } of cacheFiles) {
+        if (freedBytes >= bytesToFree) {
+          break;
+        }
+
+        filesToDelete.push(path);
+        freedBytes += size;
+      }
+
+      // Delete selected files
+      await Promise.allSettled(
+        filesToDelete.map(async (path) => {
+          try {
+            await FileSystem.deleteAsync(path, { idempotent: true });
+            void logger.debug(
+              "ImageCacheService: deleted file during cache cleanup",
+              { path },
+            );
+          } catch (error) {
+            void logger.warn(
+              "ImageCacheService: failed to delete file during cache cleanup",
+              {
+                path,
+                error: this.stringifyError(error),
+              },
+            );
+          }
+        }),
+      );
+
+      void logger.info(
+        `ImageCacheService: freed ${ImageCacheService.formatBytes(freedBytes)} by deleting ${filesToDelete.length} files`,
+      );
+    } catch (error) {
+      void logger.error("ImageCacheService: failed to enforce cache limit", {
+        error: this.stringifyError(error),
+        maxSize: maxSizeBytes,
+      });
+    }
+  }
+
+  /**
+   * Get cache files sorted by modification time (oldest first).
+   */
+  private async getCacheFilesSortedByAge(): Promise<
+    { path: string; size: number; modifiedAt: number }[]
+  > {
+    const files: { path: string; size: number; modifiedAt: number }[] = [];
+
+    try {
+      const cacheDir = FileSystem.cacheDirectory;
+      if (!cacheDir) return files;
+
+      const entries = await FileSystem.readDirectoryAsync(cacheDir);
+      if (!Array.isArray(entries)) return files;
+
+      const imageExtRegex = /\.(jpg|jpeg|png|webp|gif|bmp|img)$/i;
+
+      for (const name of entries) {
+        if (typeof name !== "string") continue;
+
+        if (imageExtRegex.test(name) || name.startsWith("image-")) {
+          const path = `${cacheDir}${name}`;
+
+          try {
+            const info = await FileSystem.getInfoAsync(path);
+            if (info.exists && !info.isDirectory && info.size) {
+              const modifiedAt = info.modificationTime
+                ? info.modificationTime * 1000
+                : Date.now();
+              files.push({
+                path,
+                size: info.size,
+                modifiedAt,
+              });
+            }
+          } catch {
+            // Ignore errors reading file info
+          }
+        }
+      }
+
+      // Sort by modification time (oldest first)
+      files.sort((a, b) => a.modifiedAt - b.modifiedAt);
+    } catch (error) {
+      void logger.warn("ImageCacheService: failed to scan cache directory", {
+        error: this.stringifyError(error),
+      });
+    }
+
+    return files;
+  }
+
+  /**
+   * Check if image is available in expo-image memory cache
+   */
+  private async checkMemoryCache(uri: string): Promise<string | null> {
+    try {
+      // expo-image doesn't expose direct memory cache access, but we can check
+      // if it can provide a cache path immediately (indicating it's in memory)
+      const cachePath = await Image.getCachePathAsync(uri);
+      return cachePath;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Smart prefetching for lists - prefetch visible and nearby items
+   */
+  async prefetchList(
+    urls: string[],
+    options: {
+      visibleRange?: { start: number; end: number };
+      priority?: "immediate" | "low" | "background";
+      maxConcurrent?: number;
+    } = {},
+  ): Promise<void> {
+    const { visibleRange, priority = "low", maxConcurrent = 3 } = options;
+
+    if (!urls.length) return;
+
+    // Prioritize visible items
+    let urlsToPrefetch: string[] = [];
+    if (visibleRange) {
+      // Add visible items immediately
+      urlsToPrefetch.push(
+        ...urls.slice(visibleRange.start, visibleRange.end + 1),
+      );
+
+      // Add nearby items (next 3, previous 1)
+      const beforeStart = Math.max(0, visibleRange.start - 1);
+      const afterEnd = Math.min(urls.length, visibleRange.end + 4);
+
+      urlsToPrefetch.push(
+        ...urls.slice(beforeStart, visibleRange.start),
+        ...urls.slice(visibleRange.end + 1, afterEnd),
+      );
+    } else {
+      urlsToPrefetch = urls;
+    }
+
+    // Remove duplicates and filter invalid URLs
+    const uniqueUrls = [...new Set(urlsToPrefetch.filter(Boolean))];
+
+    if (priority === "immediate") {
+      // High priority - prefetch immediately with higher concurrency
+      await this.prefetchConcurrent(uniqueUrls, maxConcurrent * 2);
+    } else {
+      // Low priority - add to queue for background processing
+      this.addToPrefetchQueue(uniqueUrls);
+    }
+  }
+
+  /**
+   * Concurrent prefetching with limit
+   */
+  private async prefetchConcurrent(
+    urls: string[],
+    concurrency: number,
+  ): Promise<void> {
+    const chunks: string[][] = [];
+    for (let i = 0; i < urls.length; i += concurrency) {
+      chunks.push(urls.slice(i, i + concurrency));
+    }
+
+    for (const chunk of chunks) {
+      await Promise.allSettled(
+        chunk.map((url) =>
+          this.prefetch(url).catch((error) => {
+            void logger.debug("Prefetch failed for URL", {
+              url,
+              error: this.stringifyError(error),
+            });
+          }),
+        ),
+      );
+    }
+  }
+
+  /**
+   * Add URLs to background prefetch queue
+   */
+  private addToPrefetchQueue(urls: string[]): void {
+    this.prefetchQueue.push(...urls);
+    void this.processPrefetchQueue();
+  }
+
+  /**
+   * Process background prefetch queue
+   */
+  private async processPrefetchQueue(): Promise<void> {
+    if (this.isProcessingQueue || this.prefetchQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessingQueue = true;
+
+    try {
+      // Process queue in small batches to avoid blocking UI
+      while (this.prefetchQueue.length > 0) {
+        const batch = this.prefetchQueue.splice(0, 2); // Process 2 at a time
+
+        await Promise.allSettled(
+          batch.map((url) =>
+            this.prefetch(url).catch((error) => {
+              void logger.debug("Background prefetch failed", {
+                url,
+                error: this.stringifyError(error),
+              });
+            }),
+          ),
+        );
+
+        // Small delay between batches to allow UI work
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    } finally {
+      this.isProcessingQueue = false;
+    }
+  }
+
+  /**
+   * Get cache performance statistics
+   */
+  getCacheStats() {
+    return {
+      memoryHits: this.memoryCacheHits,
+      diskHits: this.diskCacheHits,
+      misses: this.cacheMisses,
+      totalRequests:
+        this.memoryCacheHits + this.diskCacheHits + this.cacheMisses,
+      hitRate:
+        this.memoryCacheHits + this.diskCacheHits > 0
+          ? ((this.memoryCacheHits + this.diskCacheHits) /
+              (this.memoryCacheHits + this.diskCacheHits + this.cacheMisses)) *
+            100
+          : 0,
+    };
+  }
+
+  /**
+   * Reset cache statistics
+   */
+  resetCacheStats(): void {
+    this.memoryCacheHits = 0;
+    this.diskCacheHits = 0;
+    this.cacheMisses = 0;
+  }
+
+  /**
+   * Enforce cache limits after a download (best effort, doesn't block).
+   */
+  private async enforceCacheLimitAfterDownload(): Promise<void> {
+    try {
+      const { maxImageCacheSize } = useSettingsStore.getState();
+
+      // Only enforce if we have a reasonable limit set
+      if (maxImageCacheSize > 0) {
+        void this.enforceCacheLimit(maxImageCacheSize);
+      }
+    } catch (error) {
+      void logger.debug(
+        "ImageCacheService: failed to enforce cache limit after download",
+        {
+          error: this.stringifyError(error),
+        },
+      );
+    }
   }
 
   /**
@@ -235,7 +539,7 @@ class ImageCacheService {
               {
                 cachedPath,
                 error: this.stringifyError(deleteError),
-              }
+              },
             );
           }
           return;
@@ -244,7 +548,7 @@ class ImageCacheService {
         totalSize += fileInfo.size ?? 0;
         fileCount += 1;
         countedPaths.add(cachedPath);
-      })
+      }),
     );
 
     if (missingUris.length) {
@@ -280,12 +584,12 @@ class ImageCacheService {
                   await FileSystem.deleteAsync(path, { idempotent: true });
                   void logger.debug(
                     "ImageCacheService: removed stale fallback cached image during directory scan.",
-                    { path }
+                    { path },
                   );
                 } catch (err) {
                   void logger.warn(
                     "ImageCacheService: failed to delete stale fallback cached image during directory scan.",
-                    { path, error: this.stringifyError(err) }
+                    { path, error: this.stringifyError(err) },
                   );
                 }
                 return;
@@ -337,7 +641,7 @@ class ImageCacheService {
     } catch (err) {
       void logger.debug(
         "ImageCacheService: failed to scan cache directory for images.",
-        { error: this.stringifyError(err) }
+        { error: this.stringifyError(err) },
       );
     }
 
@@ -355,18 +659,96 @@ class ImageCacheService {
     await this.ensureInitialized();
 
     try {
+      // Clear expo-image caches
       await Promise.allSettled([
         Image.clearMemoryCache(),
         Image.clearDiskCache(),
       ]);
+
+      // Clear our fallback downloaded files from cache directory
+      await this.clearFallbackCacheFiles();
+
+      // Clear tracked URIs and persist
       this.trackedUris.clear();
       await this.persistTrackedUris();
+
       void logger.info("ImageCacheService: cleared image cache.");
     } catch (error) {
       void logger.error("ImageCacheService: failed to clear cache.", {
         error: this.stringifyError(error),
       });
       throw error;
+    }
+  }
+
+  /**
+   * Clear fallback cache files created by direct downloads.
+   */
+  private async clearFallbackCacheFiles(): Promise<void> {
+    try {
+      const cacheDir = FileSystem.cacheDirectory;
+      if (!cacheDir) return;
+
+      const entries = await FileSystem.readDirectoryAsync(cacheDir);
+      if (!Array.isArray(entries)) return;
+
+      const imageExtRegex = /\.(jpg|jpeg|png|webp|gif|bmp|img)$/i;
+      const work: Promise<void>[] = [];
+
+      for (const name of entries) {
+        if (typeof name !== "string") continue;
+
+        // Check for image files with our fallback naming pattern
+        if (imageExtRegex.test(name) || name.startsWith("image-")) {
+          const path = `${cacheDir}${name}`;
+          work.push(this.deleteFileIfExists(path));
+        }
+
+        // Also check subdirectories for fallback images
+        const subPath = `${cacheDir}${name}`;
+        try {
+          const info = await FileSystem.getInfoAsync(subPath);
+          if (info.exists && info.isDirectory) {
+            const subEntries = await FileSystem.readDirectoryAsync(subPath);
+            for (const subName of subEntries) {
+              if (
+                typeof subName === "string" &&
+                (imageExtRegex.test(subName) || subName.startsWith("image-"))
+              ) {
+                work.push(this.deleteFileIfExists(`${subPath}/${subName}`));
+              }
+            }
+          }
+        } catch {
+          // Ignore directory errors
+        }
+      }
+
+      await Promise.allSettled(work);
+    } catch (error) {
+      void logger.warn(
+        "ImageCacheService: failed to clear fallback cache files.",
+        {
+          error: this.stringifyError(error),
+        },
+      );
+    }
+  }
+
+  /**
+   * Delete a file if it exists, with error handling.
+   */
+  private async deleteFileIfExists(path: string): Promise<void> {
+    try {
+      await FileSystem.deleteAsync(path, { idempotent: true });
+    } catch (error) {
+      void logger.debug(
+        "ImageCacheService: failed to delete file during cache clear.",
+        {
+          path,
+          error: this.stringifyError(error),
+        },
+      );
     }
   }
 
@@ -378,7 +760,7 @@ class ImageCacheService {
     const units = ["B", "KB", "MB", "GB", "TB"];
     const index = Math.min(
       Math.floor(Math.log(bytes) / Math.log(1024)),
-      units.length - 1
+      units.length - 1,
     );
     const value = bytes / 1024 ** index;
 
@@ -445,49 +827,6 @@ class ImageCacheService {
       });
     }
 
-    // Restore variant stats
-    try {
-      const serializedStats = await AsyncStorage.getItem(
-        STORAGE_KEY_VARIANT_STATS
-      );
-      if (serializedStats) {
-        const parsed = JSON.parse(serializedStats) as Record<
-          string,
-          number
-        > | null;
-        if (parsed && typeof parsed === "object") {
-          Object.entries(parsed).forEach(([k, v]) => {
-            if (typeof v === "number" && Number.isFinite(v)) {
-              this.variantStats.set(k, v);
-            }
-          });
-        }
-      }
-    } catch (err) {
-      void logger.warn("ImageCacheService: failed to restore variant stats.", {
-        error: this.stringifyError(err),
-      });
-    }
-
-    // Restore thumbhash map
-    try {
-      const serializedThumbs = await AsyncStorage.getItem(STORAGE_KEY_THUMBHASH);
-      if (serializedThumbs) {
-        const parsed = JSON.parse(serializedThumbs) as Record<string, string> | null;
-        if (parsed && typeof parsed === "object") {
-          Object.entries(parsed).forEach(([k, v]) => {
-            if (typeof v === "string" && v.length) {
-              this.thumbhashes.set(k, v);
-            }
-          });
-        }
-      }
-    } catch (err) {
-      void logger.warn("ImageCacheService: failed to restore thumbhashes.", {
-        error: this.stringifyError(err),
-      });
-    }
-
     this.isInitialized = true;
   }
 
@@ -496,38 +835,9 @@ class ImageCacheService {
       // Ensure we never persist secrets (eg. apikey query param). Persist a
       // sanitized copy of the current URIs.
       const sanitized = Array.from(this.trackedUris).map((u) =>
-        this.sanitizeUriForStorage(u)
+        this.sanitizeUriForStorage(u),
       );
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-      // Persist variant stats alongside tracked URIs (best-effort)
-      try {
-        const statsObj: Record<string, number> = {};
-        this.variantStats.forEach((v, k) => {
-          statsObj[k] = v;
-        });
-        await AsyncStorage.setItem(
-          STORAGE_KEY_VARIANT_STATS,
-          JSON.stringify(statsObj)
-        );
-      } catch (err) {
-        // non-fatal
-        void logger.warn(
-          "ImageCacheService: failed to persist variant stats.",
-          { error: this.stringifyError(err) }
-        );
-      }
-      // Persist thumbhashes alongside tracked URIs (best-effort)
-      try {
-        const thumbsObj: Record<string, string> = {};
-        this.thumbhashes.forEach((v, k) => {
-          thumbsObj[k] = v;
-        });
-        await AsyncStorage.setItem(STORAGE_KEY_THUMBHASH, JSON.stringify(thumbsObj));
-      } catch (err) {
-        void logger.warn("ImageCacheService: failed to persist thumbhashes.", {
-          error: this.stringifyError(err),
-        });
-      }
     } catch (error) {
       void logger.warn("ImageCacheService: failed to persist tracked URIs.", {
         error: this.stringifyError(error),
@@ -592,12 +902,6 @@ class ImageCacheService {
       if (!success) {
         const downloadPath = await this.fallbackDownload(uri, fetchUri);
         if (downloadPath) {
-          // Telemetry: record a fallback-download occurrence (prefetch path)
-          try {
-            this.incrementVariantStat('fallback-download-prefetch');
-          } catch {
-            // ignore
-          }
           return downloadPath;
         }
         return null;
@@ -614,35 +918,24 @@ class ImageCacheService {
       if (!cachedPath) {
         void logger.debug(
           "ImageCacheService: prefetch succeeded but cache path missing; attempting fallback download.",
-          { uri, fetchUri }
+          { uri, fetchUri },
         );
         const downloadPath = await this.fallbackDownload(uri, fetchUri);
         if (downloadPath) {
-          // Telemetry: fallback used after prefetch reported success but cache was missing
-          try {
-            this.incrementVariantStat('fallback-download-after-prefetch');
-          } catch {
-            // ignore
-          }
           void logger.info(
             "ImageCacheService: fallback download succeeded after missing cache path.",
-            { uri, fetchUri, downloadPath }
+            { uri, fetchUri, downloadPath },
           );
+          // Enforce cache limits after successful download (fire-and-forget)
+          void this.enforceCacheLimitAfterDownload();
           return downloadPath;
         }
         void logger.warn(
           "ImageCacheService: prefetch succeeded but no cache path available and fallback download failed.",
-          { uri, fetchUri }
+          { uri, fetchUri },
         );
         return null;
       }
-      // If we have a cached path, try to generate a thumbhash (do not await)
-      try {
-        void this.maybeGenerateThumbhash(uri, cachedPath);
-      } catch {
-        // ignore
-      }
-
       return cachedPath;
     })();
 
@@ -653,7 +946,7 @@ class ImageCacheService {
       if (!result) {
         void logger.debug(
           "ImageCacheService: prefetch returned empty result.",
-          { uri }
+          { uri },
         );
       }
       return result;
@@ -713,7 +1006,7 @@ class ImageCacheService {
             await FileSystem.deleteAsync(cachedPath, { idempotent: true });
             void logger.debug(
               "ImageCacheService: removed stale cached image.",
-              { cachedPath, uri: attemptUri }
+              { cachedPath, uri: attemptUri },
             );
           } catch (error) {
             void logger.warn(
@@ -722,31 +1015,10 @@ class ImageCacheService {
                 cachedPath,
                 uri: attemptUri,
                 error: this.stringifyError(error),
-              }
+              },
             );
           }
           continue;
-        }
-
-        // Record which variant succeeded
-        try {
-          const label =
-            attemptUri === uri
-              ? "original"
-              : attemptUri === encodeURI(uri)
-              ? "encoded"
-              : attemptUri === decodeURI(uri)
-              ? "decoded"
-              : "normalized";
-          const prev = this.variantStats.get(label) ?? 0;
-          this.variantStats.set(label, prev + 1);
-          // Persist stats best-effort, but don't await in the hot path
-          void AsyncStorage.setItem(
-            STORAGE_KEY_VARIANT_STATS,
-            JSON.stringify(Object.fromEntries(this.variantStats))
-          );
-        } catch {
-          // ignore telemetry errors
         }
 
         return cachedPath;
@@ -774,7 +1046,7 @@ class ImageCacheService {
           await FileSystem.deleteAsync(dest, { idempotent: true });
           void logger.debug(
             "ImageCacheService: removed stale fallback cached image.",
-            { dest, uri }
+            { dest, uri },
           );
         } catch (error) {
           void logger.warn(
@@ -783,18 +1055,12 @@ class ImageCacheService {
               dest,
               uri,
               error: this.stringifyError(error),
-            }
+            },
           );
         }
         return null;
       }
 
-      // Telemetry: deterministic fallback cached file was found on disk
-      try {
-        this.incrementVariantStat('fallback-cache-file');
-      } catch {
-        // ignore
-      }
       return dest;
     } catch {
       return null;
@@ -808,12 +1074,12 @@ class ImageCacheService {
    */
   private async fallbackDownload(
     originalUri: string,
-    fetchUri: string
+    fetchUri: string,
   ): Promise<string | null> {
     try {
       const ext = ImageCacheService.extractExt(originalUri || fetchUri);
       const filename = `image-${ImageCacheService.hashUri(
-        originalUri || fetchUri
+        originalUri || fetchUri,
       )}${ext}`;
       const dest = `${FileSystem.cacheDirectory}${filename}`;
       void logger.debug("ImageCacheService: attempting fallback download.", {
@@ -830,12 +1096,8 @@ class ImageCacheService {
         // Make sure file exists
         const info = await FileSystem.getInfoAsync(dest);
         if (info.exists && !info.isDirectory) {
-          // Generate thumbhash for downloaded image (fire-and-forget)
-          try {
-            void this.maybeGenerateThumbhash(originalUri, dest);
-          } catch {
-            // ignore
-          }
+          // Enforce cache limits after successful download (fire-and-forget)
+          void this.enforceCacheLimitAfterDownload();
           return dest;
         }
       }
@@ -851,6 +1113,8 @@ class ImageCacheService {
           ) {
             const info2 = await FileSystem.getInfoAsync(dest);
             if (info2.exists && !info2.isDirectory) {
+              // Enforce cache limits after successful download (fire-and-forget)
+              void this.enforceCacheLimitAfterDownload();
               return dest;
             }
           }
@@ -858,7 +1122,7 @@ class ImageCacheService {
           // keep falling through to return null
           void logger.debug(
             "ImageCacheService: fallback download with originalUri failed.",
-            { originalUri, error: this.stringifyError(err2) }
+            { originalUri, error: this.stringifyError(err2) },
           );
         }
       }
@@ -872,87 +1136,12 @@ class ImageCacheService {
     return null;
   }
 
-  /**
-   * Return a stored thumbhash for the given URI if available.
-   * The URI is sanitized before lookup so stored entries don't contain secrets.
-   */
-  getThumbhash(uri: string): string | undefined {
-    try {
-      const key = this.sanitizeUriForStorage(uri);
-      return this.thumbhashes.get(key);
-    } catch {
-      return undefined;
-    }
-  }
-
-  /**
-   * Generate a thumbhash for a source (URL or file path) and store it keyed by
-   * the sanitized originalUri. This is best-effort and doesn't throw on errors.
-   */
-  private async maybeGenerateThumbhash(origUri: string, source?: string): Promise<void> {
-    try {
-      const key = this.sanitizeUriForStorage(origUri);
-      if (this.thumbhashes.has(key)) return;
-      const src = source ?? origUri;
-      if (!src) return;
-      // generateThumbhashAsync accepts a URL string or ImageRef
-      const th = await Image.generateThumbhashAsync(src);
-      if (th && typeof th === 'string' && th.length) {
-        this.thumbhashes.set(key, th);
-        // Persist thumbhashes (best-effort)
-        try {
-          const thumbsObj: Record<string, string> = {};
-          this.thumbhashes.forEach((v, k) => {
-            thumbsObj[k] = v;
-          });
-          await AsyncStorage.setItem(STORAGE_KEY_THUMBHASH, JSON.stringify(thumbsObj));
-        } catch {
-          // ignore persistence failures
-        }
-        try {
-          this.incrementVariantStat('thumbhash-generated');
-        } catch {
-          // ignore
-        }
-      }
-    } catch (err) {
-      // non-fatal
-      void logger.debug('ImageCacheService: failed to generate thumbhash.', { error: this.stringifyError(err) });
-    }
-  }
-
   private trackUri(uri: string): void {
     const sanitized = this.sanitizeUriForStorage(uri);
     if (!this.trackedUris.has(sanitized)) {
       this.trackedUris.add(sanitized);
       void this.persistTrackedUris();
     }
-  }
-
-  /**
-   * Increment a named variant stat and persist the stats (best-effort).
-   */
-  private incrementVariantStat(name: string): void {
-    const prev = this.variantStats.get(name) ?? 0;
-    this.variantStats.set(name, prev + 1);
-    // Persist asynchronously (don't await in hot path)
-    void AsyncStorage.setItem(
-      STORAGE_KEY_VARIANT_STATS,
-      JSON.stringify(Object.fromEntries(this.variantStats))
-    ).catch(() => {
-      // ignore persistence failures
-    });
-  }
-
-  /**
-   * Return a snapshot of variant success statistics for telemetry/debugging.
-   */
-  getVariantStats(): Record<string, number> {
-    const out: Record<string, number> = {};
-    this.variantStats.forEach((v, k) => {
-      out[k] = v;
-    });
-    return out;
   }
 
   // Remove known sensitive query parameters before persisting URIs and when
@@ -962,7 +1151,7 @@ class ImageCacheService {
       const parsed = new URL(uri);
       // Remove apikey and other potentially sensitive params
       ["apikey", "token", "access_token"].forEach((p) =>
-        parsed.searchParams.delete(p)
+        parsed.searchParams.delete(p),
       );
       parsed.hash = "";
       return parsed.toString();
@@ -978,37 +1167,6 @@ class ImageCacheService {
     // prefer webp extension for thumbnails
     return `image-${ImageCacheService.hashUri(uri)}-${w}x${h}.webp`;
   }
-
-  // Thumbnail helper methods removed
-
-  private acquireOp(): Promise<void> {
-    const max = this.DEFAULT_MAX_CONCURRENT_OPS;
-
-    if (this.concurrentOps < max) {
-      this.concurrentOps += 1;
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      this.opQueue.push(() => {
-        this.concurrentOps += 1;
-        resolve();
-      });
-    });
-  }
-
-  private releaseOp(): void {
-    this.concurrentOps = Math.max(0, this.concurrentOps - 1);
-    const next = this.opQueue.shift();
-    if (next) next();
-    // Try to release next queued op up to the default max
-    if (this.opQueue.length > 0 && this.concurrentOps < this.DEFAULT_MAX_CONCURRENT_OPS) {
-      const next = this.opQueue.shift()!;
-      this.concurrentOps += 1;
-      next();
-    }
-  }
-
 
   private stringifyError(error: unknown): string {
     if (error instanceof Error) {

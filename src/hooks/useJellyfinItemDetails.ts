@@ -1,28 +1,39 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+// no direct React hooks used
+import { useQuery } from "@tanstack/react-query";
 
-import type { JellyfinConnector } from '@/connectors/implementations/JellyfinConnector';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { IConnector } from '@/connectors/base/IConnector';
-import { queryKeys } from '@/hooks/queryKeys';
-import type { JellyfinItem } from '@/models/jellyfin.types';
+import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { IConnector } from "@/connectors/base/IConnector";
+import { queryKeys } from "@/hooks/queryKeys";
+import type { JellyfinItem } from "@/models/jellyfin.types";
 
 interface UseJellyfinItemDetailsOptions {
   readonly serviceId?: string;
   readonly itemId?: string;
 }
 
-const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): JellyfinConnector => {
+const ensureConnector = (
+  getConnector: (id: string) => IConnector | undefined,
+  serviceId: string,
+): JellyfinConnector => {
   const connector = getConnector(serviceId);
 
-  if (!connector || connector.config.type !== 'jellyfin') {
-    throw new Error(`Jellyfin connector not registered for service ${serviceId}.`);
+  if (!connector || connector.config.type !== "jellyfin") {
+    throw new Error(
+      `Jellyfin connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as JellyfinConnector;
 };
 
-export const useJellyfinItemDetails = ({ serviceId, itemId }: UseJellyfinItemDetailsOptions) => {
+export const useJellyfinItemDetails = ({
+  serviceId,
+  itemId,
+}: UseJellyfinItemDetailsOptions) => {
   const getConnector = useConnectorsStore(selectGetConnector);
   const enabled = Boolean(serviceId && itemId);
 
@@ -35,7 +46,7 @@ export const useJellyfinItemDetails = ({ serviceId, itemId }: UseJellyfinItemDet
     staleTime: 60_000,
     queryFn: async () => {
       if (!serviceId || !itemId) {
-        throw new Error('Jellyfin item identifier is required.');
+        throw new Error("Jellyfin item identifier is required.");
       }
 
       const connector = ensureConnector(getConnector, serviceId);

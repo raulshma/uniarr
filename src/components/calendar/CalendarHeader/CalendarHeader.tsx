@@ -1,10 +1,10 @@
-import React from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
-import { Text, IconButton, useTheme } from 'react-native-paper';
+import React from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text, IconButton, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { CalendarView, CalendarNavigation } from '@/models/calendar.types';
+import type { AppTheme } from "@/constants/theme";
+import type { CalendarView, CalendarNavigation } from "@/models/calendar.types";
 
 export type CalendarHeaderProps = {
   navigation: CalendarNavigation;
@@ -23,27 +23,27 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       paddingHorizontal: theme.custom.spacing.md,
       paddingVertical: theme.custom.spacing.sm,
       backgroundColor: theme.colors.surface,
     },
     leftSection: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       flex: 1,
     },
     centerSection: {
       flex: 2,
-      alignItems: 'center',
+      alignItems: "center",
     },
     rightSection: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       flex: 1,
-      justifyContent: 'flex-end',
+      justifyContent: "flex-end",
     },
     title: {
       fontSize: theme.custom.typography.titleLarge.fontSize,
@@ -52,7 +52,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
       lineHeight: theme.custom.typography.titleLarge.lineHeight,
       letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
       color: theme.colors.onSurface,
-      textAlign: 'center',
+      textAlign: "center",
     },
     viewToggle: {
       marginLeft: theme.custom.spacing.sm,
@@ -61,31 +61,31 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
   const getViewIcon = (view: CalendarView): string => {
     switch (view) {
-      case 'month':
-        return 'calendar-month';
-      case 'week':
-        return 'calendar-week';
-      case 'day':
-        return 'calendar-today';
-      case 'list':
-        return 'format-list-bulleted';
+      case "month":
+        return "calendar-month";
+      case "week":
+        return "calendar-week";
+      case "day":
+        return "calendar-today";
+      case "list":
+        return "format-list-bulleted";
       default:
-        return 'calendar-month';
+        return "calendar-month";
     }
   };
 
   const getNextView = (currentView: CalendarView): CalendarView => {
     switch (currentView) {
-      case 'month':
-        return 'week';
-      case 'week':
-        return 'day';
-      case 'day':
-        return 'list';
-      case 'list':
-        return 'month';
+      case "month":
+        return "week";
+      case "week":
+        return "day";
+      case "day":
+        return "list";
+      case "list":
+        return "month";
       default:
-        return 'month';
+        return "month";
     }
   };
 

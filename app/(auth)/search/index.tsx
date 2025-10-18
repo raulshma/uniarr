@@ -23,10 +23,10 @@ const UnifiedSearchScreen = () => {
         content: {
           flex: 1,
           marginTop: spacing.xs,
-          marginHorizontal: spacing.md,
+          marginHorizontal: spacing.sm,
         },
       }),
-    [theme]
+    [theme],
   );
 
   return (

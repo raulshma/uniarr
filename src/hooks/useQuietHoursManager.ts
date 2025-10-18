@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { useEffect } from "react";
+import { AppState } from "react-native";
 
-import { quietHoursService } from '@/services/notifications/QuietHoursService';
-import { useSettingsStore } from '@/store/settingsStore';
+import { quietHoursService } from "@/services/notifications/QuietHoursService";
+import { useSettingsStore } from "@/store/settingsStore";
 
 export const useQuietHoursManager = (): void => {
   const quietHours = useSettingsStore((state) => state.quietHours);
@@ -15,8 +15,8 @@ export const useQuietHoursManager = (): void => {
   }, []);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (status) => {
-      if (status === 'active') {
+    const subscription = AppState.addEventListener("change", (status) => {
+      if (status === "active") {
         void quietHoursService.flushDueSummaries();
       }
     });

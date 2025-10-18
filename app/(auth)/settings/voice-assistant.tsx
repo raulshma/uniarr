@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { View, ScrollView, Platform } from "react-native";
-import { alert } from '@/services/dialogService';
-import { useRouter } from "expo-router";
+import { alert } from "@/services/dialogService";
 import {
   Card,
   Text,
@@ -16,11 +15,10 @@ import {
   IconButton,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import useVoiceAssistant from "../../../src/hooks/useVoiceAssistant";
+import { useVoiceAssistant } from "../../../src/hooks/useVoiceAssistant";
 import type { VoiceShortcut } from "../../../src/services/voice/VoiceAssistantService";
 
 const VoiceAssistantScreen: React.FC = () => {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
     config,
@@ -47,14 +45,14 @@ const VoiceAssistantScreen: React.FC = () => {
   const handleEnableToggle = async (enabled: boolean) => {
     try {
       await setEnabled(enabled);
-    } catch (error) {
+    } catch {
       alert("Error", "Failed to update voice assistant settings");
     }
   };
 
   const handleAddShortcut = async () => {
     if (!newShortcut.title || !newShortcut.phrase || !newShortcut.action) {
-  alert("Error", "Please fill in all required fields");
+      alert("Error", "Please fill in all required fields");
       return;
     }
 
@@ -68,7 +66,7 @@ const VoiceAssistantScreen: React.FC = () => {
         action: "",
         platform: Platform.OS === "ios" ? "ios" : "android",
       });
-    } catch (error) {
+    } catch {
       alert("Error", "Failed to add voice shortcut");
     }
   };
@@ -84,14 +82,14 @@ const VoiceAssistantScreen: React.FC = () => {
           style: "destructive",
           onPress: () => removeShortcut(id),
         },
-      ]
+      ],
     );
   };
 
   const handleToggleShortcut = async (id: string, enabled: boolean) => {
     try {
       await updateShortcut(id, { enabled });
-    } catch (error) {
+    } catch {
       alert("Error", "Failed to update shortcut");
     }
   };
@@ -233,7 +231,7 @@ const VoiceAssistantScreen: React.FC = () => {
                   key={shortcut.id}
                   title={shortcut.title}
                   description={`${shortcut.phrase} • ${getActionDescription(
-                    shortcut.action
+                    shortcut.action,
                   )}`}
                   left={(props) => (
                     <List.Icon
@@ -289,7 +287,6 @@ const VoiceAssistantScreen: React.FC = () => {
                 value={config.naturalLanguageEnabled}
                 onValueChange={(enabled) => {
                   // This would update the config in the service
-                  console.log("NLP setting:", enabled);
                 }}
               />
             </View>
@@ -311,7 +308,6 @@ const VoiceAssistantScreen: React.FC = () => {
                 value={config.voiceFeedback}
                 onValueChange={(enabled) => {
                   // This would update the config in the service
-                  console.log("Voice feedback setting:", enabled);
                 }}
               />
             </View>

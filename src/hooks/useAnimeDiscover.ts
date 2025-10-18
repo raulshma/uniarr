@@ -1,21 +1,35 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import type { JellyseerrConnector } from '@/connectors/implementations/JellyseerrConnector';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import type { IConnector } from '@/connectors/base/IConnector';
-import { queryKeys } from '@/hooks/queryKeys';
-import type { components, paths } from '@/connectors/client-schemas/jellyseerr-openapi';
-type JellyseerrSearchResult = components['schemas']['MovieResult'] | components['schemas']['TvResult'];
-type JellyseerrPagedResult<T> = { items: T[]; total: number; pageInfo?: components['schemas']['PageInfo'] };
+import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import type { IConnector } from "@/connectors/base/IConnector";
+import { queryKeys } from "@/hooks/queryKeys";
+import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
+type JellyseerrSearchResult =
+  | components["schemas"]["MovieResult"]
+  | components["schemas"]["TvResult"];
+type JellyseerrPagedResult<T> = {
+  items: T[];
+  total: number;
+  pageInfo?: components["schemas"]["PageInfo"];
+};
 
-const JELLYSEERR_SERVICE_TYPE = 'jellyseerr';
+const JELLYSEERR_SERVICE_TYPE = "jellyseerr";
 
-const ensureConnector = (getConnector: (id: string) => IConnector | undefined, serviceId: string): JellyseerrConnector => {
+const ensureConnector = (
+  getConnector: (id: string) => IConnector | undefined,
+  serviceId: string,
+): JellyseerrConnector => {
   const connector = getConnector(serviceId);
 
   if (!connector || connector.config.type !== JELLYSEERR_SERVICE_TYPE) {
-    throw new Error(`Jellyseerr connector not registered for service ${serviceId}.`);
+    throw new Error(
+      `Jellyseerr connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as JellyseerrConnector;
@@ -27,7 +41,11 @@ interface UseAnimeDiscoverOptions {
   enabled?: boolean;
 }
 
-export const useAnimeRecommendations = ({ serviceId, page = 1, enabled = true }: UseAnimeDiscoverOptions) => {
+export const useAnimeRecommendations = ({
+  serviceId,
+  page = 1,
+  enabled = true,
+}: UseAnimeDiscoverOptions) => {
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
@@ -44,7 +62,11 @@ export const useAnimeRecommendations = ({ serviceId, page = 1, enabled = true }:
   });
 };
 
-export const useAnimeUpcoming = ({ serviceId, page = 1, enabled = true }: UseAnimeDiscoverOptions) => {
+export const useAnimeUpcoming = ({
+  serviceId,
+  page = 1,
+  enabled = true,
+}: UseAnimeDiscoverOptions) => {
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
@@ -61,7 +83,11 @@ export const useAnimeUpcoming = ({ serviceId, page = 1, enabled = true }: UseAni
   });
 };
 
-export const useTrendingAnime = ({ serviceId, page = 1, enabled = true }: UseAnimeDiscoverOptions) => {
+export const useTrendingAnime = ({
+  serviceId,
+  page = 1,
+  enabled = true,
+}: UseAnimeDiscoverOptions) => {
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
@@ -78,7 +104,11 @@ export const useTrendingAnime = ({ serviceId, page = 1, enabled = true }: UseAni
   });
 };
 
-export const useAnimeMovies = ({ serviceId, page = 1, enabled = true }: UseAnimeDiscoverOptions) => {
+export const useAnimeMovies = ({
+  serviceId,
+  page = 1,
+  enabled = true,
+}: UseAnimeDiscoverOptions) => {
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
@@ -95,20 +125,48 @@ export const useAnimeMovies = ({ serviceId, page = 1, enabled = true }: UseAnime
   });
 };
 
-export const useAnimeDiscover = ({ serviceId, enabled = true }: { serviceId: string; enabled?: boolean }) => {
-  const recommendations = useAnimeRecommendations({ serviceId, page: 1, enabled });
+export const useAnimeDiscover = ({
+  serviceId,
+  enabled = true,
+}: {
+  serviceId: string;
+  enabled?: boolean;
+}) => {
+  const recommendations = useAnimeRecommendations({
+    serviceId,
+    page: 1,
+    enabled,
+  });
   const upcoming = useAnimeUpcoming({ serviceId, page: 1, enabled });
   const trending = useTrendingAnime({ serviceId, page: 1, enabled });
   const movies = useAnimeMovies({ serviceId, page: 1, enabled });
 
   const isLoading = useMemo(
-    () => recommendations.isLoading || upcoming.isLoading || trending.isLoading || movies.isLoading,
-    [recommendations.isLoading, upcoming.isLoading, trending.isLoading, movies.isLoading]
+    () =>
+      recommendations.isLoading ||
+      upcoming.isLoading ||
+      trending.isLoading ||
+      movies.isLoading,
+    [
+      recommendations.isLoading,
+      upcoming.isLoading,
+      trending.isLoading,
+      movies.isLoading,
+    ],
   );
 
   const isError = useMemo(
-    () => recommendations.isError || upcoming.isError || trending.isError || movies.isError,
-    [recommendations.isError, upcoming.isError, trending.isError, movies.isError]
+    () =>
+      recommendations.isError ||
+      upcoming.isError ||
+      trending.isError ||
+      movies.isError,
+    [
+      recommendations.isError,
+      upcoming.isError,
+      trending.isError,
+      movies.isError,
+    ],
   );
 
   return {

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { useConnectorsStore, selectGetConnector } from "@/store/connectorsStore";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
 import type { components } from "@/connectors/client-schemas/prowlarr-openapi";
+import { logger } from "@/services/logger/LoggerService";
 
 type ProwlarrIndexerResource = components["schemas"]["IndexerResource"];
 type ProwlarrStatistics = {
@@ -14,7 +18,6 @@ type ProwlarrStatistics = {
     lastGrabTime?: string;
   };
 };
-import { logger } from "@/services/logger/LoggerService";
 
 interface UseProwlarrIndexersResult {
   indexers: ProwlarrIndexerResource[];
@@ -23,7 +26,7 @@ interface UseProwlarrIndexersResult {
   error: string | null;
   refresh: () => Promise<void>;
   testIndexer: (
-    indexer: ProwlarrIndexerResource
+    indexer: ProwlarrIndexerResource,
   ) => Promise<{ ok: boolean; message?: string }>;
   toggleIndexer: (indexer: ProwlarrIndexerResource) => Promise<boolean>;
   deleteIndexer: (indexerId: number) => Promise<boolean>;
@@ -38,7 +41,7 @@ interface UseProwlarrIndexersResult {
   addIndexer: (application: ProwlarrIndexerResource) => Promise<boolean>;
   updateIndexer: (
     indexerId: number,
-    data: Partial<ProwlarrIndexerResource>
+    data: Partial<ProwlarrIndexerResource>,
   ) => Promise<boolean>;
   bulkEnableDisable: (ids: number[], enable: boolean) => Promise<boolean>;
   bulkDelete: (ids: number[]) => Promise<boolean>;
@@ -58,7 +61,7 @@ export interface ApiEvent {
 }
 
 export const useProwlarrIndexers = (
-  serviceId: string
+  serviceId: string,
 ): UseProwlarrIndexersResult => {
   const [indexers, setIndexers] = useState<ProwlarrIndexerResource[]>([]);
   const [statistics, setStatistics] = useState<ProwlarrStatistics[]>([]);
@@ -117,7 +120,7 @@ export const useProwlarrIndexers = (
 
   const testIndexer = useCallback(
     async (
-      indexer: ProwlarrIndexerResource
+      indexer: ProwlarrIndexerResource,
     ): Promise<{ ok: boolean; message?: string }> => {
       if (!connector) return { ok: false, message: "Connector not available" };
       // Build a representative payload and endpoint for UI debugging
@@ -187,7 +190,7 @@ export const useProwlarrIndexers = (
         const message =
           err instanceof Error ? err.message : String(err ?? "Unknown error");
         const details = formatDetails(
-          (err as { response?: { data?: unknown } })?.response?.data ?? err
+          (err as { response?: { data?: unknown } })?.response?.data ?? err,
         );
         setLastApiEvent({
           action: "testIndexer",
@@ -201,7 +204,7 @@ export const useProwlarrIndexers = (
         return { ok: false, message };
       }
     },
-    [connector, serviceId]
+    [connector, serviceId],
   );
 
   const toggleIndexer = useCallback(
@@ -248,13 +251,13 @@ export const useProwlarrIndexers = (
           status: "error",
           message,
           details: formatDetails(
-            (err as { response?: { data?: unknown } })?.response?.data ?? err
+            (err as { response?: { data?: unknown } })?.response?.data ?? err,
           ),
         });
         return false;
       }
     },
-    [connector, serviceId, loadData]
+    [connector, serviceId, loadData],
   );
 
   const deleteIndexer = useCallback(
@@ -297,13 +300,13 @@ export const useProwlarrIndexers = (
           status: "error",
           message,
           details: formatDetails(
-            (err as { response?: { data?: unknown } })?.response?.data ?? err
+            (err as { response?: { data?: unknown } })?.response?.data ?? err,
           ),
         });
         return false;
       }
     },
-    [connector, serviceId, loadData]
+    [connector, serviceId, loadData],
   );
 
   const syncIndexersToApps = useCallback(async (): Promise<boolean> => {
@@ -388,13 +391,13 @@ export const useProwlarrIndexers = (
         return false;
       }
     },
-    [connector, serviceId, loadData]
+    [connector, serviceId, loadData],
   );
 
   const updateIndexer = useCallback(
     async (
       indexerId: number,
-      data: Partial<ProwlarrIndexerResource>
+      data: Partial<ProwlarrIndexerResource>,
     ): Promise<boolean> => {
       if (!connector) return false;
       try {
@@ -414,7 +417,7 @@ export const useProwlarrIndexers = (
         return false;
       }
     },
-    [connector, serviceId, loadData]
+    [connector, serviceId, loadData],
   );
 
   const bulkEnableDisable = useCallback(
@@ -438,7 +441,7 @@ export const useProwlarrIndexers = (
         } else {
           // Fallback: update one by one
           await Promise.all(
-            ids.map((id) => (connector as any).update?.(id, { enable }))
+            ids.map((id) => (connector as any).update?.(id, { enable })),
           );
         }
         await loadData();
@@ -467,13 +470,13 @@ export const useProwlarrIndexers = (
           status: "error",
           message,
           details: formatDetails(
-            (err as { response?: { data?: unknown } })?.response?.data ?? err
+            (err as { response?: { data?: unknown } })?.response?.data ?? err,
           ),
         });
         return false;
       }
     },
-    [connector, serviceId, loadData]
+    [connector, serviceId, loadData],
   );
 
   const bulkDelete = useCallback(
@@ -522,13 +525,13 @@ export const useProwlarrIndexers = (
           status: "error",
           message,
           details: formatDetails(
-            (err as { response?: { data?: unknown } })?.response?.data ?? err
+            (err as { response?: { data?: unknown } })?.response?.data ?? err,
           ),
         });
         return false;
       }
     },
-    [connector, serviceId, loadData]
+    [connector, serviceId, loadData],
   );
 
   const clearApiEvent = useCallback(() => {

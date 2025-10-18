@@ -1,5 +1,12 @@
-import React, { useMemo } from "react";
-import { StyleSheet, View, Linking, Image as RNImage } from "react-native";
+import React, { useMemo, useState } from "react";
+import {
+  StyleSheet,
+  View,
+  Linking,
+  Image as RNImage,
+  Pressable,
+  Modal,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ActivityIndicator, Chip, Text, useTheme } from "react-native-paper";
@@ -210,9 +217,27 @@ const AnimeHubDetailScreen: React.FC = () => {
           justifyContent: "space-between",
           alignItems: "center",
         },
+        modalOverlay: {
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.85)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: spacing.md,
+        },
+        modalImage: {
+          width: "100%",
+          height: "100%",
+        },
       }),
-    [theme]
+    [theme],
   );
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | undefined>(
+    undefined,
+  );
+
+  // modal state for fullscreen image (no pan/zoom)
 
   const openOnMal = async () => {
     if (validMalId) {
@@ -286,9 +311,6 @@ const AnimeHubDetailScreen: React.FC = () => {
     anime?.score ? `${anime.score.toFixed(1)} rating` : undefined,
     anime?.rank ? `Rank #${anime.rank}` : undefined,
   ].filter(Boolean);
-
-  // Show loading for additional data while main data is loaded
-  const isLoadingAdditional = isLoading && anime;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
@@ -554,24 +576,60 @@ const AnimeHubDetailScreen: React.FC = () => {
               </Text>
               <View style={styles.picturesContainer}>
                 {anime && anime.pictures
-                  ? anime.pictures.slice(0, 6).map((picture, index) => (
-                      <View key={index} style={styles.pictureItem}>
-                        <RNImage
-                          source={{
-                            uri:
-                              picture.jpg?.large_image_url ??
-                              picture.jpg?.image_url ??
-                              undefined,
+                  ? anime.pictures.slice(0, 6).map((picture, index) => {
+                      const uri =
+                        picture.jpg?.large_image_url ??
+                        picture.jpg?.image_url ??
+                        undefined;
+                      return (
+                        <Pressable
+                          key={index}
+                          style={styles.pictureItem}
+                          onPress={() => {
+                            if (uri) {
+                              setSelectedImage(uri);
+                              setModalVisible(true);
+                            }
                           }}
-                          style={styles.pictureImage}
-                          resizeMode="cover"
-                        />
-                      </View>
-                    ))
+                        >
+                          <RNImage
+                            source={{ uri }}
+                            style={styles.pictureImage}
+                            resizeMode="cover"
+                          />
+                        </Pressable>
+                      );
+                    })
                   : null}
               </View>
             </View>
           ) : null}
+
+          {/* Fullscreen image modal */}
+          <Modal
+            visible={modalVisible}
+            transparent
+            onRequestClose={() => setModalVisible(false)}
+          >
+            <Modal
+              visible={modalVisible}
+              transparent
+              onRequestClose={() => setModalVisible(false)}
+            >
+              <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setModalVisible(false)}
+              >
+                {selectedImage ? (
+                  <RNImage
+                    source={{ uri: selectedImage }}
+                    style={styles.modalImage}
+                    resizeMode="contain"
+                  />
+                ) : null}
+              </Pressable>
+            </Modal>
+          </Modal>
 
           {/* Related Content */}
           {anime && anime.relations && anime.relations.length > 0 ? (
@@ -611,19 +669,31 @@ const AnimeHubDetailScreen: React.FC = () => {
                 Recommended For You
               </Text>
               <View style={styles.metaRow}>
-                {anime.recommendations.slice(0, 8).map((rec) => (
-                  <Chip
-                    key={`${rec.entry?.mal_id}-${rec.entry?.name}`}
-                    mode="outlined"
-                    onPress={() => {
-                      if (rec.entry?.mal_id && rec.entry.type === "anime") {
-                        router.push(`/anime-hub/${rec.entry.mal_id}`);
-                      }
-                    }}
-                  >
-                    <Text style={styles.metaText}>{rec.entry?.name}</Text>
-                  </Chip>
-                ))}
+                {anime.recommendations.slice(0, 8).map((rec, idx) => {
+                  // `entry` may be an array of two entries or a single object depending on the API shape
+                  const entry = Array.isArray(rec.entry)
+                    ? (rec.entry[1] ?? rec.entry[0])
+                    : rec.entry;
+                  const malId = entry?.mal_id ?? entry?.malId ?? undefined;
+                  const name =
+                    entry?.name ??
+                    entry?.title ??
+                    entry?.title_english ??
+                    "Untitled";
+                  return (
+                    <Chip
+                      key={`${malId ?? idx}-${name}`}
+                      mode="outlined"
+                      onPress={() => {
+                        if (malId && entry?.type === "anime") {
+                          router.push(`/anime-hub/${malId}`);
+                        }
+                      }}
+                    >
+                      <Text style={styles.metaText}>{name}</Text>
+                    </Chip>
+                  );
+                })}
               </View>
             </View>
           ) : null}
@@ -703,7 +773,9 @@ const AnimeHubDetailScreen: React.FC = () => {
                   <Text variant="bodyMedium" style={styles.reviewContent}>
                     {review.content
                       ? `${review.content.substring(0, 200)}...`
-                      : ""}
+                      : (review as any)?.review
+                        ? `${(review as any).review.substring(0, 200)}...`
+                        : ""}
                   </Text>
                   <Text variant="labelSmall" style={styles.reviewAuthor}>
                     - {review.user?.username || "Anonymous"}

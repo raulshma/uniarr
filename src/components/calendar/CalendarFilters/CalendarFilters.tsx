@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { Text, Chip, Button, useTheme } from 'react-native-paper';
+import React, { useState } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text, Chip, Button, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { CalendarFilters as CalendarFiltersType, MediaType, ReleaseStatus } from '@/models/calendar.types';
-import { Card } from '@/components/common/Card';
+import type { AppTheme } from "@/constants/theme";
+import type {
+  CalendarFilters as CalendarFiltersType,
+  MediaType,
+  ReleaseStatus,
+} from "@/models/calendar.types";
+import { Card } from "@/components/common/Card";
 
 export type CalendarFiltersProps = {
   filters: CalendarFiltersType;
@@ -29,9 +33,9 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
       marginVertical: theme.custom.spacing.sm,
     },
     header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
       marginBottom: theme.custom.spacing.sm,
     },
     title: {
@@ -46,7 +50,7 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
       marginLeft: theme.custom.spacing.sm,
     },
     content: {
-      display: isExpanded ? 'flex' : 'none',
+      display: isExpanded ? "flex" : "none",
     },
     section: {
       marginBottom: theme.custom.spacing.md,
@@ -61,8 +65,8 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
       marginBottom: theme.custom.spacing.xs,
     },
     chipsContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+      flexDirection: "row",
+      flexWrap: "wrap",
     },
     chip: {
       marginRight: theme.custom.spacing.xs,
@@ -81,8 +85,8 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
       color: theme.colors.onSurfaceVariant,
     },
     actions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
+      flexDirection: "row",
+      justifyContent: "flex-end",
       marginTop: theme.custom.spacing.sm,
     },
     clearButton: {
@@ -91,31 +95,31 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
   });
 
   const mediaTypes: { value: MediaType; label: string }[] = [
-    { value: 'movie', label: 'Movies' },
-    { value: 'series', label: 'Series' },
-    { value: 'episode', label: 'Episodes' },
+    { value: "movie", label: "Movies" },
+    { value: "series", label: "Series" },
+    { value: "episode", label: "Episodes" },
   ];
 
   const statuses: { value: ReleaseStatus; label: string }[] = [
-    { value: 'upcoming', label: 'Upcoming' },
-    { value: 'released', label: 'Released' },
-    { value: 'delayed', label: 'Delayed' },
-    { value: 'cancelled', label: 'Cancelled' },
+    { value: "upcoming", label: "Upcoming" },
+    { value: "released", label: "Released" },
+    { value: "delayed", label: "Delayed" },
+    { value: "cancelled", label: "Cancelled" },
   ];
 
   const handleMediaTypeToggle = (type: MediaType) => {
     const newTypes = filters.mediaTypes.includes(type)
-      ? filters.mediaTypes.filter(t => t !== type)
+      ? filters.mediaTypes.filter((t) => t !== type)
       : [...filters.mediaTypes, type];
-    
+
     onFiltersChange({ mediaTypes: newTypes });
   };
 
   const handleStatusToggle = (status: ReleaseStatus) => {
     const newStatuses = filters.statuses.includes(status)
-      ? filters.statuses.filter(s => s !== status)
+      ? filters.statuses.filter((s) => s !== status)
       : [...filters.statuses, status];
-    
+
     onFiltersChange({ statuses: newStatuses });
   };
 
@@ -148,7 +152,7 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
           onPress={() => setIsExpanded(!isExpanded)}
           style={styles.toggleButton}
         >
-          {isExpanded ? 'Hide' : 'Show'}
+          {isExpanded ? "Hide" : "Show"}
         </Button>
       </View>
 

@@ -3,7 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   IconButton,
   Text,
@@ -18,15 +18,11 @@ import { FlashList } from "@shopify/flash-list";
 
 import { TabHeader } from "@/components/common/TabHeader";
 
-import { Button } from "@/components/common/Button";
+// Button removed: unused in this file (kept minimal surface area)
 import { Card } from "@/components/common/Card";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
-import {
-  AnimatedListItem,
-  AnimatedSection,
-  AnimatedScrollView,
-} from "@/components/common/AnimatedComponents";
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { ServiceStatus } from "@/components/service/ServiceStatus";
 import type { ServiceStatusState } from "@/components/service/ServiceStatus";
 import { ServiceCardSkeleton } from "@/components/service/ServiceCard";
@@ -49,13 +45,10 @@ type ServiceOverviewItem = {
   version?: string;
 };
 
-type ServicesListItem =
-  | { type: "header" }
-  | { type: "service"; data: ServiceOverviewItem };
-
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: "Sonarr",
   radarr: "Radarr",
+  lidarr: "Lidarr",
   jellyseerr: "Jellyseerr",
   jellyfin: "Jellyfin",
   qbittorrent: "qBittorrent",
@@ -66,11 +59,13 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   rtorrent: "rTorrent",
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
+  adguard: "AdGuard Home",
 };
 
 const serviceDisplayNames: Record<ServiceType, string> = {
   sonarr: "TV Shows",
   radarr: "Movie Library",
+  lidarr: "Music Library",
   jellyseerr: "Request Service",
   jellyfin: "Media Server",
   qbittorrent: "Torrent Client",
@@ -81,11 +76,13 @@ const serviceDisplayNames: Record<ServiceType, string> = {
   rtorrent: "Torrent Client",
   prowlarr: "Indexer",
   bazarr: "Subtitle Manager",
+  adguard: "DNS Protection",
 };
 
 const serviceIcons: Record<ServiceType, string> = {
   sonarr: "television-classic",
   radarr: "movie-open",
+  lidarr: "music-note",
   jellyseerr: "account-search",
   jellyfin: "play-circle",
   qbittorrent: "download-network",
@@ -96,12 +93,13 @@ const serviceIcons: Record<ServiceType, string> = {
   rtorrent: "download-network",
   prowlarr: "radar",
   bazarr: "subtitles",
+  adguard: "shield-check",
 };
 
 const deriveStatus = (
   config: ServiceConfig,
   result: ConnectionResult | undefined,
-  checkedAt: Date
+  checkedAt: Date,
 ): Pick<
   ServiceOverviewItem,
   "status" | "statusDescription" | "lastCheckedAt" | "latency" | "version"
@@ -163,8 +161,18 @@ const fetchServicesOverview = async (): Promise<ServiceOverviewItem[]> => {
     return [];
   }
 
-  const connectionResults = await manager.testAllConnections();
   const checkedAt = new Date();
+
+  // Test connections with a timeout and staggered approach to avoid blocking UI
+  const connectionResults = await Promise.race([
+    manager.testAllConnections(),
+    new Promise<Map<string, ConnectionResult>>((resolve) => {
+      // Timeout after 8 seconds to show partial results
+      setTimeout(() => {
+        resolve(new Map());
+      }, 8000);
+    }),
+  ]);
 
   return configs.map((config) => {
     const connectionResult = connectionResults.get(config.id);
@@ -196,17 +204,14 @@ const ServicesScreen = () => {
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch])
+    }, [refetch]),
   );
 
   const services = data ?? [];
   const isRefreshing = isFetching && !isLoading;
 
   // We render the tab header outside of the list so it remains fixed.
-  const listData: ServiceOverviewItem[] = useMemo(
-    () => services.slice(),
-    [services]
-  );
+  const listData: ServiceOverviewItem[] = services;
 
   const styles = useMemo(
     () =>
@@ -287,7 +292,7 @@ const ServicesScreen = () => {
           paddingTop: spacing.xl,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleBackPress = useCallback(() => {
@@ -310,6 +315,12 @@ const ServicesScreen = () => {
         case "radarr":
           router.push({
             pathname: "/(auth)/radarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "lidarr":
+          router.push({
+            pathname: "/(auth)/lidarr/[serviceId]",
             params: { serviceId: service.config.id },
           });
           break;
@@ -337,12 +348,18 @@ const ServicesScreen = () => {
             params: { serviceId: service.config.id },
           });
           break;
+        case "adguard":
+          router.push({
+            pathname: "/(auth)/adguard/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
         default:
           // For now, just show a message for unsupported services
           break;
       }
     },
-    [router]
+    [router],
   );
 
   const handleServiceMenuPress = useCallback((service: ServiceOverviewItem) => {
@@ -365,7 +382,7 @@ const ServicesScreen = () => {
 
     setServiceMenuVisible(false);
 
-  alert(
+    alert(
       "Delete Service",
       `Are you sure you want to delete "${selectedService.config.name}"? This action cannot be undone.`,
       [
@@ -387,7 +404,7 @@ const ServicesScreen = () => {
 
               alert(
                 "Service Deleted",
-                `${selectedService.config.name} has been removed.`
+                `${selectedService.config.name} has been removed.`,
               );
             } catch (error) {
               const message =
@@ -405,7 +422,7 @@ const ServicesScreen = () => {
             }
           },
         },
-      ]
+      ],
     );
   }, [selectedService, queryClient]);
 
@@ -448,8 +465,8 @@ const ServicesScreen = () => {
                         item.status === "online"
                           ? theme.colors.primary
                           : item.status === "offline"
-                          ? theme.colors.error
-                          : theme.colors.tertiary,
+                            ? theme.colors.error
+                            : theme.colors.tertiary,
                       fontSize: 14,
                       marginLeft: 4,
                     }}
@@ -457,8 +474,8 @@ const ServicesScreen = () => {
                     {item.status === "online"
                       ? "Connected"
                       : item.status === "offline"
-                      ? "Offline"
-                      : "Degraded"}
+                        ? "Offline"
+                        : "Degraded"}
                   </Text>
                 </View>
               </View>
@@ -472,25 +489,19 @@ const ServicesScreen = () => {
           </Card>
         </AnimatedListItem>
       );
-    }
-  );
-
-  const renderServiceItem = useCallback(
-    ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
-      <ServiceCard item={item} index={index} />
-    ),
-    []
+    },
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: ServiceOverviewItem; index: number }) =>
-      renderServiceItem({ item, index }),
-    [renderServiceItem]
+    ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
+      <ServiceCard item={item} index={index} />
+    ),
+    [ServiceCard],
   );
 
   const keyExtractor = useCallback(
     (item: ServiceOverviewItem) => `service-${item.config.id}`,
-    []
+    [],
   );
 
   const getItemType = useCallback(() => "service", []);
@@ -533,14 +544,14 @@ const ServicesScreen = () => {
           }}
           style={{ paddingHorizontal: spacing.xxs }}
         />
-        <AnimatedScrollView
+        <ScrollView
           style={styles.content}
           contentContainerStyle={{
             paddingVertical: spacing.lg,
             paddingBottom: spacing.xxxxl,
           }}
         >
-          <AnimatedSection style={styles.section} delay={100}>
+          <View style={styles.section}>
             <SkeletonPlaceholder
               width="50%"
               height={28}
@@ -548,20 +559,18 @@ const ServicesScreen = () => {
               style={{ marginBottom: spacing.md }}
             />
             {Array.from({ length: 4 }).map((_, index) => (
-              <AnimatedListItem
+              <View
                 key={index}
-                index={index}
-                totalItems={4}
                 style={{
                   marginBottom: spacing.sm,
                   marginHorizontal: spacing.md,
                 }}
               >
                 <ServiceCardSkeleton />
-              </AnimatedListItem>
+              </View>
             ))}
-          </AnimatedSection>
-        </AnimatedScrollView>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -588,9 +597,7 @@ const ServicesScreen = () => {
           { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
         ]}
         ListEmptyComponent={
-          <AnimatedSection style={styles.emptyContainer} delay={100}>
-            {listEmptyComponent}
-          </AnimatedSection>
+          <View style={styles.emptyContainer}>{listEmptyComponent}</View>
         }
         refreshControl={
           <ListRefreshControl
@@ -601,6 +608,7 @@ const ServicesScreen = () => {
         showsVerticalScrollIndicator={false}
         getItemType={getItemType}
         removeClippedSubviews={true}
+        scrollEventThrottle={16}
       />
 
       <Portal>
@@ -613,7 +621,7 @@ const ServicesScreen = () => {
             borderRadius: 12,
           }}
         >
-          <AnimatedSection delay={50}>
+          <View>
             <List.Item
               title="Edit Service"
               left={(props) => <List.Icon {...props} icon="pencil" />}
@@ -632,7 +640,7 @@ const ServicesScreen = () => {
               )}
               onPress={handleDeleteService}
             />
-          </AnimatedSection>
+          </View>
         </Modal>
       </Portal>
     </SafeAreaView>

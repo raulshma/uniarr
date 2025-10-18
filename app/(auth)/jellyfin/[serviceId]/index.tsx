@@ -1,6 +1,6 @@
 import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -37,11 +37,11 @@ import { useJellyfinResume } from "@/hooks/useJellyfinResume";
 import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
 import type {
   JellyfinItem,
-  JellyfinLatestItem,
   JellyfinLibraryView,
   JellyfinResumeItem,
   JellyfinSession,
 } from "@/models/jellyfin.types";
+import { spacing } from "@/theme/spacing";
 
 // Safely extract a Primary image tag from either a top-level PrimaryImageTag
 // property or an ImageTags.Primary entry without using `as any`.
@@ -61,24 +61,23 @@ const extractPrimaryImageTag = (obj?: unknown): string | undefined => {
 
 const getInternalStringField = (
   obj?: unknown,
-  key?: string
+  key?: string,
 ): string | undefined => {
   if (!obj || typeof obj !== "object" || !key) return undefined;
   const r = obj as Record<string, unknown>;
   const v = r[key];
   return typeof v === "string" ? v : undefined;
 };
-import { spacing } from "@/theme/spacing";
 
 type CollectionSegmentKey = "movies" | "tv" | "music";
 
-const collectionSegments: ReadonlyArray<{
+const collectionSegments: readonly {
   readonly key: CollectionSegmentKey;
   readonly label: string;
   readonly types: readonly string[];
   readonly includeItemTypes: readonly string[];
   readonly mediaTypes: readonly string[];
-}> = [
+}[] = [
   {
     key: "movies",
     label: "Movies",
@@ -102,27 +101,6 @@ const collectionSegments: ReadonlyArray<{
   },
 ];
 
-const formatEpisodeLabel = (item: JellyfinItem): string | undefined => {
-  if (item.Type !== "Episode") {
-    return undefined;
-  }
-
-  const season =
-    typeof item.ParentIndexNumber === "number"
-      ? `S${String(item.ParentIndexNumber).padStart(2, "0")}`
-      : "";
-  const episode =
-    typeof item.IndexNumber === "number"
-      ? `E${String(item.IndexNumber).padStart(2, "0")}`
-      : "";
-
-  if (!season && !episode) {
-    return undefined;
-  }
-
-  return `${season}${episode}`.trim();
-};
-
 const formatRuntimeMinutes = (ticks?: number | null): number | undefined => {
   const normalized = ticks ?? undefined;
   if (!normalized || normalized <= 0) {
@@ -135,7 +113,7 @@ const formatRuntimeMinutes = (ticks?: number | null): number | undefined => {
 
 const deriveSubtitle = (
   item: JellyfinItem,
-  segment: CollectionSegmentKey
+  segment: CollectionSegmentKey,
 ): string | undefined => {
   if (segment === "movies") {
     const minutes = formatRuntimeMinutes(item.RunTimeTicks);
@@ -197,7 +175,7 @@ const buildPosterUri = (
   connector: JellyfinConnector | undefined,
   item: JellyfinItem,
   fallbackWidth: number,
-  imageItemIdOverride?: string
+  imageItemIdOverride?: string,
 ): string | undefined => {
   if (!connector) {
     return undefined;
@@ -232,7 +210,7 @@ const JellyfinLibraryScreen = () => {
   const [activeSegment, setActiveSegment] =
     useState<CollectionSegmentKey>("movies");
   const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(
-    null
+    null,
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -293,7 +271,7 @@ const JellyfinLibraryScreen = () => {
     (librariesQuery.data ?? []).forEach((library) => {
       const type = ((library as any)?.CollectionType ?? "").toLowerCase();
       const segment = collectionSegments.find((candidate) =>
-        candidate.types.includes(type)
+        candidate.types.includes(type),
       );
       if (segment) {
         groups[segment.key].push(library);
@@ -305,7 +283,7 @@ const JellyfinLibraryScreen = () => {
 
   useEffect(() => {
     const firstAvailable = collectionSegments.find(
-      (segment) => groupedLibraries[segment.key].length > 0
+      (segment) => groupedLibraries[segment.key].length > 0,
     );
 
     if (firstAvailable && groupedLibraries[activeSegment].length === 0) {
@@ -316,7 +294,7 @@ const JellyfinLibraryScreen = () => {
 
     if (groupedLibraries[activeSegment].length > 0) {
       const libraryIds = groupedLibraries[activeSegment].map(
-        (library) => library?.Id ?? ""
+        (library) => library?.Id ?? "",
       );
       if (!selectedLibraryId || !libraryIds.includes(selectedLibraryId)) {
         setSelectedLibraryId(groupedLibraries[activeSegment][0]?.Id ?? null);
@@ -328,7 +306,7 @@ const JellyfinLibraryScreen = () => {
     () =>
       collectionSegments.find((segment) => segment.key === activeSegment) ??
       collectionSegments[0]!,
-    [activeSegment]
+    [activeSegment],
   );
 
   const resumeQuery = useJellyfinResume({ serviceId, limit: 12 });
@@ -367,7 +345,7 @@ const JellyfinLibraryScreen = () => {
       serviceId &&
         selectedLibraryId &&
         libraryItemsQuery.isSuccess &&
-        (libraryItemsQuery.data?.length ?? 0) === 0
+        (libraryItemsQuery.data?.length ?? 0) === 0,
     ),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -442,13 +420,16 @@ const JellyfinLibraryScreen = () => {
     aggregatedError instanceof Error
       ? aggregatedError.message
       : aggregatedError
-      ? "Unable to load Jellyfin data."
-      : null;
+        ? "Unable to load Jellyfin data."
+        : null;
 
-  const items =
-    libraryItemsQuery.data && libraryItemsQuery.data.length > 0
-      ? libraryItemsQuery.data
-      : fallbackLibraryItemsQuery.data ?? [];
+  const items = useMemo(
+    () =>
+      libraryItemsQuery.data && libraryItemsQuery.data.length > 0
+        ? libraryItemsQuery.data
+        : (fallbackLibraryItemsQuery.data ?? []),
+    [libraryItemsQuery.data, fallbackLibraryItemsQuery.data],
+  );
 
   // Derive displayItems: for the TV segment, prefer actual 'Series' items. If
   // none are returned (some libraries expose Seasons/Episodes instead), group
@@ -467,7 +448,7 @@ const JellyfinLibraryScreen = () => {
 
     for (const it of items) {
       const seriesKey = String(
-        it.SeriesId ?? it.ParentId ?? it.SeriesName ?? it.Id ?? ""
+        it.SeriesId ?? it.ParentId ?? it.SeriesName ?? it.Id ?? "",
       );
       if (!grouped.has(seriesKey)) {
         // Create a representative item (shallow copy) and attach metadata
@@ -525,7 +506,7 @@ const JellyfinLibraryScreen = () => {
         if (!connector) return null;
         try {
           return await connector.getItem(seriesId);
-        } catch (e) {
+        } catch {
           return null;
         }
       },
@@ -567,7 +548,11 @@ const JellyfinLibraryScreen = () => {
       } as JellyfinItem & { __posterSourceId?: string };
     });
   }, [displayItems, seriesMetaMap, activeSegment]);
-  const librariesForActiveSegment = groupedLibraries[activeSegment] ?? [];
+
+  const librariesForActiveSegment = useMemo(
+    () => groupedLibraries[activeSegment] ?? [],
+    [groupedLibraries, activeSegment],
+  );
 
   const handleNavigateBack = useCallback(() => {
     router.back();
@@ -603,7 +588,7 @@ const JellyfinLibraryScreen = () => {
         params: { serviceId, itemId },
       });
     },
-    [router, serviceId]
+    [router, serviceId],
   );
 
   const handleRefresh = useCallback(async () => {
@@ -625,10 +610,9 @@ const JellyfinLibraryScreen = () => {
   // Filter sessions to only those that actually have a NowPlayingItem. Some
   // connectors may return sessions without an active NowPlayingItem; avoid
   // showing the Now Playing section for those.
-  const nowPlayingSessionsRaw = nowPlayingQuery.data ?? [];
   const nowPlayingSessions = useMemo(
-    () => nowPlayingSessionsRaw.filter((s) => Boolean(s.NowPlayingItem)),
-    [nowPlayingSessionsRaw]
+    () => (nowPlayingQuery.data ?? []).filter((s) => Boolean(s.NowPlayingItem)),
+    [nowPlayingQuery.data],
   );
 
   const nowPlayingItemIds = useMemo(
@@ -636,17 +620,17 @@ const JellyfinLibraryScreen = () => {
       new Set(
         nowPlayingSessions
           .map((s) => s.NowPlayingItem?.Id)
-          .filter(Boolean) as string[]
+          .filter(Boolean) as string[],
       ),
-    [nowPlayingSessions]
+    [nowPlayingSessions],
   );
 
   const continueWatchingItems = useMemo(
     () =>
       (resumeQuery.data ?? []).filter((it) =>
-        it.Id ? !nowPlayingItemIds.has(it.Id) : true
+        it.Id ? !nowPlayingItemIds.has(it.Id) : true,
       ),
-    [resumeQuery.data, nowPlayingItemIds]
+    [resumeQuery.data, nowPlayingItemIds],
   );
 
   const renderNowPlayingItem = useCallback(
@@ -691,7 +675,7 @@ const JellyfinLibraryScreen = () => {
         </Pressable>
       );
     },
-    [connector, handleOpenItem, handleOpenNowPlaying, styles]
+    [connector, handleOpenItem, handleOpenNowPlaying, styles],
   );
 
   const renderResumeItem = useCallback(
@@ -704,9 +688,9 @@ const JellyfinLibraryScreen = () => {
           ? Math.min(
               Math.max(
                 item.UserData.PlaybackPositionTicks / item.RunTimeTicks,
-                0
+                0,
               ),
-              1
+              1,
             )
           : undefined;
 
@@ -715,8 +699,8 @@ const JellyfinLibraryScreen = () => {
         120,
         Math.min(
           240,
-          Math.floor((windowWidth - spacing.lg * 2 - spacing.md) / 2)
-        )
+          Math.floor((windowWidth - spacing.lg * 2 - spacing.md) / 2),
+        ),
       );
 
       return (
@@ -760,62 +744,7 @@ const JellyfinLibraryScreen = () => {
         </View>
       );
     },
-    [connector, handleOpenItem, styles, windowWidth, theme]
-  );
-
-  const renderLatestItem = useCallback(
-    ({ item, index }: { item: JellyfinLatestItem; index: number }) => {
-      const posterUri = buildPosterUri(connector, item, 420);
-      const subtitle =
-        item.Type === "Episode"
-          ? item.SeriesName
-          : deriveSubtitle(item, activeSegment);
-      const status = formatEpisodeLabel(item);
-
-      // Compute responsive poster size so the image dominates the card
-      const cardWidth = Math.max(
-        120,
-        Math.floor((windowWidth - spacing.lg * 2 - spacing.md) / numColumns)
-      );
-      const posterSize = Math.max(160, cardWidth - spacing.md);
-      return (
-        <View>
-          <Pressable
-            style={({ pressed }) => [
-              styles.gridCard,
-              index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight,
-              pressed && styles.cardPressed,
-            ]}
-            onPress={() => handleOpenItem(item.Id)}
-          >
-            <View style={styles.posterFrame}>
-              <MediaPoster
-                uri={posterUri}
-                size={posterSize}
-                borderRadius={14}
-              />
-            </View>
-            <Text
-              variant="bodyMedium"
-              numberOfLines={2}
-              style={styles.gridTitle}
-            >
-              {item.Name ?? "Untitled"}
-            </Text>
-            {subtitle ? (
-              <Text
-                variant="bodySmall"
-                numberOfLines={1}
-                style={styles.gridSubtitle}
-              >
-                {subtitle}
-              </Text>
-            ) : null}
-          </Pressable>
-        </View>
-      );
-    },
-    [activeSegment, connector, handleOpenItem, styles]
+    [connector, handleOpenItem, styles, windowWidth, theme],
   );
 
   const renderLibraryItem = useCallback(
@@ -829,7 +758,7 @@ const JellyfinLibraryScreen = () => {
         connector,
         item,
         480,
-        (item as any).__posterSourceId as string | undefined
+        (item as any).__posterSourceId as string | undefined,
       );
       const subtitle = deriveSubtitle(item, activeSegment);
       const positionStyle =
@@ -841,8 +770,8 @@ const JellyfinLibraryScreen = () => {
       const effectiveColumnWidth = Math.max(
         0,
         Math.floor(
-          (windowWidth - contentHorizontalPadding - totalGaps) / numColumns
-        )
+          (windowWidth - contentHorizontalPadding - totalGaps) / numColumns,
+        ),
       );
       const posterSize = Math.max(140, effectiveColumnWidth - spacing.md * 2);
       const innerPosterSize = posterSize;
@@ -886,7 +815,7 @@ const JellyfinLibraryScreen = () => {
         </View>
       );
     },
-    [activeSegment, connector, handleOpenItem, styles, windowWidth]
+    [activeSegment, connector, handleOpenItem, styles, windowWidth],
   );
 
   const listHeader = useMemo(() => {
@@ -1040,17 +969,16 @@ const JellyfinLibraryScreen = () => {
     );
   }, [
     activeSegment,
-    groupedLibraries,
     handleNavigateBack,
     handleOpenNowPlaying,
     handleOpenSettings,
-    latestQuery.data,
-    renderLatestItem,
+
     renderResumeItem,
     continueWatchingItems,
-    resumeQuery.data,
+    resumeQuery,
     nowPlayingSessions,
-    nowPlayingQuery.data,
+    nowPlayingQuery,
+    renderNowPlayingItem,
     searchTerm,
     selectedLibraryId,
     serviceName,

@@ -67,7 +67,6 @@ const ProwlarrStatisticsScreen = () => {
     serviceId?: string;
   }>();
   const serviceId = typeof rawServiceId === "string" ? rawServiceId : "";
-  const hasValidServiceId = serviceId.length > 0;
 
   const theme = useTheme<AppTheme>();
   const { indexers, statistics, isLoading, error } =
@@ -76,22 +75,22 @@ const ProwlarrStatisticsScreen = () => {
   // Calculate aggregate statistics
   const aggregateStats = useMemo(() => {
     const enabledIndexers = indexers.filter((indexer) =>
-      Boolean((indexer as any).enable)
+      Boolean((indexer as any).enable),
     ).length;
     const totalIndexers = indexers.length;
     const totalQueries = statistics.reduce(
       (sum, stat) => sum + stat.statistics.queries,
-      0
+      0,
     );
     const totalGrabs = statistics.reduce(
       (sum, stat) => sum + stat.statistics.grabs,
-      0
+      0,
     );
     const avgResponseTime =
       statistics.length > 0
         ? statistics.reduce(
             (sum, stat) => sum + (stat.statistics.averageResponseTime || 0),
-            0
+            0,
           ) / statistics.length
         : 0;
 

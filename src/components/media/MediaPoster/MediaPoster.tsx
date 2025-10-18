@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Pressable,
   StyleProp,
   StyleSheet,
   View,
   type ViewStyle,
+  Animated,
 } from "react-native";
 import { Image } from "expo-image";
 import { Text, useTheme } from "react-native-paper";
@@ -12,7 +13,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { AppTheme } from "@/constants/theme";
 import { imageCacheService } from "@/services/image/ImageCacheService";
-import { PixelRatio } from 'react-native';
+import { useThumbhash } from "@/hooks/useThumbhash";
 
 const sizeMap = {
   small: 96,
@@ -31,6 +32,22 @@ export type MediaPosterProps = {
   onPress?: () => void;
   accessibilityLabel?: string;
   showPlaceholderLabel?: boolean;
+  overlay?: React.ReactNode;
+  /**
+   * Enable progressive loading with blur-up effect
+   * @default true
+   */
+  progressiveLoading?: boolean;
+  /**
+   * Preload image when component mounts
+   * @default false
+   */
+  preload?: boolean;
+  /**
+   * Priority for loading (affects expo-image priority)
+   * @default 'normal'
+   */
+  priority?: "low" | "normal" | "high";
 };
 
 const DEFAULT_ASPECT_RATIO = 2 / 3;
@@ -45,17 +62,47 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   onPress,
   accessibilityLabel,
   showPlaceholderLabel = false,
+  overlay,
+  progressiveLoading = true,
+  preload = false,
+  priority = "normal",
 }) => {
   const theme = useTheme<AppTheme>();
+
+  // Animation value for progressive loading
+  const fadeAnim = useMemo(() => new Animated.Value(0), []);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Use theme's poster style configuration if borderRadius is not explicitly provided
   const effectiveBorderRadius =
     borderRadius ??
     theme.custom.config?.posterStyle.borderRadius ??
     DEFAULT_RADIUS;
+  const width = useMemo(
+    () => (typeof size === "number" ? size : sizeMap[size]),
+    [size],
+  );
+  const height = useMemo(
+    () => Math.round(width / aspectRatio),
+    [width, aspectRatio],
+  );
+
   const [isLoading, setIsLoading] = useState(Boolean(uri));
   const [hasError, setHasError] = useState(false);
   const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
+
+  // Use the new thumbhash hook for clean thumbhash management
+  const { thumbhash } = useThumbhash(uri, {
+    autoGenerate: true,
+    generateDelay: 100, // Small delay to not block initial render
+  });
+
+  // Preload image if requested
+  useEffect(() => {
+    if (preload && uri && !resolvedUri) {
+      void imageCacheService.prefetch(uri);
+    }
+  }, [preload, uri, resolvedUri]);
 
   useEffect(() => {
     let isMounted = true;
@@ -66,6 +113,8 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
           setResolvedUri(undefined);
           setIsLoading(false);
           setHasError(false);
+          setImageLoaded(false);
+          fadeAnim.setValue(0);
         }
         return;
       }
@@ -74,18 +123,21 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         setIsLoading(true);
         setHasError(false);
         setResolvedUri(undefined);
+        setImageLoaded(false);
+        fadeAnim.setValue(0);
       }
 
       try {
         // Request a sized thumbnail matching the rendered size * device DPR
-        const dpr = PixelRatio.get();
-        const reqWidth = Math.round(width * dpr);
-        const reqHeight = Math.round(height * dpr);
-        const localUri = await imageCacheService.resolveForSize(uri, width, height);
+        const localUri = await imageCacheService.resolveForSize(
+          uri,
+          width,
+          height,
+        );
         if (isMounted) {
           setResolvedUri(localUri);
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           setResolvedUri(uri);
         }
@@ -97,20 +149,20 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [uri]);
+  }, [uri, width, height, fadeAnim]);
 
-  const width = useMemo(
-    () => (typeof size === "number" ? size : sizeMap[size]),
-    [size]
-  );
-  const height = useMemo(
-    () => Math.round(width / aspectRatio),
-    [width, aspectRatio]
-  );
-
-  const handleImageLoad = () => {
+  const handleImageLoad = useCallback(() => {
     setIsLoading(false);
-  };
+    setImageLoaded(true);
+
+    if (progressiveLoading) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [progressiveLoading, fadeAnim]);
 
   const containerStyle = useMemo(
     () =>
@@ -139,10 +191,11 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       theme.colors.shadow,
       theme.custom.config?.posterStyle.shadowOpacity,
       theme.custom.config?.posterStyle.shadowRadius,
-    ]
+    ],
   );
 
   const isFallback = hasError || !resolvedUri;
+  const showLoadingPlaceholder = isLoading && !thumbhash;
 
   const content = isFallback ? (
     <View style={[styles.fallback, { borderRadius: effectiveBorderRadius }]}>
@@ -160,28 +213,69 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         </Text>
       ) : null}
     </View>
-  ) : (
-    <Image
-      source={{ uri: resolvedUri }}
-      // Use stored thumbhash as a placeholder when available. Expo Image accepts
-      // placeholder as an object or a string; providing the thumbhash string
-      // directly will render a compact placeholder until the real image loads.
-      placeholder={resolvedUri ? imageCacheService.getThumbhash(resolvedUri) ?? undefined : undefined}
+  ) : showLoadingPlaceholder ? (
+    <View
       style={[
-        StyleSheet.absoluteFillObject,
+        styles.loadingPlaceholder,
         { borderRadius: effectiveBorderRadius },
       ]}
-      accessibilityLabel={accessibilityLabel}
-      cachePolicy="memory-disk"
-      contentFit="cover"
-      transition={0}
-      onLoad={handleImageLoad}
-      onLoadEnd={handleImageLoad}
-      onError={() => {
-        setIsLoading(false);
-        setHasError(true);
-      }}
-    />
+    >
+      <MaterialCommunityIcons
+        name="image-outline"
+        size={32}
+        color={theme.colors.onSurfaceVariant}
+        opacity={0.5}
+      />
+    </View>
+  ) : (
+    <>
+      {/* Show thumbhash placeholder with blur effect */}
+      {thumbhash && !imageLoaded && (
+        <Image
+          source={{ uri: resolvedUri }}
+          placeholder={thumbhash}
+          style={[
+            StyleSheet.absoluteFillObject,
+            { borderRadius: effectiveBorderRadius },
+          ]}
+          blurRadius={progressiveLoading ? 8 : 0}
+          cachePolicy="memory-disk"
+          contentFit="cover"
+        />
+      )}
+
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            borderRadius: effectiveBorderRadius,
+            opacity: progressiveLoading ? fadeAnim : 1,
+          },
+        ]}
+      >
+        <Image
+          source={{ uri: resolvedUri }}
+          // Use stored thumbhash as a placeholder when available. Expo Image accepts
+          // placeholder as an object with thumbhash property for proper rendering.
+          placeholder={thumbhash}
+          style={[
+            StyleSheet.absoluteFillObject,
+            { borderRadius: effectiveBorderRadius },
+          ]}
+          accessibilityLabel={accessibilityLabel}
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          priority={priority}
+          transition={progressiveLoading ? 300 : 0}
+          onLoad={handleImageLoad}
+          onLoadEnd={handleImageLoad}
+          onError={() => {
+            setIsLoading(false);
+            setHasError(true);
+          }}
+        />
+      </Animated.View>
+    </>
   );
 
   const effectiveLabel =
@@ -197,6 +291,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       >
         <View style={containerStyle} pointerEvents="none">
           {content}
+          {overlay}
         </View>
       </Pressable>
     );
@@ -209,6 +304,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       accessibilityLabel={effectiveLabel}
     >
       {content}
+      {overlay}
     </View>
   );
 };
@@ -221,6 +317,12 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   fallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  loadingPlaceholder: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",

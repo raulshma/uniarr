@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Husky pre-push hook: run lint and typecheck
+# Runs in the repo root
+
+echo "Running pre-push checks: lint and typecheck"
+
+npm run lint --silent
+LINT_STATUS=$?
+
+if [ $LINT_STATUS -ne 0 ]; then
+  echo "Lint failed. Aborting push."
+  exit $LINT_STATUS
+fi
+
+npm run typecheck --silent
+TSC_STATUS=$?
+
+if [ $TSC_STATUS -ne 0 ]; then
+  echo "TypeScript typecheck failed. Aborting push."
+  exit $TSC_STATUS
+fi
+
+exit 0

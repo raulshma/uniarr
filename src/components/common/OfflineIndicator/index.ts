@@ -1,1 +1,1 @@
-export { OfflineIndicator } from './OfflineIndicator';
+export { OfflineIndicator } from "./OfflineIndicator";

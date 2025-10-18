@@ -3,22 +3,22 @@
  */
 
 // Core types and interfaces
-export * from './types';
+export * from "./types";
 
 // Authentication manager
-export { AuthManager, authManager } from './AuthManager';
+export { AuthManager, authManager } from "./AuthManager";
 
 // Service authentication helper
-export { ServiceAuthHelper } from './ServiceAuthHelper';
+export { ServiceAuthHelper } from "./ServiceAuthHelper";
 
 // Authentication providers
-export { BaseAuthProvider } from './providers/BaseAuthProvider';
-export { ApiKeyAuthProvider } from './providers/ApiKeyAuthProvider';
-export { BasicAuthProvider } from './providers/BasicAuthProvider';
-export { SessionAuthProvider } from './providers/SessionAuthProvider';
+export { BaseAuthProvider } from "./providers/BaseAuthProvider";
+export { ApiKeyAuthProvider } from "./providers/ApiKeyAuthProvider";
+export { BasicAuthProvider } from "./providers/BasicAuthProvider";
+export { SessionAuthProvider } from "./providers/SessionAuthProvider";
 
 // Provider factory
-export { AuthProviderFactory } from './AuthProviderFactory';
+export { AuthProviderFactory } from "./AuthProviderFactory";
 
 // Re-export existing auth service for backward compatibility
-export * from './AuthService';
+export * from "./AuthService";

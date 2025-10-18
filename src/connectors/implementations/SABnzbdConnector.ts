@@ -1,8 +1,12 @@
-import { BaseConnector } from '@/connectors/base/BaseConnector';
-import { handleApiError } from '@/utils/error.utils';
-import { logger } from '@/services/logger/LoggerService';
-import type { Torrent, TorrentState, TorrentTransferInfo } from '@/models/torrent.types';
-import type { SystemHealth } from '@/connectors/base/IConnector';
+import { BaseConnector } from "@/connectors/base/BaseConnector";
+import { handleApiError } from "@/utils/error.utils";
+import { logger } from "@/services/logger/LoggerService";
+import type {
+  Torrent,
+  TorrentState,
+  TorrentTransferInfo,
+} from "@/models/torrent.types";
+import type { SystemHealth } from "@/connectors/base/IConnector";
 
 // SABnzbd API types (adapted for torrent-like interface)
 interface SABnzbdQueueItem {
@@ -92,17 +96,17 @@ interface SABnzbdVersionResponse {
 
 // SABnzbd status mapping to torrent states
 const SABNZBD_STATUS_MAP: Record<string, TorrentState> = {
-  'Downloading': 'downloading',
-  'Queued': 'queuedDL',
-  'Paused': 'pausedDL',
-  'Checking': 'checkingDL',
-  'Repairing': 'checkingDL',
-  'Verifying': 'checkingDL',
-  'Extracting': 'checkingDL',
-  'Moving': 'moving',
-  'Completed': 'uploading', // SABnzbd doesn't have seeding, but completed items are "uploaded"
-  'Failed': 'error',
-  'Deleted': 'error',
+  Downloading: "downloading",
+  Queued: "queuedDL",
+  Paused: "pausedDL",
+  Checking: "checkingDL",
+  Repairing: "checkingDL",
+  Verifying: "checkingDL",
+  Extracting: "checkingDL",
+  Moving: "moving",
+  Completed: "uploading", // SABnzbd doesn't have seeding, but completed items are "uploaded"
+  Failed: "error",
+  Deleted: "error",
 };
 
 /**
@@ -110,27 +114,39 @@ const SABNZBD_STATUS_MAP: Record<string, TorrentState> = {
  */
 export class SABnzbdConnector extends BaseConnector<Torrent> {
   async initialize(): Promise<void> {
-    logger.debug('[SABnzbdConnector] Initializing', { serviceId: this.config.id });
+    logger.debug("[SABnzbdConnector] Initializing", {
+      serviceId: this.config.id,
+    });
     // SABnzbd doesn't require explicit initialization beyond auth
-    logger.debug('[SABnzbdConnector] Initialization completed', { serviceId: this.config.id });
+    logger.debug("[SABnzbdConnector] Initialization completed", {
+      serviceId: this.config.id,
+    });
   }
 
   async getVersion(): Promise<string> {
-    logger.debug('[SABnzbdConnector] Getting version', { serviceId: this.config.id });
+    logger.debug("[SABnzbdConnector] Getting version", {
+      serviceId: this.config.id,
+    });
 
     try {
-      const response = await this.client.get<SABnzbdVersionResponse>('version', {
-        params: { apikey: this.config.apiKey },
-      });
+      const response = await this.client.get<SABnzbdVersionResponse>(
+        "version",
+        {
+          params: { apikey: this.config.apiKey },
+        },
+      );
 
-      return response.data.version || 'unknown';
+      return response.data.version || "unknown";
     } catch (error) {
-      logger.error('[SABnzbdConnector] Version request failed', { serviceId: this.config.id, error });
+      logger.error("[SABnzbdConnector] Version request failed", {
+        serviceId: this.config.id,
+        error,
+      });
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getVersion',
-        endpoint: '/api',
+        operation: "getVersion",
+        endpoint: "/api",
       });
     }
   }
@@ -140,24 +156,24 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
       const version = await this.getVersion();
 
       return {
-        status: 'healthy',
-        message: 'SABnzbd is running and accessible.',
+        status: "healthy",
+        message: "SABnzbd is running and accessible.",
         lastChecked: new Date(),
         details: {
           version,
-          apiVersion: 'REST',
+          apiVersion: "REST",
         },
       };
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getHealth',
-        endpoint: '/api',
+        operation: "getHealth",
+        endpoint: "/api",
       });
 
       return {
-        status: diagnostic.isNetworkError ? 'offline' : 'degraded',
+        status: diagnostic.isNetworkError ? "offline" : "degraded",
         message: diagnostic.message,
         lastChecked: new Date(),
         details: diagnostic.details,
@@ -165,22 +181,32 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
     }
   }
 
-  async getTorrents(filters?: { category?: string; tag?: string; status?: string }): Promise<Torrent[]> {
+  async getTorrents(filters?: {
+    category?: string;
+    tag?: string;
+    status?: string;
+  }): Promise<Torrent[]> {
     try {
       // Get queue (active downloads)
-      const queueResponse = await this.client.get<SABnzbdQueueResponse>('queue', {
-        params: { apikey: this.config.apiKey },
-      });
+      const queueResponse = await this.client.get<SABnzbdQueueResponse>(
+        "queue",
+        {
+          params: { apikey: this.config.apiKey },
+        },
+      );
 
       const queueItems = queueResponse.data.queue.slots || [];
 
       // Get history (completed/failed downloads)
-      const historyResponse = await this.client.get<SABnzbdHistoryResponse>('history', {
-        params: {
-          apikey: this.config.apiKey,
-          limit: 100 // Get recent history items
+      const historyResponse = await this.client.get<SABnzbdHistoryResponse>(
+        "history",
+        {
+          params: {
+            apikey: this.config.apiKey,
+            limit: 100, // Get recent history items
+          },
         },
-      });
+      );
 
       const historyItems = historyResponse.data.history.slots || [];
 
@@ -192,66 +218,66 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getTorrents',
-        endpoint: '/api',
+        operation: "getTorrents",
+        endpoint: "/api",
       });
     }
   }
 
   async pauseTorrent(hash: string): Promise<void> {
     try {
-      await this.client.get('queue', {
+      await this.client.get("queue", {
         params: {
           apikey: this.config.apiKey,
-          name: 'pause',
-          value: hash
+          name: "pause",
+          value: hash,
         },
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'pauseTorrent',
-        endpoint: '/api',
+        operation: "pauseTorrent",
+        endpoint: "/api",
       });
     }
   }
 
   async resumeTorrent(hash: string): Promise<void> {
     try {
-      await this.client.get('queue', {
+      await this.client.get("queue", {
         params: {
           apikey: this.config.apiKey,
-          name: 'resume',
-          value: hash
+          name: "resume",
+          value: hash,
         },
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'resumeTorrent',
-        endpoint: '/api',
+        operation: "resumeTorrent",
+        endpoint: "/api",
       });
     }
   }
 
   async deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
     try {
-      await this.client.get('queue', {
+      await this.client.get("queue", {
         params: {
           apikey: this.config.apiKey,
-          name: 'delete',
+          name: "delete",
           value: hash,
-          ...(deleteFiles && { del_files: 1 })
+          ...(deleteFiles && { del_files: 1 }),
         },
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'deleteTorrent',
-        endpoint: '/api',
+        operation: "deleteTorrent",
+        endpoint: "/api",
       });
     }
   }
@@ -259,26 +285,26 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
   async forceRecheck(hash: string): Promise<void> {
     try {
       // SABnzbd doesn't have a direct recheck, but we can retry the download
-      await this.client.get('queue', {
+      await this.client.get("queue", {
         params: {
           apikey: this.config.apiKey,
-          name: 'retry',
-          value: hash
+          name: "retry",
+          value: hash,
         },
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'forceRecheck',
-        endpoint: '/api',
+        operation: "forceRecheck",
+        endpoint: "/api",
       });
     }
   }
 
   async getTransferInfo(): Promise<TorrentTransferInfo> {
     try {
-      const response = await this.client.get<SABnzbdQueueResponse>('queue', {
+      const response = await this.client.get<SABnzbdQueueResponse>("queue", {
         params: { apikey: this.config.apiKey },
       });
 
@@ -288,28 +314,36 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
         downloadSpeed: (queue.kbpersec || 0) * 1024, // Convert KB/s to B/s
         uploadSpeed: 0, // SABnzbd doesn't upload (Usenet client)
         dhtNodes: 0, // SABnzbd doesn't use DHT
-        connectionStatus: queue.paused ? 'disconnected' : 'connected',
+        connectionStatus: queue.paused ? "disconnected" : "connected",
       };
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getTransferInfo',
-        endpoint: '/api',
+        operation: "getTransferInfo",
+        endpoint: "/api",
       });
     }
   }
 
   private mapQueueItem(item: SABnzbdQueueItem | SABnzbdHistoryItem): Torrent {
-    const isQueueItem = 'mbleft' in item;
-    const progress = isQueueItem ? ((item.mb - item.mbleft) / item.mb) * 100 : 100;
-    const status = isQueueItem ? item.status : (item.status === 'Completed' ? 'Completed' : 'Failed');
-    const size = isQueueItem ? item.mb * 1024 * 1024 : parseInt(item.size || '0');
+    const isQueueItem = "mbleft" in item;
+    const progress = isQueueItem
+      ? ((item.mb - item.mbleft) / item.mb) * 100
+      : 100;
+    const status = isQueueItem
+      ? item.status
+      : item.status === "Completed"
+        ? "Completed"
+        : "Failed";
+    const size = isQueueItem
+      ? item.mb * 1024 * 1024
+      : parseInt(item.size || "0");
 
     return {
       hash: item.nzo_id,
       name: item.name,
-      state: SABNZBD_STATUS_MAP[status] || 'unknown',
+      state: SABNZBD_STATUS_MAP[status] || "unknown",
       progress: progress / 100, // Convert percentage to 0-1 range
       size,
       downloaded: isQueueItem ? (item.mb - item.mbleft) * 1024 * 1024 : size,
@@ -330,22 +364,23 @@ export class SABnzbdConnector extends BaseConnector<Torrent> {
         connected: 0, // SABnzbd doesn't provide peer info for Usenet
         total: 0,
       },
-      availability: isQueueItem ? 0 : (item.completeness || 0),
+      availability: isQueueItem ? 0 : item.completeness || 0,
     };
   }
 
   private parseEta(etaString?: string): number {
-    if (!etaString || etaString === '0:00:00') {
+    if (!etaString || etaString === "0:00:00") {
       return 0;
     }
 
     // Parse "X:YY:ZZ" format (days:hours:minutes:seconds)
-    const parts = etaString.split(':');
+    const parts = etaString.split(":");
     if (parts.length >= 3) {
-      const seconds = parseInt(parts[parts.length - 1] || '0') || 0;
-      const minutes = parseInt(parts[parts.length - 2] || '0') || 0;
-      const hours = parseInt(parts[parts.length - 3] || '0') || 0;
-      const days = parts.length > 3 ? parseInt(parts[parts.length - 4] || '0') || 0 : 0;
+      const seconds = parseInt(parts[parts.length - 1] || "0") || 0;
+      const minutes = parseInt(parts[parts.length - 2] || "0") || 0;
+      const hours = parseInt(parts[parts.length - 3] || "0") || 0;
+      const days =
+        parts.length > 3 ? parseInt(parts[parts.length - 4] || "0") || 0 : 0;
 
       return days * 86400 + hours * 3600 + minutes * 60 + seconds;
     }

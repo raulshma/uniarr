@@ -1,11 +1,11 @@
-import type { ServiceType } from '@/models/service.types';
+import type { ServiceType } from "@/models/service.types";
 
 export type UnifiedSearchMediaType =
-  | 'series'
-  | 'movie'
-  | 'music'
-  | 'request'
-  | 'unknown';
+  | "series"
+  | "movie"
+  | "music"
+  | "request"
+  | "unknown";
 
 export interface UnifiedSearchExternalIds {
   readonly tmdbId?: number;
@@ -21,6 +21,7 @@ export interface UnifiedSearchResult {
   readonly overview?: string;
   readonly releaseDate?: string;
   readonly year?: number;
+  readonly runtime?: number;
   readonly posterUrl?: string;
   readonly backdropUrl?: string;
   readonly rating?: number;

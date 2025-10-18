@@ -44,7 +44,7 @@ export function alert(
   title: string,
   message?: string,
   buttons?: RNAlertButton[],
-  options?: AlertOptions
+  options?: AlertOptions,
 ) {
   if (presenter) {
     presenter({ title, message, buttons, options });

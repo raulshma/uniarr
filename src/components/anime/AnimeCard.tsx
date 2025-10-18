@@ -27,8 +27,6 @@ const AnimeCard: React.FC<AnimeCardProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
-  const posterHeight = useMemo(() => width * 1.5, [width]);
-
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -82,7 +80,7 @@ const AnimeCard: React.FC<AnimeCardProps> = ({
           lineHeight: 18,
         },
       }),
-    [theme, width]
+    [theme, width],
   );
 
   return (

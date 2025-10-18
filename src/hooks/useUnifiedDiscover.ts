@@ -5,8 +5,11 @@ import type { JellyseerrConnector } from "@/connectors/implementations/Jellyseer
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import type { IConnector } from "@/connectors/base/IConnector";
-import type { ServiceType } from "@/models/service.types";
-import { useConnectorsStore, selectGetConnectorsByType } from "@/store/connectorsStore";
+import type { ServiceType, ServiceConfig } from "@/models/service.types";
+import {
+  useConnectorsStore,
+  selectGetConnectorsByType,
+} from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 import type {
   DiscoverMediaItem,
@@ -15,17 +18,40 @@ import type {
   UnifiedDiscoverServices,
 } from "@/models/discover.types";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
+
+import { useSettingsStore } from "@/store/settingsStore";
+import { getTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
+import {
+  mapTmdbMovieToDiscover,
+  mapTmdbTvToDiscover,
+} from "@/utils/tmdb.utils";
+import { logger } from "@/services/logger/LoggerService";
 type JellyseerrSearchResult =
   | components["schemas"]["MovieResult"]
   | components["schemas"]["TvResult"];
-
-import type { ServiceConfig } from "@/models/service.types";
 
 const emptyServices: UnifiedDiscoverServices = {
   sonarr: [],
   radarr: [],
   jellyseerr: [],
 };
+
+const placeholderSections: DiscoverSection[] = [
+  {
+    id: "placeholder-tv",
+    title: "Popular TV Shows",
+    mediaType: "series",
+    source: "jellyseerr",
+    items: [],
+  },
+  {
+    id: "placeholder-movies",
+    title: "Trending Movies",
+    mediaType: "movie",
+    source: "jellyseerr",
+    items: [],
+  },
+];
 
 const mapServiceSummaries = (configs: ServiceConfig[]) =>
   configs.map((config) => ({
@@ -37,7 +63,7 @@ const mapServiceSummaries = (configs: ServiceConfig[]) =>
 const mapTrendingResult = (
   result: JellyseerrSearchResult,
   mediaType: DiscoverMediaItem["mediaType"],
-  sourceServiceId?: string
+  sourceServiceId?: string,
 ): DiscoverMediaItem => {
   // Explicitly handle the MovieResult | TvResult union and fallback to mediaInfo
 
@@ -150,23 +176,24 @@ const mapTrendingResult = (
 };
 
 const fetchUnifiedDiscover = async (
-  getConnectorsByType: (type: ServiceType) => IConnector[]
+  getConnectorsByType: (type: ServiceType) => IConnector[],
+  options: { tmdbEnabled: boolean },
 ): Promise<UnifiedDiscoverPayload> => {
   const jellyConnectors = getConnectorsByType(
-    "jellyseerr"
+    "jellyseerr",
   ) as JellyseerrConnector[];
   const sonarrConnectors = getConnectorsByType("sonarr") as SonarrConnector[];
   const radarrConnectors = getConnectorsByType("radarr") as RadarrConnector[];
 
   const services: UnifiedDiscoverServices = {
     sonarr: mapServiceSummaries(
-      sonarrConnectors.map((connector) => connector.config)
+      sonarrConnectors.map((connector) => connector.config),
     ),
     radarr: mapServiceSummaries(
-      radarrConnectors.map((connector) => connector.config)
+      radarrConnectors.map((connector) => connector.config),
     ),
     jellyseerr: mapServiceSummaries(
-      jellyConnectors.map((connector) => connector.config)
+      jellyConnectors.map((connector) => connector.config),
     ),
   };
 
@@ -181,14 +208,14 @@ const fetchUnifiedDiscover = async (
       } catch (error) {
         console.warn(
           `Failed to load trending titles from ${connector.config.name}:`,
-          error
+          error,
         );
         return {
           connectorId: connector.config.id,
           items: [] as JellyseerrSearchResult[],
         } as const;
       }
-    })
+    }),
   );
 
   // Flatten while keeping a reference to which connector the item came from so
@@ -199,16 +226,11 @@ const fetchUnifiedDiscover = async (
         ({
           ...it,
           __sourceServiceId: r.connectorId,
-        } as unknown as JellyseerrSearchResult & { __sourceServiceId?: string })
-    )
+        }) as unknown as JellyseerrSearchResult & {
+          __sourceServiceId?: string;
+        },
+    ),
   );
-
-  if (trendingItems.length === 0) {
-    return {
-      sections: [],
-      services,
-    };
-  }
 
   const deduped = new Map<
     string,
@@ -222,13 +244,13 @@ const fetchUnifiedDiscover = async (
       typeof r.tmdbId === "number"
         ? (r.tmdbId as number)
         : r.mediaInfo && typeof (r.mediaInfo as any).tmdbId === "number"
-        ? ((r.mediaInfo as any).tmdbId as number)
-        : undefined;
+          ? ((r.mediaInfo as any).tmdbId as number)
+          : undefined;
     const key = tmdb ? `tmdb-${tmdb}` : `${item.mediaType}-${item.id}`;
     if (!deduped.has(key)) {
       deduped.set(
         key,
-        item as JellyseerrSearchResult & { __sourceServiceId?: string }
+        item as JellyseerrSearchResult & { __sourceServiceId?: string },
       );
     }
   }
@@ -269,6 +291,91 @@ const fetchUnifiedDiscover = async (
     });
   }
 
+  const seenTmdbIds = new Set<number>();
+  sections.forEach((section) => {
+    section.items.forEach((item) => {
+      if (typeof item.tmdbId === "number") {
+        seenTmdbIds.add(item.tmdbId);
+      }
+    });
+  });
+
+  if (options.tmdbEnabled) {
+    const tmdbConnector = await getTmdbConnector();
+    if (tmdbConnector) {
+      try {
+        const [movieDiscover, tvDiscover] = await Promise.all([
+          tmdbConnector.discoverMovies({ sort_by: "popularity.desc", page: 1 }),
+          tmdbConnector.discoverTv({ sort_by: "popularity.desc", page: 1 }),
+        ]);
+
+        const mapWithDedupe = (
+          items: unknown[],
+          mapper: (item: any) => DiscoverMediaItem,
+        ) =>
+          items
+            .map((item) => {
+              try {
+                return mapper(item);
+              } catch (error) {
+                void logger.warn("Failed to map TMDB item", {
+                  location: "useUnifiedDiscover.mapWithDedupe",
+                  error: error instanceof Error ? error.message : String(error),
+                });
+                return null;
+              }
+            })
+            .filter((item): item is DiscoverMediaItem => Boolean(item))
+            .filter((item) => {
+              if (typeof item.tmdbId === "number") {
+                if (seenTmdbIds.has(item.tmdbId)) {
+                  return false;
+                }
+                seenTmdbIds.add(item.tmdbId);
+              }
+              return true;
+            });
+
+        const tmdbMovieItems = mapWithDedupe(
+          movieDiscover.results ?? [],
+          mapTmdbMovieToDiscover,
+        ).slice(0, 12);
+
+        const tmdbTvItems = mapWithDedupe(
+          tvDiscover.results ?? [],
+          mapTmdbTvToDiscover,
+        ).slice(0, 12);
+
+        if (tmdbMovieItems.length) {
+          sections.push({
+            id: "tmdb-popular-movies",
+            title: "Popular on TMDB",
+            mediaType: "movie",
+            source: "tmdb",
+            subtitle: "Film highlights directly from TMDB",
+            items: tmdbMovieItems,
+          });
+        }
+
+        if (tmdbTvItems.length) {
+          sections.push({
+            id: "tmdb-popular-tv",
+            title: "TMDB TV Favorites",
+            mediaType: "series",
+            source: "tmdb",
+            subtitle: "Series trending across TMDB",
+            items: tmdbTvItems,
+          });
+        }
+      } catch (error) {
+        void logger.warn("Failed to load TMDB discover sections", {
+          location: "useUnifiedDiscover.fetchTmdb",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
   return {
     sections,
     services,
@@ -277,11 +384,16 @@ const fetchUnifiedDiscover = async (
 
 export const useUnifiedDiscover = () => {
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
+  const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const query = useQuery<UnifiedDiscoverPayload>({
-    queryKey: queryKeys.discover.unified,
-    queryFn: () => fetchUnifiedDiscover(getConnectorsByType),
+    queryKey: [...queryKeys.discover.unified, { tmdbEnabled }] as const,
+    queryFn: () => fetchUnifiedDiscover(getConnectorsByType, { tmdbEnabled }),
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    placeholderData: () => ({
+      sections: placeholderSections,
+      services: emptyServices,
+    }),
     // Keep previous data can be useful to avoid loading flashes; components
     // that render this query can opt into `keepPreviousData` via a local
     // useQuery overload if needed. We disable refetchOnWindowFocus here.
@@ -290,11 +402,11 @@ export const useUnifiedDiscover = () => {
 
   const services = useMemo(
     () => query.data?.services ?? emptyServices,
-    [query.data?.services]
+    [query.data?.services],
   );
   const sections = useMemo(
     () => query.data?.sections ?? [],
-    [query.data?.sections]
+    [query.data?.sections],
   );
 
   return {

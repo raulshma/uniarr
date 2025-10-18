@@ -6,7 +6,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   IconButton,
@@ -22,10 +22,13 @@ import { useRouter } from "expo-router";
 import { EmptyState } from "@/components/common/EmptyState";
 import { TabHeader } from "@/components/common/TabHeader";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
+import { SectionSkeleton } from "@/components/discover";
 import type { AppTheme } from "@/constants/theme";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import { spacing } from "@/theme/spacing";
+import { useTmdbKey } from "@/hooks/useTmdbKey";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const placeholderText = "Search for movies, shows, and more";
 
@@ -49,6 +52,8 @@ const DiscoverCard = ({
         },
         posterWrapper: {
           marginBottom: spacing.xs,
+          // anchor overlays inside the poster area so absolute elements position correctly
+          position: "relative",
         },
         title: {
           color: theme.colors.onBackground,
@@ -60,12 +65,14 @@ const DiscoverCard = ({
         },
         addButton: {
           position: "absolute",
-          top: spacing.xs,
-          right: spacing.xs,
+          top: spacing.sm,
+          right: spacing.sm,
           backgroundColor: theme.colors.primary,
+          zIndex: 100,
+          elevation: 100,
         },
       }),
-    [theme]
+    [theme],
   );
 
   return (
@@ -75,15 +82,20 @@ const DiscoverCard = ({
       accessibilityRole="button"
     >
       <View style={styles.posterWrapper}>
-        <MediaPoster uri={item.posterUrl} size={152} />
-        <IconButton
-          icon="plus"
-          size={20}
-          mode="contained"
-          style={styles.addButton}
-          iconColor={theme.colors.onPrimary}
-          onPress={() => onAdd(item)}
-          accessibilityLabel={`Add ${item.title}`}
+        <MediaPoster
+          uri={item.posterUrl}
+          size={152}
+          overlay={
+            <IconButton
+              icon="plus"
+              size={20}
+              mode="contained"
+              style={styles.addButton}
+              iconColor={theme.colors.onPrimary}
+              onPress={() => onAdd(item)}
+              accessibilityLabel={`Add ${item.title}`}
+            />
+          }
         />
       </View>
       <Text numberOfLines={2} style={styles.title}>
@@ -96,13 +108,15 @@ const DiscoverCard = ({
 const DiscoverScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
+  const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
+  const { apiKey: tmdbKey } = useTmdbKey();
 
   const { sections, services, isLoading, isFetching, isError, error, refetch } =
     useUnifiedDiscover();
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogItem, setDialogItem] = useState<DiscoverMediaItem | undefined>(
-    undefined
+    undefined,
   );
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
 
@@ -169,7 +183,7 @@ const DiscoverScreen = () => {
           marginTop: spacing.xl,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const isRefreshing = isFetching && !isLoading;
@@ -182,6 +196,17 @@ const DiscoverScreen = () => {
     router.push("/(auth)/(tabs)/settings");
   }, [router]);
 
+  const openTmdbDiscover = useCallback(() => {
+    router.push("/(auth)/discover/tmdb");
+  }, [router]);
+
+  const openSectionPage = useCallback(
+    (sectionId: string) => {
+      router.push(`/(auth)/discover/section/${sectionId}`);
+    },
+    [router],
+  );
+
   const openServicePicker = useCallback(
     (item: DiscoverMediaItem) => {
       const options =
@@ -191,7 +216,7 @@ const DiscoverScreen = () => {
           "No services available",
           `Add a ${
             item.mediaType === "series" ? "Sonarr" : "Radarr"
-          } service first to request this title.`
+          } service first to request this title.`,
         );
         return;
       }
@@ -205,7 +230,7 @@ const DiscoverScreen = () => {
       });
       setDialogVisible(true);
     },
-    [services]
+    [services],
   );
 
   const handleCardPress = useCallback(
@@ -214,7 +239,7 @@ const DiscoverScreen = () => {
       // Use the discover item id so the details screen can resolve it
       router.push({ pathname: `/(auth)/discover/${item.id}` });
     },
-    [router]
+    [router],
   );
 
   const handleDialogDismiss = useCallback(() => {
@@ -252,53 +277,67 @@ const DiscoverScreen = () => {
 
   const renderSection = useCallback(
     (
+      sectionId: string,
       sectionTitle: string,
       subtitle: string | undefined,
-      items: DiscoverMediaItem[]
-    ) => (
-      <View>
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>{sectionTitle}</Text>
-            {subtitle ? (
-              <Text style={styles.sectionSubtitle}>{subtitle}</Text>
-            ) : null}
+      items: DiscoverMediaItem[],
+    ) => {
+      // Show skeleton for placeholder sections (these should always show skeletons)
+      // or when items are empty and we're currently fetching data
+      const shouldShowSkeleton =
+        sectionId.startsWith("placeholder-") ||
+        (items.length === 0 && isFetching);
+
+      if (shouldShowSkeleton) {
+        return <SectionSkeleton />;
+      }
+
+      return (
+        <View>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+              {subtitle ? (
+                <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+              ) : null}
+            </View>
+            <PaperButton
+              mode="text"
+              compact
+              onPress={() => openSectionPage(sectionId)}
+              textColor={theme.colors.primary}
+            >
+              View all
+            </PaperButton>
           </View>
-          <PaperButton
-            mode="text"
-            compact
-            onPress={openUnifiedSearch}
-            textColor={theme.colors.primary}
-          >
-            View all
-          </PaperButton>
+          <FlatList
+            data={items}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <DiscoverCard
+                item={item}
+                onPress={handleCardPress}
+                onAdd={openServicePicker}
+              />
+            )}
+          />
         </View>
-        <FlatList
-          data={items}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <DiscoverCard
-              item={item}
-              onPress={handleCardPress}
-              onAdd={openServicePicker}
-            />
-          )}
-        />
-      </View>
-    ),
+      );
+    },
     [
       handleCardPress,
       openServicePicker,
-      openUnifiedSearch,
+      openSectionPage,
       styles.listContent,
       styles.sectionHeader,
       styles.sectionSubtitle,
       styles.sectionTitle,
       theme.colors.primary,
-    ]
+      isFetching,
+    ],
   );
 
   return (
@@ -306,6 +345,15 @@ const DiscoverScreen = () => {
       <TabHeader
         title="Discover"
         showTitle={true}
+        leftAction={
+          tmdbEnabled && tmdbKey
+            ? {
+                icon: "movie-open",
+                onPress: openTmdbDiscover,
+                accessibilityLabel: "Open TMDB discover",
+              }
+            : undefined
+        }
         rightAction={{
           icon: "cog",
           onPress: openSettings,
@@ -317,7 +365,7 @@ const DiscoverScreen = () => {
         data={sections}
         keyExtractor={(section) => section.id}
         renderItem={({ item }) =>
-          renderSection(item.title, item.subtitle, item.items)
+          renderSection(item.id, item.title, item.subtitle, item.items)
         }
         contentContainerStyle={[styles.content, styles.sectionsContainer]}
         ListHeaderComponent={
@@ -339,12 +387,7 @@ const DiscoverScreen = () => {
         }
         ListEmptyComponent={
           <View style={styles.emptyWrapper}>
-            {isLoading ? (
-              <EmptyState
-                title="Loading recommendations"
-                description="Fetching popular titles across your services."
-              />
-            ) : isError ? (
+            {isError ? (
               <EmptyState
                 title="Unable to load recommendations"
                 description={

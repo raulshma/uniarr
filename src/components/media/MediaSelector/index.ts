@@ -1,1 +1,6 @@
-export { MediaSelectorProvider, MediaSelectorActions, MediaSelectableItem, useMediaSelector } from '../MediaSelector';
+export {
+  MediaSelectorProvider,
+  MediaSelectorActions,
+  MediaSelectableItem,
+  useMediaSelector,
+} from "../MediaSelector";

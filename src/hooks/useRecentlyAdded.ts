@@ -1,19 +1,21 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+// no direct React hooks used
+import { useQuery } from "@tanstack/react-query";
 
-import type { Series } from '@/models/media.types';
-import type { Movie } from '@/models/movie.types';
-import type { SonarrConnector } from '@/connectors/implementations/SonarrConnector';
-import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
-import type { IConnector } from '@/connectors/base/IConnector';
-import type { ServiceType } from '@/models/service.types';
-import { useConnectorsStore, selectGetConnectorsByType } from '@/store/connectorsStore';
-import { queryKeys } from '@/hooks/queryKeys';
+// types Series/Movie not directly needed here
+import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
+import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
+import type { IConnector } from "@/connectors/base/IConnector";
+import type { ServiceType } from "@/models/service.types";
+import {
+  useConnectorsStore,
+  selectGetConnectorsByType,
+} from "@/store/connectorsStore";
+import { queryKeys } from "@/hooks/queryKeys";
 
 export type RecentlyAddedItem = {
   id: string;
   title: string;
-  type: 'series' | 'movie';
+  type: "series" | "movie";
   addedDate: string;
   posterUrl?: string;
   serviceName: string;
@@ -25,10 +27,11 @@ export type RecentlyAddedOverview = {
   total: number;
 };
 
-const fetchRecentlyAdded = async (getConnectorsByType: (type: ServiceType) => IConnector[]): Promise<RecentlyAddedOverview> => {
-
-  const sonarrConnectors = getConnectorsByType('sonarr') as SonarrConnector[];
-  const radarrConnectors = getConnectorsByType('radarr') as RadarrConnector[];
+const fetchRecentlyAdded = async (
+  getConnectorsByType: (type: ServiceType) => IConnector[],
+): Promise<RecentlyAddedOverview> => {
+  const sonarrConnectors = getConnectorsByType("sonarr") as SonarrConnector[];
+  const radarrConnectors = getConnectorsByType("radarr") as RadarrConnector[];
 
   const recentlyAddedItems: RecentlyAddedItem[] = [];
 
@@ -40,14 +43,16 @@ const fetchRecentlyAdded = async (getConnectorsByType: (type: ServiceType) => IC
       // Filter series that have been added and sort by added date (most recent first)
       const recentSeries = series
         .filter((s) => s.added)
-        .sort((a, b) => new Date(b.added!).getTime() - new Date(a.added!).getTime())
+        .sort(
+          (a, b) => new Date(b.added!).getTime() - new Date(a.added!).getTime(),
+        )
         .slice(0, 10); // Get 10 most recent
 
       for (const series of recentSeries) {
         recentlyAddedItems.push({
           id: `sonarr-${series.id}`,
           title: series.title,
-          type: 'series',
+          type: "series",
           addedDate: series.added!,
           posterUrl: series.posterUrl,
           serviceName: connector.config.name,
@@ -56,7 +61,10 @@ const fetchRecentlyAdded = async (getConnectorsByType: (type: ServiceType) => IC
       }
     } catch (error) {
       // Skip this connector if it fails
-      console.warn(`Failed to fetch series from ${connector.config.name}:`, error);
+      console.warn(
+        `Failed to fetch series from ${connector.config.name}:`,
+        error,
+      );
     }
   }
 
@@ -68,14 +76,18 @@ const fetchRecentlyAdded = async (getConnectorsByType: (type: ServiceType) => IC
       // Filter movies that have files (downloaded) and sort by file date (most recent first)
       const recentMovies = movies
         .filter((m) => m.movieFile?.dateAdded)
-        .sort((a, b) => new Date(b.movieFile!.dateAdded!).getTime() - new Date(a.movieFile!.dateAdded!).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.movieFile!.dateAdded!).getTime() -
+            new Date(a.movieFile!.dateAdded!).getTime(),
+        )
         .slice(0, 10); // Get 10 most recent
 
       for (const movie of recentMovies) {
         recentlyAddedItems.push({
           id: `radarr-${movie.id}`,
           title: movie.title,
-          type: 'movie',
+          type: "movie",
           addedDate: movie.movieFile!.dateAdded!,
           posterUrl: movie.posterUrl,
           serviceName: connector.config.name,
@@ -84,13 +96,19 @@ const fetchRecentlyAdded = async (getConnectorsByType: (type: ServiceType) => IC
       }
     } catch (error) {
       // Skip this connector if it fails
-      console.warn(`Failed to fetch movies from ${connector.config.name}:`, error);
+      console.warn(
+        `Failed to fetch movies from ${connector.config.name}:`,
+        error,
+      );
     }
   }
 
   // Sort all items by added date (most recent first) and take top 20
   const sortedItems = recentlyAddedItems
-    .sort((a, b) => new Date(b.addedDate).getTime() - new Date(a.addedDate).getTime())
+    .sort(
+      (a, b) =>
+        new Date(b.addedDate).getTime() - new Date(a.addedDate).getTime(),
+    )
     .slice(0, 20);
 
   return {
@@ -101,14 +119,7 @@ const fetchRecentlyAdded = async (getConnectorsByType: (type: ServiceType) => IC
 
 export const useRecentlyAdded = () => {
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.activity.recentlyAdded,
     queryFn: () => fetchRecentlyAdded(getConnectorsByType),
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes

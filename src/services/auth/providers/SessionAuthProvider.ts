@@ -1,14 +1,14 @@
-import axios, { AxiosError } from 'axios';
-import { BaseAuthProvider } from './BaseAuthProvider';
-import { logger } from '@/services/logger/LoggerService';
-import type { AuthConfig, AuthResult, AuthSession, AuthMethod } from '../types';
+import axios, { AxiosError } from "axios";
+import { BaseAuthProvider } from "./BaseAuthProvider";
+import { logger } from "@/services/logger/LoggerService";
+import type { AuthConfig, AuthResult, AuthSession, AuthMethod } from "../types";
 
 /**
  * Authentication provider for services that use session-based authentication (qBittorrent)
  */
 export class SessionAuthProvider extends BaseAuthProvider {
   getAuthMethod(): AuthMethod {
-    return 'session';
+    return "session";
   }
 
   async authenticate(config: AuthConfig): Promise<AuthResult> {
@@ -28,41 +28,50 @@ export class SessionAuthProvider extends BaseAuthProvider {
         password: config.credentials.password!,
       });
 
-      void logger.debug('Starting session authentication.', {
+      void logger.debug("Starting session authentication.", {
         url: loginUrl,
-        hasCredentials: Boolean(config.credentials.username && config.credentials.password),
+        hasCredentials: Boolean(
+          config.credentials.username && config.credentials.password,
+        ),
       });
 
       const response = await axios.post(loginUrl, payload.toString(), {
         timeout: config.timeout || this.timeout,
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Referer': config.baseUrl,
+          "Content-Type": "application/x-www-form-urlencoded",
+          Referer: config.baseUrl,
         },
         withCredentials: true, // Important for session cookies
       });
 
-      const body = typeof response.data === 'string' ? response.data.trim() : '';
-      const normalizedBody = body.toLowerCase().replace(/\.$/, '');
+      const body =
+        typeof response.data === "string" ? response.data.trim() : "";
+      const normalizedBody = body.toLowerCase().replace(/\.$/, "");
 
-      void logger.debug('Session authentication response received.', {
+      void logger.debug("Session authentication response received.", {
         status: response.status,
         responseBody: body,
-        hasSetCookie: Boolean(response.headers?.['set-cookie'] || response.headers?.['Set-Cookie']),
+        hasSetCookie: Boolean(
+          response.headers?.["set-cookie"] || response.headers?.["Set-Cookie"],
+        ),
       });
 
-      if (normalizedBody !== 'ok') {
+      if (normalizedBody !== "ok") {
         let errorMessage = body
           ? `Authentication failed. Server responded with: "${body}"`
-          : 'Authentication failed. No response body received.';
+          : "Authentication failed. No response body received.";
 
         // Add troubleshooting hints based on common issues
-        if (body === 'Fails.' || normalizedBody === 'fails.') {
-          errorMessage += ' This usually means incorrect username or password.';
-        } else if (body === 'Bad credentials' || normalizedBody === 'bad credentials') {
-          errorMessage += ' The provided credentials are invalid.';
-        } else if (body === 'Banned' || normalizedBody === 'banned') {
-          errorMessage += ' Your IP address has been banned due to multiple failed login attempts.';
+        if (body === "Fails." || normalizedBody === "fails.") {
+          errorMessage += " This usually means incorrect username or password.";
+        } else if (
+          body === "Bad credentials" ||
+          normalizedBody === "bad credentials"
+        ) {
+          errorMessage += " The provided credentials are invalid.";
+        } else if (body === "Banned" || normalizedBody === "banned") {
+          errorMessage +=
+            " Your IP address has been banned due to multiple failed login attempts.";
         }
 
         return {
@@ -80,9 +89,9 @@ export class SessionAuthProvider extends BaseAuthProvider {
       };
     } catch (error) {
       const axiosError = error as AxiosError;
-      const errorMessage = axiosError.message || 'Unknown authentication error';
+      const errorMessage = axiosError.message || "Unknown authentication error";
 
-      void logger.error('Session authentication error.', {
+      void logger.error("Session authentication error.", {
         error: errorMessage,
         status: axiosError.response?.status,
         url: `${config.baseUrl}/api/v2/auth/login`,
@@ -96,21 +105,24 @@ export class SessionAuthProvider extends BaseAuthProvider {
     }
   }
 
-  override async logout(config: AuthConfig, session: AuthSession): Promise<boolean> {
+  override async logout(
+    config: AuthConfig,
+    session: AuthSession,
+  ): Promise<boolean> {
     try {
       const logoutUrl = `${config.baseUrl}/api/v2/auth/logout`;
-      
-      await axios.post(logoutUrl, '', {
+
+      await axios.post(logoutUrl, "", {
         timeout: config.timeout || this.timeout,
         withCredentials: true,
       });
 
-      void logger.debug('Session logout successful.');
+      void logger.debug("Session logout successful.");
       return true;
     } catch (error) {
       // Ignore logout errors; the session may already be invalid
-      void logger.debug('Session logout failed (ignoring).', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      void logger.debug("Session logout failed (ignoring).", {
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       return true; // Consider logout successful even if the request fails
     }

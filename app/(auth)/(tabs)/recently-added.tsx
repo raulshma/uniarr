@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
-import { ScrollView, StyleSheet, View, TouchableOpacity } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Text, useTheme, IconButton } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -14,7 +14,7 @@ import {
   AnimatedSection,
   AnimatedScrollView,
 } from "@/components/common/AnimatedComponents";
-import { MediaCard } from "@/components/media/MediaCard";
+// MediaCard intentionally not used here; kept import removed to avoid lint warnings
 import {
   useRecentlyAdded,
   type RecentlyAddedItem,
@@ -26,8 +26,9 @@ const RecentlyAddedScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
 
-  const { recentlyAdded, isLoading, isFetching, isError, error, refetch } =
+  const { recentlyAdded, isLoading, isError, error, refetch } =
     useRecentlyAdded();
+  // MediaCard intentionally not used here; import was removed to avoid lint warnings
 
   const styles = useMemo(
     () =>
@@ -90,7 +91,7 @@ const RecentlyAddedScreen = () => {
           paddingTop: spacing.xl,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleRefresh = useCallback(() => {
@@ -103,7 +104,7 @@ const RecentlyAddedScreen = () => {
       const mediaId = id.replace(prefix, "");
       return Number(mediaId);
     },
-    []
+    [],
   );
 
   const handleMediaPress = useCallback(
@@ -126,7 +127,7 @@ const RecentlyAddedScreen = () => {
           break;
       }
     },
-    [router, extractMediaId]
+    [router, extractMediaId],
   );
 
   const getMediaIcon = (type: "series" | "movie") => {
@@ -166,7 +167,7 @@ const RecentlyAddedScreen = () => {
         </Card>
       </AnimatedListItem>
     ),
-    [handleMediaPress, styles, theme, recentlyAdded.items.length]
+    [handleMediaPress, styles, theme, recentlyAdded.items.length],
   );
 
   const formatRelativeTime = (input: Date): string => {

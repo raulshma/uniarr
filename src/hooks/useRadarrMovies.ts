@@ -1,17 +1,20 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
   useQueryClient,
   type QueryObserverResult,
   type RefetchOptions,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 
-import type { AddMovieRequest, Movie } from '@/models/movie.types';
-import type { RadarrConnector } from '@/connectors/implementations/RadarrConnector';
-import { useConnectorsStore, selectGetConnector } from '@/store/connectorsStore';
-import { queryKeys } from '@/hooks/queryKeys';
-import { IConnector } from '@/connectors/base/IConnector';
+import type { AddMovieRequest, Movie } from "@/models/movie.types";
+import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
+import {
+  useConnectorsStore,
+  selectGetConnector,
+} from "@/store/connectorsStore";
+import { queryKeys } from "@/hooks/queryKeys";
+import { IConnector } from "@/connectors/base/IConnector";
 
 interface UseRadarrMoviesResult {
   movies: Movie[] | undefined;
@@ -19,14 +22,16 @@ interface UseRadarrMoviesResult {
   isFetching: boolean;
   isError: boolean;
   error: unknown;
-  refetch: (options?: RefetchOptions) => Promise<QueryObserverResult<Movie[], Error>>;
+  refetch: (
+    options?: RefetchOptions,
+  ) => Promise<QueryObserverResult<Movie[], Error>>;
   addMovie: (request: AddMovieRequest) => void;
   addMovieAsync: (request: AddMovieRequest) => Promise<Movie>;
   isAdding: boolean;
   addError: unknown;
 }
 
-const RADARR_SERVICE_TYPE = 'radarr';
+const RADARR_SERVICE_TYPE = "radarr";
 
 const ensureRadarrConnector = (
   getConnector: (id: string) => IConnector | undefined,
@@ -34,19 +39,25 @@ const ensureRadarrConnector = (
 ): RadarrConnector => {
   const connector = getConnector(serviceId);
   if (!connector || connector.config.type !== RADARR_SERVICE_TYPE) {
-    throw new Error(`Radarr connector not registered for service ${serviceId}.`);
+    throw new Error(
+      `Radarr connector not registered for service ${serviceId}.`,
+    );
   }
 
   return connector as RadarrConnector;
 };
 
 export const useRadarrMovies = (serviceId: string): UseRadarrMoviesResult => {
-  const queryClient = useQueryClient();
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(() => ensureRadarrConnector(getConnector, serviceId), [getConnector, serviceId]);
+  const resolveConnector = useCallback(
+    () => ensureRadarrConnector(getConnector, serviceId),
+    [getConnector, serviceId],
+  );
+
+  const queryClient = useQueryClient();
 
   const moviesQuery = useQuery({
     queryKey: queryKeys.radarr.moviesList(serviceId),
@@ -66,8 +77,12 @@ export const useRadarrMovies = (serviceId: string): UseRadarrMoviesResult => {
       return connector.add(request);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.radarr.moviesList(serviceId) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.radarr.queue(serviceId) });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.radarr.moviesList(serviceId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.radarr.queue(serviceId),
+      });
     },
   });
 

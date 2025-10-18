@@ -1,13 +1,26 @@
-import axios, { type AxiosError, type AxiosInstance } from 'axios';
+import axios, { type AxiosError, type AxiosInstance } from "axios";
 
-import type { AddItemRequest, ConnectionResult, IConnector, SystemHealth } from './IConnector';
-import type { ServiceConfig } from '@/models/service.types';
-import { handleApiError } from '@/utils/error.utils';
-import { logger } from '@/services/logger/LoggerService';
-import { testNetworkConnectivity, diagnoseVpnIssues } from '@/utils/network.utils';
-import { testSonarrApi, testRadarrApi, testQBittorrentApi, testJellyseerrApi, testBazarrApi } from '@/utils/api-test.utils';
-import { debugLogger } from '@/utils/debug-logger';
-import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
+import type {
+  AddItemRequest,
+  ConnectionResult,
+  IConnector,
+  SystemHealth,
+} from "./IConnector";
+import type { ServiceConfig } from "@/models/service.types";
+import { handleApiError } from "@/utils/error.utils";
+import { logger } from "@/services/logger/LoggerService";
+import {
+  testNetworkConnectivity,
+  diagnoseVpnIssues,
+} from "@/utils/network.utils";
+import { debugLogger } from "@/utils/debug-logger";
+import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
+import { base64Encode } from "@/utils/base64";
+import {
+  withRetry,
+  networkRetryCondition,
+  type RetryOptions,
+} from "@/utils/retry.utils";
 
 /**
  * Abstract base implementation shared by all service connectors.
@@ -16,7 +29,8 @@ export abstract class BaseConnector<
   TResource = unknown,
   TCreatePayload = AddItemRequest,
   TUpdatePayload = Partial<TResource>,
-> implements IConnector<TResource, TCreatePayload, TUpdatePayload> {
+> implements IConnector<TResource, TCreatePayload, TUpdatePayload>
+{
   protected readonly client: AxiosInstance;
   private isAuthenticated = false;
 
@@ -34,7 +48,7 @@ export abstract class BaseConnector<
 
   /** Dispose of any resources held by the connector. */
   dispose(): void {
-    void logger.debug('Connector disposed.', {
+    void logger.debug("Connector disposed.", {
       serviceId: this.config.id,
       serviceType: this.config.type,
     });
@@ -49,94 +63,110 @@ export abstract class BaseConnector<
       // For VPN connections, we'll be more lenient with network tests
       // and focus on the actual API endpoint test
       debugLogger.addStep({
-        id: 'network-test-start',
-        title: 'Testing Network Connectivity',
-        status: 'running',
+        id: "network-test-start",
+        title: "Testing Network Connectivity",
+        status: "running",
         message: `Testing connection to ${this.config.url}`,
       });
-      
+
       // Test basic network connectivity with increased timeout for VPN
       const networkTimeout = this.config.timeout ?? 15000; // Increased timeout for VPN
-      const networkTest = await testNetworkConnectivity(this.config.url, networkTimeout);
-      
+      const networkTest = await testNetworkConnectivity(
+        this.config.url,
+        networkTimeout,
+      );
+
       if (!networkTest.success) {
         // For VPN connections, don't fail immediately on network test
         // Instead, log the issue and continue with API test
-        const vpnIssues = diagnoseVpnIssues({ code: 'ERR_NETWORK', message: networkTest.error }, this.config.type);
+        const vpnIssues = diagnoseVpnIssues(
+          { code: "ERR_NETWORK", message: networkTest.error },
+          this.config.type,
+        );
         debugLogger.addWarning(
           `Network test failed but continuing with API test: ${networkTest.error}`,
-          vpnIssues.join('\n')
+          vpnIssues.join("\n"),
         );
-        
+
         // Don't return early - continue with API test
       } else {
         debugLogger.addNetworkTest(true);
       }
-      
+
       // Test API endpoint using the new authentication system
       debugLogger.addStep({
-        id: 'api-test-start',
-        title: 'Testing API Authentication',
-        status: 'running',
+        id: "api-test-start",
+        title: "Testing API Authentication",
+        status: "running",
         message: `Testing ${this.config.type} API endpoint`,
       });
-      
+
       try {
         await this.ensureAuthenticated();
-        debugLogger.addSuccess('API authentication successful');
+        debugLogger.addSuccess("API authentication successful");
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
-        const vpnIssues = diagnoseVpnIssues({ 
-          code: 'AUTH_ERROR', 
-          message: errorMessage 
-        }, this.config.type);
-        
-        debugLogger.addError(`API authentication failed: ${errorMessage}`, 
-          `VPN Issues:\n${vpnIssues.join('\n')}`);
-        
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Unknown authentication error";
+        const vpnIssues = diagnoseVpnIssues(
+          {
+            code: "AUTH_ERROR",
+            message: errorMessage,
+          },
+          this.config.type,
+        );
+
+        debugLogger.addError(
+          `API authentication failed: ${errorMessage}`,
+          `VPN Issues:\n${vpnIssues.join("\n")}`,
+        );
+
         return {
           success: false,
-          message: `API authentication failed: ${errorMessage}. ${vpnIssues.join(' ')}`,
+          message: `API authentication failed: ${errorMessage}. ${vpnIssues.join(" ")}`,
           latency: Date.now() - startedAt,
         };
       }
-      
+
       // Test service initialization
       debugLogger.addStep({
-        id: 'service-test-start',
-        title: 'Testing Service Connection',
-        status: 'running',
+        id: "service-test-start",
+        title: "Testing Service Connection",
+        status: "running",
         message: `Initializing ${this.config.type} service`,
       });
-      
+
       await this.initialize();
       const version = await this.getVersion();
       const latency = Date.now() - startedAt;
-      
+
       debugLogger.addServiceTest(this.config.type, true, version);
 
       return {
         success: true,
-        message: 'Connection successful.',
+        message: "Connection successful.",
         latency,
         version,
       };
     } catch (error) {
       // Diagnose VPN-specific issues
       const vpnIssues = diagnoseVpnIssues(error, this.config.type);
-      
+
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'testConnection',
+        operation: "testConnection",
       });
 
       debugLogger.addError(
         `Service test failed: ${diagnostic.message}`,
-        vpnIssues.length > 0 ? `VPN Issues:\n${vpnIssues.join('\n')}` : undefined
+        vpnIssues.length > 0
+          ? `VPN Issues:\n${vpnIssues.join("\n")}`
+          : undefined,
       );
 
-      void logger.error('Connector test failed.', {
+      void logger.error("Connector test failed.", {
         serviceId: this.config.id,
         serviceType: this.config.type,
         message: diagnostic.message,
@@ -147,7 +177,7 @@ export abstract class BaseConnector<
 
       return {
         success: false,
-        message: `${diagnostic.message}${vpnIssues.length > 0 ? ` ${vpnIssues.join(' ')}` : ''}`,
+        message: `${diagnostic.message}${vpnIssues.length > 0 ? ` ${vpnIssues.join(" ")}` : ""}`,
         latency: Date.now() - startedAt,
       };
     }
@@ -158,23 +188,26 @@ export abstract class BaseConnector<
    */
   async getHealth(): Promise<SystemHealth> {
     try {
-      const response = await this.client.get('/health');
+      const response = await this.client.get("/health");
 
       return {
-        status: 'healthy',
-        message: 'Service responded successfully.',
+        status: "healthy",
+        message: "Service responded successfully.",
         lastChecked: new Date(),
-        details: typeof response.data === 'object' ? (response.data as Record<string, unknown>) : undefined,
+        details:
+          typeof response.data === "object"
+            ? (response.data as Record<string, unknown>)
+            : undefined,
       };
     } catch (error) {
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
-        operation: 'getHealth',
+        operation: "getHealth",
       });
 
       return {
-        status: diagnostic.isNetworkError ? 'offline' : 'degraded',
+        status: diagnostic.isNetworkError ? "offline" : "degraded",
         message: diagnostic.message,
         lastChecked: new Date(),
         details: diagnostic.details,
@@ -193,7 +226,7 @@ export abstract class BaseConnector<
 
     instance.interceptors.request.use(
       (requestConfig) => {
-        void logger.debug('Outgoing connector request.', {
+        void logger.debug("Outgoing connector request.", {
           serviceId: this.config.id,
           serviceType: this.config.type,
           method: requestConfig.method?.toUpperCase(),
@@ -206,7 +239,10 @@ export abstract class BaseConnector<
         return requestConfig;
       },
       (error) => {
-        void logger.error('Connector request setup error.', { serviceId: this.config.id, error });
+        void logger.error("Connector request setup error.", {
+          serviceId: this.config.id,
+          error,
+        });
         this.logRequestError(error);
         return Promise.reject(error);
       },
@@ -214,7 +250,7 @@ export abstract class BaseConnector<
 
     instance.interceptors.response.use(
       (response) => {
-        void logger.debug('Connector response received.', {
+        void logger.debug("Connector response received.", {
           serviceId: this.config.id,
           serviceType: this.config.type,
           status: response.status,
@@ -228,7 +264,7 @@ export abstract class BaseConnector<
         return response;
       },
       (error) => {
-        void logger.error('Connector response error.', {
+        void logger.error("Connector response error.", {
           serviceId: this.config.id,
           message: error?.message,
           code: error?.code,
@@ -250,12 +286,26 @@ export abstract class BaseConnector<
    */
   protected getDefaultHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
     };
 
     if (this.config.apiKey) {
-      headers['X-Api-Key'] = this.config.apiKey;
+      headers["X-Api-Key"] = this.config.apiKey;
+    }
+
+    // For basic auth services (AdGuard, Transmission, Deluge), add the Authorization header preemptively.
+    // qBittorrent uses session-based authentication (cookies) and should NOT receive a preemptive Basic header.
+    if (
+      (this.config.type === "transmission" ||
+        this.config.type === "deluge" ||
+        this.config.type === "adguard") &&
+      this.config.username &&
+      this.config.password
+    ) {
+      const credentials = `${this.config.username}:${this.config.password}`;
+      const base64Credentials = base64Encode(credentials);
+      headers["Authorization"] = `Basic ${base64Credentials}`;
     }
 
     return headers;
@@ -271,50 +321,40 @@ export abstract class BaseConnector<
 
     try {
       const result = await ServiceAuthHelper.authenticateService(this.config);
-      
+
       if (!result.success || !result.authenticated) {
-        throw new Error(result.error || 'Authentication failed');
+        throw new Error(result.error || "Authentication failed");
       }
 
       this.isAuthenticated = true;
-      
-      void logger.debug('Service authenticated successfully.', {
+
+      void logger.debug("Service authenticated successfully.", {
         serviceId: this.config.id,
         serviceType: this.config.type,
       });
     } catch (error) {
       this.isAuthenticated = false;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown authentication error';
-      
-      void logger.error('Service authentication failed.', {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown authentication error";
+
+      void logger.error("Service authentication failed.", {
         serviceId: this.config.id,
         serviceType: this.config.type,
         error: errorMessage,
       });
-      
+
       throw error;
     }
   }
 
   /**
    * Get authentication configuration for the HTTP client.
-   * This method now uses the centralized authentication system.
+   * We now send basic auth headers preemptively via getDefaultHeaders(),
+   * so this method returns an empty object.
    */
   protected getAuthConfig(): { auth?: { username: string; password: string } } {
-    // For services that use basic auth (qBittorrent, Transmission, Deluge), we still need to provide credentials to axios
-    if ((this.config.type === 'qbittorrent' || this.config.type === 'transmission' || this.config.type === 'deluge')
-        && this.config.username && this.config.password) {
-      return {
-        auth: {
-          username: this.config.username,
-          password: this.config.password,
-        },
-      };
-    }
-
-    // For session-based auth (qBittorrent), we don't need to set auth here
-    // as the session is managed through cookies
-    // For API key auth (Sonarr/Radarr/Jellyseerr/SABnzbd), the API key is handled in getDefaultHeaders()
+    // Basic auth is handled preemptively via Authorization headers in getDefaultHeaders()
+    // for services that use HTTP Basic (Transmission, Deluge, AdGuard). qBittorrent uses session cookies.
     return {};
   }
 
@@ -327,7 +367,7 @@ export abstract class BaseConnector<
       endpoint: error.config?.url,
     });
 
-    void logger.error('Connector request failed.', {
+    void logger.error("Connector request failed.", {
       serviceId: this.config.id,
       serviceType: this.config.type,
       message: diagnostic.message,
@@ -340,10 +380,10 @@ export abstract class BaseConnector<
     const diagnostic = handleApiError(error, {
       serviceId: this.config.id,
       serviceType: this.config.type,
-      operation: 'request',
+      operation: "request",
     });
 
-    void logger.error('Connector request setup failed.', {
+    void logger.error("Connector request setup failed.", {
       serviceId: this.config.id,
       serviceType: this.config.type,
       message: diagnostic.message,
@@ -358,5 +398,30 @@ export abstract class BaseConnector<
       serviceId: this.config.id,
       serviceType: this.config.type,
     }).message;
+  }
+
+  /**
+   * Execute an operation with standardized retry logic for network errors
+   */
+  protected async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    endpoint?: string,
+    options: Partial<RetryOptions> = {},
+  ): Promise<T> {
+    const retryOptions: RetryOptions = {
+      maxRetries: 2,
+      baseDelay: 1000,
+      retryCondition: networkRetryCondition,
+      context: {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: operationName,
+        endpoint,
+      },
+      ...options,
+    };
+
+    return withRetry(operation, retryOptions);
   }
 }

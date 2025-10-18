@@ -1,5 +1,5 @@
-import type { ColorSchemeName } from 'react-native';
-import { MD3DarkTheme, MD3LightTheme, type MD3Theme } from 'react-native-paper';
+import type { ColorSchemeName } from "react-native";
+import { MD3DarkTheme, MD3LightTheme, type MD3Theme } from "react-native-paper";
 
 import {
   darkColors,
@@ -9,14 +9,19 @@ import {
   presetThemes,
   presetKeyAliases,
   type ThemePreset,
-} from '@/theme/colors';
-import { generateSpacingScale, type DensityMode } from '@/theme/spacing';
-import { generateTypographyScale, type FontScale, typography } from '@/theme/typography';
-import { spacing } from '@/theme/spacing';
+} from "@/theme/colors";
+import { generateSpacingScale, type DensityMode } from "@/theme/spacing";
+import {
+  generateTypographyScale,
+  type FontScale,
+  typography,
+} from "@/theme/typography";
+import { spacing } from "@/theme/spacing";
 
 export type CustomThemeConfig = {
   preset?: keyof typeof presetThemes;
   customColors?: Partial<CustomColorScheme>;
+  oledEnabled?: boolean;
   fontScale: FontScale;
   densityMode: DensityMode;
   posterStyle: {
@@ -34,7 +39,10 @@ export type AppTheme = MD3Theme & {
   };
 };
 
-const createTheme = (baseTheme: MD3Theme, colors: MD3Theme['colors']): AppTheme => ({
+const createTheme = (
+  baseTheme: MD3Theme,
+  colors: MD3Theme["colors"],
+): AppTheme => ({
   ...baseTheme,
   colors,
   custom: {
@@ -48,22 +56,30 @@ const createTheme = (baseTheme: MD3Theme, colors: MD3Theme['colors']): AppTheme 
  */
 export const createCustomTheme = (
   config: CustomThemeConfig,
-  isDark: boolean = false
+  isDark: boolean = false,
 ): AppTheme => {
   // Determine color scheme
-  const requestedPreset = config.preset ?? 'uniarr';
+  const requestedPreset = config.preset ?? "uniarr";
   // Support legacy brand-based keys by mapping them to neutral keys
-  const resolvedPresetKey = (presetKeyAliases[requestedPreset as string] as keyof typeof presetThemes) ?? requestedPreset;
-  const basePreset = (
-    presetThemes[resolvedPresetKey as keyof typeof presetThemes] ?? presetThemes.uniarr
-  ) as ThemePreset;
+  const resolvedPresetKey =
+    (presetKeyAliases[
+      requestedPreset as string
+    ] as keyof typeof presetThemes) ?? requestedPreset;
+  const basePreset = (presetThemes[
+    resolvedPresetKey as keyof typeof presetThemes
+  ] ?? presetThemes.uniarr) as ThemePreset;
   const colorScheme: CustomColorScheme = {
     ...basePreset.common,
     ...config.customColors,
   };
 
   // Generate theme colors
-  const colors = generateThemeColors(colorScheme, isDark, isDark ? basePreset.modes.dark : basePreset.modes.light);
+  const colors = generateThemeColors(
+    colorScheme,
+    isDark,
+    isDark ? basePreset.modes.dark : basePreset.modes.light,
+    config.oledEnabled,
+  );
 
   // Generate typography and spacing scales
   const typographyScale = generateTypographyScale(config.fontScale);
@@ -90,13 +106,14 @@ export const darkTheme: AppTheme = createTheme(MD3DarkTheme, darkColors);
 export const defaultTheme: AppTheme = darkTheme;
 
 export const getAppTheme = (scheme: ColorSchemeName): AppTheme =>
-  scheme === 'dark' ? darkTheme : lightTheme;
+  scheme === "dark" ? darkTheme : lightTheme;
 
 // Default custom theme configuration
 export const defaultCustomThemeConfig: CustomThemeConfig = {
-  preset: 'uniarr',
-  fontScale: 'medium',
-  densityMode: 'comfortable',
+  preset: "uniarr",
+  oledEnabled: false,
+  fontScale: "medium",
+  densityMode: "comfortable",
   posterStyle: {
     borderRadius: 8,
     shadowOpacity: 0.3,

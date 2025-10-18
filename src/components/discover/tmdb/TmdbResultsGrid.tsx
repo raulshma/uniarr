@@ -1,0 +1,109 @@
+import React, { useMemo } from "react";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
+import { FlashList } from "@shopify/flash-list";
+import { Text, useTheme } from "react-native-paper";
+
+import type { AppTheme } from "@/constants/theme";
+import type { DiscoverMediaItem } from "@/models/discover.types";
+import { spacing } from "@/theme/spacing";
+import { TmdbListItem } from "@/components/discover/tmdb/TmdbListItem";
+
+interface Props {
+  items: DiscoverMediaItem[];
+  onAdd: (item: DiscoverMediaItem) => void;
+  onCardPress: (item: DiscoverMediaItem) => void;
+  onEndReached?: () => void;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  isFetchingMore?: boolean;
+}
+
+export const TmdbResultsGrid: React.FC<Props> = ({
+  items,
+  onAdd,
+  onCardPress,
+  onEndReached,
+  refreshing,
+  onRefresh,
+  isFetchingMore,
+}) => {
+  const theme = useTheme<AppTheme>();
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        // removed horizontal padding so items can render edge-to-edge
+        contentContainer: {
+          paddingBottom: spacing.xxl,
+        },
+        emptyState: {
+          paddingVertical: spacing.xl,
+          alignItems: "center",
+          gap: spacing.sm,
+        },
+        footer: {
+          paddingVertical: spacing.md,
+        },
+      }),
+    [],
+  );
+
+  const renderItem = ({ item }: { item: DiscoverMediaItem }) => (
+    <TmdbListItem item={item} onAdd={onAdd} onPress={onCardPress} />
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyState}>
+      <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+        No results yet
+      </Text>
+      <Text
+        variant="bodyMedium"
+        style={{ color: theme.colors.onSurfaceVariant }}
+      >
+        Adjust filters or try another media type.
+      </Text>
+    </View>
+  );
+
+  const renderFooter = () => {
+    if (onEndReached && isFetchingMore) {
+      return (
+        <View style={styles.footer}>
+          <ActivityIndicator />
+        </View>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <FlashList
+      data={items}
+      keyExtractor={(item) => item.id}
+      renderItem={renderItem}
+      ListEmptyComponent={renderEmpty}
+      ListFooterComponent={renderFooter}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.3}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={Boolean(refreshing)}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
+        ) : undefined
+      }
+      showsVerticalScrollIndicator={false}
+    />
+  );
+};
+
+export default TmdbResultsGrid;

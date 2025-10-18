@@ -1,16 +1,18 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Card, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Card, useTheme } from "react-native-paper";
 
-import { SkeletonPlaceholder } from '@/components/common/Skeleton';
-import type { AppTheme } from '@/constants/theme';
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import type { AppTheme } from "@/constants/theme";
 
 export type MovieDetailsSkeletonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-const MovieDetailsSkeleton: React.FC<MovieDetailsSkeletonProps> = ({ style }) => {
+const MovieDetailsSkeleton: React.FC<MovieDetailsSkeletonProps> = ({
+  style,
+}) => {
   const theme = useTheme<AppTheme>();
 
   const styles = useMemo(
@@ -24,7 +26,7 @@ const MovieDetailsSkeleton: React.FC<MovieDetailsSkeletonProps> = ({ style }) =>
           paddingBottom: 32,
         },
         posterContainer: {
-          alignItems: 'center',
+          alignItems: "center",
           paddingVertical: 20,
         },
         titleContainer: {
@@ -47,8 +49,8 @@ const MovieDetailsSkeleton: React.FC<MovieDetailsSkeletonProps> = ({ style }) =>
           padding: 16,
         },
         detailRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          justifyContent: "space-between",
           marginBottom: 12,
         },
         fileInfoSection: {
@@ -67,7 +69,10 @@ const MovieDetailsSkeleton: React.FC<MovieDetailsSkeletonProps> = ({ style }) =>
   );
 
   return (
-    <ScrollView style={[styles.container, style]} contentContainerStyle={styles.contentContainer}>
+    <ScrollView
+      style={[styles.container, style]}
+      contentContainerStyle={styles.contentContainer}
+    >
       {/* Large Poster */}
       <View style={styles.posterContainer}>
         <SkeletonPlaceholder width={280} height={420} borderRadius={16} />
@@ -80,8 +85,18 @@ const MovieDetailsSkeleton: React.FC<MovieDetailsSkeletonProps> = ({ style }) =>
 
       {/* Overview */}
       <View style={styles.overviewContainer}>
-        <SkeletonPlaceholder width="100%" height={16} borderRadius={6} style={{ marginBottom: 8 }} />
-        <SkeletonPlaceholder width="100%" height={16} borderRadius={6} style={{ marginBottom: 8 }} />
+        <SkeletonPlaceholder
+          width="100%"
+          height={16}
+          borderRadius={6}
+          style={{ marginBottom: 8 }}
+        />
+        <SkeletonPlaceholder
+          width="100%"
+          height={16}
+          borderRadius={6}
+          style={{ marginBottom: 8 }}
+        />
         <SkeletonPlaceholder width="70%" height={16} borderRadius={6} />
       </View>
 
@@ -107,7 +122,12 @@ const MovieDetailsSkeleton: React.FC<MovieDetailsSkeletonProps> = ({ style }) =>
 
       {/* File Information */}
       <View style={styles.fileInfoSection}>
-        <SkeletonPlaceholder width="40%" height={24} borderRadius={8} style={styles.sectionTitle} />
+        <SkeletonPlaceholder
+          width="40%"
+          height={24}
+          borderRadius={8}
+          style={styles.sectionTitle}
+        />
         <Card style={styles.fileInfoCard}>
           <Card.Content style={styles.cardContent}>
             <View style={styles.detailRow}>

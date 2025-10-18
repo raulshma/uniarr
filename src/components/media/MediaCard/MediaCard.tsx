@@ -1,15 +1,20 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
-import { Chip, Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Chip, Text, useTheme } from "react-native-paper";
 
-import { Card } from '@/components/common/Card';
-import type { AppTheme } from '@/constants/theme';
-import { MediaPoster } from '@/components/media/MediaPoster';
+import { Card } from "@/components/common/Card";
+import type { AppTheme } from "@/constants/theme";
+import { MediaPoster } from "@/components/media/MediaPoster";
 
-export type MediaKind = 'series' | 'movie';
+export type MediaKind = "series" | "movie";
 
-export type MediaDownloadStatus = 'missing' | 'queued' | 'downloading' | 'available' | 'unknown';
+export type MediaDownloadStatus =
+  | "missing"
+  | "queued"
+  | "downloading"
+  | "available"
+  | "unknown";
 
 export type MediaCardProps = {
   id: number | string;
@@ -29,12 +34,18 @@ export type MediaCardProps = {
   testID?: string;
 };
 
-const downloadStatusConfig: Record<MediaDownloadStatus, { label: string; tone: 'primary' | 'error' | 'secondary' | 'tertiary' | 'outline' }> = {
-  available: { label: 'Available', tone: 'secondary' },
-  downloading: { label: 'Downloading', tone: 'primary' },
-  queued: { label: 'Queued', tone: 'tertiary' },
-  missing: { label: 'Missing', tone: 'error' },
-  unknown: { label: 'Unknown', tone: 'outline' },
+const downloadStatusConfig: Record<
+  MediaDownloadStatus,
+  {
+    label: string;
+    tone: "primary" | "error" | "secondary" | "tertiary" | "outline";
+  }
+> = {
+  available: { label: "Available", tone: "secondary" },
+  downloading: { label: "Downloading", tone: "primary" },
+  queued: { label: "Queued", tone: "tertiary" },
+  missing: { label: "Missing", tone: "error" },
+  unknown: { label: "Unknown", tone: "outline" },
 };
 
 const MediaCard: React.FC<MediaCardProps> = ({
@@ -57,16 +68,16 @@ const MediaCard: React.FC<MediaCardProps> = ({
 
   const secondaryLine = useMemo(() => {
     const meta: string[] = [];
-    if (typeof year === 'number') {
+    if (typeof year === "number") {
       meta.push(String(year));
     }
-    if (typeof status === 'string') {
+    if (typeof status === "string") {
       meta.push(status);
     }
-    if (typeof subtitle === 'string') {
+    if (typeof subtitle === "string") {
       meta.push(subtitle);
     }
-    return meta.join(' • ');
+    return meta.join(" • ");
   }, [status, subtitle, year]);
 
   const monitoredChip = useMemo(() => {
@@ -74,9 +85,13 @@ const MediaCard: React.FC<MediaCardProps> = ({
       return null;
     }
 
-    const label = monitored ? 'Monitored' : 'Not monitored';
-    const backgroundColor = monitored ? theme.colors.primaryContainer : theme.colors.surfaceVariant;
-    const textColor = monitored ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant;
+    const label = monitored ? "Monitored" : "Not monitored";
+    const backgroundColor = monitored
+      ? theme.colors.primaryContainer
+      : theme.colors.surfaceVariant;
+    const textColor = monitored
+      ? theme.colors.onPrimaryContainer
+      : theme.colors.onSurfaceVariant;
 
     return (
       <Chip
@@ -97,12 +112,30 @@ const MediaCard: React.FC<MediaCardProps> = ({
 
     const { label, tone } = downloadStatusConfig[downloadStatus];
 
-    const toneColorMap: Record<typeof tone, { background: string; text: string; border?: string }> = {
-      primary: { background: theme.colors.primaryContainer, text: theme.colors.onPrimaryContainer },
-      secondary: { background: theme.colors.secondaryContainer, text: theme.colors.onSecondaryContainer },
-      tertiary: { background: theme.colors.tertiaryContainer, text: theme.colors.onTertiaryContainer },
-      error: { background: theme.colors.errorContainer, text: theme.colors.onErrorContainer },
-      outline: { background: theme.colors.surfaceVariant, text: theme.colors.onSurfaceVariant },
+    const toneColorMap: Record<
+      typeof tone,
+      { background: string; text: string; border?: string }
+    > = {
+      primary: {
+        background: theme.colors.primaryContainer,
+        text: theme.colors.onPrimaryContainer,
+      },
+      secondary: {
+        background: theme.colors.secondaryContainer,
+        text: theme.colors.onSecondaryContainer,
+      },
+      tertiary: {
+        background: theme.colors.tertiaryContainer,
+        text: theme.colors.onTertiaryContainer,
+      },
+      error: {
+        background: theme.colors.errorContainer,
+        text: theme.colors.onErrorContainer,
+      },
+      outline: {
+        background: theme.colors.surfaceVariant,
+        text: theme.colors.onSurfaceVariant,
+      },
     };
 
     const colors = toneColorMap[tone];
@@ -119,7 +152,8 @@ const MediaCard: React.FC<MediaCardProps> = ({
     );
   }, [downloadStatus, theme]);
 
-  const secondaryText = secondaryLine || (type === 'series' ? 'Series' : 'Movie');
+  const secondaryText =
+    secondaryLine || (type === "series" ? "Series" : "Movie");
 
   return (
     <Card
@@ -138,10 +172,18 @@ const MediaCard: React.FC<MediaCardProps> = ({
           style={{ marginRight: theme.custom.spacing.md }}
         />
         <View style={styles.meta}>
-          <Text variant="titleMedium" numberOfLines={2} style={[styles.title, { color: theme.colors.onSurface }]}>
-            {typeof title === 'string' ? title : 'Unknown Title'}
+          <Text
+            variant="titleMedium"
+            numberOfLines={2}
+            style={[styles.title, { color: theme.colors.onSurface }]}
+          >
+            {typeof title === "string" ? title : "Unknown Title"}
           </Text>
-          <Text variant="bodyMedium" numberOfLines={2} style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
+          <Text
+            variant="bodyMedium"
+            numberOfLines={2}
+            style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}
+          >
             {secondaryText}
           </Text>
           <View style={styles.badges}>
@@ -160,8 +202,8 @@ export default MediaCard;
 
 const styles = StyleSheet.create({
   root: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   meta: {
     flex: 1,
@@ -173,8 +215,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   badges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   chip: {
     marginRight: 6,

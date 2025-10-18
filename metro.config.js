@@ -1,11 +1,11 @@
-const path = require('path');
-const { getDefaultConfig } = require('expo/metro-config');
+const path = require("path");
+const { getDefaultConfig } = require("expo/metro-config");
 
 const config = getDefaultConfig(__dirname);
 
 config.resolver.extraNodeModules = {
   ...(config.resolver.extraNodeModules || {}),
-  '@': path.resolve(__dirname, 'src'),
+  "@": path.resolve(__dirname, "src"),
 };
 
 // Improve startup performance by deferring module evaluation until first use.

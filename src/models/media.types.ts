@@ -96,12 +96,12 @@ export interface Series {
  * Sonarr series status values.
  */
 export type SeriesStatus =
-  | 'continuing'
-  | 'ended'
-  | 'upcoming'
-  | 'deleted'
-  | 'archived'
-  | 'tba'
+  | "continuing"
+  | "ended"
+  | "upcoming"
+  | "deleted"
+  | "archived"
+  | "tba"
   | string;
 
 /**
@@ -157,11 +157,288 @@ export interface AddSeriesRequest {
   readonly languageProfileId?: number;
   readonly monitored?: boolean;
   readonly seasonFolder?: boolean;
-  readonly seriesType?: 'standard' | 'anime' | 'daily';
+  readonly seriesType?: "standard" | "anime" | "daily";
   readonly tags?: number[];
   readonly searchNow?: boolean;
   readonly addOptions?: {
     readonly searchForMissingEpisodes?: boolean;
-    readonly monitor?: 'all' | 'future' | 'existing' | 'firstSeason' | 'latestSeason' | 'none';
+    readonly monitor?:
+      | "all"
+      | "future"
+      | "existing"
+      | "firstSeason"
+      | "latestSeason"
+      | "none";
   };
+}
+
+// ===== MUSIC TYPES (FOR LIDARR) =====
+
+/**
+ * Representation of a music artist in Lidarr.
+ */
+export interface Artist {
+  readonly id: number;
+  readonly title: string;
+  readonly sortTitle?: string;
+  readonly status: ArtistStatus;
+  readonly ended: boolean;
+  readonly artistName: string;
+  readonly overview?: string;
+  readonly disambiguation?: string;
+  readonly foreignArtistId?: string;
+  readonly path?: string;
+  readonly qualityProfileId?: number;
+  readonly metadataProfileId?: number;
+  readonly monitored: boolean;
+  readonly tags?: number[];
+  readonly images?: ArtistImage[];
+  readonly links?: ArtistLink[];
+  readonly genres?: string[];
+  readonly added?: string;
+  readonly ratings?: ArtistRating;
+  readonly albumCount?: number;
+  readonly statistics?: ArtistStatistics;
+  readonly posterUrl?: string;
+  readonly fanartUrl?: string;
+  readonly albums?: Album[];
+}
+
+/**
+ * Artist status values.
+ */
+export type ArtistStatus =
+  | "continuing"
+  | "ended"
+  | "upcoming"
+  | "deleted"
+  | "archived"
+  | "tba"
+  | string;
+
+/**
+ * Artist image information.
+ */
+export interface ArtistImage {
+  readonly coverType:
+    | "poster"
+    | "fanart"
+    | "banner"
+    | "logo"
+    | "clearlogo"
+    | "disc";
+  readonly url: string;
+  readonly remoteUrl?: string;
+}
+
+/**
+ * External links for artist.
+ */
+export interface ArtistLink {
+  readonly url: string;
+  readonly name: string;
+}
+
+/**
+ * Artist rating information.
+ */
+export interface ArtistRating {
+  readonly votes: number;
+  readonly value: number;
+}
+
+/**
+ * Statistics for an artist.
+ */
+export interface ArtistStatistics {
+  readonly albumCount: number;
+  readonly trackFileCount: number;
+  readonly trackCount: number;
+  readonly totalTrackCount: number;
+  readonly sizeOnDisk: number;
+  readonly percentOfTracks: number;
+}
+
+/**
+ * Representation of an album in Lidarr.
+ */
+export interface Album {
+  readonly id: number;
+  readonly title: string;
+  readonly sortTitle?: string;
+  readonly releaseDate?: string;
+  readonly albumType: AlbumType;
+  readonly status: AlbumStatus;
+  readonly overview?: string;
+  readonly disambiguation?: string;
+  readonly foreignAlbumId?: string;
+  readonly artistId: number;
+  readonly artist?: Artist;
+  readonly qualityProfileId?: number;
+  readonly monitored: boolean;
+  readonly anyReleaseOk: boolean;
+  readonly profileId?: number;
+  readonly path?: string;
+  readonly tags?: number[];
+  readonly images?: AlbumImage[];
+  readonly links?: AlbumLink[];
+  readonly genres?: string[];
+  readonly added?: string;
+  readonly ratings?: AlbumRating;
+  readonly trackCount?: number;
+  readonly releaseCount?: number;
+  readonly statistics?: AlbumStatistics;
+  readonly posterUrl?: string;
+  readonly fanartUrl?: string;
+  readonly tracks?: Track[];
+}
+
+/**
+ * Album type values.
+ */
+export type AlbumType =
+  | "Album"
+  | "EP"
+  | "Single"
+  | "Broadcast"
+  | "Other"
+  | "Compilation"
+  | "Soundtrack"
+  | "Spokenword"
+  | "Interview"
+  | "Audiobook"
+  | "Live"
+  | "Remix"
+  | "DJ-mix"
+  | "Mixtape/Street"
+  | string;
+
+/**
+ * Album status values.
+ */
+export type AlbumStatus =
+  | "announced"
+  | "inCinemas"
+  | "released"
+  | "deleted"
+  | "tba"
+  | string;
+
+/**
+ * Album image information.
+ */
+export interface AlbumImage {
+  readonly coverType: "cover" | "disc" | "logo" | "backdrop";
+  readonly url: string;
+  readonly remoteUrl?: string;
+}
+
+/**
+ * External links for album.
+ */
+export interface AlbumLink {
+  readonly url: string;
+  readonly name: string;
+}
+
+/**
+ * Album rating information.
+ */
+export interface AlbumRating {
+  readonly votes: number;
+  readonly value: number;
+}
+
+/**
+ * Statistics for an album.
+ */
+export interface AlbumStatistics {
+  readonly trackFileCount: number;
+  readonly trackCount: number;
+  readonly sizeOnDisk: number;
+  readonly percentOfTracks: number;
+}
+
+/**
+ * Representation of a track in Lidarr.
+ */
+export interface Track {
+  readonly id: number;
+  readonly title: string;
+  readonly duration?: number;
+  readonly mediumNumber?: number;
+  readonly trackNumber?: number;
+  readonly absoluteTrackNumber?: number;
+  readonly artistId: number;
+  readonly artist?: Artist;
+  readonly albumId: number;
+  readonly album?: Album;
+  readonly releaseId?: number;
+  readonly mediumId?: number;
+  readonly hasFile: boolean;
+  readonly trackFileId?: number;
+  readonly quality?: Quality;
+  readonly monitored: boolean;
+  readonly ratings?: TrackRating;
+  readonly genre?: string;
+  readonly relativePath?: string;
+  readonly sizeInMB?: number;
+}
+
+/**
+ * Track rating information.
+ */
+export interface TrackRating {
+  readonly votes: number;
+  readonly value: number;
+}
+
+/**
+ * Request payload for adding an artist to Lidarr.
+ */
+export interface AddArtistRequest {
+  readonly foreignArtistId: string;
+  readonly artistName: string;
+  readonly overview?: string;
+  readonly path: string;
+  readonly qualityProfileId: number;
+  readonly metadataProfileId: number;
+  readonly monitored?: boolean;
+  readonly rootFolderPath: string;
+  readonly tags?: number[];
+  readonly searchNow?: boolean;
+  readonly addOptions?: {
+    readonly monitor: "all" | "new" | "none" | "missing";
+    readonly searchForMissingAlbums?: boolean;
+  };
+}
+
+/**
+ * Quality profile for music.
+ */
+export interface MusicQualityProfile {
+  readonly id: number;
+  readonly name: string;
+  readonly upgradeAllowed?: boolean;
+  readonly cutoff?: Quality;
+  readonly items?: MusicQualityProfileItem[];
+}
+
+/**
+ * Quality profile item for music.
+ */
+export interface MusicQualityProfileItem {
+  readonly allowed: boolean;
+  readonly quality?: Quality;
+  readonly items?: MusicQualityProfileItem[];
+}
+
+/**
+ * Metadata profile for music.
+ */
+export interface MetadataProfile {
+  readonly id: number;
+  readonly name: string;
+  readonly primaryAlbumType: AlbumType;
+  readonly secondaryAlbumTypes: AlbumType[];
 }

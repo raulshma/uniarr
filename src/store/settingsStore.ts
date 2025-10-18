@@ -1,24 +1,31 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-// Exportable shallow equality helper for components to use when selecting
-// small slices of state to avoid unnecessary re-renders.
-export { shallow } from 'zustand/shallow';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
-import { logger } from '@/services/logger/LoggerService';
-import type { NotificationCategory, QuietHoursConfig } from '@/models/notification.types';
-import type { CalendarView } from '@/models/calendar.types';
+import { logger, LogLevel } from "@/services/logger/LoggerService";
+import type {
+  NotificationCategory,
+  QuietHoursConfig,
+} from "@/models/notification.types";
+import type { CalendarView } from "@/models/calendar.types";
 import {
   createDefaultQuietHoursConfig,
   normalizeQuietHoursConfig,
-} from '@/utils/quietHours.utils';
-import { defaultCustomThemeConfig, type CustomThemeConfig } from '@/constants/theme';
+} from "@/utils/quietHours.utils";
+import {
+  defaultCustomThemeConfig,
+  type CustomThemeConfig,
+} from "@/constants/theme";
+// Exportable shallow equality helper for components to use when selecting
+// small slices of state to avoid unnecessary re-renders.
+export { shallow } from "zustand/shallow";
 
-export type ThemePreference = 'system' | 'light' | 'dark';
+export type ThemePreference = "system" | "light" | "dark";
 
 type SettingsData = {
   theme: ThemePreference;
   customThemeConfig: CustomThemeConfig;
+  oledEnabled: boolean;
   notificationsEnabled: boolean;
   releaseNotificationsEnabled: boolean;
   downloadNotificationsEnabled: boolean;
@@ -31,11 +38,18 @@ type SettingsData = {
   // Remember last selected calendar view (week/day/month/list)
   lastCalendarView: CalendarView;
   useNativeTabs: boolean;
+  tmdbEnabled: boolean;
   // Number of retry attempts to perform for Jellyseerr requests when the server
   // returns 5xx errors. This value represents the number of retry attempts
   // after the initial request. Default: 3
   jellyseerrRetryAttempts: number;
-    // (thumbnail generation removed)
+  // Maximum image cache size in bytes. Default: 100MB
+  maxImageCacheSize: number;
+  // Minimum log level for the application's logger
+  logLevel: LogLevel;
+  // Haptic feedback setting
+  hapticFeedback: boolean;
+  // (thumbnail generation removed)
 };
 
 interface SettingsState extends SettingsData {
@@ -43,6 +57,7 @@ interface SettingsState extends SettingsData {
   updateCustomThemeConfig: (config: Partial<CustomThemeConfig>) => void;
   setCustomThemeConfig: (config: CustomThemeConfig) => void;
   resetCustomThemeConfig: () => void;
+  setOledEnabled: (enabled: boolean) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   setReleaseNotificationsEnabled: (enabled: boolean) => void;
   setDownloadNotificationsEnabled: (enabled: boolean) => void;
@@ -58,22 +73,40 @@ interface SettingsState extends SettingsData {
   reset: () => void;
   setLastCalendarView: (view: CalendarView) => void;
   setUseNativeTabs: (enabled: boolean) => void;
+  setTmdbEnabled: (enabled: boolean) => void;
   setJellyseerrRetryAttempts: (attempts: number) => void;
-    // (thumbnail setters removed)
+  setMaxImageCacheSize: (size: number) => void;
+  setLogLevel: (level: LogLevel) => void;
+  setHapticFeedback: (enabled: boolean) => void;
+  // (thumbnail setters removed)
 }
 
-const STORAGE_KEY = 'SettingsStore:v1';
+const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
 const MAX_REFRESH_INTERVAL = 120;
 const DEFAULT_REFRESH_INTERVAL = 15;
 const DEFAULT_JELLYSEERR_RETRY_ATTEMPTS = 3;
 const MIN_JELLYSEERR_RETRY_ATTEMPTS = 0;
 const MAX_JELLYSEERR_RETRY_ATTEMPTS = 10;
+const DEFAULT_MAX_IMAGE_CACHE_SIZE = 100 * 1024 * 1024; // 100MB
+const MIN_MAX_IMAGE_CACHE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_MAX_IMAGE_CACHE_SIZE = 1024 * 1024 * 1024; // 1GB
 // thumbnail generation removed
 
 const clampRetryAttempts = (value: number): number => {
   if (Number.isNaN(value)) return DEFAULT_JELLYSEERR_RETRY_ATTEMPTS;
-  return Math.min(Math.max(Math.round(value), MIN_JELLYSEERR_RETRY_ATTEMPTS), MAX_JELLYSEERR_RETRY_ATTEMPTS);
+  return Math.min(
+    Math.max(Math.round(value), MIN_JELLYSEERR_RETRY_ATTEMPTS),
+    MAX_JELLYSEERR_RETRY_ATTEMPTS,
+  );
+};
+
+const clampMaxImageCacheSize = (value: number): number => {
+  if (Number.isNaN(value)) return DEFAULT_MAX_IMAGE_CACHE_SIZE;
+  return Math.min(
+    Math.max(Math.round(value), MIN_MAX_IMAGE_CACHE_SIZE),
+    MAX_MAX_IMAGE_CACHE_SIZE,
+  );
 };
 
 const clampRefreshInterval = (minutes: number): number => {
@@ -81,19 +114,26 @@ const clampRefreshInterval = (minutes: number): number => {
     return DEFAULT_REFRESH_INTERVAL;
   }
 
-  return Math.min(Math.max(Math.round(minutes), MIN_REFRESH_INTERVAL), MAX_REFRESH_INTERVAL);
+  return Math.min(
+    Math.max(Math.round(minutes), MIN_REFRESH_INTERVAL),
+    MAX_REFRESH_INTERVAL,
+  );
 };
 
-const createDefaultQuietHoursState = (): Record<NotificationCategory, QuietHoursConfig> => ({
-  downloads: createDefaultQuietHoursConfig('weeknights'),
-  failures: createDefaultQuietHoursConfig('weeknights'),
-  requests: createDefaultQuietHoursConfig('weeknights'),
-  serviceHealth: createDefaultQuietHoursConfig('everyday'),
+const createDefaultQuietHoursState = (): Record<
+  NotificationCategory,
+  QuietHoursConfig
+> => ({
+  downloads: createDefaultQuietHoursConfig("weeknights"),
+  failures: createDefaultQuietHoursConfig("weeknights"),
+  requests: createDefaultQuietHoursConfig("weeknights"),
+  serviceHealth: createDefaultQuietHoursConfig("everyday"),
 });
 
 const createDefaultSettings = (): SettingsData => ({
-  theme: 'system',
+  theme: "system",
   customThemeConfig: defaultCustomThemeConfig,
+  oledEnabled: false,
   notificationsEnabled: true,
   releaseNotificationsEnabled: false,
   downloadNotificationsEnabled: true,
@@ -103,29 +143,40 @@ const createDefaultSettings = (): SettingsData => ({
   refreshIntervalMinutes: DEFAULT_REFRESH_INTERVAL,
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
-  lastCalendarView: 'week',
-  useNativeTabs: false,
+  lastCalendarView: "week",
+  useNativeTabs: true,
+  tmdbEnabled: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
-    // (thumbnail defaults removed)
+  maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
+  logLevel: LogLevel.DEBUG,
+  hapticFeedback: true,
+  // (thumbnail defaults removed)
 });
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       ...createDefaultSettings(),
+      setLogLevel: (level: LogLevel) => set({ logLevel: level }),
       setTheme: (theme) => set({ theme }),
       updateCustomThemeConfig: (config) =>
         set((state) => ({
           customThemeConfig: { ...state.customThemeConfig, ...config },
         })),
       setCustomThemeConfig: (config) => set({ customThemeConfig: config }),
-      resetCustomThemeConfig: () => set({ customThemeConfig: defaultCustomThemeConfig }),
-      setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
-      setReleaseNotificationsEnabled: (enabled) => set({ releaseNotificationsEnabled: enabled }),
-      setDownloadNotificationsEnabled: (enabled) => set({ downloadNotificationsEnabled: enabled }),
+      resetCustomThemeConfig: () =>
+        set({ customThemeConfig: defaultCustomThemeConfig }),
+      setOledEnabled: (enabled: boolean) => set({ oledEnabled: enabled }),
+      setNotificationsEnabled: (enabled) =>
+        set({ notificationsEnabled: enabled }),
+      setReleaseNotificationsEnabled: (enabled) =>
+        set({ releaseNotificationsEnabled: enabled }),
+      setDownloadNotificationsEnabled: (enabled) =>
+        set({ downloadNotificationsEnabled: enabled }),
       setFailedDownloadNotificationsEnabled: (enabled) =>
         set({ failedDownloadNotificationsEnabled: enabled }),
-      setRequestNotificationsEnabled: (enabled) => set({ requestNotificationsEnabled: enabled }),
+      setRequestNotificationsEnabled: (enabled) =>
+        set({ requestNotificationsEnabled: enabled }),
       setServiceHealthNotificationsEnabled: (enabled) =>
         set({ serviceHealthNotificationsEnabled: enabled }),
       setRefreshIntervalMinutes: (minutes) =>
@@ -142,11 +193,16 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       setCriticalHealthAlertsBypassQuietHours: (enabled) =>
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
-  setLastCalendarView: (view: CalendarView) => set({ lastCalendarView: view }),
-  setUseNativeTabs: (enabled: boolean) => set({ useNativeTabs: enabled }),
+      setLastCalendarView: (view: CalendarView) =>
+        set({ lastCalendarView: view }),
+      setUseNativeTabs: (enabled: boolean) => set({ useNativeTabs: enabled }),
+      setTmdbEnabled: (enabled: boolean) => set({ tmdbEnabled: enabled }),
       setJellyseerrRetryAttempts: (attempts: number) =>
         set({ jellyseerrRetryAttempts: clampRetryAttempts(attempts) }),
-  reset: () => set(createDefaultSettings()),
+      setMaxImageCacheSize: (size: number) =>
+        set({ maxImageCacheSize: clampMaxImageCacheSize(size) }),
+      setHapticFeedback: (enabled: boolean) => set({ hapticFeedback: enabled }),
+      reset: () => set(createDefaultSettings()),
     }),
     {
       name: STORAGE_KEY,
@@ -157,27 +213,35 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: (state) => ({
         theme: state.theme,
         customThemeConfig: state.customThemeConfig,
+        oledEnabled: state.oledEnabled,
         notificationsEnabled: state.notificationsEnabled,
         releaseNotificationsEnabled: state.releaseNotificationsEnabled,
         downloadNotificationsEnabled: state.downloadNotificationsEnabled,
-        failedDownloadNotificationsEnabled: state.failedDownloadNotificationsEnabled,
+        failedDownloadNotificationsEnabled:
+          state.failedDownloadNotificationsEnabled,
         requestNotificationsEnabled: state.requestNotificationsEnabled,
-        serviceHealthNotificationsEnabled: state.serviceHealthNotificationsEnabled,
+        serviceHealthNotificationsEnabled:
+          state.serviceHealthNotificationsEnabled,
         refreshIntervalMinutes: state.refreshIntervalMinutes,
         quietHours: state.quietHours,
-        criticalHealthAlertsBypassQuietHours: state.criticalHealthAlertsBypassQuietHours,
+        criticalHealthAlertsBypassQuietHours:
+          state.criticalHealthAlertsBypassQuietHours,
         lastCalendarView: state.lastCalendarView,
         useNativeTabs: state.useNativeTabs,
+        tmdbEnabled: state.tmdbEnabled,
         jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
-  // thumbnail fields removed
+        maxImageCacheSize: state.maxImageCacheSize,
+        logLevel: state.logLevel,
+        hapticFeedback: state.hapticFeedback,
+        // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 4,
+      version: 7,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
-          void logger.error('Failed to rehydrate settings store.', {
-            location: 'settingsStore.onRehydrateStorage',
+          void logger.error("Failed to rehydrate settings store.", {
+            location: "settingsStore.onRehydrateStorage",
             error: error instanceof Error ? error.message : String(error),
           });
           return;
@@ -187,16 +251,25 @@ export const useSettingsStore = create<SettingsState>()(
           return;
         }
 
-        const normalizedInterval = clampRefreshInterval(state.refreshIntervalMinutes);
+        const normalizedInterval = clampRefreshInterval(
+          state.refreshIntervalMinutes,
+        );
         if (normalizedInterval !== state.refreshIntervalMinutes) {
           state.refreshIntervalMinutes = normalizedInterval;
         }
 
+        // Ensure oledEnabled is properly initialized
+        if (typeof state.oledEnabled !== "boolean") {
+          state.oledEnabled = false;
+        }
+
         // Normalize jellyseerr retry attempts
-        if (typeof state.jellyseerrRetryAttempts === 'undefined') {
+        if (typeof state.jellyseerrRetryAttempts === "undefined") {
           state.jellyseerrRetryAttempts = DEFAULT_JELLYSEERR_RETRY_ATTEMPTS;
         } else {
-          const normalizedRetries = clampRetryAttempts(state.jellyseerrRetryAttempts);
+          const normalizedRetries = clampRetryAttempts(
+            state.jellyseerrRetryAttempts,
+          );
           if (normalizedRetries !== state.jellyseerrRetryAttempts) {
             state.jellyseerrRetryAttempts = normalizedRetries;
           }
@@ -218,11 +291,39 @@ export const useSettingsStore = create<SettingsState>()(
         );
 
         const baseDefaults = createDefaultSettings();
-        (Object.keys(baseDefaults.quietHours) as NotificationCategory[]).forEach((category) => {
+        (
+          Object.keys(baseDefaults.quietHours) as NotificationCategory[]
+        ).forEach((category) => {
           if (!state.quietHours[category]) {
             state.quietHours[category] = baseDefaults.quietHours[category];
           }
         });
+
+        if (typeof state.tmdbEnabled !== "boolean") {
+          state.tmdbEnabled = baseDefaults.tmdbEnabled;
+        }
+
+        // Normalize max image cache size
+        if (typeof state.maxImageCacheSize !== "number") {
+          state.maxImageCacheSize = baseDefaults.maxImageCacheSize;
+        } else {
+          const normalizedSize = clampMaxImageCacheSize(
+            state.maxImageCacheSize,
+          );
+          if (normalizedSize !== state.maxImageCacheSize) {
+            state.maxImageCacheSize = normalizedSize;
+          }
+        }
+
+        // Ensure we have a valid log level and apply it to the logger
+        if (typeof state.logLevel === "undefined") {
+          state.logLevel = baseDefaults.logLevel;
+        }
+        try {
+          logger.setMinimumLevel(state.logLevel);
+        } catch {
+          // don't crash on logger wiring
+        }
       },
       migrate: (persistedState) => {
         if (!persistedState) {
@@ -232,7 +333,9 @@ export const useSettingsStore = create<SettingsState>()(
         const partial = persistedState as Partial<SettingsData>;
         const baseDefaults = createDefaultSettings();
 
-        const quietHours = (Object.keys(baseDefaults.quietHours) as NotificationCategory[]).reduce(
+        const quietHours = (
+          Object.keys(baseDefaults.quietHours) as NotificationCategory[]
+        ).reduce(
           (acc, category) => {
             const persistedConfig = partial.quietHours?.[category];
             const baseConfig = baseDefaults.quietHours[category];
@@ -250,11 +353,19 @@ export const useSettingsStore = create<SettingsState>()(
           ...baseDefaults,
           ...partial,
           refreshIntervalMinutes: clampRefreshInterval(
-            partial.refreshIntervalMinutes ?? baseDefaults.refreshIntervalMinutes,
+            partial.refreshIntervalMinutes ??
+              baseDefaults.refreshIntervalMinutes,
           ),
+          oledEnabled: partial.oledEnabled ?? baseDefaults.oledEnabled,
           jellyseerrRetryAttempts: clampRetryAttempts(
-            partial.jellyseerrRetryAttempts ?? baseDefaults.jellyseerrRetryAttempts,
+            partial.jellyseerrRetryAttempts ??
+              baseDefaults.jellyseerrRetryAttempts,
           ),
+          tmdbEnabled: partial.tmdbEnabled ?? baseDefaults.tmdbEnabled,
+          maxImageCacheSize: clampMaxImageCacheSize(
+            partial.maxImageCacheSize ?? baseDefaults.maxImageCacheSize,
+          ),
+          logLevel: (partial.logLevel as LogLevel) ?? baseDefaults.logLevel,
           // thumbnail migration removed
           quietHours,
           criticalHealthAlertsBypassQuietHours:
@@ -267,19 +378,28 @@ export const useSettingsStore = create<SettingsState>()(
   ),
 );
 
-export const selectThemePreference = (state: SettingsState): ThemePreference => state.theme;
-export const selectCustomThemeConfig = (state: SettingsState): CustomThemeConfig => state.customThemeConfig;
-export const selectNotificationsEnabled = (state: SettingsState): boolean => state.notificationsEnabled;
-export const selectReleaseNotificationsEnabled = (state: SettingsState): boolean =>
-  state.releaseNotificationsEnabled;
-export const selectDownloadNotificationsEnabled = (state: SettingsState): boolean =>
-  state.downloadNotificationsEnabled;
-export const selectFailedDownloadNotificationsEnabled = (state: SettingsState): boolean =>
-  state.failedDownloadNotificationsEnabled;
-export const selectRequestNotificationsEnabled = (state: SettingsState): boolean =>
-  state.requestNotificationsEnabled;
-export const selectServiceHealthNotificationsEnabled = (state: SettingsState): boolean =>
-  state.serviceHealthNotificationsEnabled;
+export const selectThemePreference = (state: SettingsState): ThemePreference =>
+  state.theme;
+export const selectCustomThemeConfig = (
+  state: SettingsState,
+): CustomThemeConfig => state.customThemeConfig;
+export const selectNotificationsEnabled = (state: SettingsState): boolean =>
+  state.notificationsEnabled;
+export const selectReleaseNotificationsEnabled = (
+  state: SettingsState,
+): boolean => state.releaseNotificationsEnabled;
+export const selectDownloadNotificationsEnabled = (
+  state: SettingsState,
+): boolean => state.downloadNotificationsEnabled;
+export const selectFailedDownloadNotificationsEnabled = (
+  state: SettingsState,
+): boolean => state.failedDownloadNotificationsEnabled;
+export const selectRequestNotificationsEnabled = (
+  state: SettingsState,
+): boolean => state.requestNotificationsEnabled;
+export const selectServiceHealthNotificationsEnabled = (
+  state: SettingsState,
+): boolean => state.serviceHealthNotificationsEnabled;
 export const selectRefreshIntervalMinutes = (state: SettingsState): number =>
   state.refreshIntervalMinutes;
 export const selectJellyseerrRetryAttempts = (state: SettingsState): number =>
@@ -287,13 +407,15 @@ export const selectJellyseerrRetryAttempts = (state: SettingsState): number =>
 export const selectQuietHours = (
   state: SettingsState,
 ): Record<NotificationCategory, QuietHoursConfig> => state.quietHours;
-export const selectQuietHoursForCategory = (
-  category: NotificationCategory,
-) =>
+export const selectQuietHoursForCategory =
+  (category: NotificationCategory) =>
   (state: SettingsState): QuietHoursConfig =>
     state.quietHours[category] ?? createDefaultQuietHoursState()[category];
-export const selectCriticalHealthAlertsBypassQuietHours = (state: SettingsState): boolean =>
-  state.criticalHealthAlertsBypassQuietHours;
+export const selectCriticalHealthAlertsBypassQuietHours = (
+  state: SettingsState,
+): boolean => state.criticalHealthAlertsBypassQuietHours;
 
-export const selectLastCalendarView = (state: SettingsState) => state.lastCalendarView;
-export const selectUseNativeTabs = (state: SettingsState) => state.useNativeTabs;
+export const selectLastCalendarView = (state: SettingsState) =>
+  state.lastCalendarView;
+export const selectUseNativeTabs = (state: SettingsState) =>
+  state.useNativeTabs;

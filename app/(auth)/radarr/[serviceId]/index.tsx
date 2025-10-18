@@ -37,37 +37,6 @@ type FilterValue =
   | typeof FILTER_MONITORED
   | typeof FILTER_UNMONITORED;
 
-const formatRuntime = (runtime?: number): string | undefined => {
-  if (!runtime) {
-    return undefined;
-  }
-
-  const hours = Math.floor(runtime / 60);
-  const minutes = runtime % 60;
-
-  return hours > 0
-    ? `${hours}h ${minutes.toString().padStart(2, "0")}m`
-    : `${minutes}m`;
-};
-
-const formatByteSize = (bytes?: number): string | undefined => {
-  if (bytes === undefined || bytes === null) {
-    return undefined;
-  }
-
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = bytes;
-  let index = 0;
-
-  while (value >= 1024 && index < units.length - 1) {
-    value /= 1024;
-    index += 1;
-  }
-
-  const precision = index === 0 ? 0 : 1;
-  return `${value.toFixed(precision)} ${units[index]}`;
-};
-
 const deriveDownloadStatus = (movie: Movie): MediaDownloadStatus => {
   if (movie.hasFile || movie.statistics?.percentAvailable === 100) {
     return "available";
@@ -95,9 +64,6 @@ const getFilterForMovie = (movie: Movie): FilterValue => {
 
   return FILTER_ALL; // This shouldn't happen for properly configured movies
 };
-
-const normalizeSearchTerm = (input: string): string =>
-  input.trim().toLowerCase();
 
 const RadarrMoviesListScreen = () => {
   const { serviceId: rawServiceId } = useLocalSearchParams<{
@@ -172,7 +138,7 @@ const RadarrMoviesListScreen = () => {
       }
 
       void refetch();
-    }, [hasValidServiceId, refetch])
+    }, [hasValidServiceId, refetch]),
   );
 
   const connector = hasValidServiceId
@@ -300,7 +266,7 @@ const RadarrMoviesListScreen = () => {
           height: spacing.md,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleMoviePress = useCallback(
@@ -317,7 +283,7 @@ const RadarrMoviesListScreen = () => {
         },
       });
     },
-    [hasValidServiceId, router, serviceId]
+    [hasValidServiceId, router, serviceId],
   );
 
   const handleAddMovie = useCallback(() => {
@@ -360,7 +326,7 @@ const RadarrMoviesListScreen = () => {
         </View>
       );
     },
-    [handleMoviePress]
+    [handleMoviePress],
   );
 
   const keyExtractor = useCallback((item: Movie) => item.id.toString(), []);
@@ -416,7 +382,8 @@ const RadarrMoviesListScreen = () => {
                   ]}
                   textStyle={[
                     styles.filterChipText,
-                    filterValue === filter.value && styles.filterChipTextSelected,
+                    filterValue === filter.value &&
+                      styles.filterChipTextSelected,
                   ]}
                 >
                   {filter.label}
@@ -431,7 +398,6 @@ const RadarrMoviesListScreen = () => {
       filteredMovies.length,
       totalMovies,
       handleAddMovie,
-      handleClearFilters,
       searchTerm,
       filterValue,
       styles,
@@ -552,8 +518,8 @@ const RadarrMoviesListScreen = () => {
       try {
         // If the error is a fetch-like response with a message payload
         const maybe = (error as any) ?? {};
-        if (typeof maybe === 'string') return maybe;
-        if (typeof maybe?.message === 'string') return maybe.message;
+        if (typeof maybe === "string") return maybe;
+        if (typeof maybe?.message === "string") return maybe.message;
       } catch {
         // fallthrough
       }

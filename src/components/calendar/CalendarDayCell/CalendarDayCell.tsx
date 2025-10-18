@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, Pressable } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View, Pressable } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { CalendarDay } from '@/models/calendar.types';
-import { MediaReleaseCard } from '../MediaReleaseCard';
+import type { AppTheme } from "@/constants/theme";
+import type { CalendarDay } from "@/models/calendar.types";
+import { MediaReleaseCard } from "../MediaReleaseCard";
 
 export type CalendarDayCellProps = {
   day: CalendarDay;
@@ -45,7 +45,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
       flex: 1,
     },
     dateContainer: {
-      alignItems: 'center',
+      alignItems: "center",
       marginBottom: theme.custom.spacing.xs,
     },
     dateText: {
@@ -58,7 +58,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
     },
     dateTextToday: {
       color: theme.colors.primary,
-      fontWeight: '600',
+      fontWeight: "600",
     },
     dateTextOtherMonth: {
       color: theme.colors.onSurfaceVariant,
@@ -68,7 +68,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
       color: theme.colors.onPrimary,
     },
     selectedIndicator: {
-      position: 'absolute',
+      position: "absolute",
       top: 2,
       right: 2,
       width: 6,
@@ -86,7 +86,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
       marginBottom: 0,
     },
     moreIndicator: {
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: theme.custom.spacing.xxs,
     },
     moreText: {
@@ -147,7 +147,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
           borderless: false,
         }}
         accessibilityRole="button"
-        accessibilityLabel={`${day.date}${hasReleases ? `, ${day.releases.length} releases` : ''}`}
+        accessibilityLabel={`${day.date}${hasReleases ? `, ${day.releases.length} releases` : ""}`}
         accessibilityState={{ selected: isSelected }}
       >
         <View style={styles.content}>
@@ -166,7 +166,8 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
                 key={release.id}
                 style={[
                   styles.releaseItem,
-                  index === visibleReleases.length - 1 && styles.releaseItemLast,
+                  index === visibleReleases.length - 1 &&
+                    styles.releaseItemLast,
                 ]}
               >
                 <MediaReleaseCard
@@ -179,9 +180,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
 
             {hasMoreReleases && (
               <View style={styles.moreIndicator}>
-                <Text style={styles.moreText}>
-                  +{moreCount} more
-                </Text>
+                <Text style={styles.moreText}>+{moreCount} more</Text>
               </View>
             )}
           </View>

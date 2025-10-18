@@ -5,8 +5,8 @@ import type {
   RequestStatistics,
   QualityProfileDistribution,
   IndexerPerformance,
-  ActivityTimes
-} from '@/models/analytics.types';
+  ActivityTimes,
+} from "@/models/analytics.types";
 
 /**
  * Stub implementations for analytics dependencies
@@ -20,7 +20,7 @@ export class AnalyticsStubs {
    */
   public static generateStubLibraryGrowth(
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): LibraryGrowthData[] {
     const data: LibraryGrowthData[] = [];
     const currentDate = new Date(startDate);
@@ -30,7 +30,7 @@ export class AnalyticsStubs {
     let moviesCount = 400;
 
     while (currentDate <= endDate) {
-  const dateStr = currentDate.toISOString().slice(0, 10);
+      const dateStr = currentDate.toISOString().slice(0, 10);
 
       // Add some random growth each day
       const seriesGrowth = Math.floor(Math.random() * 3); // 0-2 new series per day
@@ -43,7 +43,7 @@ export class AnalyticsStubs {
         date: dateStr,
         sonarrSeries: seriesCount,
         radarrMovies: moviesCount,
-        totalMedia: seriesCount + moviesCount
+        totalMedia: seriesCount + moviesCount,
       });
 
       currentDate.setDate(currentDate.getDate() + 1);
@@ -58,13 +58,13 @@ export class AnalyticsStubs {
    */
   public static generateStubDownloadStatistics(
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): DownloadStatistics[] {
     const data: DownloadStatistics[] = [];
     const currentDate = new Date(startDate);
 
     while (currentDate <= endDate) {
-  const dateStr = currentDate.toISOString().slice(0, 10);
+      const dateStr = currentDate.toISOString().slice(0, 10);
 
       // Simulate realistic download patterns
       const baseCompleted = 8; // Base downloads per day
@@ -73,16 +73,18 @@ export class AnalyticsStubs {
 
       // Add some variance based on day of week (more downloads on weekends)
       const dayOfWeek = currentDate.getDay();
-      const weekendMultiplier = (dayOfWeek === 0 || dayOfWeek === 6) ? 1.5 : 1;
+      const weekendMultiplier = dayOfWeek === 0 || dayOfWeek === 6 ? 1.5 : 1;
 
-      const completed = Math.floor((baseCompleted + Math.random() * 12) * weekendMultiplier);
+      const completed = Math.floor(
+        (baseCompleted + Math.random() * 12) * weekendMultiplier,
+      );
       const failed = Math.floor((baseFailed + Math.random() * 2) * 0.8);
 
       data.push({
         date: dateStr,
         completed,
         failed,
-        totalSize: completed * avgSize
+        totalSize: completed * avgSize,
       });
 
       currentDate.setDate(currentDate.getDate() + 1);
@@ -97,13 +99,13 @@ export class AnalyticsStubs {
    */
   public static generateStubRequestStatistics(
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): RequestStatistics[] {
     const data: RequestStatistics[] = [];
     const currentDate = new Date(startDate);
 
     while (currentDate <= endDate) {
-  const dateStr = currentDate.toISOString().slice(0, 10);
+      const dateStr = currentDate.toISOString().slice(0, 10);
 
       // Simulate request patterns
       const pending = Math.floor(Math.random() * 8) + 2; // 2-10 pending requests
@@ -114,7 +116,7 @@ export class AnalyticsStubs {
         date: dateStr,
         approved,
         pending,
-        denied
+        denied,
       });
 
       currentDate.setDate(currentDate.getDate() + 1);
@@ -129,11 +131,11 @@ export class AnalyticsStubs {
    */
   public static generateStubQualityDistribution(): QualityProfileDistribution[] {
     return [
-      { qualityProfile: '4K UHD', count: 45, percentage: 15.0 },
-      { qualityProfile: '1080p BluRay', count: 120, percentage: 40.0 },
-      { qualityProfile: '1080p Web-DL', count: 75, percentage: 25.0 },
-      { qualityProfile: '720p Web-DL', count: 45, percentage: 15.0 },
-      { qualityProfile: 'SD', count: 15, percentage: 5.0 }
+      { qualityProfile: "4K UHD", count: 45, percentage: 15.0 },
+      { qualityProfile: "1080p BluRay", count: 120, percentage: 40.0 },
+      { qualityProfile: "1080p Web-DL", count: 75, percentage: 25.0 },
+      { qualityProfile: "720p Web-DL", count: 45, percentage: 15.0 },
+      { qualityProfile: "SD", count: 15, percentage: 5.0 },
     ];
   }
 
@@ -144,40 +146,40 @@ export class AnalyticsStubs {
   public static generateStubIndexerPerformance(): IndexerPerformance[] {
     return [
       {
-        indexerName: 'RARBG',
+        indexerName: "RARBG",
         queries: 2500,
         grabs: 875,
         successRate: 35.0,
-        avgResponseTime: 180
+        avgResponseTime: 180,
       },
       {
-        indexerName: '1337x',
+        indexerName: "1337x",
         queries: 1800,
         grabs: 540,
         successRate: 30.0,
-        avgResponseTime: 220
+        avgResponseTime: 220,
       },
       {
-        indexerName: 'The Pirate Bay',
+        indexerName: "The Pirate Bay",
         queries: 1200,
         grabs: 300,
         successRate: 25.0,
-        avgResponseTime: 350
+        avgResponseTime: 350,
       },
       {
-        indexerName: 'YTS',
+        indexerName: "YTS",
         queries: 900,
         grabs: 360,
         successRate: 40.0,
-        avgResponseTime: 140
+        avgResponseTime: 140,
       },
       {
-        indexerName: 'TorrentGalaxy',
+        indexerName: "TorrentGalaxy",
         queries: 1500,
         grabs: 525,
         successRate: 35.0,
-        avgResponseTime: 200
-      }
+        avgResponseTime: 200,
+      },
     ];
   }
 
@@ -214,7 +216,7 @@ export class AnalyticsStubs {
       activityTimes.push({
         hour,
         downloads,
-        requests
+        requests,
       });
     }
 
@@ -226,7 +228,7 @@ export class AnalyticsStubs {
    */
   public static generateStubAnalyticsSummary(
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): AnalyticsSummary {
     const end = endDate || new Date();
     const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
@@ -238,7 +240,7 @@ export class AnalyticsStubs {
       qualityDistribution: this.generateStubQualityDistribution(),
       indexerPerformance: this.generateStubIndexerPerformance(),
       activityTimes: this.generateStubActivityTimes(),
-      dateRange: { start, end }
+      dateRange: { start, end },
     };
   }
 }

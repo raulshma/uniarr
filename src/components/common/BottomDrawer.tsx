@@ -1,8 +1,22 @@
-import React, { useMemo, useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, ViewStyle, Dimensions } from 'react-native';
-import { useTheme, IconButton, Text, TouchableRipple, Icon } from 'react-native-paper';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import Animated, { FadeIn, FadeInDown, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import React, { useMemo, useRef, useCallback, useEffect } from "react";
+import { View, StyleSheet, ViewStyle, Dimensions } from "react-native";
+import {
+  useTheme,
+  IconButton,
+  Text,
+  TouchableRipple,
+  Icon,
+} from "react-native-paper";
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetBackdropProps,
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
+import Animated, {
+  FadeInDown,
+  SlideInDown,
+  SlideOutDown,
+} from "react-native-reanimated";
 
 type Props = {
   visible: boolean;
@@ -36,8 +50,8 @@ export const DrawerItem: React.FC<DrawerItemProps> = ({
   const textColor = destructive
     ? theme.colors.error
     : disabled
-    ? theme.colors.onSurfaceDisabled
-    : theme.colors.onSurface;
+      ? theme.colors.onSurfaceDisabled
+      : theme.colors.onSurface;
 
   return (
     <TouchableRipple
@@ -49,11 +63,7 @@ export const DrawerItem: React.FC<DrawerItemProps> = ({
       <View style={styles.drawerItem}>
         {icon && (
           <View style={styles.iconContainer}>
-            <Icon
-              source={icon}
-              size={24}
-              color={textColor}
-            />
+            <Icon source={icon} size={24} color={textColor} />
           </View>
         )}
         <Text
@@ -62,31 +72,27 @@ export const DrawerItem: React.FC<DrawerItemProps> = ({
             styles.drawerItemText,
             {
               color: textColor,
-              fontWeight: selected ? '600' : '400',
+              fontWeight: selected ? "600" : "400",
             },
           ]}
         >
           {label}
         </Text>
         {selected && (
-          <Icon
-            source="check"
-            size={20}
-            color={theme.colors.primary}
-          />
+          <Icon source="check" size={20} color={theme.colors.primary} />
         )}
       </View>
     </TouchableRipple>
   );
 };
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight } = Dimensions.get("window");
 
 const BottomDrawer: React.FC<Props> = ({
   visible,
   onDismiss,
   title,
-  maxHeight = '60%',
+  maxHeight = "60%",
   children,
   style,
   closeOnBackdropPress = true,
@@ -96,8 +102,8 @@ const BottomDrawer: React.FC<Props> = ({
 
   // Calculate snap points more intelligently
   const snapPoints = useMemo(() => {
-    if (typeof maxHeight === 'string') {
-      if (maxHeight.includes('%')) {
+    if (typeof maxHeight === "string") {
+      if (maxHeight.includes("%")) {
         const percentage = parseFloat(maxHeight) / 100;
         return [Math.max(200, screenHeight * percentage)]; // Minimum 200px height
       }
@@ -112,7 +118,7 @@ const BottomDrawer: React.FC<Props> = ({
         onDismiss();
       }
     },
-    [onDismiss]
+    [onDismiss],
   );
 
   useEffect(() => {
@@ -133,10 +139,10 @@ const BottomDrawer: React.FC<Props> = ({
         disappearsOnIndex={-1}
         appearsOnIndex={0}
         opacity={backdropOpacity}
-        pressBehavior={closeOnBackdropPress ? 'close' : 'none'}
+        pressBehavior={closeOnBackdropPress ? "close" : "none"}
       />
     ),
-    [backdropOpacity, closeOnBackdropPress]
+    [backdropOpacity, closeOnBackdropPress],
   );
 
   if (!visible) {
@@ -164,11 +170,6 @@ const BottomDrawer: React.FC<Props> = ({
           borderTopRightRadius: 20,
           borderColor: theme.colors.outlineVariant,
           borderWidth: 1,
-          shadowColor: theme.colors.shadow,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          elevation: 8,
         }}
         handleStyle={{
           paddingTop: 8,
@@ -183,7 +184,7 @@ const BottomDrawer: React.FC<Props> = ({
                 style={{
                   color: theme.colors.onSurface,
                   flex: 1,
-                  fontWeight: '600'
+                  fontWeight: "600",
                 }}
               >
                 {title}
@@ -224,9 +225,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 16,
@@ -243,8 +244,8 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   drawerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 16,
     paddingHorizontal: 16,
     minHeight: 56,
@@ -253,8 +254,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 16,
   },
   drawerItemText: {

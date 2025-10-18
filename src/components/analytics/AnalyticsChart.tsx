@@ -1,12 +1,16 @@
-import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
-import { Text, useTheme } from 'react-native-paper';
+import React from "react";
+import { View, StyleSheet, Dimensions } from "react-native";
+import { LineChart, BarChart, PieChart } from "react-native-chart-kit";
+import { Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { ChartType, ChartData, ChartConfig } from '@/models/analytics.types';
+import type { AppTheme } from "@/constants/theme";
+import type {
+  ChartType,
+  ChartData,
+  ChartConfig,
+} from "@/models/analytics.types";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 
 interface AnalyticsChartProps {
   title: string;
@@ -18,25 +22,25 @@ interface AnalyticsChartProps {
 }
 
 const defaultChartConfig: ChartConfig = {
-  backgroundColor: '#ffffff',
-  backgroundGradientFrom: '#ffffff',
-  backgroundGradientTo: '#ffffff',
+  backgroundColor: "#ffffff",
+  backgroundGradientFrom: "#ffffff",
+  backgroundGradientTo: "#ffffff",
   color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
   labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-  strokeColor: '#ffa726',
+  strokeColor: "#ffa726",
   propsForDots: {
-    r: '4',
-    strokeWidth: '2',
-    stroke: '#ffa726'
+    r: "4",
+    strokeWidth: "2",
+    stroke: "#ffa726",
   },
   propsForBackgroundLines: {
-    stroke: '#e3e3e3',
-    strokeDasharray: '0'
+    stroke: "#e3e3e3",
+    strokeDasharray: "0",
   },
   propsForLabels: {
     fontSize: 12,
-    fontWeight: '500'
-  }
+    fontWeight: "500",
+  },
 };
 
 export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
@@ -45,14 +49,14 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
   data,
   config = {},
   height = 220,
-  showLegend = true
+  showLegend = true,
 }) => {
   const theme = useTheme<AppTheme>();
   const chartConfig = { ...defaultChartConfig, ...config };
 
   const renderChart = () => {
     switch (type) {
-      case 'line':
+      case "line":
         return (
           <LineChart
             data={data}
@@ -70,7 +74,7 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
           />
         );
 
-      case 'bar':
+      case "bar":
         return (
           <BarChart
             data={data}
@@ -87,19 +91,21 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
           />
         );
 
-      case 'pie':
-      case 'doughnut':
+      case "pie":
+      case "doughnut":
         return (
           <PieChart
-            data={data.datasets[0]?.data.map((value, index) => ({
-              name: data.labels[index] || `Item ${index + 1}`,
-              value,
-              color: data.datasets[0]?.color ?
-                data.datasets[0].color(1) :
-                `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 1)`,
-              legendFontColor: theme.colors.onSurface,
-              legendFontSize: 12
-            })) || []}
+            data={
+              data.datasets[0]?.data.map((value, index) => ({
+                name: data.labels[index] || `Item ${index + 1}`,
+                value,
+                color: data.datasets[0]?.color
+                  ? data.datasets[0].color(1)
+                  : `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 1)`,
+                legendFontColor: theme.colors.onSurface,
+                legendFontSize: 12,
+              })) || []
+            }
             width={screenWidth - 32}
             height={height}
             chartConfig={chartConfig}
@@ -119,7 +125,10 @@ export const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      <Text variant="titleMedium" style={[styles.title, { color: theme.colors.onSurface }]}>
+      <Text
+        variant="titleMedium"
+        style={[styles.title, { color: theme.colors.onSurface }]}
+      >
         {title}
       </Text>
       {renderChart()}
@@ -133,7 +142,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderRadius: 8,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -143,8 +152,8 @@ const styles = StyleSheet.create({
   },
   title: {
     marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '600',
+    textAlign: "center",
+    fontWeight: "600",
   },
   chart: {
     marginVertical: 8,

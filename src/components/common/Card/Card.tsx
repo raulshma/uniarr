@@ -1,9 +1,13 @@
-import React, { forwardRef, useMemo, useState } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, Pressable } from 'react-native';
-import { Card as PaperCard, type CardProps as PaperCardProps, useTheme } from 'react-native-paper';
+import React, { forwardRef, useMemo, useState } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View, Pressable } from "react-native";
+import {
+  Card as PaperCard,
+  type CardProps as PaperCardProps,
+  useTheme,
+} from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
+import type { AppTheme } from "@/constants/theme";
 
 // Use native Pressable rather than an animated wrapper — keep behavior
 // but remove entrance/interaction animations for snappier UI.
@@ -23,11 +27,14 @@ type ElevationVariant = keyof typeof elevationMap;
 
 type PaperCardRef = React.ComponentRef<typeof PaperCard>;
 
-export type CardProps = Omit<PaperCardProps, 'elevation' | 'mode' | 'contentStyle'> & {
+export type CardProps = Omit<
+  PaperCardProps,
+  "elevation" | "mode" | "contentStyle"
+> & {
   elevation?: ElevationVariant;
-  contentPadding?: keyof AppTheme['custom']['spacing'] | number;
+  contentPadding?: keyof AppTheme["custom"]["spacing"] | number;
   contentStyle?: StyleProp<ViewStyle>;
-  variant?: 'default' | 'outlined' | 'custom';
+  variant?: "default" | "outlined" | "custom";
   focusable?: boolean;
 };
 
@@ -37,11 +44,11 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       children,
       style,
       contentStyle,
-      elevation = 'medium',
-      contentPadding = 'md',
-  variant = 'default',
-  onPress,
-  disabled,
+      elevation = "medium",
+      contentPadding = "md",
+      variant = "default",
+      onPress,
+      disabled,
       accessibilityLabel,
       accessibilityHint,
       focusable: focusableProp,
@@ -55,7 +62,7 @@ const Card = forwardRef<PaperCardRef, CardProps>(
     const [isFocused, setIsFocused] = useState(false);
 
     const paddingValue = useMemo(() => {
-      if (typeof contentPadding === 'number') {
+      if (typeof contentPadding === "number") {
         return contentPadding;
       }
 
@@ -67,9 +74,11 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       [contentStyle, paddingValue],
     );
 
-  const focusable = focusableProp ?? Boolean(onPress);
-  const isDisabled = Boolean(disabled);
-  const resolvedAccessibilityRole = onPress ? 'button' : accessibilityRoleProp;
+    const focusable = focusableProp ?? Boolean(onPress);
+    const isDisabled = Boolean(disabled);
+    const resolvedAccessibilityRole = onPress
+      ? "button"
+      : accessibilityRoleProp;
 
     const baseFocusRingStyle = useMemo<any>(
       () => ({
@@ -106,10 +115,11 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       ...(focusable ? { disabled: isDisabled } : {}),
     };
 
-    const accessibilityState = Object.keys(combinedAccessibilityState).length > 0
-      ? combinedAccessibilityState
-      : undefined;
-    if (variant === 'custom') {
+    const accessibilityState =
+      Object.keys(combinedAccessibilityState).length > 0
+        ? combinedAccessibilityState
+        : undefined;
+    if (variant === "custom") {
       return (
         <AnimatedPressable
           style={[
@@ -128,7 +138,9 @@ const Card = forwardRef<PaperCardRef, CardProps>(
           disabled={isDisabled}
           {...rest}
         >
-          {React.Children.count(children) > 0 ? <View style={innerStyle}>{children}</View> : null}
+          {React.Children.count(children) > 0 ? (
+            <View style={innerStyle}>{children}</View>
+          ) : null}
         </AnimatedPressable>
       );
     }
@@ -140,38 +152,44 @@ const Card = forwardRef<PaperCardRef, CardProps>(
         ref={ref}
         mode="elevated"
         elevation={cardElevation}
-        style={[styles.base, style, focusable && isFocused ? baseFocusRingStyle : undefined]}
+        style={[
+          styles.base,
+          style,
+          focusable && isFocused ? baseFocusRingStyle : undefined,
+        ]}
         onPress={onPress}
         onFocus={handleFocus}
         onBlur={handleBlur}
-  accessibilityRole={resolvedAccessibilityRole}
+        accessibilityRole={resolvedAccessibilityRole}
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={accessibilityHint}
         accessibilityState={accessibilityState}
         focusable={focusable}
-  disabled={isDisabled}
+        disabled={isDisabled}
         {...rest}
       >
-        {React.Children.count(children) > 0 ? <View style={innerStyle}>{children}</View> : null}
+        {React.Children.count(children) > 0 ? (
+          <View style={innerStyle}>{children}</View>
+        ) : null}
       </PaperCard>
     );
   },
 );
 
-Card.displayName = 'Card';
+Card.displayName = "Card";
 
 export default Card;
 
 const styles = StyleSheet.create({
   base: {
     borderRadius: BASE_RADIUS,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   customBase: {
     borderRadius: CUSTOM_RADIUS,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   inner: {
-    width: '100%',
+    width: "100%",
   },
 });

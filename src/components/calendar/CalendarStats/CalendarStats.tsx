@@ -1,21 +1,18 @@
-import React from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import React from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import type { CalendarStats as CalendarStatsType } from '@/models/calendar.types';
-import { Card } from '@/components/common/Card';
+import type { AppTheme } from "@/constants/theme";
+import type { CalendarStats as CalendarStatsType } from "@/models/calendar.types";
+import { Card } from "@/components/common/Card";
 
 export type CalendarStatsProps = {
   stats: CalendarStatsType;
   style?: StyleProp<ViewStyle>;
 };
 
-const CalendarStats: React.FC<CalendarStatsProps> = ({
-  stats,
-  style,
-}) => {
+const CalendarStats: React.FC<CalendarStatsProps> = ({ stats, style }) => {
   const theme = useTheme<AppTheme>();
 
   const styles = StyleSheet.create({
@@ -24,12 +21,12 @@ const CalendarStats: React.FC<CalendarStatsProps> = ({
       marginVertical: theme.custom.spacing.sm,
     },
     grid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
     },
     statItem: {
-      width: '48%',
+      width: "48%",
       marginBottom: theme.custom.spacing.sm,
     },
     statValue: {
@@ -39,7 +36,7 @@ const CalendarStats: React.FC<CalendarStatsProps> = ({
       lineHeight: theme.custom.typography.headlineSmall.lineHeight,
       letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
       color: theme.colors.primary,
-      textAlign: 'center',
+      textAlign: "center",
     },
     statLabel: {
       fontSize: theme.custom.typography.bodySmall.fontSize,
@@ -48,7 +45,7 @@ const CalendarStats: React.FC<CalendarStatsProps> = ({
       lineHeight: theme.custom.typography.bodySmall.lineHeight,
       letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      textAlign: 'center',
+      textAlign: "center",
       marginTop: theme.custom.spacing.xxs,
     },
     breakdownContainer: {
@@ -64,9 +61,9 @@ const CalendarStats: React.FC<CalendarStatsProps> = ({
       marginBottom: theme.custom.spacing.xs,
     },
     breakdownRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
       paddingVertical: theme.custom.spacing.xxs,
     },
     breakdownLabel: {
@@ -88,7 +85,7 @@ const CalendarStats: React.FC<CalendarStatsProps> = ({
   });
 
   const formatPercentage = (value: number, total: number) => {
-    if (total === 0) return '0%';
+    if (total === 0) return "0%";
     return `${Math.round((value / total) * 100)}%`;
   };
 
@@ -99,17 +96,17 @@ const CalendarStats: React.FC<CalendarStatsProps> = ({
           <Text style={styles.statValue}>{stats.totalReleases}</Text>
           <Text style={styles.statLabel}>Total Releases</Text>
         </View>
-        
+
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{stats.upcomingReleases}</Text>
           <Text style={styles.statLabel}>Upcoming</Text>
         </View>
-        
+
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{stats.releasedThisWeek}</Text>
           <Text style={styles.statLabel}>This Week</Text>
         </View>
-        
+
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{stats.monitoredReleases}</Text>
           <Text style={styles.statLabel}>Monitored</Text>
@@ -129,7 +126,12 @@ const CalendarStats: React.FC<CalendarStatsProps> = ({
           </View>
         ))}
 
-        <Text style={[styles.breakdownTitle, { marginTop: theme.custom.spacing.sm }]}>
+        <Text
+          style={[
+            styles.breakdownTitle,
+            { marginTop: theme.custom.spacing.sm },
+          ]}
+        >
           By Status
         </Text>
         {Object.entries(stats.byStatus).map(([status, count]) => (

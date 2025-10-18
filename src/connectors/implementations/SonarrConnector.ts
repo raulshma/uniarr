@@ -18,17 +18,8 @@ import type { components } from "@/connectors/client-schemas/sonarr-openapi";
 // Local aliases for the Sonarr OpenAPI-generated schemas. Using these aliases
 // keeps the rest of the file readable and allows us to change the underlying
 // source of truth without updating every usage site.
-type SonarrSeries = components["schemas"]["SeriesResource"];
 type SonarrEpisode = components["schemas"]["EpisodeResource"];
-type SonarrSystemStatus = components["schemas"]["SystemResource"];
-type SonarrQualityProfile = components["schemas"]["QualityProfileResource"];
-type SonarrQualityProfileItem =
-  components["schemas"]["QualityProfileQualityItemResource"];
 type SonarrQuality = components["schemas"]["Quality"];
-type SonarrRootFolder = components["schemas"]["RootFolderResource"];
-type SonarrQueueResponse = components["schemas"]["QueueResourcePagingResource"];
-type SonarrQueueRecord = components["schemas"]["QueueResource"];
-type SonarrTag = components["schemas"]["TagResource"];
 
 export interface SonarrQueueItem {
   readonly id: number;
@@ -149,9 +140,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async getSeries(): Promise<Series[]> {
     try {
-      const response = await this.client.get<
-        components["schemas"]["SeriesResource"][]
-      >("/api/v3/series");
+      const response =
+        await this.client.get<components["schemas"]["SeriesResource"][]>(
+          "/api/v3/series",
+        );
       return response.data.map((item) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {
@@ -195,20 +187,20 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
           `/api/v3/series/${id}`,
           {
             params: { includeSeasonImages: true },
-          }
+          },
         ),
         this.client.get<components["schemas"]["EpisodeResource"][]>(
           `/api/v3/episode`,
           {
             params: { seriesId: id, includeImages: true },
-          }
+          },
         ),
       ]);
 
       const series = this.mapSeries(seriesResponse.data);
       const episodesBySeason = this.groupEpisodesBySeason(
         episodesResponse.data,
-        series.id
+        series.id,
       );
 
       const seasons: Season[] | undefined = series.seasons?.map((season) => ({
@@ -281,7 +273,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async deleteSeries(
     seriesId: number,
-    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {}
+    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
   ): Promise<void> {
     try {
       const params = {
@@ -309,7 +301,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         components["schemas"]["SeriesResource"],
         "id" | "seasons" | "statistics"
       >
-    >
+    >,
   ): Promise<Series> {
     try {
       const response = await this.client.put<
@@ -392,9 +384,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async getTags(): Promise<components["schemas"]["TagResource"][]> {
     try {
-      const response = await this.client.get<
-        components["schemas"]["TagResource"][]
-      >("/api/v3/tag");
+      const response =
+        await this.client.get<components["schemas"]["TagResource"][]>(
+          "/api/v3/tag",
+        );
       return response.data;
     } catch (error) {
       throw handleApiError(error, {
@@ -407,7 +400,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   async createTag(
-    label: string
+    label: string,
   ): Promise<components["schemas"]["TagResource"]> {
     try {
       const response = await this.client.post<
@@ -426,7 +419,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async updateTag(
     tagId: number,
-    label: string
+    label: string,
   ): Promise<components["schemas"]["TagResource"]> {
     try {
       const response = await this.client.put<
@@ -479,9 +472,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     for (const endpoint of candidateEndpoints) {
       try {
         // Attempt endpoint variant
-        const response = await this.client.get<
-          components["schemas"]["QualityProfileResource"][]
-        >(endpoint);
+        const response =
+          await this.client.get<
+            components["schemas"]["QualityProfileResource"][]
+          >(endpoint);
 
         // Check if response contains an error
         if (
@@ -504,7 +498,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         // Only continue trying on 404; for other errors, fail-fast and report diagnostics
         if (status !== 404) {
           const enhancedError = new Error(
-            "Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again."
+            "Failed to load quality profiles. This may be due to corrupted custom formats in Sonarr. Please check your Sonarr quality profiles and custom formats, then try again.",
           );
           throw handleApiError(enhancedError, {
             serviceId: this.config.id,
@@ -518,7 +512,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
 
     const enhancedError = new Error(
-      "Failed to load quality profiles. Tried several Sonarr endpoints but none responded. This may be due to API changes or server configuration."
+      "Failed to load quality profiles. Tried several Sonarr endpoints but none responded. This may be due to API changes or server configuration.",
     );
     throw handleApiError(enhancedError, {
       serviceId: this.config.id,
@@ -530,9 +524,10 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async getRootFolders(): Promise<RootFolder[]> {
     try {
-      const response = await this.client.get<
-        components["schemas"]["RootFolderResource"][]
-      >("/api/v3/rootfolder");
+      const response =
+        await this.client.get<components["schemas"]["RootFolderResource"][]>(
+          "/api/v3/rootfolder",
+        );
       return response.data.map((folder) => this.mapRootFolder(folder));
     } catch (error) {
       throw handleApiError(error, {
@@ -547,7 +542,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   async getCalendar(
     start?: string,
     end?: string,
-    unmonitored?: boolean
+    unmonitored?: boolean,
   ): Promise<SonarrEpisode[]> {
     try {
       const params: Record<string, unknown> = {
@@ -573,11 +568,12 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async getQueue(): Promise<SonarrQueueItem[]> {
     try {
-      const response = await this.client.get<
-        components["schemas"]["QueueResourcePagingResource"]
-      >("/api/v3/queue");
+      const response =
+        await this.client.get<
+          components["schemas"]["QueueResourcePagingResource"]
+        >("/api/v3/queue");
       return (response.data.records ?? []).map((record) =>
-        this.mapQueueRecord(record)
+        this.mapQueueRecord(record),
       );
     } catch (error) {
       throw handleApiError(error, {
@@ -585,6 +581,35 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         serviceType: this.config.type,
         operation: "getQueue",
         endpoint: "/api/v3/queue",
+      });
+    }
+  }
+
+  async getHistory(options?: {
+    page?: number;
+    pageSize?: number;
+  }): Promise<components["schemas"]["HistoryResourcePagingResource"]> {
+    try {
+      const params: Record<string, unknown> = {};
+      if (options?.page) params.page = options.page;
+      if (options?.pageSize) params.pageSize = options.pageSize;
+      // Include related data for better UI display
+      params.includeSeries = true;
+      params.includeEpisode = true;
+      // Order by most recent first
+      params.sortKey = "date";
+      params.sortDirection = "descending";
+
+      const response = await this.client.get<
+        components["schemas"]["HistoryResourcePagingResource"]
+      >("/api/v3/history", { params });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getHistory",
+        endpoint: "/api/v3/history",
       });
     }
   }
@@ -640,7 +665,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       rootFolderPath: data.rootFolderPath ?? undefined,
       tags: data.tags ?? undefined,
       seasons: data.seasons?.map((season) =>
-        this.mapSeason(season, data.id ?? undefined)
+        this.mapSeason(season, data.id ?? undefined),
       ),
       nextAiring: data.nextAiring ?? undefined,
       previousAiring: data.previousAiring ?? undefined,
@@ -655,7 +680,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   private mapSeason(
     season: components["schemas"]["SeasonResource"],
-    seriesId?: number
+    seriesId?: number,
   ): Season {
     const posterUrl =
       this.findImageUrl(season.images ?? undefined, "poster") ??
@@ -675,7 +700,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   private mapStatistics(
     statistics?:
       | components["schemas"]["SeasonStatisticsResource"]
-      | components["schemas"]["SeriesStatisticsResource"]
+      | components["schemas"]["SeriesStatisticsResource"],
   ): MediaStatistics | undefined {
     if (!statistics) {
       return undefined;
@@ -690,7 +715,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   private mapEpisode(
     episode: components["schemas"]["EpisodeResource"],
-    seriesId?: number
+    seriesId?: number,
   ): Episode {
     // Try to get poster from images array first (if available in API response)
     // Try screenshot first as it's more commonly available for episodes
@@ -718,7 +743,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         ?.quality?.quality
         ? this.mapQualityResource(
             (episode as unknown as { quality?: { quality?: SonarrQuality } })
-              .quality!.quality!
+              .quality!.quality!,
           )
         : undefined,
       relativePath:
@@ -730,7 +755,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   private groupEpisodesBySeason(
     episodes: components["schemas"]["EpisodeResource"][],
-    seriesId: number
+    seriesId: number,
   ): Map<number, Episode[]> {
     return episodes.reduce((accumulator, episode) => {
       const seasonNum = episode.seasonNumber ?? 0;
@@ -743,7 +768,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   private findImageUrl(
     images: components["schemas"]["MediaCover"][] | null | undefined,
-    type: string
+    type: string,
   ): string | undefined {
     return (
       images?.find((image) => image.coverType === type)?.remoteUrl ?? undefined
@@ -754,13 +779,13 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     try {
       const url = new URL(
         `/api/v3/mediacover/${seriesId}/season-${seasonNumber}.jpg`,
-        this.config.url
+        this.config.url,
       );
       if (this.config.apiKey) {
         url.searchParams.set("apikey", this.config.apiKey);
       }
       return url.toString();
-    } catch (_e) {
+    } catch {
       // Fallback to string concat if URL construction fails for any reason
       return `${
         this.config.url
@@ -778,13 +803,13 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       // Use 'screenshot' as the image type for episodes (most common)
       const url = new URL(
         `/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg`,
-        this.config.url
+        this.config.url,
       );
       if (this.config.apiKey) {
         url.searchParams.set("apikey", this.config.apiKey);
       }
       return url.toString();
-    } catch (_e) {
+    } catch {
       return `${
         this.config.url
       }/api/v3/mediacover/${seriesId}/episode-${episodeId}-screenshot.jpg${
@@ -796,7 +821,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private mapQueueRecord(
-    record: components["schemas"]["QueueResource"]
+    record: components["schemas"]["QueueResource"],
   ): SonarrQueueItem {
     return {
       id: record.id ?? 0,
@@ -818,7 +843,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private mapQualityProfile(
-    profile: components["schemas"]["QualityProfileResource"]
+    profile: components["schemas"]["QualityProfileResource"],
   ): QualityProfile {
     return {
       id: profile.id ?? 0,
@@ -826,20 +851,20 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       upgradeAllowed: profile.upgradeAllowed ?? false,
       cutoff: this.findQualityById(profile.items ?? [], profile.cutoff ?? 0),
       items: (profile.items ?? []).map((item) =>
-        this.mapQualityProfileItem(item)
+        this.mapQualityProfileItem(item),
       ),
     };
   }
 
   private findQualityById(
     items: components["schemas"]["QualityProfileQualityItemResource"][] = [],
-    qualityId: number
+    qualityId: number,
   ): Quality {
     // Flatten all qualities from the nested structure
     const allQualities: components["schemas"]["Quality"][] = [];
 
     const processItem = (
-      item: components["schemas"]["QualityProfileQualityItemResource"]
+      item: components["schemas"]["QualityProfileQualityItemResource"],
     ) => {
       if (item.quality) {
         allQualities.push(item.quality);
@@ -867,7 +892,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private mapQualityProfileItem(
-    item: components["schemas"]["QualityProfileQualityItemResource"]
+    item: components["schemas"]["QualityProfileQualityItemResource"],
   ): QualityProfileItem {
     // For groups, we need to handle differently, but for now, if no quality, use a placeholder
     const quality =
@@ -890,7 +915,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   private mapQualityResource(
     resource:
       | components["schemas"]["QualityModel"]
-      | components["schemas"]["Quality"]
+      | components["schemas"]["Quality"],
   ): Quality {
     const maybe = resource as unknown;
     const qualityObj: components["schemas"]["Quality"] =
@@ -908,7 +933,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   }
 
   private mapRootFolder(
-    folder: components["schemas"]["RootFolderResource"]
+    folder: components["schemas"]["RootFolderResource"],
   ): RootFolder {
     return {
       id: folder.id ?? 0,

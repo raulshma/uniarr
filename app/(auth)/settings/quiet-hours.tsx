@@ -77,13 +77,13 @@ const QuietHoursScreen = () => {
   const theme = useTheme<AppTheme>();
   const quietHours = useSettingsStore((state) => state.quietHours);
   const updateQuietHoursConfig = useSettingsStore(
-    (state) => state.updateQuietHoursConfig
+    (state) => state.updateQuietHoursConfig,
   );
   const criticalBypass = useSettingsStore(
-    (state) => state.criticalHealthAlertsBypassQuietHours
+    (state) => state.criticalHealthAlertsBypassQuietHours,
   );
   const setCriticalBypass = useSettingsStore(
-    (state) => state.setCriticalHealthAlertsBypassQuietHours
+    (state) => state.setCriticalHealthAlertsBypassQuietHours,
   );
 
   const [timeDialog, setTimeDialog] = useState<{
@@ -91,7 +91,7 @@ const QuietHoursScreen = () => {
     field: TimeField;
   } | null>(null);
 
-  const timeOptions = useMemo(buildTimeOptions, []);
+  const timeOptions = useMemo(() => buildTimeOptions(), []);
 
   const styles = StyleSheet.create({
     container: {
@@ -196,7 +196,7 @@ const QuietHoursScreen = () => {
 
   const handleDayToggle = (
     category: NotificationCategory,
-    day: QuietHoursDay
+    day: QuietHoursDay,
   ) => {
     const config = quietHours[category];
     const nextDays = config.days.includes(day)
@@ -211,7 +211,7 @@ const QuietHoursScreen = () => {
 
   const handlePresetSelect = (
     category: NotificationCategory,
-    preset: QuietHoursPreset
+    preset: QuietHoursPreset,
   ) => {
     updateQuietHoursConfig(category, {
       preset,

@@ -1,5 +1,5 @@
-import axios, { AxiosError } from 'axios';
-import { ServiceAuthHelper } from '@/services/auth/ServiceAuthHelper';
+import axios, { AxiosError } from "axios";
+import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
 
 export interface ApiTestResult {
   success: boolean;
@@ -16,30 +16,21 @@ export async function testApiEndpoint(
   baseUrl: string,
   endpoint: string,
   apiKey?: string,
-  timeout: number = 15000
+  timeout: number = 15000,
 ): Promise<ApiTestResult> {
   const fullUrl = `${baseUrl}${endpoint}`;
-  console.log('🧪 [ApiTest] Testing endpoint:', fullUrl);
-  console.log('🧪 [ApiTest] API Key provided:', apiKey ? 'Yes' : 'No');
 
   try {
     // Test 1: Try with X-Api-Key header (Sonarr/Radarr standard)
     if (apiKey) {
-      console.log('🧪 [ApiTest] Testing with X-Api-Key header...');
       try {
         const response = await axios.get(fullUrl, {
           timeout,
           headers: {
-            'X-Api-Key': apiKey,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
+            "X-Api-Key": apiKey,
+            "Content-Type": "application/json",
+            Accept: "application/json",
           },
-        });
-
-        console.log('✅ [ApiTest] X-Api-Key header worked:', {
-          status: response.status,
-          dataType: typeof response.data,
-          hasData: !!response.data,
         });
 
         return {
@@ -48,31 +39,21 @@ export async function testApiEndpoint(
           data: response.data,
           headers: response.headers as Record<string, string>,
         };
-      } catch (error) {
-        console.log('❌ [ApiTest] X-Api-Key header failed:', {
-          status: (error as AxiosError).response?.status,
-          message: (error as AxiosError).message,
-        });
+      } catch {
+        // X-Api-Key header failed, continue to next test
       }
     }
 
     // Test 2: Try with query parameter
     if (apiKey) {
-      console.log('🧪 [ApiTest] Testing with query parameter...');
       try {
         const urlWithKey = `${fullUrl}?apikey=${encodeURIComponent(apiKey)}`;
         const response = await axios.get(urlWithKey, {
           timeout,
           headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
+            "Content-Type": "application/json",
+            Accept: "application/json",
           },
-        });
-
-        console.log('✅ [ApiTest] Query parameter worked:', {
-          status: response.status,
-          dataType: typeof response.data,
-          hasData: !!response.data,
         });
 
         return {
@@ -81,29 +62,19 @@ export async function testApiEndpoint(
           data: response.data,
           headers: response.headers as Record<string, string>,
         };
-      } catch (error) {
-        console.log('❌ [ApiTest] Query parameter failed:', {
-          status: (error as AxiosError).response?.status,
-          message: (error as AxiosError).message,
-        });
+      } catch {
+        // Query parameter failed, continue to next test
       }
     }
 
     // Test 3: Try without authentication (to see what error we get)
-    console.log('🧪 [ApiTest] Testing without authentication...');
     try {
       const response = await axios.get(fullUrl, {
         timeout,
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-      });
-
-      console.log('⚠️ [ApiTest] No authentication required:', {
-        status: response.status,
-        dataType: typeof response.data,
-        hasData: !!response.data,
       });
 
       return {
@@ -114,11 +85,6 @@ export async function testApiEndpoint(
       };
     } catch (error) {
       const axiosError = error as AxiosError;
-      console.log('❌ [ApiTest] No auth failed:', {
-        status: axiosError.response?.status,
-        message: axiosError.message,
-        data: axiosError.response?.data,
-      });
 
       return {
         success: false,
@@ -128,10 +94,9 @@ export async function testApiEndpoint(
       };
     }
   } catch (error) {
-    console.error('❌ [ApiTest] All tests failed:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
@@ -139,33 +104,42 @@ export async function testApiEndpoint(
 /**
  * Test Sonarr API specifically
  */
-export async function testSonarrApi(baseUrl: string, apiKey?: string, timeout: number = 15000): Promise<ApiTestResult> {
-  return testApiEndpoint(baseUrl, '/api/v3/system/status', apiKey, timeout);
+export async function testSonarrApi(
+  baseUrl: string,
+  apiKey?: string,
+  timeout: number = 15000,
+): Promise<ApiTestResult> {
+  return testApiEndpoint(baseUrl, "/api/v3/system/status", apiKey, timeout);
 }
 
 /**
  * Test Radarr API specifically
  */
-export async function testRadarrApi(baseUrl: string, apiKey?: string, timeout: number = 15000): Promise<ApiTestResult> {
-  return testApiEndpoint(baseUrl, '/api/v3/system/status', apiKey, timeout);
+export async function testRadarrApi(
+  baseUrl: string,
+  apiKey?: string,
+  timeout: number = 15000,
+): Promise<ApiTestResult> {
+  return testApiEndpoint(baseUrl, "/api/v3/system/status", apiKey, timeout);
 }
 
 /**
  * Test qBittorrent API specifically
  */
-export async function testQBittorrentApi(baseUrl: string, username?: string, password?: string, timeout: number = 15000): Promise<ApiTestResult> {
+export async function testQBittorrentApi(
+  baseUrl: string,
+  username?: string,
+  password?: string,
+  timeout: number = 15000,
+): Promise<ApiTestResult> {
   const fullUrl = `${baseUrl}/api/v2/app/version`;
-  console.log('🧪 [ApiTest] Testing qBittorrent API:', fullUrl);
-  console.log('🧪 [ApiTest] Username provided:', username ? 'Yes' : 'No');
-  console.log('🧪 [ApiTest] Password provided:', password ? 'Yes' : 'No');
-  console.log('🧪 [ApiTest] Timeout:', timeout);
 
   try {
     // Create a mock service config for testing
     const mockConfig = {
-      id: 'test-qbittorrent',
-      name: 'Test qBittorrent',
-      type: 'qbittorrent' as const,
+      id: "test-qbittorrent",
+      name: "Test qBittorrent",
+      type: "qbittorrent" as const,
       url: baseUrl,
       username,
       password,
@@ -176,11 +150,11 @@ export async function testQBittorrentApi(baseUrl: string, username?: string, pas
 
     // Use the new authentication system
     const authResult = await ServiceAuthHelper.authenticateService(mockConfig);
-    
+
     if (!authResult.success || !authResult.authenticated) {
       return {
         success: false,
-        error: authResult.error || 'Authentication failed',
+        error: authResult.error || "Authentication failed",
       };
     }
 
@@ -188,16 +162,11 @@ export async function testQBittorrentApi(baseUrl: string, username?: string, pas
     const response = await axios.get(fullUrl, {
       timeout,
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'UniArr/1.0.0',
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "UniArr/1.0.0",
       },
       withCredentials: true, // Important for session cookies
-    });
-
-    console.log('✅ [ApiTest] qBittorrent API worked:', {
-      status: response.status,
-      data: response.data,
     });
 
     return {
@@ -208,12 +177,6 @@ export async function testQBittorrentApi(baseUrl: string, username?: string, pas
     };
   } catch (error) {
     const axiosError = error as AxiosError;
-    console.log('❌ [ApiTest] qBittorrent API failed:', {
-      status: axiosError.response?.status,
-      message: axiosError.message,
-      code: axiosError.code,
-      data: axiosError.response?.data,
-    });
 
     return {
       success: false,
@@ -227,18 +190,19 @@ export async function testQBittorrentApi(baseUrl: string, username?: string, pas
 /**
  * Test Jellyseerr API specifically
  */
-export async function testJellyseerrApi(baseUrl: string, apiKey?: string, timeout: number = 15000): Promise<ApiTestResult> {
+export async function testJellyseerrApi(
+  baseUrl: string,
+  apiKey?: string,
+  timeout: number = 15000,
+): Promise<ApiTestResult> {
   const fullUrl = `${baseUrl}/api/v1/status`;
-  console.log('🧪 [ApiTest] Testing Jellyseerr API:', fullUrl);
-  console.log('🧪 [ApiTest] API Key provided:', apiKey ? 'Yes' : 'No');
-  console.log('🧪 [ApiTest] Timeout:', timeout);
 
   try {
     // Create a mock service config for testing
     const mockConfig = {
-      id: 'test-jellyseerr',
-      name: 'Test Jellyseerr',
-      type: 'jellyseerr' as const,
+      id: "test-jellyseerr",
+      name: "Test Jellyseerr",
+      type: "jellyseerr" as const,
       url: baseUrl,
       apiKey,
       enabled: true,
@@ -252,7 +216,7 @@ export async function testJellyseerrApi(baseUrl: string, apiKey?: string, timeou
     if (!authResult.success || !authResult.authenticated) {
       return {
         success: false,
-        error: authResult.error || 'Authentication failed',
+        error: authResult.error || "Authentication failed",
       };
     }
 
@@ -260,16 +224,11 @@ export async function testJellyseerrApi(baseUrl: string, apiKey?: string, timeou
     const response = await axios.get(fullUrl, {
       timeout,
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'UniArr/1.0.0',
-        ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "UniArr/1.0.0",
+        ...(apiKey ? { "X-Api-Key": apiKey } : {}),
       },
-    });
-
-    console.log('✅ [ApiTest] Jellyseerr API worked:', {
-      status: response.status,
-      data: response.data,
     });
 
     return {
@@ -280,12 +239,6 @@ export async function testJellyseerrApi(baseUrl: string, apiKey?: string, timeou
     };
   } catch (error) {
     const axiosError = error as AxiosError;
-    console.log('❌ [ApiTest] Jellyseerr API failed:', {
-      status: axiosError.response?.status,
-      message: axiosError.message,
-      code: axiosError.code,
-      data: axiosError.response?.data,
-    });
 
     return {
       success: false,
@@ -299,18 +252,20 @@ export async function testJellyseerrApi(baseUrl: string, apiKey?: string, timeou
 /**
  * Test Transmission API specifically
  */
-export async function testTransmissionApi(baseUrl: string, username?: string, password?: string, timeout: number = 15000): Promise<ApiTestResult> {
+export async function testTransmissionApi(
+  baseUrl: string,
+  username?: string,
+  password?: string,
+  timeout: number = 15000,
+): Promise<ApiTestResult> {
   const fullUrl = `${baseUrl}/transmission/rpc`;
-  console.log('🧪 [ApiTest] Testing Transmission API:', fullUrl);
-  console.log('🧪 [ApiTest] Username provided:', username ? 'Yes' : 'No');
-  console.log('🧪 [ApiTest] Password provided:', password ? 'Yes' : 'No');
 
   try {
     // Create a mock service config for testing
     const mockConfig = {
-      id: 'test-transmission',
-      name: 'Test Transmission',
-      type: 'transmission' as const,
+      id: "test-transmission",
+      name: "Test Transmission",
+      type: "transmission" as const,
       url: baseUrl,
       username,
       password,
@@ -325,27 +280,26 @@ export async function testTransmissionApi(baseUrl: string, username?: string, pa
     if (!authResult.success || !authResult.authenticated) {
       return {
         success: false,
-        error: authResult.error || 'Authentication failed',
+        error: authResult.error || "Authentication failed",
       };
     }
 
     // Test the actual API endpoint
-    const response = await axios.post(fullUrl, {
-      method: 'session-get',
-      arguments: {},
-    }, {
-      timeout,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'UniArr/1.0.0',
+    const response = await axios.post(
+      fullUrl,
+      {
+        method: "session-get",
+        arguments: {},
       },
-    });
-
-    console.log('✅ [ApiTest] Transmission API worked:', {
-      status: response.status,
-      data: response.data,
-    });
+      {
+        timeout,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": "UniArr/1.0.0",
+        },
+      },
+    );
 
     return {
       success: true,
@@ -355,12 +309,6 @@ export async function testTransmissionApi(baseUrl: string, username?: string, pa
     };
   } catch (error) {
     const axiosError = error as AxiosError;
-    console.log('❌ [ApiTest] Transmission API failed:', {
-      status: axiosError.response?.status,
-      message: axiosError.message,
-      code: axiosError.code,
-      data: axiosError.response?.data,
-    });
 
     return {
       success: false,
@@ -374,18 +322,20 @@ export async function testTransmissionApi(baseUrl: string, username?: string, pa
 /**
  * Test Deluge API specifically
  */
-export async function testDelugeApi(baseUrl: string, username?: string, password?: string, timeout: number = 15000): Promise<ApiTestResult> {
+export async function testDelugeApi(
+  baseUrl: string,
+  username?: string,
+  password?: string,
+  timeout: number = 15000,
+): Promise<ApiTestResult> {
   const fullUrl = `${baseUrl}/json`;
-  console.log('🧪 [ApiTest] Testing Deluge API:', fullUrl);
-  console.log('🧪 [ApiTest] Username provided:', username ? 'Yes' : 'No');
-  console.log('🧪 [ApiTest] Password provided:', password ? 'Yes' : 'No');
 
   try {
     // Create a mock service config for testing
     const mockConfig = {
-      id: 'test-deluge',
-      name: 'Test Deluge',
-      type: 'deluge' as const,
+      id: "test-deluge",
+      name: "Test Deluge",
+      type: "deluge" as const,
       url: baseUrl,
       username,
       password,
@@ -400,29 +350,28 @@ export async function testDelugeApi(baseUrl: string, username?: string, password
     if (!authResult.success || !authResult.authenticated) {
       return {
         success: false,
-        error: authResult.error || 'Authentication failed',
+        error: authResult.error || "Authentication failed",
       };
     }
 
     // Test the actual API endpoint
-    const response = await axios.post(fullUrl, {
-      method: 'web.get_version',
-      params: [],
-      id: 1,
-      jsonrpc: '2.0',
-    }, {
-      timeout,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'UniArr/1.0.0',
+    const response = await axios.post(
+      fullUrl,
+      {
+        method: "web.get_version",
+        params: [],
+        id: 1,
+        jsonrpc: "2.0",
       },
-    });
-
-    console.log('✅ [ApiTest] Deluge API worked:', {
-      status: response.status,
-      data: response.data,
-    });
+      {
+        timeout,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "User-Agent": "UniArr/1.0.0",
+        },
+      },
+    );
 
     return {
       success: true,
@@ -432,12 +381,6 @@ export async function testDelugeApi(baseUrl: string, username?: string, password
     };
   } catch (error) {
     const axiosError = error as AxiosError;
-    console.log('❌ [ApiTest] Deluge API failed:', {
-      status: axiosError.response?.status,
-      message: axiosError.message,
-      code: axiosError.code,
-      data: axiosError.response?.data,
-    });
 
     return {
       success: false,
@@ -451,17 +394,19 @@ export async function testDelugeApi(baseUrl: string, username?: string, password
 /**
  * Test SABnzbd API specifically
  */
-export async function testSABnzbdApi(baseUrl: string, apiKey?: string, timeout: number = 15000): Promise<ApiTestResult> {
+export async function testSABnzbdApi(
+  baseUrl: string,
+  apiKey?: string,
+  timeout: number = 15000,
+): Promise<ApiTestResult> {
   const fullUrl = `${baseUrl}/api`;
-  console.log('🧪 [ApiTest] Testing SABnzbd API:', fullUrl);
-  console.log('🧪 [ApiTest] API Key provided:', apiKey ? 'Yes' : 'No');
 
   try {
     // Create a mock service config for testing
     const mockConfig = {
-      id: 'test-sabnzbd',
-      name: 'Test SABnzbd',
-      type: 'sabnzbd' as const,
+      id: "test-sabnzbd",
+      name: "Test SABnzbd",
+      type: "sabnzbd" as const,
       url: baseUrl,
       apiKey,
       enabled: true,
@@ -475,7 +420,7 @@ export async function testSABnzbdApi(baseUrl: string, apiKey?: string, timeout: 
     if (!authResult.success || !authResult.authenticated) {
       return {
         success: false,
-        error: authResult.error || 'Authentication failed',
+        error: authResult.error || "Authentication failed",
       };
     }
 
@@ -484,15 +429,10 @@ export async function testSABnzbdApi(baseUrl: string, apiKey?: string, timeout: 
       timeout,
       params: { apikey: apiKey },
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'UniArr/1.0.0',
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": "UniArr/1.0.0",
       },
-    });
-
-    console.log('✅ [ApiTest] SABnzbd API worked:', {
-      status: response.status,
-      data: response.data,
     });
 
     return {
@@ -503,12 +443,6 @@ export async function testSABnzbdApi(baseUrl: string, apiKey?: string, timeout: 
     };
   } catch (error) {
     const axiosError = error as AxiosError;
-    console.log('❌ [ApiTest] SABnzbd API failed:', {
-      status: axiosError.response?.status,
-      message: axiosError.message,
-      code: axiosError.code,
-      data: axiosError.response?.data,
-    });
 
     return {
       success: false,
@@ -525,34 +459,24 @@ export async function testSABnzbdApi(baseUrl: string, apiKey?: string, timeout: 
 export async function testBazarrApi(
   baseUrl: string,
   apiKey?: string,
-  timeout: number = 15000
+  timeout: number = 15000,
 ): Promise<ApiTestResult> {
-  console.log('🧪 [ApiTest] Testing Bazarr API at:', baseUrl);
-
   if (!apiKey) {
-    console.log('⚠️ [ApiTest] No API key provided for Bazarr');
     return {
       success: false,
-      error: 'API key is required for Bazarr authentication',
+      error: "API key is required for Bazarr authentication",
     };
   }
 
   try {
     // Test 1: Try with X-Api-Key header (Bazarr standard)
-    console.log('🧪 [ApiTest] Testing Bazarr with X-Api-Key header...');
     const response = await axios.get(`${baseUrl}/api/system/status`, {
       timeout,
       headers: {
-        'X-Api-Key': apiKey,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        "X-Api-Key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
       },
-    });
-
-    console.log('✅ [ApiTest] Bazarr API worked:', {
-      status: response.status,
-      dataType: typeof response.data,
-      hasData: !!response.data,
     });
 
     return {
@@ -563,12 +487,6 @@ export async function testBazarrApi(
     };
   } catch (error) {
     const axiosError = error as AxiosError;
-    console.log('❌ [ApiTest] Bazarr API failed:', {
-      status: axiosError.response?.status,
-      message: axiosError.message,
-      code: axiosError.code,
-      data: axiosError.response?.data,
-    });
 
     return {
       success: false,

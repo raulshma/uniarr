@@ -1,16 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  FadeOut,
-  Layout,
-} from "react-native-reanimated";
+import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -36,9 +30,6 @@ const RadarrMovieDetailsScreen = () => {
     movie,
     isLoading,
     isFetching,
-    isError,
-    error,
-    refetch,
     toggleMonitor,
     isTogglingMonitor,
     triggerSearch,
@@ -69,14 +60,14 @@ const RadarrMovieDetailsScreen = () => {
           marginBottom: spacing.md,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleToggleMonitor = useCallback(
     (nextState: boolean) => {
       toggleMonitor(nextState);
     },
-    [toggleMonitor]
+    [toggleMonitor],
   );
 
   const handleTriggerSearch = useCallback(() => {
@@ -84,7 +75,7 @@ const RadarrMovieDetailsScreen = () => {
   }, [triggerSearch]);
 
   const handleDeleteMovie = useCallback(() => {
-  alert(
+    alert(
       "Remove Movie",
       "Are you sure you want to remove this movie from Radarr? Existing files will be kept.",
       [
@@ -110,7 +101,7 @@ const RadarrMovieDetailsScreen = () => {
           },
         },
       ],
-      { cancelable: true }
+      { cancelable: true },
     );
   }, [deleteMovieAsync, router]);
 

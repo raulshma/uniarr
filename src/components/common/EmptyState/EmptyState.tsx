@@ -1,14 +1,14 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Icon, Text, useTheme } from 'react-native-paper';
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { Icon, Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import { Button } from '@/components/common/Button';
+import type { AppTheme } from "@/constants/theme";
+import { Button } from "@/components/common/Button";
 
 export type EmptyStateProps = {
   title: string;
   description?: string;
-  icon?: React.ComponentProps<typeof Icon>['source'];
+  icon?: React.ComponentProps<typeof Icon>["source"];
   actionLabel?: string;
   onActionPress?: () => void;
   children?: React.ReactNode;
@@ -18,11 +18,11 @@ export type EmptyStateProps = {
 const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
-  icon = 'inbox-outline',
+  icon = "inbox-outline",
   actionLabel,
   onActionPress,
   children,
-  testID = 'empty-state',
+  testID = "empty-state",
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -32,16 +32,18 @@ const EmptyState: React.FC<EmptyStateProps> = ({
       accessibilityRole="summary"
       testID={testID}
     >
-      <Icon
-        source={icon}
-        size={48}
-        color={theme.colors.onSurfaceVariant}
-      />
-      <Text variant="titleMedium" style={[styles.title, { color: theme.colors.onSurface }]}>
+      <Icon source={icon} size={48} color={theme.colors.onSurfaceVariant} />
+      <Text
+        variant="titleMedium"
+        style={[styles.title, { color: theme.colors.onSurface }]}
+      >
         {title}
       </Text>
       {description ? (
-        <Text variant="bodyMedium" style={[styles.description, { color: theme.colors.onSurfaceVariant }]}>
+        <Text
+          variant="bodyMedium"
+          style={[styles.description, { color: theme.colors.onSurfaceVariant }]}
+        >
           {description}
         </Text>
       ) : null}
@@ -60,17 +62,17 @@ export default EmptyState;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 32,
   },
   title: {
     marginTop: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   description: {
     marginTop: 8,
     marginBottom: 24,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

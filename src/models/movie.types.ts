@@ -1,4 +1,4 @@
-import type { Quality } from './media.types';
+import type { Quality } from "./media.types";
 
 /**
  * Radarr movie image reference supplied by the API.

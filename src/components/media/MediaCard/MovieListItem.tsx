@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, Pressable } from 'react-native';
-import { IconButton, Text, useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View, Pressable } from "react-native";
+import { IconButton, Text, useTheme } from "react-native-paper";
 
-import type { AppTheme } from '@/constants/theme';
-import { MediaPoster } from '@/components/media/MediaPoster';
+import type { AppTheme } from "@/constants/theme";
+import { MediaPoster } from "@/components/media/MediaPoster";
 
 export type MovieListItemProps = {
   id: number | string;
@@ -15,7 +15,12 @@ export type MovieListItemProps = {
   status?: string;
   subtitle?: string;
   monitored?: boolean;
-  downloadStatus?: 'missing' | 'queued' | 'downloading' | 'available' | 'unknown';
+  downloadStatus?:
+    | "missing"
+    | "queued"
+    | "downloading"
+    | "available"
+    | "unknown";
   posterUri?: string;
   genres?: string[];
   studio?: string;
@@ -36,7 +41,9 @@ const formatRuntime = (runtime?: number): string | undefined => {
   const hours = Math.floor(runtime / 60);
   const minutes = runtime % 60;
 
-  return hours > 0 ? `${hours}h ${minutes.toString().padStart(2, '0')}m` : `${minutes}m`;
+  return hours > 0
+    ? `${hours}h ${minutes.toString().padStart(2, "0")}m`
+    : `${minutes}m`;
 };
 
 const formatByteSize = (bytes?: number): string | undefined => {
@@ -44,7 +51,7 @@ const formatByteSize = (bytes?: number): string | undefined => {
     return undefined;
   }
 
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const units = ["B", "KB", "MB", "GB", "TB"];
   let value = bytes;
   let index = 0;
 
@@ -57,24 +64,28 @@ const formatByteSize = (bytes?: number): string | undefined => {
   return `${value.toFixed(precision)} ${units[index]}`;
 };
 
-const getStatusIndicator = (downloadStatus?: string, percentAvailable?: number, hasFile?: boolean) => {
+const getStatusIndicator = (
+  downloadStatus?: string,
+  percentAvailable?: number,
+  hasFile?: boolean,
+) => {
   if (hasFile && percentAvailable === 100) {
-    return 'available';
+    return "available";
   }
 
   if (percentAvailable && percentAvailable > 0 && percentAvailable < 100) {
-    return 'downloading';
+    return "downloading";
   }
 
-  if (downloadStatus === 'downloading' || downloadStatus === 'queued') {
-    return 'downloading';
+  if (downloadStatus === "downloading" || downloadStatus === "queued") {
+    return "downloading";
   }
 
-  if (downloadStatus === 'missing') {
-    return 'missing';
+  if (downloadStatus === "missing") {
+    return "missing";
   }
 
-  return 'unknown';
+  return "unknown";
 };
 
 const MovieListItem: React.FC<MovieListItemProps> = ({
@@ -97,7 +108,10 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
   const theme = useTheme<AppTheme>();
 
   const formattedRuntime = useMemo(() => formatRuntime(runtime), [runtime]);
-  const formattedSize = useMemo(() => formatByteSize(sizeOnDisk || statistics?.sizeOnDisk), [sizeOnDisk, statistics?.sizeOnDisk]);
+  const formattedSize = useMemo(
+    () => formatByteSize(sizeOnDisk || statistics?.sizeOnDisk),
+    [sizeOnDisk, statistics?.sizeOnDisk],
+  );
   const percentAvailable = statistics?.percentAvailable;
 
   const metadataParts: string[] = [];
@@ -111,17 +125,19 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
   }
 
   if (genres && Array.isArray(genres) && genres.length > 0) {
-    const validGenres = genres.filter((genre): genre is string => typeof genre === 'string');
+    const validGenres = genres.filter(
+      (genre): genre is string => typeof genre === "string",
+    );
     if (validGenres.length > 0) {
-      metadataParts.push(validGenres.slice(0, 2).join(', '));
+      metadataParts.push(validGenres.slice(0, 2).join(", "));
     }
   }
 
-  if (typeof studio === 'string') {
+  if (typeof studio === "string") {
     metadataParts.push(studio);
   }
 
-  const metadata = metadataParts.join(' • ');
+  const metadata = metadataParts.join(" • ");
 
   const statusIndicator = getStatusIndicator(downloadStatus, percentAvailable);
 
@@ -129,8 +145,8 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
     () =>
       StyleSheet.create({
         root: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           paddingVertical: theme.custom.spacing.sm,
           paddingHorizontal: theme.custom.spacing.md,
           borderRadius: 12,
@@ -143,8 +159,8 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
           flex: 1,
         },
         titleRow: {
-          flexDirection: 'row',
-          alignItems: 'baseline',
+          flexDirection: "row",
+          alignItems: "baseline",
           marginBottom: 4,
         },
         title: {
@@ -161,20 +177,26 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
           fontSize: 12,
         },
         statusIndicator: {
-          position: 'absolute',
+          position: "absolute",
           top: 4,
           right: 4,
-          backgroundColor: statusIndicator === 'downloading' ? theme.colors.primary : theme.colors.surfaceVariant,
+          backgroundColor:
+            statusIndicator === "downloading"
+              ? theme.colors.primary
+              : theme.colors.surfaceVariant,
           borderRadius: 8,
           paddingHorizontal: 6,
           paddingVertical: 2,
           minWidth: 36,
-          alignItems: 'center',
+          alignItems: "center",
         },
         statusText: {
-          color: statusIndicator === 'downloading' ? theme.colors.onPrimary : theme.colors.onSurfaceVariant,
+          color:
+            statusIndicator === "downloading"
+              ? theme.colors.onPrimary
+              : theme.colors.onSurfaceVariant,
           fontSize: 10,
-          fontWeight: '500',
+          fontWeight: "500",
         },
         chevron: {
           marginLeft: theme.custom.spacing.sm,
@@ -184,11 +206,14 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
   );
 
   const renderStatusIndicator = () => {
-    if (statusIndicator === 'available') {
+    if (statusIndicator === "available") {
       return null; // No indicator for available movies
     }
 
-    if (statusIndicator === 'downloading' && typeof percentAvailable === 'number') {
+    if (
+      statusIndicator === "downloading" &&
+      typeof percentAvailable === "number"
+    ) {
       return (
         <View style={styles.statusIndicator}>
           <Text style={styles.statusText}>{percentAvailable}%</Text>
@@ -196,10 +221,22 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
       );
     }
 
-    if (statusIndicator === 'missing') {
+    if (statusIndicator === "missing") {
       return (
-        <View style={[styles.statusIndicator, { backgroundColor: theme.colors.errorContainer }]}>
-          <Text style={[styles.statusText, { color: theme.colors.onErrorContainer }]}>Missing</Text>
+        <View
+          style={[
+            styles.statusIndicator,
+            { backgroundColor: theme.colors.errorContainer },
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusText,
+              { color: theme.colors.onErrorContainer },
+            ]}
+          >
+            Missing
+          </Text>
         </View>
       );
     }
@@ -210,14 +247,10 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.root,
-        style,
-        pressed && { opacity: 0.8 }
-      ]}
+      style={({ pressed }) => [styles.root, style, pressed && { opacity: 0.8 }]}
       testID={testID}
     >
-      <View style={{ position: 'relative' }}>
+      <View style={{ position: "relative" }}>
         <MediaPoster
           uri={posterUri}
           size="small"
@@ -230,9 +263,9 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
       <View style={styles.content}>
         <View style={styles.titleRow}>
           <Text variant="titleMedium" style={styles.title} numberOfLines={1}>
-            {typeof title === 'string' ? title : 'Unknown Title'}
+            {typeof title === "string" ? title : "Unknown Title"}
           </Text>
-          {typeof year === 'number' && (
+          {typeof year === "number" && (
             <Text variant="bodyMedium" style={styles.year}>
               {year}
             </Text>

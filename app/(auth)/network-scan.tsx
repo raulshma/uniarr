@@ -1,10 +1,9 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   Appbar,
-  Divider,
   ProgressBar,
   Text,
   useTheme,
@@ -122,7 +121,7 @@ const NetworkScanScreen = () => {
           flex: 1,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const handleServiceSelect = useCallback(
@@ -139,7 +138,7 @@ const NetworkScanScreen = () => {
         },
       });
     },
-    [router]
+    [router],
   );
 
   const handleStartScan = useCallback(
@@ -147,7 +146,7 @@ const NetworkScanScreen = () => {
       resetScan();
       await scanNetwork(undefined, fastScan, customIpAddress || undefined);
     },
-    [scanNetwork, resetScan, customIpAddress]
+    [scanNetwork, resetScan, customIpAddress],
   );
 
   const handleStopScan = useCallback(() => {
@@ -176,7 +175,7 @@ const NetworkScanScreen = () => {
   }, [scannerService]);
 
   const handleClearHistory = useCallback(async () => {
-  alert(
+    alert(
       "Clear History",
       "Are you sure you want to clear all scan history and recent IP addresses?",
       [
@@ -194,7 +193,7 @@ const NetworkScanScreen = () => {
             }
           },
         },
-      ]
+      ],
     );
   }, [scannerService]);
 

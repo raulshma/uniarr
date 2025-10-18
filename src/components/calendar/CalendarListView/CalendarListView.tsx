@@ -1,12 +1,12 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import { FlashList } from '@shopify/flash-list';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text, useTheme } from "react-native-paper";
+import { FlashList } from "@shopify/flash-list";
 
-import type { AppTheme } from '@/constants/theme';
-import type { MediaRelease } from '@/models/calendar.types';
-import { MediaReleaseCard } from '../MediaReleaseCard';
+import type { AppTheme } from "@/constants/theme";
+import type { MediaRelease } from "@/models/calendar.types";
+import { MediaReleaseCard } from "../MediaReleaseCard";
 
 export type CalendarListViewProps = {
   releases: MediaRelease[];
@@ -45,7 +45,7 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
       gap: theme.custom.spacing.sm,
     },
     emptyState: {
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: theme.custom.spacing.xl,
     },
     emptyText: {
@@ -55,14 +55,14 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
       lineHeight: theme.custom.typography.bodyLarge.lineHeight,
       letterSpacing: theme.custom.typography.bodyLarge.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      textAlign: 'center',
+      textAlign: "center",
     },
   });
 
   const releasesByDate = useMemo(() => {
     const grouped: { [date: string]: MediaRelease[] } = {};
-    
-    releases.forEach(release => {
+
+    releases.forEach((release) => {
       if (!grouped[release.releaseDate]) {
         grouped[release.releaseDate] = [];
       }
@@ -70,16 +70,16 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
     });
 
     // Sort releases within each date by title
-    Object.keys(grouped).forEach(date => {
+    Object.keys(grouped).forEach((date) => {
       grouped[date]?.sort((a, b) => a.title.localeCompare(b.title));
     });
 
     // Sort dates
-    const sortedDates = Object.keys(grouped).sort((a, b) => 
-      new Date(b).getTime() - new Date(a).getTime()
+    const sortedDates = Object.keys(grouped).sort(
+      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
     );
 
-    return sortedDates.map(date => ({
+    return sortedDates.map((date) => ({
       date,
       releases: grouped[date] || [],
     }));
@@ -92,24 +92,28 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     let relativeDate: string;
-    if (diffDays === 0) relativeDate = 'Today';
-    else if (diffDays === 1) relativeDate = 'Tomorrow';
-    else if (diffDays === -1) relativeDate = 'Yesterday';
+    if (diffDays === 0) relativeDate = "Today";
+    else if (diffDays === 1) relativeDate = "Tomorrow";
+    else if (diffDays === -1) relativeDate = "Yesterday";
     else if (diffDays > 0) relativeDate = `In ${diffDays} days`;
     else if (diffDays < 0) relativeDate = `${Math.abs(diffDays)} days ago`;
     else relativeDate = date.toLocaleDateString();
 
-    const fullDate = date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
+    const fullDate = date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
     });
 
     return { relativeDate, fullDate };
   };
 
-  const renderDateSection = ({ item }: { item: { date: string; releases: MediaRelease[] } }) => {
+  const renderDateSection = ({
+    item,
+  }: {
+    item: { date: string; releases: MediaRelease[] };
+  }) => {
     const { relativeDate, fullDate } = formatDate(item.date);
 
     return (
@@ -135,9 +139,7 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
       <View style={[styles.container, style]}>
         <View style={styles.content}>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              No releases found
-            </Text>
+            <Text style={styles.emptyText}>No releases found</Text>
           </View>
         </View>
       </View>

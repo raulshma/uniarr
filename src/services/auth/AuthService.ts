@@ -1,9 +1,9 @@
-import { isClerkAPIResponseError, type TokenCache } from '@clerk/clerk-expo';
-import type { UserResource } from '@clerk/types';
-import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
+import { isClerkAPIResponseError, type TokenCache } from "@clerk/clerk-expo";
+import type { UserResource } from "@clerk/types";
+import Constants from "expo-constants";
+import * as SecureStore from "expo-secure-store";
 
-import { logger } from '@/services/logger/LoggerService';
+import { logger } from "@/services/logger/LoggerService";
 
 export interface AuthUser {
   id: string;
@@ -14,18 +14,18 @@ export interface AuthUser {
   displayName: string;
 }
 
-const TOKEN_CACHE_KEY_PREFIX = 'ClerkToken_';
-const CLERK_PUBLISHABLE_KEY_ENV = 'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY';
+const TOKEN_CACHE_KEY_PREFIX = "ClerkToken_";
 
-const getStorageKey = (key: string): string => `${TOKEN_CACHE_KEY_PREFIX}${key}`;
+const getStorageKey = (key: string): string =>
+  `${TOKEN_CACHE_KEY_PREFIX}${key}`;
 
 export const clerkTokenCache: TokenCache = {
   getToken: async (key: string): Promise<string | null> => {
     try {
       return await SecureStore.getItemAsync(getStorageKey(key));
     } catch (error) {
-      void logger.warn('Failed to read Clerk token from secure storage.', {
-        location: 'AuthService.clerkTokenCache.getToken',
+      void logger.warn("Failed to read Clerk token from secure storage.", {
+        location: "AuthService.clerkTokenCache.getToken",
         error: error instanceof Error ? error.message : String(error),
       });
       return null;
@@ -40,8 +40,8 @@ export const clerkTokenCache: TokenCache = {
 
       await SecureStore.setItemAsync(getStorageKey(key), token);
     } catch (error) {
-      void logger.error('Failed to persist Clerk token to secure storage.', {
-        location: 'AuthService.clerkTokenCache.saveToken',
+      void logger.error("Failed to persist Clerk token to secure storage.", {
+        location: "AuthService.clerkTokenCache.saveToken",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -50,8 +50,8 @@ export const clerkTokenCache: TokenCache = {
     try {
       await SecureStore.deleteItemAsync(getStorageKey(key));
     } catch (error) {
-      void logger.warn('Failed to clear Clerk token from secure storage.', {
-        location: 'AuthService.clerkTokenCache.clearToken',
+      void logger.warn("Failed to clear Clerk token from secure storage.", {
+        location: "AuthService.clerkTokenCache.clearToken",
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -59,33 +59,41 @@ export const clerkTokenCache: TokenCache = {
 };
 
 export const getClerkPublishableKey = (): string => {
-  const envValue = process.env[CLERK_PUBLISHABLE_KEY_ENV];
+  // Expo recommends reading publishable values via Constants.expoConfig.extra
+  // which is bundled into the app manifest. Avoid dynamic process.env access
+  // because it doesn't work consistently in native runtimes.
   const configValue =
-    typeof Constants.expoConfig?.extra?.clerkPublishableKey === 'string'
+    typeof Constants.expoConfig?.extra?.clerkPublishableKey === "string"
       ? Constants.expoConfig.extra.clerkPublishableKey
-      : undefined;
+      : typeof (Constants.manifest as any)?.extra?.clerkPublishableKey ===
+          "string"
+        ? (Constants.manifest as any).extra.clerkPublishableKey
+        : undefined;
 
-  const key = envValue ?? configValue;
+  const key = configValue ?? undefined;
 
   if (!key || key.trim().length === 0) {
     throw new Error(
-      'Clerk publishable key is not configured. Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY before running the app.',
+      "Clerk publishable key is not configured. Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY before running the app.",
     );
   }
 
   return key;
 };
 
-export const mapClerkUser = (user: UserResource | null | undefined): AuthUser | null => {
+export const mapClerkUser = (
+  user: UserResource | null | undefined,
+): AuthUser | null => {
   if (!user) {
     return null;
   }
 
   const primaryEmail =
-    user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? null;
+    user.primaryEmailAddress?.emailAddress ??
+    user.emailAddresses?.[0]?.emailAddress ??
+    null;
 
-  const displayName =
-    user.fullName ?? user.username ?? primaryEmail ?? user.id;
+  const displayName = user.fullName ?? user.username ?? primaryEmail ?? user.id;
 
   return {
     id: user.id,
@@ -99,7 +107,7 @@ export const mapClerkUser = (user: UserResource | null | undefined): AuthUser | 
 
 export const getClerkErrorMessage = (
   error: unknown,
-  fallbackMessage = 'Unable to complete the request. Please try again.',
+  fallbackMessage = "Unable to complete the request. Please try again.",
 ): string => {
   if (isClerkAPIResponseError(error)) {
     const firstError = error.errors?.[0];

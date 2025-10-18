@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
-import { useTheme } from 'react-native-paper';
+import React, { useMemo } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { useTheme } from "react-native-paper";
 
-import SkeletonPlaceholder from './SkeletonPlaceholder';
-import type { AppTheme } from '@/constants/theme';
+import SkeletonPlaceholder from "./SkeletonPlaceholder";
+import type { AppTheme } from "@/constants/theme";
 
 export type ListRowSkeletonProps = {
   style?: StyleProp<ViewStyle>;
@@ -23,8 +23,8 @@ const ListRowSkeleton: React.FC<ListRowSkeletonProps> = ({
     () =>
       StyleSheet.create({
         container: {
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           padding: theme.custom.spacing.md,
           borderRadius: 12,
           backgroundColor: theme.colors.elevation.level1,
@@ -47,14 +47,31 @@ const ListRowSkeleton: React.FC<ListRowSkeletonProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      <SkeletonPlaceholder width={48} height={48} borderRadius={24} style={styles.icon} />
+      <SkeletonPlaceholder
+        width={48}
+        height={48}
+        borderRadius={24}
+        style={styles.icon}
+      />
       <View style={styles.content}>
-        <SkeletonPlaceholder width="70%" height={18} borderRadius={6} style={styles.line} />
+        <SkeletonPlaceholder
+          width="70%"
+          height={18}
+          borderRadius={6}
+          style={styles.line}
+        />
         {showSecondaryLine ? (
           <SkeletonPlaceholder width="50%" height={14} borderRadius={6} />
         ) : null}
       </View>
-      {showAction ? <SkeletonPlaceholder width={24} height={24} borderRadius={12} style={styles.action} /> : null}
+      {showAction ? (
+        <SkeletonPlaceholder
+          width={24}
+          height={24}
+          borderRadius={12}
+          style={styles.action}
+        />
+      ) : null}
     </View>
   );
 };

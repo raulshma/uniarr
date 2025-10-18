@@ -1,9 +1,7 @@
 import { BaseConnector } from "@/connectors/base/BaseConnector";
 import type { SearchOptions } from "@/connectors/base/IConnector";
-import type {
-  components,
-  paths,
-} from "@/connectors/client-schemas/prowlarr-openapi";
+import type { components } from "@/connectors/client-schemas/prowlarr-openapi";
+import { handleApiError } from "@/utils/error.utils";
 
 // Map the project's previous manual types to the generated OpenAPI types
 type ProwlarrIndexerResource = components["schemas"]["IndexerResource"];
@@ -32,7 +30,6 @@ type ProwlarrStatistics = {
 };
 type IndexerStatsResource = components["schemas"]["IndexerStatsResource"];
 type IndexerStatistics = components["schemas"]["IndexerStatistics"];
-import { handleApiError } from "@/utils/error.utils";
 
 /**
  * Prowlarr connector for managing indexers and applications
@@ -104,7 +101,7 @@ export class ProwlarrConnector extends BaseConnector<
    * Create a new application (indexer)
    */
   async addIndexer(
-    application: ProwlarrIndexerResource
+    application: ProwlarrIndexerResource,
   ): Promise<ProwlarrIndexerResource> {
     try {
       const response = await this.client.post("/api/v1/indexer", application);
@@ -125,7 +122,7 @@ export class ProwlarrConnector extends BaseConnector<
    */
   async updateIndexer(
     id: number,
-    data: Partial<ProwlarrIndexerResource>
+    data: Partial<ProwlarrIndexerResource>,
   ): Promise<ProwlarrIndexerResource> {
     try {
       const response = await this.client.put(`/api/v1/indexer/${id}`, data);
@@ -163,7 +160,7 @@ export class ProwlarrConnector extends BaseConnector<
    * Test a specific application (indexer)
    */
   async testIndexerConfig(
-    application: ProwlarrIndexerResource
+    application: ProwlarrIndexerResource,
   ): Promise<ProwlarrTestResult> {
     // Prepare a minimal payload that matches the API contract; some Prowlarr builds
     // are strict about the request body and will return 400 if extraneous or malformed
@@ -218,7 +215,7 @@ export class ProwlarrConnector extends BaseConnector<
           if (b.errors && typeof b.errors === "object") {
             try {
               details += "\n" + JSON.stringify(b.errors, null, 2);
-            } catch (_) {
+            } catch {
               details += "\n" + String(b.errors);
             }
           }
@@ -226,7 +223,7 @@ export class ProwlarrConnector extends BaseConnector<
           if (b.modelState) {
             try {
               details += "\n" + JSON.stringify(b.modelState, null, 2);
-            } catch (_) {
+            } catch {
               details += "\n" + String(b.modelState);
             }
           }
@@ -241,7 +238,7 @@ export class ProwlarrConnector extends BaseConnector<
         throw new Error(
           `Failed to test indexer config: ${diagnostic.message}${
             details ? ` - Details: ${details}` : ""
-          }`
+          }`,
         );
       }
 
@@ -249,7 +246,7 @@ export class ProwlarrConnector extends BaseConnector<
       try {
         const fallbackResp = await this.client.post(
           "/api/v1/applications/test",
-          payload
+          payload,
         );
         return fallbackResp.data;
       } catch (fallbackErr) {
@@ -286,7 +283,7 @@ export class ProwlarrConnector extends BaseConnector<
    * Enable or disable applications (indexers)
    */
   async bulkUpdateIndexers(
-    bulkData: ProwlarrApplicationBulkResource
+    bulkData: ProwlarrApplicationBulkResource,
   ): Promise<ProwlarrIndexerResource[]> {
     try {
       const response = await this.client.put("/api/v1/indexer/bulk", bulkData);
@@ -345,7 +342,7 @@ export class ProwlarrConnector extends BaseConnector<
    */
   async executeCommand(
     commandName: string,
-    payload?: Record<string, unknown>
+    payload?: Record<string, unknown>,
   ): Promise<void> {
     try {
       await this.client.post("/api/v1/command", {
@@ -360,7 +357,7 @@ export class ProwlarrConnector extends BaseConnector<
       });
 
       throw new Error(
-        `Failed to execute command ${commandName}: ${diagnostic.message}`
+        `Failed to execute command ${commandName}: ${diagnostic.message}`,
       );
     }
   }
@@ -398,7 +395,7 @@ export class ProwlarrConnector extends BaseConnector<
       });
 
       throw new Error(
-        `Failed to get application statistics: ${diagnostic.message}`
+        `Failed to get application statistics: ${diagnostic.message}`,
       );
     }
   }
@@ -465,7 +462,7 @@ export class ProwlarrConnector extends BaseConnector<
               maybePaging.records as components["schemas"]["CommandResource"][];
           }
         }
-      } catch (cmdErr) {
+      } catch {
         // Non-fatal - commands may not be available on all Prowlarr builds
         commands = [];
       }
@@ -484,17 +481,17 @@ export class ProwlarrConnector extends BaseConnector<
             .map((p) => p.name)
             .filter(Boolean) as string[];
           if (profileNames.length > 0) connectedApps = profileNames;
-        } catch (profileErr) {
+        } catch {
           // ignore - appprofile endpoint may not be present on all versions
         }
       }
 
       // Look for ApplicationIndexerSync command entries to determine status and last run
       const syncCommands = commands.filter(
-        (c) => c.commandName === "ApplicationIndexerSync"
+        (c) => c.commandName === "ApplicationIndexerSync",
       );
       const syncInProgress = syncCommands.some((c) =>
-        ["queued", "started"].includes(String(c.status ?? ""))
+        ["queued", "started"].includes(String(c.status ?? "")),
       );
 
       // Derive last sync time from the most recent completed/started command if available
@@ -556,12 +553,12 @@ export class ProwlarrConnector extends BaseConnector<
   }
 
   async add(
-    application: ProwlarrConnectedApplication
+    application: ProwlarrConnectedApplication,
   ): Promise<ProwlarrConnectedApplication> {
     try {
       const response = await this.client.post(
         "/api/v1/applications",
-        application
+        application,
       );
       return response.data;
     } catch (error) {
@@ -576,12 +573,12 @@ export class ProwlarrConnector extends BaseConnector<
 
   async update(
     id: number,
-    data: Partial<ProwlarrConnectedApplication>
+    data: Partial<ProwlarrConnectedApplication>,
   ): Promise<ProwlarrConnectedApplication> {
     try {
       const response = await this.client.put(
         `/api/v1/applications/${id}`,
-        data
+        data,
       );
       return response.data;
     } catch (error) {
@@ -591,7 +588,7 @@ export class ProwlarrConnector extends BaseConnector<
         operation: "updateApplication",
       });
       throw new Error(
-        `Failed to update application ${id}: ${diagnostic.message}`
+        `Failed to update application ${id}: ${diagnostic.message}`,
       );
     }
   }
@@ -607,18 +604,18 @@ export class ProwlarrConnector extends BaseConnector<
         operation: "deleteApplication",
       });
       throw new Error(
-        `Failed to delete application ${id}: ${diagnostic.message}`
+        `Failed to delete application ${id}: ${diagnostic.message}`,
       );
     }
   }
 
   async testApplication(
-    application: ProwlarrConnectedApplication
+    application: ProwlarrConnectedApplication,
   ): Promise<ProwlarrTestResult> {
     try {
       const response = await this.client.post(
         "/api/v1/applications/test",
-        application
+        application,
       );
       return response.data;
     } catch (error) {
@@ -646,12 +643,12 @@ export class ProwlarrConnector extends BaseConnector<
   }
 
   async bulkUpdateApplications(
-    bulkData: ProwlarrApplicationBulkResource
+    bulkData: ProwlarrApplicationBulkResource,
   ): Promise<ProwlarrConnectedApplication[]> {
     try {
       const response = await this.client.put(
         "/api/v1/applications/bulk",
-        bulkData
+        bulkData,
       );
       return response.data || [];
     } catch (error) {
@@ -661,7 +658,7 @@ export class ProwlarrConnector extends BaseConnector<
         operation: "bulkUpdateApplications",
       });
       throw new Error(
-        `Failed to bulk update applications: ${diagnostic.message}`
+        `Failed to bulk update applications: ${diagnostic.message}`,
       );
     }
   }
@@ -677,7 +674,7 @@ export class ProwlarrConnector extends BaseConnector<
         operation: "bulkDeleteApplications",
       });
       throw new Error(
-        `Failed to bulk delete applications: ${diagnostic.message}`
+        `Failed to bulk delete applications: ${diagnostic.message}`,
       );
     }
   }
@@ -693,7 +690,7 @@ export class ProwlarrConnector extends BaseConnector<
         operation: "getApplicationSchema",
       });
       throw new Error(
-        `Failed to get application schema: ${diagnostic.message}`
+        `Failed to get application schema: ${diagnostic.message}`,
       );
     }
   }
@@ -706,7 +703,7 @@ export class ProwlarrConnector extends BaseConnector<
   // Search functionality for unified search integration
   async search(
     query: string,
-    options?: SearchOptions
+    options?: SearchOptions,
   ): Promise<ProwlarrIndexerResource[]> {
     // Prowlarr doesn't have a traditional search API like Sonarr/Radarr
     // This would typically be used for searching available indexers or configurations

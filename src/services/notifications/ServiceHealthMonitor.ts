@@ -1,8 +1,8 @@
-import { ConnectorManager } from '@/connectors/manager/ConnectorManager';
-import type { SystemHealth } from '@/connectors/base/IConnector';
-import { notificationEventService } from '@/services/notifications/NotificationEventService';
-import { logger } from '@/services/logger/LoggerService';
-import { useSettingsStore } from '@/store/settingsStore';
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import type { SystemHealth } from "@/connectors/base/IConnector";
+import { notificationEventService } from "@/services/notifications/NotificationEventService";
+import { logger } from "@/services/logger/LoggerService";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -11,7 +11,7 @@ class ServiceHealthMonitor {
 
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  private readonly lastStatuses = new Map<string, SystemHealth['status']>();
+  private readonly lastStatuses = new Map<string, SystemHealth["status"]>();
 
   private isChecking = false;
 
@@ -51,7 +51,8 @@ class ServiceHealthMonitor {
       return;
     }
 
-    const { notificationsEnabled, serviceHealthNotificationsEnabled } = useSettingsStore.getState();
+    const { notificationsEnabled, serviceHealthNotificationsEnabled } =
+      useSettingsStore.getState();
     if (!notificationsEnabled || !serviceHealthNotificationsEnabled) {
       return;
     }
@@ -66,10 +67,13 @@ class ServiceHealthMonitor {
           await manager.loadSavedServices();
           this.hasBootstrapped = true;
         } catch (error) {
-          await logger.error('Failed to bootstrap connectors for health monitoring.', {
-            location: 'ServiceHealthMonitor.runCheck',
-            error: error instanceof Error ? error.message : String(error),
-          });
+          await logger.error(
+            "Failed to bootstrap connectors for health monitoring.",
+            {
+              location: "ServiceHealthMonitor.runCheck",
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
           return;
         }
       }
@@ -94,8 +98,8 @@ class ServiceHealthMonitor {
 
             this.lastStatuses.set(connector.config.id, health.status);
           } catch (error) {
-            await logger.error('Service health check failed.', {
-              location: 'ServiceHealthMonitor.runCheck',
+            await logger.error("Service health check failed.", {
+              location: "ServiceHealthMonitor.runCheck",
               serviceId: connector.config.id,
               serviceType: connector.config.type,
               error: error instanceof Error ? error.message : String(error),
@@ -106,14 +110,14 @@ class ServiceHealthMonitor {
               serviceId: connector.config.id,
               serviceName: connector.config.name,
               health: {
-                status: 'offline',
-                message: 'Service health check failed.',
+                status: "offline",
+                message: "Service health check failed.",
                 lastChecked: new Date(),
               },
               previousStatus,
             });
 
-            this.lastStatuses.set(connector.config.id, 'offline');
+            this.lastStatuses.set(connector.config.id, "offline");
           }
         }),
       );

@@ -1,1 +1,1 @@
-export { default } from '../MediaEditor';
+export { default } from "../MediaEditor";

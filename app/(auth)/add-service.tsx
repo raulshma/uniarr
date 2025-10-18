@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View, Pressable } from "react-native";
-import { alert } from '@/services/dialogService';
+import { alert } from "@/services/dialogService";
 import {
   HelperText,
   Text,
@@ -40,6 +40,7 @@ import { debugLogger } from "@/utils/debug-logger";
 const allServiceTypes: ServiceType[] = [
   "sonarr",
   "radarr",
+  "lidarr",
   "jellyseerr",
   "jellyfin",
   "qbittorrent",
@@ -50,10 +51,12 @@ const allServiceTypes: ServiceType[] = [
   "rtorrent",
   "prowlarr",
   "bazarr",
+  "adguard",
 ];
 const apiKeyServiceTypes = [
   "sonarr",
   "radarr",
+  "lidarr",
   "jellyseerr",
   "jellyfin",
   "prowlarr",
@@ -67,6 +70,7 @@ const isApiKeyService = (type: ServiceType): type is ApiKeyServiceType =>
 const serviceTypeLabels: Record<ServiceType, string> = {
   sonarr: "Sonarr",
   radarr: "Radarr",
+  lidarr: "Lidarr",
   jellyseerr: "Jellyseerr",
   jellyfin: "Jellyfin",
   qbittorrent: "qBittorrent",
@@ -77,6 +81,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   rtorrent: "rTorrent",
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
+  adguard: "AdGuard Home",
 };
 
 const generateServiceId = (): string => {
@@ -99,7 +104,7 @@ const normalizeSensitiveValue = (value?: string): string | undefined => {
 
 const buildServiceConfig = (
   values: ServiceConfigInput,
-  id: string
+  id: string,
 ): ServiceConfig => {
   const now = new Date();
   const cleanedUrl = values.url.trim().replace(/\/+$/, "");
@@ -134,11 +139,11 @@ const AddServiceScreen = () => {
 
   const supportedTypes = useMemo(
     () => ConnectorFactory.getSupportedTypes(),
-    []
+    [],
   );
   const supportedTypeSet = useMemo(
     () => new Set(supportedTypes),
-    [supportedTypes]
+    [supportedTypes],
   );
 
   const defaultType = supportedTypes[0] ?? "sonarr";
@@ -177,15 +182,9 @@ const AddServiceScreen = () => {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
-  // Debug showDebugPanel state changes
-  useEffect(() => {
-    console.log("🧪 [AddService] showDebugPanel changed to:", showDebugPanel);
-  }, [showDebugPanel]);
-
   // Subscribe to debug logger
   useEffect(() => {
     const unsubscribe = debugLogger.subscribe((steps) => {
-      console.log("🧪 [AddService] Debug steps updated:", steps);
       setDebugSteps(steps);
     });
     return unsubscribe;
@@ -202,8 +201,8 @@ const AddServiceScreen = () => {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.none,
           backgroundColor: theme.colors.surface,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: theme.colors.outlineVariant,
@@ -338,7 +337,7 @@ const AddServiceScreen = () => {
           borderTopColor: theme.colors.outlineVariant,
         },
       }),
-    [theme]
+    [theme],
   );
 
   const inputTheme = useMemo(
@@ -356,7 +355,7 @@ const AddServiceScreen = () => {
       theme.colors.onSurfaceVariant,
       theme.colors.outlineVariant,
       theme.colors.primary,
-    ]
+    ],
   );
 
   const placeholderColor = theme.colors.onSurfaceVariant;
@@ -411,32 +410,24 @@ const AddServiceScreen = () => {
         connector.dispose();
       }
     },
-    []
+    [],
   );
 
   const handleTestConnection = useCallback(
     async (values: ServiceConfigInput): Promise<void> => {
-      console.log(
-        "🧪 [AddService] handleTestConnection called with values:",
-        values
-      );
-      console.log("🧪 [AddService] Form errors:", errors);
       resetDiagnostics();
       debugLogger.clear();
       setShowDebugPanel(true);
-      console.log("🧪 [AddService] Debug panel should be visible now");
 
       if (!supportedTypeSet.has(values.type)) {
-        console.log("❌ [AddService] Service type not supported:", values.type);
         debugLogger.addError(
           "Service type not supported",
-          `Selected service type '${values.type}' is not available yet.`
+          `Selected service type '${values.type}' is not available yet.`,
         );
         setTestError("Selected service type is not available yet.");
         return;
       }
 
-      console.log("🧪 [AddService] Starting test connection...");
       setIsTesting(true);
 
       try {
@@ -449,35 +440,24 @@ const AddServiceScreen = () => {
           debugLogger.addApiKeyValidation(
             apiKeyTest.isValid,
             apiKeyTest.message,
-            apiKeyTest.suggestions
+            apiKeyTest.suggestions,
           );
 
           if (!apiKeyTest.isValid) {
             setTestError(
-              `${apiKeyTest.message}. ${apiKeyTest.suggestions.join(" ")}`
+              `${apiKeyTest.message}. ${apiKeyTest.suggestions.join(" ")}`,
             );
             return;
           }
         }
 
-        console.log(
-          "🧪 [AddService] Starting connection test for:",
-          config.type,
-          config.url
-        );
         const result = await runConnectionTest(config);
-        console.log("🧪 [AddService] Connection test result:", result);
 
         if (result.success) {
           setTestResult(result);
-          console.log("✅ [AddService] Connection test successful");
         } else {
-          console.log(
-            "❌ [AddService] Connection test failed:",
-            result.message
-          );
           setTestError(
-            result.message ?? "Unable to connect to the selected service."
+            result.message ?? "Unable to connect to the selected service.",
           );
         }
       } catch (error) {
@@ -498,37 +478,31 @@ const AddServiceScreen = () => {
         setIsTesting(false);
       }
     },
-    [resetDiagnostics, runConnectionTest, supportedTypeSet]
+    [resetDiagnostics, runConnectionTest, supportedTypeSet],
   );
 
   const handleSave = useCallback(
     async (values: ServiceConfigInput): Promise<void> => {
-      console.log("💾 [AddService] handleSave called with values:", values);
       resetDiagnostics();
 
       if (!supportedTypeSet.has(values.type)) {
-        console.log("❌ Service type not supported:", values.type);
         setFormError("This service type is not supported yet.");
         return;
       }
 
       const config = buildServiceConfig(values, generateServiceId());
-      console.log("📋 Built config for save:", config);
 
       try {
-        console.log("🔍 Checking existing services...");
         const existingServices = await secureStorage.getServiceConfigs();
-        console.log("📋 Existing services:", existingServices.length);
 
         if (
           existingServices.some(
             (service) =>
-              service.name.trim().toLowerCase() === config.name.toLowerCase()
+              service.name.trim().toLowerCase() === config.name.toLowerCase(),
           )
         ) {
-          console.log("❌ Service name already exists");
           setFormError(
-            "A service with this name already exists. Choose a different name."
+            "A service with this name already exists. Choose a different name.",
           );
           return;
         }
@@ -537,42 +511,30 @@ const AddServiceScreen = () => {
           existingServices.some(
             (service) =>
               service.type === config.type &&
-              service.url.toLowerCase() === config.url.toLowerCase()
+              service.url.toLowerCase() === config.url.toLowerCase(),
           )
         ) {
-          console.log("❌ Service already configured");
           setFormError("This service is already configured.");
           return;
         }
 
-        console.log("🔄 Testing connection before save...");
         const testOutcome = await runConnectionTest(config);
-        console.log("✅ Connection test result for save:", testOutcome);
 
         if (!testOutcome.success) {
-          console.log(
-            "❌ Connection test failed during save:",
-            testOutcome.message
-          );
           setFormError(
-            testOutcome.message ?? "Unable to verify the connection."
+            testOutcome.message ?? "Unable to verify the connection.",
           );
           return;
         }
 
-        console.log("💾 Adding connector to manager...");
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
-        console.log("✅ Connector added to manager");
 
-        console.log("🔄 Invalidating queries...");
         await queryClient.invalidateQueries({
           queryKey: queryKeys.services.overview,
         });
-        console.log("✅ Queries invalidated");
 
-        console.log("🎉 Service saved successfully, showing alert...");
-  alert(
+        alert(
           "Service added",
           `${serviceTypeLabels[config.type]} has been connected successfully.`,
           [
@@ -580,7 +542,7 @@ const AddServiceScreen = () => {
               text: "OK",
               onPress: () => router.back(),
             },
-          ]
+          ],
         );
 
         reset({
@@ -613,7 +575,7 @@ const AddServiceScreen = () => {
       router,
       runConnectionTest,
       supportedTypeSet,
-    ]
+    ],
   );
 
   const serviceOptions = useMemo(
@@ -624,7 +586,7 @@ const AddServiceScreen = () => {
         supported: supportedTypeSet.has(type),
         isLast: index === allServiceTypes.length - 1,
       })),
-    [supportedTypeSet]
+    [supportedTypeSet],
   );
 
   return (
@@ -745,7 +707,7 @@ const AddServiceScreen = () => {
                             </Pressable>
                             {!option.isLast && <Divider />}
                           </View>
-                        )
+                        ),
                       )}
                     </Modal>
                   </Portal>
@@ -927,7 +889,8 @@ const AddServiceScreen = () => {
               if (
                 serviceType === "qbittorrent" ||
                 serviceType === "transmission" ||
-                serviceType === "deluge"
+                serviceType === "deluge" ||
+                serviceType === "adguard"
               ) {
                 return (
                   <>
@@ -1141,10 +1104,6 @@ const AddServiceScreen = () => {
             <Button
               mode="contained"
               onPress={() => {
-                console.log("🧪 [AddService] Test Connection button pressed");
-                console.log("🧪 [AddService] Form errors:", errors);
-                console.log("🧪 [AddService] Is submitting:", isSubmitting);
-                console.log("🧪 [AddService] Is testing:", isTesting);
                 handleSubmit(handleTestConnection)();
               }}
               loading={isTesting}
@@ -1160,10 +1119,6 @@ const AddServiceScreen = () => {
             <Button
               mode="contained"
               onPress={() => {
-                console.log("💾 [AddService] Save Service button pressed");
-                console.log("💾 [AddService] Form errors:", errors);
-                console.log("💾 [AddService] Is submitting:", isSubmitting);
-                console.log("💾 [AddService] Is testing:", isTesting);
                 handleSubmit(handleSave)();
               }}
               loading={isSubmitting}
