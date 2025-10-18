@@ -7,7 +7,8 @@ export type WidgetType =
   | "download-progress"
   | "recent-activity"
   | "statistics"
-  | "calendar-preview";
+  | "calendar-preview"
+  | "shortcuts";
 
 export interface Widget {
   id: string;
@@ -98,11 +99,51 @@ class WidgetService {
         size: "medium",
       },
       {
+        id: "shortcuts",
+        type: "shortcuts",
+        title: "Shortcuts",
+        enabled: true,
+        order: 1,
+        size: "medium",
+        config: {
+          shortcuts: [
+            {
+              id: "discover",
+              label: "Discover",
+              icon: "compass",
+              route: "/discover",
+              enabled: true,
+            },
+            {
+              id: "search",
+              label: "Search",
+              icon: "magnify",
+              route: "/dashboard/search",
+              enabled: true,
+            },
+            {
+              id: "calendar",
+              label: "Calendar",
+              icon: "calendar",
+              route: "/calendar",
+              enabled: true,
+            },
+            {
+              id: "anime",
+              label: "Anime Hub",
+              icon: "play-circle",
+              route: "/anime-hub",
+              enabled: true,
+            },
+          ],
+        },
+      },
+      {
         id: "download-progress",
         type: "download-progress",
         title: "Downloads",
         enabled: true,
-        order: 1,
+        order: 2,
         size: "medium",
       },
       {
@@ -110,7 +151,7 @@ class WidgetService {
         type: "recent-activity",
         title: "Recent Activity",
         enabled: true,
-        order: 2,
+        order: 3,
         size: "large",
       },
       {
@@ -118,7 +159,7 @@ class WidgetService {
         type: "statistics",
         title: "Statistics",
         enabled: true,
-        order: 3,
+        order: 4,
         size: "large",
       },
       {
@@ -126,7 +167,7 @@ class WidgetService {
         type: "calendar-preview",
         title: "Upcoming Releases",
         enabled: true,
-        order: 4,
+        order: 5,
         size: "large",
       },
     ];
@@ -324,6 +365,12 @@ class WidgetService {
   getCalendarPreviewWidgets(): Widget[] {
     return Array.from(this.widgets.values()).filter(
       (widget) => widget.type === "calendar-preview" && widget.enabled,
+    );
+  }
+
+  getShortcutsWidgets(): Widget[] {
+    return Array.from(this.widgets.values()).filter(
+      (widget) => widget.type === "shortcuts" && widget.enabled,
     );
   }
 }

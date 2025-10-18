@@ -483,6 +483,8 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.activityList}
+          scrollEnabled={false}
+          nestedScrollEnabled={false}
         />
       </View>
     </View>

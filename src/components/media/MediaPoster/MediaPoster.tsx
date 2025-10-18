@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
 import {
   Pressable,
   StyleProp,
@@ -69,77 +75,112 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
-  // Animation value for progressive loading
-  const fadeAnim = useMemo(() => new Animated.Value(0), []);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  // Optimized: use ref to avoid recreation on each render
+  const fadeAnimRef = useRef(new Animated.Value(0));
+  const fadeAnim = fadeAnimRef.current;
 
-  // Use theme's poster style configuration if borderRadius is not explicitly provided
-  const effectiveBorderRadius =
-    borderRadius ??
-    theme.custom.config?.posterStyle.borderRadius ??
-    DEFAULT_RADIUS;
-  const width = useMemo(
-    () => (typeof size === "number" ? size : sizeMap[size]),
-    [size],
-  );
-  const height = useMemo(
-    () => Math.round(width / aspectRatio),
-    [width, aspectRatio],
-  );
-
-  const [isLoading, setIsLoading] = useState(Boolean(uri));
-  const [hasError, setHasError] = useState(false);
-  const [resolvedUri, setResolvedUri] = useState<string | undefined>(uri);
-
-  // Use the new thumbhash hook for clean thumbhash management
-  const { thumbhash } = useThumbhash(uri, {
-    autoGenerate: true,
-    generateDelay: 100, // Small delay to not block initial render
+  // Consolidated state to reduce re-renders
+  const [imageState, setImageState] = useState({
+    loaded: false,
+    loading: Boolean(uri),
+    error: false,
+    resolvedUri: uri,
   });
 
-  // Preload image if requested
+  // Memoize expensive calculations
+  const effectiveBorderRadius = useMemo(
+    () =>
+      borderRadius ??
+      theme.custom.config?.posterStyle.borderRadius ??
+      DEFAULT_RADIUS,
+    [borderRadius, theme.custom.config?.posterStyle.borderRadius],
+  );
+
+  const dimensions = useMemo(() => {
+    const widthValue = typeof size === "number" ? size : sizeMap[size];
+    const heightValue = Math.round(widthValue / aspectRatio);
+    return { width: widthValue, height: heightValue };
+  }, [size, aspectRatio]);
+
+  // Debug logging for URI changes
   useEffect(() => {
-    if (preload && uri && !resolvedUri) {
+    if (process.env.NODE_ENV === "development" && uri) {
+      console.log("MediaPoster URI changed:", uri);
+    }
+  }, [uri, imageState.loading, imageState.resolvedUri]);
+
+  // Use the thumbhash hook with reduced delay for better UX
+  const { thumbhash } = useThumbhash(uri, {
+    autoGenerate: true,
+    generateDelay: 50, // Reduced delay for faster feedback
+  });
+
+  // Optimized preloading with early return
+  useEffect(() => {
+    if (preload && uri && !imageState.resolvedUri) {
       void imageCacheService.prefetch(uri);
     }
-  }, [preload, uri, resolvedUri]);
+  }, [preload, uri, imageState.resolvedUri]);
 
+  // Optimized URI resolution with caching and better error handling
   useEffect(() => {
     let isMounted = true;
+    let cancelled = false;
 
     const resolve = async () => {
       if (!uri) {
-        if (isMounted) {
-          setResolvedUri(undefined);
-          setIsLoading(false);
-          setHasError(false);
-          setImageLoaded(false);
+        if (isMounted && !cancelled) {
+          setImageState({
+            loaded: false,
+            loading: false,
+            error: false,
+            resolvedUri: undefined,
+          });
           fadeAnim.setValue(0);
         }
         return;
       }
 
-      if (isMounted) {
-        setIsLoading(true);
-        setHasError(false);
-        setResolvedUri(undefined);
-        setImageLoaded(false);
-        fadeAnim.setValue(0);
+      // Avoid unnecessary re-resolutions if URI hasn't changed or if already loading
+      if (imageState.resolvedUri === uri || imageState.loading) {
+        return;
+      }
+
+      if (isMounted && !cancelled) {
+        setImageState((prev) => ({
+          ...prev,
+          loading: true,
+          error: false,
+          // Keep previous URI during loading to prevent flickering
+          resolvedUri: prev.resolvedUri || uri,
+        }));
+        // Don't reset fade animation to prevent flickering
       }
 
       try {
-        // Request a sized thumbnail matching the rendered size * device DPR
+        // Optimized: cache resolved URIs to avoid repeated processing
         const localUri = await imageCacheService.resolveForSize(
           uri,
-          width,
-          height,
+          dimensions.width,
+          dimensions.height,
         );
-        if (isMounted) {
-          setResolvedUri(localUri);
+        if (isMounted && !cancelled) {
+          setImageState({
+            loaded: false,
+            loading: false,
+            error: false,
+            resolvedUri: localUri,
+          });
         }
       } catch {
-        if (isMounted) {
-          setResolvedUri(uri);
+        // Silent error handling - fallback to original URI
+        if (isMounted && !cancelled) {
+          setImageState({
+            loaded: false,
+            loading: false,
+            error: true,
+            resolvedUri: uri,
+          });
         }
       }
     };
@@ -148,12 +189,12 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
 
     return () => {
       isMounted = false;
+      cancelled = true;
     };
-  }, [uri, width, height, fadeAnim]);
+  }, [uri, dimensions.width, dimensions.height, fadeAnim]);
 
   const handleImageLoad = useCallback(() => {
-    setIsLoading(false);
-    setImageLoaded(true);
+    setImageState((prev) => ({ ...prev, loaded: true, loading: false }));
 
     if (progressiveLoading) {
       Animated.timing(fadeAnim, {
@@ -164,13 +205,23 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     }
   }, [progressiveLoading, fadeAnim]);
 
+  const handleError = useCallback(() => {
+    setImageState((prev) => ({
+      ...prev,
+      loaded: false,
+      loading: false,
+      error: true,
+    }));
+  }, []);
+
+  // Optimized container style calculation
   const containerStyle = useMemo(
     () =>
       [
         styles.container,
         {
-          width,
-          height,
+          width: dimensions.width,
+          height: dimensions.height,
           borderRadius: effectiveBorderRadius,
           backgroundColor: theme.colors.surfaceVariant,
           // Apply shadow styling from theme configuration
@@ -183,8 +234,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         style,
       ] as StyleProp<ViewStyle>,
     [
-      width,
-      height,
+      dimensions,
       effectiveBorderRadius,
       style,
       theme.colors.surfaceVariant,
@@ -194,8 +244,8 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     ],
   );
 
-  const isFallback = hasError || !resolvedUri;
-  const showLoadingPlaceholder = isLoading && !thumbhash;
+  const isFallback = imageState.error || !imageState.resolvedUri;
+  const showLoadingPlaceholder = imageState.loading && !thumbhash;
 
   const content = isFallback ? (
     <View style={[styles.fallback, { borderRadius: effectiveBorderRadius }]}>
@@ -229,16 +279,16 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     </View>
   ) : (
     <>
-      {/* Show thumbhash placeholder with blur effect */}
-      {thumbhash && !imageLoaded && (
+      {/* Show thumbhash placeholder with blur effect - only show when we have a valid URI and not loaded */}
+      {thumbhash && !imageState.loaded && imageState.resolvedUri && (
         <Image
-          source={{ uri: resolvedUri }}
+          source={{ uri: imageState.resolvedUri }}
           placeholder={thumbhash}
           style={[
             StyleSheet.absoluteFillObject,
             { borderRadius: effectiveBorderRadius },
           ]}
-          blurRadius={progressiveLoading ? 8 : 0}
+          blurRadius={progressiveLoading ? 6 : 0} // Slightly reduced blur for performance
           cachePolicy="memory-disk"
           contentFit="cover"
         />
@@ -254,9 +304,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         ]}
       >
         <Image
-          source={{ uri: resolvedUri }}
-          // Use stored thumbhash as a placeholder when available. Expo Image accepts
-          // placeholder as an object with thumbhash property for proper rendering.
+          source={{ uri: imageState.resolvedUri }}
           placeholder={thumbhash}
           style={[
             StyleSheet.absoluteFillObject,
@@ -266,13 +314,12 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
           cachePolicy="memory-disk"
           contentFit="cover"
           priority={priority}
-          transition={progressiveLoading ? 300 : 0}
+          transition={progressiveLoading ? 250 : 0} // Slightly reduced for snappier feel
           onLoad={handleImageLoad}
           onLoadEnd={handleImageLoad}
-          onError={() => {
-            setIsLoading(false);
-            setHasError(true);
-          }}
+          onError={handleError}
+          // Only render when we have a valid resolved URI to prevent flickering
+          key={imageState.resolvedUri || "placeholder"}
         />
       </Animated.View>
     </>
@@ -309,7 +356,7 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   );
 };
 
-export default MediaPoster;
+export default React.memo(MediaPoster);
 
 const styles = StyleSheet.create({
   container: {

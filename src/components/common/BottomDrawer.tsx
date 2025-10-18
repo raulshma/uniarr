@@ -12,11 +12,7 @@ import BottomSheet, {
   BottomSheetBackdropProps,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import Animated, {
-  FadeInDown,
-  SlideInDown,
-  SlideOutDown,
-} from "react-native-reanimated";
+import Animated, { SlideInDown, SlideOutDown } from "react-native-reanimated";
 
 type Props = {
   visible: boolean;
@@ -176,7 +172,7 @@ const BottomDrawer: React.FC<Props> = ({
           paddingBottom: 4,
         }}
       >
-        <Animated.View entering={FadeInDown.delay(100).duration(300)}>
+        <View>
           <View style={styles.headerRow}>
             {title ? (
               <Text
@@ -201,16 +197,14 @@ const BottomDrawer: React.FC<Props> = ({
               style={styles.closeButton}
             />
           </View>
-        </Animated.View>
+        </View>
 
         <BottomSheetScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          <Animated.View entering={FadeInDown.delay(150).duration(400)}>
-            {children}
-          </Animated.View>
+          {children}
         </BottomSheetScrollView>
       </BottomSheet>
     </Animated.View>

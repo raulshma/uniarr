@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Image,
-  Linking,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -35,7 +34,7 @@ import {
   useConnectorsStore,
   selectGetConnector,
 } from "@/store/connectorsStore";
-import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import DownloadButton from "@/components/downloads/DownloadButton";
 
 const mediaTypeLabels: Record<UnifiedSearchMediaType, string> = {
   series: "Series",
@@ -326,6 +325,13 @@ export const UnifiedSearchPanel: React.FC = () => {
           justifyContent: "center",
           alignItems: "center",
         },
+        downloadButtonContainer: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          justifyContent: "center",
+          alignItems: "center",
+        },
         historyContainer: {
           paddingHorizontal: spacing.sm,
           paddingVertical: spacing.sm,
@@ -498,39 +504,6 @@ export const UnifiedSearchPanel: React.FC = () => {
   const hasAdvancedFilters =
     qualityFilter !== "Any" || releaseTypeFilter !== "Any";
 
-  // Attempt to open a specific Jellyseerr media detail page in the browser
-  const openJellyseerrMediaDetail = useCallback(
-    async (item: UnifiedSearchResult): Promise<boolean> => {
-      try {
-        // Validate basics
-        if (item.serviceType !== "jellyseerr") return false;
-        const connector = getConnector(item.serviceId) as
-          | JellyseerrConnector
-          | undefined;
-        if (!connector || connector.config.type !== "jellyseerr") return false;
-
-        // Prefer TMDB id for Jellyseerr routes; fallback to service native id
-        const tmdbId =
-          item.externalIds?.tmdbId ?? item.externalIds?.serviceNativeId;
-        if (!tmdbId) return false;
-
-        const mediaPathType: "movie" | "tv" =
-          item.mediaType === "series" ? "tv" : "movie";
-        const path = connector.getMediaDetailUrl(Number(tmdbId), mediaPathType);
-        if (!path) return false;
-
-        // Join base URL and path safely
-        const base = connector.config.url.replace(/\/$/, "");
-        const fullUrl = `${base}${path.startsWith("/") ? "" : "/"}${path}`;
-        await Linking.openURL(fullUrl);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    [getConnector],
-  );
-
   // If the route provides search params (e.g. from Discover card), prefill the search
   useEffect(() => {
     if (params.query && params.query !== searchTerm) {
@@ -622,40 +595,6 @@ export const UnifiedSearchPanel: React.FC = () => {
     [recordSearch, router],
   );
 
-  const handleOpenService = useCallback(
-    (item: UnifiedSearchResult) => {
-      if (item.serviceType === "jellyseerr") {
-        // Icon button: open Jellyseerr media detail page in browser (web app)
-        void openJellyseerrMediaDetail(item);
-        return;
-      }
-
-      switch (item.serviceType) {
-        case "jellyfin":
-          router.push({
-            pathname: "/(auth)/jellyfin/[serviceId]",
-            params: { serviceId: item.serviceId },
-          });
-          break;
-        case "sonarr":
-          router.push({
-            pathname: "/(auth)/sonarr/[serviceId]",
-            params: { serviceId: item.serviceId },
-          });
-          break;
-        case "radarr":
-          router.push({
-            pathname: "/(auth)/radarr/[serviceId]",
-            params: { serviceId: item.serviceId },
-          });
-          break;
-        default:
-          break;
-      }
-    },
-    [openJellyseerrMediaDetail, router],
-  );
-
   const renderResult = useCallback(
     (item: UnifiedSearchResult) => {
       const subtitleInfo = [];
@@ -738,19 +677,22 @@ export const UnifiedSearchPanel: React.FC = () => {
                     />
                   </View>
 
-                  <View
-                    style={[
-                      styles.actionButton,
-                      { backgroundColor: theme.colors.surfaceVariant },
-                    ]}
-                  >
-                    <IconButton
-                      icon="download"
-                      size={20}
-                      iconColor={theme.colors.onSurfaceVariant}
-                      onPress={() => handleOpenService(item)}
-                    />
-                  </View>
+                  {item.serviceId && getConnector(item.serviceId)?.config && (
+                    <View style={styles.downloadButtonContainer}>
+                      <DownloadButton
+                        serviceConfig={getConnector(item.serviceId)!.config}
+                        contentId={item.id}
+                        size="small"
+                        variant="icon"
+                        onDownloadStart={(downloadId) => {
+                          console.log(`Download started: ${downloadId}`);
+                        }}
+                        onDownloadError={(error) => {
+                          console.error(`Download failed: ${error}`);
+                        }}
+                      />
+                    </View>
+                  )}
 
                   <View
                     style={[
@@ -771,7 +713,7 @@ export const UnifiedSearchPanel: React.FC = () => {
         </View>
       );
     },
-    [handleOpenService, handlePrimaryAction, styles, theme],
+    [handlePrimaryAction, styles, theme, getConnector],
   );
 
   const renderErrorHelper = useMemo(() => {

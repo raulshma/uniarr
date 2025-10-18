@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
-import { Text, FAB, useTheme, Portal, Modal, Button } from "react-native-paper";
+import { View, StyleSheet, ScrollView, Modal } from "react-native";
+import { Text, FAB, useTheme, Button } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
@@ -13,6 +13,7 @@ import DownloadProgressWidget from "../DownloadProgressWidget/DownloadProgressWi
 import RecentActivityWidget from "../RecentActivityWidget/RecentActivityWidget";
 import StatisticsWidget from "../StatisticsWidget/StatisticsWidget";
 import CalendarPreviewWidget from "../CalendarPreviewWidget/CalendarPreviewWidget";
+import ShortcutsWidget from "../ShortcutsWidget/ShortcutsWidget";
 
 export interface WidgetContainerProps {
   /**
@@ -81,6 +82,15 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
+      case "shortcuts":
+        return (
+          <ShortcutsWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleRefresh}
+            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+          />
+        );
       case "download-progress":
         return (
           <DownloadProgressWidget
@@ -129,8 +139,25 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
   const handleEditWidget = (widget: Widget) => {
     onPress();
-    // TODO: Open widget configuration modal
-    console.log("Edit widget:", widget);
+    // Navigate to widget-specific settings if available
+    switch (widget.type) {
+      case "service-status":
+        // Navigate to service connections settings
+        router.push("/(auth)/settings/connections");
+        break;
+      case "shortcuts":
+        // Navigate to shortcuts settings
+        router.push("/(auth)/settings/shortcuts");
+        break;
+      case "download-progress":
+        // Navigate to download settings
+        router.push("/(auth)/settings/downloads");
+        break;
+      default:
+        // For widgets without specific settings, go to general widget settings
+        router.push("/(auth)/settings/widgets");
+        break;
+    }
   };
 
   const handleToggleWidget = async (widgetId: string) => {
@@ -181,54 +208,119 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
       </View>
 
       {editable && (
-        <FAB icon="cog" style={styles.fab} onPress={() => setEditing(true)} />
+        <FAB
+          icon="cog"
+          size="small"
+          style={styles.fab}
+          onPress={() => setEditing(true)}
+        />
       )}
 
       {/* Widget Settings Modal */}
-      <Portal>
-        <Modal
-          visible={editing}
-          onDismiss={() => setEditing(false)}
-          contentContainerStyle={styles.modal}
+      <Modal
+        visible={editing}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditing(false)}
+      >
+        <View
+          style={[
+            styles.fullScreenModal,
+            { backgroundColor: theme.colors.background },
+          ]}
         >
-          <View style={styles.modalContent}>
-            <Text variant="headlineMedium">Widget Settings</Text>
+          {/* Header */}
+          <View
+            style={[
+              styles.modalHeader,
+              { borderBottomColor: theme.colors.outline },
+            ]}
+          >
+            <Text
+              variant="headlineLarge"
+              style={{ color: theme.colors.onBackground }}
+            >
+              Widget Settings
+            </Text>
+            <Button
+              mode="text"
+              onPress={() => setEditing(false)}
+              textColor={theme.colors.primary}
+              labelStyle={{ fontWeight: "600" }}
+            >
+              Done
+            </Button>
+          </View>
 
-            <ScrollView style={styles.widgetList}>
-              {widgets.map((widget) => (
-                <View key={widget.id} style={styles.widgetListItem}>
+          {/* Content */}
+          <ScrollView
+            style={styles.modalScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {widgets.length > 0 ? (
+              widgets.map((widget) => (
+                <View
+                  key={widget.id}
+                  style={[
+                    styles.widgetListItem,
+                    { borderBottomColor: theme.colors.outline },
+                  ]}
+                >
                   <View style={styles.widgetInfo}>
-                    <Text variant="titleMedium">{widget.title}</Text>
-                    <Text variant="bodySmall">{widget.type}</Text>
+                    <Text
+                      variant="titleLarge"
+                      style={{ color: theme.colors.onBackground }}
+                    >
+                      {widget.title}
+                    </Text>
+                    <Text
+                      variant="bodyMedium"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {widget.type}
+                    </Text>
                   </View>
                   <View style={styles.widgetActions}>
                     <Button
                       mode={widget.enabled ? "outlined" : "contained"}
                       onPress={() => handleToggleWidget(widget.id)}
-                      compact
                     >
                       {widget.enabled ? "Disable" : "Enable"}
                     </Button>
                   </View>
                 </View>
-              ))}
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <Button
-                mode="text"
-                onPress={() => setEditing(false)}
-                style={styles.cancelButton}
-              >
-                Cancel
-              </Button>
-              <Button mode="contained" onPress={() => setEditing(false)}>
-                Done
-              </Button>
-            </View>
-          </View>
-        </Modal>
-      </Portal>
+              ))
+            ) : (
+              <View style={styles.emptyModalState}>
+                <MaterialCommunityIcons
+                  name="widgets-outline"
+                  size={64}
+                  color={theme.colors.onSurfaceVariant}
+                />
+                <Text
+                  variant="titleMedium"
+                  style={{
+                    color: theme.colors.onSurfaceVariant,
+                    marginTop: 16,
+                  }}
+                >
+                  No widgets available
+                </Text>
+                <Text
+                  variant="bodyMedium"
+                  style={{
+                    color: theme.colors.onSurfaceVariant,
+                    marginTop: 8,
+                    textAlign: "center",
+                  }}
+                >
+                  Please check your widget configuration
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -266,7 +358,7 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "rgba(0,0,0,0.05)",
     borderRadius: 8,
     minHeight: 200,
   },
@@ -276,16 +368,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  modal: {
-    backgroundColor: "white",
-    padding: 20,
-    margin: 20,
-    borderRadius: 8,
-    maxHeight: "80%",
-  },
-  modalContent: {
-    flex: 1,
-  },
   widgetList: {
     marginVertical: 20,
   },
@@ -293,25 +375,40 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: "rgba(0,0,0,0.08)",
   },
   widgetInfo: {
     flex: 1,
   },
   widgetActions: {
     flexDirection: "row",
-    gap: 8,
-  },
-  modalActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
     gap: 12,
-    marginTop: 20,
   },
-  cancelButton: {
-    marginRight: "auto",
+  emptyModalState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+  },
+  fullScreenModal: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+  },
+  modalScrollContent: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
 });
 

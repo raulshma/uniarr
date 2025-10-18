@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system/legacy";
+import { File, Directory } from "expo-file-system";
+import * as FileSystemLegacy from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import * as Crypto from "expo-crypto";
@@ -552,9 +553,9 @@ class BackupRestoreService {
 
       // Create backup file
       const fileName = `uniarr-backup-${new Date().toISOString().split("T")[0]}${options.encryptSensitive ? "-encrypted" : ""}.json`;
-      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+      const filePath = `${FileSystemLegacy.documentDirectory}${fileName}`;
 
-      await FileSystem.writeAsStringAsync(
+      await FileSystemLegacy.writeAsStringAsync(
         filePath,
         JSON.stringify(backupData, null, 2),
       );
@@ -635,9 +636,9 @@ class BackupRestoreService {
 
       // Create backup file
       const fileName = `uniarr-backup-${new Date().toISOString().split("T")[0]}.json`;
-      const filePath = `${FileSystem.documentDirectory}${fileName}`;
+      const filePath = `${FileSystemLegacy.documentDirectory}${fileName}`;
 
-      await FileSystem.writeAsStringAsync(
+      await FileSystemLegacy.writeAsStringAsync(
         filePath,
         JSON.stringify(backupData, null, 2),
       );
@@ -731,7 +732,7 @@ class BackupRestoreService {
       }
 
       // Read the file
-      const fileContent = await FileSystem.readAsStringAsync(fileUri);
+      const fileContent = await FileSystemLegacy.readAsStringAsync(fileUri);
 
       // Validate that the file content is valid JSON
       let backupData: AnyBackupData;
@@ -1059,11 +1060,11 @@ class BackupRestoreService {
    */
   async getBackupFileSize(filePath: string): Promise<number> {
     try {
-      const fileInfo = await FileSystem.getInfoAsync(filePath);
-      if (!fileInfo.exists || fileInfo.isDirectory) {
+      const file = new File(filePath);
+      if (!file.exists) {
         return 0;
       }
-      return (fileInfo as any).size ?? 0;
+      return file.size ?? 0;
     } catch (error) {
       await logger.error("Failed to get backup file size", {
         location: "BackupRestoreService.getBackupFileSize",
@@ -1078,7 +1079,10 @@ class BackupRestoreService {
    */
   async deleteBackup(filePath: string): Promise<void> {
     try {
-      await FileSystem.deleteAsync(filePath, { idempotent: true });
+      const deleteFile = new File(filePath);
+      if (deleteFile.exists) {
+        deleteFile.delete();
+      }
 
       await logger.info("Backup file deleted", {
         location: "BackupRestoreService.deleteBackup",
@@ -1099,32 +1103,35 @@ class BackupRestoreService {
     { name: string; path: string; modificationTime: number }[]
   > {
     try {
-      const docDir = FileSystem.documentDirectory;
+      const docDir = FileSystemLegacy.documentDirectory;
       if (!docDir) {
         return [];
       }
 
-      const files = await FileSystem.readDirectoryAsync(docDir);
+      const directory = new Directory(docDir);
+      const files = directory.exists ? directory.list() : [];
       const backupFiles: {
         name: string;
         path: string;
         modificationTime: number;
       }[] = [];
 
-      for (const fileName of files) {
+      for (const fileItem of files) {
+        // Skip directories, only process files
+        if (fileItem instanceof Directory) {
+          continue;
+        }
+
+        const fileName = fileItem.name;
         if (
           fileName.startsWith("uniarr-backup-") &&
           fileName.endsWith(".json")
         ) {
-          const filePath = `${docDir}${fileName}`;
-          const fileInfo = await FileSystem.getInfoAsync(filePath);
-
-          if (fileInfo.exists && !fileInfo.isDirectory) {
+          if (fileItem.exists) {
             backupFiles.push({
               name: fileName,
-              path: filePath,
-              modificationTime:
-                ((fileInfo as any).modificationTime ?? 0) * 1000,
+              path: fileItem.uri,
+              modificationTime: 0, // File API doesn't expose modification time directly
             });
           }
         }

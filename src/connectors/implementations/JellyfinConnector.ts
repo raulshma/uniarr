@@ -14,6 +14,13 @@ import type {
   JellyfinSearchHintResult,
   JellyfinSearchOptions,
 } from "@/models/jellyfin.types";
+import type {
+  IDownloadConnector,
+  DownloadCapability,
+  QualityOption,
+  DownloadContentMetadata,
+  DownloadInfo,
+} from "@/connectors/base/IDownloadConnector";
 import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
 import { logger } from "@/services/logger/LoggerService";
 
@@ -33,13 +40,21 @@ const DEFAULT_ITEM_FIELDS = [
   "PremiereDate",
   "ProductionYear",
   "OfficialRating",
+  "IndexNumber",
+  "ParentIndexNumber",
 ].join(",");
 
-export class JellyfinConnector extends BaseConnector<JellyfinItem> {
+export class JellyfinConnector
+  extends BaseConnector<JellyfinItem>
+  implements IDownloadConnector
+{
   private userId?: string;
   private userName?: string;
   private serverVersion?: string;
   private serverName?: string;
+
+  // Download connector properties
+  public readonly supportsDownloads = true;
 
   constructor(config: ServiceConfig) {
     super(config);
@@ -569,5 +584,679 @@ export class JellyfinConnector extends BaseConnector<JellyfinItem> {
   } {
     // Jellyfin manages authentication via tokens, so no basic auth configuration is required here.
     return {};
+  }
+
+  // ==================== DOWNLOAD CONNECTOR METHODS ====================
+
+  /**
+   * Check if a specific content item can be downloaded
+   */
+  async canDownload(contentId: string): Promise<DownloadCapability> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    try {
+      // Get the item details to check if it can be downloaded
+      const item = await this.getItem(contentId);
+
+      // Movies, episodes, and series can be downloaded
+      if (
+        item.Type !== "Movie" &&
+        item.Type !== "Episode" &&
+        item.Type !== "Series"
+      ) {
+        return {
+          canDownload: false,
+          resumable: false,
+          restrictions: [
+            `Content type '${item.Type}' is not supported for download`,
+          ],
+        };
+      }
+
+      // For series, check if there are episodes available
+      if (item.Type === "Series") {
+        const episodes = await this.getSeriesEpisodes(contentId);
+        if (!episodes || episodes.length === 0) {
+          return {
+            canDownload: false,
+            resumable: false,
+            restrictions: ["No episodes available for download"],
+            isSeries: true,
+          };
+        }
+
+        return {
+          canDownload: true,
+          format: "Multiple Episodes",
+          estimatedSize: undefined,
+          resumable: true,
+          restrictions: [],
+          isSeries: true,
+          episodeCount: episodes.length,
+        };
+      }
+
+      // Check if user has permission to download this content
+      const canDownload = await this.checkDownloadPermission(item, userId);
+
+      if (!canDownload) {
+        return {
+          canDownload: false,
+          resumable: false,
+          restrictions: ["You don't have permission to download this content"],
+        };
+      }
+
+      // Get media sources to determine download capabilities
+      const mediaSources = await this.getMediaSources(contentId);
+
+      if (!mediaSources || mediaSources.length === 0) {
+        return {
+          canDownload: false,
+          resumable: false,
+          restrictions: ["No media sources available for download"],
+        };
+      }
+
+      // Get available quality options
+      const qualityOptions = await this.getDownloadQualities(contentId);
+
+      // Estimate file size based on quality and duration
+      const estimatedSize = this.estimateFileSize(item, qualityOptions[0]);
+
+      return {
+        canDownload: true,
+        format: this.getMediaFormat(mediaSources[0]),
+        qualityOptions,
+        estimatedSize,
+        resumable: true, // Jellyfin supports byte range requests
+        restrictions: this.getDownloadRestrictions(item),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error("Failed to check download capability", {
+        contentId,
+        error: message,
+      });
+
+      return {
+        canDownload: false,
+        resumable: false,
+        restrictions: [message],
+      };
+    }
+  }
+
+  /**
+   * Get download information for a specific content item
+   */
+  async getDownloadInfo(
+    contentId: string,
+    quality?: string,
+    episodeIds?: readonly string[],
+  ): Promise<DownloadInfo> {
+    await this.ensureAuthenticated();
+
+    try {
+      // Get item details
+      const item = await this.getItem(contentId);
+
+      // If this is a series and episodeIds are provided, download the first episode
+      // and let the download manager queue the rest as individual downloads
+      if (item.Type === "Series" && (!episodeIds || episodeIds.length === 0)) {
+        throw new Error(
+          "Cannot download series container. Download individual episodes instead.",
+        );
+      }
+
+      // For series downloads with episodeIds, use the first episode
+      let downloadItemId = contentId;
+      if (item.Type === "Series" && episodeIds && episodeIds.length > 0) {
+        const firstEpisodeId = episodeIds[0];
+        if (firstEpisodeId) {
+          downloadItemId = firstEpisodeId;
+        }
+      }
+
+      // Get media sources for the download item
+      const mediaSources = await this.getMediaSources(downloadItemId);
+      if (!mediaSources || mediaSources.length === 0) {
+        throw new Error("No media sources available for download");
+      }
+
+      // Select the appropriate media source based on quality preference
+      const selectedSource = this.selectMediaSource(mediaSources, quality);
+
+      // Get download URL
+      const downloadUrl = await this.getDownloadUrl(
+        downloadItemId,
+        selectedSource.Id,
+      );
+
+      // Generate filename
+      const fileName = this.generateFileName(item);
+
+      // Get MIME type
+      const mimeType = this.getMimeType(selectedSource);
+
+      // Get file size if available
+      const size = selectedSource.Size ?? undefined;
+
+      return {
+        sourceUrl: downloadUrl,
+        fileName,
+        mimeType,
+        size,
+        resumable: true, // Jellyfin supports resumable downloads
+        headers: {
+          // Add any necessary headers for the download request
+          "User-Agent": "UniArr/1.0",
+        },
+        auth: {
+          // Include authentication information
+          ...this.getDownloadAuth(),
+          type: "bearer" as const,
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error("Failed to get download info", {
+        contentId,
+        error: message,
+      });
+      throw new Error(`Failed to get download info: ${message}`);
+    }
+  }
+
+  /**
+   * Get metadata about a content item for download purposes
+   */
+  async getContentMetadata(
+    contentId: string,
+  ): Promise<DownloadContentMetadata> {
+    await this.ensureAuthenticated();
+
+    try {
+      const item = await this.getItem(contentId);
+
+      const metadata: DownloadContentMetadata = {
+        id: item.Id || "",
+        title: item.Name || "",
+        type: item.Type?.toLowerCase() || "unknown",
+        description: item.Overview || undefined,
+        thumbnailUrl: this.getImageUrl(item.Id || "", "Primary"),
+        duration: item.RunTimeTicks
+          ? Math.floor(item.RunTimeTicks / 10_000_000)
+          : undefined,
+        year: item.ProductionYear || undefined,
+      };
+
+      // Add series information for TV episodes
+      if (item.Type === "Episode" && item.SeriesName) {
+        return {
+          ...metadata,
+          seriesInfo: {
+            seriesName: item.SeriesName,
+            season: item.ParentIndexNumber ?? 0,
+            episode: item.IndexNumber ?? 0,
+            episodeTitle: item.Name || "",
+          },
+        };
+      }
+
+      return metadata;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error("Failed to get content metadata", {
+        contentId,
+        error: message,
+      });
+      throw new Error(`Failed to get content metadata: ${message}`);
+    }
+  }
+
+  /**
+   * Get a preview or thumbnail URL for the content
+   */
+  async getContentThumbnail(
+    contentId: string,
+    options?: { readonly width?: number; readonly height?: number },
+  ): Promise<string | undefined> {
+    try {
+      const imageOptions: any = {};
+      if (options?.width) imageOptions.width = options.width;
+      if (options?.height) imageOptions.height = options.height;
+
+      return this.getImageUrl(contentId, "Primary", imageOptions);
+    } catch (error) {
+      logger.warn("Failed to get content thumbnail", {
+        contentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
+  /**
+   * Get available download quality options for a content item
+   */
+  async getDownloadQualities(
+    contentId: string,
+  ): Promise<readonly QualityOption[]> {
+    await this.ensureAuthenticated();
+
+    try {
+      const mediaSources = await this.getMediaSources(contentId);
+      if (!mediaSources || mediaSources.length === 0) {
+        return [];
+      }
+
+      return mediaSources.map((source) => ({
+        label: this.getQualityLabel(source),
+        value: source.Id,
+        estimatedSize: source.Size,
+        url: "", // Will be generated when needed
+      }));
+    } catch (error) {
+      logger.error("Failed to get download qualities", {
+        contentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Validate that a download URL is still valid and accessible
+   */
+  async validateDownloadUrl(downloadUrl: string): Promise<boolean> {
+    try {
+      // Make a HEAD request to check if the URL is accessible
+      const response = await this.client.head(downloadUrl);
+      return response.status === 200;
+    } catch (error) {
+      logger.warn("Download URL validation failed", {
+        downloadUrl,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Refresh an expiring download URL
+   */
+  async refreshDownloadUrl(
+    contentId: string,
+    currentUrl: string,
+  ): Promise<string> {
+    // For Jellyfin, we can generate a fresh URL
+    const mediaSources = await this.getMediaSources(contentId);
+    if (!mediaSources || mediaSources.length === 0) {
+      throw new Error("No media sources available");
+    }
+
+    // Find the media source that matches the current URL
+    const currentSource = mediaSources.find((source) =>
+      currentUrl.includes(source.Id),
+    );
+
+    if (!currentSource) {
+      throw new Error("Could not find matching media source for current URL");
+    }
+
+    return this.getDownloadUrl(contentId, currentSource.Id);
+  }
+
+  /**
+   * Get download requirements or restrictions for the user
+   */
+  async getDownloadRequirements(contentId: string): Promise<readonly string[]> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    try {
+      const item = await this.getItem(contentId);
+      const requirements: string[] = [];
+
+      // Check if user has appropriate permissions
+      const canDownload = await this.checkDownloadPermission(item, userId);
+      if (!canDownload) {
+        requirements.push(
+          "You must have download permissions for this content",
+        );
+      }
+
+      // Check storage requirements
+      const mediaSources = await this.getMediaSources(contentId);
+      if (mediaSources && mediaSources.length > 0) {
+        const estimatedSize = this.estimateFileSize(item, mediaSources[0]);
+        requirements.push(
+          `Requires approximately ${this.formatBytes(estimatedSize)} of storage space`,
+        );
+      }
+
+      // Add content-specific requirements
+      if (item.Type === "Movie") {
+        requirements.push("Movies can be downloaded for offline viewing");
+      } else if (item.Type === "Episode") {
+        requirements.push("TV episodes can be downloaded for offline viewing");
+      }
+
+      return requirements;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return [`Failed to check download requirements: ${message}`];
+    }
+  }
+
+  // ==================== HELPER METHODS ====================
+
+  /**
+   * Check if user has permission to download the item
+   */
+  private async checkDownloadPermission(
+    item: any,
+    userId: string,
+  ): Promise<boolean> {
+    // For now, assume all authenticated users can download
+    // In a real implementation, you would check user permissions
+    return true;
+  }
+
+  /**
+   * Get media sources for an item
+   * Note: This endpoint only works for playable items (movies, episodes).
+   * Series and other container types will return an empty array.
+   */
+  private async getMediaSources(itemId: string): Promise<any[]> {
+    try {
+      // First check if the item is a Series or other non-playable type
+      const item = await this.getItem(itemId);
+
+      // Series and other container types don't have media sources
+      if (
+        item.Type === "Series" ||
+        item.Type === "Folder" ||
+        item.Type === "BoxSet"
+      ) {
+        return [];
+      }
+
+      // Only playable items (Movie, Episode, etc.) have PlaybackInfo
+      const response = await this.client.get(`/Items/${itemId}/PlaybackInfo`);
+      return response.data?.MediaSources ?? [];
+    } catch (error) {
+      logger.error("Failed to get media sources", {
+        itemId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Get episodes for a TV series
+   */
+  async getSeriesEpisodes(seriesId: string): Promise<JellyfinItem[]> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    const episodes: JellyfinItem[] = [];
+    const pageSize = 200;
+    let startIndex = 0;
+
+    try {
+      // Jellyfin exposes a dedicated endpoint to enumerate all episodes for a series.
+      // Page through results to avoid truncation on shows with large libraries.
+      while (true) {
+        const response = await this.client.get<JellyfinItemsResponse>(
+          `/Shows/${seriesId}/Episodes`,
+          {
+            params: {
+              userId,
+              fields: DEFAULT_ITEM_FIELDS.split(","),
+              enableImages: true,
+              sortBy: "ParentIndexNumber,IndexNumber",
+              sortOrder: "Ascending",
+              startIndex,
+              limit: pageSize,
+            },
+          },
+        );
+
+        const batch = Array.isArray(response.data?.Items)
+          ? (response.data?.Items as JellyfinItem[])
+          : [];
+
+        if (batch.length === 0) {
+          break;
+        }
+
+        episodes.push(...batch);
+
+        const total = response.data?.TotalRecordCount;
+        startIndex += batch.length;
+
+        if (!total || episodes.length >= total || batch.length < pageSize) {
+          break;
+        }
+      }
+
+      return episodes;
+    } catch (error) {
+      logger.error("Failed to get series episodes", {
+        seriesId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Get download URL for a media source
+   */
+  private async getDownloadUrl(
+    itemId: string,
+    mediaSourceId: string,
+  ): Promise<string> {
+    const baseUrl = this.getBaseUrl();
+
+    // Generate a download URL using Jellyfin's streaming endpoint
+    return `${baseUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${mediaSourceId}&deviceId=UniApp&api_key=${this.getApiKey()}`;
+  }
+
+  /**
+   * Select the appropriate media source based on quality preference
+   */
+  private selectMediaSource(sources: any[], quality?: string): any {
+    if (!quality || sources.length === 0) {
+      return sources[0];
+    }
+
+    // Try to find a source matching the requested quality
+    const matchingSource = sources.find(
+      (source) =>
+        source.Id === quality || this.getQualityLabel(source).includes(quality),
+    );
+
+    return matchingSource || sources[0];
+  }
+
+  /**
+   * Generate a filename for the download
+   */
+  private generateFileName(item: any): string {
+    let filename = item.Name;
+
+    // Sanitize filename
+    filename = filename.replace(/[<>:"/\\|?*]/g, "_");
+
+    // Add year for movies
+    if (item.Type === "Movie" && item.ProductionYear) {
+      filename += ` (${item.ProductionYear})`;
+    }
+
+    // Add season/episode for TV shows
+    if (item.Type === "Episode") {
+      const season =
+        item.ParentIndexNumber?.toString().padStart(2, "0") ?? "00";
+      const episode = item.IndexNumber?.toString().padStart(2, "0") ?? "00";
+      filename = `S${season}E${episode} - ${filename}`;
+    }
+
+    // Add extension
+    const mediaSources = item.MediaSources ?? [];
+    if (mediaSources.length > 0) {
+      const container = mediaSources[0].Container;
+      if (
+        container &&
+        !filename.toLowerCase().endsWith(`.${container.toLowerCase()}`)
+      ) {
+        filename += `.${container}`;
+      }
+    } else {
+      filename += ".mp4"; // Default extension
+    }
+
+    return filename;
+  }
+
+  /**
+   * Get MIME type for a media source
+   */
+  private getMimeType(mediaSource: any): string {
+    const container = mediaSource.Container?.toLowerCase();
+
+    const mimeTypes: Record<string, string> = {
+      mp4: "video/mp4",
+      mkv: "video/x-matroska",
+      avi: "video/x-msvideo",
+      mov: "video/quicktime",
+      wmv: "video/x-ms-wmv",
+      flv: "video/x-flv",
+      webm: "video/webm",
+      m4v: "video/x-m4v",
+    };
+
+    return mimeTypes[container] || "video/mp4";
+  }
+
+  /**
+   * Get media format from media source
+   */
+  private getMediaFormat(mediaSource: any): string {
+    return mediaSource.Container?.toUpperCase() || "MP4";
+  }
+
+  /**
+   * Get quality label for a media source
+   */
+  private getQualityLabel(mediaSource: any): string {
+    const height = mediaSource.Height;
+
+    if (!height) return "Unknown";
+
+    if (height >= 2160) return "4K";
+    if (height >= 1440) return "1440p";
+    if (height >= 1080) return "1080p";
+    if (height >= 720) return "720p";
+    if (height >= 480) return "480p";
+    if (height >= 360) return "360p";
+
+    return `${height}p`;
+  }
+
+  /**
+   * Estimate file size based on item and quality
+   */
+  private estimateFileSize(item: any, mediaSource?: any): number {
+    if (mediaSource?.Size) {
+      return mediaSource.Size;
+    }
+
+    // Estimate based on duration and quality
+    const durationMinutes = item.RunTimeTicks
+      ? Math.floor(item.RunTimeTicks / 600_000_000) // Convert ticks to minutes
+      : 90; // Default 90 minutes
+
+    const height = mediaSource?.Height ?? 720;
+
+    // Bitrate estimates in bits per second
+    const bitrates: Record<number, number> = {
+      2160: 15_000_000, // 15 Mbps for 4K
+      1440: 9_000_000, // 9 Mbps for 1440p
+      1080: 6_000_000, // 6 Mbps for 1080p
+      720: 3_000_000, // 3 Mbps for 720p
+      480: 1_500_000, // 1.5 Mbps for 480p
+      360: 800_000, // 800 kbps for 360p
+    };
+
+    const bitrate = bitrates[height] ?? bitrates[720];
+    const estimatedSizeBytes = (durationMinutes * 60 * (bitrate ?? 0)) / 8; // Convert to bytes
+
+    return Math.floor(estimatedSizeBytes);
+  }
+
+  /**
+   * Get download restrictions for an item
+   */
+  private getDownloadRestrictions(item: any): string[] {
+    const restrictions: string[] = [];
+
+    // Add content-specific restrictions
+    if (!item.CanDownload) {
+      restrictions.push(
+        "This content cannot be downloaded due to restrictions",
+      );
+    }
+
+    // Add quality restrictions
+    const mediaSources = item.MediaSources ?? [];
+    if (mediaSources.length === 0) {
+      restrictions.push("No media sources available");
+    }
+
+    return restrictions;
+  }
+
+  /**
+   * Get authentication for download requests
+   */
+  private getDownloadAuth(): {
+    cookies?: string;
+    token?: string;
+    type?: "bearer" | "basic" | "custom";
+  } {
+    // Since we don't have access to the actual session type, we'll use API key
+    if (this.config.apiKey) {
+      return {
+        token: this.config.apiKey,
+        type: "bearer",
+      };
+    }
+
+    return {};
+  }
+
+  /**
+   * Get API key from config
+   */
+  private getApiKey(): string {
+    return this.config.apiKey ?? "";
+  }
+
+  /**
+   * Format bytes to human readable string
+   */
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return "0 Bytes";
+
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 }

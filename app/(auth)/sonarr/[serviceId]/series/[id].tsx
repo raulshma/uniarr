@@ -15,6 +15,7 @@ import type { AppTheme } from "@/constants/theme";
 import type { Series } from "@/models/media.types";
 import { useSonarrSeriesDetails } from "@/hooks/useSonarrSeriesDetails";
 import { spacing } from "@/theme/spacing";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 const findEpisodeRuntime = (series?: Series): number | undefined => {
   if (!series?.seasons) {
@@ -95,6 +96,13 @@ const SonarrSeriesDetailsScreen = () => {
   );
 
   const runtimeMinutes = useMemo(() => findEpisodeRuntime(series), [series]);
+
+  // Get service config for download functionality
+  const serviceConfig = useMemo(() => {
+    if (!serviceId) return undefined;
+    const connector = ConnectorManager.getInstance().getConnector(serviceId);
+    return connector?.config;
+  }, [serviceId]);
 
   const handleToggleMonitor = useCallback(
     (nextState: boolean) => {
@@ -230,6 +238,8 @@ const SonarrSeriesDetailsScreen = () => {
               isDeleting={isDeleting}
               showPoster={false}
               disableScroll={true}
+              serviceConfig={serviceConfig}
+              contentId={numericSeriesId.toString()}
             />
           </DetailHero>
         ) : (

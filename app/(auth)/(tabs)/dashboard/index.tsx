@@ -1,12 +1,6 @@
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo } from "react";
-import {
-  StyleSheet,
-  View,
-  Dimensions,
-  ScrollView,
-  RefreshControl,
-} from "react-native";
+import { StyleSheet, View, Dimensions, RefreshControl } from "react-native";
 import { Text, IconButton, Portal, Avatar } from "react-native-paper";
 import { useHaptics } from "@/hooks/useHaptics";
 
@@ -477,7 +471,7 @@ const DashboardScreen = () => {
               <View style={styles.profileSection}>
                 <Avatar.Text
                   size={48}
-                  label="JD"
+                  label="arr"
                   style={styles.profileAvatar}
                   labelStyle={{ color: theme.colors.onPrimaryContainer }}
                 />
@@ -499,19 +493,9 @@ const DashboardScreen = () => {
 
       case "widgets":
         return (
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg }}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-              />
-            }
-            showsVerticalScrollIndicator={false}
-          >
+          <View style={{ paddingHorizontal: spacing.lg }}>
             <WidgetContainer editable={true} />
-          </ScrollView>
+          </View>
         );
 
       default:
@@ -543,6 +527,9 @@ const DashboardScreen = () => {
           showsVerticalScrollIndicator={false}
           getItemType={getItemType}
           removeClippedSubviews={true}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
         />
       </SafeAreaView>
     </Portal.Host>

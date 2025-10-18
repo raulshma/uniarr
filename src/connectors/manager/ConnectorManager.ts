@@ -3,6 +3,8 @@ import type {
   IConnector,
 } from "@/connectors/base/IConnector";
 import type { ServiceConfig, ServiceType } from "@/models/service.types";
+import type { IDownloadConnector } from "@/connectors/base/IDownloadConnector";
+import { isDownloadConnector } from "@/connectors/base/IDownloadConnector";
 
 import { ConnectorFactory } from "@/connectors/factory/ConnectorFactory";
 import { logger } from "@/services/logger/LoggerService";
@@ -148,6 +150,93 @@ export class ConnectorManager {
     );
 
     return new Map(results);
+  }
+
+  // ==================== DOWNLOAD CONNECTOR METHODS ====================
+
+  /** Get all download-capable connectors */
+  getDownloadConnectors(): IDownloadConnector[] {
+    return Array.from(this.connectors.values()).filter(
+      (connector): connector is IDownloadConnector & IConnector =>
+        isDownloadConnector(connector),
+    );
+  }
+
+  /** Get download connectors by service type */
+  getDownloadConnectorsByType(type: ServiceType): IDownloadConnector[] {
+    return this.getConnectorsByType(type).filter(
+      (connector): connector is IDownloadConnector & IConnector =>
+        isDownloadConnector(connector),
+    );
+  }
+
+  /** Get a specific download connector by ID */
+  getDownloadConnector(id: string): IDownloadConnector | undefined {
+    const connector = this.getConnector(id);
+    return connector && isDownloadConnector(connector) ? connector : undefined;
+  }
+
+  /** Check if a service type supports downloads */
+  supportsDownloadType(serviceType: ServiceType): boolean {
+    const connectors = this.getConnectorsByType(serviceType);
+    return connectors.some((connector) => isDownloadConnector(connector));
+  }
+
+  /** Get all service types that support downloads */
+  getDownloadSupportedServiceTypes(): ServiceType[] {
+    const allConnectors = this.getAllConnectors();
+    const downloadCapableTypes = new Set<ServiceType>();
+
+    for (const connector of allConnectors) {
+      if (isDownloadConnector(connector)) {
+        downloadCapableTypes.add(connector.config.type);
+      }
+    }
+
+    return Array.from(downloadCapableTypes);
+  }
+
+  /** Check if any download connectors are available */
+  hasDownloadConnectors(): boolean {
+    return this.getDownloadConnectors().length > 0;
+  }
+
+  /** Get download connector for a specific content ID and service type */
+  getDownloadConnectorForContent(
+    serviceType: ServiceType,
+    contentId: string,
+  ): IDownloadConnector | undefined {
+    const downloadConnectors = this.getDownloadConnectorsByType(serviceType);
+
+    // For now, return the first available download connector of the specified type
+    // In the future, you might want to implement more sophisticated selection logic
+    return downloadConnectors[0];
+  }
+
+  /** Get statistics about download-capable connectors */
+  getDownloadConnectorStats(): {
+    totalConnectors: number;
+    downloadCapableConnectors: number;
+    downloadCapableTypes: ServiceType[];
+    connectorsByType: Record<ServiceType, number>;
+  } {
+    const allConnectors = this.getAllConnectors();
+    const downloadConnectors = this.getDownloadConnectors();
+    const downloadCapableTypes = this.getDownloadSupportedServiceTypes();
+
+    const connectorsByType: Record<string, number> = {};
+
+    for (const connector of allConnectors) {
+      const type = connector.config.type;
+      connectorsByType[type] = (connectorsByType[type] || 0) + 1;
+    }
+
+    return {
+      totalConnectors: allConnectors.length,
+      downloadCapableConnectors: downloadConnectors.length,
+      downloadCapableTypes,
+      connectorsByType: connectorsByType as Record<ServiceType, number>,
+    };
   }
 
   /** Dispose all managed connectors and clear internal state. */
