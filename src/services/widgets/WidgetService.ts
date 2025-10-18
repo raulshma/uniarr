@@ -117,15 +117,15 @@ class WidgetService {
         id: "statistics",
         type: "statistics",
         title: "Statistics",
-        enabled: false,
+        enabled: true,
         order: 3,
-        size: "small",
+        size: "large",
       },
       {
         id: "calendar-preview",
         type: "calendar-preview",
         title: "Upcoming Releases",
-        enabled: false,
+        enabled: true,
         order: 4,
         size: "large",
       },
@@ -214,6 +214,9 @@ class WidgetService {
       }
     });
     await this.saveWidgets();
+    // Note: We intentionally do NOT clear widget data here.
+    // This allows widgets to display cached data immediately without showing a loading skeleton.
+    // Fresh data will load in the background if needed.
   }
 
   async setWidgetData<T>(
@@ -277,6 +280,18 @@ class WidgetService {
   private async ensureInitialized(): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
+    }
+  }
+
+  // Refresh widgets from storage without re-initializing the entire service
+  async refreshWidgetsFromStorage(): Promise<void> {
+    try {
+      await this.loadWidgets();
+      logger.debug("[WidgetService] Refreshed widgets from storage");
+    } catch (error) {
+      logger.error("[WidgetService] Failed to refresh widgets from storage", {
+        error,
+      });
     }
   }
 

@@ -837,7 +837,35 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={2} totalItems={3}>
+          <AnimatedListItem index={2} totalItems={4}>
+            <Card
+              variant="custom"
+              style={styles.settingCard}
+              onPress={() => router.push("/(auth)/settings/widgets")}
+            >
+              <View style={styles.settingContent}>
+                <View style={styles.settingIcon}>
+                  <IconButton
+                    icon="widgets"
+                    size={20}
+                    iconColor={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Widget Settings</Text>
+                  <Text style={styles.settingValue}>
+                    Configure dashboard widgets
+                  </Text>
+                </View>
+                <IconButton
+                  icon="chevron-right"
+                  size={16}
+                  iconColor={theme.colors.outline}
+                />
+              </View>
+            </Card>
+          </AnimatedListItem>
+          <AnimatedListItem index={3} totalItems={4}>
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>

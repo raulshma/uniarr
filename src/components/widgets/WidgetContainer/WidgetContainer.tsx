@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
+import { View, StyleSheet, ScrollView } from "react-native";
 import { Text, FAB, useTheme, Portal, Modal, Button } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter, useFocusEffect } from "expo-router";
 
-import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
-import { ResponsiveGrid } from "@/components/common/ResponsiveGrid";
+import { spacing } from "@/theme/spacing";
 import ServiceStatusWidget from "../ServiceStatusWidget/ServiceStatusWidget";
 import DownloadProgressWidget from "../DownloadProgressWidget/DownloadProgressWidget";
+import RecentActivityWidget from "../RecentActivityWidget/RecentActivityWidget";
+import StatisticsWidget from "../StatisticsWidget/StatisticsWidget";
+import CalendarPreviewWidget from "../CalendarPreviewWidget/CalendarPreviewWidget";
 
 export interface WidgetContainerProps {
   /**
@@ -27,16 +30,11 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
   editable = false,
   style,
 }) => {
+  const router = useRouter();
   const theme = useTheme<AppTheme>();
-  const { spacing } = useResponsiveLayout();
   const { onPress } = useHaptics();
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [editing, setEditing] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    loadWidgets();
-  }, []);
 
   const loadWidgets = async () => {
     try {
@@ -49,11 +47,27 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
     }
   };
 
+  useEffect(() => {
+    loadWidgets();
+  }, []);
+
+  // Reload widgets when the screen gains focus (after returning from settings)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Refresh widgets from storage in case they were reordered
+      void (async () => {
+        await widgetService.refreshWidgetsFromStorage();
+        await loadWidgets();
+      })();
+      return () => {
+        // Cleanup function (optional)
+      };
+    }, []),
+  );
+
   const handleRefresh = async () => {
     onPress();
-    setRefreshing(true);
     await loadWidgets();
-    setRefreshing(false);
   };
 
   const renderWidget = (widget: Widget) => {
@@ -70,6 +84,33 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
       case "download-progress":
         return (
           <DownloadProgressWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleRefresh}
+            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+          />
+        );
+      case "recent-activity":
+        return (
+          <RecentActivityWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleRefresh}
+            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+          />
+        );
+      case "statistics":
+        return (
+          <StatisticsWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleRefresh}
+            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+          />
+        );
+      case "calendar-preview":
+        return (
+          <CalendarPreviewWidget
             key={widget.id}
             widget={widget}
             onRefresh={handleRefresh}
@@ -98,27 +139,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
     await loadWidgets();
   };
 
-  const getWidgetSize = (size: "small" | "medium" | "large") => {
-    switch (size) {
-      case "small":
-        return 160;
-      case "medium":
-        return 240;
-      case "large":
-        return 320;
-      default:
-        return 240;
-    }
-  };
-
-  const renderGridItem = (widget: Widget) => {
-    const itemWidth = getWidgetSize(widget.size);
-    return (
-      <View style={[styles.gridItem, { width: itemWidth }]}>
-        {renderWidget(widget)}
-      </View>
-    );
-  };
+  // widget size helper removed (unused)
 
   if (widgets.length === 0) {
     return (
@@ -138,7 +159,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           <Button
             mode="outlined"
             onPress={() => {
-              /* TODO: Open widget settings */
+              router.push("/(auth)/settings/widgets");
             }}
             style={styles.setupButton}
           >
@@ -151,25 +172,13 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.contentContainer,
-          { paddingHorizontal: spacing.medium },
-        ]}
-      >
-        <ResponsiveGrid
-          data={widgets}
-          renderItem={renderGridItem}
-          keyExtractor={(widget) => widget.id}
-          itemWidth={240} // Default width, widgets will override this
-          spacing={spacing.medium}
-        />
-      </ScrollView>
+      <View style={styles.widgetsContainer}>
+        {widgets.map((widget) => (
+          <View key={widget.id} style={styles.widgetWrapper}>
+            {renderWidget(widget)}
+          </View>
+        ))}
+      </View>
 
       {editable && (
         <FAB icon="cog" style={styles.fab} onPress={() => setEditing(true)} />
@@ -228,14 +237,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
+  widgetsContainer: {
     flex: 1,
+    gap: spacing.lg,
   },
-  contentContainer: {
-    paddingVertical: 16,
-  },
-  gridItem: {
-    // Width is set dynamically
+  widgetWrapper: {
+    // Each widget handles its own styling
   },
   emptyState: {
     flex: 1,
