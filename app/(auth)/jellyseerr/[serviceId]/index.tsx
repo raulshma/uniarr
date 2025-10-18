@@ -2,7 +2,7 @@ import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View, Dimensions } from "react-native";
 import { alert } from "@/services/dialogService";
 import {
   Chip,
@@ -10,6 +10,9 @@ import {
   SegmentedButtons,
   Text,
   useTheme,
+  Surface,
+  IconButton,
+  FAB,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -25,13 +28,13 @@ import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useJellyseerrRequests } from "@/hooks/useJellyseerrRequests";
-import type {
-  components,
-  paths,
-} from "@/connectors/client-schemas/jellyseerr-openapi";
+import type { paths } from "@/connectors/client-schemas/jellyseerr-openapi";
+import type { JellyseerrRequest } from "@/models/jellyseerr.types";
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
-type JellyseerrRequest = components["schemas"]["MediaRequest"];
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
 type JellyseerrRequestQueryOptions =
   paths["/request"]["get"]["parameters"]["query"];
 
@@ -53,6 +56,52 @@ type FilterValue =
 type PendingAction = {
   readonly type: "approve" | "decline" | "delete";
   readonly requestId: number;
+};
+
+type TabValue = "requests" | "discover" | "stats";
+
+const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original";
+
+type MediaSummary = {
+  readonly title: string;
+  readonly releaseDate?: string;
+  readonly posterUri?: string;
+  readonly mediaType: "movie" | "series";
+  readonly statusCode?: number;
+};
+
+const resolvePosterUri = (path?: string | null): string | undefined => {
+  if (!path) {
+    return undefined;
+  }
+
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+
+  return `${TMDB_IMAGE_BASE_URL}${path}`;
+};
+
+const pickFirstString = (
+  ...values: (string | undefined | null)[]
+): string | undefined => {
+  for (const value of values) {
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const pickFirstNumber = (
+  ...values: (number | undefined | null)[]
+): number | undefined => {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return undefined;
 };
 
 const deriveDownloadStatus = (
@@ -110,6 +159,12 @@ const JellyseerrRequestsScreen = () => {
     null,
   );
   const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<TabValue>("requests");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedRequests, setSelectedRequests] = useState<Set<number>>(
+    new Set(),
+  );
+  const [bulkActionMode, setBulkActionMode] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -207,23 +262,180 @@ const JellyseerrRequestsScreen = () => {
     [],
   );
 
-  // Apply client-side search filtering because the Jellyseerr API /request
-  // endpoint does not accept a free-text search parameter in the OpenAPI spec.
-  const getMediaTitle = useCallback(
-    (m: JellyseerrRequest["media"] | undefined): string => {
-      if (!m) return "";
-      const r = toRecord(m);
-      const t =
-        r?.title ??
-        r?.originalTitle ??
-        r?.name ??
-        (r?.mediaInfo && (r.mediaInfo as any)?.title) ??
-        (r?.mediaInfo && (r.mediaInfo as any)?.name) ??
-        undefined;
-      return typeof t === "string" ? t : "";
+  const buildMediaSummary = useCallback(
+    (request: JellyseerrRequest): MediaSummary => {
+      const mediaRecord = toRecord(request.media);
+      const mediaInfoRecord = toRecord(mediaRecord?.mediaInfo ?? undefined);
+      const asString = (value: unknown): string | undefined =>
+        typeof value === "string" && value.length > 0 ? value : undefined;
+      const asNumber = (value: unknown): number | undefined =>
+        typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+      const details = request.mediaDetails;
+      if (details) {
+        const enrichedInfoRecord = toRecord(details.mediaInfo ?? undefined);
+        const detailRecord = toRecord(details);
+
+        const title =
+          pickFirstString(
+            details.mediaType === "movie"
+              ? asString(detailRecord?.title)
+              : asString(detailRecord?.name),
+            details.mediaType === "movie"
+              ? asString(detailRecord?.originalTitle)
+              : asString(detailRecord?.originalName),
+            asString(detailRecord?.title),
+            asString(detailRecord?.originalTitle),
+            asString(detailRecord?.name),
+            asString(detailRecord?.originalName),
+            asString(enrichedInfoRecord?.title),
+            asString(enrichedInfoRecord?.name),
+            asString(mediaInfoRecord?.title),
+            asString(mediaInfoRecord?.name),
+          ) ?? "";
+
+        const releaseDate = pickFirstString(
+          details.mediaType === "movie"
+            ? asString(detailRecord?.releaseDate)
+            : asString(detailRecord?.firstAirDate),
+          asString(detailRecord?.releaseDate),
+          asString(detailRecord?.firstAirDate),
+          asString(enrichedInfoRecord?.releaseDate),
+          asString(enrichedInfoRecord?.firstAirDate),
+          asString(mediaInfoRecord?.releaseDate),
+          asString(mediaInfoRecord?.firstAirDate),
+        );
+
+        const posterCandidate = pickFirstString(
+          details.posterPath,
+          details.backdropPath,
+          asString(enrichedInfoRecord?.posterPath),
+          asString(mediaRecord?.posterPath),
+          asString(mediaRecord?.backdropPath),
+          asString(mediaInfoRecord?.posterPath),
+        );
+
+        const statusCode = pickFirstNumber(
+          details.mediaInfo?.status,
+          asNumber(enrichedInfoRecord?.status),
+          asNumber(mediaInfoRecord?.status),
+          asNumber(mediaRecord?.status),
+        );
+
+        return {
+          title,
+          releaseDate,
+          posterUri: resolvePosterUri(posterCandidate),
+          mediaType: details.mediaType === "tv" ? "series" : "movie",
+          statusCode,
+        };
+      }
+
+      const title =
+        pickFirstString(
+          asString(mediaRecord?.title),
+          asString(mediaRecord?.originalTitle),
+          asString(mediaRecord?.name),
+          asString(mediaRecord?.originalName),
+          asString(mediaInfoRecord?.title),
+          asString(mediaInfoRecord?.name),
+        ) ?? "";
+
+      const releaseDate = pickFirstString(
+        asString(mediaRecord?.releaseDate),
+        asString(mediaRecord?.firstAirDate),
+        asString(mediaInfoRecord?.releaseDate),
+        asString(mediaInfoRecord?.firstAirDate),
+      );
+
+      const posterCandidate = pickFirstString(
+        asString(mediaRecord?.posterPath),
+        asString(mediaRecord?.backdropPath),
+        asString(mediaInfoRecord?.posterPath),
+      );
+
+      const rawMediaType = pickFirstString(
+        asString(mediaRecord?.mediaType),
+        asString(mediaInfoRecord?.mediaType),
+      );
+
+      const statusCode = pickFirstNumber(
+        asNumber(mediaRecord?.status),
+        asNumber(mediaInfoRecord?.status),
+      );
+
+      return {
+        title,
+        releaseDate,
+        posterUri: resolvePosterUri(posterCandidate),
+        mediaType:
+          rawMediaType === "tv" || rawMediaType === "series"
+            ? "series"
+            : "movie",
+        statusCode,
+      };
     },
     [toRecord],
   );
+
+  // Filter requests by search term
+  const filteredRequests = useMemo(() => {
+    if (!requests) return [];
+    if (!searchTerm.trim()) return requests;
+
+    const lowerQuery = searchTerm.toLowerCase();
+    return requests.filter((req) => {
+      const title = buildMediaSummary(req).title.toLowerCase();
+      const requester =
+        req.requestedBy?.username?.toLowerCase() ||
+        req.requestedBy?.email?.toLowerCase() ||
+        "";
+      return title.includes(lowerQuery) || requester.includes(lowerQuery);
+    });
+  }, [requests, searchTerm, buildMediaSummary]);
+
+  // Calculate stats
+  const requestStats = useMemo(() => {
+    if (!requests) {
+      return {
+        pending: 0,
+        approved: 0,
+        processing: 0,
+        available: 0,
+        declined: 0,
+      };
+    }
+
+    return requests.reduce(
+      (acc, req) => {
+        switch (req.status) {
+          case 1:
+            acc.pending++;
+            break;
+          case 2:
+            acc.approved++;
+            break;
+          case 3:
+            acc.declined++;
+            break;
+          case 4:
+            acc.processing++;
+            break;
+          case 5:
+            acc.available++;
+            break;
+        }
+        return acc;
+      },
+      {
+        pending: 0,
+        approved: 0,
+        processing: 0,
+        available: 0,
+        declined: 0,
+      },
+    );
+  }, [requests]);
 
   useFocusEffect(
     useCallback(() => {
@@ -252,9 +464,17 @@ const JellyseerrRequestsScreen = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
+        container: {
+          flex: 1,
+        },
         listContent: {
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.xxl,
+        },
+        headerContainer: {
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.lg,
+          paddingBottom: spacing.md,
         },
         listHeader: {
           paddingTop: spacing.lg,
@@ -264,18 +484,54 @@ const JellyseerrRequestsScreen = () => {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: spacing.sm,
+          marginBottom: spacing.md,
         },
         headerTitle: {
           color: theme.colors.onBackground,
+        },
+        headerActions: {
+          flexDirection: "row",
+          gap: spacing.xs,
         },
         headerMeta: {
           color: theme.colors.onSurfaceVariant,
         },
         searchBar: {
           marginBottom: spacing.md,
+          elevation: 2,
+        },
+        tabBar: {
+          marginBottom: spacing.md,
+        },
+        statsContainer: {
+          marginBottom: spacing.md,
+        },
+        statsRow: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: spacing.sm,
+        },
+        statCard: {
+          flex: 1,
+          minWidth: SCREEN_WIDTH / 2 - spacing.lg - spacing.sm / 2,
+          padding: spacing.md,
+          borderRadius: 12,
+          elevation: 2,
+        },
+        statLabel: {
+          fontSize: 12,
+          color: theme.colors.onSurfaceVariant,
+          marginBottom: spacing.xs,
+        },
+        statValue: {
+          fontSize: 24,
+          fontWeight: "bold",
+          color: theme.colors.onSurface,
         },
         filters: {
+          marginBottom: spacing.sm,
+        },
+        filtersRow: {
           marginBottom: spacing.sm,
         },
         filtersScroll: {
@@ -307,6 +563,24 @@ const JellyseerrRequestsScreen = () => {
           justifyContent: "space-between",
           alignItems: "center",
           marginTop: spacing.md,
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.lg,
+        },
+        fab: {
+          position: "absolute",
+          right: spacing.lg,
+          bottom: spacing.xl,
+        },
+        bulkActionBar: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: spacing.md,
+          backgroundColor: theme.colors.primaryContainer,
+        },
+        bulkActionButtons: {
+          flexDirection: "row",
+          gap: spacing.sm,
         },
       }),
     [theme],
@@ -405,6 +679,71 @@ const JellyseerrRequestsScreen = () => {
     }
   }, [page]);
 
+  const handleSelectRequest = useCallback((requestId: number) => {
+    setSelectedRequests((prev) => {
+      const next = new Set(prev);
+      if (next.has(requestId)) {
+        next.delete(requestId);
+      } else {
+        next.add(requestId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleBulkApprove = useCallback(async () => {
+    const ids = Array.from(selectedRequests);
+    if (ids.length === 0) return;
+
+    alert("Approve selected requests", `Approve ${ids.length} request(s)?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Approve",
+        onPress: async () => {
+          try {
+            await Promise.all(
+              ids.map((id) => approveRequestAsync({ requestId: id })),
+            );
+            setSelectedRequests(new Set());
+            setBulkActionMode(false);
+          } catch (error) {
+            alert(
+              "Bulk approve failed",
+              error instanceof Error ? error.message : "Unknown error",
+            );
+          }
+        },
+      },
+    ]);
+  }, [selectedRequests, approveRequestAsync]);
+
+  const handleBulkDecline = useCallback(async () => {
+    const ids = Array.from(selectedRequests);
+    if (ids.length === 0) return;
+
+    alert("Decline selected requests", `Decline ${ids.length} request(s)?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Decline",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await Promise.all(
+              ids.map((id) => declineRequestAsync({ requestId: id })),
+            );
+            setSelectedRequests(new Set());
+            setBulkActionMode(false);
+          } catch (error) {
+            alert(
+              "Bulk decline failed",
+              error instanceof Error ? error.message : "Unknown error",
+            );
+          }
+        },
+      },
+    ]);
+  }, [selectedRequests, declineRequestAsync]);
+
   const renderStatusChip = useCallback(
     (status: number | string | undefined, is4k: boolean | undefined) => {
       const toneMap: Record<string, { background: string; text: string }> = {
@@ -467,9 +806,8 @@ const JellyseerrRequestsScreen = () => {
 
   const renderRequestItem = useCallback(
     ({ item }: { item: JellyseerrRequest }) => {
-      const downloadStatus = deriveDownloadStatus(
-        item.media?.status as number | undefined,
-      );
+      const summary = buildMediaSummary(item);
+      const downloadStatus = deriveDownloadStatus(summary.statusCode);
       const requesterName =
         item.requestedBy?.username ??
         item.requestedBy?.email ??
@@ -490,106 +828,119 @@ const JellyseerrRequestsScreen = () => {
         pendingAction.requestId === item.id &&
         isDeleting;
 
+      const isSelected = selectedRequests.has(item.id);
+
       return (
-        <MediaCard
-          id={item.id}
-          title={getMediaTitle(item.media) || `Untitled Media`}
-          year={(() => {
-            const r = toRecord(item.media);
-            const release = r?.releaseDate ?? r?.firstAirDate ?? undefined;
-            if (typeof release === "string" && release.length >= 4) {
-              const parsed = Number.parseInt(release.slice(0, 4), 10);
-              return Number.isFinite(parsed) ? parsed : undefined;
-            }
-            return undefined;
-          })()}
-          status={formatRequestStatusLabel(item.status ?? 0)}
-          subtitle={`Requested by ${requesterName}`}
-          downloadStatus={downloadStatus}
-          posterUri={(() => {
-            const r = toRecord(item.media);
-            const p =
-              r?.posterPath ??
-              (r?.mediaInfo && (r.mediaInfo as any)?.posterPath) ??
-              undefined;
-            return typeof p === "string"
-              ? `https://image.tmdb.org/t/p/original${p}`
-              : undefined;
-          })()}
-          type={(() => {
-            const r = toRecord(item.media);
-            const mt = r?.mediaType ?? undefined;
-            return mt === "tv" ? "series" : "movie";
-          })()}
-          statusBadge={renderStatusChip(
-            item.status as number | undefined,
-            item.is4k,
-          )}
-          footer={
-            <View style={styles.actionRow}>
-              {item.status === 1 ? (
-                <Button
-                  mode="contained"
-                  icon="check"
-                  compact
-                  onPress={() => void handleApproveRequest(item)}
-                  loading={isApprovingCurrent}
-                  disabled={
-                    isApprovingCurrent ||
-                    isDecliningCurrent ||
-                    isDeletingCurrent
-                  }
-                >
-                  Approve
-                </Button>
-              ) : null}
-              {item.status === 1 || item.status === 2 ? (
-                <Button
-                  mode="outlined"
-                  icon="close"
-                  compact
-                  onPress={() => void handleDeclineRequest(item)}
-                  loading={isDecliningCurrent}
-                  disabled={
-                    isApprovingCurrent ||
-                    isDecliningCurrent ||
-                    isDeletingCurrent
-                  }
-                >
-                  Decline
-                </Button>
-              ) : null}
-              <Button
-                mode="text"
-                icon="delete"
-                compact
-                onPress={() => void handleDeleteRequest(item)}
-                loading={isDeletingCurrent}
-                textColor={theme.colors.error}
-                disabled={
-                  isDeletingCurrent || isApprovingCurrent || isDecliningCurrent
+        <View>
+          {bulkActionMode && (
+            <View
+              style={{
+                position: "absolute",
+                top: spacing.sm,
+                left: spacing.sm,
+                zIndex: 10,
+              }}
+            >
+              <IconButton
+                icon={isSelected ? "checkbox-marked" : "checkbox-blank-outline"}
+                size={24}
+                iconColor={
+                  isSelected ? theme.colors.primary : theme.colors.outline
                 }
-              >
-                Delete
-              </Button>
+                onPress={() => handleSelectRequest(item.id)}
+              />
             </View>
-          }
-        />
+          )}
+          <MediaCard
+            id={item.id}
+            title={summary.title || `Untitled Media`}
+            year={(() => {
+              const release = summary.releaseDate;
+              if (typeof release === "string" && release.length >= 4) {
+                const parsed = Number.parseInt(release.slice(0, 4), 10);
+                return Number.isFinite(parsed) ? parsed : undefined;
+              }
+              return undefined;
+            })()}
+            status={formatRequestStatusLabel(item.status ?? 0)}
+            subtitle={`Requested by ${requesterName}`}
+            downloadStatus={downloadStatus}
+            posterUri={summary.posterUri}
+            type={summary.mediaType}
+            statusBadge={renderStatusChip(
+              item.status as number | undefined,
+              item.is4k,
+            )}
+            footer={
+              <View style={styles.actionRow}>
+                {item.status === 1 ? (
+                  <Button
+                    mode="contained"
+                    icon="check"
+                    compact
+                    onPress={() => void handleApproveRequest(item)}
+                    loading={isApprovingCurrent}
+                    disabled={
+                      isApprovingCurrent ||
+                      isDecliningCurrent ||
+                      isDeletingCurrent
+                    }
+                  >
+                    Approve
+                  </Button>
+                ) : null}
+                {item.status === 1 || item.status === 2 ? (
+                  <Button
+                    mode="outlined"
+                    icon="close"
+                    compact
+                    onPress={() => void handleDeclineRequest(item)}
+                    loading={isDecliningCurrent}
+                    disabled={
+                      isApprovingCurrent ||
+                      isDecliningCurrent ||
+                      isDeletingCurrent
+                    }
+                  >
+                    Decline
+                  </Button>
+                ) : null}
+                <Button
+                  mode="text"
+                  icon="delete"
+                  compact
+                  onPress={() => void handleDeleteRequest(item)}
+                  loading={isDeletingCurrent}
+                  textColor={theme.colors.error}
+                  disabled={
+                    isDeletingCurrent ||
+                    isApprovingCurrent ||
+                    isDecliningCurrent
+                  }
+                >
+                  Delete
+                </Button>
+              </View>
+            }
+          />
+        </View>
       );
     },
     [
+      buildMediaSummary,
       handleApproveRequest,
       handleDeclineRequest,
       handleDeleteRequest,
+      handleSelectRequest,
       isApproving,
       isDeclining,
       isDeleting,
       pendingAction,
       renderStatusChip,
+      selectedRequests,
+      bulkActionMode,
       styles.actionRow,
-      theme.colors.error,
-      getMediaTitle,
-      toRecord,
+      theme.colors,
     ],
   );
 
@@ -597,6 +948,81 @@ const JellyseerrRequestsScreen = () => {
     (item: JellyseerrRequest) => item.id.toString(),
     [],
   );
+
+  const renderStatsTab = useCallback(() => {
+    const totalRequests =
+      requestStats.pending +
+      requestStats.approved +
+      requestStats.processing +
+      requestStats.available +
+      requestStats.declined;
+
+    const statItems = [
+      {
+        label: "Pending",
+        value: requestStats.pending,
+        background: theme.colors.primaryContainer,
+        text: theme.colors.onPrimaryContainer,
+      },
+      {
+        label: "Approved",
+        value: requestStats.approved,
+        background: theme.colors.secondaryContainer,
+        text: theme.colors.onSecondaryContainer,
+      },
+      {
+        label: "Processing",
+        value: requestStats.processing,
+        background: theme.colors.tertiaryContainer,
+        text: theme.colors.onTertiaryContainer,
+      },
+      {
+        label: "Available",
+        value: requestStats.available,
+        background: theme.colors.tertiaryContainer,
+        text: theme.colors.onTertiaryContainer,
+      },
+      {
+        label: "Declined",
+        value: requestStats.declined,
+        background: theme.colors.errorContainer,
+        text: theme.colors.onErrorContainer,
+      },
+      {
+        label: "Total",
+        value: totalRequests,
+        background: theme.colors.surfaceVariant,
+        text: theme.colors.onSurfaceVariant,
+      },
+    ];
+
+    return (
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.xxl,
+        }}
+      >
+        <View style={styles.statsContainer}>
+          <View style={styles.statsRow}>
+            {statItems.map((stat, index) => (
+              <Surface
+                key={index}
+                style={[styles.statCard, { backgroundColor: stat.background }]}
+              >
+                <Text style={[styles.statLabel, { color: stat.text }]}>
+                  {stat.label}
+                </Text>
+                <Text style={[styles.statValue, { color: stat.text }]}>
+                  {stat.value}
+                </Text>
+              </Surface>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }, [requestStats, theme.colors, styles]);
 
   const listHeader = useMemo(
     () => (
@@ -610,69 +1036,124 @@ const JellyseerrRequestsScreen = () => {
               Showing {requests?.length ?? 0} of {total} requests
             </Text>
           </View>
-          <Button
-            mode="contained"
-            onPress={() => router.push("/(auth)/dashboard")}
-          >
-            Back to Dashboard
-          </Button>
+          <View style={styles.headerActions}>
+            <IconButton
+              icon={showFilters ? "chevron-up" : "chevron-down"}
+              size={24}
+              onPress={() => setShowFilters(!showFilters)}
+              accessibilityLabel="Toggle filters"
+            />
+            <Button
+              mode="contained"
+              onPress={() => router.push("/(auth)/dashboard")}
+            >
+              Back to Dashboard
+            </Button>
+          </View>
         </View>
-        <Searchbar
-          placeholder="Search requests"
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          style={styles.searchBar}
-          accessibilityLabel="Search requests"
+
+        {/* Tab Navigation */}
+        <SegmentedButtons
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as TabValue)}
+          buttons={[
+            { label: "Requests", value: "requests" },
+            { label: "Discover", value: "discover" },
+            { label: "Stats", value: "stats" },
+          ]}
+          style={styles.tabBar}
         />
-        <Text variant="labelSmall" style={styles.filterLabel}>
-          Filter by status
-        </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filtersScroll}
-        >
-          <SegmentedButtons
-            value={filterValue}
-            onValueChange={(value) => {
-              setFilterValue(value as FilterValue);
-              setPage(1);
-            }}
-            buttons={[
-              { label: "All", value: FILTER_ALL },
-              { label: "Pending", value: FILTER_PENDING },
-              { label: "Approved", value: FILTER_APPROVED },
-              { label: "Processing", value: FILTER_PROCESSING },
-              { label: "Available", value: FILTER_AVAILABLE },
-              { label: "Declined", value: FILTER_DECLINED },
-            ]}
-          />
-        </ScrollView>
-        <View style={styles.paginationRow}>
-          <Button
-            mode="outlined"
-            onPress={handleLoadPrevious}
-            disabled={page <= 1}
-          >
-            Previous
-          </Button>
-          <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            Page {page} of {totalPages}
-          </Text>
-          <Button
-            mode="outlined"
-            onPress={handleLoadMore}
-            disabled={page >= totalPages}
-          >
-            Next
-          </Button>
-        </View>
+
+        {/* Quick Stats Row */}
+        {activeTab === "requests" && (
+          <View style={styles.statsRow}>
+            <Surface
+              style={[
+                styles.statCard,
+                { backgroundColor: theme.colors.primaryContainer },
+              ]}
+            >
+              <Text style={styles.statLabel}>Pending</Text>
+              <Text style={styles.statValue}>{requestStats.pending}</Text>
+            </Surface>
+            <Surface
+              style={[
+                styles.statCard,
+                { backgroundColor: theme.colors.secondaryContainer },
+              ]}
+            >
+              <Text style={styles.statLabel}>Approved</Text>
+              <Text style={styles.statValue}>{requestStats.approved}</Text>
+            </Surface>
+          </View>
+        )}
+
+        {/* Requests Tab Content */}
+        {activeTab === "requests" && (
+          <>
+            {showFilters && (
+              <>
+                <Searchbar
+                  placeholder="Search requests"
+                  value={searchTerm}
+                  onChangeText={setSearchTerm}
+                  style={styles.searchBar}
+                  accessibilityLabel="Search requests"
+                />
+                <Text variant="labelSmall" style={styles.filterLabel}>
+                  Filter by status
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.filtersScroll}
+                >
+                  <SegmentedButtons
+                    value={filterValue}
+                    onValueChange={(value) => {
+                      setFilterValue(value as FilterValue);
+                      setPage(1);
+                    }}
+                    buttons={[
+                      { label: "All", value: FILTER_ALL },
+                      { label: "Pending", value: FILTER_PENDING },
+                      { label: "Approved", value: FILTER_APPROVED },
+                      { label: "Processing", value: FILTER_PROCESSING },
+                      { label: "Available", value: FILTER_AVAILABLE },
+                      { label: "Declined", value: FILTER_DECLINED },
+                    ]}
+                  />
+                </ScrollView>
+              </>
+            )}
+            <View style={styles.paginationRow}>
+              <Button
+                mode="outlined"
+                onPress={handleLoadPrevious}
+                disabled={page <= 1}
+              >
+                Previous
+              </Button>
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Page {page} of {totalPages}
+              </Text>
+              <Button
+                mode="outlined"
+                onPress={handleLoadMore}
+                disabled={page >= totalPages}
+              >
+                Next
+              </Button>
+            </View>
+          </>
+        )}
       </View>
     ),
     [
+      activeTab,
       filterValue,
       handleLoadMore,
       handleLoadPrevious,
@@ -680,10 +1161,12 @@ const JellyseerrRequestsScreen = () => {
       requests?.length,
       router,
       searchTerm,
+      showFilters,
       styles,
-      theme.colors.onSurfaceVariant,
+      theme.colors,
       total,
       totalPages,
+      requestStats,
     ],
   );
 
@@ -821,23 +1304,97 @@ const JellyseerrRequestsScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <FlashList
-        data={requests ?? []}
-        keyExtractor={keyExtractor}
-        renderItem={renderRequestItem}
-        ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>{listEmptyComponent}</View>
-        }
-        refreshControl={
-          <ListRefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => refetch()}
+      <View style={styles.container}>
+        {/* Bulk Action Bar */}
+        {bulkActionMode && (
+          <View style={styles.bulkActionBar}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+              }}
+            >
+              <IconButton
+                icon="close"
+                size={20}
+                onPress={() => {
+                  setBulkActionMode(false);
+                  setSelectedRequests(new Set());
+                }}
+              />
+              <Text variant="labelLarge">{selectedRequests.size} selected</Text>
+            </View>
+            <View style={styles.bulkActionButtons}>
+              <Button
+                mode="contained"
+                icon="check"
+                compact
+                onPress={handleBulkApprove}
+                disabled={selectedRequests.size === 0}
+              >
+                Approve
+              </Button>
+              <Button
+                mode="outlined"
+                icon="close"
+                compact
+                onPress={handleBulkDecline}
+                disabled={selectedRequests.size === 0}
+              >
+                Decline
+              </Button>
+            </View>
+          </View>
+        )}
+
+        {/* Tab Content */}
+        {activeTab === "stats" ? (
+          renderStatsTab()
+        ) : activeTab === "discover" ? (
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: spacing.lg,
+              paddingBottom: spacing.xxl,
+            }}
+          >
+            <EmptyState
+              title="Discover Coming Soon"
+              description="Browse trending movies and TV shows across all services."
+              actionLabel="Back to Requests"
+              onActionPress={() => setActiveTab("requests")}
+            />
+          </ScrollView>
+        ) : (
+          <FlashList
+            data={filteredRequests ?? []}
+            keyExtractor={keyExtractor}
+            renderItem={renderRequestItem}
+            ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
+            contentContainerStyle={styles.listContent}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>{listEmptyComponent}</View>
+            }
+            refreshControl={
+              <ListRefreshControl
+                refreshing={isRefreshing}
+                onRefresh={() => refetch()}
+              />
+            }
           />
-        }
-      />
+        )}
+
+        {/* FAB for Bulk Mode */}
+        {activeTab === "requests" && !bulkActionMode && (
+          <FAB
+            icon="checkbox-multiple-marked"
+            label="Select"
+            style={styles.fab}
+            onPress={() => setBulkActionMode(true)}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 };

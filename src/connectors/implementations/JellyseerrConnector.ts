@@ -20,7 +20,17 @@ type JellyseerrApprovalOptions =
   paths["/request/{requestId}"]["put"]["requestBody"]["content"]["application/json"];
 type JellyseerrDeclineOptions =
   paths["/request/{requestId}"]["put"]["requestBody"]["content"]["application/json"];
-type JellyseerrMediaSummary = components["schemas"]["MediaInfo"];
+type RequestListResponse =
+  paths["/request"]["get"]["responses"]["200"]["content"]["application/json"];
+type RequestDetailsResponse =
+  paths["/request/{requestId}"]["get"]["responses"]["200"]["content"]["application/json"];
+type MovieDetailsResponse =
+  paths["/movie/{movieId}"]["get"]["responses"]["200"]["content"]["application/json"];
+type TvDetailsResponse =
+  paths["/tv/{tvId}"]["get"]["responses"]["200"]["content"]["application/json"];
+type JellyseerrMediaSummary =
+  | (MovieDetailsResponse & { readonly mediaType: "movie" })
+  | (TvDetailsResponse & { readonly mediaType: "tv" });
 type JellyseerrPagedResult<T> = {
   items: T[];
   total: number;
@@ -68,6 +78,8 @@ type ApiMedia = Omit<components["schemas"]["MediaInfo"], "tvdbId"> & {
   readonly mediaType: "movie" | "tv";
   readonly title?: string;
   readonly originalTitle?: string;
+  readonly name?: string;
+  readonly originalName?: string;
   readonly externalUrl?: string;
   readonly overview?: string;
   readonly releaseDate?: string;
@@ -97,47 +109,7 @@ type ApiRequest = components["schemas"]["MediaRequest"] & {
 type ApiStatusResponse =
   paths["/status"]["get"]["responses"]["200"]["content"]["application/json"];
 
-type ApiMediaDetails =
-  | {
-      readonly mediaType: "movie";
-      readonly id?: number;
-      readonly tmdbId?: number;
-      readonly tvdbId?: number;
-      readonly imdbId?: string;
-      readonly title?: string;
-      readonly originalTitle?: string;
-      readonly overview?: string;
-      readonly posterPath?: string;
-      readonly backdropPath?: string;
-      readonly releaseDate?: string;
-      readonly rating?: number;
-      readonly runtime?: number;
-      readonly genres?: components["schemas"]["Genre"][];
-      readonly credits?: ApiCreditsResponse;
-    }
-  | {
-      readonly mediaType: "tv";
-      readonly id?: number;
-      readonly tmdbId?: number;
-      readonly tvdbId?: number;
-      readonly imdbId?: string;
-      readonly name?: string;
-      readonly originalName?: string;
-      readonly overview?: string;
-      readonly posterPath?: string;
-      readonly backdropPath?: string;
-      readonly firstAirDate?: string;
-      readonly rating?: number;
-      readonly episodeRunTime?: number[];
-      readonly genres?: components["schemas"]["Genre"][];
-      readonly credits?: ApiCreditsResponse;
-    };
-
 type ApiCreditPerson = components["schemas"]["Cast"];
-
-interface ApiCreditsResponse {
-  readonly cast?: ApiCreditPerson[];
-}
 
 type ApiSearchResult =
   | {
@@ -194,33 +166,28 @@ const mapRequest = (request: ApiRequest): JellyseerrRequest => {
   return request as unknown as JellyseerrRequest;
 };
 
-const mapPagedRequests = (
-  data: ApiPaginatedResponse<ApiRequest>,
-): JellyseerrRequestList => {
-  const items = data.results.map((r) => r as unknown as JellyseerrRequest);
-  const total = data.pageInfo?.results ?? data.totalResults ?? items.length;
-
-  const pageInfo =
-    data.pageInfo ??
-    (data.page || data.totalPages || data.totalResults
-      ? {
-          page: data.page,
-          pages: data.totalPages,
-          results: data.totalResults,
-        }
-      : undefined);
+const mapPagedRequests = (data: RequestListResponse): JellyseerrRequestList => {
+  const rawResults = Array.isArray(data.results)
+    ? (data.results as unknown as ApiRequest[])
+    : [];
+  const items = rawResults.map(mapRequest);
+  const total = data.pageInfo?.results ?? rawResults.length;
 
   return {
     items,
     total,
-    pageInfo,
+    pageInfo: data.pageInfo,
   };
 };
 
-const mapMediaDetails = (media: ApiMediaDetails): JellyseerrMediaSummary => {
-  // For full migration we return the OpenAPI media details as-is and let
-  // consumers interpret the generated schema.
-  return media as unknown as JellyseerrMediaSummary;
+const mapMediaDetails = (
+  mediaType: "movie" | "tv",
+  media: MovieDetailsResponse | TvDetailsResponse,
+): JellyseerrMediaSummary => {
+  return {
+    ...media,
+    mediaType,
+  } as JellyseerrMediaSummary;
 };
 
 const mapCastMember = (p: ApiCreditPerson) => ({
@@ -257,8 +224,24 @@ const normalizeRequestQuery = (
     params.skip = options.skip;
   }
 
-  if (options.filter && options.filter !== "all") {
+  if (typeof options.filter === "string") {
     params.filter = options.filter;
+  }
+
+  if (typeof options.sort === "string") {
+    params.sort = options.sort;
+  }
+
+  if (typeof options.sortDirection === "string") {
+    params.sortDirection = options.sortDirection;
+  }
+
+  if (typeof options.requestedBy === "number") {
+    params.requestedBy = options.requestedBy;
+  }
+
+  if (typeof options.mediaType === "string") {
+    params.mediaType = options.mediaType;
   }
 
   // Note: The Jellyseerr /request endpoint does not accept a free-text
@@ -462,102 +445,138 @@ export class JellyseerrConnector extends BaseConnector<
 
     try {
       const params = normalizeRequestQuery(options);
-      const response = await this.getWithRetry<
-        ApiPaginatedResponse<ApiRequest>
-      >(REQUEST_ENDPOINT, { params }, "getRequests");
+      const response = await this.getWithRetry<RequestListResponse>(
+        REQUEST_ENDPOINT,
+        { params },
+        "getRequests",
+      );
       let requests = mapPagedRequests(response.data);
 
-      // Fetch media details for requests that don't have a title/name
-      const requestsToUpdate = requests.items.filter(
-        (item: JellyseerrRequest) => {
-          const media = (item as unknown as Record<string, unknown>)?.media as
-            | Record<string, unknown>
-            | undefined;
-          return (
-            !media ||
-            !(typeof media.title === "string" || typeof media.name === "string")
-          );
-        },
-      );
-
-      if (requestsToUpdate.length > 0) {
-        const mediaDetailsPromises = requestsToUpdate.map(
-          async (request: JellyseerrRequest) => {
-            const media = (request as unknown as Record<string, unknown>)
-              ?.media as Record<string, unknown> | undefined;
-            const mediaId =
-              typeof media?.id === "number" ? (media!.id as number) : undefined;
-            if (typeof mediaId === "number") {
-              try {
-                // Derive mediaType if present; if absent, make a best-effort guess
-                let mediaTypeCandidate =
-                  typeof media?.mediaType === "string"
-                    ? (media!.mediaType as string)
-                    : undefined;
-                let mediaType: "movie" | "tv" | undefined;
-                if (
-                  mediaTypeCandidate === "movie" ||
-                  mediaTypeCandidate === "tv"
-                ) {
-                  mediaType = mediaTypeCandidate;
-                } else {
-                  mediaType =
-                    typeof media?.firstAirDate === "string" ||
-                    typeof media?.name === "string" ||
-                    typeof media?.originalName === "string"
-                      ? "tv"
-                      : "movie";
-                }
-                const mediaDetails = await this.getMediaDetails(
-                  mediaId,
-                  mediaType,
+      if (requests.items.length > 0) {
+        const enrichedResults = await Promise.all(
+          requests.items.map(async (request: JellyseerrRequest) => {
+            try {
+              const requestDetails =
+                await this.getWithRetry<RequestDetailsResponse>(
+                  `${REQUEST_ENDPOINT}/${request.id}`,
+                  undefined,
+                  "getRequestDetails",
                 );
-                return {
-                  requestId: (request as unknown as Record<string, unknown>)
-                    ?.id as number,
-                  mediaDetails,
-                };
-              } catch (error) {
-                void logger.warn("Failed to fetch media details", {
-                  mediaId,
-                  mediaType: media?.mediaType,
-                  error,
-                });
+
+              const requestPayload = requestDetails.data as ApiRequest & {
+                readonly mediaType?: string;
+                readonly type?: string;
+                readonly mediaId?: number;
+              };
+              const media = requestPayload.media as ApiMedia | undefined;
+              const tmdbId =
+                typeof media?.tmdbId === "number" ? media.tmdbId : undefined;
+              const fallbackId =
+                typeof requestPayload.mediaId === "number"
+                  ? requestPayload.mediaId
+                  : typeof media?.id === "number"
+                    ? media.id
+                    : undefined;
+              const mediaId = tmdbId ?? fallbackId;
+
+              if (typeof mediaId !== "number") {
+                void logger.warn(
+                  "Missing Jellyseerr media identifier; skipping enrichment",
+                  {
+                    location: "JellyseerrConnector.getRequests",
+                    requestId: request.id,
+                    serviceId: this.config.id,
+                  },
+                );
                 return null;
               }
+
+              const candidates: (string | undefined)[] = [
+                requestPayload.mediaType,
+                requestPayload.type,
+                media?.mediaType,
+                (media as { readonly type?: string } | undefined)?.type,
+              ];
+
+              let mediaType: "movie" | "tv" | undefined;
+              for (const candidate of candidates) {
+                if (candidate === "movie" || candidate === "tv") {
+                  mediaType = candidate;
+                  break;
+                }
+              }
+
+              if (!mediaType) {
+                if (
+                  typeof media?.firstAirDate === "string" ||
+                  typeof media?.name === "string" ||
+                  typeof media?.originalName === "string"
+                ) {
+                  mediaType = "tv";
+                } else if (
+                  typeof media?.releaseDate === "string" ||
+                  typeof media?.title === "string" ||
+                  typeof media?.originalTitle === "string"
+                ) {
+                  mediaType = "movie";
+                }
+              }
+
+              if (!mediaType) {
+                void logger.warn(
+                  "Unable to determine Jellyseerr media type for request; skipping enrichment",
+                  {
+                    location: "JellyseerrConnector.getRequests",
+                    requestId: request.id,
+                    mediaId,
+                    serviceId: this.config.id,
+                  },
+                );
+                return null;
+              }
+
+              const mediaDetails = await this.getMediaDetails(
+                mediaId,
+                mediaType,
+              );
+
+              return {
+                requestId: request.id,
+                mediaDetails,
+              };
+            } catch (detailsError) {
+              void logger.warn("Failed to fetch request details", {
+                requestId: request.id,
+                error: detailsError,
+              });
+              return null;
             }
-            return null;
-          },
+          }),
         );
 
-        const mediaDetailsResults = await Promise.all(mediaDetailsPromises);
         const mediaDetailsMap = new Map<number, JellyseerrMediaSummary>();
-        mediaDetailsResults.forEach(
-          (
-            result: {
-              requestId: number;
-              mediaDetails: JellyseerrMediaSummary;
-            } | null,
-          ) => {
-            if (result) {
-              mediaDetailsMap.set(result.requestId, result.mediaDetails);
-            }
-          },
-        );
+        for (const result of enrichedResults) {
+          if (result) {
+            mediaDetailsMap.set(result.requestId, result.mediaDetails);
+          }
+        }
 
-        requests = {
-          ...requests,
-          items: requests.items.map((item: JellyseerrRequest) => {
-            const mediaDetails = mediaDetailsMap.get(item.id);
-            if (mediaDetails) {
+        if (mediaDetailsMap.size > 0) {
+          requests = {
+            ...requests,
+            items: requests.items.map((item: JellyseerrRequest) => {
+              const mediaDetails = mediaDetailsMap.get(item.id);
+              if (!mediaDetails) {
+                return item;
+              }
+
               return {
                 ...item,
-                media: mediaDetails,
-              };
-            }
-            return item;
-          }),
-        };
+                mediaDetails,
+              } as JellyseerrRequest;
+            }),
+          };
+        }
       }
 
       // Return the (possibly enriched) requests list
@@ -585,12 +604,21 @@ export class JellyseerrConnector extends BaseConnector<
           ? `${API_PREFIX}/movie/${mediaId}`
           : `${API_PREFIX}/tv/${mediaId}`;
 
-      const response = await this.getWithRetry<ApiMediaDetails>(
+      if (mediaType === "movie") {
+        const response = await this.getWithRetry<MovieDetailsResponse>(
+          endpoint,
+          undefined,
+          "getMediaDetails",
+        );
+        return mapMediaDetails("movie", response.data);
+      }
+
+      const response = await this.getWithRetry<TvDetailsResponse>(
         endpoint,
         undefined,
         "getMediaDetails",
       );
-      return mapMediaDetails(response.data);
+      return mapMediaDetails("tv", response.data);
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
@@ -620,7 +648,17 @@ export class JellyseerrConnector extends BaseConnector<
           ? `${API_PREFIX}/movie/${mediaId}`
           : `${API_PREFIX}/tv/${mediaId}`;
 
-      const response = await this.getWithRetry<ApiMediaDetails>(
+      if (mediaType === "movie") {
+        const response = await this.getWithRetry<MovieDetailsResponse>(
+          endpoint,
+          undefined,
+          "getMediaCredits",
+        );
+        const cast = response.data.credits?.cast ?? [];
+        return cast.map(mapCastMember);
+      }
+
+      const response = await this.getWithRetry<TvDetailsResponse>(
         endpoint,
         undefined,
         "getMediaCredits",
