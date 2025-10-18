@@ -20,6 +20,7 @@ import {
 import type { DownloadItem } from "@/models/download.types";
 import { formatBytes, formatSpeed, formatEta } from "@/utils/torrent.utils";
 import { spacing } from "@/theme/spacing";
+import { useDownloadActions as useDownloadActionsHook } from "@/hooks/useDownloadActions";
 
 interface DownloadProgressSheetProps {
   visible: boolean;
@@ -35,180 +36,186 @@ interface DownloadItemProps {
 }
 
 /**
- * Individual download item component
+ * Individual download item component (memoized for performance)
  */
-const DownloadItemCard: React.FC<DownloadItemProps> = ({
-  download,
-  onPause,
-  onResume,
-  onCancel,
-  onRetry,
-}) => {
-  const theme = useTheme<AppTheme>();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+const DownloadItemCard: React.FC<DownloadItemProps> = React.memo(
+  ({ download, onPause, onResume, onCancel, onRetry }) => {
+    const theme = useTheme<AppTheme>();
+    const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const progress = Math.max(0, Math.min(1, download.state.progress));
-  const percent = Math.round(progress * 100);
-  const isActive = download.state.status === "downloading";
-  const isPaused = download.state.status === "paused";
-  const isCompleted = download.state.status === "completed";
-  const isFailed = download.state.status === "failed";
-  const canRetry =
-    isFailed && download.state.retryCount < download.state.maxRetries;
+    const progress = Math.max(0, Math.min(1, download.state.progress));
+    const percent = Math.round(progress * 100);
+    const isActive = download.state.status === "downloading";
+    const isPaused = download.state.status === "paused";
+    const isCompleted = download.state.status === "completed";
+    const isFailed = download.state.status === "failed";
+    const canRetry =
+      isFailed && download.state.retryCount < download.state.maxRetries;
 
-  const getStatusText = () => {
-    if (isCompleted) {
-      return `Completed • ${formatBytes(download.download.size || download.state.bytesDownloaded)}`;
-    }
-    if (isPaused) {
-      return `Paused • ${formatBytes(download.state.bytesDownloaded)} downloaded`;
-    }
-    if (isFailed) {
-      return `Failed • ${download.state.errorMessage || "Unknown error"}`;
-    }
-    if (isActive) {
-      const progressText =
-        download.state.totalBytes > 0
-          ? `${formatBytes(download.state.bytesDownloaded)} / ${formatBytes(download.state.totalBytes)}`
-          : formatBytes(download.state.bytesDownloaded);
+    const getStatusText = () => {
+      if (isCompleted) {
+        return `Completed • ${formatBytes(download.download.size || download.state.bytesDownloaded)}`;
+      }
+      if (isPaused) {
+        return `Paused • ${formatBytes(download.state.bytesDownloaded)} downloaded`;
+      }
+      if (isFailed) {
+        return `Failed • ${download.state.errorMessage || "Unknown error"}`;
+      }
+      if (isActive) {
+        const progressText =
+          download.state.totalBytes > 0
+            ? `${formatBytes(download.state.bytesDownloaded)} / ${formatBytes(download.state.totalBytes)}`
+            : formatBytes(download.state.bytesDownloaded);
 
-      const speedText =
-        download.state.downloadSpeed > 0
-          ? ` • ${formatSpeed(download.state.downloadSpeed)}`
-          : "";
+        const speedText =
+          download.state.downloadSpeed > 0
+            ? ` • ${formatSpeed(download.state.downloadSpeed)}`
+            : "";
 
-      const etaText =
-        download.state.eta > 0 && download.state.downloadSpeed > 0
-          ? ` • ~${formatEta(download.state.eta)}`
-          : "";
+        const etaText =
+          download.state.eta > 0 && download.state.downloadSpeed > 0
+            ? ` • ~${formatEta(download.state.eta)}`
+            : "";
 
-      return `${progressText}${speedText}${etaText}`;
-    }
-    return `Pending • ${formatBytes(download.state.bytesDownloaded)}`;
-  };
+        return `${progressText}${speedText}${etaText}`;
+      }
+      return `Pending • ${formatBytes(download.state.bytesDownloaded)}`;
+    };
 
-  const getStatusColor = () => {
-    if (isCompleted) return theme.colors.primary;
-    if (isFailed) return theme.colors.error;
-    if (isPaused) return theme.colors.onSurfaceVariant;
-    if (isActive) return theme.colors.primary;
-    return theme.colors.onSurfaceVariant;
-  };
+    const getStatusColor = () => {
+      if (isCompleted) return theme.colors.primary;
+      if (isFailed) return theme.colors.error;
+      if (isPaused) return theme.colors.onSurfaceVariant;
+      if (isActive) return theme.colors.primary;
+      return theme.colors.onSurfaceVariant;
+    };
 
-  const getProgressColor = () => {
-    if (isCompleted) return theme.colors.primary;
-    if (isFailed) return theme.colors.error;
-    if (isPaused) return theme.colors.onSurfaceVariant;
-    return theme.colors.primary;
-  };
+    const getProgressColor = () => {
+      if (isCompleted) return theme.colors.primary;
+      if (isFailed) return theme.colors.error;
+      if (isPaused) return theme.colors.onSurfaceVariant;
+      return theme.colors.primary;
+    };
 
-  const handleActionPress = () => {
-    if (isCompleted) return;
-    if (isPaused && onResume) {
-      onResume(download.id);
-    } else if (isActive && onPause) {
-      onPause(download.id);
-    } else if (canRetry && onRetry) {
-      onRetry(download.id);
-    }
-  };
+    const handleActionPress = () => {
+      if (isCompleted) return;
+      if (isPaused && onResume) {
+        onResume(download.id);
+      } else if (isActive && onPause) {
+        onPause(download.id);
+      } else if (canRetry && onRetry) {
+        onRetry(download.id);
+      }
+    };
 
-  const handleCancelPress = () => {
-    if (onCancel && !isCompleted) {
-      onCancel(download.id);
-    }
-  };
+    const handleCancelPress = () => {
+      if (onCancel && !isCompleted) {
+        onCancel(download.id);
+      }
+    };
 
-  return (
-    <Surface style={styles.downloadItem}>
-      <View style={styles.downloadHeader}>
-        <View style={styles.downloadInfo}>
-          <Text
-            variant="titleSmall"
-            style={styles.downloadTitle}
-            numberOfLines={2}
-          >
-            {download.content.title}
-          </Text>
-          <Text
-            variant="bodySmall"
-            style={[
-              styles.downloadService,
-              { color: theme.colors.onSurfaceVariant },
-            ]}
-          >
-            {download.serviceConfig.name}
-          </Text>
-        </View>
-        <View style={styles.downloadActions}>
-          <IconButton
-            icon={
-              isCompleted
-                ? "check"
-                : isPaused
-                  ? "play"
-                  : isActive
-                    ? "pause"
-                    : canRetry
-                      ? "refresh"
-                      : "close"
-            }
-            size={20}
-            onPress={handleActionPress}
-            disabled={isCompleted}
-            iconColor={getStatusColor()}
-            style={styles.actionButton}
-          />
-          {!isCompleted && (
+    return (
+      <Surface style={styles.downloadItem}>
+        <View style={styles.downloadHeader}>
+          <View style={styles.downloadInfo}>
+            <Text
+              variant="titleSmall"
+              style={styles.downloadTitle}
+              numberOfLines={2}
+            >
+              {download.content.title}
+            </Text>
+            <Text
+              variant="bodySmall"
+              style={[
+                styles.downloadService,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
+            >
+              {download.serviceConfig.name}
+            </Text>
+          </View>
+          <View style={styles.downloadActions}>
             <IconButton
-              icon="close"
+              icon={
+                isCompleted
+                  ? "check"
+                  : isPaused
+                    ? "play"
+                    : isActive
+                      ? "pause"
+                      : canRetry
+                        ? "refresh"
+                        : "close"
+              }
               size={20}
-              onPress={handleCancelPress}
-              iconColor={theme.colors.error}
+              onPress={handleActionPress}
+              disabled={isCompleted}
+              iconColor={getStatusColor()}
               style={styles.actionButton}
             />
-          )}
+            {!isCompleted && (
+              <IconButton
+                icon="close"
+                size={20}
+                onPress={handleCancelPress}
+                iconColor={theme.colors.error}
+                style={styles.actionButton}
+              />
+            )}
+          </View>
         </View>
-      </View>
 
-      <View style={styles.downloadProgress}>
-        <ProgressBar
-          progress={progress}
-          color={getProgressColor()}
-          style={styles.progressBar}
-        />
-        <View style={styles.progressInfo}>
-          <Text
-            variant="labelSmall"
-            style={[styles.progressPercent, { color: getStatusColor() }]}
-          >
-            {percent}%
-          </Text>
-          <Text
-            variant="labelSmall"
-            style={[
-              styles.progressStatus,
-              { color: theme.colors.onSurfaceVariant },
-            ]}
-          >
-            {getStatusText()}
-          </Text>
+        <View style={styles.downloadProgress}>
+          <ProgressBar
+            progress={progress}
+            color={getProgressColor()}
+            style={styles.progressBar}
+          />
+          <View style={styles.progressInfo}>
+            <Text
+              variant="labelSmall"
+              style={[styles.progressPercent, { color: getStatusColor() }]}
+            >
+              {percent}%
+            </Text>
+            <Text
+              variant="labelSmall"
+              style={[
+                styles.progressStatus,
+                { color: theme.colors.onSurfaceVariant },
+              ]}
+            >
+              {getStatusText()}
+            </Text>
+          </View>
         </View>
-      </View>
 
-      {download.content.thumbnailUrl && (
-        <View style={styles.thumbnailContainer}>
-          {/* Thumbnail would go here - using expo-image */}
-          {/* <Image
+        {download.content.thumbnailUrl && (
+          <View style={styles.thumbnailContainer}>
+            {/* Thumbnail would go here - using expo-image */}
+            {/* <Image
             source={{ uri: download.content.thumbnailUrl }}
             style={styles.thumbnail}
             contentFit="cover"
           /> */}
-        </View>
-      )}
-    </Surface>
-  );
-};
+          </View>
+        )}
+      </Surface>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison to prevent re-renders when only other downloads change
+    return (
+      prevProps.download.id === nextProps.download.id &&
+      prevProps.download.state.status === nextProps.download.state.status &&
+      prevProps.download.state.progress === nextProps.download.state.progress &&
+      prevProps.download.state.downloadSpeed ===
+        nextProps.download.state.downloadSpeed
+    );
+  },
+);
 
 /**
  * Download progress sheet component
@@ -261,30 +268,45 @@ const DownloadProgressSheet: React.FC<DownloadProgressSheetProps> = ({
   }, [activeDownloads, completedDownloads, failedDownloads]);
 
   // Handle download actions (these would be connected to DownloadManager)
-  const handlePauseDownload = useCallback((downloadId: string) => {
-    // TODO: Connect to DownloadManager
-    console.log("Pause download:", downloadId);
-  }, []);
+  const {
+    pauseDownload: pauseDownloadAction,
+    resumeDownload: resumeDownloadAction,
+    cancelDownload: cancelDownloadAction,
+    retryDownload: retryDownloadAction,
+    clearCompletedDownloads: clearCompletedAction,
+  } = useDownloadActionsHook();
 
-  const handleResumeDownload = useCallback((downloadId: string) => {
-    // TODO: Connect to DownloadManager
-    console.log("Resume download:", downloadId);
-  }, []);
+  const handlePauseDownload = useCallback(
+    (downloadId: string) => {
+      void pauseDownloadAction(downloadId, { confirmDestructive: false });
+    },
+    [pauseDownloadAction],
+  );
 
-  const handleCancelDownload = useCallback((downloadId: string) => {
-    // TODO: Connect to DownloadManager
-    console.log("Cancel download:", downloadId);
-  }, []);
+  const handleResumeDownload = useCallback(
+    (downloadId: string) => {
+      void resumeDownloadAction(downloadId, { confirmDestructive: false });
+    },
+    [resumeDownloadAction],
+  );
 
-  const handleRetryDownload = useCallback((downloadId: string) => {
-    // TODO: Connect to DownloadManager
-    console.log("Retry download:", downloadId);
-  }, []);
+  const handleCancelDownload = useCallback(
+    (downloadId: string) => {
+      void cancelDownloadAction(downloadId, { confirmDestructive: false });
+    },
+    [cancelDownloadAction],
+  );
+
+  const handleRetryDownload = useCallback(
+    (downloadId: string) => {
+      void retryDownloadAction(downloadId, { confirmDestructive: false });
+    },
+    [retryDownloadAction],
+  );
 
   const handleClearCompleted = useCallback(() => {
-    // TODO: Connect to DownloadManager
-    console.log("Clear completed downloads");
-  }, []);
+    void clearCompletedAction({ confirmDestructive: false });
+  }, [clearCompletedAction]);
 
   const handleShowAllHistory = useCallback(() => {
     // TODO: Navigate to download history screen

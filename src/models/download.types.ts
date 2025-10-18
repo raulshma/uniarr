@@ -252,3 +252,35 @@ export interface DownloadHistoryEntry {
   /** Whether the file still exists */
   readonly fileExists: boolean;
 }
+
+/**
+ * Download progress data from the file system
+ */
+export interface DownloadProgressData {
+  /** Total bytes downloaded so far */
+  readonly totalBytesWritten: number;
+  /** Total bytes expected to download */
+  readonly totalBytesExpectedToWrite: number;
+}
+
+/**
+ * Download pause state from expo-file-system
+ */
+export interface DownloadPauseState {
+  /** Indicates if the download was paused */
+  readonly isFile?: boolean;
+  /** Resume data */
+  readonly pauseData?: string;
+}
+
+/**
+ * Download resumable task interface - matches expo-file-system DownloadResumable
+ */
+export interface DownloadResumable {
+  /** Resume the download */
+  resumeAsync(): Promise<{ uri: string } | undefined>;
+  /** Pause the download */
+  pauseAsync(): Promise<DownloadPauseState>;
+  /** Save the resumable state */
+  savable(): Promise<{ url: string; fileUri: string }>;
+}

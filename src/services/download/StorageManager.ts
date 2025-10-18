@@ -172,7 +172,17 @@ export class StorageManager {
           localPath: download.download.localPath,
           fileExists: true, // In a real implementation, you'd check if the file exists
         }))
-        .sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
+        .sort((a, b) => {
+          const dateA =
+            a.completedAt instanceof Date
+              ? a.completedAt
+              : new Date(a.completedAt);
+          const dateB =
+            b.completedAt instanceof Date
+              ? b.completedAt
+              : new Date(b.completedAt);
+          return dateB.getTime() - dateA.getTime();
+        });
     } catch (error) {
       logger.error("Failed to get download history", {
         error: error instanceof Error ? error.message : String(error),

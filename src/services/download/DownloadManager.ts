@@ -7,9 +7,18 @@ import type {
   DownloadEvent,
   DownloadQueueConfig,
   DownloadStorageInfo,
+  DownloadProgressData,
+  DownloadResumable,
 } from "@/models/download.types";
 import { logger } from "@/services/logger/LoggerService";
 import { DownloadNotificationService } from "./NotificationService";
+
+/**
+ * Utility type to make readonly properties mutable
+ */
+type Mutable<T> = {
+  -readonly [K in keyof T]: T[K];
+};
 
 /**
  * Get a safe download directory path
@@ -50,13 +59,15 @@ export class DownloadManager {
   private readonly downloads: Map<string, DownloadItem> = new Map();
   private readonly downloadQueue: string[] = [];
   private readonly activeDownloads: Set<string> = new Set();
-  private readonly downloadTasks: Map<string, any> = new Map(); // DownloadResumable type
+  private readonly downloadTasks: Map<string, DownloadResumable> = new Map();
   private readonly config: DownloadQueueConfig;
   private readonly onEvent?: (event: DownloadEvent) => void;
   private readonly progressUpdateInterval: number;
   private readonly enablePersistence: boolean;
   private progressUpdateTimers: Map<string, NodeJS.Timeout> = new Map();
   private notificationService: DownloadNotificationService;
+  private lastProgressUpdate: Map<string, number> = new Map();
+  private readonly progressThrottleMs: number = 1000; // Throttle progress updates to once per second
 
   constructor(options: DownloadManagerOptions = {}) {
     this.config = { ...DEFAULT_CONFIG, ...options.queueConfig };
@@ -126,6 +137,19 @@ export class DownloadManager {
       await this.saveState();
     }
 
+    // Emit event for the newly added download so the store can capture it
+    this.emitEvent(
+      {
+        type: "downloadProgress",
+        downloadId: id,
+        progress: 0,
+        bytesDownloaded: 0,
+        speed: 0,
+        eta: 0,
+      },
+      download,
+    );
+
     this.emitEvent({
       type: "queueUpdated",
       queueSize: this.downloadQueue.length,
@@ -156,7 +180,14 @@ export class DownloadManager {
 
     const task = this.downloadTasks.get(downloadId);
     if (task) {
-      await task.pauseAsync();
+      try {
+        await task.pauseAsync();
+      } catch (error) {
+        logger.warn("Failed to pause download task", {
+          downloadId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     // Clear progress timer
@@ -216,7 +247,14 @@ export class DownloadManager {
 
     const task = this.downloadTasks.get(downloadId);
     if (task) {
-      await task.pauseAsync();
+      try {
+        await task.pauseAsync();
+      } catch (error) {
+        logger.warn("Failed to pause download task during cancellation", {
+          downloadId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     // Clear progress timer
@@ -463,7 +501,11 @@ export class DownloadManager {
         this.handleDownloadProgress.bind(this, download.id),
       );
 
-      this.downloadTasks.set(download.id, downloadResumable);
+      // Cast to our interface - both are compatible at runtime
+      this.downloadTasks.set(
+        download.id,
+        downloadResumable as unknown as DownloadResumable,
+      );
 
       // Start the download
       let result;
@@ -510,24 +552,40 @@ export class DownloadManager {
   }
 
   /**
-   * Handle download progress updates
+   * Handle download progress updates (throttled)
    */
   private handleDownloadProgress(
     downloadId: string,
-    data: any, // DownloadProgressData type
+    data: DownloadProgressData,
   ): void {
     const download = this.downloads.get(downloadId);
     if (!download) return;
 
-    const now = new Date();
-    const timeDiff =
-      (now.getTime() - download.state.updatedAt.getTime()) / 1000;
+    const now = Date.now();
+    const lastUpdate = this.lastProgressUpdate.get(downloadId) || 0;
+
+    // Throttle updates to once per second to avoid excessive re-renders
+    if (now - lastUpdate < this.progressThrottleMs) {
+      return;
+    }
+
+    this.lastProgressUpdate.set(downloadId, now);
+
+    // Ensure updatedAt is a Date instance (it might be a string or object from deserialization)
+    const lastUpdateTime =
+      download.state.updatedAt instanceof Date
+        ? download.state.updatedAt
+        : new Date(download.state.updatedAt);
+
+    const timeDiff = (now - lastUpdateTime.getTime()) / 1000;
     const bytesDiff = data.totalBytesWritten - download.state.bytesDownloaded;
     const speed = timeDiff > 0 ? bytesDiff / timeDiff : 0;
     const eta =
       speed > 0 && data.totalBytesExpectedToWrite > 0
         ? (data.totalBytesExpectedToWrite - data.totalBytesWritten) / speed
         : 0;
+
+    const nowDate = new Date(now);
 
     this.updateDownloadState(downloadId, {
       status: "downloading",
@@ -539,7 +597,7 @@ export class DownloadManager {
       totalBytes: data.totalBytesExpectedToWrite,
       downloadSpeed: speed,
       eta,
-      updatedAt: now,
+      updatedAt: nowDate,
     });
 
     this.emitEvent({
@@ -609,6 +667,18 @@ export class DownloadManager {
   private handleDownloadError(downloadId: string, error: unknown): void {
     const download = this.downloads.get(downloadId);
     if (!download) return;
+
+    // Skip error handling if download is already paused (error is likely from pause operation)
+    if (download.state.status === "paused") {
+      logger.debug(
+        "Download error received but download is already paused, skipping error handling",
+        {
+          downloadId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return;
+    }
 
     // Clear progress timer and task
     const timer = this.progressUpdateTimers.get(downloadId);
@@ -724,7 +794,9 @@ export class DownloadManager {
             directory.create();
           }
           // Update config to use fallback directory
-          (this.config as any).defaultDownloadDirectory = fallbackDir;
+          // Note: config is readonly, so we cast to mutable for emergency fallback
+          const mutableConfig = this.config as Mutable<DownloadQueueConfig>;
+          mutableConfig.defaultDownloadDirectory = fallbackDir;
           logger.info("Fallback download directory created successfully", {
             fallbackDir,
           });

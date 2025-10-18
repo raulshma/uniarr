@@ -61,6 +61,14 @@ export const DownloadPortalProvider: React.FC<DownloadPortalProviderProps> = ({
     useState<DownloadManager | null>(initialDownloadManager);
   const autoShowTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Update download manager when it changes
+  React.useEffect(() => {
+    if (initialDownloadManager && !downloadManager) {
+      setDownloadManager(initialDownloadManager);
+      logger.debug("Download manager updated from prop");
+    }
+  }, [initialDownloadManager, downloadManager]);
+
   // Get active downloads count from store
   const activeDownloadsCount = useDownloadStore(selectActiveDownloadsCount);
 

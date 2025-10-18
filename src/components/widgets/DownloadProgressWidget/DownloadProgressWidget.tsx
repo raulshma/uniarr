@@ -81,10 +81,10 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
   const { onPress } = useHaptics();
   const [refreshing, setRefreshing] = useState(false);
 
-  // Use the download store to get real download data with stable selector
+  // Use optimized selector to prevent excessive re-renders
   const downloads = useDownloadStore(selectDownloads);
 
-  // Convert download store data to display format
+  // Memoize display downloads with progress threshold
   const displayDownloads = React.useMemo(() => {
     const downloadArray = Array.from(downloads.values());
     return downloadArray.map(convertToDisplayItem).sort((a, b) => {

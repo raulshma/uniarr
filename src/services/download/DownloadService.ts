@@ -6,7 +6,10 @@ import type { ServiceConfig } from "@/models/service.types";
 import type {
   DownloadItem,
   DownloadManagerOptions,
+  DownloadEvent,
 } from "@/models/download.types";
+import { useState, useEffect } from "react";
+import * as FileSystemLegacy from "expo-file-system/legacy";
 
 /**
  * Global download service instance
@@ -15,6 +18,7 @@ class DownloadService {
   private static instance: DownloadService | null = null;
   private downloadManager: DownloadManager | null = null;
   private isInitialized = false;
+  private listeners: Set<() => void> = new Set();
 
   private constructor() {}
 
@@ -23,6 +27,23 @@ class DownloadService {
       DownloadService.instance = new DownloadService();
     }
     return DownloadService.instance;
+  }
+
+  /**
+   * Subscribe to initialization changes
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /**
+   * Notify all listeners of state changes
+   */
+  private notifyListeners(): void {
+    this.listeners.forEach((listener) => listener());
   }
 
   /**
@@ -35,14 +56,25 @@ class DownloadService {
     }
 
     try {
-      // Create download manager
-      this.downloadManager = new DownloadManager(options);
+      // Create event handler for download manager events
+      const onEvent = (event: DownloadEvent) => {
+        this.handleDownloadEvent(event);
+      };
+
+      // Create download manager with event handler
+      this.downloadManager = new DownloadManager({
+        ...options,
+        onEvent,
+      });
 
       // Connect to store for real-time updates
       this.connectToStore();
 
       this.isInitialized = true;
       logger.info("Download service initialized successfully");
+
+      // Notify all subscribers
+      this.notifyListeners();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error("Failed to initialize download service", { error: message });
@@ -251,6 +283,97 @@ class DownloadService {
     }
     this.isInitialized = false;
     logger.info("Download service cleaned up");
+
+    // Notify all subscribers
+    this.notifyListeners();
+  }
+
+  /**
+   * Handle download manager events and sync with store
+   */
+  private handleDownloadEvent(event: DownloadEvent): void {
+    const store = useDownloadStore.getState();
+
+    try {
+      switch (event.type) {
+        case "queueUpdated":
+          logger.debug("Queue updated", { queueSize: event.queueSize });
+          break;
+
+        case "downloadProgress": {
+          const download = this.downloadManager?.getDownload(event.downloadId);
+          if (download) {
+            const existing = store.getDownloadById(event.downloadId);
+
+            if (!existing) {
+              store.updateDownload(event.downloadId, download);
+            } else {
+              store.updateDownloadProgress(event.downloadId, download.state);
+            }
+          }
+          break;
+        }
+
+        case "downloadCompleted": {
+          const download = this.downloadManager?.getDownload(event.downloadId);
+          if (download) {
+            store.updateDownload(event.downloadId, download);
+            logger.info("Download completed - store synced", {
+              downloadId: event.downloadId,
+            });
+          }
+          break;
+        }
+
+        case "downloadFailed": {
+          const download = this.downloadManager?.getDownload(event.downloadId);
+          if (download) {
+            store.updateDownload(event.downloadId, download);
+            logger.warn("Download failed - store synced", {
+              downloadId: event.downloadId,
+            });
+          }
+          break;
+        }
+
+        case "downloadPaused": {
+          const download = this.downloadManager?.getDownload(event.downloadId);
+          if (download) {
+            store.updateDownload(event.downloadId, download);
+          }
+          break;
+        }
+
+        case "downloadResumed": {
+          const download = this.downloadManager?.getDownload(event.downloadId);
+          if (download) {
+            store.updateDownload(event.downloadId, download);
+          }
+          break;
+        }
+
+        case "downloadCancelled": {
+          store.removeDownload(event.downloadId);
+          break;
+        }
+
+        case "downloadRetrying": {
+          const download = this.downloadManager?.getDownload(event.downloadId);
+          if (download) {
+            store.updateDownload(event.downloadId, download);
+          }
+          break;
+        }
+
+        default:
+          break;
+      }
+    } catch (error) {
+      logger.error("Error handling download event", {
+        eventType: event.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   /**
@@ -259,13 +382,18 @@ class DownloadService {
   private connectToStore(): void {
     if (!this.downloadManager) return;
 
-    // The DownloadManager was already initialized with event handlers in the constructor
-    // No additional setup needed here
-
-    // Initial connection
+    // Set download manager reference in store
     useDownloadStore.getState().setDownloadManager(this.downloadManager);
 
-    logger.debug("Download manager connected to store");
+    // Sync existing downloads from manager to store
+    const downloads = this.downloadManager.getAllDownloads();
+    for (const download of downloads) {
+      useDownloadStore.getState().updateDownload(download.id, download);
+    }
+
+    logger.debug("Download manager connected to store", {
+      downloadCount: downloads.length,
+    });
   }
 
   /**
@@ -274,7 +402,22 @@ class DownloadService {
   private generateDownloadPath(fileName: string): string {
     // Sanitize filename for file system
     const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-_]/g, "_");
-    return `./downloads/${sanitizedName}`;
+
+    // Get absolute path from document or cache directory
+    const baseDir =
+      FileSystemLegacy.cacheDirectory ||
+      FileSystemLegacy.documentDirectory ||
+      "";
+
+    if (!baseDir) {
+      logger.error("No valid file system directory available");
+      throw new Error(
+        "Cannot generate download path: no file system directory available",
+      );
+    }
+
+    const downloadsDir = `${baseDir}downloads/`;
+    return `${downloadsDir}${sanitizedName}`;
   }
 }
 
@@ -283,10 +426,23 @@ class DownloadService {
  */
 export const useDownloadService = () => {
   const service = DownloadService.getInstance();
+  const [isReady, setIsReady] = useState(() => service.isReady());
+
+  useEffect(() => {
+    // Update state immediately
+    setIsReady(service.isReady());
+
+    // Subscribe to future changes
+    const unsubscribe = service.subscribe(() => {
+      setIsReady(service.isReady());
+    });
+
+    return unsubscribe;
+  }, [service]);
 
   return {
     service,
-    isReady: service.isReady(),
+    isReady,
     getManager: () => service.getManager(),
     startDownload: (
       serviceConfig: ServiceConfig,

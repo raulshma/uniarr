@@ -20,6 +20,10 @@ interface DownloadStoreState extends DownloadManagerState {
   // Actions
   setDownloadManager: (manager: DownloadManager | null) => void;
   updateDownload: (downloadId: string, download: DownloadItem) => void;
+  updateDownloadProgress: (
+    downloadId: string,
+    progress: Partial<DownloadItem["state"]>,
+  ) => void;
   removeDownload: (downloadId: string) => void;
   updateConfig: (config: Partial<DownloadQueueConfig>) => void;
   updateStats: (stats: Partial<DownloadStats>) => void;
@@ -78,40 +82,118 @@ export const useDownloadStore = create<DownloadStoreState>()(
 
           // Update active downloads set based on download status
           const newActiveDownloads = new Set(state.activeDownloads);
-          if (download.state.status === "downloading") {
+          if (
+            download.state.status === "pending" ||
+            download.state.status === "downloading" ||
+            download.state.status === "paused" ||
+            download.state.status === "retrying"
+          ) {
             newActiveDownloads.add(downloadId);
           } else {
             newActiveDownloads.delete(downloadId);
           }
 
-          // Recalculate stats
-          const allDownloads = Array.from(newDownloads.values());
-          const activeDownloads = allDownloads.filter(
-            (d) => d.state.status === "downloading",
-          );
+          // Only recalculate stats if status changed (not just progress)
+          const oldDownload = state.downloads.get(downloadId);
+          const statusChanged =
+            !oldDownload || oldDownload.state.status !== download.state.status;
+
+          if (statusChanged) {
+            const allDownloads = Array.from(newDownloads.values());
+            const activeDownloads = allDownloads.filter(
+              (d) => d.state.status === "downloading",
+            );
+
+            return {
+              downloads: newDownloads,
+              activeDownloads: newActiveDownloads,
+              stats: {
+                ...state.stats,
+                totalDownloads: allDownloads.length,
+                activeDownloads: activeDownloads.length,
+                completedDownloads: allDownloads.filter(
+                  (d) => d.state.status === "completed",
+                ).length,
+                failedDownloads: allDownloads.filter(
+                  (d) => d.state.status === "failed",
+                ).length,
+                totalBytesDownloaded: allDownloads.reduce(
+                  (sum, d) => sum + d.state.bytesDownloaded,
+                  0,
+                ),
+                currentDownloadSpeed: activeDownloads.reduce(
+                  (sum, d) => sum + d.state.downloadSpeed,
+                  0,
+                ),
+              },
+            };
+          }
+
+          // For progress-only updates, just update the download
+          return {
+            downloads: newDownloads,
+            activeDownloads: newActiveDownloads,
+          };
+        });
+      },
+
+      updateDownloadProgress: (downloadId, progressUpdates) => {
+        set((state) => {
+          const download = state.downloads.get(downloadId);
+          if (!download) {
+            return state;
+          }
+
+          const updatedState = {
+            ...download.state,
+            ...progressUpdates,
+          };
+
+          const newDownloads = new Map(state.downloads);
+          newDownloads.set(downloadId, {
+            ...download,
+            state: updatedState,
+          });
+
+          const newActiveDownloads = new Set(state.activeDownloads);
+          const isActiveStatus =
+            updatedState.status === "pending" ||
+            updatedState.status === "downloading" ||
+            updatedState.status === "paused" ||
+            updatedState.status === "retrying";
+
+          if (isActiveStatus) {
+            newActiveDownloads.add(downloadId);
+          } else {
+            newActiveDownloads.delete(downloadId);
+          }
+
+          const previousSpeed = download.state.downloadSpeed ?? 0;
+          const newSpeed =
+            updatedState.downloadSpeed ?? (isActiveStatus ? previousSpeed : 0);
+          const previousBytes = download.state.bytesDownloaded ?? 0;
+          const newBytes = updatedState.bytesDownloaded ?? previousBytes;
+
+          const speedDelta = newSpeed - previousSpeed;
+          const bytesDelta = newBytes - previousBytes;
+
+          const nextStats = {
+            ...state.stats,
+            activeDownloads: newActiveDownloads.size,
+            currentDownloadSpeed: Math.max(
+              0,
+              state.stats.currentDownloadSpeed + speedDelta,
+            ),
+            totalBytesDownloaded: Math.max(
+              0,
+              state.stats.totalBytesDownloaded + bytesDelta,
+            ),
+          };
 
           return {
             downloads: newDownloads,
             activeDownloads: newActiveDownloads,
-            stats: {
-              ...state.stats,
-              totalDownloads: allDownloads.length,
-              activeDownloads: activeDownloads.length,
-              completedDownloads: allDownloads.filter(
-                (d) => d.state.status === "completed",
-              ).length,
-              failedDownloads: allDownloads.filter(
-                (d) => d.state.status === "failed",
-              ).length,
-              totalBytesDownloaded: allDownloads.reduce(
-                (sum, d) => sum + d.state.bytesDownloaded,
-                0,
-              ),
-              currentDownloadSpeed: activeDownloads.reduce(
-                (sum, d) => sum + d.state.downloadSpeed,
-                0,
-              ),
-            },
+            stats: nextStats,
           };
         });
       },
@@ -275,14 +357,47 @@ export const useDownloadStore = create<DownloadStoreState>()(
           ),
         ),
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          logger.info("Download store rehydrated", {
-            downloadsCount: state.downloads?.size || 0,
-            completedDownloads: state.stats?.completedDownloads || 0,
-          });
-        }
-      },
+      onRehydrateStorage:
+        () => (state?: DownloadStoreState, error?: unknown) => {
+          if (error) {
+            logger.error("Failed to rehydrate download store", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+            return;
+          }
+
+          if (state) {
+            // Convert deserialized downloads object back to Map
+            if (state.downloads && !(state.downloads instanceof Map)) {
+              const downloads = new Map(
+                Object.entries(state.downloads as Record<string, DownloadItem>),
+              );
+              // Use setState to update, since state is read-only
+              useDownloadStore.setState({ downloads });
+            }
+            // Ensure activeDownloads is a Set
+            if (
+              state.activeDownloads &&
+              !(state.activeDownloads instanceof Set)
+            ) {
+              const activeDownloads = new Set<string>(
+                Array.isArray(state.activeDownloads)
+                  ? (state.activeDownloads as string[])
+                  : Array.from(
+                      state.activeDownloads as any as Iterable<string>,
+                    ),
+              );
+              useDownloadStore.setState({ activeDownloads });
+            }
+            logger.info("Download store rehydrated", {
+              downloadsCount:
+                state.downloads instanceof Map
+                  ? state.downloads.size
+                  : Object.keys(state.downloads || {}).length,
+              completedDownloads: state.stats?.completedDownloads || 0,
+            });
+          }
+        },
     },
   ),
 );
@@ -310,7 +425,15 @@ export const selectDownloadsArray = (() => {
     if (lastDownloads === state.downloads && cache !== null) {
       return cache;
     }
-    cache = Array.from(state.downloads.values());
+    // Handle both Map and plain object (from deserialization)
+    const downloads = state.downloads;
+    if (downloads instanceof Map) {
+      cache = Array.from(downloads.values());
+    } else if (downloads && typeof downloads === "object") {
+      cache = Object.values(downloads);
+    } else {
+      cache = [];
+    }
     lastDownloads = state.downloads;
     return cache;
   };
@@ -329,9 +452,27 @@ export const selectActiveDownloadsArray = (() => {
     ) {
       return cache;
     }
-    cache = Array.from(state.activeDownloads)
-      .map((id) => state.downloads.get(id))
-      .filter((download): download is DownloadItem => download !== undefined);
+    const activeIds =
+      state.activeDownloads instanceof Set
+        ? Array.from(state.activeDownloads)
+        : Array.isArray(state.activeDownloads)
+          ? state.activeDownloads
+          : [];
+
+    const downloads = state.downloads;
+
+    if (downloads instanceof Map) {
+      cache = activeIds
+        .map((id) => downloads.get(id))
+        .filter((download): download is DownloadItem => download !== undefined);
+    } else if (downloads && typeof downloads === "object") {
+      const downloadObj = downloads as Record<string, DownloadItem>;
+      cache = activeIds
+        .map((id) => downloadObj[id])
+        .filter((download): download is DownloadItem => download !== undefined);
+    } else {
+      cache = [];
+    }
     lastActiveDownloads = state.activeDownloads;
     lastDownloads = state.downloads;
     return cache;
@@ -346,9 +487,16 @@ export const selectCompletedDownloadsArray = (() => {
     if (lastDownloads === state.downloads && cache !== null) {
       return cache;
     }
-    cache = Array.from(state.downloads.values()).filter(
-      (download) => download.state.status === "completed",
-    );
+    const downloads = state.downloads;
+    let items: DownloadItem[] = [];
+
+    if (downloads instanceof Map) {
+      items = Array.from(downloads.values());
+    } else if (downloads && typeof downloads === "object") {
+      items = Object.values(downloads);
+    }
+
+    cache = items.filter((download) => download.state.status === "completed");
     lastDownloads = state.downloads;
     return cache;
   };
@@ -362,9 +510,16 @@ export const selectFailedDownloadsArray = (() => {
     if (lastDownloads === state.downloads && cache !== null) {
       return cache;
     }
-    cache = Array.from(state.downloads.values()).filter(
-      (download) => download.state.status === "failed",
-    );
+    const downloads = state.downloads;
+    let items: DownloadItem[] = [];
+
+    if (downloads instanceof Map) {
+      items = Array.from(downloads.values());
+    } else if (downloads && typeof downloads === "object") {
+      items = Object.values(downloads);
+    }
+
+    cache = items.filter((download) => download.state.status === "failed");
     lastDownloads = state.downloads;
     return cache;
   };
@@ -373,10 +528,18 @@ export const selectFailedDownloadsArray = (() => {
 // Status-based selectors
 export const selectDownloadsByStatus =
   (status: DownloadItem["state"]["status"]) =>
-  (state: DownloadStoreState): DownloadItem[] =>
-    Array.from(state.downloads.values()).filter(
-      (d) => d.state.status === status,
-    );
+  (state: DownloadStoreState): DownloadItem[] => {
+    const downloads = state.downloads;
+    let items: DownloadItem[] = [];
+
+    if (downloads instanceof Map) {
+      items = Array.from(downloads.values());
+    } else if (downloads && typeof downloads === "object") {
+      items = Object.values(downloads);
+    }
+
+    return items.filter((d) => d.state.status === status);
+  };
 
 // Count selectors for performance
 export const selectTotalDownloadsCount = (state: DownloadStoreState): number =>
@@ -440,4 +603,19 @@ export const useCurrentDownloadSpeed = (): number => {
  */
 export const useDownloadConfig = (): DownloadQueueConfig => {
   return useDownloadStore((state) => state.config);
+};
+
+/**
+ * Hook for download store actions
+ */
+export const useDownloadStoreActions = () => {
+  return useDownloadStore((state) => ({
+    updateDownload: state.updateDownload,
+    updateDownloadProgress: state.updateDownloadProgress,
+    removeDownload: state.removeDownload,
+    updateConfig: state.updateConfig,
+    updateStats: state.updateStats,
+    clearCompletedDownloads: state.clearCompletedDownloads,
+    resetStore: state.resetStore,
+  }));
 };

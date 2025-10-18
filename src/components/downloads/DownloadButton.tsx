@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable, ViewStyle } from "react-native";
 import { IconButton, Text, Menu, Divider, useTheme } from "react-native-paper";
 import Animated, {
   useSharedValue,
@@ -13,6 +13,8 @@ import type { ServiceConfig } from "@/models/service.types";
 import type { QualityOption } from "@/connectors/base/IDownloadConnector";
 import { spacing } from "@/theme/spacing";
 import * as Haptics from "expo-haptics";
+import { useCurrentDownloadSpeed } from "@/store/downloadStore";
+import { formatSpeed } from "@/utils/torrent.utils";
 
 interface DownloadButtonProps {
   /** Service configuration */
@@ -22,11 +24,11 @@ interface DownloadButtonProps {
   /** Button size variant */
   size?: "small" | "medium" | "large";
   /** Button variant */
-  variant?: "icon" | "button" | "card";
+  variant?: "icon" | "button" | "card" | "navbar-circle";
   /** Whether to show quality selection */
   showQuality?: boolean;
   /** Custom styles */
-  style?: any;
+  style?: ViewStyle;
   /** Callback when download starts */
   onDownloadStart?: (downloadId: string) => void;
   /** Callback when download fails */
@@ -51,6 +53,7 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
     () => createStyles(theme, size, variant),
     [theme, size, variant],
   );
+  const currentDownloadSpeed = useCurrentDownloadSpeed();
 
   // Menu state
   const [menuVisible, setMenuVisible] = useState(false);
@@ -318,117 +321,171 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
   }
 
   // Card variant
-  return (
-    <>
-      <Animated.View style={[animatedStyle, styles.card, style]}>
+  if (variant === "card") {
+    return (
+      <>
+        <Animated.View style={[animatedStyle, styles.card, style]}>
+          <Pressable
+            style={[
+              styles.cardContent,
+              {
+                backgroundColor: canDownload
+                  ? theme.colors.surface
+                  : theme.colors.surfaceDisabled,
+                opacity: isLoading ? 0.7 : 1,
+              },
+            ]}
+            onPress={handlePress}
+            disabled={isLoading || !canDownload}
+          >
+            <View style={styles.cardInfo}>
+              <Text
+                variant="titleSmall"
+                style={[
+                  styles.cardTitle,
+                  {
+                    color: canDownload
+                      ? theme.colors.onSurface
+                      : theme.colors.onSurfaceDisabled,
+                  },
+                ]}
+              >
+                Download Content
+              </Text>
+              {downloadCapability?.format && (
+                <Text
+                  variant="bodySmall"
+                  style={[
+                    styles.cardFormat,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
+                >
+                  {downloadCapability.format}
+                </Text>
+              )}
+              {downloadCapability?.estimatedSize && (
+                <Text
+                  variant="bodySmall"
+                  style={[
+                    styles.cardSize,
+                    { color: theme.colors.onSurfaceVariant },
+                  ]}
+                >
+                  {`${(downloadCapability.estimatedSize / 1024 / 1024).toFixed(1)} MB`}
+                </Text>
+              )}
+            </View>
+            <IconButton
+              icon={isLoading ? "loading" : "download"}
+              size={sizeConfig.iconSize}
+              iconColor={
+                canDownload
+                  ? theme.colors.primary
+                  : theme.colors.onSurfaceDisabled
+              }
+            />
+          </Pressable>
+        </Animated.View>
+
+        {showQuality && qualityOptions.length > 1 && (
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={
+              <View style={styles.menuAnchor}>
+                <IconButton
+                  icon="chevron-down"
+                  size={sizeConfig.iconSize}
+                  onPress={() => setMenuVisible(true)}
+                  disabled={!canDownload}
+                  iconColor={theme.colors.onSurfaceVariant}
+                />
+              </View>
+            }
+          >
+            {qualityOptions.map((quality) => (
+              <View key={quality.value}>
+                <Pressable
+                  style={styles.qualityItem}
+                  onPress={() => handleQualitySelect(quality)}
+                >
+                  <Text variant="bodyMedium" style={styles.qualityLabel}>
+                    {quality.label}
+                  </Text>
+                  {quality.estimatedSize && (
+                    <Text variant="bodySmall" style={styles.qualitySize}>
+                      {`${(quality.estimatedSize / 1024 / 1024).toFixed(1)} MB`}
+                    </Text>
+                  )}
+                </Pressable>
+                {qualityOptions.indexOf(quality) <
+                  qualityOptions.length - 1 && <Divider />}
+              </View>
+            ))}
+          </Menu>
+        )}
+      </>
+    );
+  }
+
+  // Navbar circle variant - circle button with speed in center
+  if (variant === "navbar-circle") {
+    const buttonSize = 48;
+    return (
+      <Animated.View style={[animatedStyle, style]}>
         <Pressable
           style={[
-            styles.cardContent,
+            styles.navbarCircle,
             {
+              width: buttonSize,
+              height: buttonSize,
               backgroundColor: canDownload
-                ? theme.colors.surface
-                : theme.colors.surfaceDisabled,
-              opacity: isLoading ? 0.7 : 1,
+                ? theme.colors.primary
+                : theme.colors.surfaceVariant,
             },
           ]}
           onPress={handlePress}
           disabled={isLoading || !canDownload}
         >
-          <View style={styles.cardInfo}>
-            <Text
-              variant="titleSmall"
-              style={[
-                styles.cardTitle,
-                {
-                  color: canDownload
-                    ? theme.colors.onSurface
-                    : theme.colors.onSurfaceDisabled,
-                },
-              ]}
-            >
-              Download Content
-            </Text>
-            {downloadCapability?.format && (
+          <View style={styles.navbarCircleContent}>
+            {currentDownloadSpeed > 0 ? (
               <Text
-                variant="bodySmall"
+                variant="labelSmall"
                 style={[
-                  styles.cardFormat,
-                  { color: theme.colors.onSurfaceVariant },
+                  styles.navbarCircleSpeed,
+                  {
+                    color: theme.colors.onPrimary,
+                  },
                 ]}
               >
-                {downloadCapability.format}
+                {formatSpeed(currentDownloadSpeed)}
               </Text>
-            )}
-            {downloadCapability?.estimatedSize && (
-              <Text
-                variant="bodySmall"
-                style={[
-                  styles.cardSize,
-                  { color: theme.colors.onSurfaceVariant },
-                ]}
-              >
-                {`${(downloadCapability.estimatedSize / 1024 / 1024).toFixed(1)} MB`}
-              </Text>
+            ) : (
+              <IconButton
+                icon={isLoading ? "loading" : "download"}
+                size={20}
+                iconColor={
+                  canDownload
+                    ? theme.colors.onPrimary
+                    : theme.colors.onSurfaceDisabled
+                }
+                style={styles.navbarCircleIcon}
+              />
             )}
           </View>
-          <IconButton
-            icon={isLoading ? "loading" : "download"}
-            size={sizeConfig.iconSize}
-            iconColor={
-              canDownload
-                ? theme.colors.primary
-                : theme.colors.onSurfaceDisabled
-            }
-          />
         </Pressable>
       </Animated.View>
+    );
+  }
 
-      {showQuality && qualityOptions.length > 1 && (
-        <Menu
-          visible={menuVisible}
-          onDismiss={() => setMenuVisible(false)}
-          anchor={
-            <View style={styles.menuAnchor}>
-              <IconButton
-                icon="chevron-down"
-                size={sizeConfig.iconSize}
-                onPress={() => setMenuVisible(true)}
-                disabled={!canDownload}
-                iconColor={theme.colors.onSurfaceVariant}
-              />
-            </View>
-          }
-        >
-          {qualityOptions.map((quality) => (
-            <View key={quality.value}>
-              <Pressable
-                style={styles.qualityItem}
-                onPress={() => handleQualitySelect(quality)}
-              >
-                <Text variant="bodyMedium" style={styles.qualityLabel}>
-                  {quality.label}
-                </Text>
-                {quality.estimatedSize && (
-                  <Text variant="bodySmall" style={styles.qualitySize}>
-                    {`${(quality.estimatedSize / 1024 / 1024).toFixed(1)} MB`}
-                  </Text>
-                )}
-              </Pressable>
-              {qualityOptions.indexOf(quality) < qualityOptions.length - 1 && (
-                <Divider />
-              )}
-            </View>
-          ))}
-        </Menu>
-      )}
-    </>
-  );
+  // Default return - should not reach here but prevents TypeScript errors
+  return null;
 };
 
 const createStyles = (
   theme: AppTheme,
   size: "small" | "medium" | "large",
-  variant: "icon" | "button" | "card",
+  variant: "icon" | "button" | "card" | "navbar-circle",
 ) =>
   StyleSheet.create({
     iconContainer: {
@@ -488,6 +545,26 @@ const createStyles = (
     qualitySize: {
       color: theme.colors.onSurfaceVariant,
       marginTop: spacing.xs / 2,
+    },
+    navbarCircle: {
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
+    navbarCircleContent: {
+      width: "100%",
+      height: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    navbarCircleSpeed: {
+      fontWeight: "700",
+      fontSize: 10,
+      textAlign: "center",
+    },
+    navbarCircleIcon: {
+      margin: 0,
     },
   });
 

@@ -44,6 +44,7 @@ export const useContentDownload = ({
   const { downloadManager } = useDownloadPortal();
   const { startDownload } = useDownloadActions();
   const connectorManager = ConnectorManager.getInstance();
+  const [isPortalReady, setIsPortalReady] = useState(!!downloadManager);
 
   // State
   const [state, setState] = useState<DownloadCapabilityState>({
@@ -53,6 +54,17 @@ export const useContentDownload = ({
     selectedQuality: null,
     error: null,
   });
+
+  // Track when download manager becomes available
+  useEffect(() => {
+    if (downloadManager && !isPortalReady) {
+      setIsPortalReady(true);
+      logger.debug("Download manager became available in portal");
+    } else if (!downloadManager && isPortalReady) {
+      setIsPortalReady(false);
+      logger.warn("Download manager no longer available in portal");
+    }
+  }, [downloadManager, isPortalReady]);
 
   // Reset state
   const resetState = useCallback(() => {
@@ -127,6 +139,10 @@ export const useContentDownload = ({
   // Start download
   const startContentDownload = useCallback(async () => {
     if (!downloadManager) {
+      logger.error("Download manager not available", {
+        downloadManager: !!downloadManager,
+        state: "attempting to start download",
+      });
       throw new Error("Download manager not available");
     }
 

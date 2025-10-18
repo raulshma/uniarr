@@ -79,12 +79,21 @@ export const DownloadManagerProvider: React.FC<
   });
 
   const { getManager } = useDownloadService();
-  const downloadManager = useMemo(() => getManager(), [getManager]);
+  const downloadManager = useMemo(() => {
+    if (isReady) {
+      return getManager();
+    }
+    return null;
+  }, [isReady, getManager]);
 
   // Ensure download manager is connected to the portal when ready
   useEffect(() => {
     if (isReady && downloadManager) {
-      logger.info("Download manager is ready and connected to portal");
+      logger.info("Download manager is ready and connected to portal", {
+        managerId: downloadManager.constructor.name,
+      });
+    } else if (!isReady) {
+      logger.debug("Download manager not yet ready");
     }
   }, [isReady, downloadManager]);
 

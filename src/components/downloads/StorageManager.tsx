@@ -54,8 +54,11 @@ const StorageManagerComponent: React.FC<StorageManagerProps> = ({
     removed: number;
     errors: string[];
   } | null>(null);
-  const [storageRecommendations, setStorageRecommendations] =
-    useState<any>(null);
+  const [storageRecommendations, setStorageRecommendations] = useState<{
+    priority: "low" | "medium" | "high" | "critical";
+    message: string;
+    actions: string[];
+  } | null>(null);
 
   // Cleanup options
   const [cleanupOptions, setCleanupOptions] = useState<CleanupOptions>({

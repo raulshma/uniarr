@@ -4,7 +4,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withRepeat,
   withTiming,
   interpolate,
 } from "react-native-reanimated";
@@ -45,50 +44,27 @@ const DownloadIndicator: React.FC<DownloadIndicatorProps> = ({
   const activeCount = useDownloadStore(selectActiveDownloadsCount);
   const currentSpeed = useDownloadStore(selectCurrentDownloadSpeed);
 
-  // Animation values
-  const pulseAnimation = useSharedValue(0);
+  // Simplified animations - only for floating position
   const slideAnimation = useSharedValue(0);
 
-  // Start animations when there are active downloads
+  // Start animations only for floating position when there are active downloads
   React.useEffect(() => {
-    if (activeCount > 0) {
-      // Pulsing animation for the icon
-      pulseAnimation.value = withRepeat(
-        withSpring(1, { damping: 10, stiffness: 100 }),
-        -1,
-        true,
-      );
-
-      // Slide in animation
+    if (position === "floating" && activeCount > 0) {
       slideAnimation.value = withSpring(1, { damping: 15, stiffness: 100 });
     } else {
-      // Reset animations
-      pulseAnimation.value = withTiming(0);
       slideAnimation.value = withTiming(0);
     }
-  }, [activeCount, pulseAnimation, slideAnimation]);
+  }, [activeCount, slideAnimation, position]);
 
-  // Animated styles
-  const pulseStyle = useAnimatedStyle(() => {
-    const scale = interpolate(pulseAnimation.value, [0, 1], [1, 1.1]);
-    return {
-      transform: [{ scale }],
-    };
-  });
-
+  // Animated styles - minimal for performance
   const slideStyle = useAnimatedStyle(() => {
+    if (position !== "floating") return { opacity: 1 };
+
     const opacity = slideAnimation.value;
     const translateY = interpolate(slideAnimation.value, [0, 1], [10, 0]);
     return {
       opacity,
       transform: [{ translateY }],
-    };
-  });
-
-  const badgeStyle = useAnimatedStyle(() => {
-    const scale = activeCount > 0 ? 1 : 0;
-    return {
-      transform: [{ scale }],
     };
   });
 
@@ -135,7 +111,7 @@ const DownloadIndicator: React.FC<DownloadIndicatorProps> = ({
       <Animated.View style={[styles.floatingContainer, slideStyle]}>
         <Pressable onPress={handlePress} style={styles.floatingPressable}>
           <Surface style={styles.floatingSurface}>
-            <Animated.View style={[styles.iconContainer, pulseStyle]}>
+            <View style={styles.iconContainer}>
               <IconButton
                 icon="download"
                 size={sizeConfig.iconSize}
@@ -146,7 +122,7 @@ const DownloadIndicator: React.FC<DownloadIndicatorProps> = ({
                 }
                 style={styles.iconButton}
               />
-            </Animated.View>
+            </View>
 
             <View style={styles.floatingInfo}>
               <Text
@@ -169,29 +145,31 @@ const DownloadIndicator: React.FC<DownloadIndicatorProps> = ({
               )}
             </View>
 
-            <Animated.View style={[styles.badgeContainer, badgeStyle]}>
-              <Badge
-                style={[
-                  styles.floatingBadge,
-                  { backgroundColor: theme.colors.primary },
-                ]}
-                size={size === "small" ? 20 : 24}
-              >
-                {activeCount}
-              </Badge>
-            </Animated.View>
+            {activeCount > 0 && (
+              <View style={styles.badgeContainer}>
+                <Badge
+                  style={[
+                    styles.floatingBadge,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                  size={size === "small" ? 20 : 24}
+                >
+                  {activeCount}
+                </Badge>
+              </View>
+            )}
           </Surface>
         </Pressable>
       </Animated.View>
     );
   }
 
-  // Header indicator
+  // Header indicator - no animations for better performance
   return (
-    <Animated.View style={[styles.container, slideStyle]}>
+    <View style={styles.container}>
       <Pressable onPress={handlePress} style={styles.pressable}>
         <Surface style={styles.surface}>
-          <Animated.View style={[styles.iconContainer, pulseStyle]}>
+          <View style={styles.iconContainer}>
             <IconButton
               icon={isActive ? "download" : "download-outline"}
               size={sizeConfig.iconSize}
@@ -200,11 +178,11 @@ const DownloadIndicator: React.FC<DownloadIndicatorProps> = ({
               }
               style={styles.iconButton}
             />
-          </Animated.View>
+          </View>
 
           {isActive && (
             <>
-              <Animated.View style={[styles.badgeContainer, badgeStyle]}>
+              <View style={styles.badgeContainer}>
                 <Badge
                   style={[
                     styles.badge,
@@ -214,7 +192,7 @@ const DownloadIndicator: React.FC<DownloadIndicatorProps> = ({
                 >
                   {activeCount}
                 </Badge>
-              </Animated.View>
+              </View>
 
               {showSpeed && currentSpeed > 0 && (
                 <View style={styles.speedContainer}>
@@ -233,7 +211,7 @@ const DownloadIndicator: React.FC<DownloadIndicatorProps> = ({
           )}
         </Surface>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 };
 

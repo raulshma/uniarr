@@ -532,11 +532,27 @@ const JellyfinItemDetailsScreen = () => {
               accessibilityLabel="Go back"
               onPress={handleNavigateBack}
             />
-            <IconButton
-              icon="share-variant"
-              accessibilityLabel="Share item"
-              onPress={handleShare}
-            />
+            <View style={styles.heroActionsRight}>
+              {connector && item.Id && (
+                <DownloadButton
+                  serviceConfig={connector.config}
+                  contentId={item.Id}
+                  size="small"
+                  variant="navbar-circle"
+                  onDownloadStart={(downloadId) => {
+                    console.log(`Download started: ${downloadId}`);
+                  }}
+                  onDownloadError={(error) => {
+                    console.error(`Download failed: ${error}`);
+                  }}
+                />
+              )}
+              <IconButton
+                icon="share-variant"
+                accessibilityLabel="Share item"
+                onPress={handleShare}
+              />
+            </View>
           </Animated.View>
           {/* heroPoster has been moved out so it can be pinned independent of the scrollable content */}
         </Animated.View>
@@ -640,24 +656,6 @@ const JellyfinItemDetailsScreen = () => {
               Play on Jellyfin
             </Button>
 
-            {/* Download button */}
-            {connector && item.Id && (
-              <DownloadButton
-                serviceConfig={connector.config}
-                contentId={item.Id}
-                size="large"
-                variant="button"
-                showQuality={true}
-                style={styles.downloadButton}
-                onDownloadStart={(downloadId) => {
-                  console.log(`Download started: ${downloadId}`);
-                }}
-                onDownloadError={(error) => {
-                  console.error(`Download failed: ${error}`);
-                }}
-              />
-            )}
-
             {/* Sync card with inline Update button on the right */}
             <Surface style={styles.syncCard} elevation={1}>
               <LinearGradient
@@ -732,6 +730,12 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
+    },
+    heroActionsRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: spacing.xs,
     },
     heroPoster: {
       position: "absolute",
@@ -874,12 +878,6 @@ const createStyles = (theme: AppTheme) =>
       marginTop: spacing.md,
       marginBottom: spacing.sm,
       backgroundColor: theme.colors.primary,
-    },
-    downloadButton: {
-      width: "100%",
-      borderRadius: 28,
-      marginTop: spacing.sm,
-      marginBottom: spacing.sm,
     },
     playButtonContent: {
       height: 56,
