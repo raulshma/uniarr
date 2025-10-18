@@ -114,16 +114,16 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
   const handleEpisodeSelection = (selectedEpisodeIds: string[]) => {
     setSelectedEpisodes(selectedEpisodeIds);
     setEpisodeDialogVisible(false);
-    handleDownloadAction();
+    handleDownloadAction(selectedEpisodeIds);
   };
 
   // Handle download action
-  const handleDownloadAction = async () => {
+  const handleDownloadAction = async (overrideEpisodes?: readonly string[]) => {
     try {
       scaleAnimation.value = withSpring(0.9, { damping: 15, stiffness: 100 });
       rotateAnimation.value = withSpring(1, { damping: 15, stiffness: 100 });
 
-      const downloadId = await startDownload();
+      const downloadId = await startDownload(overrideEpisodes);
 
       scaleAnimation.value = withSpring(1, { damping: 15, stiffness: 100 });
       rotateAnimation.value = withSpring(0, { damping: 15, stiffness: 100 });

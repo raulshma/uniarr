@@ -45,6 +45,7 @@ export const useDownloadActions = () => {
       contentId: string,
       quality?: string,
       options?: DownloadActionOptions,
+      episodeIds?: string[],
     ) => {
       if (!isReady) {
         throw new Error("Download manager not available");
@@ -55,6 +56,7 @@ export const useDownloadActions = () => {
           serviceConfig,
           contentId,
           quality,
+          episodeIds,
         );
 
         if (options?.haptics !== false) {

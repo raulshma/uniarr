@@ -109,11 +109,13 @@ export interface IDownloadConnector {
    * Get download information for a specific content item
    * @param contentId - The content identifier from the service
    * @param quality - Optional quality preference
+   * @param episodeIds - Optional array of episode IDs for series downloads
    * @returns Promise resolving to download information
    */
   readonly getDownloadInfo: (
     contentId: string,
     quality?: string,
+    episodeIds?: readonly string[],
   ) => Promise<DownloadInfo>;
 
   /**

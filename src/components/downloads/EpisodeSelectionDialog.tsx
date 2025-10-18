@@ -8,6 +8,7 @@ import {
   Chip,
   Divider,
   useTheme,
+  Portal,
 } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -136,138 +137,145 @@ const EpisodeSelectionDialog: React.FC<EpisodeSelectionDialogProps> = ({
   const episodeCount = selectedEpisodeIds.size;
 
   return (
-    <Dialog visible={visible} onDismiss={onDismiss}>
-      <Dialog.Title>Select Episodes to Download</Dialog.Title>
+    <Portal>
+      <Dialog
+        visible={visible}
+        onDismiss={onDismiss}
+        style={{ maxHeight: "90%" }}
+      >
+        <Dialog.Title>Select Episodes to Download</Dialog.Title>
 
-      <Dialog.ScrollArea>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text variant="bodyMedium" style={styles.seriesTitle}>
-            {title}
-          </Text>
-
-          {seasons.length === 0 ? (
-            <Text variant="bodySmall" style={styles.emptyText}>
-              No episodes available
+        <Dialog.ScrollArea>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <Text variant="bodyMedium" style={styles.seriesTitle}>
+              {title}
             </Text>
-          ) : (
-            seasons.map((season: number) => {
-              const seasonEpisodes = episodesBySeason[season] || [];
-              const selectedInSeason = seasonEpisodes.filter((ep) =>
-                selectedEpisodeIds.has(ep.Id || ""),
-              ).length;
-              const allSelectedInSeason =
-                selectedInSeason === seasonEpisodes.length;
-              const someSelectedInSeason =
-                selectedInSeason > 0 && !allSelectedInSeason;
 
-              return (
-                <View key={season}>
-                  <Pressable
-                    onPress={() => handleSelectSeason(season)}
-                    style={styles.seasonHeader}
-                  >
-                    <Checkbox
-                      status={
-                        allSelectedInSeason
-                          ? "checked"
-                          : someSelectedInSeason
-                            ? "indeterminate"
-                            : "unchecked"
-                      }
+            {seasons.length === 0 ? (
+              <Text variant="bodySmall" style={styles.emptyText}>
+                No episodes available
+              </Text>
+            ) : (
+              seasons.map((season: number) => {
+                const seasonEpisodes = episodesBySeason[season] || [];
+                const selectedInSeason = seasonEpisodes.filter((ep) =>
+                  selectedEpisodeIds.has(ep.Id || ""),
+                ).length;
+                const allSelectedInSeason =
+                  selectedInSeason === seasonEpisodes.length;
+                const someSelectedInSeason =
+                  selectedInSeason > 0 && !allSelectedInSeason;
+
+                return (
+                  <View key={season}>
+                    <Pressable
                       onPress={() => handleSelectSeason(season)}
-                    />
-                    <Text variant="titleSmall" style={styles.seasonTitle}>
-                      Season {season}
-                    </Text>
-                    <Text
-                      variant="bodySmall"
-                      style={[
-                        styles.seasonCount,
-                        {
-                          color: theme.colors.onSurfaceVariant,
-                        },
-                      ]}
+                      style={styles.seasonHeader}
                     >
-                      {selectedInSeason}/{seasonEpisodes.length}
-                    </Text>
-                  </Pressable>
-
-                  {seasonEpisodes.map((episode) => {
-                    const isSelected = selectedEpisodeIds.has(episode.Id || "");
-                    const episodeNum = episode.IndexNumber ?? 0;
-                    const episodeTitle = episode.Name || "Untitled";
-
-                    return (
-                      <Pressable
-                        key={episode.Id}
-                        onPress={() =>
-                          handleToggleEpisode(episode.Id || "", season)
+                      <Checkbox
+                        status={
+                          allSelectedInSeason
+                            ? "checked"
+                            : someSelectedInSeason
+                              ? "indeterminate"
+                              : "unchecked"
                         }
+                        onPress={() => handleSelectSeason(season)}
+                      />
+                      <Text variant="titleSmall" style={styles.seasonTitle}>
+                        Season {season}
+                      </Text>
+                      <Text
+                        variant="bodySmall"
                         style={[
-                          styles.episodeItem,
-                          isSelected && styles.episodeItemSelected,
+                          styles.seasonCount,
+                          {
+                            color: theme.colors.onSurfaceVariant,
+                          },
                         ]}
                       >
-                        <Checkbox
-                          status={isSelected ? "checked" : "unchecked"}
-                          onPress={() =>
-                            handleToggleEpisode(episode.Id || "", season)
-                          }
-                        />
-                        <View style={styles.episodeInfo}>
-                          <Text
-                            variant="bodyMedium"
-                            style={styles.episodeLabel}
-                          >
-                            E{episodeNum.toString().padStart(2, "0")} -{" "}
-                            {episodeTitle}
-                          </Text>
-                          {episode.RunTimeTicks && (
+                        {selectedInSeason}/{seasonEpisodes.length}
+                      </Text>
+                    </Pressable>
+
+                    {seasonEpisodes.map((episode) => {
+                      const episodeId = episode.Id || "";
+                      const isSelected = selectedEpisodeIds.has(episodeId);
+                      const episodeNum = episode.IndexNumber ?? 0;
+                      const episodeTitle = episode.Name || "Untitled";
+
+                      return (
+                        <Pressable
+                          key={episode.Id}
+                          onPress={() => {
+                            handleToggleEpisode(episodeId, season);
+                          }}
+                          style={[
+                            styles.episodeItem,
+                            isSelected && styles.episodeItemSelected,
+                          ]}
+                        >
+                          <Checkbox
+                            status={isSelected ? "checked" : "unchecked"}
+                            onPress={() => {
+                              handleToggleEpisode(episodeId, season);
+                            }}
+                          />
+                          <View style={styles.episodeInfo}>
                             <Text
-                              variant="bodySmall"
-                              style={[
-                                styles.episodeDuration,
-                                {
-                                  color: theme.colors.onSurfaceVariant,
-                                },
-                              ]}
+                              variant="bodyMedium"
+                              style={styles.episodeLabel}
                             >
-                              {Math.floor(episode.RunTimeTicks / 600_000_000)}{" "}
-                              min
+                              E{episodeNum.toString().padStart(2, "0")} -{" "}
+                              {episodeTitle}
                             </Text>
-                          )}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
+                            {episode.RunTimeTicks && (
+                              <Text
+                                variant="bodySmall"
+                                style={[
+                                  styles.episodeDuration,
+                                  {
+                                    color: theme.colors.onSurfaceVariant,
+                                  },
+                                ]}
+                              >
+                                {Math.floor(episode.RunTimeTicks / 600_000_000)}{" "}
+                                min
+                              </Text>
+                            )}
+                          </View>
+                        </Pressable>
+                      );
+                    })}
 
-                  <Divider style={styles.seasonDivider} />
-                </View>
-              );
-            })
+                    <Divider style={styles.seasonDivider} />
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        </Dialog.ScrollArea>
+
+        <View style={styles.footer}>
+          {episodeCount > 0 && (
+            <Chip icon="check" style={styles.selectedChip}>
+              {episodeCount} episode{episodeCount !== 1 ? "s" : ""} selected
+            </Chip>
           )}
-        </ScrollView>
-      </Dialog.ScrollArea>
+        </View>
 
-      <View style={styles.footer}>
-        {episodeCount > 0 && (
-          <Chip icon="check" style={styles.selectedChip}>
-            {episodeCount} episode{episodeCount !== 1 ? "s" : ""} selected
-          </Chip>
-        )}
-      </View>
-
-      <Dialog.Actions>
-        <Button onPress={onDismiss}>Cancel</Button>
-        <Button
-          onPress={handleConfirm}
-          disabled={episodeCount === 0}
-          mode="contained"
-        >
-          Download
-        </Button>
-      </Dialog.Actions>
-    </Dialog>
+        <Dialog.Actions>
+          <Button onPress={onDismiss}>Cancel</Button>
+          <Button
+            onPress={handleConfirm}
+            disabled={episodeCount === 0}
+            mode="contained"
+          >
+            Download
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
   );
 };
 

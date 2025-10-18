@@ -40,6 +40,8 @@ const DEFAULT_ITEM_FIELDS = [
   "PremiereDate",
   "ProductionYear",
   "OfficialRating",
+  "IndexNumber",
+  "ParentIndexNumber",
 ].join(",");
 
 export class JellyfinConnector
@@ -692,6 +694,7 @@ export class JellyfinConnector
   async getDownloadInfo(
     contentId: string,
     quality?: string,
+    episodeIds?: readonly string[],
   ): Promise<DownloadInfo> {
     await this.ensureAuthenticated();
 
@@ -699,15 +702,25 @@ export class JellyfinConnector
       // Get item details
       const item = await this.getItem(contentId);
 
-      // Ensure this is not a Series (should only be called for Movies/Episodes)
-      if (item.Type === "Series") {
+      // If this is a series and episodeIds are provided, download the first episode
+      // and let the download manager queue the rest as individual downloads
+      if (item.Type === "Series" && (!episodeIds || episodeIds.length === 0)) {
         throw new Error(
           "Cannot download series container. Download individual episodes instead.",
         );
       }
 
-      // Get media sources
-      const mediaSources = await this.getMediaSources(contentId);
+      // For series downloads with episodeIds, use the first episode
+      let downloadItemId = contentId;
+      if (item.Type === "Series" && episodeIds && episodeIds.length > 0) {
+        const firstEpisodeId = episodeIds[0];
+        if (firstEpisodeId) {
+          downloadItemId = firstEpisodeId;
+        }
+      }
+
+      // Get media sources for the download item
+      const mediaSources = await this.getMediaSources(downloadItemId);
       if (!mediaSources || mediaSources.length === 0) {
         throw new Error("No media sources available for download");
       }
@@ -717,7 +730,7 @@ export class JellyfinConnector
 
       // Get download URL
       const downloadUrl = await this.getDownloadUrl(
-        contentId,
+        downloadItemId,
         selectedSource.Id,
       );
 
@@ -990,24 +1003,48 @@ export class JellyfinConnector
     await this.ensureAuthenticated();
     const userId = await this.ensureUserId();
 
-    try {
-      const response = await this.client.get<JellyfinItemsResponse>(
-        `/Users/${userId}/Items`,
-        {
-          params: {
-            ParentId: seriesId,
-            IncludeItemTypes: "Episode",
-            SortBy: "SortName",
-            SortOrder: "Ascending",
-            Fields: DEFAULT_ITEM_FIELDS,
-            Recursive: false,
-          },
-        },
-      );
+    const episodes: JellyfinItem[] = [];
+    const pageSize = 200;
+    let startIndex = 0;
 
-      return Array.isArray(response.data?.Items)
-        ? [...response.data.Items]
-        : [];
+    try {
+      // Jellyfin exposes a dedicated endpoint to enumerate all episodes for a series.
+      // Page through results to avoid truncation on shows with large libraries.
+      while (true) {
+        const response = await this.client.get<JellyfinItemsResponse>(
+          `/Shows/${seriesId}/Episodes`,
+          {
+            params: {
+              userId,
+              fields: DEFAULT_ITEM_FIELDS.split(","),
+              enableImages: true,
+              sortBy: "ParentIndexNumber,IndexNumber",
+              sortOrder: "Ascending",
+              startIndex,
+              limit: pageSize,
+            },
+          },
+        );
+
+        const batch = Array.isArray(response.data?.Items)
+          ? (response.data?.Items as JellyfinItem[])
+          : [];
+
+        if (batch.length === 0) {
+          break;
+        }
+
+        episodes.push(...batch);
+
+        const total = response.data?.TotalRecordCount;
+        startIndex += batch.length;
+
+        if (!total || episodes.length >= total || batch.length < pageSize) {
+          break;
+        }
+      }
+
+      return episodes;
     } catch (error) {
       logger.error("Failed to get series episodes", {
         seriesId,

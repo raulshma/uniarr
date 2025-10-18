@@ -103,6 +103,7 @@ class DownloadService {
     serviceConfig: ServiceConfig,
     contentId: string,
     quality?: string,
+    episodeIds?: string[],
   ): Promise<string> {
     if (!this.isReady()) {
       throw new Error("Download service not initialized");
@@ -128,7 +129,69 @@ class DownloadService {
         );
       }
 
-      // Get download information
+      // If episodeIds are provided, create a download for each episode
+      if (episodeIds && episodeIds.length > 0) {
+        const downloadIds: string[] = [];
+
+        for (const episodeId of episodeIds) {
+          try {
+            const downloadInfo = await downloadConnector.getDownloadInfo(
+              episodeId,
+              quality,
+            );
+            const metadata =
+              await downloadConnector.getContentMetadata(episodeId);
+
+            const downloadItem = {
+              serviceConfig,
+              content: {
+                id: metadata.id,
+                title: metadata.title,
+                type: metadata.type,
+                description: metadata.description,
+                thumbnailUrl: metadata.thumbnailUrl,
+                duration: metadata.duration,
+                size: downloadInfo.size,
+              },
+              download: {
+                sourceUrl: downloadInfo.sourceUrl,
+                localPath: this.generateDownloadPath(downloadInfo.fileName),
+                fileName: downloadInfo.fileName,
+                mimeType: downloadInfo.mimeType,
+                size: downloadInfo.size,
+                checksum: downloadInfo.checksum,
+              },
+            };
+
+            const downloadId =
+              await this.downloadManager!.addDownload(downloadItem);
+            downloadIds.push(downloadId);
+          } catch (error) {
+            logger.warn("Failed to queue episode download", {
+              episodeId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
+        if (downloadIds.length === 0) {
+          throw new Error("Failed to queue any episode downloads");
+        }
+
+        logger.info("Batch episode downloads started via service", {
+          downloadIds,
+          count: downloadIds.length,
+          service: serviceConfig.name,
+        });
+
+        const firstDownloadId = downloadIds[0];
+        if (!firstDownloadId) {
+          throw new Error("Failed to get first download ID");
+        }
+        return firstDownloadId;
+      }
+
+      // Single content download (not a series)
       const downloadInfo = await downloadConnector.getDownloadInfo(
         contentId,
         quality,
@@ -448,7 +511,8 @@ export const useDownloadService = () => {
       serviceConfig: ServiceConfig,
       contentId: string,
       quality?: string,
-    ) => service.startDownload(serviceConfig, contentId, quality),
+      episodeIds?: string[],
+    ) => service.startDownload(serviceConfig, contentId, quality, episodeIds),
     pauseDownload: (downloadId: string) => service.pauseDownload(downloadId),
     resumeDownload: (downloadId: string) => service.resumeDownload(downloadId),
     cancelDownload: (downloadId: string) => service.cancelDownload(downloadId),

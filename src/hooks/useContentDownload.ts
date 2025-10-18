@@ -170,61 +170,70 @@ export const useContentDownload = ({
   }, []);
 
   // Start download
-  const startContentDownload = useCallback(async () => {
-    if (!downloadManager) {
-      logger.error("Download manager not available", {
-        downloadManager: !!downloadManager,
-        state: "attempting to start download",
-      });
-      throw new Error("Download manager not available");
-    }
+  const startContentDownload = useCallback(
+    async (overrideEpisodes?: readonly string[]) => {
+      if (!downloadManager) {
+        logger.error("Download manager not available", {
+          downloadManager: !!downloadManager,
+          state: "attempting to start download",
+        });
+        throw new Error("Download manager not available");
+      }
 
-    if (!state.capability?.canDownload) {
-      throw new Error("Content cannot be downloaded");
-    }
+      if (!state.capability?.canDownload) {
+        throw new Error("Content cannot be downloaded");
+      }
 
-    try {
-      // Start the download with haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try {
+        // Start the download with haptic feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      const downloadId = await startDownload(
-        serviceConfig,
-        contentId,
-        state.selectedQuality || undefined,
-        {
-          haptics: true,
-        },
-      );
+        const episodesToDownload = overrideEpisodes
+          ? [...overrideEpisodes]
+          : state.selectedEpisodes;
 
-      logger.info("Content download started", {
-        downloadId,
-        contentId,
-        service: serviceConfig.name,
-        quality: state.selectedQuality,
-      });
+        const downloadId = await startDownload(
+          serviceConfig,
+          contentId,
+          state.selectedQuality || undefined,
+          {
+            haptics: true,
+          },
+          episodesToDownload.length > 0 ? episodesToDownload : undefined,
+        );
 
-      return downloadId;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+        logger.info("Content download started", {
+          downloadId,
+          contentId,
+          service: serviceConfig.name,
+          quality: state.selectedQuality,
+        });
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return downloadId;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
 
-      logger.error("Failed to start content download", {
-        serviceId: serviceConfig.id,
-        contentId,
-        error: message,
-      });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
-      throw error;
-    }
-  }, [
-    downloadManager,
-    startDownload,
-    serviceConfig,
-    contentId,
-    state.capability,
-    state.selectedQuality,
-  ]);
+        logger.error("Failed to start content download", {
+          serviceId: serviceConfig.id,
+          contentId,
+          error: message,
+        });
+
+        throw error;
+      }
+    },
+    [
+      downloadManager,
+      startDownload,
+      serviceConfig,
+      contentId,
+      state.capability,
+      state.selectedQuality,
+      state.selectedEpisodes,
+    ],
+  );
 
   // Show download confirmation dialog
   const showDownloadConfirmation = useCallback(() => {
