@@ -25,6 +25,7 @@ import { SeriesListItemSkeleton } from "@/components/media/skeletons";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
+import DownloadButton from "@/components/downloads/DownloadButton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
@@ -732,6 +733,23 @@ const JellyfinLibraryScreen = () => {
                   />
                 </View>
               ) : null}
+              {/* Download button for resume items */}
+              {connector && serviceId && item.Id && (
+                <View style={styles.resumeDownloadOverlay}>
+                  <DownloadButton
+                    serviceConfig={connector.config}
+                    contentId={item.Id}
+                    size="small"
+                    variant="icon"
+                    onDownloadStart={(downloadId) => {
+                      console.log(`Download started: ${downloadId}`);
+                    }}
+                    onDownloadError={(error) => {
+                      console.error(`Download failed: ${error}`);
+                    }}
+                  />
+                </View>
+              )}
             </View>
           </Pressable>
           <Text
@@ -744,7 +762,7 @@ const JellyfinLibraryScreen = () => {
         </View>
       );
     },
-    [connector, handleOpenItem, styles, windowWidth, theme],
+    [connector, handleOpenItem, serviceId, styles, windowWidth, theme],
   );
 
   const renderLibraryItem = useCallback(
@@ -794,6 +812,23 @@ const JellyfinLibraryScreen = () => {
                 size={innerPosterSize}
                 borderRadius={12}
               />
+              {/* Download button overlay on poster */}
+              {connector && serviceId && item.Id && (
+                <View style={styles.downloadOverlay}>
+                  <DownloadButton
+                    serviceConfig={connector.config}
+                    contentId={item.Id}
+                    size="small"
+                    variant="icon"
+                    onDownloadStart={(downloadId) => {
+                      console.log(`Download started: ${downloadId}`);
+                    }}
+                    onDownloadError={(error) => {
+                      console.error(`Download failed: ${error}`);
+                    }}
+                  />
+                </View>
+              )}
             </View>
             <Text
               variant="bodyMedium"
@@ -815,7 +850,7 @@ const JellyfinLibraryScreen = () => {
         </View>
       );
     },
-    [activeSegment, connector, handleOpenItem, styles, windowWidth],
+    [activeSegment, connector, handleOpenItem, serviceId, styles, windowWidth],
   );
 
   const listHeader = useMemo(() => {
@@ -1245,6 +1280,13 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surfaceVariant,
       overflow: "hidden",
     },
+    resumeDownloadOverlay: {
+      position: "absolute",
+      top: 4,
+      right: 4,
+      backgroundColor: "rgba(0, 0, 0, 0.6)",
+      borderRadius: 12,
+    },
     resumePosterProgressFill: {
       height: "100%",
       backgroundColor: theme.colors.primary,
@@ -1346,6 +1388,13 @@ const createStyles = (theme: AppTheme) =>
       padding: 0,
       borderRadius: 12,
       alignItems: "center",
+    },
+    downloadOverlay: {
+      position: "absolute",
+      top: spacing.xs,
+      right: spacing.xs,
+      backgroundColor: "rgba(0, 0, 0, 0.6)",
+      borderRadius: 16,
     },
     gridCardLeft: {
       marginRight: spacing.md,

@@ -1,4 +1,5 @@
-import * as FileSystem from "expo-file-system";
+import { File, Directory } from "expo-file-system";
+import * as FileSystemLegacy from "expo-file-system/legacy";
 import type {
   DownloadStorageInfo,
   DownloadHistoryEntry,
@@ -11,7 +12,9 @@ import { logger } from "@/services/logger/LoggerService";
  */
 export class StorageManager {
   private static instance: StorageManager | null = null;
-  private downloadDirectory = "./downloads/";
+  private downloadDirectory = FileSystemLegacy.cacheDirectory
+    ? `${FileSystemLegacy.cacheDirectory}downloads/`
+    : `${FileSystemLegacy.documentDirectory || ""}downloads/`;
 
   private constructor() {}
 
@@ -36,21 +39,19 @@ export class StorageManager {
       let largestFile = 0;
 
       try {
-        const files = await FileSystem.readDirectoryAsync(
-          this.downloadDirectory,
-        );
+        const directory = new Directory(this.downloadDirectory);
+        if (directory.exists) {
+          const files = directory.list();
 
-        for (const file of files) {
-          const filePath = `${this.downloadDirectory}${file}`;
-          const fileInfo = await FileSystem.getInfoAsync(filePath);
+          for (const item of files) {
+            if (!(item instanceof Directory)) {
+              const size = item.size || 0;
+              totalSize += size;
+              fileCount++;
 
-          if (fileInfo.exists && !fileInfo.isDirectory) {
-            const size = fileInfo.size || 0;
-            totalSize += size;
-            fileCount++;
-
-            if (size > largestFile) {
-              largestFile = size;
+              if (size > largestFile) {
+                largestFile = size;
+              }
             }
           }
         }
@@ -65,13 +66,7 @@ export class StorageManager {
       // Get free disk space (if available)
       let freeSpace = 0;
       try {
-        // Note: getFreeDiskStorageAsync might not be available in all expo-file-system versions
-        if ("getFreeDiskStorageAsync" in FileSystem) {
-          freeSpace = await (FileSystem as any).getFreeDiskStorageAsync();
-        } else {
-          // Fallback estimate
-          freeSpace = 1024 * 1024 * 1024; // 1GB default estimate
-        }
+        freeSpace = await FileSystemLegacy.getFreeDiskStorageAsync();
       } catch (error) {
         logger.debug("Could not get free disk space", {
           error: error instanceof Error ? error.message : String(error),
@@ -400,8 +395,8 @@ export class StorageManager {
    */
   private async checkFileExists(filePath: string): Promise<boolean> {
     try {
-      const fileInfo = await FileSystem.getInfoAsync(filePath);
-      return fileInfo.exists;
+      const file = new File(filePath);
+      return file.exists;
     } catch (error) {
       logger.debug("Failed to check file existence", {
         filePath,
@@ -416,8 +411,9 @@ export class StorageManager {
    */
   private async removeDownloadFile(filePath: string): Promise<void> {
     try {
-      if (await this.checkFileExists(filePath)) {
-        await FileSystem.deleteAsync(filePath);
+      const file = new File(filePath);
+      if (file.exists) {
+        file.delete();
         logger.debug("Removed download file", { filePath });
       } else {
         logger.debug("File does not exist, skipping removal", { filePath });
@@ -451,9 +447,9 @@ export class StorageManager {
    */
   private async ensureDirectoryExists(directory: string): Promise<void> {
     try {
-      const dirInfo = await FileSystem.getInfoAsync(directory);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+      const dir = new Directory(directory);
+      if (!dir.exists) {
+        dir.create();
         logger.info("Created download directory", { directory });
       }
     } catch (error) {

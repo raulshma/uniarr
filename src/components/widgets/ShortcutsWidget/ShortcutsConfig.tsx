@@ -40,27 +40,27 @@ const ShortcutsConfig: React.FC<ShortcutsConfigProps> = ({
 
   // Load current shortcuts configuration when modal opens
   React.useEffect(() => {
-    if (visible) {
-      loadCurrentShortcuts();
-    }
-  }, [visible, widget.id]);
+    if (!visible) return;
 
-  const loadCurrentShortcuts = async () => {
-    try {
-      await widgetService.initialize();
-      const widgetConfig = await widgetService.getWidget(widget.id);
+    const loadCurrentShortcuts = async () => {
+      try {
+        await widgetService.initialize();
+        const widgetConfig = await widgetService.getWidget(widget.id);
 
-      if (widgetConfig?.config?.shortcuts) {
-        setShortcuts(widgetConfig.config.shortcuts);
-      } else {
-        // Initialize with default shortcuts
+        if (widgetConfig?.config?.shortcuts) {
+          setShortcuts(widgetConfig.config.shortcuts);
+        } else {
+          // Initialize with default shortcuts
+          setShortcuts([...DEFAULT_SHORTCUTS, ...OPTIONAL_SHORTCUTS]);
+        }
+      } catch (error) {
+        console.error("Failed to load shortcuts configuration:", error);
         setShortcuts([...DEFAULT_SHORTCUTS, ...OPTIONAL_SHORTCUTS]);
       }
-    } catch (error) {
-      console.error("Failed to load shortcuts configuration:", error);
-      setShortcuts([...DEFAULT_SHORTCUTS, ...OPTIONAL_SHORTCUTS]);
-    }
-  };
+    };
+
+    loadCurrentShortcuts();
+  }, [visible, widget.id]);
 
   const handleToggleShortcut = (shortcutId: string) => {
     hapticPress();

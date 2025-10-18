@@ -78,7 +78,7 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
     const scale = interpolate(scaleAnimation.value, [0, 1], [0.8, 1]);
     const rotate = interpolate(rotateAnimation.value, [0, 1], [0, 180]);
     return {
-      transform: [{ scale: scale as any }, { rotate: rotate as any }],
+      transform: [{ scale }, { rotate: `${rotate}deg` }],
     };
   });
 

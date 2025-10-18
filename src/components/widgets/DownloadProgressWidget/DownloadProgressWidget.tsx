@@ -13,8 +13,9 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
-import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { Widget } from "@/services/widgets/WidgetService";
+import { useDownloadStore, selectDownloads } from "@/store/downloadStore";
+import type { DownloadItem } from "@/models/download.types";
 
 export interface DownloadProgressWidgetProps {
   widget: Widget;
@@ -22,7 +23,7 @@ export interface DownloadProgressWidgetProps {
   onEdit?: () => void;
 }
 
-interface DownloadItem {
+interface DisplayDownloadItem {
   id: string;
   title: string;
   service: string;
@@ -36,6 +37,40 @@ interface DownloadItem {
   protocol: "torrent" | "usenet";
 }
 
+// Helper function to convert DownloadItem to display format
+const convertToDisplayItem = (download: DownloadItem) => {
+  const progress = download.state.progress * 100;
+  return {
+    id: download.id,
+    title: download.content.title,
+    service: download.serviceConfig.name,
+    serviceType: download.serviceConfig.type,
+    progress: Math.round(progress),
+    size: download.download.size || download.state.totalBytes || 0,
+    sizeLeft: download.state.totalBytes - download.state.bytesDownloaded,
+    speed: download.state.downloadSpeed || 0,
+    timeLeft:
+      download.state.eta > 0 ? formatTime(download.state.eta) : undefined,
+    status: download.state.status as
+      | "downloading"
+      | "completed"
+      | "paused"
+      | "error",
+    protocol: (download.serviceConfig.type === "qbittorrent" ||
+    download.serviceConfig.type === "transmission" ||
+    download.serviceConfig.type === "deluge"
+      ? "torrent"
+      : "usenet") as "torrent" | "usenet",
+  };
+};
+
+// Format time in seconds to human readable string
+const formatTime = (seconds: number): string => {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  return `${Math.round(seconds / 3600)}h`;
+};
+
 const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
   widget,
   onRefresh,
@@ -44,128 +79,35 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
   const theme = useTheme<AppTheme>();
   const { spacing } = useResponsiveLayout();
   const { onPress } = useHaptics();
-  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Use the download store to get real download data with stable selector
+  const downloads = useDownloadStore(selectDownloads);
+
+  // Convert download store data to display format
+  const displayDownloads = React.useMemo(() => {
+    const downloadArray = Array.from(downloads.values());
+    return downloadArray.map(convertToDisplayItem).sort((a, b) => {
+      // Sort by status: downloading first, then by progress
+      if (a.status === "downloading" && b.status !== "downloading") return -1;
+      if (a.status !== "downloading" && b.status === "downloading") return 1;
+      return b.progress - a.progress;
+    });
+  }, [downloads]);
+
   const loadDownloads = useCallback(async () => {
-    try {
-      const connectors = ConnectorManager.getInstance().getAllConnectors();
-      const allDownloads: DownloadItem[] = [];
-
-      // Get downloads from torrent clients
-      const torrentClients = connectors.filter(
-        (c) =>
-          c.config.enabled &&
-          ["qbittorrent", "transmission", "deluge"].includes(c.config.type),
-      );
-
-      for (const client of torrentClients) {
-        try {
-          const clientDownloads = await getTorrentDownloads(client.config.id);
-          allDownloads.push(...clientDownloads);
-        } catch (error) {
-          console.error(
-            `Failed to load downloads from ${client.config.name}:`,
-            error,
-          );
-        }
-      }
-
-      // Get downloads from Usenet clients
-      const usenetClients = connectors.filter(
-        (c) => c.config.enabled && ["sabnzbd"].includes(c.config.type),
-      );
-
-      for (const client of usenetClients) {
-        try {
-          const clientDownloads = await getUsenetDownloads(client.config.id);
-          allDownloads.push(...clientDownloads);
-        } catch (error) {
-          console.error(
-            `Failed to load downloads from ${client.config.name}:`,
-            error,
-          );
-        }
-      }
-
-      // Sort by progress (active downloads first)
-      allDownloads.sort((a, b) => {
-        if (a.status === "downloading" && b.status !== "downloading") return -1;
-        if (a.status !== "downloading" && b.status === "downloading") return 1;
-        return b.progress - a.progress;
-      });
-
-      setDownloads(allDownloads);
-    } catch (error) {
-      console.error("Failed to load downloads:", error);
-    }
+    // The download store automatically updates, but we can trigger any refresh logic here if needed
+    setRefreshing(true);
+    // For now, just wait a bit to show refresh animation
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
   }, []);
 
   useEffect(() => {
-    loadDownloads();
-  }, [loadDownloads]);
-
-  const getTorrentDownloads = async (
-    serviceId: string,
-  ): Promise<DownloadItem[]> => {
-    // This is a placeholder implementation
-    // In reality, you would use the specific connector to get queue items
-    const connector = ConnectorManager.getInstance().getConnector(serviceId);
-    if (!connector) return [];
-
-    try {
-      // For now, return mock data
-      return [
-        {
-          id: `${serviceId}-1`,
-          title: "Example Movie 2024",
-          service: connector.config.name,
-          serviceType: connector.config.type,
-          progress: 75,
-          size: 8.5 * 1024 * 1024 * 1024, // 8.5 GB
-          sizeLeft: 2.1 * 1024 * 1024 * 1024, // 2.1 GB
-          speed: 5.2 * 1024 * 1024, // 5.2 MB/s
-          timeLeft: "7m 32s",
-          status: "downloading",
-          protocol: "torrent",
-        },
-        {
-          id: `${serviceId}-2`,
-          title: "TV Series S01E01",
-          service: connector.config.name,
-          serviceType: connector.config.type,
-          progress: 100,
-          size: 1.2 * 1024 * 1024 * 1024, // 1.2 GB
-          sizeLeft: 0,
-          status: "completed",
-          protocol: "torrent",
-        },
-      ];
-    } catch {
-      return [];
-    }
-  };
-
-  const getUsenetDownloads = async (
-    serviceId: string,
-  ): Promise<DownloadItem[]> => {
-    // Placeholder implementation for Usenet downloads
-    return [
-      {
-        id: `${serviceId}-1`,
-        title: "Album Release 2024",
-        service: "SABnzbd",
-        serviceType: "sabnzbd",
-        progress: 45,
-        size: 500 * 1024 * 1024, // 500 MB
-        sizeLeft: 275 * 1024 * 1024, // 275 MB
-        speed: 2.8 * 1024 * 1024, // 2.8 MB/s
-        timeLeft: "2m 45s",
-        status: "downloading",
-        protocol: "usenet",
-      },
-    ];
-  };
+    // The download store automatically updates, so we don't need to manually load
+    // But we keep the effect for any future initialization logic
+  }, []);
 
   const handleRefresh = async () => {
     onPress();
@@ -202,7 +144,7 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
     return protocol === "torrent" ? "magnet" : "newspaper";
   };
 
-  const renderDownloadItem = (download: DownloadItem) => (
+  const renderDownloadItem = (download: DisplayDownloadItem) => (
     <Card key={download.id} style={styles.downloadCard}>
       <View style={styles.downloadContent}>
         <View style={styles.downloadHeader}>
@@ -284,8 +226,12 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
     </Card>
   );
 
-  const activeDownloads = downloads.filter((d) => d.status === "downloading");
-  const completedDownloads = downloads.filter((d) => d.status === "completed");
+  const activeDownloads = displayDownloads.filter(
+    (d) => d.status === "downloading",
+  );
+  const completedDownloads = displayDownloads.filter(
+    (d) => d.status === "completed",
+  );
 
   return (
     <Card style={[styles.container, { padding: spacing.medium }]}>
@@ -340,7 +286,7 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
         </View>
       )}
 
-      {downloads.length === 0 && (
+      {displayDownloads.length === 0 && (
         <View style={styles.emptyState}>
           <MaterialCommunityIcons
             name="download-off"

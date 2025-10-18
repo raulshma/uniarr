@@ -1,4 +1,5 @@
-import * as FileSystem from "expo-file-system";
+import { File, Directory } from "expo-file-system";
+import * as FileSystemLegacy from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type {
   DownloadItem,
@@ -11,13 +12,34 @@ import { logger } from "@/services/logger/LoggerService";
 import { DownloadNotificationService } from "./NotificationService";
 
 /**
+ * Get a safe download directory path
+ */
+function getDownloadDirectory(): string {
+  // Try cache directory first (preferred for downloads)
+  if (FileSystemLegacy.cacheDirectory) {
+    return `${FileSystemLegacy.cacheDirectory}downloads/`;
+  }
+
+  // Fallback to document directory
+  if (FileSystemLegacy.documentDirectory) {
+    return `${FileSystemLegacy.documentDirectory}downloads/`;
+  }
+
+  // Last resort - this should never happen but provides a safe fallback
+  logger.warn(
+    "Both cacheDirectory and documentDirectory are unavailable, using relative path",
+  );
+  return "./downloads/";
+}
+
+/**
  * Default download queue configuration
  */
 const DEFAULT_CONFIG: DownloadQueueConfig = {
   maxConcurrentDownloads: 3,
   allowMobileData: false,
   allowBackgroundDownloads: true,
-  defaultDownloadDirectory: "./downloads/",
+  defaultDownloadDirectory: getDownloadDirectory(),
   maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
 };
 
@@ -206,11 +228,9 @@ export class DownloadManager {
 
     // Delete partial file
     try {
-      const fileInfo = await FileSystem.getInfoAsync(
-        download.download.localPath,
-      );
-      if (fileInfo.exists) {
-        await FileSystem.deleteAsync(download.download.localPath);
+      const file = new File(download.download.localPath);
+      if (file.exists) {
+        file.delete();
       }
     } catch (error) {
       logger.warn("Failed to delete partial download file", {
@@ -258,11 +278,9 @@ export class DownloadManager {
 
     // Delete partial file if it exists
     try {
-      const fileInfo = await FileSystem.getInfoAsync(
-        download.download.localPath,
-      );
-      if (fileInfo.exists) {
-        await FileSystem.deleteAsync(download.download.localPath);
+      const file = new File(download.download.localPath);
+      if (file.exists) {
+        file.delete();
       }
     } catch (error) {
       logger.warn("Failed to delete partial download file for retry", {
@@ -357,8 +375,9 @@ export class DownloadManager {
    */
   async getStorageInfo(): Promise<DownloadStorageInfo> {
     try {
-      const freeSpace = await FileSystem.getFreeDiskStorageAsync();
-      const totalSpace = await FileSystem.getTotalDiskCapacityAsync();
+      // Use legacy API for storage info as new API doesn't have direct replacement yet
+      const freeSpace = await FileSystemLegacy.getFreeDiskStorageAsync();
+      const totalSpace = await FileSystemLegacy.getTotalDiskCapacityAsync();
 
       // Calculate used space by scanning download directory
       const usedSpace = await this.calculateDownloadDirectorySize();
@@ -390,11 +409,9 @@ export class DownloadManager {
 
     for (const download of completedDownloads) {
       try {
-        const fileInfo = await FileSystem.getInfoAsync(
-          download.download.localPath,
-        );
-        if (fileInfo.exists) {
-          await FileSystem.deleteAsync(download.download.localPath);
+        const file = new File(download.download.localPath);
+        if (file.exists) {
+          file.delete();
         }
         this.downloads.delete(download.id);
       } catch (error) {
@@ -438,8 +455,8 @@ export class DownloadManager {
    */
   private async startDownload(download: DownloadItem): Promise<void> {
     try {
-      // Create download resumable task
-      const downloadResumable = FileSystem.createDownloadResumable(
+      // Create download resumable task using legacy API
+      const downloadResumable = FileSystemLegacy.createDownloadResumable(
         download.download.sourceUrl,
         download.download.localPath,
         {},
@@ -668,22 +685,58 @@ export class DownloadManager {
    */
   private async ensureDownloadDirectory(): Promise<void> {
     try {
-      const dirInfo = await FileSystem.getInfoAsync(
-        this.config.defaultDownloadDirectory,
-      );
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(
-          this.config.defaultDownloadDirectory,
-          {
-            intermediates: true,
-          },
+      const directoryPath = this.config.defaultDownloadDirectory;
+
+      // Validate that we have an absolute path
+      if (
+        !directoryPath.startsWith("/") &&
+        !directoryPath.startsWith("file://")
+      ) {
+        throw new Error(
+          `Download directory path must be absolute, got: ${directoryPath}`,
         );
+      }
+
+      const directory = new Directory(directoryPath);
+      if (!directory.exists) {
+        logger.info("Creating download directory", { directoryPath });
+        directory.create();
+      } else {
+        logger.debug("Download directory already exists", { directoryPath });
       }
     } catch (error) {
       logger.error("Failed to create download directory", {
         directory: this.config.defaultDownloadDirectory,
         error: error instanceof Error ? error.message : String(error),
       });
+
+      // Attempt to create a fallback directory
+      try {
+        const fallbackDir = FileSystemLegacy.documentDirectory
+          ? `${FileSystemLegacy.documentDirectory}downloads_fallback/`
+          : null;
+        if (fallbackDir) {
+          logger.info("Attempting to create fallback download directory", {
+            fallbackDir,
+          });
+          const directory = new Directory(fallbackDir);
+          if (!directory.exists) {
+            directory.create();
+          }
+          // Update config to use fallback directory
+          (this.config as any).defaultDownloadDirectory = fallbackDir;
+          logger.info("Fallback download directory created successfully", {
+            fallbackDir,
+          });
+        }
+      } catch (fallbackError) {
+        logger.error("Failed to create fallback directory", {
+          error:
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : String(fallbackError),
+        });
+      }
     }
   }
 
@@ -701,13 +754,11 @@ export class DownloadManager {
         throw new Error("Invalid download path - no parent directory");
       }
 
-      const dirInfo = await FileSystem.getInfoAsync(parentDir);
+      const directory = new Directory(parentDir);
 
-      if (!dirInfo.exists) {
+      if (!directory.exists) {
         try {
-          await FileSystem.makeDirectoryAsync(parentDir, {
-            intermediates: true,
-          });
+          directory.create();
           logger.debug("Created parent directory for download", { parentDir });
         } catch (mkdirError) {
           const errorMessage =
@@ -716,8 +767,6 @@ export class DownloadManager {
               : String(mkdirError);
           throw new Error(`Failed to create parent directory: ${errorMessage}`);
         }
-      } else if (dirInfo.isDirectory !== undefined && !dirInfo.isDirectory) {
-        throw new Error("Parent path exists but is not a directory");
       }
     } catch (error) {
       const errorMessage =
@@ -737,7 +786,7 @@ export class DownloadManager {
     try {
       let freeSpace = 0;
       try {
-        freeSpace = await FileSystem.getFreeDiskStorageAsync();
+        freeSpace = await FileSystemLegacy.getFreeDiskStorageAsync();
       } catch (error) {
         logger.warn("Could not get free disk storage space", {
           error: error instanceof Error ? error.message : String(error),
@@ -789,16 +838,14 @@ export class DownloadManager {
       let totalSize = 0;
 
       try {
-        const files = await FileSystem.readDirectoryAsync(
-          this.config.defaultDownloadDirectory,
-        );
+        const directory = new Directory(this.config.defaultDownloadDirectory);
+        if (directory.exists) {
+          const files = directory.list();
 
-        for (const file of files) {
-          const filePath = `${this.config.defaultDownloadDirectory}${file}`;
-          const fileInfo = await FileSystem.getInfoAsync(filePath);
-
-          if (fileInfo.exists && !fileInfo.isDirectory) {
-            totalSize += fileInfo.size || 0;
+          for (const item of files) {
+            if (!(item instanceof Directory)) {
+              totalSize += item.size || 0;
+            }
           }
         }
       } catch (error) {
@@ -825,16 +872,14 @@ export class DownloadManager {
       let fileCount = 0;
 
       try {
-        const files = await FileSystem.readDirectoryAsync(
-          this.config.defaultDownloadDirectory,
-        );
+        const directory = new Directory(this.config.defaultDownloadDirectory);
+        if (directory.exists) {
+          const files = directory.list();
 
-        for (const file of files) {
-          const filePath = `${this.config.defaultDownloadDirectory}${file}`;
-          const fileInfo = await FileSystem.getInfoAsync(filePath);
-
-          if (fileInfo.exists && !fileInfo.isDirectory) {
-            fileCount++;
+          for (const item of files) {
+            if (!(item instanceof Directory)) {
+              fileCount++;
+            }
           }
         }
       } catch (error) {
@@ -861,18 +906,16 @@ export class DownloadManager {
       let largestFile = 0;
 
       try {
-        const files = await FileSystem.readDirectoryAsync(
-          this.config.defaultDownloadDirectory,
-        );
+        const directory = new Directory(this.config.defaultDownloadDirectory);
+        if (directory.exists) {
+          const files = directory.list();
 
-        for (const file of files) {
-          const filePath = `${this.config.defaultDownloadDirectory}${file}`;
-          const fileInfo = await FileSystem.getInfoAsync(filePath);
-
-          if (fileInfo.exists && !fileInfo.isDirectory) {
-            const size = fileInfo.size || 0;
-            if (size > largestFile) {
-              largestFile = size;
+          for (const item of files) {
+            if (!(item instanceof Directory)) {
+              const size = item.size || 0;
+              if (size > largestFile) {
+                largestFile = size;
+              }
             }
           }
         }
@@ -1071,10 +1114,8 @@ export class DownloadManager {
         // Check if file still exists for completed downloads
         if (download.state.status === "completed") {
           try {
-            const fileInfo = await FileSystem.getInfoAsync(
-              download.download.localPath,
-            );
-            if (!fileInfo.exists) {
+            const file = new File(download.download.localPath);
+            if (!file.exists) {
               // Mark as failed if file doesn't exist
               this.updateDownloadState(download.id, {
                 status: "failed",

@@ -32,88 +32,59 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
 
   // Load shortcuts configuration
   React.useEffect(() => {
+    const loadShortcuts = async () => {
+      try {
+        await widgetService.initialize();
+        const widgetConfig = await widgetService.getWidget(widget.id);
+
+        if (widgetConfig?.config?.shortcuts) {
+          setShortcuts(
+            widgetConfig.config.shortcuts.filter((s: Shortcut) => s.enabled),
+          );
+        } else {
+          // Use default shortcuts if none configured
+          setShortcuts([
+            {
+              id: "discover",
+              label: "Discover",
+              icon: "compass",
+              route: "/discover",
+              enabled: true,
+            },
+            {
+              id: "search",
+              label: "Search",
+              icon: "magnify",
+              route: "/dashboard/search",
+              enabled: true,
+            },
+            {
+              id: "calendar",
+              label: "Calendar",
+              icon: "calendar",
+              route: "/calendar",
+              enabled: true,
+            },
+            {
+              id: "anime",
+              label: "Anime Hub",
+              icon: "play-circle",
+              route: "/anime-hub",
+              enabled: true,
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Failed to load shortcuts configuration:", error);
+        setLoading(false);
+        return;
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadShortcuts();
   }, [widget.id]);
-
-  const loadShortcuts = async () => {
-    try {
-      await widgetService.initialize();
-      const widgetConfig = await widgetService.getWidget(widget.id);
-
-      if (widgetConfig?.config?.shortcuts) {
-        setShortcuts(
-          widgetConfig.config.shortcuts.filter((s: Shortcut) => s.enabled),
-        );
-      } else {
-        // Use default shortcuts if none configured
-        setShortcuts([
-          {
-            id: "discover",
-            label: "Discover",
-            icon: "compass",
-            route: "/discover",
-            enabled: true,
-          },
-          {
-            id: "search",
-            label: "Search",
-            icon: "magnify",
-            route: "/dashboard/search",
-            enabled: true,
-          },
-          {
-            id: "calendar",
-            label: "Calendar",
-            icon: "calendar",
-            route: "/calendar",
-            enabled: true,
-          },
-          {
-            id: "anime",
-            label: "Anime Hub",
-            icon: "play-circle",
-            route: "/anime-hub",
-            enabled: true,
-          },
-        ]);
-      }
-    } catch (error) {
-      console.error("Failed to load shortcuts:", error);
-      // Fallback to default shortcuts
-      setShortcuts([
-        {
-          id: "discover",
-          label: "Discover",
-          icon: "compass",
-          route: "/discover",
-          enabled: true,
-        },
-        {
-          id: "search",
-          label: "Search",
-          icon: "magnify",
-          route: "/dashboard/search",
-          enabled: true,
-        },
-        {
-          id: "calendar",
-          label: "Calendar",
-          icon: "calendar",
-          route: "/calendar",
-          enabled: true,
-        },
-        {
-          id: "anime",
-          label: "Anime Hub",
-          icon: "play-circle",
-          route: "/anime-hub",
-          enabled: true,
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleShortcutPress = (shortcut: Shortcut) => {
     hapticPress();

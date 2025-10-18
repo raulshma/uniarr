@@ -6,6 +6,8 @@ import { Chip, Text, useTheme } from "react-native-paper";
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
 import { MediaPoster } from "@/components/media/MediaPoster";
+import DownloadButton from "@/components/downloads/DownloadButton";
+import type { ServiceConfig } from "@/models/service.types";
 
 export type MediaKind = "series" | "movie";
 
@@ -32,6 +34,12 @@ export type MediaCardProps = {
   onLongPress?: () => void;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  // Download functionality props
+  serviceConfig?: ServiceConfig;
+  contentId?: string;
+  showDownloadButton?: boolean;
+  onDownloadStart?: (downloadId: string) => void;
+  onDownloadError?: (error: string) => void;
 };
 
 const downloadStatusConfig: Record<
@@ -63,6 +71,11 @@ const MediaCard: React.FC<MediaCardProps> = ({
   onLongPress,
   style,
   testID,
+  serviceConfig,
+  contentId,
+  showDownloadButton = false,
+  onDownloadStart,
+  onDownloadError,
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -190,6 +203,18 @@ const MediaCard: React.FC<MediaCardProps> = ({
             {statusBadge}
             {monitoredChip}
             {downloadChip}
+            {showDownloadButton && serviceConfig && contentId && (
+              <View style={styles.downloadButtonContainer}>
+                <DownloadButton
+                  serviceConfig={serviceConfig}
+                  contentId={contentId}
+                  size="small"
+                  variant="icon"
+                  onDownloadStart={onDownloadStart}
+                  onDownloadError={onDownloadError}
+                />
+              </View>
+            )}
           </View>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </View>
@@ -219,6 +244,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   chip: {
+    marginRight: 6,
+    marginTop: 4,
+  },
+  downloadButtonContainer: {
     marginRight: 6,
     marginTop: 4,
   },

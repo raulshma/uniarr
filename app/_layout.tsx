@@ -18,6 +18,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { defaultTheme } from "@/constants/theme";
 import { ErrorBoundary, DialogProvider } from "@/components/common";
 import { OfflineIndicator } from "@/components/common/OfflineIndicator";
+import { DownloadManagerProvider } from "@/providers/DownloadManagerProvider";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useOfflineAwareActions } from "@/hooks/useOfflineAwareActions";
@@ -44,11 +45,33 @@ const RootLayout = () => {
               <QueryClientProvider client={queryClient}>
                 <PaperProvider theme={theme || defaultTheme}>
                   <DialogProvider>
-                    <StatusBar style={theme.dark ? "light" : "dark"} />
-                    <ErrorBoundary context={{ location: "RootLayout" }}>
-                      <AppContent />
-                    </ErrorBoundary>
-                    <QueryDevtools />
+                    <DownloadManagerProvider
+                      managerOptions={{
+                        queueConfig: {
+                          maxConcurrentDownloads: 3,
+                          allowMobileData: false,
+                          allowBackgroundDownloads: true,
+                          maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
+                        },
+                        progressUpdateInterval: 1000,
+                        enablePersistence: true,
+                      }}
+                      onInitialized={(success) => {
+                        console.log("Download manager initialized:", success);
+                      }}
+                      onError={(error) => {
+                        console.error(
+                          "Download manager initialization failed:",
+                          error,
+                        );
+                      }}
+                    >
+                      <StatusBar style={theme.dark ? "light" : "dark"} />
+                      <ErrorBoundary context={{ location: "RootLayout" }}>
+                        <AppContent />
+                      </ErrorBoundary>
+                      <QueryDevtools />
+                    </DownloadManagerProvider>
                   </DialogProvider>
                 </PaperProvider>
               </QueryClientProvider>

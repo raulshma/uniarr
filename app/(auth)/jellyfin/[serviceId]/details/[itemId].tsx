@@ -38,6 +38,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
+import DownloadButton from "@/components/downloads/DownloadButton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
@@ -639,6 +640,24 @@ const JellyfinItemDetailsScreen = () => {
               Play on Jellyfin
             </Button>
 
+            {/* Download button */}
+            {connector && item.Id && (
+              <DownloadButton
+                serviceConfig={connector.config}
+                contentId={item.Id}
+                size="large"
+                variant="button"
+                showQuality={true}
+                style={styles.downloadButton}
+                onDownloadStart={(downloadId) => {
+                  console.log(`Download started: ${downloadId}`);
+                }}
+                onDownloadError={(error) => {
+                  console.error(`Download failed: ${error}`);
+                }}
+              />
+            )}
+
             {/* Sync card with inline Update button on the right */}
             <Surface style={styles.syncCard} elevation={1}>
               <LinearGradient
@@ -855,6 +874,12 @@ const createStyles = (theme: AppTheme) =>
       marginTop: spacing.md,
       marginBottom: spacing.sm,
       backgroundColor: theme.colors.primary,
+    },
+    downloadButton: {
+      width: "100%",
+      borderRadius: 28,
+      marginTop: spacing.sm,
+      marginBottom: spacing.sm,
     },
     playButtonContent: {
       height: 56,

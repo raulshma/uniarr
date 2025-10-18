@@ -278,8 +278,8 @@ export const useDownloadStore = create<DownloadStoreState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           logger.info("Download store rehydrated", {
-            downloadsCount: state.downloads.size,
-            completedDownloads: state.stats.completedDownloads,
+            downloadsCount: state.downloads?.size || 0,
+            completedDownloads: state.stats?.completedDownloads || 0,
           });
         }
       },
@@ -301,28 +301,74 @@ export const selectConfig = (state: DownloadStoreState): DownloadQueueConfig =>
 export const selectStats = (state: DownloadStoreState): DownloadStats =>
   state.stats;
 
-// Computed selectors
-export const selectDownloadsArray = (
-  state: DownloadStoreState,
-): DownloadItem[] => Array.from(state.downloads.values());
-export const selectActiveDownloadsArray = (
-  state: DownloadStoreState,
-): DownloadItem[] =>
-  Array.from(state.activeDownloads)
-    .map((id) => state.downloads.get(id))
-    .filter((download): download is DownloadItem => download !== undefined);
-export const selectCompletedDownloadsArray = (
-  state: DownloadStoreState,
-): DownloadItem[] =>
-  Array.from(state.downloads.values()).filter(
-    (download) => download.state.status === "completed",
-  );
-export const selectFailedDownloadsArray = (
-  state: DownloadStoreState,
-): DownloadItem[] =>
-  Array.from(state.downloads.values()).filter(
-    (download) => download.state.status === "failed",
-  );
+// Memoized selectors to prevent infinite loops
+export const selectDownloadsArray = (() => {
+  let cache: DownloadItem[] | null = null;
+  let lastDownloads: Map<string, DownloadItem> | null = null;
+
+  return (state: DownloadStoreState): DownloadItem[] => {
+    if (lastDownloads === state.downloads && cache !== null) {
+      return cache;
+    }
+    cache = Array.from(state.downloads.values());
+    lastDownloads = state.downloads;
+    return cache;
+  };
+})();
+
+export const selectActiveDownloadsArray = (() => {
+  let cache: DownloadItem[] | null = null;
+  let lastActiveDownloads: Set<string> | null = null;
+  let lastDownloads: Map<string, DownloadItem> | null = null;
+
+  return (state: DownloadStoreState): DownloadItem[] => {
+    if (
+      lastActiveDownloads === state.activeDownloads &&
+      lastDownloads === state.downloads &&
+      cache !== null
+    ) {
+      return cache;
+    }
+    cache = Array.from(state.activeDownloads)
+      .map((id) => state.downloads.get(id))
+      .filter((download): download is DownloadItem => download !== undefined);
+    lastActiveDownloads = state.activeDownloads;
+    lastDownloads = state.downloads;
+    return cache;
+  };
+})();
+
+export const selectCompletedDownloadsArray = (() => {
+  let cache: DownloadItem[] | null = null;
+  let lastDownloads: Map<string, DownloadItem> | null = null;
+
+  return (state: DownloadStoreState): DownloadItem[] => {
+    if (lastDownloads === state.downloads && cache !== null) {
+      return cache;
+    }
+    cache = Array.from(state.downloads.values()).filter(
+      (download) => download.state.status === "completed",
+    );
+    lastDownloads = state.downloads;
+    return cache;
+  };
+})();
+
+export const selectFailedDownloadsArray = (() => {
+  let cache: DownloadItem[] | null = null;
+  let lastDownloads: Map<string, DownloadItem> | null = null;
+
+  return (state: DownloadStoreState): DownloadItem[] => {
+    if (lastDownloads === state.downloads && cache !== null) {
+      return cache;
+    }
+    cache = Array.from(state.downloads.values()).filter(
+      (download) => download.state.status === "failed",
+    );
+    lastDownloads = state.downloads;
+    return cache;
+  };
+})();
 
 // Status-based selectors
 export const selectDownloadsByStatus =

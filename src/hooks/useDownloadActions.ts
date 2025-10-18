@@ -2,8 +2,8 @@ import { useCallback } from "react";
 import { Alert } from "react-native";
 import * as Haptics from "expo-haptics";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { useDownloadService } from "@/services/download";
 import { logger } from "@/services/logger/LoggerService";
-import type { DownloadManager } from "@/services/download/DownloadManager";
 import type { ServiceConfig } from "@/models/service.types";
 
 /**
@@ -30,8 +30,13 @@ export interface DownloadActionOptions {
 /**
  * Hook for managing download actions
  */
-export const useDownloadActions = (downloadManager?: DownloadManager) => {
+export const useDownloadActions = () => {
   const connectorManager = ConnectorManager.getInstance();
+  const {
+    isReady,
+    getManager,
+    startDownload: serviceStartDownload,
+  } = useDownloadService();
 
   /**
    * Start a new download
@@ -43,76 +48,31 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
       quality?: string,
       options?: DownloadActionOptions,
     ) => {
+      if (!isReady) {
+        throw new Error("Download manager not available");
+      }
+
       try {
-        // Get the download connector for this service
-        const downloadConnector = connectorManager.getDownloadConnector(
-          serviceConfig.id,
-        );
-        if (!downloadConnector) {
-          throw new Error(
-            `Service ${serviceConfig.name} does not support downloads`,
-          );
-        }
-
-        // Check if content can be downloaded
-        const capability = await downloadConnector.canDownload(contentId);
-        if (!capability.canDownload) {
-          throw new Error(
-            capability.restrictions?.join(", ") ||
-              "Cannot download this content",
-          );
-        }
-
-        // Get download information
-        const downloadInfo = await downloadConnector.getDownloadInfo(
+        const downloadId = await serviceStartDownload(
+          serviceConfig,
           contentId,
           quality,
         );
-        const metadata = await downloadConnector.getContentMetadata(contentId);
-
-        // Create download item
-        const downloadItem = {
-          serviceConfig,
-          content: {
-            id: metadata.id,
-            title: metadata.title,
-            type: metadata.type,
-            description: metadata.description,
-            thumbnailUrl: metadata.thumbnailUrl,
-            duration: metadata.duration,
-            size: downloadInfo.size,
-          },
-          download: {
-            sourceUrl: downloadInfo.sourceUrl,
-            localPath: generateDownloadPath(downloadInfo.fileName),
-            fileName: downloadInfo.fileName,
-            mimeType: downloadInfo.mimeType,
-            size: downloadInfo.size,
-            checksum: downloadInfo.checksum,
-          },
-        };
-
-        if (!downloadManager) {
-          throw new Error("Download manager not available");
-        }
-
-        // Start the download
-        const downloadId = await downloadManager.addDownload(downloadItem);
 
         if (options?.haptics !== false) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
 
-        logger.info("Download started", {
+        logger.info("Download started via actions", {
           downloadId,
-          title: metadata.title,
           service: serviceConfig.name,
+          contentId,
         });
 
         return downloadId;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        logger.error("Failed to start download", {
+        logger.error("Failed to start download via actions", {
           serviceId: serviceConfig.id,
           contentId,
           error: message,
@@ -125,7 +85,7 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
         throw error;
       }
     },
-    [connectorManager, downloadManager],
+    [isReady, serviceStartDownload],
   );
 
   /**
@@ -133,7 +93,12 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
    */
   const pauseDownload = useCallback(
     async (downloadId: string, options?: DownloadActionOptions) => {
+      if (!isReady) {
+        throw new Error("Download manager not available");
+      }
+
       try {
+        const downloadManager = getManager();
         if (!downloadManager) {
           throw new Error("Download manager not available");
         }
@@ -159,7 +124,7 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
         throw error;
       }
     },
-    [downloadManager],
+    [isReady, getManager],
   );
 
   /**
@@ -167,7 +132,12 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
    */
   const resumeDownload = useCallback(
     async (downloadId: string, options?: DownloadActionOptions) => {
+      if (!isReady) {
+        throw new Error("Download manager not available");
+      }
+
       try {
+        const downloadManager = getManager();
         if (!downloadManager) {
           throw new Error("Download manager not available");
         }
@@ -193,7 +163,7 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
         throw error;
       }
     },
-    [downloadManager],
+    [isReady, getManager],
   );
 
   /**
@@ -204,7 +174,12 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
       const confirmDestructive = options?.confirmDestructive ?? true;
 
       const performCancel = async () => {
+        if (!isReady) {
+          throw new Error("Download manager not available");
+        }
+
         try {
+          const downloadManager = getManager();
           if (!downloadManager) {
             throw new Error("Download manager not available");
           }
@@ -252,7 +227,7 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
         await performCancel();
       }
     },
-    [downloadManager],
+    [isReady, getManager],
   );
 
   /**
@@ -260,7 +235,12 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
    */
   const retryDownload = useCallback(
     async (downloadId: string, options?: DownloadActionOptions) => {
+      if (!isReady) {
+        throw new Error("Download manager not available");
+      }
+
       try {
+        const downloadManager = getManager();
         if (!downloadManager) {
           throw new Error("Download manager not available");
         }
@@ -286,7 +266,7 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
         throw error;
       }
     },
-    [downloadManager],
+    [isReady, getManager],
   );
 
   /**
@@ -297,7 +277,12 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
       const confirmDestructive = options?.confirmDestructive ?? true;
 
       const performRemove = async () => {
+        if (!isReady) {
+          throw new Error("Download manager not available");
+        }
+
         try {
+          const downloadManager = getManager();
           if (!downloadManager) {
             throw new Error("Download manager not available");
           }
@@ -346,7 +331,7 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
         await performRemove();
       }
     },
-    [downloadManager],
+    [isReady, getManager],
   );
 
   /**
@@ -357,7 +342,12 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
       const confirmDestructive = options?.confirmDestructive ?? true;
 
       const performClear = async () => {
+        if (!isReady) {
+          throw new Error("Download manager not available");
+        }
+
         try {
+          const downloadManager = getManager();
           if (!downloadManager) {
             throw new Error("Download manager not available");
           }
@@ -404,7 +394,7 @@ export const useDownloadActions = (downloadManager?: DownloadManager) => {
         await performClear();
       }
     },
-    [downloadManager],
+    [isReady, getManager],
   );
 
   /**
