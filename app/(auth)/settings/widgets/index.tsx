@@ -128,6 +128,8 @@ const WidgetSettingsScreen = () => {
     switch (type) {
       case "service-status":
         return "server-network";
+      case "shortcuts":
+        return "gesture-tap";
       case "download-progress":
         return "download";
       case "recent-activity":
@@ -145,6 +147,8 @@ const WidgetSettingsScreen = () => {
     switch (type) {
       case "service-status":
         return "Monitor connection status and response times";
+      case "shortcuts":
+        return "Quick access to your favorite app sections";
       case "download-progress":
         return "Track active and completed downloads";
       case "recent-activity":

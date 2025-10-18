@@ -13,6 +13,7 @@ import DownloadProgressWidget from "../DownloadProgressWidget/DownloadProgressWi
 import RecentActivityWidget from "../RecentActivityWidget/RecentActivityWidget";
 import StatisticsWidget from "../StatisticsWidget/StatisticsWidget";
 import CalendarPreviewWidget from "../CalendarPreviewWidget/CalendarPreviewWidget";
+import ShortcutsWidget from "../ShortcutsWidget/ShortcutsWidget";
 
 export interface WidgetContainerProps {
   /**
@@ -75,6 +76,15 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
       case "service-status":
         return (
           <ServiceStatusWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleRefresh}
+            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+          />
+        );
+      case "shortcuts":
+        return (
+          <ShortcutsWidget
             key={widget.id}
             widget={widget}
             onRefresh={handleRefresh}
