@@ -36,15 +36,19 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const { onPress } = useHaptics();
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [editing, setEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadWidgets = async () => {
     try {
+      setIsLoading(true);
       await widgetService.initialize();
       const availableWidgets = await widgetService.getWidgets();
       const enabledWidgets = availableWidgets.filter((w) => w.enabled);
       setWidgets(enabledWidgets);
     } catch (error) {
       console.error("Failed to load widgets:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -167,6 +171,23 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
   };
 
   // widget size helper removed (unused)
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, style]}>
+        <View style={styles.emptyState}>
+          <MaterialCommunityIcons
+            name="loading"
+            size={48}
+            color={theme.colors.primary}
+          />
+          <Text variant="bodyMedium" style={styles.emptyText}>
+            Loading widgets...
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (widgets.length === 0) {
     return (

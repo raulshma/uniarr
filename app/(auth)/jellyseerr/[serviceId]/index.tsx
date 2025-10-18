@@ -795,7 +795,7 @@ const JellyseerrRequestsScreen = () => {
             styles.statusChip,
             { backgroundColor: selectedTone.background },
           ]}
-          textStyle={{ color: selectedTone.text }}
+          textStyle={{ color: selectedTone.text, fontSize: 13, lineHeight: 18 }}
         >
           {label}
         </Chip>

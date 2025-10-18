@@ -191,7 +191,14 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
       isMounted = false;
       cancelled = true;
     };
-  }, [uri, dimensions.width, dimensions.height, fadeAnim]);
+  }, [
+    uri,
+    dimensions.width,
+    dimensions.height,
+    fadeAnim,
+    imageState.loading,
+    imageState.resolvedUri,
+  ]);
 
   const handleImageLoad = useCallback(() => {
     setImageState((prev) => ({ ...prev, loaded: true, loading: false }));
