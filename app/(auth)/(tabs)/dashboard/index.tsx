@@ -117,6 +117,11 @@ const DashboardScreen = () => {
           alignItems: "center",
           marginBottom: spacing.lg,
         },
+        headerActions: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.sm,
+        },
         profileSection: {
           flexDirection: "row",
           alignItems: "center",
@@ -480,13 +485,22 @@ const DashboardScreen = () => {
                   <Text style={styles.profileSubtitle}>Welcome back</Text>
                 </View>
               </View>
-              <IconButton
-                icon="cog"
-                size={24}
-                iconColor={theme.colors.onSurfaceVariant}
-                style={styles.settingsButton}
-                onPress={() => router.push("/(auth)/settings")}
-              />
+              <View style={styles.headerActions}>
+                <IconButton
+                  icon="download"
+                  size={24}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  style={styles.settingsButton}
+                  onPress={() => router.push("/(auth)/jellyfin-downloads")}
+                />
+                <IconButton
+                  icon="cog"
+                  size={24}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  style={styles.settingsButton}
+                  onPress={() => router.push("/(auth)/settings")}
+                />
+              </View>
             </View>
           </View>
         );

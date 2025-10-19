@@ -526,9 +526,27 @@ export const selectFailedDownloadsArray = (() => {
 })();
 
 // Status-based selectors
-export const selectDownloadsByStatus =
-  (status: DownloadItem["state"]["status"]) =>
-  (state: DownloadStoreState): DownloadItem[] => {
+const statusSelectorCache = new Map<
+  DownloadItem["state"]["status"],
+  (state: DownloadStoreState) => DownloadItem[]
+>();
+
+export const selectDownloadsByStatus = (
+  status: DownloadItem["state"]["status"],
+) => {
+  const cachedSelector = statusSelectorCache.get(status);
+  if (cachedSelector) {
+    return cachedSelector;
+  }
+
+  let cache: DownloadItem[] | null = null;
+  let lastDownloads: Map<string, DownloadItem> | null = null;
+
+  const selector = (state: DownloadStoreState): DownloadItem[] => {
+    if (lastDownloads === state.downloads && cache !== null) {
+      return cache;
+    }
+
     const downloads = state.downloads;
     let items: DownloadItem[] = [];
 
@@ -538,8 +556,14 @@ export const selectDownloadsByStatus =
       items = Object.values(downloads);
     }
 
-    return items.filter((d) => d.state.status === status);
+    cache = items.filter((d) => d.state.status === status);
+    lastDownloads = state.downloads;
+    return cache;
   };
+
+  statusSelectorCache.set(status, selector);
+  return selector;
+};
 
 // Count selectors for performance
 export const selectTotalDownloadsCount = (state: DownloadStoreState): number =>
