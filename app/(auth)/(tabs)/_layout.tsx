@@ -25,6 +25,17 @@ export default function TabsLayout() {
         badgeBackgroundColor={theme.colors.primaryContainer}
         badgeTextColor={theme.colors.onPrimaryContainer}
       >
+        <NativeTabs.Trigger name="dashboard/index">
+          <Icon
+            src={
+              <VectorIcon
+                family={MaterialCommunityIcons}
+                name="view-dashboard"
+              />
+            }
+          />
+          <Label>Dashboard</Label>
+        </NativeTabs.Trigger>
         <NativeTabs.Trigger name="services/index">
           <Icon
             src={<VectorIcon family={MaterialCommunityIcons} name="server" />}
@@ -41,17 +52,6 @@ export default function TabsLayout() {
             }
           />
           <Label>Recently Added</Label>
-        </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="dashboard/index">
-          <Icon
-            src={
-              <VectorIcon
-                family={MaterialCommunityIcons}
-                name="view-dashboard"
-              />
-            }
-          />
-          <Label>Dashboard</Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="downloads/index">
           <Icon

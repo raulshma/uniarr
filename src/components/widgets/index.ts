@@ -7,6 +7,8 @@ export type { DownloadProgressWidgetProps } from "./DownloadProgressWidget/Downl
 export { default as RecentActivityWidget } from "./RecentActivityWidget/RecentActivityWidget";
 export { default as StatisticsWidget } from "./StatisticsWidget/StatisticsWidget";
 export { default as CalendarPreviewWidget } from "./CalendarPreviewWidget/CalendarPreviewWidget";
+export { default as BookmarksWidget } from "./BookmarksWidget/BookmarksWidget";
+export type { BookmarksWidgetProps } from "./BookmarksWidget/BookmarksWidget.types";
 
 // Re-export widget types
 export type {

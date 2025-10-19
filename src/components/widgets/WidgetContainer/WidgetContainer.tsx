@@ -14,6 +14,7 @@ import RecentActivityWidget from "../RecentActivityWidget/RecentActivityWidget";
 import StatisticsWidget from "../StatisticsWidget/StatisticsWidget";
 import CalendarPreviewWidget from "../CalendarPreviewWidget/CalendarPreviewWidget";
 import ShortcutsWidget from "../ShortcutsWidget/ShortcutsWidget";
+import BookmarksWidget from "../BookmarksWidget/BookmarksWidget";
 
 export interface WidgetContainerProps {
   /**
@@ -131,6 +132,15 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
+      case "bookmarks":
+        return (
+          <BookmarksWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleRefresh}
+            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+          />
+        );
       default:
         return (
           <View key={widget.id} style={styles.placeholderWidget}>
@@ -152,6 +162,13 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
       case "shortcuts":
         // Navigate to shortcuts settings
         router.push("/(auth)/settings/shortcuts");
+        break;
+      case "bookmarks":
+        // Navigate to bookmarks settings
+        router.push({
+          pathname: "/(auth)/settings/bookmarks",
+          params: { widgetId: widget.id },
+        });
         break;
       case "download-progress":
         // Navigate to download settings
