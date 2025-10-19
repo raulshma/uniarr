@@ -425,6 +425,48 @@ const BackupExportScreen = () => {
                 <Text style={styles.checkboxLabel}>Recent IPs</Text>
               </View>
             </View>
+
+            {/* Download Configuration */}
+            <View style={styles.checkboxContainer}>
+              <Checkbox
+                status={options.includeDownloadConfig ? "checked" : "unchecked"}
+                onPress={() =>
+                  handleOptionChange(
+                    "includeDownloadConfig",
+                    !options.includeDownloadConfig,
+                  )
+                }
+              />
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.checkboxLabel}>Download Configuration</Text>
+                <Text style={styles.sensitiveLabel}>
+                  Download settings and preferences
+                </Text>
+              </View>
+            </View>
+
+            {/* Services View State */}
+            <View style={styles.checkboxContainer}>
+              <Checkbox
+                status={
+                  options.includeServicesViewState ? "checked" : "unchecked"
+                }
+                onPress={() =>
+                  handleOptionChange(
+                    "includeServicesViewState",
+                    !options.includeServicesViewState,
+                  )
+                }
+              />
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.checkboxLabel}>
+                  Services View Preferences
+                </Text>
+                <Text style={styles.sensitiveLabel}>
+                  View mode and sort settings
+                </Text>
+              </View>
+            </View>
           </Card>
         </View>
 
@@ -480,7 +522,9 @@ const BackupExportScreen = () => {
                   !options.includeServiceConfigs &&
                   !options.includeTmdbCredentials &&
                   !options.includeNetworkHistory &&
-                  !options.includeRecentIPs)
+                  !options.includeRecentIPs &&
+                  !options.includeDownloadConfig &&
+                  !options.includeServicesViewState)
               }
               onPress={handleCreateBackup}
             >

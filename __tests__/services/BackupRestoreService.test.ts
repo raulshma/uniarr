@@ -157,3 +157,68 @@ describe("BackupRestoreService - Encryption/Decryption", () => {
     }
   });
 });
+
+describe("BackupRestoreService - Backup Options", () => {
+  it("should include new backup options in default export options", () => {
+    const defaults = backupRestoreService.getDefaultExportOptions();
+
+    expect(defaults.includeDownloadConfig).toBe(true);
+    expect(defaults.includeServicesViewState).toBe(true);
+    expect(defaults.includeSettings).toBe(true);
+    expect(defaults.includeServiceConfigs).toBe(true);
+    expect(defaults.includeNetworkHistory).toBe(true);
+    expect(defaults.includeRecentIPs).toBe(true);
+  });
+
+  it("should include new backup options in selection config", () => {
+    const config = backupRestoreService.getBackupSelectionConfig();
+
+    expect(config.downloadConfig).toBeDefined();
+    expect(config.downloadConfig.enabled).toBe(true);
+    expect(config.downloadConfig.sensitive).toBe(false);
+
+    expect(config.servicesViewState).toBeDefined();
+    expect(config.servicesViewState.enabled).toBe(true);
+    expect(config.servicesViewState.sensitive).toBe(false);
+  });
+
+  it("should validate export options correctly", () => {
+    const validOptions = {
+      includeSettings: true,
+      includeServiceConfigs: false,
+      includeServiceCredentials: false,
+      includeTmdbCredentials: false,
+      includeNetworkHistory: false,
+      includeRecentIPs: false,
+      includeDownloadConfig: true,
+      includeServicesViewState: false,
+      encryptSensitive: false,
+    };
+
+    const validation = backupRestoreService.validateExportOptions(validOptions);
+
+    expect(validation.isValid).toBe(true);
+    expect(validation.errors.length).toBe(0);
+  });
+
+  it("should detect invalid export options", () => {
+    const invalidOptions = {
+      includeSettings: false,
+      includeServiceConfigs: false,
+      includeServiceCredentials: false,
+      includeTmdbCredentials: false,
+      includeNetworkHistory: false,
+      includeRecentIPs: false,
+      includeDownloadConfig: false,
+      includeServicesViewState: false,
+      encryptSensitive: true,
+      password: "test", // Too short
+    };
+
+    const validation =
+      backupRestoreService.validateExportOptions(invalidOptions);
+
+    expect(validation.isValid).toBe(false);
+    expect(validation.errors.length).toBeGreaterThan(0);
+  });
+});

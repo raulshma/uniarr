@@ -21,6 +21,8 @@ export interface BackupExportOptions {
   includeTmdbCredentials: boolean;
   includeNetworkHistory: boolean;
   includeRecentIPs: boolean;
+  includeDownloadConfig: boolean;
+  includeServicesViewState: boolean;
   encryptSensitive: boolean;
   password?: string;
 }
@@ -44,6 +46,14 @@ export interface BackupSelectionConfig {
     sensitive: boolean;
   };
   recentIPs: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  downloadConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  servicesViewState: {
     enabled: boolean;
     sensitive: boolean;
   };
@@ -101,6 +111,18 @@ export interface EncryptedBackupData {
     tmdbCredentials?: {
       apiKey?: string;
     };
+    downloadConfig?: {
+      maxConcurrentDownloads: number;
+      allowMobileData: boolean;
+      allowBackgroundDownloads: boolean;
+      defaultDownloadDirectory: string;
+      maxStorageUsage: number;
+    };
+    servicesViewState?: {
+      viewMode: "grid" | "list";
+      sortKey: "name" | "status" | "type";
+      sortDirection: "asc" | "desc";
+    };
   };
 }
 
@@ -155,6 +177,18 @@ export interface BackupData {
     }[];
     tmdbCredentials?: {
       apiKey?: string;
+    };
+    downloadConfig?: {
+      maxConcurrentDownloads: number;
+      allowMobileData: boolean;
+      allowBackgroundDownloads: boolean;
+      defaultDownloadDirectory: string;
+      maxStorageUsage: number;
+    };
+    servicesViewState?: {
+      viewMode: "grid" | "list";
+      sortKey: "name" | "status" | "type";
+      sortDirection: "asc" | "desc";
     };
   };
 }
@@ -420,6 +454,8 @@ class BackupRestoreService {
           includeTmdbCredentials: options.includeTmdbCredentials,
           includeNetworkHistory: options.includeNetworkHistory,
           includeRecentIPs: options.includeRecentIPs,
+          includeDownloadConfig: options.includeDownloadConfig,
+          includeServicesViewState: options.includeServicesViewState,
           encryptSensitive: options.encryptSensitive,
         },
       });
@@ -523,6 +559,58 @@ class BackupRestoreService {
         }
       }
 
+      // Collect download configuration
+      if (options.includeDownloadConfig) {
+        const downloadConfigKey = "download-store";
+        const downloadStoreData = await AsyncStorage.getItem(downloadConfigKey);
+        if (downloadStoreData) {
+          try {
+            const parsedData = JSON.parse(downloadStoreData);
+            // Extract the state if it's wrapped in a state object
+            const state = parsedData.state || parsedData;
+            if (state.config) {
+              backupData.appData.downloadConfig = state.config;
+            }
+          } catch (parseError) {
+            await logger.warn("Failed to parse download store data", {
+              location: "BackupRestoreService.createSelectiveBackup",
+              error:
+                parseError instanceof Error
+                  ? parseError.message
+                  : String(parseError),
+            });
+          }
+        }
+      }
+
+      // Collect services view state (viewMode, sort preferences)
+      if (options.includeServicesViewState) {
+        const servicesStoreKey = "ServicesStore:v1";
+        const servicesStoreData = await AsyncStorage.getItem(servicesStoreKey);
+        if (servicesStoreData) {
+          try {
+            const parsedData = JSON.parse(servicesStoreData);
+            // Extract the state if it's wrapped in a state object
+            const state = parsedData.state || parsedData;
+            if (state.viewMode || state.sortKey) {
+              backupData.appData.servicesViewState = {
+                viewMode: state.viewMode || "grid",
+                sortKey: state.sortKey || "name",
+                sortDirection: state.sortDirection || "asc",
+              };
+            }
+          } catch (parseError) {
+            await logger.warn("Failed to parse services store data", {
+              location: "BackupRestoreService.createSelectiveBackup",
+              error:
+                parseError instanceof Error
+                  ? parseError.message
+                  : String(parseError),
+            });
+          }
+        }
+      }
+
       // Encrypt sensitive data if needed
       if (
         options.encryptSensitive &&
@@ -600,6 +688,54 @@ class BackupRestoreService {
       const recentIPs = await secureStorage.getRecentIPs();
       const tmdbApiKey = await getStoredTmdbKey();
 
+      // Fetch download configuration
+      let downloadConfig = undefined;
+      const downloadConfigKey = "download-store";
+      const downloadStoreData = await AsyncStorage.getItem(downloadConfigKey);
+      if (downloadStoreData) {
+        try {
+          const parsedData = JSON.parse(downloadStoreData);
+          const state = parsedData.state || parsedData;
+          if (state.config) {
+            downloadConfig = state.config;
+          }
+        } catch (parseError) {
+          await logger.warn("Failed to parse download store data", {
+            location: "BackupRestoreService.createBackup",
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          });
+        }
+      }
+
+      // Fetch services view state
+      let servicesViewState = undefined;
+      const servicesStoreKey = "ServicesStore:v1";
+      const servicesStoreData = await AsyncStorage.getItem(servicesStoreKey);
+      if (servicesStoreData) {
+        try {
+          const parsedData = JSON.parse(servicesStoreData);
+          const state = parsedData.state || parsedData;
+          if (state.viewMode || state.sortKey) {
+            servicesViewState = {
+              viewMode: state.viewMode || "grid",
+              sortKey: state.sortKey || "name",
+              sortDirection: state.sortDirection || "asc",
+            };
+          }
+        } catch (parseError) {
+          await logger.warn("Failed to parse services store data", {
+            location: "BackupRestoreService.createBackup",
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          });
+        }
+      }
+
       // Prepare backup data structure
       const backupData: BackupData = {
         version: "1.1",
@@ -631,6 +767,8 @@ class BackupRestoreService {
           tmdbCredentials: {
             apiKey: tmdbApiKey || undefined,
           },
+          ...(downloadConfig && { downloadConfig }),
+          ...(servicesViewState && { servicesViewState }),
         },
       };
 
@@ -650,6 +788,8 @@ class BackupRestoreService {
         hasNetworkHistory: networkScanHistory.length > 0,
         hasRecentIPs: recentIPs.length > 0,
         hasTmdbCredentials: !!tmdbApiKey,
+        hasDownloadConfig: !!downloadConfig,
+        hasServicesViewState: !!servicesViewState,
       });
 
       return filePath;
@@ -907,6 +1047,50 @@ class BackupRestoreService {
         });
       }
 
+      // Restore download configuration if available
+      if (backupData.appData.downloadConfig) {
+        const downloadConfigKey = "download-store";
+        const stateToStore = {
+          state: {
+            config: backupData.appData.downloadConfig,
+          },
+        };
+        await AsyncStorage.setItem(
+          downloadConfigKey,
+          JSON.stringify(stateToStore),
+        );
+
+        await logger.info("Download configuration restored", {
+          location: "BackupRestoreService.restoreBackup",
+          maxConcurrentDownloads:
+            backupData.appData.downloadConfig.maxConcurrentDownloads,
+          maxStorageUsage: backupData.appData.downloadConfig.maxStorageUsage,
+        });
+      }
+
+      // Restore services view state if available
+      if (backupData.appData.servicesViewState) {
+        const servicesStoreKey = "ServicesStore:v1";
+        const stateToStore = {
+          state: {
+            viewMode: backupData.appData.servicesViewState.viewMode,
+            sortKey: backupData.appData.servicesViewState.sortKey,
+            sortDirection: backupData.appData.servicesViewState.sortDirection,
+          },
+        };
+        await AsyncStorage.setItem(
+          servicesStoreKey,
+          JSON.stringify(stateToStore),
+        );
+
+        await logger.info("Services view state restored", {
+          location: "BackupRestoreService.restoreBackup",
+          viewMode: backupData.appData.servicesViewState.viewMode,
+          sortKey: backupData.appData.servicesViewState.sortKey,
+          sortDirection: backupData.appData.servicesViewState.sortDirection,
+        });
+      }
+
       await logger.info("Backup restore completed successfully", {
         location: "BackupRestoreService.restoreBackup",
       });
@@ -993,6 +1177,8 @@ class BackupRestoreService {
       includeTmdbCredentials: true,
       includeNetworkHistory: true,
       includeRecentIPs: true,
+      includeDownloadConfig: true,
+      includeServicesViewState: true,
       encryptSensitive: false,
     };
   }
@@ -1022,6 +1208,14 @@ class BackupRestoreService {
       recentIPs: {
         enabled: true,
         sensitive: false, // Recent IPs are not considered highly sensitive
+      },
+      downloadConfig: {
+        enabled: true,
+        sensitive: false, // Download config is not sensitive (user preferences)
+      },
+      servicesViewState: {
+        enabled: true,
+        sensitive: false, // View state is not sensitive (UI preferences)
       },
     };
   }
