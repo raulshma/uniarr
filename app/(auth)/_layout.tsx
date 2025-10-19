@@ -1,9 +1,12 @@
 import { Stack } from "expo-router";
 import { useTheme } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
+import { useWidgetServiceInitialization } from "@/hooks/useWidgetServiceInitialization";
 
 const AuthenticatedLayout = () => {
   const theme = useTheme<AppTheme>();
+  useWidgetServiceInitialization();
+
   return (
     <Stack
       screenOptions={{

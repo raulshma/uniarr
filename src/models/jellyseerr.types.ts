@@ -10,8 +10,16 @@ import type {
 
 export type JellyseerrUserSummary = components["schemas"]["User"];
 export type JellyseerrSeasonRequestStatus = components["schemas"]["Season"];
-export type JellyseerrMediaSummary = components["schemas"]["MediaInfo"];
-export type JellyseerrRequest = components["schemas"]["MediaRequest"];
+export type JellyseerrMovieDetails =
+  paths["/movie/{movieId}"]["get"]["responses"]["200"]["content"]["application/json"];
+export type JellyseerrTvDetails =
+  paths["/tv/{tvId}"]["get"]["responses"]["200"]["content"]["application/json"];
+export type JellyseerrMediaSummary =
+  | (JellyseerrMovieDetails & { readonly mediaType: "movie" })
+  | (JellyseerrTvDetails & { readonly mediaType: "tv" });
+export type JellyseerrRequest = components["schemas"]["MediaRequest"] & {
+  readonly mediaDetails?: JellyseerrMediaSummary;
+};
 
 export type JellyseerrPagedResult<TItem> = {
   readonly items: TItem[];

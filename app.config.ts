@@ -53,6 +53,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         data: [
           {
             scheme: "uniarr",
+            path: "/auth/callback",
+          },
+          // Also allow bare scheme for backward compatibility
+          {
+            scheme: "uniarr",
           },
         ],
         category: ["BROWSABLE", "DEFAULT"],

@@ -78,6 +78,12 @@ const MediaCard: React.FC<MediaCardProps> = ({
   onDownloadError,
 }) => {
   const theme = useTheme<AppTheme>();
+  // Match the small poster size/ratio used by MediaPoster for consistent layout
+  const POSTER_SMALL_WIDTH = 96;
+  const POSTER_DEFAULT_ASPECT = 2 / 3;
+  const posterSmallHeight = Math.round(
+    POSTER_SMALL_WIDTH / POSTER_DEFAULT_ASPECT,
+  );
 
   const secondaryLine = useMemo(() => {
     const meta: string[] = [];
@@ -111,7 +117,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
         compact
         mode="flat"
         style={[styles.chip, { backgroundColor }]}
-        textStyle={{ color: textColor }}
+        textStyle={{ color: textColor, fontSize: 13, lineHeight: 18 }}
       >
         {label}
       </Chip>
@@ -158,7 +164,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
         compact
         mode="flat"
         style={[styles.chip, { backgroundColor: colors.background }]}
-        textStyle={{ color: colors.text }}
+        textStyle={{ color: colors.text, fontSize: 13, lineHeight: 18 }}
       >
         {label}
       </Chip>
@@ -184,7 +190,12 @@ const MediaCard: React.FC<MediaCardProps> = ({
           showPlaceholderLabel={true}
           style={{ marginRight: theme.custom.spacing.md }}
         />
-        <View style={styles.meta}>
+        <View
+          style={[
+            styles.meta,
+            { minHeight: posterSmallHeight, justifyContent: "space-between" },
+          ]}
+        >
           <Text
             variant="titleMedium"
             numberOfLines={2}
@@ -242,16 +253,23 @@ const styles = StyleSheet.create({
   badges: {
     flexDirection: "row",
     flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
   },
   chip: {
     marginRight: 6,
     marginTop: 4,
+    // Normalize chip height and vertical padding so different chips match
+    minHeight: 36,
+    paddingVertical: 4,
+    alignItems: "center",
   },
   downloadButtonContainer: {
     marginRight: 6,
     marginTop: 4,
   },
   footer: {
-    marginTop: 12,
+    // Footer intentionally sits at the bottom of the meta column; spacing handled by meta
+    marginTop: 0,
   },
 });
