@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useState } from "react";
 import { View, ScrollView, StyleSheet, RefreshControl } from "react-native";
 import {
   useTheme,
@@ -9,6 +9,7 @@ import {
   Badge,
   Searchbar,
   SegmentedButtons,
+  Menu,
 } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import {
@@ -17,7 +18,9 @@ import {
   selectFailedDownloadsArray,
 } from "@/store/downloadStore";
 import { useDownloadActions } from "@/hooks/useDownloadActions";
+import { useDownloadedFileActions } from "@/hooks/useDownloadedFileActions";
 import type { DownloadItem } from "@/models/download.types";
+import type { VideoPlayerOption } from "@/utils/fileOperations.utils";
 import { formatBytes } from "@/utils/torrent.utils";
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
@@ -39,7 +42,8 @@ interface DownloadHistoryItemProps {
   download: DownloadItem;
   onRetry?: (downloadId: string) => void;
   onRemove?: (downloadId: string) => void;
-  onOpenFile?: (downloadPath: string) => void;
+  onOpenFile?: (download: DownloadItem, player?: VideoPlayerOption) => void;
+  onDeleteFile?: (download: DownloadItem) => void;
 }
 
 /**
@@ -50,14 +54,20 @@ const DownloadHistoryItem: React.FC<DownloadHistoryItemProps> = ({
   onRetry,
   onRemove,
   onOpenFile,
+  onDeleteFile,
 }) => {
   const theme = useTheme<AppTheme>();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [playerMenuVisible, setPlayerMenuVisible] = useState(false);
+  const { isLoading, getAvailableVideoPlayers, isVideoFile } =
+    useDownloadedFileActions();
 
   const isCompleted = download.state.status === "completed";
   const isFailed = download.state.status === "failed";
   const canRetry =
     isFailed && download.state.retryCount < download.state.maxRetries;
+  const isVideoDownload = isVideoFile(download);
+  const videoPlayers = getAvailableVideoPlayers();
 
   const getStatusColor = () => {
     if (isCompleted) return theme.colors.primary;
@@ -75,9 +85,22 @@ const DownloadHistoryItem: React.FC<DownloadHistoryItemProps> = ({
     return download.state.status;
   };
 
+  const handleOpenPress = () => {
+    if (isVideoDownload && videoPlayers.length > 1) {
+      setPlayerMenuVisible(true);
+    } else if (onOpenFile) {
+      onOpenFile(download, videoPlayers[0]);
+    }
+  };
+
+  const handlePlayerSelect = (player: VideoPlayerOption) => {
+    setPlayerMenuVisible(false);
+    onOpenFile?.(download, player);
+  };
+
   const handleActionPress = () => {
-    if (isCompleted && onOpenFile) {
-      onOpenFile(download.download.localPath);
+    if (isCompleted && onOpenFile && isVideoDownload) {
+      handleOpenPress();
     } else if (canRetry && onRetry) {
       onRetry(download.id);
     } else if (onRemove) {
@@ -85,9 +108,9 @@ const DownloadHistoryItem: React.FC<DownloadHistoryItemProps> = ({
     }
   };
 
-  const handleRemovePress = () => {
-    if (onRemove) {
-      onRemove(download.id);
+  const handleDeletePress = () => {
+    if (onDeleteFile) {
+      onDeleteFile(download);
     }
   };
 
@@ -110,20 +133,51 @@ const DownloadHistoryItem: React.FC<DownloadHistoryItemProps> = ({
         </View>
         <View style={styles.itemActions}>
           <IconButton
-            icon={isCompleted ? "folder-open" : canRetry ? "refresh" : "close"}
+            icon={
+              isCompleted && isVideoDownload
+                ? "play"
+                : canRetry
+                  ? "refresh"
+                  : "close"
+            }
             size={20}
             onPress={handleActionPress}
-            disabled={isFailed && !canRetry}
+            disabled={isLoading || (isFailed && !canRetry)}
             iconColor={getStatusColor()}
             style={styles.actionButton}
+            loading={isLoading}
           />
-          <IconButton
-            icon="trash-can"
-            size={20}
-            onPress={handleRemovePress}
-            iconColor={theme.colors.error}
-            style={styles.actionButton}
-          />
+          <Menu
+            visible={playerMenuVisible}
+            onDismiss={() => setPlayerMenuVisible(false)}
+            anchor={
+              <IconButton
+                icon="trash-can"
+                size={20}
+                onPress={handleDeletePress}
+                disabled={isLoading}
+                iconColor={theme.colors.error}
+                style={styles.actionButton}
+              />
+            }
+          >
+            {videoPlayers.length > 1 &&
+              videoPlayers.map((player) => (
+                <View
+                  key={player.packageName}
+                  onTouchEnd={() => handlePlayerSelect(player)}
+                >
+                  <Text
+                    style={{
+                      padding: spacing.md,
+                      color: theme.colors.onSurface,
+                    }}
+                  >
+                    {player.label}
+                  </Text>
+                </View>
+              ))}
+          </Menu>
         </View>
       </View>
 
@@ -175,12 +229,56 @@ const DownloadHistory: React.FC<DownloadHistoryProps> = ({
   const completedDownloads = useDownloadStore(selectCompletedDownloadsArray);
   const failedDownloads = useDownloadStore(selectFailedDownloadsArray);
   const { removeDownload } = useDownloadActions();
+  const fileActions = useDownloadedFileActions();
 
   // State
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filter, setFilter] = React.useState<"all" | "completed" | "failed">(
     "all",
   );
+
+  // Handle actions
+  const handleRetry = useCallback((downloadId: string) => {
+    // This would be connected to the download actions
+    logger.info("Retry download from history", { downloadId });
+  }, []);
+
+  const handleRemove = useCallback(
+    (downloadId: string) => {
+      removeDownload(downloadId, { confirmDestructive: true });
+    },
+    [removeDownload],
+  );
+
+  const handleOpenFile = useCallback(
+    async (download: DownloadItem, player?: VideoPlayerOption) => {
+      const success = await fileActions.openFile(download, player);
+      if (!success) {
+        logger.warn("Failed to open downloaded file", {
+          downloadId: download.id,
+          error: fileActions.error,
+        });
+      }
+    },
+    [fileActions],
+  );
+
+  const handleDeleteFile = useCallback(
+    async (download: DownloadItem) => {
+      const success = await fileActions.deleteFile(download);
+      if (success) {
+        logger.info("Downloaded file deleted", {
+          downloadId: download.id,
+          title: download.content.title,
+        });
+      }
+    },
+    [fileActions],
+  );
+
+  const handleRefresh = useCallback(() => {
+    onRefresh?.();
+  }, [onRefresh]);
 
   // Filter downloads based on props and state
   const allDownloads = useMemo(() => {
@@ -228,28 +326,6 @@ const DownloadHistory: React.FC<DownloadHistoryProps> = ({
     searchQuery,
     maxItems,
   ]);
-
-  // Handle actions
-  const handleRetry = useCallback((downloadId: string) => {
-    // This would be connected to the download actions
-    logger.info("Retry download from history", { downloadId });
-  }, []);
-
-  const handleRemove = useCallback(
-    (downloadId: string) => {
-      removeDownload(downloadId, { confirmDestructive: true });
-    },
-    [removeDownload],
-  );
-
-  const handleOpenFile = useCallback((downloadPath: string) => {
-    // This would open the downloaded file
-    logger.info("Open downloaded file", { path: downloadPath });
-  }, []);
-
-  const handleRefresh = useCallback(() => {
-    onRefresh?.();
-  }, [onRefresh]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -368,6 +444,7 @@ const DownloadHistory: React.FC<DownloadHistoryProps> = ({
             onRetry={handleRetry}
             onRemove={handleRemove}
             onOpenFile={handleOpenFile}
+            onDeleteFile={handleDeleteFile}
           />
         ))}
 

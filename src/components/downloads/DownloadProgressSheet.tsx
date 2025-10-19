@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useState } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import {
   useTheme,
@@ -8,6 +8,7 @@ import {
   ProgressBar,
   Surface,
   Badge,
+  Menu,
 } from "react-native-paper";
 import BottomDrawer from "@/components/common/BottomDrawer";
 import type { AppTheme } from "@/constants/theme";
@@ -17,7 +18,9 @@ import {
   selectCompletedDownloadsArray,
   selectFailedDownloadsArray,
 } from "@/store/downloadStore";
+import { useDownloadedFileActions } from "@/hooks/useDownloadedFileActions";
 import type { DownloadItem } from "@/models/download.types";
+import type { VideoPlayerOption } from "@/utils/fileOperations.utils";
 import { formatBytes, formatSpeed, formatEta } from "@/utils/torrent.utils";
 import { spacing } from "@/theme/spacing";
 import { useDownloadActions as useDownloadActionsHook } from "@/hooks/useDownloadActions";
@@ -33,15 +36,28 @@ interface DownloadItemProps {
   onResume?: (downloadId: string) => void;
   onCancel?: (downloadId: string) => void;
   onRetry?: (downloadId: string) => void;
+  onOpenFile?: (download: DownloadItem, player?: VideoPlayerOption) => void;
+  onDeleteFile?: (download: DownloadItem) => void;
 }
 
 /**
  * Individual download item component (memoized for performance)
  */
 const DownloadItemCard: React.FC<DownloadItemProps> = React.memo(
-  ({ download, onPause, onResume, onCancel, onRetry }) => {
+  ({
+    download,
+    onPause,
+    onResume,
+    onCancel,
+    onRetry,
+    onOpenFile,
+    onDeleteFile,
+  }) => {
     const theme = useTheme<AppTheme>();
     const styles = useMemo(() => createStyles(theme), [theme]);
+    const [playerMenuVisible, setPlayerMenuVisible] = useState(false);
+    const { isLoading, getAvailableVideoPlayers, isVideoFile } =
+      useDownloadedFileActions();
 
     const progress = Math.max(0, Math.min(1, download.state.progress));
     const percent = Math.round(progress * 100);
@@ -51,6 +67,8 @@ const DownloadItemCard: React.FC<DownloadItemProps> = React.memo(
     const isFailed = download.state.status === "failed";
     const canRetry =
       isFailed && download.state.retryCount < download.state.maxRetries;
+    const isVideoDownload = isVideoFile(download);
+    const videoPlayers = getAvailableVideoPlayers();
 
     const getStatusText = () => {
       if (isCompleted) {
@@ -98,9 +116,23 @@ const DownloadItemCard: React.FC<DownloadItemProps> = React.memo(
       return theme.colors.primary;
     };
 
+    const handleOpenPress = () => {
+      if (isVideoDownload && videoPlayers.length > 1) {
+        setPlayerMenuVisible(true);
+      } else if (onOpenFile) {
+        onOpenFile(download, videoPlayers[0]);
+      }
+    };
+
+    const handlePlayerSelect = (player: VideoPlayerOption) => {
+      setPlayerMenuVisible(false);
+      onOpenFile?.(download, player);
+    };
+
     const handleActionPress = () => {
-      if (isCompleted) return;
-      if (isPaused && onResume) {
+      if (isCompleted && onOpenFile && isVideoDownload) {
+        handleOpenPress();
+      } else if (isPaused && onResume) {
         onResume(download.id);
       } else if (isActive && onPause) {
         onPause(download.id);
@@ -112,6 +144,12 @@ const DownloadItemCard: React.FC<DownloadItemProps> = React.memo(
     const handleCancelPress = () => {
       if (onCancel && !isCompleted) {
         onCancel(download.id);
+      }
+    };
+
+    const handleDeletePress = () => {
+      if (onDeleteFile) {
+        onDeleteFile(download);
       }
     };
 
@@ -139,8 +177,8 @@ const DownloadItemCard: React.FC<DownloadItemProps> = React.memo(
           <View style={styles.downloadActions}>
             <IconButton
               icon={
-                isCompleted
-                  ? "check"
+                isCompleted && isVideoDownload
+                  ? "play"
                   : isPaused
                     ? "play"
                     : isActive
@@ -151,15 +189,57 @@ const DownloadItemCard: React.FC<DownloadItemProps> = React.memo(
               }
               size={20}
               onPress={handleActionPress}
-              disabled={isCompleted}
+              disabled={isLoading}
               iconColor={getStatusColor()}
               style={styles.actionButton}
+              loading={isLoading}
             />
-            {!isCompleted && (
+            {isCompleted && isVideoDownload && videoPlayers.length > 1 && (
+              <Menu
+                visible={playerMenuVisible}
+                onDismiss={() => setPlayerMenuVisible(false)}
+                anchor={
+                  <IconButton
+                    icon="menu-down"
+                    size={20}
+                    onPress={() => setPlayerMenuVisible(true)}
+                    iconColor={theme.colors.primary}
+                    style={styles.actionButton}
+                  />
+                }
+              >
+                {videoPlayers.map((player) => (
+                  <View
+                    key={player.packageName}
+                    onTouchEnd={() => handlePlayerSelect(player)}
+                  >
+                    <Text
+                      style={{
+                        padding: spacing.md,
+                        color: theme.colors.onSurface,
+                      }}
+                    >
+                      {player.label}
+                    </Text>
+                  </View>
+                ))}
+              </Menu>
+            )}
+            {!isActive && !isPaused && !isCompleted && (
               <IconButton
                 icon="close"
                 size={20}
                 onPress={handleCancelPress}
+                iconColor={theme.colors.error}
+                style={styles.actionButton}
+              />
+            )}
+            {isCompleted && (
+              <IconButton
+                icon="delete"
+                size={20}
+                onPress={handleDeletePress}
+                disabled={isLoading}
                 iconColor={theme.colors.error}
                 style={styles.actionButton}
               />
@@ -231,6 +311,7 @@ const DownloadProgressSheet: React.FC<DownloadProgressSheetProps> = ({
   const activeDownloads = useDownloadStore(selectActiveDownloadsArray);
   const completedDownloads = useDownloadStore(selectCompletedDownloadsArray);
   const failedDownloads = useDownloadStore(selectFailedDownloadsArray);
+  const fileActions = useDownloadedFileActions();
 
   // Combine all downloads for display
   const downloads = useMemo(() => {
@@ -312,6 +393,20 @@ const DownloadProgressSheet: React.FC<DownloadProgressSheetProps> = ({
     // TODO: Navigate to download history screen
     console.log("Show all download history");
   }, []);
+
+  const handleOpenFile = useCallback(
+    async (download: DownloadItem, player?: VideoPlayerOption) => {
+      await fileActions.openFile(download, player);
+    },
+    [fileActions],
+  );
+
+  const handleDeleteFile = useCallback(
+    async (download: DownloadItem) => {
+      await fileActions.deleteFile(download);
+    },
+    [fileActions],
+  );
 
   if (!visible) {
     return null;
@@ -446,7 +541,12 @@ const DownloadProgressSheet: React.FC<DownloadProgressSheetProps> = ({
               </Button>
             </View>
             {completedDownloads.slice(0, 3).map((download) => (
-              <DownloadItemCard key={download.id} download={download} />
+              <DownloadItemCard
+                key={download.id}
+                download={download}
+                onOpenFile={handleOpenFile}
+                onDeleteFile={handleDeleteFile}
+              />
             ))}
             {completedDownloads.length > 3 && (
               <Button
