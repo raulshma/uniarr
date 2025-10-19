@@ -76,12 +76,24 @@ const IconPicker: React.FC<IconPickerProps> = ({
   const [tab, setTab] = useState<"material" | "cdn">("material");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [allCdnIcons, setAllCdnIcons] = useState<CDNIcon[]>([]);
+  const [cdnSearchResults, setCdnSearchResults] = useState<CDNIcon[]>([]);
   const [loading, setCdnLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  // Fetch all available icons from GitHub API
-  const fetchAllIcons = async () => {
+  // Search for icons by name from GitHub API
+  const searchCdnIcons = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setCdnSearchResults([]);
+      setHasSearched(false);
+      setError(null);
+      return;
+    }
+
+    setCdnLoading(true);
+    setError(null);
+    setHasSearched(true);
+
     try {
       const response = await fetch(GITHUB_API_URL);
       if (!response.ok) {
@@ -89,36 +101,31 @@ const IconPicker: React.FC<IconPickerProps> = ({
       }
 
       const data: any[] = await response.json();
-      const svgIcons = data
-        .filter((file) => file.name.endsWith(".svg"))
+      const matchedIcons = data
+        .filter(
+          (file) =>
+            file.name.endsWith(".svg") &&
+            file.name.toLowerCase().includes(query.toLowerCase()),
+        )
         .map((file) => ({
           name: file.name.replace(/\.svg$/i, ""),
           path: file.name,
         }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, 100); // Limit results to 100
 
-      setAllCdnIcons(svgIcons);
-      setError(null);
+      setCdnSearchResults(matchedIcons);
+      if (matchedIcons.length === 0) {
+        setError("No icons found matching your search");
+      }
     } catch (err: any) {
-      logger.error("[IconPicker] Failed to fetch icons from GitHub", err);
-      setError("Failed to load icons from repository");
-      setAllCdnIcons([]);
-    }
-  };
-
-  // Load CDN icons when modal opens or tab changes
-  const loadCdnIcons = useCallback(async () => {
-    if (allCdnIcons.length === 0) {
-      setCdnLoading(true);
-      await fetchAllIcons();
+      logger.error("[IconPicker] Failed to search icons from GitHub", err);
+      setError("Failed to search icons");
+      setCdnSearchResults([]);
+    } finally {
       setCdnLoading(false);
     }
-  }, [allCdnIcons.length]);
-
-  useEffect(() => {
-    if (!visible || tab !== "cdn") return;
-    loadCdnIcons();
-  }, [visible, tab, loadCdnIcons]);
+  }, []);
 
   // Build a runtime-validated list of material icons by checking the glyph map
   // exported by the vector-icons MaterialIcons component. This avoids passing
@@ -155,14 +162,24 @@ const IconPicker: React.FC<IconPickerProps> = ({
     return () => clearTimeout(t);
   }, [search]);
 
+  // Search CDN icons when debounced search changes and on CDN tab
+  useEffect(() => {
+    if (tab !== "cdn") return;
+    if (debouncedSearch) {
+      searchCdnIcons(debouncedSearch);
+    } else {
+      setCdnSearchResults([]);
+      setHasSearched(false);
+      setError(null);
+    }
+  }, [debouncedSearch, tab, searchCdnIcons]);
+
   const filteredMaterialIcons = validMaterialIcons.filter((icon) =>
     icon.toLowerCase().includes(debouncedSearch.toLowerCase()),
   );
 
-  // Filter and search CDN icons from all available icons
-  const filteredCdnIcons = allCdnIcons.filter((icon) =>
-    icon.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
-  );
+  // CDN icons are already filtered by the search function
+  const filteredCdnIcons = cdnSearchResults;
 
   const handleMaterialIconSelect = (icon: string) => {
     hapticPress();
@@ -319,14 +336,31 @@ const IconPicker: React.FC<IconPickerProps> = ({
               </ScrollView>
             ) : (
               <View style={styles.iconsContainer}>
-                {loading ? (
+                {!hasSearched ? (
+                  <View style={styles.emptyStateContainer}>
+                    <MaterialIcons
+                      name="search"
+                      size={48}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                    <Text
+                      variant="bodySmall"
+                      style={[
+                        styles.emptyStateText,
+                        { color: theme.colors.onSurfaceVariant },
+                      ]}
+                    >
+                      Type an icon name to search
+                    </Text>
+                  </View>
+                ) : loading ? (
                   <View style={styles.loadingContainer}>
                     <ActivityIndicator
                       size="large"
                       color={theme.colors.primary}
                     />
                     <Text variant="bodySmall" style={styles.loadingText}>
-                      Loading icons...
+                      Searching icons...
                     </Text>
                   </View>
                 ) : error ? (
@@ -339,11 +373,16 @@ const IconPicker: React.FC<IconPickerProps> = ({
                     <Text variant="bodySmall" style={styles.errorText}>
                       {error}
                     </Text>
-                    <View style={{ marginTop: spacing.md }}>
-                      <Button mode="contained" onPress={loadCdnIcons}>
-                        Retry
-                      </Button>
-                    </View>
+                    {error.includes("search") && (
+                      <View style={{ marginTop: spacing.md }}>
+                        <Button
+                          mode="contained"
+                          onPress={() => searchCdnIcons(debouncedSearch)}
+                        >
+                          Retry
+                        </Button>
+                      </View>
+                    )}
                   </View>
                 ) : filteredCdnIcons.length === 0 ? (
                   <View style={styles.noResults}>
@@ -525,6 +564,15 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: spacing.md,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyStateText: {
+    marginTop: spacing.md,
+    textAlign: "center",
   },
   errorContainer: {
     flex: 1,
