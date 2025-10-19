@@ -270,16 +270,16 @@ const useStyles = (theme: AppTheme) =>
       fontWeight: "600",
     },
     smallScrollContainer: {
-      maxHeight: 100,
+      maxHeight: 160,
     },
     mediumScrollContainer: {
-      maxHeight: 140,
+      maxHeight: 220,
     },
     largeScrollContainer: {
-      maxHeight: 180,
+      maxHeight: 280,
     },
     scrollContent: {
-      paddingBottom: spacing.xs,
+      paddingBottom: spacing.md,
     },
     gridContainer: {
       flexDirection: "row",

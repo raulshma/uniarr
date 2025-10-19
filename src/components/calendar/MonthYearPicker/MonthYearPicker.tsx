@@ -69,13 +69,13 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({
         },
       ],
     };
-  });
+  }, [visible]);
 
   const animatedBackdropStyle = useAnimatedStyle(() => {
     return {
       opacity: withTiming(visible ? 0.5 : 0, { duration: 200 }),
     };
-  });
+  }, [visible]);
 
   const handleMonthSelect = useCallback(
     (monthIndex: number) => {

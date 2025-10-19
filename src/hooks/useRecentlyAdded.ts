@@ -11,6 +11,7 @@ import {
   selectGetConnectorsByType,
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 export type RecentlyAddedItem = {
   id: string;
@@ -48,13 +49,13 @@ const fetchRecentlyAdded = async (
         )
         .slice(0, 10); // Get 10 most recent
 
-      for (const series of recentSeries) {
+      for (const item of recentSeries) {
         recentlyAddedItems.push({
-          id: `sonarr-${series.id}`,
-          title: series.title,
+          id: `sonarr-${item.id}`,
+          title: item.title,
           type: "series",
-          addedDate: series.added!,
-          posterUrl: series.posterUrl,
+          addedDate: item.added!,
+          posterUrl: item.posterUrl,
           serviceName: connector.config.name,
           serviceId: connector.config.id,
         });
@@ -121,7 +122,13 @@ export const useRecentlyAdded = () => {
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.activity.recentlyAdded,
-    queryFn: () => fetchRecentlyAdded(getConnectorsByType),
+    queryFn: async () => {
+      // Ensure connectors are loaded before fetching
+      const manager = ConnectorManager.getInstance();
+      await manager.loadSavedServices();
+
+      return fetchRecentlyAdded(getConnectorsByType);
+    },
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
     staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
     refetchOnWindowFocus: false,

@@ -81,14 +81,14 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
     checkDownloadCapabilityOnMount: variant !== "icon", // Auto-check for non-icon variants
   });
 
-  // Animated styles
+  // Animated styles - wrapped in worklet to avoid strict mode warnings
   const animatedStyle = useAnimatedStyle(() => {
     const scale = interpolate(scaleAnimation.value, [0, 1], [0.8, 1]);
     const rotate = interpolate(rotateAnimation.value, [0, 1], [0, 180]);
     return {
       transform: [{ scale }, { rotate: `${rotate}deg` }],
     };
-  });
+  }, [scaleAnimation, rotateAnimation]);
 
   // Handle button press
   const handlePress = () => {

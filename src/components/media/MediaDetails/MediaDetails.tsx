@@ -580,7 +580,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                       textAlign: "center",
                     }}
                   >
-                    Chapter {episode.episodeNumber}: {episode.title}
+                    E{episode.episodeNumber}: {episode.title}
                   </Text>
 
                   <View
@@ -603,6 +603,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                       paddingHorizontal: 8,
                       paddingVertical: 4,
                       alignItems: "center",
+                      marginBottom: 8,
                     }}
                   >
                     <Text
@@ -623,13 +624,23 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                       variant="bodySmall"
                       style={{
                         color: theme.colors.onSurfaceVariant,
-                        marginTop: 4,
+                        marginBottom: 8,
                         textAlign: "center",
                         fontWeight: "500",
                       }}
                     >
                       {formatFileSizeFromMB(episode.sizeInMB)}
                     </Text>
+                  )}
+
+                  {!episode.hasFile && serviceConfig && contentId && (
+                    <DownloadButton
+                      serviceConfig={serviceConfig}
+                      contentId={contentId}
+                      size="small"
+                      variant="icon"
+                      style={{ alignSelf: "center" }}
+                    />
                   )}
                 </View>
               ),
@@ -658,16 +669,6 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
           {/* Action Buttons for Episodes */}
           <View style={{ flexDirection: "row", gap: 12 }}>
-            {serviceConfig && contentId && (
-              <DownloadButton
-                serviceConfig={serviceConfig}
-                contentId={contentId}
-                size="medium"
-                variant="button"
-                style={{ flex: 1 }}
-              />
-            )}
-
             <Button
               mode="contained"
               onPress={onSearchMissingPress}
@@ -676,7 +677,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
               buttonColor={theme.colors.primary}
               textColor={theme.colors.onPrimary}
               style={{
-                flex: serviceConfig && contentId ? 1 : 2,
+                flex: 1,
                 borderRadius: 8,
               }}
               labelStyle={{ fontWeight: "600" }}

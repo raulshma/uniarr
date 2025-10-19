@@ -208,25 +208,40 @@ const EnhancedCalendarHeader: React.FC<EnhancedCalendarHeaderProps> = ({
   }, [navigation]);
 
   // Animated styles for buttons
-  const prevButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: prevButtonScale.value }],
-  }));
+  const prevButtonStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ scale: prevButtonScale.value }],
+    }),
+    [prevButtonScale],
+  );
 
-  const nextButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: nextButtonScale.value }],
-  }));
+  const nextButtonStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ scale: nextButtonScale.value }],
+    }),
+    [nextButtonScale],
+  );
 
-  const todayButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: todayButtonScale.value }],
-  }));
+  const todayButtonStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ scale: todayButtonScale.value }],
+    }),
+    [todayButtonScale],
+  );
 
-  const viewButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: viewButtonScale.value }],
-  }));
+  const viewButtonStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ scale: viewButtonScale.value }],
+    }),
+    [viewButtonScale],
+  );
 
-  const titleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: titleScale.value }],
-  }));
+  const titleStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ scale: titleScale.value }],
+    }),
+    [titleScale],
+  );
 
   // Extract current month and year from the current date
   const getCurrentMonthYear = useCallback(() => {

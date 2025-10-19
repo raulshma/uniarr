@@ -1,5 +1,6 @@
 import { File, Directory } from "expo-file-system";
 import * as FileSystemLegacy from "expo-file-system/legacy";
+import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type {
   DownloadItem,
@@ -21,24 +22,48 @@ type Mutable<T> = {
 };
 
 /**
- * Get a safe download directory path
+ * Get a safe download directory path using StorageAccessFramework patterns
  */
 function getDownloadDirectory(): string {
-  // Try cache directory first (preferred for downloads)
-  if (FileSystemLegacy.cacheDirectory) {
-    return `${FileSystemLegacy.cacheDirectory}downloads/`;
-  }
+  try {
+    // Android: Use StorageAccessFramework scoped storage
+    if (Platform.OS === "android") {
+      // Prefer document directory for user-visible Downloads
+      if (FileSystemLegacy.documentDirectory) {
+        return `${FileSystemLegacy.documentDirectory}Downloads/`;
+      }
+      // Fallback to cache directory
+      if (FileSystemLegacy.cacheDirectory) {
+        return `${FileSystemLegacy.cacheDirectory}downloads/`;
+      }
+    } else if (Platform.OS === "ios") {
+      // iOS: Use document directory which is accessible in Files app and iTunes File Sharing
+      if (FileSystemLegacy.documentDirectory) {
+        return `${FileSystemLegacy.documentDirectory}Downloads/`;
+      }
+      // Fallback to cache directory
+      if (FileSystemLegacy.cacheDirectory) {
+        return `${FileSystemLegacy.cacheDirectory}downloads/`;
+      }
+    } else {
+      // Web or other platforms
+      if (FileSystemLegacy.documentDirectory) {
+        return `${FileSystemLegacy.documentDirectory}downloads/`;
+      }
+    }
 
-  // Fallback to document directory
-  if (FileSystemLegacy.documentDirectory) {
-    return `${FileSystemLegacy.documentDirectory}downloads/`;
+    // Last resort fallback
+    logger.warn("No system directory available, using relative path", {
+      platform: Platform.OS,
+    });
+    return "./downloads/";
+  } catch (error) {
+    logger.error("Failed to determine download directory", {
+      error: error instanceof Error ? error.message : String(error),
+      platform: Platform.OS,
+    });
+    return "./downloads/";
   }
-
-  // Last resort - this should never happen but provides a safe fallback
-  logger.warn(
-    "Both cacheDirectory and documentDirectory are unavailable, using relative path",
-  );
-  return "./downloads/";
 }
 
 /**

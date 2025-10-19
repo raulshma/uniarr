@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import { router, useLocalSearchParams } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { AppTheme } from "@/constants/theme";
 import BookmarksConfig from "@/components/widgets/BookmarksWidget/BookmarksConfig";
@@ -51,7 +52,7 @@ const BookmarksSettingsScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View
+      <SafeAreaView
         style={[
           styles.centerContainer,
           { backgroundColor: theme.colors.background },
@@ -59,13 +60,13 @@ const BookmarksSettingsScreen: React.FC = () => {
       >
         <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.statusText}>Loading bookmarks settings...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error || !widget) {
     return (
-      <View
+      <SafeAreaView
         style={[
           styles.centerContainer,
           { backgroundColor: theme.colors.background },
@@ -74,22 +75,24 @@ const BookmarksSettingsScreen: React.FC = () => {
         <Text style={[styles.statusText, { color: theme.colors.error }]}>
           {error ?? "Bookmarks widget not found."}
         </Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <BookmarksConfig
-      visible
-      isScreenMode
-      widget={widget}
-      onDismiss={() => {
-        router.back();
-      }}
-      onSave={() => {
-        router.back();
-      }}
-    />
+    <SafeAreaView style={{ flex: 1 }}>
+      <BookmarksConfig
+        visible
+        isScreenMode
+        widget={widget}
+        onDismiss={() => {
+          router.back();
+        }}
+        onSave={() => {
+          router.back();
+        }}
+      />
+    </SafeAreaView>
   );
 };
 

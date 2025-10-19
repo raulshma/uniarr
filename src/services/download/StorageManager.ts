@@ -1,5 +1,6 @@
 import { File, Directory } from "expo-file-system";
 import * as FileSystemLegacy from "expo-file-system/legacy";
+import { Platform } from "react-native";
 import type {
   DownloadStorageInfo,
   DownloadHistoryEntry,
@@ -9,18 +10,62 @@ import { logger } from "@/services/logger/LoggerService";
 
 /**
  * Storage management service for downloads
+ * Uses StorageAccessFramework on Android and native Downloads folder on iOS
  */
 export class StorageManager {
   private static instance: StorageManager | null = null;
-  private downloadDirectory = FileSystemLegacy.cacheDirectory
-    ? `${FileSystemLegacy.cacheDirectory}downloads/`
-    : `${FileSystemLegacy.documentDirectory || ""}downloads/`;
+  private downloadDirectory: string = "";
+  private isInitialized = false;
+
+  private initializeDownloadDirectory(): void {
+    if (this.isInitialized) return;
+
+    try {
+      // Android: Use StorageAccessFramework to access Downloads folder
+      if (Platform.OS === "android") {
+        // For Android 11+ (API 30+), use document directory which maps to app-specific Downloads
+        // or use scoped storage path
+        if (FileSystemLegacy.documentDirectory) {
+          this.downloadDirectory = `${FileSystemLegacy.documentDirectory}Downloads/`;
+        } else if (FileSystemLegacy.cacheDirectory) {
+          this.downloadDirectory = `${FileSystemLegacy.cacheDirectory}downloads/`;
+        } else {
+          this.downloadDirectory = "./downloads/";
+        }
+      } else if (Platform.OS === "ios") {
+        // iOS: Use document directory which is accessible in Files app
+        if (FileSystemLegacy.documentDirectory) {
+          this.downloadDirectory = `${FileSystemLegacy.documentDirectory}Downloads/`;
+        } else if (FileSystemLegacy.cacheDirectory) {
+          this.downloadDirectory = `${FileSystemLegacy.cacheDirectory}downloads/`;
+        } else {
+          this.downloadDirectory = "./downloads/";
+        }
+      } else {
+        // Web or other platforms
+        this.downloadDirectory = "./downloads/";
+      }
+
+      logger.info("Download directory initialized", {
+        directory: this.downloadDirectory,
+        platform: Platform.OS,
+      });
+    } catch (error) {
+      logger.error("Failed to initialize download directory", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      this.downloadDirectory = "./downloads/";
+    }
+
+    this.isInitialized = true;
+  }
 
   private constructor() {}
 
   static getInstance(): StorageManager {
     if (!StorageManager.instance) {
       StorageManager.instance = new StorageManager();
+      StorageManager.instance.initializeDownloadDirectory();
     }
     return StorageManager.instance;
   }
@@ -30,6 +75,11 @@ export class StorageManager {
    */
   async getStorageInfo(): Promise<DownloadStorageInfo> {
     try {
+      // Initialize if needed
+      if (!this.isInitialized) {
+        this.initializeDownloadDirectory();
+      }
+
       // Ensure download directory exists
       await this.ensureDirectoryExists(this.downloadDirectory);
 
@@ -438,10 +488,11 @@ export class StorageManager {
   }
 
   /**
-   * Set download directory
+   * Set download directory (use with caution - only for testing or custom configurations)
    */
   setDownloadDirectory(directory: string): void {
     this.downloadDirectory = directory;
+    this.isInitialized = true;
     logger.info("Download directory updated", { directory });
   }
 
@@ -449,6 +500,9 @@ export class StorageManager {
    * Get download directory
    */
   getDownloadDirectory(): string {
+    if (!this.isInitialized) {
+      this.initializeDownloadDirectory();
+    }
     return this.downloadDirectory;
   }
 
@@ -468,6 +522,29 @@ export class StorageManager {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    }
+  }
+
+  /**
+   * Check if storage access is available (for Android 13+ scoped storage)
+   */
+  async isStorageAccessAvailable(): Promise<boolean> {
+    try {
+      if (Platform.OS === "android") {
+        // For Android, check if we can write to the download directory
+        if (!this.isInitialized) {
+          this.initializeDownloadDirectory();
+        }
+        await this.ensureDirectoryExists(this.getDownloadDirectory());
+        return true;
+      }
+      // iOS and web always have access
+      return true;
+    } catch (error) {
+      logger.warn("Storage access check failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
     }
   }
 }

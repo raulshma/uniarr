@@ -390,9 +390,9 @@ const JellyfinLibraryScreen = () => {
         queryKey: serviceId
           ? [
               ...queryKeys.jellyfin.resume(serviceId, { limit: 12 }),
-              "consolidated", // Add unique suffix to prevent duplicates
+              "consolidated",
             ]
-          : queryKeys.jellyfin.base,
+          : [...queryKeys.jellyfin.base, "resume"],
         enabled: Boolean(serviceId),
         staleTime: 60_000, // 1 minute - resume data changes frequently
         refetchOnWindowFocus: false,
@@ -409,12 +409,15 @@ const JellyfinLibraryScreen = () => {
       {
         queryKey:
           serviceId && libraryState.selectedLibraryId
-            ? queryKeys.jellyfin.latest(
-                serviceId,
-                libraryState.selectedLibraryId,
-                { limit: 16 },
-              )
-            : queryKeys.jellyfin.base,
+            ? [
+                ...queryKeys.jellyfin.latest(
+                  serviceId,
+                  libraryState.selectedLibraryId,
+                  { limit: 16 },
+                ),
+                "consolidated",
+              ]
+            : [...queryKeys.jellyfin.base, "latest"],
         enabled: Boolean(serviceId && libraryState.selectedLibraryId),
         staleTime: 5 * 60_000, // 5 minutes - latest items are relatively stable
         refetchOnWindowFocus: false,
@@ -431,19 +434,22 @@ const JellyfinLibraryScreen = () => {
       {
         queryKey:
           serviceId && libraryState.selectedLibraryId
-            ? queryKeys.jellyfin.libraryItems(
-                serviceId,
-                libraryState.selectedLibraryId,
-                {
-                  search: libraryState.debouncedSearch.toLowerCase(),
-                  includeItemTypes: activeSegmentConfig.includeItemTypes,
-                  mediaTypes: activeSegmentConfig.mediaTypes,
-                  sortBy: "SortName",
-                  sortOrder: "Ascending",
-                  limit: 60,
-                },
-              )
-            : queryKeys.jellyfin.base,
+            ? [
+                ...queryKeys.jellyfin.libraryItems(
+                  serviceId,
+                  libraryState.selectedLibraryId,
+                  {
+                    search: libraryState.debouncedSearch.toLowerCase(),
+                    includeItemTypes: activeSegmentConfig.includeItemTypes,
+                    mediaTypes: activeSegmentConfig.mediaTypes,
+                    sortBy: "SortName",
+                    sortOrder: "Ascending",
+                    limit: 60,
+                  },
+                ),
+                "consolidated",
+              ]
+            : [...queryKeys.jellyfin.base, "libraryItems"],
         enabled: Boolean(serviceId && libraryState.selectedLibraryId),
         staleTime: 30_000,
         placeholderData: (previous?: JellyfinItem[] | undefined) =>

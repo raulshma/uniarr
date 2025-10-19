@@ -26,6 +26,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
       },
+      // File sharing configuration - allows access to Downloads folder via Files app
+      UIFileSharingEnabled: true,
+      LSSupportsOpeningDocumentsInPlace: true,
       // Siri Shortcuts Configuration
       NSSiriUsageDescription:
         "UniArr uses Siri to help you manage your media library with voice commands.",
@@ -47,6 +50,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "com.raulshma.uniarr",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
+    // Permissions for file system access
+    permissions: [
+      "android.permission.INTERNET",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      // For Android 11+ scoped storage - access to Downloads
+      "android.permission.MANAGE_EXTERNAL_STORAGE",
+    ],
     intentFilters: [
       {
         action: "VIEW",
@@ -77,6 +88,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         android: {
           usesCleartextTraffic: true,
+          // Enable storage access for downloads
+          enableRoomDependency: true,
         },
       },
     ],
