@@ -3,7 +3,13 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View, TouchableOpacity } from "react-native";
-import { Text, useTheme, Divider, Searchbar } from "react-native-paper";
+import {
+  Text,
+  useTheme,
+  Divider,
+  Searchbar,
+  IconButton,
+} from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TabHeader } from "@/components/common/TabHeader";
@@ -24,6 +30,8 @@ import {
 } from "@/store/downloadStore";
 import { NAVIGATION_ROUTES, navigateToRoute } from "@/utils/navigation.utils";
 import { formatBytes } from "@/utils/torrent.utils";
+import { useDownloadActions } from "@/hooks/useDownloadActions";
+import { useDownloadedFileActions } from "@/hooks/useDownloadedFileActions";
 import { formatDate } from "@/utils/calendar.utils";
 
 type JellyfinDownloadItem = DownloadItem & {
@@ -122,6 +130,12 @@ const JellyfinDownloadsScreen = () => {
 
   useFocusEffect(useFocusEffectCallback);
 
+  // Download action hooks (must be called at top level)
+  const { pauseDownload, resumeDownload, cancelDownload, retryDownload } =
+    useDownloadActions();
+
+  const { deleteFile, openFile } = useDownloadedFileActions();
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -172,6 +186,22 @@ const JellyfinDownloadsScreen = () => {
           paddingHorizontal: spacing.sm,
           paddingVertical: 2,
           borderRadius: 4,
+        },
+        downloadInfoLeft: {
+          flex: 1,
+        },
+        downloadInfoRight: {
+          alignItems: "flex-end",
+          marginLeft: spacing.sm,
+        },
+        downloadService: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 12,
+          marginTop: spacing.xs,
+        },
+        downloadActions: {
+          flexDirection: "row",
+          alignItems: "center",
         },
         activeStatus: {
           color: theme.colors.onPrimary,
@@ -255,6 +285,33 @@ const JellyfinDownloadsScreen = () => {
         );
       };
 
+      const isPaused = item.state.status === "paused";
+      const isFailed = item.state.status === "failed";
+
+      const handlePause = (downloadId: string) => {
+        pauseDownload(downloadId).catch(() => {});
+      };
+
+      const handleResume = (downloadId: string) => {
+        resumeDownload(downloadId).catch(() => {});
+      };
+
+      const handleCancel = (downloadId: string) => {
+        cancelDownload(downloadId).catch(() => {});
+      };
+
+      const handleRetry = (downloadId: string) => {
+        retryDownload(downloadId).catch(() => {});
+      };
+
+      const handleOpenFile = (download: JellyfinDownloadItem) => {
+        openFile(download).catch(() => {});
+      };
+
+      const handleDeleteFile = (download: JellyfinDownloadItem) => {
+        deleteFile(download).catch(() => {});
+      };
+
       const getDetailText = () => {
         if (isCompleted) {
           return `${formatBytes(item.download.size || 0)} • ${formatDate(
@@ -283,21 +340,85 @@ const JellyfinDownloadsScreen = () => {
         >
           <TouchableOpacity style={styles.downloadItem} activeOpacity={0.7}>
             <View style={styles.downloadHeader}>
-              <Text style={styles.downloadTitle} numberOfLines={2}>
-                {item.content.title}
-              </Text>
-              <Text
-                style={[
-                  styles.downloadStatus,
-                  isActive
-                    ? styles.activeStatus
-                    : isCompleted
-                      ? styles.completedStatus
-                      : {},
-                ]}
-              >
-                {getStatusLabel()}
-              </Text>
+              <View style={styles.downloadInfoLeft}>
+                <Text style={styles.downloadTitle} numberOfLines={2}>
+                  {item.content.title}
+                </Text>
+                <Text style={styles.downloadService} numberOfLines={1}>
+                  {item.serviceConfig.name}
+                </Text>
+              </View>
+
+              <View style={styles.downloadInfoRight}>
+                <Text
+                  style={[
+                    styles.downloadStatus,
+                    isActive
+                      ? styles.activeStatus
+                      : isCompleted
+                        ? styles.completedStatus
+                        : {},
+                  ]}
+                >
+                  {getStatusLabel()}
+                </Text>
+
+                <View style={styles.downloadActions}>
+                  {/* Action buttons: pause/resume/cancel/retry/open/delete */}
+                  {isActive && (
+                    <IconButton
+                      icon="pause"
+                      size={18}
+                      onPress={() => handlePause(item.id)}
+                      accessibilityLabel="Pause download"
+                    />
+                  )}
+
+                  {isPaused && (
+                    <IconButton
+                      icon="play"
+                      size={18}
+                      onPress={() => handleResume(item.id)}
+                      accessibilityLabel="Resume download"
+                    />
+                  )}
+
+                  {isFailed && (
+                    <IconButton
+                      icon="refresh"
+                      size={18}
+                      onPress={() => handleRetry(item.id)}
+                      accessibilityLabel="Retry download"
+                    />
+                  )}
+
+                  {!isCompleted && !isActive && !isPaused && (
+                    <IconButton
+                      icon="close"
+                      size={18}
+                      onPress={() => handleCancel(item.id)}
+                      accessibilityLabel="Cancel download"
+                    />
+                  )}
+
+                  {isCompleted && (
+                    <>
+                      <IconButton
+                        icon="play"
+                        size={18}
+                        onPress={() => handleOpenFile(item)}
+                        accessibilityLabel="Open file"
+                      />
+                      <IconButton
+                        icon="delete"
+                        size={18}
+                        onPress={() => handleDeleteFile(item)}
+                        accessibilityLabel="Delete file"
+                      />
+                    </>
+                  )}
+                </View>
+              </View>
             </View>
 
             <View style={styles.downloadMeta}>
@@ -318,7 +439,16 @@ const JellyfinDownloadsScreen = () => {
         </AnimatedListItem>
       );
     },
-    [styles, overview],
+    [
+      styles,
+      overview,
+      pauseDownload,
+      resumeDownload,
+      cancelDownload,
+      retryDownload,
+      deleteFile,
+      openFile,
+    ],
   );
 
   const hasDownloads =

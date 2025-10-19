@@ -4,9 +4,11 @@
  */
 
 import { File } from "expo-file-system";
+import * as FileSystem from "expo-file-system";
 import * as FileSystemLegacy from "expo-file-system/legacy";
 import { Platform, Linking, Share } from "react-native";
 import { logger } from "@/services/logger/LoggerService";
+import * as IntentLauncherModule from "expo-intent-launcher";
 
 /**
  * Video player options available on different platforms
@@ -281,37 +283,144 @@ const openFileAndroid = async (
   playerOption?: VideoPlayerOption,
 ): Promise<boolean> => {
   try {
-    // If a specific player is requested
+    // Normalize file path to a single file:// prefix (avoid file://file://...)
+    const normalizeFileUri = (fp: string) => {
+      if (!fp) return fp;
+      // strip any leading file:/* and ensure exactly one file:// prefix
+      const stripped = fp.replace(/^file:\/+/i, "");
+      return `file://${stripped}`;
+    };
+
+    const normalizedFileUri = normalizeFileUri(filePath);
+
+    // Try to obtain a content:// URI on Android to avoid FileUriExposedException
+    let contentUri: string | null = null;
+    try {
+      // Prefer the new File API if available
+      if ((File as any) && (File as any).getContentUriAsync) {
+        const result = await (File as any).getContentUriAsync(
+          normalizedFileUri,
+        );
+        if (typeof result === "string") contentUri = result;
+        else if (result && typeof result === "object" && result.uri)
+          contentUri = result.uri;
+      }
+
+      // Next try the legacy expo-file-system API
+      if (!contentUri && (FileSystemLegacy as any).getContentUriAsync) {
+        const result = await (FileSystemLegacy as any).getContentUriAsync(
+          normalizedFileUri,
+        );
+        if (typeof result === "string") contentUri = result;
+        else if (result && typeof result === "object" && result.uri)
+          contentUri = result.uri;
+      }
+
+      // Last resort: the top-level FileSystem export (may be deprecated)
+      if (!contentUri && (FileSystem as any).getContentUriAsync) {
+        const result = await (FileSystem as any).getContentUriAsync(
+          normalizedFileUri,
+        );
+        if (typeof result === "string") contentUri = result;
+        else if (result && typeof result === "object" && result.uri)
+          contentUri = result.uri;
+      }
+    } catch (err) {
+      // Not fatal — we'll fall back to file:// URI
+      logger.debug("Failed to get content URI for file, will use file URI", {
+        filePath,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const dataUri = contentUri || normalizedFileUri;
+
+    // Helper to launch an intent with the appropriate read permissions so
+    // third-party players can access the downloaded media file.
+    const tryLaunchIntent = async (packageName?: string): Promise<boolean> => {
+      try {
+        const IntentLauncher =
+          IntentLauncherModule && (IntentLauncherModule as any).default
+            ? (IntentLauncherModule as any).default
+            : IntentLauncherModule;
+
+        if (
+          !IntentLauncher ||
+          typeof IntentLauncher.startActivityAsync !== "function"
+        ) {
+          return false;
+        }
+
+        const FLAG_GRANT_READ_URI_PERMISSION = 0x00000001;
+        const FLAG_GRANT_WRITE_URI_PERMISSION = 0x00000002;
+
+        await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+          data: dataUri,
+          type: mimeType,
+          packageName,
+          flags:
+            FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION,
+        });
+
+        logger.info("Opened file via IntentLauncher", {
+          filePath,
+          packageName,
+          dataUri,
+        });
+
+        return true;
+      } catch (intentError) {
+        logger.debug("Intent launch failed", {
+          filePath,
+          packageName,
+          error:
+            intentError instanceof Error
+              ? intentError.message
+              : String(intentError),
+        });
+        return false;
+      }
+    };
+
+    // If a specific player is requested, try to open using an intent with the content URI if available
     if (
       playerOption &&
       playerOption.packageName !== "com.android.systemui.video"
     ) {
-      const intentUri = `intent:#Intent;action=android.intent.action.VIEW;data=${encodeURIComponent(
-        `file://${filePath}`,
-      )};type=${mimeType};package=${playerOption.packageName};end`;
+      const launched = await tryLaunchIntent(playerOption.packageName);
+      if (launched) {
+        return true;
+      }
 
+      // Fallback: try using an intent: URI via Linking.openURL (raw URI)
       try {
+        const intentUri = `intent:#Intent;action=android.intent.action.VIEW;data=${dataUri};type=${mimeType};package=${playerOption.packageName};end`;
         await Linking.openURL(intentUri);
-        logger.info("Opened file with player", {
+        logger.info("Opened file with player via intent URI", {
           filePath,
           player: playerOption.label,
         });
         return true;
-      } catch {
+      } catch (e) {
         logger.warn(
           "Failed to open with specified player, falling back to system",
           {
             filePath,
             player: playerOption.label,
+            error: e instanceof Error ? e.message : String(e),
           },
         );
       }
     }
 
-    // Fallback to system player
-    const fileUri = `file://${filePath}`;
-    await Linking.openURL(fileUri);
-    logger.info("Opened file with system player", { filePath });
+    // Fallback to system player: use intent launcher first to ensure URI permissions are granted
+    if (await tryLaunchIntent()) {
+      return true;
+    }
+
+    const openUri = dataUri;
+    await Linking.openURL(openUri);
+    logger.info("Opened file with system player", { filePath, openUri });
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
