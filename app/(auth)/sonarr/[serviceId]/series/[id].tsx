@@ -56,8 +56,14 @@ const SonarrSeriesDetailsScreen = () => {
     refetch,
     toggleMonitor,
     isTogglingMonitor,
+    toggleSeasonMonitor,
+    isTogglingSeasonMonitor,
     triggerSearch,
     isTriggeringSearch,
+    searchMissingEpisodes,
+    isSearchingMissing,
+    unmonitorAllEpisodes,
+    isUnmonitoringAll,
     deleteSeriesAsync,
     isDeleting,
   } = useSonarrSeriesDetails({
@@ -231,10 +237,16 @@ const SonarrSeriesDetailsScreen = () => {
               runtimeMinutes={runtimeMinutes}
               type="series"
               onToggleMonitor={handleToggleMonitor}
+              onToggleSeasonMonitor={toggleSeasonMonitor}
               onSearchPress={handleTriggerSearch}
+              onSearchMissingPress={searchMissingEpisodes}
+              onUnmonitorAllPress={unmonitorAllEpisodes}
               onDeletePress={handleDeleteSeries}
               isUpdatingMonitor={isTogglingMonitor}
               isSearching={isTriggeringSearch}
+              isSearchingMissing={isSearchingMissing}
+              isUnmonitoringAll={isUnmonitoringAll}
+              isTogglingSeasonMonitor={isTogglingSeasonMonitor}
               isDeleting={isDeleting}
               showPoster={false}
               disableScroll={true}

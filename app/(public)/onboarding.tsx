@@ -88,9 +88,9 @@ const OnboardingScreen = () => {
           paddingHorizontal: spacing.lg,
         },
         iconContainer: {
-          width: 120,
+          width: 120, // Keep original size for this specific hero element
           height: 120,
-          borderRadius: 60,
+          borderRadius: 60, // Perfect circle
           alignItems: "center",
           justifyContent: "center",
           marginBottom: spacing.xl,
@@ -130,14 +130,14 @@ const OnboardingScreen = () => {
           gap: spacing.sm,
         },
         paginationDot: {
-          width: 8,
+          width: 8, // Keep original size for pagination dots
           height: 8,
-          borderRadius: 4,
+          borderRadius: 4, // Perfect circle
           backgroundColor: theme.colors.outlineVariant,
         },
         paginationDotActive: {
           backgroundColor: theme.colors.primary,
-          width: 24,
+          width: 24, // Keep original active width
         },
         buttonContainer: {
           flexDirection: "row",

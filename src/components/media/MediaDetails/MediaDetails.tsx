@@ -44,9 +44,15 @@ export type MediaDetailsProps = {
   onToggleMonitor?: (nextState: boolean) => void;
   onSearchPress?: () => void;
   onDeletePress?: () => void;
+  onToggleSeasonMonitor?: (seasonNumber: number, nextState: boolean) => void;
+  onSearchMissingPress?: () => void;
+  onUnmonitorAllPress?: () => void;
   isUpdatingMonitor?: boolean;
   isSearching?: boolean;
   isDeleting?: boolean;
+  isSearchingMissing?: boolean;
+  isUnmonitoringAll?: boolean;
+  isTogglingSeasonMonitor?: boolean;
   /** Service configuration for download functionality */
   serviceConfig?: ServiceConfig;
   /** Content ID for download functionality */
@@ -91,9 +97,15 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   onToggleMonitor,
   onSearchPress,
   onDeletePress,
+  onToggleSeasonMonitor,
+  onSearchMissingPress,
+  onUnmonitorAllPress,
   isUpdatingMonitor = false,
   isSearching = false,
   isDeleting = false,
+  isSearchingMissing = false,
+  isUnmonitoringAll = false,
+  isTogglingSeasonMonitor = false,
   showPoster = true,
   contentInsetTop = 0,
   disableScroll = false,
@@ -120,6 +132,15 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   const handleBackToSeasons = useCallback(() => {
     setSelectedSeason(null);
   }, []);
+
+  const handleSeasonMonitorToggle = useCallback(
+    (seasonNumber: number, nextState: boolean) => {
+      if (onToggleSeasonMonitor) {
+        onToggleSeasonMonitor(seasonNumber, nextState);
+      }
+    },
+    [onToggleSeasonMonitor],
+  );
 
   const showSeasons = type === "series" && seasons?.length;
   const showEpisodes = showSeasons && (selectedSeason || seasons?.length === 1);
@@ -373,7 +394,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             }}
             labelStyle={{ fontWeight: "600" }}
           >
-            Upgrade
+            {monitored ? "Unmonitor" : "Monitor"}
           </Button>
         </View>
       </View>
@@ -458,14 +479,15 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                       </View>
                       <Switch
                         value={season.monitored ?? true}
-                        onValueChange={() => {
-                          // TODO: Handle season monitoring toggle
+                        onValueChange={(value) => {
+                          handleSeasonMonitorToggle(season.seasonNumber, value);
                         }}
                         color={theme.colors.primary}
                         trackColor={{
                           false: theme.colors.surfaceVariant,
                           true: theme.colors.primaryContainer,
                         }}
+                        disabled={isUpdatingMonitor || isTogglingSeasonMonitor}
                       />
                     </View>
                   </TouchableRipple>
@@ -648,7 +670,9 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
             <Button
               mode="contained"
-              onPress={() => {}}
+              onPress={onSearchMissingPress}
+              loading={isSearchingMissing}
+              disabled={isSearchingMissing}
               buttonColor={theme.colors.primary}
               textColor={theme.colors.onPrimary}
               style={{
@@ -662,7 +686,9 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
             <Button
               mode="outlined"
-              onPress={() => {}}
+              onPress={onUnmonitorAllPress}
+              loading={isUnmonitoringAll}
+              disabled={isUnmonitoringAll}
               textColor={theme.colors.onSurfaceVariant}
               style={{ flex: 1, borderRadius: 8 }}
               labelStyle={{ fontWeight: "600" }}

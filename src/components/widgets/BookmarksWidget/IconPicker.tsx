@@ -15,6 +15,8 @@ import { Text, useTheme, Portal, Button } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
+import { getComponentElevation } from "@/constants/elevation";
+import { borderRadius } from "@/constants/sizes";
 
 export interface IconPickerProps {
   visible: boolean;
@@ -72,6 +74,10 @@ const IconPicker: React.FC<IconPickerProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress: hapticPress } = useHaptics();
+
+  // Elevation styles
+  const modalElevationStyle = getComponentElevation("modal", theme);
+  const cardElevationStyle = getComponentElevation("card", theme);
 
   const [tab, setTab] = useState<"material" | "cdn">("material");
   const [search, setSearch] = useState("");
@@ -205,6 +211,7 @@ const IconPicker: React.FC<IconPickerProps> = ({
             style={[
               styles.portalCard,
               { backgroundColor: theme.colors.surface },
+              modalElevationStyle,
             ]}
           >
             {/* Header */}
@@ -316,8 +323,8 @@ const IconPicker: React.FC<IconPickerProps> = ({
                             backgroundColor: theme.colors.surface,
                             borderColor: theme.colors.outline,
                             borderWidth: 1,
-                            elevation: 2,
                           },
+                          cardElevationStyle,
                         ]}
                         onPress={() => handleMaterialIconSelect(icon)}
                       >
@@ -402,8 +409,8 @@ const IconPicker: React.FC<IconPickerProps> = ({
                             backgroundColor: theme.colors.surface,
                             borderColor: theme.colors.outline,
                             borderWidth: 1,
-                            elevation: 2,
                           },
+                          cardElevationStyle,
                         ]}
                         onPress={() => handleCdnIconSelect(item)}
                       >
@@ -439,7 +446,7 @@ const IconPicker: React.FC<IconPickerProps> = ({
 const styles = StyleSheet.create({
   modal: {
     margin: spacing.lg,
-    borderRadius: 16,
+    borderRadius: borderRadius.xl,
     maxHeight: "90%",
   },
   modalContent: {
@@ -508,9 +515,8 @@ const styles = StyleSheet.create({
     width: "94%",
     maxWidth: 720,
     maxHeight: "92%",
-    borderRadius: 16,
+    borderRadius: borderRadius.xl,
     overflow: "hidden",
-    elevation: 6,
   },
   iconsContent: {
     padding: spacing.md,
@@ -524,7 +530,7 @@ const styles = StyleSheet.create({
   iconItem: {
     width: "22%",
     aspectRatio: 1,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: spacing.sm,
@@ -542,7 +548,7 @@ const styles = StyleSheet.create({
   cdnIconItem: {
     width: "22%",
     aspectRatio: 1,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.sm,

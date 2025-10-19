@@ -20,6 +20,7 @@ import { buildProfileUrl } from "@/utils/tmdb.utils";
 import { useTmdbDetails } from "@/hooks/tmdb/useTmdbDetails";
 import RatingsOverview from "@/components/media/RatingsOverview";
 import { spacing } from "@/theme/spacing";
+import { avatarSizes } from "@/constants/sizes";
 import RelatedItems from "@/components/discover/RelatedItems";
 
 const DiscoverItemDetails = () => {
@@ -249,8 +250,8 @@ const CastRow: React.FC<{
   const theme = useTheme<AppTheme>();
   const router = useRouter();
 
-  // Constants tuned to match the design pixel-for-pixel
-  const AVATAR_SIZE = 48;
+  // Use centralized size tokens for consistent avatar sizing
+  const AVATAR_SIZE = avatarSizes.lg;
   const MAX_VISIBLE = 5; // show up to 5 avatars, then a +N badge
   const OVERLAP = Math.round(AVATAR_SIZE * 0.35);
 
@@ -291,7 +292,7 @@ const CastRow: React.FC<{
           justifyContent: "center",
         },
       }),
-    [],
+    [AVATAR_SIZE],
   );
 
   // Map TMDB cast data to match Jellyseerr structure for consistent rendering

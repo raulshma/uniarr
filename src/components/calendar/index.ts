@@ -1,6 +1,8 @@
 // Calendar Header
 export { CalendarHeader } from "./CalendarHeader";
 export type { CalendarHeaderProps } from "./CalendarHeader";
+export { default as EnhancedCalendarHeader } from "./CalendarHeader/EnhancedCalendarHeader";
+export type { EnhancedCalendarHeaderProps } from "./CalendarHeader/EnhancedCalendarHeader";
 
 // Calendar Views
 export { CalendarMonthView } from "./CalendarMonthView";
@@ -30,3 +32,7 @@ export type { CalendarStatsProps } from "./CalendarStats";
 // Calendar Filters
 export { CalendarFilters } from "./CalendarFilters";
 export type { CalendarFiltersProps } from "./CalendarFilters";
+
+// Month Year Picker
+export { default as MonthYearPicker } from "./MonthYearPicker/MonthYearPicker";
+export type { MonthYearPickerProps } from "./MonthYearPicker/MonthYearPicker";

@@ -8,6 +8,7 @@ import {
 } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
+import { buttonSizes, borderRadius } from "@/constants/sizes";
 
 type PaperButtonRef = React.ComponentRef<typeof PaperButton>;
 
@@ -36,7 +37,11 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
 
     const combinedContentStyle = useMemo<StyleProp<ViewStyle>>(
       () => [
-        styles.baseContent,
+        {
+          height: buttonSizes.height.md,
+          borderRadius: borderRadius.round,
+          justifyContent: "center",
+        },
         { paddingHorizontal: theme.custom.spacing.lg },
         contentStyle,
       ],
@@ -104,7 +109,7 @@ export default Button;
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: 999,
+    borderRadius: borderRadius.round,
   },
   fullWidth: {
     alignSelf: "stretch",
@@ -117,11 +122,6 @@ const styles = StyleSheet.create({
   },
   alignRight: {
     alignSelf: "flex-end",
-  },
-  baseContent: {
-    height: 48,
-    borderRadius: 999,
-    justifyContent: "center",
   },
   baseLabel: {
     textTransform: "none",

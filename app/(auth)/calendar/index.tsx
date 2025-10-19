@@ -16,15 +16,19 @@ import {
   isYesterday,
   parseISO,
 } from "date-fns";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import BottomDrawer from "@/components/common/BottomDrawer";
 import { TabHeader } from "@/components/common/TabHeader";
-import { MediaReleaseCard } from "@/components/calendar";
+import {
+  MediaReleaseCard,
+  EnhancedCalendarHeader,
+} from "@/components/calendar";
 import { useCalendar } from "@/hooks/useCalendar";
+import { validateDateString } from "@/utils/calendar.utils";
 import type { AppTheme } from "@/constants/theme";
 import type {
   CalendarDay,
@@ -56,6 +60,7 @@ const cloneFilters = (filters: CalendarFilters): CalendarFilters => ({
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
+  const localSearchParams = useLocalSearchParams<{ date?: string }>();
   const {
     state,
     calendarData,
@@ -66,7 +71,19 @@ const CalendarScreen = () => {
     setFilters,
     clearFilters,
     goToToday,
+    goToDate,
   } = useCalendar();
+
+  // Handle date parameter from URL (e.g., from widget navigation)
+  useEffect(() => {
+    if (localSearchParams.date) {
+      const urlDate = localSearchParams.date;
+      // Validate the date format
+      if (validateDateString(urlDate)) {
+        goToDate(urlDate);
+      }
+    }
+  }, [localSearchParams.date, goToDate]);
 
   const VIEW_SEGMENTS: {
     label: string;
@@ -687,6 +704,14 @@ const CalendarScreen = () => {
           onPress: openFilters,
           accessibilityLabel: "Open filters",
         }}
+      />
+
+      <EnhancedCalendarHeader
+        navigation={navigation}
+        view={state.view}
+        currentDate={state.currentDate}
+        onViewChange={setView}
+        style={{ marginBottom: theme.custom.spacing.sm }}
       />
 
       <View style={styles.headerContent}>

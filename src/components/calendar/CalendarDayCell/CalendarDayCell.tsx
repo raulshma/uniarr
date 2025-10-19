@@ -30,7 +30,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      minHeight: 120,
+      minHeight: theme.custom.sizes.cardSizes.height.lg,
       borderRightWidth: 1,
       borderRightColor: theme.colors.outlineVariant,
       padding: theme.custom.spacing.xs,
@@ -71,9 +71,9 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
       position: "absolute",
       top: 2,
       right: 2,
-      width: 6,
-      height: 6,
-      borderRadius: 3,
+      width: theme.custom.sizes.controlSizes.indicator.width,
+      height: theme.custom.sizes.controlSizes.indicator.height,
+      borderRadius: theme.custom.sizes.controlSizes.indicator.borderRadius,
       backgroundColor: theme.colors.primary,
     },
     releasesContainer: {

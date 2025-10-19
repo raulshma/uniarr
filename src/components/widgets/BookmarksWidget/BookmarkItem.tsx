@@ -13,6 +13,8 @@ import type { AppTheme } from "@/constants/theme";
 import type { BookmarkItemProps } from "./BookmarksWidget.types";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
+import { getComponentElevation } from "@/constants/elevation";
+import { borderRadius } from "@/constants/sizes";
 
 const BookmarkItem: React.FC<BookmarkItemProps> = ({
   bookmark,
@@ -24,6 +26,7 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress: hapticPress } = useHaptics();
+  const cardElevationStyle = getComponentElevation("card", theme);
 
   const handlePress = () => {
     hapticPress();
@@ -115,6 +118,7 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
         size === "large" && styles.largeContainer,
         disabled && styles.disabled,
         { backgroundColor: theme.colors.surfaceVariant },
+        cardElevationStyle,
       ]}
       onPress={handlePress}
       onLongPress={handleLongPress}
@@ -164,17 +168,12 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
     minHeight: 100,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   smallContainer: {
     flex: 1,
@@ -196,7 +195,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 56,
     height: 56,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -212,16 +211,16 @@ const styles = StyleSheet.create({
   healthBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: borderRadius.sm,
     borderWidth: 1,
   },
   healthDot: {
     width: 4,
     height: 4,
-    borderRadius: 2,
+    borderRadius: borderRadius.xs,
   },
   healthText: {
     fontSize: 10,

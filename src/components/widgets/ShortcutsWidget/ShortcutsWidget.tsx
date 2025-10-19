@@ -7,6 +7,8 @@ import { useRouter } from "expo-router";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
+import { borderRadius } from "@/constants/sizes";
+import { getComponentElevation } from "@/constants/elevation";
 import type { Widget } from "@/services/widgets/WidgetService";
 import { widgetService } from "@/services/widgets/WidgetService";
 import ShortcutItem from "./ShortcutItem";
@@ -26,6 +28,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const { onPress: hapticPress } = useHaptics();
+  const styles = useStyles(theme);
 
   const [shortcuts, setShortcuts] = React.useState<Shortcut[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -140,7 +143,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
           {onEdit && (
             <MaterialCommunityIcons
               name="cog"
-              size={20}
+              size={theme.custom.sizes.iconSizes.lg}
               color={theme.colors.onSurfaceVariant}
               onPress={onEdit}
             />
@@ -149,7 +152,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
         <View style={styles.loadingContainer}>
           <MaterialCommunityIcons
             name="loading"
-            size={24}
+            size={theme.custom.sizes.iconSizes.lg}
             color={theme.colors.primary}
           />
           <Text variant="bodySmall" style={styles.loadingText}>
@@ -178,7 +181,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
           {onEdit && (
             <MaterialCommunityIcons
               name="cog"
-              size={20}
+              size={theme.custom.sizes.iconSizes.lg}
               color={theme.colors.onSurfaceVariant}
               onPress={onEdit}
             />
@@ -187,7 +190,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons
             name="gesture-tap"
-            size={32}
+            size={theme.custom.sizes.iconSizes.xxl}
             color={theme.colors.onSurfaceVariant}
           />
           <Text variant="bodySmall" style={styles.emptyText}>
@@ -213,7 +216,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
         {onEdit && (
           <MaterialCommunityIcons
             name="cog"
-            size={20}
+            size={theme.custom.sizes.iconSizes.lg}
             color={theme.colors.onSurfaceVariant}
             onPress={onEdit}
           />
@@ -241,73 +244,70 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    borderRadius: 16,
-    padding: spacing.md,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-  },
-  smallContainer: {
-    minHeight: 140,
-  },
-  mediumContainer: {
-    minHeight: 180,
-  },
-  largeContainer: {
-    minHeight: 220,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontWeight: "600",
-  },
-  smallScrollContainer: {
-    maxHeight: 100,
-  },
-  mediumScrollContainer: {
-    maxHeight: 140,
-  },
-  largeScrollContainer: {
-    maxHeight: 180,
-  },
-  scrollContent: {
-    paddingBottom: spacing.xs,
-  },
-  gridContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-start",
-    alignItems: "flex-start",
-    gap: spacing.sm,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.lg,
-  },
-  loadingText: {
-    marginTop: spacing.sm,
-    opacity: 0.7,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.lg,
-  },
-  emptyText: {
-    marginTop: spacing.sm,
-    opacity: 0.7,
-  },
-});
+const useStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      borderRadius: borderRadius.xl,
+      padding: spacing.md,
+      ...getComponentElevation("widget", theme),
+    },
+    smallContainer: {
+      minHeight: 140,
+    },
+    mediumContainer: {
+      minHeight: 180,
+    },
+    largeContainer: {
+      minHeight: 220,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.md,
+    },
+    title: {
+      fontWeight: "600",
+    },
+    smallScrollContainer: {
+      maxHeight: 100,
+    },
+    mediumScrollContainer: {
+      maxHeight: 140,
+    },
+    largeScrollContainer: {
+      maxHeight: 180,
+    },
+    scrollContent: {
+      paddingBottom: spacing.xs,
+    },
+    gridContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "flex-start",
+      alignItems: "flex-start",
+      gap: spacing.sm,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: spacing.lg,
+    },
+    loadingText: {
+      marginTop: spacing.sm,
+      opacity: 0.7,
+    },
+    emptyContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: spacing.lg,
+    },
+    emptyText: {
+      marginTop: spacing.sm,
+      opacity: 0.7,
+    },
+  });
 
 export default ShortcutsWidget;

@@ -13,6 +13,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Path, Svg } from "react-native-svg";
 import { getPathDown } from "react-native-curved-bottom-bar/src/CurvedBottomBar/utils/pathDown";
 import type { AppTheme } from "@/constants/theme";
+import { iconSizes, touchSizes } from "@/constants/sizes";
+import { getComponentElevation } from "@/constants/elevation";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -24,10 +26,18 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
 
+  // Use centralized size tokens
+  const TAB_BAR_HEIGHT = touchSizes.xl + 9; // 65 = 56 + 9 for curve
+  const CENTER_BUTTON_SIZE = touchSizes.lg + 8; // 56 = 48 + 8
+  const TAB_ICON_SIZE = iconSizes.lg; // 24
+  const CENTER_ICON_SIZE = iconSizes.xl; // 28
+  const TAB_TOUCH_TARGET = 60; // Fixed width for each tab area
+
   // Generate the curved path for the bottom bar
   const curvedPath = useMemo(
-    () => getPathDown(screenWidth, 65, 65, true, "CENTER"),
-    [],
+    () =>
+      getPathDown(screenWidth, TAB_BAR_HEIGHT, TAB_BAR_HEIGHT, true, "CENTER"),
+    [TAB_BAR_HEIGHT],
   );
 
   const styles = useMemo(
@@ -38,7 +48,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
           bottom: 0,
           left: 0,
           right: 0,
-          height: 65,
+          height: TAB_BAR_HEIGHT,
         },
         curvedBackground: {
           position: "absolute",
@@ -47,13 +57,13 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
           right: 0,
         },
         contentContainer: {
-          height: 65,
+          height: TAB_BAR_HEIGHT,
           alignItems: "center",
         },
         tabPosition: {
           position: "absolute",
-          width: 60, // Fixed width for each tab area
-          height: 65,
+          width: TAB_TOUCH_TARGET,
+          height: TAB_BAR_HEIGHT,
           alignItems: "center",
           justifyContent: "center",
         },
@@ -68,22 +78,19 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
         },
         tabItemFocused: {
           borderWidth: 2,
-          borderRadius: 28,
+          borderRadius: CENTER_BUTTON_SIZE / 2,
           paddingVertical: 6,
         },
         centerButton: {
-          width: 56,
-          height: 56,
-          borderRadius: 28,
+          width: CENTER_BUTTON_SIZE,
+          height: CENTER_BUTTON_SIZE,
+          borderRadius: CENTER_BUTTON_SIZE / 2,
           alignItems: "center",
           justifyContent: "center",
           position: "absolute",
           bottom: 30,
-          left: screenWidth / 2 - 28,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.3,
-          shadowRadius: 4,
-          elevation: 8,
+          left: screenWidth / 2 - CENTER_BUTTON_SIZE / 2,
+          ...getComponentElevation("floatingButton", theme),
         },
         centerButtonPressed: {
           opacity: 0.9,
@@ -92,7 +99,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
           borderWidth: 2,
         },
       }),
-    [],
+    [TAB_BAR_HEIGHT, CENTER_BUTTON_SIZE, TAB_TOUCH_TARGET, theme],
   );
 
   const renderTab = useCallback(
@@ -189,7 +196,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
         >
           <MaterialCommunityIcons
             name={iconName as any}
-            size={24}
+            size={TAB_ICON_SIZE}
             color={
               isFocused ? theme.colors.primary : theme.colors.onSurfaceVariant
             }
@@ -204,6 +211,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
       styles,
       theme.colors.primary,
       theme.colors.onSurfaceVariant,
+      TAB_ICON_SIZE,
     ],
   );
 
@@ -271,7 +279,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
       >
         <MaterialCommunityIcons
           name="view-dashboard"
-          size={28}
+          size={CENTER_ICON_SIZE}
           color={
             isDashboardFocused
               ? theme.colors.onPrimary
@@ -290,6 +298,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
     theme.colors.shadow,
     theme.colors.onPrimary,
     theme.colors.onSurfaceVariant,
+    CENTER_ICON_SIZE,
   ]);
 
   const tabPositions = useMemo(
@@ -306,7 +315,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
     <View style={[styles.mainContainer, { paddingBottom: insets.bottom }]}>
       {/* Curved background */}
       <View style={styles.curvedBackground}>
-        <Svg width={screenWidth} height={65}>
+        <Svg width={screenWidth} height={TAB_BAR_HEIGHT}>
           <Path fill={theme.colors.surface} d={curvedPath} />
         </Svg>
       </View>

@@ -17,6 +17,7 @@ import {
   typography,
 } from "@/theme/typography";
 import { spacing } from "@/theme/spacing";
+import { generateSizeTokens } from "@/constants/sizes";
 
 export type CustomThemeConfig = {
   preset?: keyof typeof presetThemes;
@@ -35,6 +36,7 @@ export type AppTheme = MD3Theme & {
   custom: {
     spacing: typeof spacing;
     typography: typeof typography;
+    sizes: ReturnType<typeof generateSizeTokens>;
     config?: CustomThemeConfig;
   };
 };
@@ -48,6 +50,7 @@ const createTheme = (
   custom: {
     spacing,
     typography,
+    sizes: generateSizeTokens(),
   },
 });
 
@@ -81,9 +84,10 @@ export const createCustomTheme = (
     config.oledEnabled,
   );
 
-  // Generate typography and spacing scales
+  // Generate typography, spacing, and size scales
   const typographyScale = generateTypographyScale(config.fontScale);
   const spacingScale = generateSpacingScale(config.densityMode);
+  const sizeScale = generateSizeTokens(config.densityMode);
 
   const baseTheme = isDark ? MD3DarkTheme : MD3LightTheme;
 
@@ -93,6 +97,7 @@ export const createCustomTheme = (
     custom: {
       spacing: spacingScale,
       typography: typographyScale,
+      sizes: sizeScale,
       config,
     },
   };

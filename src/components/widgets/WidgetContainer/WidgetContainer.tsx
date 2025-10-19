@@ -8,6 +8,9 @@ import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { spacing } from "@/theme/spacing";
+import { borderRadius, gapSizes } from "@/constants/sizes";
+import { createFlexLayout } from "@/utils/style.utils";
+
 import ServiceStatusWidget from "../ServiceStatusWidget/ServiceStatusWidget";
 import DownloadProgressWidget from "../DownloadProgressWidget/DownloadProgressWidget";
 import RecentActivityWidget from "../RecentActivityWidget/RecentActivityWidget";
@@ -195,7 +198,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
         <View style={styles.emptyState}>
           <MaterialCommunityIcons
             name="loading"
-            size={48}
+            size={theme.custom.sizes.iconSizes.xxxl}
             color={theme.colors.primary}
           />
           <Text variant="bodyMedium" style={styles.emptyText}>
@@ -212,7 +215,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
         <View style={styles.emptyState}>
           <MaterialCommunityIcons
             name="widgets"
-            size={64}
+            size={theme.custom.sizes.iconSizes.xxxl}
             color={theme.colors.onSurfaceVariant}
           />
           <Text variant="headlineSmall" style={styles.emptyTitle}>
@@ -332,14 +335,14 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
               <View style={styles.emptyModalState}>
                 <MaterialCommunityIcons
                   name="widgets-outline"
-                  size={64}
+                  size={theme.custom.sizes.iconSizes.xxxl}
                   color={theme.colors.onSurfaceVariant}
                 />
                 <Text
                   variant="titleMedium"
                   style={{
                     color: theme.colors.onSurfaceVariant,
-                    marginTop: 16,
+                    marginTop: spacing.md,
                   }}
                 >
                   No widgets available
@@ -348,7 +351,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
                   variant="bodyMedium"
                   style={{
                     color: theme.colors.onSurfaceVariant,
-                    marginTop: 8,
+                    marginTop: spacing.sm,
                     textAlign: "center",
                   }}
                 >
@@ -378,43 +381,43 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 64,
+    paddingVertical: spacing.xxxxl, // 64 -> xxxxl
   },
   emptyTitle: {
-    marginTop: 16,
+    marginTop: spacing.md,
     fontWeight: "600",
   },
   emptyText: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     textAlign: "center",
     opacity: 0.7,
   },
   setupButton: {
-    marginTop: 24,
+    marginTop: spacing.lg,
   },
   placeholderWidget: {
-    padding: 20,
+    padding: spacing.lg,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.05)",
-    borderRadius: 8,
-    minHeight: 200,
+    borderRadius: borderRadius.md,
+    minHeight: spacing.xxxxl + spacing.lg, // 200 -> centralized spacing
   },
   fab: {
     position: "absolute",
-    margin: 16,
+    margin: spacing.md,
     right: 0,
     bottom: 0,
   },
   widgetList: {
-    marginVertical: 20,
+    marginVertical: spacing.lg,
   },
   widgetListItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 20,
-    paddingHorizontal: 4,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.08)",
   },
@@ -423,7 +426,7 @@ const styles = StyleSheet.create({
   },
   widgetActions: {
     flexDirection: "row",
-    gap: 12,
+    gap: gapSizes.lg,
   },
   emptyModalState: {
     flex: 1,
@@ -435,18 +438,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    ...createFlexLayout("row", "lg", {
+      justify: "space-between",
+      align: "center",
+    }),
+    paddingVertical: spacing.lg, // 20 -> lg
     borderBottomWidth: 1,
   },
   modalScrollContent: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.lg, // 24 -> lg
+    paddingTop: spacing.xs, // 8 -> xs
+    paddingBottom: spacing.lg, // 24 -> lg
   },
 });
 

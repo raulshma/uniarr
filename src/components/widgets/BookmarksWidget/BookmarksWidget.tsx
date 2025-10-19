@@ -8,6 +8,8 @@ import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
 import { widgetService } from "@/services/widgets/WidgetService";
+import { getComponentElevation } from "@/constants/elevation";
+import { borderRadius } from "@/constants/sizes";
 import { healthCheckService } from "@/services/bookmarks/HealthCheckService";
 import BookmarkItem from "./BookmarkItem";
 import type {
@@ -162,6 +164,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
   };
 
   const gridLayout = getGridLayout();
+  const containerElevationStyle = getComponentElevation("widget", theme);
 
   if (loading) {
     return (
@@ -170,6 +173,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
           styles.container,
           gridLayout.container,
           { backgroundColor: theme.colors.surface },
+          containerElevationStyle,
         ]}
       >
         <View style={styles.header}>
@@ -186,7 +190,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
         <View style={styles.loadingContainer}>
           <MaterialCommunityIcons
             name="loading"
-            size={24}
+            size={theme.custom.sizes.iconSizes.lg}
             color={theme.colors.primary}
           />
           <Text variant="bodySmall" style={styles.loadingText}>
@@ -206,6 +210,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
           styles.container,
           gridLayout.container,
           { backgroundColor: theme.colors.surface },
+          containerElevationStyle,
         ]}
       >
         <View style={styles.header}>
@@ -222,7 +227,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons
             name="link-box"
-            size={32}
+            size={theme.custom.sizes.iconSizes.xxl}
             color={theme.colors.onSurfaceVariant}
           />
           <Text variant="bodySmall" style={styles.emptyText}>
@@ -239,6 +244,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
         styles.container,
         gridLayout.container,
         { backgroundColor: theme.colors.surface },
+        containerElevationStyle,
       ]}
     >
       <View style={styles.header}>
@@ -284,13 +290,8 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
   },
   smallContainer: {
     minHeight: 140,

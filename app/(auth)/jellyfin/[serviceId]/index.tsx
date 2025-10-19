@@ -816,7 +816,7 @@ const JellyfinLibraryScreen = () => {
 
   // Optimized render functions with stable dependencies
   const renderNowPlayingItem = useCallback(
-    ({ item }: { item: JellyfinSession; index: number }) => {
+    ({ item, index }: { item: JellyfinSession; index: number }) => {
       const playing = item.NowPlayingItem;
       if (!playing) return null;
 
@@ -832,7 +832,12 @@ const JellyfinLibraryScreen = () => {
           ]}
           onPress={() => handleOpenItem(playing.Id)}
         >
-          <MediaPoster uri={posterUri} size={72} borderRadius={10} />
+          <MediaPoster
+            key={`now-playing-${item.Id || playing.Id || "unknown"}-${index}`}
+            uri={posterUri}
+            size={72}
+            borderRadius={10}
+          />
           <View style={styles.nowPlayingMeta}>
             <Text
               variant="bodyMedium"
@@ -870,7 +875,7 @@ const JellyfinLibraryScreen = () => {
   );
 
   const renderResumeItem = useCallback(
-    ({ item }: { item: JellyfinResumeItem; index: number }) => {
+    ({ item, index }: { item: JellyfinResumeItem; index: number }) => {
       const title = item.SeriesName ?? item.Name ?? "Untitled";
       const posterUri = buildPosterUri(connector, item, 420);
 
@@ -905,6 +910,7 @@ const JellyfinLibraryScreen = () => {
           >
             <View style={styles.resumePosterContainer}>
               <MediaPoster
+                key={`resume-poster-${item.Id || item.Name || "unknown"}-${index}`}
                 uri={posterUri}
                 size={posterSize - 8}
                 borderRadius={12}
@@ -1007,6 +1013,7 @@ const JellyfinLibraryScreen = () => {
           >
             <View style={styles.posterFrame}>
               <MediaPoster
+                key={`poster-${item.Id || item.Name || "unknown"}-${index}`}
                 uri={posterUri}
                 size={posterSize}
                 borderRadius={12}
@@ -1138,7 +1145,11 @@ const JellyfinLibraryScreen = () => {
 
             <FlashList
               data={continueWatchingItems}
-              keyExtractor={(item) => item.Id ?? item.Name ?? ""}
+              keyExtractor={(item, index) => {
+                // Create a unique key using item Id and index to prevent virtualized list recycling issues
+                const baseKey = item.Id || item.Name || "unknown";
+                return `${baseKey}-${index}`;
+              }}
               renderItem={renderResumeItem}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1312,7 +1323,11 @@ const JellyfinLibraryScreen = () => {
       >
         <FlashList
           data={displayItemsEnriched}
-          keyExtractor={(item) => item.Id ?? item.Name ?? ""}
+          keyExtractor={(item, index) => {
+            // Create a unique key using item Id and index to prevent virtualized list recycling issues
+            const baseKey = item.Id || item.Name || "unknown";
+            return `${baseKey}-${index}`;
+          }}
           renderItem={renderLibraryItem}
           numColumns={2}
           contentContainerStyle={styles.listContent}

@@ -15,6 +15,8 @@ import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { borderRadius, iconSizes } from "@/constants/sizes";
+import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { secureStorage } from "@/services/storage/SecureStorage";
 
@@ -242,7 +244,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           marginBottom: spacing.lg,
         },
         title: {
-          fontSize: 20,
+          fontSize: theme.custom.typography.titleLarge.fontSize,
           fontWeight: "700",
           color: theme.colors.onBackground,
           letterSpacing: -0.5,
@@ -268,41 +270,37 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
         },
         statCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: 16,
+          borderRadius: borderRadius.xl,
           padding: spacing.lg,
           alignItems: "flex-start",
           width: cardSize,
           minHeight: 120,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 4,
+          ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
         },
         statIconContainer: {
-          width: 40,
-          height: 40,
-          borderRadius: 12,
+          width: iconSizes.xxl,
+          height: iconSizes.xxl,
+          borderRadius: borderRadius.xxl,
           backgroundColor: theme.colors.primaryContainer,
           alignItems: "center",
           justifyContent: "center",
           marginBottom: spacing.md,
         },
         statNumber: {
-          fontSize: 28,
+          fontSize: theme.custom.typography.headlineSmall.fontSize,
           fontWeight: "700",
           color: theme.colors.onSurface,
           marginBottom: spacing.xs,
         },
         statLabel: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
         },
         errorText: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           color: theme.colors.error,
           textAlign: "center",
           paddingVertical: spacing.md,
@@ -315,36 +313,32 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
         },
         statSkeleton: {
           backgroundColor: theme.colors.surface,
-          borderRadius: 16,
+          borderRadius: borderRadius.xl,
           padding: spacing.lg,
           alignItems: "flex-start",
           width: cardSize,
           minHeight: 120,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 4,
+          ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
         },
         skeletonIconContainer: {
-          width: 40,
-          height: 40,
-          borderRadius: 12,
+          width: iconSizes.lg,
+          height: iconSizes.lg,
+          borderRadius: borderRadius.lg,
           backgroundColor: theme.colors.primaryContainer,
           marginBottom: spacing.md,
         },
         skeletonNumber: {
-          width: 40,
-          height: 28,
-          borderRadius: 4,
+          width: iconSizes.lg,
+          height: iconSizes.md + 8,
+          borderRadius: borderRadius.sm,
           marginBottom: spacing.xs,
         },
         skeletonLabel: {
-          width: 50,
-          height: 14,
-          borderRadius: 4,
+          width: iconSizes.lg + 10,
+          height: iconSizes.sm - 2,
+          borderRadius: borderRadius.sm,
         },
       }),
     [theme, cardSize],
@@ -379,18 +373,8 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           {[1, 2, 3, 4].map((key) => (
             <View key={key} style={styles.statSkeleton}>
               <View style={styles.skeletonIconContainer} />
-              <SkeletonPlaceholder
-                width={40}
-                height={28}
-                borderRadius={4}
-                style={styles.skeletonNumber}
-              />
-              <SkeletonPlaceholder
-                width={50}
-                height={14}
-                borderRadius={4}
-                style={styles.skeletonLabel}
-              />
+              <SkeletonPlaceholder style={styles.skeletonNumber} />
+              <SkeletonPlaceholder style={styles.skeletonLabel} />
             </View>
           ))}
         </View>
@@ -465,7 +449,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           visible={filterDialogVisible}
           onDismiss={() => setFilterDialogVisible(false)}
           style={{
-            borderRadius: 12,
+            borderRadius: borderRadius.lg,
             backgroundColor: theme.colors.elevation.level1,
           }}
         >

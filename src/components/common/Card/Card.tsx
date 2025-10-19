@@ -8,14 +8,16 @@ import {
 } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
+import { borderRadius } from "@/constants/sizes";
 
 // Use native Pressable rather than an animated wrapper — keep behavior
 // but remove entrance/interaction animations for snappier UI.
 const AnimatedPressable = Pressable;
 
-const BASE_RADIUS = 16;
-const CUSTOM_RADIUS = 12;
+const BASE_RADIUS = borderRadius.xl;
+const CUSTOM_RADIUS = borderRadius.lg;
 
+// Keep numeric values for PaperCard but map to logical levels
 const elevationMap = {
   none: 0,
   low: 1,

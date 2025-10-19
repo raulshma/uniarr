@@ -271,6 +271,77 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
+  async setSeasonMonitored(
+    seriesId: number,
+    seasonNumber: number,
+    monitored: boolean,
+  ): Promise<void> {
+    try {
+      await this.client.put(`/api/v3/series/${seriesId}`, {
+        seasons: [
+          {
+            seasonNumber,
+            monitored,
+          },
+        ],
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "setSeasonMonitored",
+        endpoint: `/api/v3/series/${seriesId}`,
+      });
+    }
+  }
+
+  async searchMissingEpisodes(seriesId: number): Promise<void> {
+    try {
+      await this.client.post("/api/v3/command", {
+        name: "SeriesSearch",
+        seriesId,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "searchMissingEpisodes",
+        endpoint: "/api/v3/command",
+      });
+    }
+  }
+
+  async unmonitorAllEpisodes(seriesId: number): Promise<void> {
+    try {
+      // First, get the series to retrieve all seasons
+      const seriesResponse = await this.client.get<
+        components["schemas"]["SeriesResource"]
+      >(`/api/v3/series/${seriesId}`);
+
+      const series = seriesResponse.data;
+      if (!series.seasons) {
+        return;
+      }
+
+      // Unmonitor all seasons
+      const updatedSeasons = series.seasons.map((season) => ({
+        seasonNumber: season.seasonNumber,
+        monitored: false,
+      }));
+
+      await this.client.put(`/api/v3/series/${seriesId}`, {
+        seasons: updatedSeasons,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "unmonitorAllEpisodes",
+        endpoint: `/api/v3/series/${seriesId}`,
+      });
+    }
+  }
+
   async deleteSeries(
     seriesId: number,
     options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},

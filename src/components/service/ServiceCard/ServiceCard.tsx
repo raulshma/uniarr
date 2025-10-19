@@ -11,6 +11,8 @@ import {
 
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
+import { avatarSizes } from "@/constants/sizes";
 import {
   ServiceStatus,
   type ServiceStatusState,
@@ -143,7 +145,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
     >
       <View style={styles.root}>
         <Avatar.Icon
-          size={48}
+          size={avatarSizes.lg}
           icon={icon}
           style={{ backgroundColor: theme.colors.primaryContainer }}
           color={theme.colors.onPrimaryContainer}
@@ -240,17 +242,17 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: spacing.xxxs,
   },
   statusWrapper: {
-    marginLeft: 12,
+    marginLeft: spacing.md,
   },
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 8,
+    marginLeft: spacing.sm,
   },
   deleteSpinner: {
-    marginHorizontal: 4,
+    marginHorizontal: spacing.xxxs,
   },
 });

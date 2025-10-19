@@ -13,6 +13,8 @@ import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { borderRadius } from "@/constants/sizes";
+import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { secureStorage } from "@/services/storage/SecureStorage";
 
@@ -280,21 +282,17 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         },
         activityCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: 16,
+          borderRadius: borderRadius.xl,
           padding: spacing.md,
           flexDirection: "row",
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 4,
+          ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
         },
         activityImage: {
-          width: 60,
-          height: 80,
-          borderRadius: 8,
+          width: theme.custom.sizes.additionalCardSizes.portrait.width,
+          height: theme.custom.sizes.additionalCardSizes.portrait.height,
+          borderRadius: borderRadius.md,
           marginRight: spacing.md,
           backgroundColor: theme.colors.surfaceVariant,
         },

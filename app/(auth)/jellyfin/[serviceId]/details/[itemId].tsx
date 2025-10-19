@@ -44,10 +44,11 @@ import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { spacing } from "@/theme/spacing";
+import { posterSizes } from "@/constants/sizes";
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 // Size used for the hero poster so layout calculations remain consistent
-const POSTER_SIZE = 160;
+const POSTER_SIZE = posterSizes.xl;
 // Height of the hero area (kept in sync with styles.heroArea)
 const HERO_HEIGHT = 320;
 // Height for the action/header row. Used so the poster pins directly below it

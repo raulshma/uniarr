@@ -5,9 +5,17 @@ import { Chip, Text, useTheme } from "react-native-paper";
 
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
+import { createFlexLayout } from "@/utils/style.utils";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import DownloadButton from "@/components/downloads/DownloadButton";
 import type { ServiceConfig } from "@/models/service.types";
+import {
+  aspectRatios,
+  borderRadius,
+  gapSizes,
+  buttonSizes,
+} from "@/constants/sizes";
 
 export type MediaKind = "series" | "movie";
 
@@ -78,12 +86,50 @@ const MediaCard: React.FC<MediaCardProps> = ({
   onDownloadError,
 }) => {
   const theme = useTheme<AppTheme>();
-  // Match the small poster size/ratio used by MediaPoster for consistent layout
-  const POSTER_SMALL_WIDTH = 96;
-  const POSTER_DEFAULT_ASPECT = 2 / 3;
-  const posterSmallHeight = Math.round(
-    POSTER_SMALL_WIDTH / POSTER_DEFAULT_ASPECT,
-  );
+  // Use centralized size tokens for consistent layout
+  const POSTER_WIDTH = theme.custom.sizes.posterSizes.md;
+  const POSTER_ASPECT_RATIO = aspectRatios.poster;
+  const posterSmallHeight = Math.round(POSTER_WIDTH / POSTER_ASPECT_RATIO);
+
+  // Define styles inside component to access theme
+  const styles = StyleSheet.create({
+    root: {
+      ...createFlexLayout("row", "md", {
+        align: "flex-start",
+      }),
+    },
+    meta: {
+      flex: 1,
+    },
+    title: {
+      marginBottom: spacing.xxxs,
+    },
+    subtitle: {
+      marginBottom: spacing.sm,
+    },
+    badges: {
+      ...createFlexLayout("row", "sm", {
+        align: "center",
+        wrap: "wrap",
+      }),
+    },
+    chip: {
+      marginRight: gapSizes.sm,
+      marginTop: spacing.xxxs,
+      // Normalize chip height and vertical padding so different chips match
+      minHeight: buttonSizes.height.sm,
+      paddingVertical: spacing.xxxs,
+      alignItems: "center",
+    },
+    downloadButtonContainer: {
+      marginRight: gapSizes.sm,
+      marginTop: spacing.xxxs,
+    },
+    footer: {
+      // Footer intentionally sits at the bottom of the meta column; spacing handled by meta
+      marginTop: 0,
+    },
+  });
 
   const secondaryLine = useMemo(() => {
     const meta: string[] = [];
@@ -117,12 +163,16 @@ const MediaCard: React.FC<MediaCardProps> = ({
         compact
         mode="flat"
         style={[styles.chip, { backgroundColor }]}
-        textStyle={{ color: textColor, fontSize: 13, lineHeight: 18 }}
+        textStyle={{
+          color: textColor,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
+          lineHeight: 18,
+        }}
       >
         {label}
       </Chip>
     );
-  }, [monitored, theme]);
+  }, [monitored, theme, styles.chip]);
 
   const downloadChip = useMemo(() => {
     if (!downloadStatus) {
@@ -164,12 +214,16 @@ const MediaCard: React.FC<MediaCardProps> = ({
         compact
         mode="flat"
         style={[styles.chip, { backgroundColor: colors.background }]}
-        textStyle={{ color: colors.text, fontSize: 13, lineHeight: 18 }}
+        textStyle={{
+          color: colors.text,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
+          lineHeight: 18,
+        }}
       >
         {label}
       </Chip>
     );
-  }, [downloadStatus, theme]);
+  }, [downloadStatus, theme, styles.chip]);
 
   const secondaryText =
     secondaryLine || (type === "series" ? "Series" : "Movie");
@@ -186,9 +240,9 @@ const MediaCard: React.FC<MediaCardProps> = ({
         <MediaPoster
           uri={posterUri}
           size="small"
-          borderRadius={12}
+          borderRadius={borderRadius.lg}
           showPlaceholderLabel={true}
-          style={{ marginRight: theme.custom.spacing.md }}
+          style={{ marginRight: spacing.md }}
         />
         <View
           style={[
@@ -235,41 +289,3 @@ const MediaCard: React.FC<MediaCardProps> = ({
 };
 
 export default MediaCard;
-
-const styles = StyleSheet.create({
-  root: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-  meta: {
-    flex: 1,
-  },
-  title: {
-    marginBottom: 4,
-  },
-  subtitle: {
-    marginBottom: 8,
-  },
-  badges: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 6,
-  },
-  chip: {
-    marginRight: 6,
-    marginTop: 4,
-    // Normalize chip height and vertical padding so different chips match
-    minHeight: 36,
-    paddingVertical: 4,
-    alignItems: "center",
-  },
-  downloadButtonContainer: {
-    marginRight: 6,
-    marginTop: 4,
-  },
-  footer: {
-    // Footer intentionally sits at the bottom of the meta column; spacing handled by meta
-    marginTop: 0,
-  },
-});

@@ -13,11 +13,15 @@ import {
   ActivityIndicator,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
+import { createCalendarNavigation } from "@/utils/navigation.utils";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { borderRadius } from "@/constants/sizes";
+import { getComponentElevation } from "@/constants/elevation";
 import { CalendarService } from "@/services/calendar/CalendarService";
 
 type UpcomingReleaseItem = {
@@ -44,7 +48,9 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   onEdit,
 }) => {
   const theme = useTheme<AppTheme>();
+  const router = useRouter();
   const { onPress } = useHaptics();
+  const calendarNavigation = createCalendarNavigation();
   const [upcomingReleases, setUpcomingReleases] = useState<
     UpcomingReleaseItem[]
   >([]);
@@ -140,10 +146,11 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   const handleItemPress = useCallback(
     (item: UpcomingReleaseItem) => {
       onPress();
-      // Navigate to calendar page
-      console.log("Navigate to calendar for item:", item.id);
+      // Navigate to calendar page with the specific date
+      // The calendar will automatically focus on the date when it loads
+      calendarNavigation.navigateToCalendar(router, item.releaseDate);
     },
-    [onPress],
+    [onPress, router, calendarNavigation],
   );
 
   const handleRefresh = useCallback(() => {
@@ -258,13 +265,9 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
         },
         card: {
           backgroundColor: theme.colors.surface,
-          borderRadius: 12,
+          borderRadius: borderRadius.lg,
           marginRight: spacing.md,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-          elevation: 4,
+          ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
           overflow: "hidden",
@@ -278,7 +281,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
           height: "100%",
         },
         posterImage: {
-          borderRadius: 8,
+          borderRadius: borderRadius.sm,
         },
         overlay: {
           flex: 1,
@@ -289,7 +292,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
           backgroundColor: theme.colors.primary,
           paddingHorizontal: spacing.xs,
           paddingVertical: 4,
-          borderRadius: 6,
+          borderRadius: borderRadius.xs,
           alignSelf: "flex-start",
           marginBottom: spacing.sm,
         },

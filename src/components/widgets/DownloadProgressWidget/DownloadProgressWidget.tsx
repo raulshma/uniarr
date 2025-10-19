@@ -14,6 +14,8 @@ import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import type { Widget } from "@/services/widgets/WidgetService";
+import { borderRadius } from "@/constants/sizes";
+import { spacing } from "@/theme/spacing";
 import { useDownloadStore, selectDownloads } from "@/store/downloadStore";
 import type { DownloadItem } from "@/models/download.types";
 
@@ -332,7 +334,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   downloadContent: {
-    padding: 12,
+    padding: spacing.sm,
   },
   downloadHeader: {
     flexDirection: "row",
@@ -348,7 +350,7 @@ const styles = StyleSheet.create({
   protocolIcon: {
     width: 32,
     height: 32,
-    borderRadius: 6,
+    borderRadius: borderRadius.xs,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -378,7 +380,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: borderRadius.xs,
   },
   progressDetails: {
     flexDirection: "row",

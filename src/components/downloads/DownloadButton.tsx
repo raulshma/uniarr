@@ -12,6 +12,7 @@ import { useContentDownload } from "@/hooks/useContentDownload";
 import type { ServiceConfig } from "@/models/service.types";
 import type { QualityOption } from "@/connectors/base/IDownloadConnector";
 import { spacing } from "@/theme/spacing";
+import { iconSizes, buttonSizes, touchSizes } from "@/constants/sizes";
 import * as Haptics from "expo-haptics";
 import { useCurrentDownloadSpeed } from "@/store/downloadStore";
 import { formatSpeed } from "@/utils/torrent.utils";
@@ -142,32 +143,32 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
     handleDownloadAction();
   };
 
-  // Size configurations
+  // Size configurations using centralized tokens
   const sizeConfig = useMemo(() => {
     switch (size) {
       case "small":
         return {
-          iconSize: 18,
-          buttonHeight: 32,
-          fontSize: 12,
+          iconSize: iconSizes.sm + 2, // 18
+          buttonHeight: buttonSizes.height.sm,
+          fontSize: theme.custom.typography.labelSmall.fontSize,
           padding: spacing.xs,
         };
       case "large":
         return {
-          iconSize: 28,
-          buttonHeight: 48,
-          fontSize: 16,
+          iconSize: iconSizes.xl - 4, // 28
+          buttonHeight: buttonSizes.height.lg,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           padding: spacing.md,
         };
       default: // medium
         return {
-          iconSize: 24,
-          buttonHeight: 40,
-          fontSize: 14,
+          iconSize: iconSizes.md, // 24
+          buttonHeight: buttonSizes.height.md,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           padding: spacing.sm,
         };
     }
-  }, [size]);
+  }, [size, theme.custom.typography]);
 
   // Don't render if download capability is not available and not loading
   if (!isLoading && canDownload === false && variant === "icon") {
@@ -477,7 +478,7 @@ const DownloadButton: React.FC<DownloadButtonProps> = ({
 
   // Navbar circle variant - circle button with speed in center
   if (variant === "navbar-circle") {
-    const buttonSize = 48;
+    const buttonSize = touchSizes.lg; // Standard touch target size
     return (
       <>
         <Animated.View style={[animatedStyle, style]}>
@@ -590,7 +591,7 @@ const createStyles = (
       marginBottom: spacing.xs / 2,
     },
     cardSize: {
-      fontSize: 12,
+      fontSize: theme.custom.typography.labelSmall.fontSize,
     },
     menuAnchor: {
       marginLeft: -spacing.xs,
@@ -619,7 +620,7 @@ const createStyles = (
     },
     navbarCircleSpeed: {
       fontWeight: "700",
-      fontSize: 10,
+      fontSize: theme.custom.typography.labelSmall.fontSize * 0.8, // Small text for speed indicator
       textAlign: "center",
     },
     navbarCircleIcon: {
