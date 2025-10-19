@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Image,
   Linking,
+  ColorValue,
 } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -46,32 +47,24 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
   };
 
   const renderIcon = () => {
-    const iconProps = {
-      size: size === "small" ? 24 : size === "medium" ? 32 : 40,
-    };
+    const iconSize = size === "small" ? 24 : size === "medium" ? 32 : 40;
 
     switch (bookmark.icon.type) {
       case "material-icon":
         return (
           <MaterialCommunityIcons
             name={bookmark.icon.value as any}
+            size={iconSize}
             color={bookmark.icon.textColor || theme.colors.primary}
-            {...iconProps}
           />
         );
 
       case "cdn-icon":
         return (
-          <Image
-            source={{
-              uri: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${bookmark.icon.value}.svg`,
-            }}
-            style={{
-              width: iconProps.size,
-              height: iconProps.size,
-              tintColor: bookmark.icon.textColor || theme.colors.primary,
-            }}
-            resizeMode="contain"
+          <CdnIconImage
+            name={bookmark.icon.value}
+            size={iconSize}
+            tintColor={bookmark.icon.textColor}
           />
         );
 
@@ -80,8 +73,8 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
           <Image
             source={{ uri: bookmark.icon.value }}
             style={{
-              width: iconProps.size,
-              height: iconProps.size,
+              width: iconSize,
+              height: iconSize,
             }}
             resizeMode="contain"
           />
@@ -91,8 +84,8 @@ const BookmarkItem: React.FC<BookmarkItemProps> = ({
         return (
           <MaterialCommunityIcons
             name="link"
+            size={iconSize}
             color={theme.colors.primary}
-            {...iconProps}
           />
         );
     }
@@ -228,3 +221,43 @@ const styles = StyleSheet.create({
 });
 
 export default BookmarkItem;
+
+// CDN Icon Image component with fallback and color support
+const CdnIconImage: React.FC<{
+  name: string;
+  size: number;
+  tintColor?: string;
+}> = ({ name, size, tintColor }) => {
+  const [urlIndex, setUrlIndex] = React.useState(0);
+
+  const getUrlPriority = (): string[] => {
+    return [
+      `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${name}.svg`,
+      `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${name}.png`,
+      `https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/${name}.svg`,
+      `https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/png/${name}.png`,
+    ];
+  };
+
+  const urls = getUrlPriority();
+  const currentUrl = urls[urlIndex];
+
+  const handleError = () => {
+    if (urlIndex < urls.length - 1) {
+      setUrlIndex(urlIndex + 1);
+    }
+  };
+
+  return (
+    <Image
+      source={{ uri: currentUrl }}
+      style={{
+        width: size,
+        height: size,
+        ...(tintColor && { tintColor: tintColor as ColorValue }),
+      }}
+      resizeMode="contain"
+      onError={handleError}
+    />
+  );
+};
