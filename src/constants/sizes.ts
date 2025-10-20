@@ -164,7 +164,10 @@ export type AspectRatioToken = (typeof aspectRatios)[keyof typeof aspectRatios];
 /**
  * Generate size tokens adjusted for density mode
  */
-export const generateSizeTokens = (density: DensityMode = "comfortable") => {
+export const generateSizeTokens = (
+  density: DensityMode = "comfortable",
+  globalBorderRadius?: keyof typeof borderRadius,
+) => {
   const densityFactors = {
     compact: 0.875, // 12.5% smaller
     comfortable: 1.0, // Default size
@@ -218,11 +221,19 @@ export const generateSizeTokens = (density: DensityMode = "comfortable") => {
       padding: buttonSizes.padding, // Padding scales with spacing system
     },
     borderRadius: Object.fromEntries(
-      Object.entries(borderRadius).map(([key, value]) =>
-        key === "none" || key === "round"
+      Object.entries(borderRadius).map(([key, value]) => {
+        // Use globalBorderRadius as the default for 'md' if specified
+        if (
+          key === "md" &&
+          globalBorderRadius &&
+          borderRadius[globalBorderRadius]
+        ) {
+          return [key, scaleSize(borderRadius[globalBorderRadius])];
+        }
+        return key === "none" || key === "round"
           ? [key, value]
-          : [key, scaleSize(value)],
-      ),
+          : [key, scaleSize(value)];
+      }),
     ) as typeof borderRadius,
     gapSizes: Object.fromEntries(
       Object.entries(gapSizes).map(([key, value]) => [key, scaleSize(value)]),

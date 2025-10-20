@@ -23,7 +23,6 @@ import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useWebhookNotifications } from "@/hooks/useWebhookNotifications";
 import type { AppTheme } from "@/constants/theme";
-import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import type { WebhookNotification } from "@/services/webhooks/WebhookService";
 
@@ -341,7 +340,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginBottom: spacing.md,
     backgroundColor: "#f5f5f5",
-    borderRadius: borderRadius.md,
+    borderRadius: 8, // TODO: Replace with theme.custom.sizes.borderRadius.md when moved inside component
   },
   statItem: {
     alignItems: "center",
@@ -425,7 +424,7 @@ const styles = StyleSheet.create({
   },
   modal: {
     margin: spacing.lg,
-    borderRadius: borderRadius.md,
+    borderRadius: 8, // TODO: Replace with theme.custom.sizes.borderRadius.md when moved inside component
     maxHeight: "80%",
   },
   modalActions: {

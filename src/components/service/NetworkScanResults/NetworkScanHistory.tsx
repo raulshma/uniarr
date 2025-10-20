@@ -76,7 +76,7 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
         historyItem: {
           marginHorizontal: 0,
           marginVertical: 0,
-          borderRadius: 0,
+          borderRadius: theme.custom.sizes.borderRadius.none,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: theme.colors.outlineVariant,
         },
@@ -111,7 +111,7 @@ const NetworkScanHistory: React.FC<NetworkScanHistoryProps> = ({
           paddingHorizontal: 8,
           paddingVertical: 4,
           backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 12,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
         },
         historyServiceText: {
           fontSize: 11,

@@ -26,6 +26,7 @@ import type { AppTheme } from "@/constants/theme";
 import { DensityMode } from "@/theme/spacing";
 import { FontScale } from "@/theme/typography";
 import { presetThemes } from "@/theme/colors";
+import { borderRadius } from "@/constants/sizes";
 
 const PRESET_NAMES = {
   uniarr: "UniArr",
@@ -67,6 +68,12 @@ export default function ThemeEditorScreen() {
 
   const handleDensityChange = (densityMode: DensityMode) => {
     updateConfig({ densityMode });
+  };
+
+  const handleGlobalBorderRadiusChange = (
+    radius: keyof typeof borderRadius,
+  ) => {
+    updateConfig({ globalBorderRadius: radius });
   };
 
   const handleColorChange = (colorKey: string, value: string) => {
@@ -152,7 +159,7 @@ export default function ThemeEditorScreen() {
         },
         previewContainer: {
           padding: theme.custom.spacing.md,
-          borderRadius: theme.custom.config?.posterStyle.borderRadius ?? 12,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           borderWidth: 1,
         },
         previewCard: {
@@ -332,6 +339,37 @@ export default function ThemeEditorScreen() {
                 { value: "spacious", label: "Spacious" },
               ]}
             />
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.section}>
+          <Card.Title title="Border Radius" />
+          <Card.Content>
+            <SegmentedButtons
+              value={config.globalBorderRadius || "md"}
+              onValueChange={handleGlobalBorderRadiusChange}
+              buttons={[
+                { value: "none", label: "None" },
+                { value: "xs", label: "XS" },
+                { value: "sm", label: "SM" },
+                { value: "md", label: "MD" },
+                { value: "lg", label: "LG" },
+                { value: "xl", label: "XL" },
+                { value: "xxl", label: "XXL" },
+                { value: "xxxl", label: "XXXL" },
+                { value: "round", label: "Round" },
+              ]}
+              style={{ marginTop: theme.custom.spacing.sm }}
+            />
+            <Text
+              variant="bodySmall"
+              style={{
+                marginTop: theme.custom.spacing.sm,
+                color: theme.colors.onSurfaceVariant,
+              }}
+            >
+              Current: {borderRadius[config.globalBorderRadius || "md"]}px
+            </Text>
           </Card.Content>
         </Card>
 

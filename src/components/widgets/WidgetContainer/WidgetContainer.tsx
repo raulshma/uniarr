@@ -7,7 +7,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
-import { borderRadius, gapSizes } from "@/constants/sizes";
+import { gapSizes } from "@/constants/sizes";
 import { createFlexLayout } from "@/utils/style.utils";
 
 import ServiceStatusWidget from "../ServiceStatusWidget/ServiceStatusWidget";
@@ -227,7 +227,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: "rgba(0,0,0,0.05)",
-          borderRadius: borderRadius.md,
+          borderRadius: theme.custom.sizes.borderRadius.md,
           minHeight: theme.custom.spacing.xxxxl + theme.custom.spacing.lg, // 200 -> centralized spacing
         },
         fab: {

@@ -10,7 +10,7 @@ import Animated, {
 
 import type { AppTheme } from "@/constants/theme";
 import type { CalendarView, CalendarNavigation } from "@/models/calendar.types";
-import { iconSizes, borderRadius } from "@/constants/sizes";
+import { iconSizes } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
 import { createFlexLayout } from "@/utils/style.utils";
 import { spacing } from "@/theme/spacing";
@@ -79,7 +79,7 @@ const EnhancedCalendarHeader: React.FC<EnhancedCalendarHeaderProps> = ({
     titleButton: {
       paddingVertical: spacing.xs,
       paddingHorizontal: spacing.sm,
-      borderRadius: borderRadius.md, // 8 -> md
+      borderRadius: theme.custom.sizes.borderRadius.md, // 8 -> md
       minWidth: spacing.xxxl + spacing.xl, // 120 -> centralized
     },
     navigationButton: {

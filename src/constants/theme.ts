@@ -17,7 +17,7 @@ import {
   typography,
 } from "@/theme/typography";
 import { spacing } from "@/theme/spacing";
-import { generateSizeTokens } from "@/constants/sizes";
+import { generateSizeTokens, borderRadius } from "@/constants/sizes";
 
 export type CustomThemeConfig = {
   preset?: keyof typeof presetThemes;
@@ -25,6 +25,7 @@ export type CustomThemeConfig = {
   oledEnabled?: boolean;
   fontScale: FontScale;
   densityMode: DensityMode;
+  globalBorderRadius?: keyof typeof borderRadius;
   posterStyle: {
     borderRadius: number;
     shadowOpacity: number;
@@ -87,7 +88,10 @@ export const createCustomTheme = (
   // Generate typography, spacing, and size scales
   const typographyScale = generateTypographyScale(config.fontScale);
   const spacingScale = generateSpacingScale(config.densityMode);
-  const sizeScale = generateSizeTokens(config.densityMode);
+  const sizeScale = generateSizeTokens(
+    config.densityMode,
+    config.globalBorderRadius,
+  );
 
   const baseTheme = isDark ? MD3DarkTheme : MD3LightTheme;
 
@@ -119,6 +123,7 @@ export const defaultCustomThemeConfig: CustomThemeConfig = {
   oledEnabled: false,
   fontScale: "medium",
   densityMode: "comfortable",
+  globalBorderRadius: "md",
   posterStyle: {
     borderRadius: 8,
     shadowOpacity: 0.3,
