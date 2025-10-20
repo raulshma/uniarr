@@ -103,6 +103,7 @@ export const UnifiedSearchPanel: React.FC = () => {
   );
   const [qualityFilter, setQualityFilter] = useState<string>("Any");
   const [releaseTypeFilter, setReleaseTypeFilter] = useState<string>("Any");
+  const [statusFilter, setStatusFilter] = useState<string>("Any");
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
   const {
@@ -499,10 +500,13 @@ export const UnifiedSearchPanel: React.FC = () => {
   const clearAdvancedFilters = useCallback(() => {
     setQualityFilter("Any");
     setReleaseTypeFilter("Any");
+    setStatusFilter("Any");
   }, []);
 
   const hasAdvancedFilters =
-    qualityFilter !== "Any" || releaseTypeFilter !== "Any";
+    qualityFilter !== "Any" ||
+    releaseTypeFilter !== "Any" ||
+    statusFilter !== "Any";
 
   // If the route provides search params (e.g. from Discover card), prefill the search
   useEffect(() => {
@@ -786,11 +790,22 @@ export const UnifiedSearchPanel: React.FC = () => {
               </View>
             )}
             {hasAdvancedFilters && (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>
-                  Quality: {qualityFilter}
-                </Text>
-              </View>
+              <>
+                {qualityFilter !== "Any" && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>
+                      Quality: {qualityFilter}
+                    </Text>
+                  </View>
+                )}
+                {statusFilter !== "Any" && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>
+                      Status: {statusFilter}
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>
@@ -909,6 +924,7 @@ export const UnifiedSearchPanel: React.FC = () => {
                 <Text style={styles.advancedFilterTitle}>Status</Text>
                 <View style={[styles.mainFilterRow, { flexWrap: "wrap" }]}>
                   {[
+                    "Any",
                     "Owned",
                     "Monitored",
                     "Missing",
@@ -917,12 +933,23 @@ export const UnifiedSearchPanel: React.FC = () => {
                   ].map((status) => (
                     <TouchableOpacity
                       key={status}
-                      style={[styles.mainFilterPill]}
+                      style={[
+                        styles.mainFilterPill,
+                        statusFilter === status && styles.mainFilterPillActive,
+                      ]}
                       onPress={() => {
-                        // TODO: Implement status filtering
+                        setStatusFilter(status);
                       }}
                     >
-                      <Text style={styles.mainFilterText}>{status}</Text>
+                      <Text
+                        style={[
+                          styles.mainFilterText,
+                          statusFilter === status &&
+                            styles.mainFilterTextActive,
+                        ]}
+                      >
+                        {status}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </View>

@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback, useState } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
+import { useRouter } from "expo-router";
 import {
   useTheme,
   Text,
@@ -305,6 +306,7 @@ const DownloadProgressSheet: React.FC<DownloadProgressSheetProps> = ({
   onDismiss,
 }) => {
   const theme = useTheme<AppTheme>();
+  const router = useRouter();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   // Get downloads from store
@@ -390,9 +392,11 @@ const DownloadProgressSheet: React.FC<DownloadProgressSheetProps> = ({
   }, [clearCompletedAction]);
 
   const handleShowAllHistory = useCallback(() => {
-    // TODO: Navigate to download history screen
-    console.log("Show all download history");
-  }, []);
+    // Navigate to the downloads tab for full history
+    router.push("/(auth)/(tabs)/downloads");
+    // Close the sheet after navigation
+    onDismiss();
+  }, [router, onDismiss]);
 
   const handleOpenFile = useCallback(
     async (download: DownloadItem, player?: VideoPlayerOption) => {

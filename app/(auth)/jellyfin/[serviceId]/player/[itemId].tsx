@@ -11,6 +11,7 @@ import {
   Dimensions,
   GestureResponderEvent,
   LayoutChangeEvent,
+  PanResponder,
   Platform,
   Pressable,
   Share,
@@ -374,6 +375,18 @@ const JellyfinPlayerScreen = () => {
     readonly playSessionId?: string;
   } | null>(null);
   const lastProgressTicksRef = useRef<number>(-1);
+  const isPlayerMountedRef = useRef(true);
+  const gestureStartYRef = useRef(0);
+  const gestureStartXRef = useRef(0);
+  const currentGestureRef = useRef<"brightness" | "volume" | null>(null);
+  const [brightnessOverlay, setBrightnessOverlay] = useState<number | null>(
+    null,
+  );
+  const [volumeOverlay, setVolumeOverlay] = useState<number | null>(null);
+  const brightnessHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     pendingSeekSecondsRef.current = startPositionSeconds;
@@ -390,6 +403,13 @@ const JellyfinPlayerScreen = () => {
       if (hideControlsTimer.current) {
         clearTimeout(hideControlsTimer.current);
       }
+      if (brightnessHideTimerRef.current) {
+        clearTimeout(brightnessHideTimerRef.current);
+      }
+      if (volumeHideTimerRef.current) {
+        clearTimeout(volumeHideTimerRef.current);
+      }
+      isPlayerMountedRef.current = false;
     };
   }, []);
 
@@ -741,7 +761,14 @@ const JellyfinPlayerScreen = () => {
   useEffect(() => {
     return () => {
       reportStop();
-      player.pause();
+      // Safely pause player - check if mounted and try-catch for released object
+      if (isPlayerMountedRef.current) {
+        try {
+          player.pause();
+        } catch {
+          // ignore errors from released player instance
+        }
+      }
     };
   }, [player, reportStop]);
 
@@ -861,6 +888,75 @@ const JellyfinPlayerScreen = () => {
   const toggleInfo = useCallback(() => {
     setInfoVisible((prev) => !prev);
   }, []);
+
+  const handleGestureStart = useCallback((event: GestureResponderEvent) => {
+    gestureStartXRef.current = event.nativeEvent.locationX;
+    gestureStartYRef.current = event.nativeEvent.locationY;
+
+    const screenWidth = Dimensions.get("window").width;
+    const isLeftSide = gestureStartXRef.current < screenWidth / 3;
+    const isRightSide = gestureStartXRef.current > (screenWidth * 2) / 3;
+
+    if (isLeftSide) {
+      currentGestureRef.current = "brightness";
+    } else if (isRightSide) {
+      currentGestureRef.current = "volume";
+    } else {
+      currentGestureRef.current = null;
+    }
+  }, []);
+
+  const handleGestureMove = useCallback((event: GestureResponderEvent) => {
+    if (!currentGestureRef.current) {
+      return;
+    }
+
+    const deltaY = gestureStartYRef.current - event.nativeEvent.locationY;
+    const screenHeight = Dimensions.get("window").height;
+    const sensitivity = screenHeight / 100;
+    const delta = deltaY / sensitivity;
+
+    if (currentGestureRef.current === "brightness") {
+      setBrightnessOverlay((prev) => {
+        const next = Math.max(0, Math.min(100, (prev ?? 50) + delta));
+        if (brightnessHideTimerRef.current) {
+          clearTimeout(brightnessHideTimerRef.current);
+        }
+        brightnessHideTimerRef.current = setTimeout(() => {
+          setBrightnessOverlay(null);
+        }, 1500);
+        return next;
+      });
+    } else if (currentGestureRef.current === "volume") {
+      setVolumeOverlay((prev) => {
+        const next = Math.max(0, Math.min(100, (prev ?? 50) + delta));
+        if (volumeHideTimerRef.current) {
+          clearTimeout(volumeHideTimerRef.current);
+        }
+        volumeHideTimerRef.current = setTimeout(() => {
+          setVolumeOverlay(null);
+        }, 1500);
+        return next;
+      });
+    }
+
+    gestureStartYRef.current = event.nativeEvent.locationY;
+  }, []);
+
+  const handleGestureEnd = useCallback(() => {
+    currentGestureRef.current = null;
+  }, []);
+
+  const panResponderRef = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (event) => handleGestureStart(event),
+      onPanResponderMove: (event) => handleGestureMove(event),
+      onPanResponderRelease: handleGestureEnd,
+      onPanResponderTerminate: handleGestureEnd,
+    }),
+  );
 
   const playbackErrorMessage = playbackError
     ? playbackError
@@ -1048,7 +1144,7 @@ const JellyfinPlayerScreen = () => {
     (playerStatus !== "readyToPlay" && playerStatus !== "error");
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponderRef.current?.panHandlers}>
       {backdropUri ? (
         <Image
           source={{ uri: backdropUri }}
@@ -1423,6 +1519,54 @@ const JellyfinPlayerScreen = () => {
           {playbackErrorMessage}
         </HelperText>
       ) : null}
+
+      {brightnessOverlay !== null ? (
+        <View style={styles.gestureOverlayContainer} pointerEvents="none">
+          <View style={styles.gestureOverlay}>
+            <IconButton
+              icon="brightness-7"
+              size={32}
+              iconColor="white"
+              style={styles.gestureIcon}
+            />
+            <View style={styles.gestureBar}>
+              <View
+                style={[
+                  styles.gestureFill,
+                  { width: `${brightnessOverlay}%` },
+                  { backgroundColor: theme.colors.primary },
+                ]}
+              />
+            </View>
+            <Text style={styles.gestureText}>
+              {Math.round(brightnessOverlay)}%
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {volumeOverlay !== null ? (
+        <View style={styles.gestureOverlayContainer} pointerEvents="none">
+          <View style={[styles.gestureOverlay, styles.gestureOverlayRight]}>
+            <IconButton
+              icon="volume-high"
+              size={32}
+              iconColor="white"
+              style={styles.gestureIcon}
+            />
+            <View style={styles.gestureBar}>
+              <View
+                style={[
+                  styles.gestureFill,
+                  { width: `${volumeOverlay}%` },
+                  { backgroundColor: theme.colors.primary },
+                ]}
+              />
+            </View>
+            <Text style={styles.gestureText}>{Math.round(volumeOverlay)}%</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -1684,6 +1828,45 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       gap: spacing.sm,
       marginTop: spacing.sm,
+    },
+    gestureOverlayContainer: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: "center",
+      justifyContent: "center",
+      pointerEvents: "none",
+    },
+    gestureOverlay: {
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(0,0,0,0.7)",
+      borderRadius: spacing.lg,
+      padding: spacing.lg,
+      minWidth: 140,
+      gap: spacing.md,
+    },
+    gestureOverlayRight: {
+      alignSelf: "flex-end",
+      marginRight: spacing.lg,
+      marginBottom: spacing.xl,
+    },
+    gestureIcon: {
+      margin: 0,
+    },
+    gestureBar: {
+      width: 120,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: "rgba(255,255,255,0.25)",
+      overflow: "hidden",
+    },
+    gestureFill: {
+      height: "100%",
+      borderRadius: 2,
+    },
+    gestureText: {
+      color: "white",
+      fontWeight: "600",
+      fontSize: 14,
     },
   });
 
