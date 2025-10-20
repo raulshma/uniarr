@@ -7,7 +7,6 @@ import { useHaptics } from "@/hooks/useHaptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 
-import { spacing } from "@/theme/spacing";
 import { useTheme } from "@/hooks/useTheme";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
 
@@ -107,25 +106,25 @@ const DashboardScreen = () => {
 
         // Header Section
         headerSection: {
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.lg,
-          paddingBottom: spacing.md,
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingTop: theme.custom.spacing.lg,
+          paddingBottom: theme.custom.spacing.md,
         },
         headerContainer: {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: spacing.lg,
+          marginBottom: theme.custom.spacing.lg,
         },
         headerActions: {
           flexDirection: "row",
           alignItems: "center",
-          gap: spacing.sm,
+          gap: theme.custom.spacing.sm,
         },
         profileSection: {
           flexDirection: "row",
           alignItems: "center",
-          gap: spacing.md,
+          gap: theme.custom.spacing.md,
           flexShrink: 1,
         },
         profileAvatar: {
@@ -135,13 +134,13 @@ const DashboardScreen = () => {
           flex: 1,
         },
         profileName: {
-          fontSize: 24,
+          fontSize: theme.custom.typography.headlineSmall.fontSize,
           fontWeight: "700",
           color: theme.colors.onBackground,
-          letterSpacing: -0.5,
+          letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
         },
         profileSubtitle: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
           color: theme.colors.onSurfaceVariant,
           marginTop: 2,
         },
@@ -151,23 +150,23 @@ const DashboardScreen = () => {
 
         // Statistics Section
         statisticsSection: {
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.xl,
+          paddingHorizontal: theme.custom.spacing.lg,
+          marginBottom: theme.custom.spacing.xl,
         },
         statisticsHeader: {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: spacing.lg,
+          marginBottom: theme.custom.spacing.lg,
         },
         statisticsTitle: {
-          fontSize: 20,
+          fontSize: theme.custom.typography.titleLarge.fontSize,
           fontWeight: "700",
           color: theme.colors.onBackground,
-          letterSpacing: -0.5,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
         },
         filterButton: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           fontWeight: "500",
           color: theme.colors.primary,
         },
@@ -177,28 +176,32 @@ const DashboardScreen = () => {
           justifyContent: "space-between",
         },
         statCard: {
-          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
+          width:
+            (screenWidth -
+              theme.custom.spacing.lg * 2 -
+              theme.custom.spacing.sm) /
+            2,
           backgroundColor: theme.colors.surface,
-          borderRadius: 12,
-          padding: spacing.lg,
-          marginBottom: spacing.sm,
+          borderRadius: theme.custom.config?.posterStyle.borderRadius ?? 12,
+          padding: theme.custom.spacing.lg,
+          marginBottom: theme.custom.spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
           alignItems: "center",
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.1,
+          shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
           elevation: 3,
         },
         statNumber: {
-          fontSize: 28,
+          fontSize: theme.custom.typography.headlineMedium.fontSize,
           fontWeight: "700",
           color: theme.colors.primary,
-          marginBottom: spacing.xs,
+          marginBottom: theme.custom.spacing.xs,
         },
         statLabel: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
@@ -206,23 +209,23 @@ const DashboardScreen = () => {
 
         // Continue Watching Section
         continueWatchingSection: {
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.xl,
+          paddingHorizontal: theme.custom.spacing.lg,
+          marginBottom: theme.custom.spacing.xl,
         },
         continueWatchingHeader: {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: spacing.lg,
+          marginBottom: theme.custom.spacing.lg,
         },
         continueWatchingTitle: {
-          fontSize: 20,
+          fontSize: theme.custom.typography.titleLarge.fontSize,
           fontWeight: "700",
           color: theme.colors.onBackground,
-          letterSpacing: -0.5,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
         },
         seeAllButtonSmall: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           fontWeight: "500",
           color: theme.colors.primary,
         },
@@ -232,16 +235,20 @@ const DashboardScreen = () => {
           justifyContent: "space-between",
         },
         continueWatchingCard: {
-          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
+          width:
+            (screenWidth -
+              theme.custom.spacing.lg * 2 -
+              theme.custom.spacing.sm) /
+            2,
           backgroundColor: theme.colors.surface,
-          borderRadius: 12,
-          marginBottom: spacing.sm,
+          borderRadius: theme.custom.config?.posterStyle.borderRadius ?? 12,
+          marginBottom: theme.custom.spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.1,
+          shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
           elevation: 3,
           overflow: "hidden",
         },
@@ -256,7 +263,7 @@ const DashboardScreen = () => {
           bottom: 0,
           left: 0,
           right: 0,
-          padding: spacing.sm,
+          padding: theme.custom.spacing.sm,
           backgroundColor: "rgba(0,0,0,0.7)",
         },
         progressBar: {
@@ -270,35 +277,35 @@ const DashboardScreen = () => {
           backgroundColor: theme.colors.primary,
         },
         continueWatchingContent: {
-          padding: spacing.md,
+          padding: theme.custom.spacing.md,
         },
         continueWatchingCardTitle: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           fontWeight: "600",
           color: theme.colors.onSurface,
-          marginBottom: spacing.xs,
+          marginBottom: theme.custom.spacing.xs,
         },
         continueWatchingMeta: {
-          fontSize: 12,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
           color: theme.colors.onSurfaceVariant,
         },
 
         // Trending TV Section
         trendingTVSection: {
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.xl,
+          paddingHorizontal: theme.custom.spacing.lg,
+          marginBottom: theme.custom.spacing.xl,
         },
         trendingTVHeader: {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: spacing.lg,
+          marginBottom: theme.custom.spacing.lg,
         },
         trendingTVSectionTitle: {
-          fontSize: 20,
+          fontSize: theme.custom.typography.titleLarge.fontSize,
           fontWeight: "700",
           color: theme.colors.onBackground,
-          letterSpacing: -0.5,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
         },
         trendingTVList: {
           flexDirection: "row",
@@ -306,16 +313,20 @@ const DashboardScreen = () => {
           justifyContent: "space-between",
         },
         trendingTVCard: {
-          width: (screenWidth - spacing.lg * 2 - spacing.sm * 3) / 4,
+          width:
+            (screenWidth -
+              theme.custom.spacing.lg * 2 -
+              theme.custom.spacing.sm * 3) /
+            4,
           backgroundColor: theme.colors.surface,
-          borderRadius: 12,
-          marginBottom: spacing.sm,
+          borderRadius: theme.custom.config?.posterStyle.borderRadius ?? 12,
+          marginBottom: theme.custom.spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.1,
+          shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
           elevation: 3,
           overflow: "hidden",
         },
@@ -325,16 +336,16 @@ const DashboardScreen = () => {
           backgroundColor: theme.colors.surfaceVariant,
         },
         trendingTVContent: {
-          padding: spacing.sm,
+          padding: theme.custom.spacing.sm,
         },
         trendingTVTitle: {
-          fontSize: 12,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
           fontWeight: "600",
           color: theme.colors.onSurface,
           textAlign: "center",
         },
         trendingTVRating: {
-          fontSize: 10,
+          fontSize: theme.custom.typography.labelSmall.fontSize,
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
           marginTop: 2,
@@ -342,20 +353,20 @@ const DashboardScreen = () => {
 
         // Upcoming Releases Section
         upcomingReleasesSection: {
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.xl,
+          paddingHorizontal: theme.custom.spacing.lg,
+          marginBottom: theme.custom.spacing.xl,
         },
         upcomingReleasesHeader: {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: spacing.lg,
+          marginBottom: theme.custom.spacing.lg,
         },
         upcomingReleasesTitle: {
-          fontSize: 20,
+          fontSize: theme.custom.typography.titleLarge.fontSize,
           fontWeight: "700",
           color: theme.colors.onBackground,
-          letterSpacing: -0.5,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
         },
         upcomingReleasesList: {
           flexDirection: "row",
@@ -363,16 +374,20 @@ const DashboardScreen = () => {
           justifyContent: "space-between",
         },
         upcomingReleaseCard: {
-          width: (screenWidth - spacing.lg * 2 - spacing.sm) / 2,
+          width:
+            (screenWidth -
+              theme.custom.spacing.lg * 2 -
+              theme.custom.spacing.sm) /
+            2,
           backgroundColor: theme.colors.surface,
-          borderRadius: 12,
-          marginBottom: spacing.sm,
+          borderRadius: theme.custom.config?.posterStyle.borderRadius ?? 12,
+          marginBottom: theme.custom.spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.1,
+          shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
           elevation: 3,
           overflow: "hidden",
         },
@@ -382,63 +397,63 @@ const DashboardScreen = () => {
           backgroundColor: theme.colors.surfaceVariant,
         },
         upcomingReleaseContent: {
-          padding: spacing.md,
+          padding: theme.custom.spacing.md,
         },
         upcomingReleaseTitle: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           fontWeight: "600",
           color: theme.colors.onSurface,
-          marginBottom: spacing.xs,
+          marginBottom: theme.custom.spacing.xs,
         },
         upcomingReleaseMeta: {
-          fontSize: 12,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
           color: theme.colors.onSurfaceVariant,
         },
         releaseDateBadge: {
-          fontSize: 10,
+          fontSize: theme.custom.typography.labelSmall.fontSize,
           fontWeight: "500",
           color: theme.colors.onPrimary,
           backgroundColor: theme.colors.primary,
-          paddingHorizontal: spacing.xs,
+          paddingHorizontal: theme.custom.spacing.xs,
           paddingVertical: 2,
           borderRadius: 4,
           alignSelf: "flex-start",
-          marginTop: spacing.xs,
+          marginTop: theme.custom.spacing.xs,
         },
 
         // Recent Activity Section
         recentActivityHeader: {
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.lg,
+          paddingHorizontal: theme.custom.spacing.lg,
+          marginBottom: theme.custom.spacing.lg,
         },
         recentActivityTitle: {
-          fontSize: 20,
+          fontSize: theme.custom.typography.titleLarge.fontSize,
           fontWeight: "700",
           color: theme.colors.onBackground,
-          letterSpacing: -0.5,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
         },
         recentActivityList: {
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal: theme.custom.spacing.lg,
         },
         activityCard: {
           flexDirection: "row",
           backgroundColor: theme.colors.surface,
-          borderRadius: 12,
-          padding: spacing.md,
-          marginBottom: spacing.md,
+          borderRadius: theme.custom.config?.posterStyle.borderRadius ?? 12,
+          padding: theme.custom.spacing.md,
+          marginBottom: theme.custom.spacing.md,
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.1,
+          shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
           elevation: 3,
         },
         activityImage: {
           width: 50,
           height: 75,
           borderRadius: 8,
-          marginRight: spacing.md,
+          marginRight: theme.custom.spacing.md,
           backgroundColor: theme.colors.surfaceVariant,
         },
         activityContent: {
@@ -446,18 +461,18 @@ const DashboardScreen = () => {
           justifyContent: "center",
         },
         activityTitle: {
-          fontSize: 16,
+          fontSize: theme.custom.typography.titleMedium.fontSize,
           fontWeight: "600",
           color: theme.colors.onSurface,
           marginBottom: 4,
         },
         activityShow: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
           color: theme.colors.onSurfaceVariant,
           marginBottom: 4,
         },
         activityDate: {
-          fontSize: 12,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
           color: theme.colors.outline,
         },
       }),
@@ -507,7 +522,7 @@ const DashboardScreen = () => {
 
       case "widgets":
         return (
-          <View style={{ paddingHorizontal: spacing.lg }}>
+          <View style={{ paddingHorizontal: theme.custom.spacing.lg }}>
             <WidgetContainer editable={true} />
           </View>
         );

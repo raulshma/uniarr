@@ -14,7 +14,6 @@ import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
-import { spacing } from "@/theme/spacing";
 import { borderRadius, iconSizes } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
@@ -229,7 +228,9 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
   };
 
   const screenWidth = Dimensions.get("window").width;
-  const cardSize = (screenWidth - spacing.lg * 2 - spacing.md) / 2 - spacing.sm;
+  const cardSize =
+    (screenWidth - theme.custom.spacing.lg * 2 - theme.custom.spacing.md) / 2 -
+    theme.custom.spacing.sm;
 
   const styles = useMemo(
     () =>
@@ -241,7 +242,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: spacing.lg,
+          marginBottom: theme.custom.spacing.lg,
         },
         title: {
           fontSize: theme.custom.typography.titleLarge.fontSize,
@@ -251,11 +252,11 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
         },
         actions: {
           flexDirection: "row",
-          gap: spacing.xs,
+          gap: theme.custom.spacing.xs,
           alignItems: "center",
         },
         filterButton: {
-          fontSize: 14,
+          fontSize: theme.custom.typography.labelMedium.fontSize,
           fontWeight: "500",
           color: theme.colors.primary,
         },
@@ -266,12 +267,12 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           flexDirection: "row",
           flexWrap: "wrap",
           justifyContent: "space-between",
-          gap: spacing.sm,
+          gap: theme.custom.spacing.sm,
         },
         statCard: {
           backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.xl,
-          padding: spacing.lg,
+          padding: theme.custom.spacing.lg,
           alignItems: "flex-start",
           width: cardSize,
           minHeight: 120,
@@ -286,13 +287,13 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           backgroundColor: theme.colors.primaryContainer,
           alignItems: "center",
           justifyContent: "center",
-          marginBottom: spacing.md,
+          marginBottom: theme.custom.spacing.md,
         },
         statNumber: {
           fontSize: theme.custom.typography.headlineSmall.fontSize,
           fontWeight: "700",
           color: theme.colors.onSurface,
-          marginBottom: spacing.xs,
+          marginBottom: theme.custom.spacing.xs,
         },
         statLabel: {
           fontSize: theme.custom.typography.labelMedium.fontSize,
@@ -303,18 +304,18 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           fontSize: theme.custom.typography.labelMedium.fontSize,
           color: theme.colors.error,
           textAlign: "center",
-          paddingVertical: spacing.md,
+          paddingVertical: theme.custom.spacing.md,
         },
         loadingSkeleton: {
           flexDirection: "row",
           flexWrap: "wrap",
           justifyContent: "space-between",
-          gap: spacing.sm,
+          gap: theme.custom.spacing.sm,
         },
         statSkeleton: {
           backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.xl,
-          padding: spacing.lg,
+          padding: theme.custom.spacing.lg,
           alignItems: "flex-start",
           width: cardSize,
           minHeight: 120,
@@ -327,13 +328,13 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           height: iconSizes.lg,
           borderRadius: borderRadius.lg,
           backgroundColor: theme.colors.primaryContainer,
-          marginBottom: spacing.md,
+          marginBottom: theme.custom.spacing.md,
         },
         skeletonNumber: {
           width: iconSizes.lg,
           height: iconSizes.md + 8,
           borderRadius: borderRadius.sm,
-          marginBottom: spacing.xs,
+          marginBottom: theme.custom.spacing.xs,
         },
         skeletonLabel: {
           width: iconSizes.lg + 10,
@@ -460,12 +461,12 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
             <Text
               style={{
                 color: theme.colors.onSurfaceVariant,
-                marginBottom: spacing.md,
+                marginBottom: theme.custom.spacing.md,
               }}
             >
               Select time range for statistics:
             </Text>
-            <View style={{ gap: spacing.xs }}>
+            <View style={{ gap: theme.custom.spacing.xs }}>
               {[
                 { key: "all" as const, label: "All Time" },
                 { key: "recent" as const, label: "Recent (7 days)" },

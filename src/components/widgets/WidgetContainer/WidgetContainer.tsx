@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { View, StyleSheet, ScrollView, Modal } from "react-native";
 import { Text, FAB, useTheme, Button } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -7,7 +7,6 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
-import { spacing } from "@/theme/spacing";
 import { borderRadius, gapSizes } from "@/constants/sizes";
 import { createFlexLayout } from "@/utils/style.utils";
 
@@ -192,6 +191,97 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
   // widget size helper removed (unused)
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+        },
+        widgetsContainer: {
+          flex: 1,
+          gap: theme.custom.spacing.lg,
+        },
+        widgetWrapper: {
+          // Each widget handles its own styling
+        },
+        emptyState: {
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingVertical: theme.custom.spacing.xxxxl, // 64 -> xxxxl
+        },
+        emptyTitle: {
+          marginTop: theme.custom.spacing.md,
+          fontWeight: "600",
+        },
+        emptyText: {
+          marginTop: theme.custom.spacing.sm,
+          textAlign: "center",
+          opacity: 0.7,
+        },
+        setupButton: {
+          marginTop: theme.custom.spacing.lg,
+        },
+        placeholderWidget: {
+          padding: theme.custom.spacing.lg,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(0,0,0,0.05)",
+          borderRadius: borderRadius.md,
+          minHeight: theme.custom.spacing.xxxxl + theme.custom.spacing.lg, // 200 -> centralized spacing
+        },
+        fab: {
+          position: "absolute",
+          margin: theme.custom.spacing.md,
+          right: 0,
+          bottom: 0,
+        },
+        widgetList: {
+          marginVertical: theme.custom.spacing.lg,
+        },
+        widgetListItem: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingVertical: theme.custom.spacing.lg,
+          paddingHorizontal: theme.custom.spacing.sm,
+          borderBottomWidth: 1,
+          borderBottomColor: "rgba(0,0,0,0.08)",
+        },
+        widgetInfo: {
+          flex: 1,
+        },
+        widgetActions: {
+          flexDirection: "row",
+          gap: gapSizes.lg,
+        },
+        emptyModalState: {
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingVertical: theme.custom.spacing.xxl,
+        },
+        fullScreenModal: {
+          flex: 1,
+        },
+        modalHeader: {
+          ...createFlexLayout("row", "lg", {
+            justify: "space-between",
+            align: "center",
+          }),
+          paddingVertical: theme.custom.spacing.lg, // 20 -> lg
+          borderBottomWidth: 1,
+        },
+        modalScrollContent: {
+          flex: 1,
+          paddingHorizontal: theme.custom.spacing.lg, // 24 -> lg
+          paddingTop: theme.custom.spacing.xs, // 8 -> xs
+          paddingBottom: theme.custom.spacing.lg, // 24 -> lg
+        },
+      }),
+    [theme],
+  );
+
   if (isLoading) {
     return (
       <View style={[styles.container, style]}>
@@ -342,7 +432,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
                   variant="titleMedium"
                   style={{
                     color: theme.colors.onSurfaceVariant,
-                    marginTop: spacing.md,
+                    marginTop: theme.custom.spacing.md,
                   }}
                 >
                   No widgets available
@@ -351,7 +441,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
                   variant="bodyMedium"
                   style={{
                     color: theme.colors.onSurfaceVariant,
-                    marginTop: spacing.sm,
+                    marginTop: theme.custom.spacing.sm,
                     textAlign: "center",
                   }}
                 >
@@ -365,92 +455,5 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  widgetsContainer: {
-    flex: 1,
-    gap: spacing.lg,
-  },
-  widgetWrapper: {
-    // Each widget handles its own styling
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.xxxxl, // 64 -> xxxxl
-  },
-  emptyTitle: {
-    marginTop: spacing.md,
-    fontWeight: "600",
-  },
-  emptyText: {
-    marginTop: spacing.sm,
-    textAlign: "center",
-    opacity: 0.7,
-  },
-  setupButton: {
-    marginTop: spacing.lg,
-  },
-  placeholderWidget: {
-    padding: spacing.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.05)",
-    borderRadius: borderRadius.md,
-    minHeight: spacing.xxxxl + spacing.lg, // 200 -> centralized spacing
-  },
-  fab: {
-    position: "absolute",
-    margin: spacing.md,
-    right: 0,
-    bottom: 0,
-  },
-  widgetList: {
-    marginVertical: spacing.lg,
-  },
-  widgetListItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.08)",
-  },
-  widgetInfo: {
-    flex: 1,
-  },
-  widgetActions: {
-    flexDirection: "row",
-    gap: gapSizes.lg,
-  },
-  emptyModalState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.xxl,
-  },
-  fullScreenModal: {
-    flex: 1,
-  },
-  modalHeader: {
-    ...createFlexLayout("row", "lg", {
-      justify: "space-between",
-      align: "center",
-    }),
-    paddingVertical: spacing.lg, // 20 -> lg
-    borderBottomWidth: 1,
-  },
-  modalScrollContent: {
-    flex: 1,
-    paddingHorizontal: spacing.lg, // 24 -> lg
-    paddingTop: spacing.xs, // 8 -> xs
-    paddingBottom: spacing.lg, // 24 -> lg
-  },
-});
 
 export default WidgetContainer;

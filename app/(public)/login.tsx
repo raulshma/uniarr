@@ -17,7 +17,6 @@ import { type AppTheme } from "@/constants/theme";
 import { useAuth } from "@/services/auth/AuthProvider";
 import { getClerkErrorMessage } from "@/services/auth/AuthService";
 import { logger } from "@/services/logger/LoggerService";
-import { spacing } from "@/theme/spacing";
 
 const useWarmUpBrowser = () => {
   useEffect(() => {
@@ -55,9 +54,9 @@ const LoginScreen = () => {
         },
         content: {
           flex: 1,
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.xxl,
-          paddingBottom: spacing.lg,
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingTop: theme.custom.spacing.xxl,
+          paddingBottom: theme.custom.spacing.lg,
           justifyContent: "space-between",
         },
         header: {
@@ -65,11 +64,11 @@ const LoginScreen = () => {
         },
         brand: {
           color: theme.colors.primary,
-          marginBottom: spacing.md,
+          marginBottom: theme.custom.spacing.md,
         },
         welcomeTitle: {
           color: theme.colors.onBackground,
-          marginBottom: spacing.xs,
+          marginBottom: theme.custom.spacing.xs,
           textAlign: "center",
         },
         subtitle: {
@@ -77,28 +76,28 @@ const LoginScreen = () => {
           textAlign: "center",
         },
         form: {
-          marginTop: spacing.xl,
+          marginTop: theme.custom.spacing.xl,
         },
         formSpacing: {
-          marginBottom: spacing.md,
+          marginBottom: theme.custom.spacing.md,
         },
         forgotPasswordContainer: {
           alignItems: "flex-end",
-          marginBottom: spacing.lg,
+          marginBottom: theme.custom.spacing.lg,
         },
         forgotPasswordText: {
           color: theme.colors.primary,
         },
         error: {
-          marginBottom: spacing.md,
+          marginBottom: theme.custom.spacing.md,
         },
         primaryButton: {
-          marginBottom: spacing.md,
+          marginBottom: theme.custom.spacing.md,
         },
         dividerRow: {
           flexDirection: "row",
           alignItems: "center",
-          marginVertical: spacing.lg,
+          marginVertical: theme.custom.spacing.lg,
         },
         dividerLine: {
           flex: 1,
@@ -106,17 +105,17 @@ const LoginScreen = () => {
           backgroundColor: theme.colors.outlineVariant,
         },
         dividerText: {
-          marginHorizontal: spacing.sm,
+          marginHorizontal: theme.custom.spacing.sm,
           color: theme.colors.onSurfaceVariant,
         },
         socialRow: {
           flexDirection: "row",
           justifyContent: "space-between",
-          marginTop: spacing.sm,
+          marginTop: theme.custom.spacing.sm,
         },
         socialButton: {
           flex: 1,
-          marginHorizontal: spacing.xs,
+          marginHorizontal: theme.custom.spacing.xs,
         },
         footer: {
           flexDirection: "row",
@@ -127,11 +126,11 @@ const LoginScreen = () => {
           color: theme.colors.onSurfaceVariant,
         },
         signUpText: {
-          marginLeft: spacing.xs,
+          marginLeft: theme.custom.spacing.xs,
           color: theme.colors.primary,
         },
         guestButton: {
-          marginTop: spacing.md,
+          marginTop: theme.custom.spacing.md,
         },
       }),
     [theme],
