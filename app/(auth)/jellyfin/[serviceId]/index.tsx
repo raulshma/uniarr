@@ -38,6 +38,7 @@ import type {
   JellyfinLibraryView,
   JellyfinResumeItem,
   JellyfinSession,
+  JellyfinSessionPlayState,
 } from "@/models/jellyfin.types";
 import { spacing } from "@/theme/spacing";
 
@@ -777,6 +778,43 @@ const JellyfinLibraryScreen = () => {
     [router, serviceId],
   );
 
+  const openPlayer = useCallback(
+    (itemId: string, resumeTicks?: number | null) => {
+      if (!serviceId || !itemId) {
+        return;
+      }
+
+      const params: Record<string, string> = {
+        serviceId,
+        itemId,
+      };
+
+      if (typeof resumeTicks === "number" && resumeTicks > 0) {
+        params.startTicks = String(Math.floor(resumeTicks));
+      }
+
+      router.push({
+        pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+        params,
+      });
+    },
+    [router, serviceId],
+  );
+
+  const handlePlayItem = useCallback(
+    (item: JellyfinItem, resumeTicks?: number | null) => {
+      if (!item?.Id) {
+        return;
+      }
+
+      const ticksCandidate =
+        resumeTicks ?? item.UserData?.PlaybackPositionTicks ?? null;
+
+      openPlayer(item.Id, ticksCandidate);
+    },
+    [openPlayer],
+  );
+
   const handleRefresh = useCallback(async () => {
     // Refresh all queries in parallel for better performance
     await Promise.all([
@@ -861,6 +899,17 @@ const JellyfinLibraryScreen = () => {
             </Text>
           </View>
           <IconButton
+            icon="play-circle"
+            accessibilityLabel="Play locally"
+            onPress={() =>
+              handlePlayItem(
+                playing as JellyfinItem,
+                (item.PlayState as JellyfinSessionPlayState | undefined)
+                  ?.PositionTicks ?? null,
+              )
+            }
+          />
+          <IconButton
             icon="dots-vertical"
             accessibilityLabel="Session actions"
             onPress={() => void handleOpenNowPlaying()}
@@ -872,6 +921,7 @@ const JellyfinLibraryScreen = () => {
       connector,
       handleOpenItem,
       handleOpenNowPlaying,
+      handlePlayItem,
       styles.cardPressed,
       styles.nowPlayingRow,
       styles.nowPlayingMeta,
@@ -922,9 +972,18 @@ const JellyfinLibraryScreen = () => {
                 borderRadius={12}
                 accessibilityLabel={`Continue watching ${title}`}
               />
-              <View style={styles.playOverlay} pointerEvents="none">
+              <Pressable
+                style={styles.playOverlay}
+                hitSlop={10}
+                onPress={() =>
+                  handlePlayItem(
+                    item as JellyfinItem,
+                    item.UserData?.PlaybackPositionTicks ?? null,
+                  )
+                }
+              >
                 <Icon source="play" size={28} color={theme.colors.onPrimary} />
-              </View>
+              </Pressable>
               {typeof progress === "number" ? (
                 <View style={styles.resumePosterProgressRail}>
                   <View
@@ -963,6 +1022,7 @@ const JellyfinLibraryScreen = () => {
     [
       connector,
       handleOpenItem,
+      handlePlayItem,
       serviceId,
       windowWidth,
       theme,
@@ -993,6 +1053,11 @@ const JellyfinLibraryScreen = () => {
       const subtitle = deriveSubtitle(item, libraryState.activeSegment);
       const positionStyle =
         index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight;
+      const isPlayable =
+        item.Type === "Movie" ||
+        item.Type === "Episode" ||
+        item.Type === "Video" ||
+        item.MediaType === "Video";
 
       // Optimized column sizing with pre-computed values
       const contentHorizontalPadding = spacing.lg * 2;
@@ -1024,6 +1089,28 @@ const JellyfinLibraryScreen = () => {
                 size={posterSize}
                 borderRadius={12}
               />
+              {isPlayable ? (
+                <Pressable
+                  style={styles.gridPlayOverlay}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Play ${item.Name ?? "item"}`}
+                  onPress={(event) => {
+                    event.stopPropagation?.();
+                    handlePlayItem(
+                      item,
+                      item.UserData?.PlaybackPositionTicks ?? null,
+                    );
+                  }}
+                >
+                  <View style={styles.gridPlayButton}>
+                    <Icon
+                      source="play"
+                      size={20}
+                      color={theme.colors.onPrimary}
+                    />
+                  </View>
+                </Pressable>
+              ) : null}
               {/* Download button overlay on poster */}
               {connector && serviceId && item.Id && (
                 <View style={styles.downloadOverlay}>
@@ -1061,6 +1148,7 @@ const JellyfinLibraryScreen = () => {
     [
       libraryState.activeSegment,
       connector,
+      handlePlayItem,
       handleOpenItem,
       serviceId,
       windowWidth,
@@ -1070,8 +1158,11 @@ const JellyfinLibraryScreen = () => {
       styles.gridCardRight,
       styles.posterFrame,
       styles.downloadOverlay,
+      styles.gridPlayOverlay,
+      styles.gridPlayButton,
       styles.gridTitle,
       styles.gridSubtitle,
+      theme.colors.onPrimary,
     ],
   );
 
@@ -1655,6 +1746,22 @@ const createStyles = (theme: AppTheme) =>
       padding: 0,
       borderRadius: 12,
       alignItems: "center",
+    },
+    gridPlayOverlay: {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: [{ translateX: -18 }, { translateY: -18 }],
+      zIndex: 2,
+    },
+    gridPlayButton: {
+      backgroundColor: "rgba(0, 0, 0, 0.65)",
+      borderRadius: 20,
+      padding: spacing.xs,
+      alignItems: "center",
+      justifyContent: "center",
+      width: 36,
+      height: 36,
     },
     downloadOverlay: {
       position: "absolute",

@@ -20,6 +20,15 @@ const JellyfinServiceLayout = () => {
           animation: "fade",
         }}
       />
+      <Stack.Screen
+        name="player/[itemId]"
+        options={{
+          headerShown: false,
+          presentation: "fullScreenModal",
+          animation: "fade",
+          gestureEnabled: false,
+        }}
+      />
     </Stack>
   );
 };

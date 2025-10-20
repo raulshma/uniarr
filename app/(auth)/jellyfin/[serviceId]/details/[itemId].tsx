@@ -1,14 +1,7 @@
 import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Linking,
-  Share,
-  ScrollView,
-  StyleSheet,
-  View,
-  Dimensions,
-} from "react-native";
+import { Share, ScrollView, StyleSheet, View, Dimensions } from "react-native";
 import {
   ActivityIndicator,
   Button,
@@ -396,20 +389,26 @@ const JellyfinItemDetailsScreen = () => {
     }
   }, [item]);
 
-  const handlePlay = useCallback(async () => {
-    if (!connector || !item) {
+  const handlePlay = useCallback(() => {
+    if (!serviceId || !item?.Id) {
       return;
     }
 
-    const baseUrl = connector.config.url.replace(/\/$/, "");
-    const deepLink = `${baseUrl}/web/index.html#!/details?id=${item.Id}`;
+    const params: Record<string, string> = {
+      serviceId,
+      itemId: item.Id,
+    };
 
-    try {
-      await Linking.openURL(deepLink);
-    } catch {
-      setSyncStatus("Unable to open Jellyfin web player.");
+    const resumeTicks = item.UserData?.PlaybackPositionTicks;
+    if (typeof resumeTicks === "number" && resumeTicks > 0) {
+      params.startTicks = String(Math.floor(resumeTicks));
     }
-  }, [connector, item]);
+
+    router.push({
+      pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+      params,
+    });
+  }, [router, serviceId, item]);
 
   const handleSyncMetadata = useCallback(async () => {
     if (!connector || !item) {
@@ -706,7 +705,7 @@ const JellyfinItemDetailsScreen = () => {
               contentStyle={styles.playButtonContent}
               labelStyle={styles.playButtonLabel}
             >
-              Play on Jellyfin
+              Play
             </Button>
 
             {/* Sync card with inline Update button on the right */}

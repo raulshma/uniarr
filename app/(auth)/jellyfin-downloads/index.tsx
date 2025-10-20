@@ -9,6 +9,7 @@ import {
   Divider,
   Searchbar,
   IconButton,
+  Menu,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -33,6 +34,11 @@ import { formatBytes } from "@/utils/torrent.utils";
 import { useDownloadActions } from "@/hooks/useDownloadActions";
 import { useDownloadedFileActions } from "@/hooks/useDownloadedFileActions";
 import { formatDate } from "@/utils/calendar.utils";
+import {
+  getAvailableVideoPlayers,
+  openFileWithPlayer,
+} from "@/utils/fileOperations.utils";
+import type { VideoPlayerOption } from "@/utils/fileOperations.utils";
 
 type JellyfinDownloadItem = DownloadItem & {
   isJellyfinDownload: boolean;
@@ -57,6 +63,100 @@ const filterJellyfinDownloads = (
   downloads: DownloadItem[],
 ): JellyfinDownloadItem[] => {
   return downloads.filter(isJellyfinDownload) as JellyfinDownloadItem[];
+};
+
+// Component for completed-item actions. Placed at module level so hooks are
+// called at the top level of a component and not inside another function.
+const CompletedActions = ({
+  item,
+  onOpenFile,
+  onDeleteFile,
+}: {
+  item: JellyfinDownloadItem;
+  onOpenFile: (d: JellyfinDownloadItem) => void;
+  onDeleteFile: (d: JellyfinDownloadItem) => void;
+}) => {
+  const router = useRouter();
+  const [menuVisible, setMenuVisible] = useState(false);
+  const players = useMemo(() => getAvailableVideoPlayers(), []);
+
+  const handleOpenWithPlayer = async (playerOption?: VideoPlayerOption) => {
+    setMenuVisible(false);
+    const path = item.download.localPath;
+    if (!path) return;
+    try {
+      if (playerOption) {
+        await openFileWithPlayer(path, playerOption);
+      } else {
+        await openFileWithPlayer(path);
+      }
+    } catch {
+      // ignore errors
+    }
+  };
+
+  return (
+    <>
+      <IconButton
+        icon="play"
+        size={18}
+        onPress={() => {
+          try {
+            router.push({
+              pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+              params: {
+                serviceId: item.serviceConfig.id,
+                itemId: item.content.id,
+                source: "download",
+              },
+            });
+          } catch {
+            onOpenFile(item);
+          }
+        }}
+        accessibilityLabel="Play in app"
+      />
+
+      <View>
+        <Menu
+          key={`open-with-menu-${menuVisible}-${item.id}`}
+          visible={menuVisible}
+          onDismiss={() => setMenuVisible(false)}
+          anchor={
+            <IconButton
+              icon="open-in-new"
+              size={18}
+              onPress={() => setMenuVisible(true)}
+              accessibilityLabel="Open with"
+            />
+          }
+        >
+          {players.length > 0 ? (
+            players.map((p) => (
+              <Menu.Item
+                key={p.packageName}
+                onPress={() => void handleOpenWithPlayer(p)}
+                title={p.label}
+                leadingIcon={p.icon}
+              />
+            ))
+          ) : (
+            <Menu.Item
+              onPress={() => void handleOpenWithPlayer(undefined)}
+              title="Open"
+            />
+          )}
+        </Menu>
+      </View>
+
+      <IconButton
+        icon="delete"
+        size={18}
+        onPress={() => onDeleteFile(item)}
+        accessibilityLabel="Delete file"
+      />
+    </>
+  );
 };
 
 const JellyfinDownloadsScreen = () => {
@@ -402,20 +502,11 @@ const JellyfinDownloadsScreen = () => {
                   )}
 
                   {isCompleted && (
-                    <>
-                      <IconButton
-                        icon="play"
-                        size={18}
-                        onPress={() => handleOpenFile(item)}
-                        accessibilityLabel="Open file"
-                      />
-                      <IconButton
-                        icon="delete"
-                        size={18}
-                        onPress={() => handleDeleteFile(item)}
-                        accessibilityLabel="Delete file"
-                      />
-                    </>
+                    <CompletedActions
+                      item={item}
+                      onOpenFile={handleOpenFile}
+                      onDeleteFile={handleDeleteFile}
+                    />
                   )}
                 </View>
               </View>

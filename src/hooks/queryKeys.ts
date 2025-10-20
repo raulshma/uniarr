@@ -219,6 +219,28 @@ export const queryKeys = {
       [...queryKeys.jellyfin.service(serviceId), "item", itemId] as const,
     nowPlaying: (serviceId: string): QueryKeyBuilder =>
       [...queryKeys.jellyfin.service(serviceId), "nowPlaying"] as const,
+    nextUp: (
+      serviceId: string,
+      seriesId: string,
+      options?: Record<string, unknown>,
+    ): QueryKeyBuilder =>
+      [
+        ...queryKeys.jellyfin.service(serviceId),
+        "nextUp",
+        seriesId,
+        options ?? {},
+      ] as const,
+    playback: (
+      serviceId: string,
+      itemId: string,
+      options?: Record<string, unknown>,
+    ): QueryKeyBuilder =>
+      [
+        ...queryKeys.jellyfin.service(serviceId),
+        "playback",
+        itemId,
+        options ?? {},
+      ] as const,
     search: (
       serviceId: string,
       term: string,
