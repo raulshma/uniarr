@@ -368,8 +368,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   progressSection: {
     gap: 4,
@@ -388,24 +388,24 @@ const styles = StyleSheet.create({
   },
   completedSection: {
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
   moreText: {
     textAlign: "center",
     opacity: 0.7,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 32,
+    paddingVertical: spacing.xl,
   },
   emptyText: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     fontWeight: "500",
   },
   emptySubtext: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     opacity: 0.7,
     textAlign: "center",
   },

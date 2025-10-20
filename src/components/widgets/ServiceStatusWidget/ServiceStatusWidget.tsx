@@ -311,8 +311,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: themeSpacing.sm,
+    paddingVertical: themeSpacing.xs,
   },
   statusMessage: {
     fontStyle: "italic",
@@ -330,14 +330,14 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 32,
+    paddingVertical: themeSpacing.xl,
   },
   emptyText: {
-    marginTop: 8,
+    marginTop: themeSpacing.sm,
     fontWeight: "500",
   },
   emptySubtext: {
-    marginTop: 4,
+    marginTop: themeSpacing.xs,
     opacity: 0.7,
     textAlign: "center",
   },

@@ -22,7 +22,7 @@ import { router } from "expo-router";
 
 import { useThemeEditor } from "@/hooks/useThemeEditor";
 import { ColorPicker } from "@/components/common/ColorPicker";
-import { DensityMode } from "@/theme/spacing";
+import { DensityMode, spacing } from "@/theme/spacing";
 import { FontScale } from "@/theme/typography";
 import { presetThemes } from "@/theme/colors";
 
@@ -527,6 +527,6 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    marginHorizontal: 8,
+    marginHorizontal: spacing.xs,
   },
 });

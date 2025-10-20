@@ -917,8 +917,8 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surfaceVariant,
       borderWidth: 1,
       borderColor: theme.colors.outlineVariant,
-      paddingVertical: 6,
-      paddingHorizontal: 12,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
     },
     genreChipText: {
       color: theme.colors.onSurface,

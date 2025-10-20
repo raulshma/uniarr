@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.08)",
   },
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 40,
+    paddingVertical: spacing.xxl,
   },
   fullScreenModal: {
     flex: 1,

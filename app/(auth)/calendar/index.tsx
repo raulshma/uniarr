@@ -41,6 +41,7 @@ import type {
   MediaType,
   ReleaseStatus,
 } from "@/models/calendar.types";
+import { spacing } from "@/theme/spacing";
 
 const ALL_MEDIA_TYPES: MediaType[] = ["movie", "series", "episode"];
 const DEFAULT_STATUSES: ReleaseStatus[] = ["upcoming", "released"];
@@ -120,9 +121,9 @@ const CalendarScreen = () => {
       backgroundColor: theme.colors.background,
     },
     headerContent: {
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingBottom: theme.custom.spacing.md,
-      gap: theme.custom.spacing.md,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.lg,
+      gap: spacing.lg,
     },
     segmentsRow: {
       flexDirection: "row",
@@ -136,7 +137,7 @@ const CalendarScreen = () => {
     segmentButton: {
       flex: 1,
       borderRadius: 24,
-      paddingVertical: theme.custom.spacing.sm,
+      paddingVertical: spacing.sm,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -154,7 +155,7 @@ const CalendarScreen = () => {
       color: theme.colors.onPrimary,
     },
     sectionHeader: {
-      paddingHorizontal: theme.custom.spacing.md,
+      paddingHorizontal: spacing.lg,
     },
     headingText: {
       fontSize: theme.custom.typography.headlineSmall.fontSize,
@@ -164,7 +165,7 @@ const CalendarScreen = () => {
       letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
     },
     subheadingText: {
-      marginTop: theme.custom.spacing.xs,
+      marginTop: spacing.xs,
       fontSize: theme.custom.typography.bodySmall.fontSize,
       fontFamily: theme.custom.typography.bodySmall.fontFamily,
       fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
@@ -172,16 +173,16 @@ const CalendarScreen = () => {
       letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
     },
     filtersRow: {
-      paddingHorizontal: theme.custom.spacing.md,
-      marginTop: theme.custom.spacing.sm,
+      paddingHorizontal: spacing.lg,
+      marginTop: spacing.sm,
     },
     filtersButton: {
       flexDirection: "row",
       alignItems: "center",
       alignSelf: "flex-start",
-      gap: theme.custom.spacing.xs,
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingVertical: theme.custom.spacing.sm,
+      gap: spacing.xs,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
       borderRadius: 999,
       backgroundColor: theme.colors.surfaceVariant,
     },
@@ -198,17 +199,17 @@ const CalendarScreen = () => {
       color: theme.colors.onPrimary,
     },
     listContent: {
-      padding: theme.custom.spacing.md,
-      paddingBottom: theme.custom.spacing.xl * 2,
-      gap: theme.custom.spacing.sm,
+      padding: spacing.lg,
+      paddingBottom: spacing.xl * 2,
+      gap: spacing.sm,
     },
     emptyWrapper: {
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingTop: theme.custom.spacing.lg,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.lg,
     },
     drawerSection: {
-      marginBottom: theme.custom.spacing.lg,
-      gap: theme.custom.spacing.sm,
+      marginBottom: spacing.lg,
+      gap: spacing.sm,
     },
     drawerSectionTitle: {
       fontSize: theme.custom.typography.titleMedium.fontSize,
@@ -220,11 +221,11 @@ const CalendarScreen = () => {
     pillGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: theme.custom.spacing.sm,
+      gap: spacing.sm,
     },
     pill: {
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingVertical: theme.custom.spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
       borderRadius: 999,
       backgroundColor: theme.colors.surfaceVariant,
     },
@@ -243,13 +244,13 @@ const CalendarScreen = () => {
     dateRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: theme.custom.spacing.sm,
+      gap: spacing.sm,
     },
     dateField: {
       flex: 1,
       borderRadius: 14,
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingVertical: theme.custom.spacing.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.lg,
       backgroundColor: theme.colors.surfaceVariant,
       borderWidth: 1,
       borderColor: "transparent",
@@ -262,7 +263,7 @@ const CalendarScreen = () => {
       fontFamily: theme.custom.typography.labelSmall.fontFamily,
       fontWeight: theme.custom.typography.labelSmall.fontWeight as any,
       color: theme.colors.onSurfaceVariant,
-      marginBottom: theme.custom.spacing.xs,
+      marginBottom: spacing.xs,
     },
     dateFieldValue: {
       fontSize: theme.custom.typography.bodyLarge.fontSize,
@@ -271,7 +272,7 @@ const CalendarScreen = () => {
       color: theme.colors.onSurface,
     },
     drawerActions: {
-      gap: theme.custom.spacing.sm,
+      gap: spacing.sm,
     },
     clearButton: {
       alignSelf: "center",
@@ -711,7 +712,7 @@ const CalendarScreen = () => {
         view={state.view}
         currentDate={state.currentDate}
         onViewChange={setView}
-        style={{ marginBottom: theme.custom.spacing.sm }}
+        style={{ marginBottom: spacing.sm }}
       />
 
       <View style={styles.headerContent}>
@@ -786,7 +787,7 @@ const CalendarScreen = () => {
       >
         <View
           style={{
-            paddingHorizontal: theme.custom.spacing.md,
+            paddingHorizontal: spacing.lg,
             backgroundColor: theme.colors.surface,
           }}
         >

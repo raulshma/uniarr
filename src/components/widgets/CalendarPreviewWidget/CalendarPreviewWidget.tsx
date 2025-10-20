@@ -291,7 +291,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
         dateBadge: {
           backgroundColor: theme.colors.primary,
           paddingHorizontal: spacing.xs,
-          paddingVertical: 4,
+          paddingVertical: spacing.xs,
           borderRadius: borderRadius.xs,
           alignSelf: "flex-start",
           marginBottom: spacing.sm,
