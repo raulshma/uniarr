@@ -279,7 +279,17 @@ const JellyfinPlayerScreen = () => {
   const playerStatus = statusEvent?.status ?? player.status;
   const isPlaying = playingEvent?.isPlaying ?? player.playing;
   const currentTime = timeEvent?.currentTime ?? player.currentTime ?? 0;
-  const duration = player.duration ?? 0;
+
+  // Use playback metadata duration if player.duration is not available (common with streams)
+  const playbackMetadataDuration = useMemo(() => {
+    if (playbackQuery.data?.mediaSource?.RunTimeTicks) {
+      return playbackQuery.data.mediaSource.RunTimeTicks / 10_000_000;
+    }
+    return 0;
+  }, [playbackQuery.data?.mediaSource?.RunTimeTicks]);
+
+  const duration =
+    player.duration > 0 ? player.duration : playbackMetadataDuration;
 
   const currentAudioTrack = audioTrackEvent?.audioTrack ?? player.audioTrack;
   const currentSubtitleTrack =
@@ -667,198 +677,218 @@ const JellyfinPlayerScreen = () => {
       {/* Controls Overlay */}
       <Animated.View
         style={[styles.overlay, { opacity: controlsOpacityAnim }]}
-        pointerEvents={controlsVisible ? "auto" : "none"}
+        pointerEvents="auto"
       >
-        <Pressable style={styles.overlayPressable} onPress={toggleControls}>
+        <Pressable
+          style={styles.overlayPressable}
+          onPress={toggleControls}
+          hitSlop={0}
+        >
           {/* Top Bar */}
-          <View style={styles.topBar}>
-            <View style={styles.topLeft}>
-              <IconButton
-                icon="arrow-left"
-                iconColor="white"
-                onPress={handleBack}
-              />
-              <View style={styles.titleGroup}>
-                <Text
-                  variant="titleMedium"
-                  style={styles.titleText}
-                  numberOfLines={1}
-                >
-                  {itemQuery.data?.Name ?? "Video"}
-                </Text>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={styles.topBar}>
+              <View style={styles.topLeft}>
+                <IconButton
+                  icon="arrow-left"
+                  iconColor="white"
+                  onPress={handleBack}
+                />
+                <View style={styles.titleGroup}>
+                  <Text
+                    variant="titleMedium"
+                    style={styles.titleText}
+                    numberOfLines={1}
+                  >
+                    {itemQuery.data?.Name ?? "Video"}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
+          </Pressable>
 
           {/* Center Controls */}
-          <View style={styles.centerControls}>
-            <IconButton
-              icon="rewind-10"
-              iconColor="white"
-              size={40}
-              onPress={() => seekRelative(-SEEK_STEP_SECONDS)}
-            />
-            <Pressable style={styles.playButton} onPress={togglePlayPause}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={styles.centerControls}>
               <IconButton
-                icon={isPlaying ? "pause" : "play"}
+                icon="rewind-10"
                 iconColor="white"
-                size={56}
+                size={40}
+                onPress={() => seekRelative(-SEEK_STEP_SECONDS)}
               />
-            </Pressable>
-            <IconButton
-              icon="fast-forward-10"
-              iconColor="white"
-              size={40}
-              onPress={() => seekRelative(SEEK_STEP_SECONDS)}
-            />
-          </View>
-
-          {/* Bottom Section */}
-          <View style={styles.bottomSection}>
-            {/* Progress Bar */}
-            <View
-              style={styles.progressContainer}
-              onLayout={handleProgressBarLayout}
-            >
-              <Pressable
-                style={styles.progressBar}
-                onPress={handleProgressBarPress}
-              >
-                <View style={styles.progressBackground} />
-                <View
-                  style={[styles.progressFill, { width: `${progress * 100}%` }]}
-                />
-                <View
-                  style={[styles.progressThumb, { left: `${progress * 100}%` }]}
+              <Pressable style={styles.playButton} onPress={togglePlayPause}>
+                <IconButton
+                  icon={isPlaying ? "pause" : "play"}
+                  iconColor="white"
+                  size={56}
                 />
               </Pressable>
-              <View style={styles.timeRow}>
-                <Text variant="labelSmall" style={styles.timeText}>
-                  {formatTime(currentTime)}
-                </Text>
-                <Text variant="labelSmall" style={styles.timeText}>
-                  {formatTime(duration)}
-                </Text>
+              <IconButton
+                icon="fast-forward-10"
+                iconColor="white"
+                size={40}
+                onPress={() => seekRelative(SEEK_STEP_SECONDS)}
+              />
+            </View>
+          </Pressable>
+
+          {/* Bottom Section */}
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={styles.bottomSection}>
+              {/* Progress Bar */}
+              <View
+                style={styles.progressContainer}
+                onLayout={handleProgressBarLayout}
+              >
+                <Pressable
+                  style={styles.progressBar}
+                  onPress={handleProgressBarPress}
+                >
+                  <View style={styles.progressBackground} />
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${progress * 100}%` },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.progressThumb,
+                      { left: `${progress * 100}%` },
+                    ]}
+                  />
+                </Pressable>
+                <View style={styles.timeRow}>
+                  <Text variant="labelSmall" style={styles.timeText}>
+                    {formatTime(currentTime)}
+                  </Text>
+                  <Text variant="labelSmall" style={styles.timeText}>
+                    {formatTime(duration)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Controls Row */}
+              <View style={styles.controlsRow}>
+                {/* Source Menu */}
+                <Menu
+                  visible={sourceMenuVisible}
+                  onDismiss={() => setSourceMenuVisible(false)}
+                  anchor={
+                    <IconButton
+                      icon="playlist-play"
+                      iconColor="white"
+                      onPress={() => setSourceMenuVisible(true)}
+                      disabled={!hasDownload && !hasStream}
+                    />
+                  }
+                >
+                  <Menu.Item
+                    onPress={() => handlePlaybackModeChange("stream")}
+                    title="Stream from Jellyfin"
+                    disabled={!hasStream}
+                    leadingIcon={
+                      playbackMode === "stream" ? "check" : undefined
+                    }
+                  />
+                  <Menu.Item
+                    onPress={() => handlePlaybackModeChange("download")}
+                    title="Play downloaded copy"
+                    disabled={!hasDownload}
+                    leadingIcon={
+                      playbackMode === "download" ? "check" : undefined
+                    }
+                  />
+                </Menu>
+
+                {/* Track Menu */}
+                <Menu
+                  visible={trackMenuVisible}
+                  onDismiss={() => setTrackMenuVisible(false)}
+                  anchor={
+                    <IconButton
+                      icon="tune-vertical"
+                      iconColor="white"
+                      onPress={() => setTrackMenuVisible(true)}
+                      disabled={!hasTrackOptions}
+                    />
+                  }
+                >
+                  {audioTracks.length > 0 && (
+                    <>
+                      <Menu.Item title="Audio Tracks" disabled />
+                      {audioTracks.map((track, idx) => (
+                        <Menu.Item
+                          key={track.id ?? `audio-${idx}`}
+                          onPress={() => {
+                            player.audioTrack = track;
+                            setTrackMenuVisible(false);
+                          }}
+                          title={formatTrackLabel(track)}
+                          leadingIcon={
+                            isTrackSelected(track, currentAudioTrack)
+                              ? "check"
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </>
+                  )}
+                  {subtitleTracks.length > 0 && (
+                    <>
+                      <Menu.Item title="Subtitles" disabled />
+                      <Menu.Item
+                        onPress={() => {
+                          player.subtitleTrack = null;
+                          setTrackMenuVisible(false);
+                        }}
+                        title="Subtitles Off"
+                        leadingIcon={
+                          !currentSubtitleTrack ? "check" : undefined
+                        }
+                      />
+                      {subtitleTracks.map((track, idx) => (
+                        <Menu.Item
+                          key={track.id ?? `subtitle-${idx}`}
+                          onPress={() => {
+                            player.subtitleTrack = track;
+                            setTrackMenuVisible(false);
+                          }}
+                          title={formatTrackLabel(track)}
+                          leadingIcon={
+                            isTrackSelected(track, currentSubtitleTrack)
+                              ? "check"
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </>
+                  )}
+                </Menu>
+
+                {/* Speed Menu */}
+                <Menu
+                  visible={speedMenuVisible}
+                  onDismiss={() => setSpeedMenuVisible(false)}
+                  anchor={
+                    <IconButton
+                      icon="speedometer"
+                      iconColor="white"
+                      onPress={() => setSpeedMenuVisible(true)}
+                    />
+                  }
+                >
+                  {PLAYBACK_RATES.map((rate) => (
+                    <Menu.Item
+                      key={rate}
+                      onPress={() => handlePlaybackRateChange(rate)}
+                      title={`${rate}×`}
+                      leadingIcon={rate === playbackRate ? "check" : undefined}
+                    />
+                  ))}
+                </Menu>
               </View>
             </View>
-
-            {/* Controls Row */}
-            <View style={styles.controlsRow}>
-              {/* Source Menu */}
-              <Menu
-                visible={sourceMenuVisible}
-                onDismiss={() => setSourceMenuVisible(false)}
-                anchor={
-                  <IconButton
-                    icon="playlist-play"
-                    iconColor="white"
-                    onPress={() => setSourceMenuVisible(true)}
-                    disabled={!hasDownload && !hasStream}
-                  />
-                }
-              >
-                <Menu.Item
-                  onPress={() => handlePlaybackModeChange("stream")}
-                  title="Stream from Jellyfin"
-                  disabled={!hasStream}
-                  leadingIcon={playbackMode === "stream" ? "check" : undefined}
-                />
-                <Menu.Item
-                  onPress={() => handlePlaybackModeChange("download")}
-                  title="Play downloaded copy"
-                  disabled={!hasDownload}
-                  leadingIcon={
-                    playbackMode === "download" ? "check" : undefined
-                  }
-                />
-              </Menu>
-
-              {/* Track Menu */}
-              <Menu
-                visible={trackMenuVisible}
-                onDismiss={() => setTrackMenuVisible(false)}
-                anchor={
-                  <IconButton
-                    icon="tune-vertical"
-                    iconColor="white"
-                    onPress={() => setTrackMenuVisible(true)}
-                    disabled={!hasTrackOptions}
-                  />
-                }
-              >
-                {audioTracks.length > 0 && (
-                  <>
-                    <Menu.Item title="Audio Tracks" disabled />
-                    {audioTracks.map((track, idx) => (
-                      <Menu.Item
-                        key={track.id ?? `audio-${idx}`}
-                        onPress={() => {
-                          player.audioTrack = track;
-                          setTrackMenuVisible(false);
-                        }}
-                        title={formatTrackLabel(track)}
-                        leadingIcon={
-                          isTrackSelected(track, currentAudioTrack)
-                            ? "check"
-                            : undefined
-                        }
-                      />
-                    ))}
-                  </>
-                )}
-                {subtitleTracks.length > 0 && (
-                  <>
-                    <Menu.Item title="Subtitles" disabled />
-                    <Menu.Item
-                      onPress={() => {
-                        player.subtitleTrack = null;
-                        setTrackMenuVisible(false);
-                      }}
-                      title="Subtitles Off"
-                      leadingIcon={!currentSubtitleTrack ? "check" : undefined}
-                    />
-                    {subtitleTracks.map((track, idx) => (
-                      <Menu.Item
-                        key={track.id ?? `subtitle-${idx}`}
-                        onPress={() => {
-                          player.subtitleTrack = track;
-                          setTrackMenuVisible(false);
-                        }}
-                        title={formatTrackLabel(track)}
-                        leadingIcon={
-                          isTrackSelected(track, currentSubtitleTrack)
-                            ? "check"
-                            : undefined
-                        }
-                      />
-                    ))}
-                  </>
-                )}
-              </Menu>
-
-              {/* Speed Menu */}
-              <Menu
-                visible={speedMenuVisible}
-                onDismiss={() => setSpeedMenuVisible(false)}
-                anchor={
-                  <IconButton
-                    icon="speedometer"
-                    iconColor="white"
-                    onPress={() => setSpeedMenuVisible(true)}
-                  />
-                }
-              >
-                {PLAYBACK_RATES.map((rate) => (
-                  <Menu.Item
-                    key={rate}
-                    onPress={() => handlePlaybackRateChange(rate)}
-                    title={`${rate}×`}
-                    leadingIcon={rate === playbackRate ? "check" : undefined}
-                  />
-                ))}
-              </Menu>
-            </View>
-          </View>
+          </Pressable>
         </Pressable>
       </Animated.View>
 
