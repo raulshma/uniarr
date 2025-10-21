@@ -156,8 +156,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   const handleRefresh = useCallback(() => {
     onPress();
     loadUpcomingReleases();
-    onRefresh?.();
-  }, [onPress, onRefresh, loadUpcomingReleases]);
+  }, [onPress, loadUpcomingReleases]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

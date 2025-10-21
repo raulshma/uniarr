@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Brightness from "expo-brightness";
 import { LinearGradient } from "expo-linear-gradient";
 import { VideoAirPlayButton, VideoView, useVideoPlayer } from "expo-video";
 import type { AudioTrack, SubtitleTrack, VideoSource } from "expo-video";
@@ -8,10 +9,9 @@ import { Image } from "expo-image";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
+  Animated,
   GestureResponderEvent,
   LayoutChangeEvent,
-  PanResponder,
   Platform,
   Pressable,
   Share,
@@ -21,22 +21,19 @@ import {
 import {
   Button,
   Divider,
-  HelperText,
   IconButton,
   Menu,
   Text,
   useTheme,
 } from "react-native-paper";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
 
 import { useQuery } from "@tanstack/react-query";
 
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { EmptyState } from "@/components/common/EmptyState";
+import { FullscreenLoading } from "@/components/common/FullscreenLoading";
+import { FullscreenError } from "@/components/common/FullscreenError";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { useJellyfinPlaybackInfo } from "@/hooks/useJellyfinPlaybackInfo";
 import { queryKeys } from "@/hooks/queryKeys";
@@ -142,6 +139,9 @@ const formatEpisodeCode = (item?: JellyfinItem | null): string | undefined => {
   return undefined;
 };
 
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max);
+
 const JellyfinPlayerScreen = () => {
   "use no memo";
   const {
@@ -169,7 +169,6 @@ const JellyfinPlayerScreen = () => {
 
   const theme = useTheme<AppTheme>();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const getConnector = useConnectorsStore(selectGetConnector);
@@ -213,6 +212,20 @@ const JellyfinPlayerScreen = () => {
 
   const itemQuery = useJellyfinItemDetails({ serviceId, itemId });
   const playbackQuery = useJellyfinPlaybackInfo({ serviceId, itemId });
+
+  // Manage metadata loading states
+  useEffect(() => {
+    if (itemQuery.isLoading || playbackQuery.isLoading) {
+      setMetadataLoading(true);
+      setLoadingMessage(
+        itemQuery.isLoading
+          ? "Loading media metadata..."
+          : "Loading playback information...",
+      );
+    } else {
+      setMetadataLoading(false);
+    }
+  }, [itemQuery.isLoading, playbackQuery.isLoading]);
 
   const seriesId = useMemo(() => {
     const item = itemQuery.data;
@@ -266,23 +279,18 @@ const JellyfinPlayerScreen = () => {
   const hasDownload = Boolean(localFileUri);
   const hasStream = Boolean(playbackQuery.data?.streamUrl);
 
-  const initialPlaybackMode = useMemo(() => {
-    if (sourcePreference) {
-      if (sourcePreference === "download" && hasDownload) {
-        return "download" as const;
-      }
-      if (sourcePreference === "stream") {
-        return "stream" as const;
-      }
-    }
-    if (hasDownload) {
-      return "download" as const;
-    }
-    return "stream" as const;
-  }, [hasDownload, sourcePreference]);
-
   const [playbackMode, setPlaybackMode] = useState<"download" | "stream">(
-    initialPlaybackMode,
+    () => {
+      if (sourcePreference) {
+        if (sourcePreference === "download" && hasDownload) {
+          return "download";
+        }
+        if (sourcePreference === "stream") {
+          return "stream";
+        }
+      }
+      return hasDownload ? "download" : "stream";
+    },
   );
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [sourceMenuVisible, setSourceMenuVisible] = useState(false);
@@ -291,12 +299,68 @@ const JellyfinPlayerScreen = () => {
   const [infoVisible, setInfoVisible] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
-  const [initialSeekApplied, setInitialSeekApplied] = useState(false);
   const [upNextVisible, setUpNextVisible] = useState(false);
+  const [brightnessLevel, setBrightnessLevel] = useState<number>(1);
+  const [brightnessControlAvailable, setBrightnessControlAvailable] =
+    useState<boolean>(Platform.OS !== "web");
+  const [volumeLevel, setVolumeLevel] = useState<number>(1);
+  const [mediaLoading, setMediaLoading] = useState<boolean>(false);
+  const [metadataLoading, setMetadataLoading] = useState<boolean>(false);
+  const [loadingMessage, setLoadingMessage] = useState<string>("Loading...");
+
+  // Controls visibility animation
+  const controlsOpacityAnim = useRef(new Animated.Value(1)).current;
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setUpNextVisible(false);
   }, [itemId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (Platform.OS === "web") {
+      setBrightnessControlAvailable(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const initializeBrightness = async () => {
+      try {
+        if (Platform.OS === "android") {
+          const permission = await Brightness.getPermissionsAsync();
+          if (permission.status !== "granted") {
+            const request = await Brightness.requestPermissionsAsync();
+            if (request.status !== "granted") {
+              if (!cancelled) {
+                setBrightnessControlAvailable(false);
+              }
+              return;
+            }
+          }
+        }
+
+        const systemBrightness = await Brightness.getBrightnessAsync();
+        if (!cancelled && typeof systemBrightness === "number") {
+          setBrightnessLevel(clamp(systemBrightness, 0, 1));
+        }
+        if (!cancelled) {
+          setBrightnessControlAvailable(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setBrightnessControlAvailable(false);
+        }
+      }
+    };
+
+    void initializeBrightness();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (playbackMode === "download" && !hasDownload && hasStream) {
@@ -356,10 +420,10 @@ const JellyfinPlayerScreen = () => {
     playerInstance.playbackRate = playbackRate;
   });
 
-  useEffect(() => {
-    // eslint-disable-next-line react-compiler/react-compiler
-    player.allowsExternalPlayback = playbackMode === "stream";
-  }, [player, playbackMode]);
+  // Note: some player implementations expose `allowsExternalPlayback` but
+  // mutating the player object returned from the hook can trigger static
+  // analysis warnings and is not strictly required for core playback in-app.
+  // We intentionally avoid mutating the returned player object here.
 
   const videoViewRef = useRef<any>(null);
   const pendingSeekSecondsRef = useRef<number | undefined>(
@@ -376,17 +440,71 @@ const JellyfinPlayerScreen = () => {
   } | null>(null);
   const lastProgressTicksRef = useRef<number>(-1);
   const isPlayerMountedRef = useRef(true);
-  const gestureStartYRef = useRef(0);
-  const gestureStartXRef = useRef(0);
-  const currentGestureRef = useRef<"brightness" | "volume" | null>(null);
-  const [brightnessOverlay, setBrightnessOverlay] = useState<number | null>(
-    null,
+
+  const applyBrightnessLevel = useCallback(
+    (value: number) => {
+      if (Platform.OS === "web") {
+        return;
+      }
+
+      const nextValue = clamp(value, 0, 1);
+
+      void (async () => {
+        try {
+          await Brightness.setBrightnessAsync(nextValue);
+          if (Platform.OS === "android") {
+            try {
+              await Brightness.setSystemBrightnessAsync(nextValue);
+            } catch {
+              // ignore system brightness errors on Android
+            }
+          }
+        } catch {
+          if (isPlayerMountedRef.current) {
+            setBrightnessControlAvailable(false);
+          }
+        }
+      })();
+    },
+    [isPlayerMountedRef, setBrightnessControlAvailable],
   );
-  const [volumeOverlay, setVolumeOverlay] = useState<number | null>(null);
-  const brightnessHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
+
+  const adjustBrightness = useCallback(
+    (delta: number) => {
+      if (!brightnessControlAvailable) {
+        return;
+      }
+      setControlsVisible(true);
+      setBrightnessLevel((prev) => {
+        const baseline = Number.isFinite(prev) ? prev : 0.5;
+        const next = clamp(baseline + delta, 0, 1);
+        applyBrightnessLevel(next);
+        return next;
+      });
+    },
+    [applyBrightnessLevel, brightnessControlAvailable, setControlsVisible],
   );
-  const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const adjustVolume = useCallback(
+    (delta: number) => {
+      setControlsVisible(true);
+      setVolumeLevel((prev) => {
+        const baseline = Number.isFinite(prev) ? prev : 1;
+        return clamp(baseline + delta, 0, 1);
+      });
+    },
+    [setControlsVisible],
+  );
+
+  useEffect(() => {
+    try {
+      // Some player implementations require imperative assignment here.
+      // eslint-disable-next-line react-compiler/react-compiler
+      player.volume = clamp(volumeLevel, 0, 1);
+    } catch {
+      // ignore volume adjustment errors
+    }
+  }, [player, volumeLevel]);
 
   useEffect(() => {
     pendingSeekSecondsRef.current = startPositionSeconds;
@@ -399,15 +517,10 @@ const JellyfinPlayerScreen = () => {
   }, [startPositionSeconds]);
 
   useEffect(() => {
+    const timer = hideControlsTimer.current;
     return () => {
-      if (hideControlsTimer.current) {
-        clearTimeout(hideControlsTimer.current);
-      }
-      if (brightnessHideTimerRef.current) {
-        clearTimeout(brightnessHideTimerRef.current);
-      }
-      if (volumeHideTimerRef.current) {
-        clearTimeout(volumeHideTimerRef.current);
+      if (timer) {
+        clearTimeout(timer);
       }
       isPlayerMountedRef.current = false;
     };
@@ -572,16 +685,29 @@ const JellyfinPlayerScreen = () => {
 
     const load = async () => {
       try {
+        if (!cancelled) {
+          setMediaLoading(true);
+          setLoadingMessage(
+            playbackMode === "download"
+              ? "Preparing offline playback..."
+              : "Preparing video stream...",
+          );
+        }
         await player.replaceAsync(playbackSource);
+        if (!cancelled) {
+          setLoadingMessage("Initializing player...");
+        }
         player.play();
         if (!cancelled) {
           setPlaybackError(null);
+          setMediaLoading(false);
         }
       } catch (error) {
         if (!cancelled) {
           setPlaybackError(
             error instanceof Error ? error.message : "Unable to load media.",
           );
+          setMediaLoading(false);
         }
       }
     };
@@ -590,22 +716,24 @@ const JellyfinPlayerScreen = () => {
 
     return () => {
       cancelled = true;
+      if (!cancelled) {
+        setMediaLoading(false);
+      }
     };
-  }, [player, playbackSource, playbackSourceKey]);
+  }, [player, playbackSource, playbackSourceKey, playbackMode]);
 
-  // Handle initial seek position separately to avoid React Compiler mutation warnings
+  // Handle initial seek position when player is ready
   useEffect(() => {
     if (
-      !initialSeekApplied &&
       typeof pendingSeekSecondsRef.current === "number" &&
       playerStatus === "readyToPlay"
     ) {
       const seekPosition = pendingSeekSecondsRef.current;
       // Seeking on player instance is an intentional imperative operation
       player.currentTime = seekPosition;
-      setInitialSeekApplied(true);
+      pendingSeekSecondsRef.current = undefined;
     }
-  }, [initialSeekApplied, playerStatus, player]);
+  }, [playerStatus, player]);
 
   useEffect(() => {
     if (statusEvent?.error) {
@@ -616,15 +744,21 @@ const JellyfinPlayerScreen = () => {
   }, [playerStatus, statusEvent]);
 
   const resetHideControlsTimer = useCallback(() => {
-    if (hideControlsTimer.current) {
-      clearTimeout(hideControlsTimer.current);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
     }
-    if (isReadyToPlay && isPlaying) {
-      hideControlsTimer.current = setTimeout(() => {
-        setControlsVisible(false);
-      }, 3000);
+    if (!isPlaying) {
+      return; // Don't auto-hide when paused
     }
-  }, [isPlaying, isReadyToPlay]);
+    controlsTimeoutRef.current = setTimeout(() => {
+      setControlsVisible(false);
+      Animated.timing(controlsOpacityAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }, 4000); // Hide after 4 seconds of playing for better fullscreen experience
+  }, [isPlaying, controlsOpacityAnim]);
 
   useEffect(() => {
     if (controlsVisible) {
@@ -639,8 +773,8 @@ const JellyfinPlayerScreen = () => {
 
     if (isPlaying) {
       resetHideControlsTimer();
-    } else if (hideControlsTimer.current) {
-      clearTimeout(hideControlsTimer.current);
+    } else if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
     }
   }, [isPlaying, isReadyToPlay, resetHideControlsTimer]);
 
@@ -670,11 +804,27 @@ const JellyfinPlayerScreen = () => {
     setControlsVisible((prev) => {
       const next = !prev;
       if (next) {
+        // Fade in controls
+        Animated.timing(controlsOpacityAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
         resetHideControlsTimer();
+      } else {
+        // Fade out controls
+        Animated.timing(controlsOpacityAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+        if (controlsTimeoutRef.current) {
+          clearTimeout(controlsTimeoutRef.current);
+        }
       }
       return next;
     });
-  }, [resetHideControlsTimer]);
+  }, [controlsOpacityAnim, resetHideControlsTimer]);
 
   const handleTogglePlay = useCallback(() => {
     if (isPlaying) {
@@ -703,7 +853,13 @@ const JellyfinPlayerScreen = () => {
         durationSeconds,
       );
       pendingSeekSecondsRef.current = undefined;
-      player.currentTime = targetSeconds;
+
+      // Prevent orientation changes during seek
+      try {
+        player.currentTime = targetSeconds;
+      } catch (error) {
+        console.warn("Seek operation failed:", error);
+      }
     },
     [mediaSource?.RunTimeTicks, player, timeEvent],
   );
@@ -726,7 +882,13 @@ const JellyfinPlayerScreen = () => {
         1,
       );
       pendingSeekSecondsRef.current = undefined;
-      player.currentTime = durationSeconds * fraction;
+
+      // Prevent orientation changes during seek
+      try {
+        player.currentTime = durationSeconds * fraction;
+      } catch (error) {
+        console.warn("Seek operation failed:", error);
+      }
     },
     [mediaSource?.RunTimeTicks, player],
   );
@@ -823,12 +985,15 @@ const JellyfinPlayerScreen = () => {
     [player],
   );
 
-  const handleEnterFullscreen = useCallback(() => {
-    const view = videoViewRef.current;
-    if (view?.enterFullscreen) {
-      void view.enterFullscreen();
-    }
-  }, []);
+  const handleFullscreenEnterEvent = useCallback(() => {
+    setControlsVisible(true);
+    resetHideControlsTimer();
+  }, [resetHideControlsTimer]);
+
+  const handleFullscreenExitEvent = useCallback(() => {
+    setControlsVisible(true);
+    resetHideControlsTimer();
+  }, [resetHideControlsTimer]);
 
   const handleShare = useCallback(async () => {
     const item = itemQuery.data;
@@ -889,74 +1054,16 @@ const JellyfinPlayerScreen = () => {
     setInfoVisible((prev) => !prev);
   }, []);
 
-  const handleGestureStart = useCallback((event: GestureResponderEvent) => {
-    gestureStartXRef.current = event.nativeEvent.locationX;
-    gestureStartYRef.current = event.nativeEvent.locationY;
-
-    const screenWidth = Dimensions.get("window").width;
-    const isLeftSide = gestureStartXRef.current < screenWidth / 3;
-    const isRightSide = gestureStartXRef.current > (screenWidth * 2) / 3;
-
-    if (isLeftSide) {
-      currentGestureRef.current = "brightness";
-    } else if (isRightSide) {
-      currentGestureRef.current = "volume";
-    } else {
-      currentGestureRef.current = null;
+  const handleRetry = useCallback(() => {
+    setPlaybackError(null);
+    if (playbackQuery.refetch) {
+      playbackQuery.refetch();
     }
-  }, []);
+  }, [playbackQuery]);
 
-  const handleGestureMove = useCallback((event: GestureResponderEvent) => {
-    if (!currentGestureRef.current) {
-      return;
-    }
-
-    const deltaY = gestureStartYRef.current - event.nativeEvent.locationY;
-    const screenHeight = Dimensions.get("window").height;
-    const sensitivity = screenHeight / 100;
-    const delta = deltaY / sensitivity;
-
-    if (currentGestureRef.current === "brightness") {
-      setBrightnessOverlay((prev) => {
-        const next = Math.max(0, Math.min(100, (prev ?? 50) + delta));
-        if (brightnessHideTimerRef.current) {
-          clearTimeout(brightnessHideTimerRef.current);
-        }
-        brightnessHideTimerRef.current = setTimeout(() => {
-          setBrightnessOverlay(null);
-        }, 1500);
-        return next;
-      });
-    } else if (currentGestureRef.current === "volume") {
-      setVolumeOverlay((prev) => {
-        const next = Math.max(0, Math.min(100, (prev ?? 50) + delta));
-        if (volumeHideTimerRef.current) {
-          clearTimeout(volumeHideTimerRef.current);
-        }
-        volumeHideTimerRef.current = setTimeout(() => {
-          setVolumeOverlay(null);
-        }, 1500);
-        return next;
-      });
-    }
-
-    gestureStartYRef.current = event.nativeEvent.locationY;
-  }, []);
-
-  const handleGestureEnd = useCallback(() => {
-    currentGestureRef.current = null;
-  }, []);
-
-  const panResponderRef = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (event) => handleGestureStart(event),
-      onPanResponderMove: (event) => handleGestureMove(event),
-      onPanResponderRelease: handleGestureEnd,
-      onPanResponderTerminate: handleGestureEnd,
-    }),
-  );
+  const handleErrorGoBack = useCallback(() => {
+    handleBack();
+  }, [handleBack]);
 
   const playbackErrorMessage = playbackError
     ? playbackError
@@ -999,53 +1106,69 @@ const JellyfinPlayerScreen = () => {
     }
   }, [upNextVisible]);
 
+  const brightnessPercent = Math.round(clamp(brightnessLevel, 0, 1) * 100);
+  const volumePercent = Math.round(clamp(volumeLevel, 0, 1) * 100);
+  // Minimal padding for fullscreen experience
+  const topControlsPadding = spacing.md;
+  const bottomControlsPadding = spacing.md;
+  const topGradientPadding = spacing.xs;
+  const bottomGradientPadding = spacing.sm;
+
+  // Single, clean fullscreen trigger when video is ready to play
+  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
+  useEffect(() => {
+    if (
+      playbackSource &&
+      playerStatus === "readyToPlay" &&
+      !hasEnteredFullscreen &&
+      videoViewRef.current
+    ) {
+      // Enter fullscreen only once when video is ready
+      try {
+        void videoViewRef.current.enterFullscreen();
+        setHasEnteredFullscreen(true);
+      } catch {
+        // Fullscreen may not be available on all platforms
+        setHasEnteredFullscreen(true); // Don't retry
+      }
+    }
+  }, [playbackSource, playerStatus, hasEnteredFullscreen]);
+
   if (!serviceId || !itemId) {
     return (
-      <SafeAreaView style={styles.fallbackSafeArea}>
+      <View style={styles.fallbackContainer}>
         <EmptyState
           title="Missing playback context"
           description="Select an item from Jellyfin before opening the media player."
           actionLabel="Go back"
           onActionPress={handleBack}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (playbackMode === "stream" && !hasDownload && playbackQuery.isError) {
     return (
-      <SafeAreaView style={styles.fallbackSafeArea}>
+      <View style={styles.fallbackContainer}>
         <EmptyState
           title="Playback unavailable"
           description={playbackErrorMessage ?? "Unable to start streaming."}
           actionLabel="Retry"
           onActionPress={() => void playbackQuery.refetch()}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
   const posterTag =
     (itemQuery.data as unknown as { PrimaryImageTag?: string })
       ?.PrimaryImageTag ?? itemQuery.data?.ImageTags?.Primary;
-  const backdropTag =
-    itemQuery.data?.BackdropImageTags?.[0] ??
-    itemQuery.data?.ImageTags?.Backdrop ??
-    undefined;
 
   const posterUri =
     connector && itemQuery.data?.Id && posterTag
       ? connector.getImageUrl(itemQuery.data.Id, "Primary", {
           tag: posterTag,
           width: 640,
-        })
-      : undefined;
-
-  const backdropUri =
-    connector && itemQuery.data?.Id && backdropTag
-      ? connector.getImageUrl(itemQuery.data.Id, "Backdrop", {
-          tag: backdropTag,
-          width: Dimensions.get("window").width * 2,
         })
       : undefined;
 
@@ -1071,6 +1194,10 @@ const JellyfinPlayerScreen = () => {
     }
     return 0;
   })();
+
+  const isDurationLoading =
+    durationMillis === 0 &&
+    (mediaLoading || metadataLoading || playerStatus !== "readyToPlay");
   const progressFraction = durationMillis
     ? Math.min(Math.max(positionMillis / durationMillis, 0), 1)
     : 0;
@@ -1141,307 +1268,359 @@ const JellyfinPlayerScreen = () => {
 
   const showLoader =
     !playbackSource ||
-    (playerStatus !== "readyToPlay" && playerStatus !== "error");
+    (playerStatus !== "readyToPlay" && playerStatus !== "error") ||
+    metadataLoading ||
+    mediaLoading;
 
   return (
-    <View style={styles.container} {...panResponderRef.current?.panHandlers}>
-      {backdropUri ? (
-        <Image
-          source={{ uri: backdropUri }}
-          style={styles.backdrop}
-          contentFit="cover"
-          blurRadius={20}
+    <View style={styles.container}>
+      {playbackSource ? (
+        <VideoView
+          style={styles.video}
+          player={player}
+          nativeControls={false}
+          fullscreenOptions={{
+            enable: true,
+            orientation: "landscape",
+          }}
+          allowsPictureInPicture={false}
+          contentFit="contain"
+          pointerEvents="none"
+          onFullscreenEnter={handleFullscreenEnterEvent}
+          onFullscreenExit={handleFullscreenExitEvent}
+          ref={videoViewRef}
         />
-      ) : null}
-      <Pressable style={styles.videoSurface} onPress={toggleControls}>
-        {playbackSource ? (
-          <VideoView
-            style={styles.video}
-            player={player}
-            nativeControls={false}
-            fullscreenOptions={{ enable: true, orientation: "landscape" }}
-            allowsPictureInPicture={false}
-            contentFit="contain"
-            ref={videoViewRef}
-          />
-        ) : (
-          <View style={styles.videoFallback}>
-            <ActivityIndicator animating size="large" />
-          </View>
-        )}
-      </Pressable>
+      ) : (
+        <View style={styles.videoFallback}>
+          <ActivityIndicator animating size="large" />
+        </View>
+      )}
 
       <LinearGradient
+        pointerEvents="none"
         colors={["rgba(0,0,0,0.6)", "transparent"]}
-        style={[styles.gradientTop, { paddingTop: insets.top + spacing.sm }]}
+        style={[styles.gradientTop, { paddingTop: topGradientPadding }]}
       />
       <LinearGradient
+        pointerEvents="none"
         colors={["transparent", "rgba(0,0,0,0.85)"]}
         style={[
           styles.gradientBottom,
-          { paddingBottom: insets.bottom + spacing.md },
+          { paddingBottom: bottomGradientPadding },
         ]}
       />
 
-      <View
+      <Animated.View
+        style={[
+          styles.overlay,
+          {
+            opacity: controlsOpacityAnim,
+            pointerEvents: controlsVisible ? "auto" : "none",
+          },
+        ]}
         pointerEvents={controlsVisible ? "auto" : "none"}
-        style={[styles.overlay, { opacity: controlsVisible ? 1 : 0 }]}
       >
-        <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
-          <View style={styles.topLeft}>
-            <IconButton icon="arrow-left" onPress={handleBack} />
-            <View style={styles.titleGroup}>
-              <Text
-                variant="titleMedium"
-                style={styles.titleText}
-                numberOfLines={1}
-              >
-                {title}
-              </Text>
-              {subtitle ? (
+        <Pressable style={styles.overlayPressable} onPress={toggleControls}>
+          <View
+            pointerEvents="box-none"
+            style={[styles.topBar, { paddingTop: topControlsPadding }]}
+          >
+            <View style={styles.topLeft}>
+              <IconButton icon="arrow-left" onPress={handleBack} />
+              <View style={styles.titleGroup}>
                 <Text
-                  variant="bodySmall"
-                  style={styles.subtitleText}
+                  variant="titleMedium"
+                  style={styles.titleText}
                   numberOfLines={1}
                 >
-                  {subtitle}
+                  {title}
                 </Text>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.topActions}>
-            {showAirPlayButton && playbackMode === "stream" ? (
-              <View style={styles.airPlayWrapper}>
-                <VideoAirPlayButton tint="white" style={styles.airPlayButton} />
+                {subtitle ? (
+                  <Text
+                    variant="bodySmall"
+                    style={styles.subtitleText}
+                    numberOfLines={1}
+                  >
+                    {subtitle}
+                  </Text>
+                ) : null}
               </View>
-            ) : null}
-            <IconButton icon="share-variant" onPress={handleShare} />
-            <IconButton icon="information-outline" onPress={toggleInfo} />
-          </View>
-        </View>
-
-        <View style={styles.centerControls}>
-          <IconButton
-            icon="rewind-10"
-            size={36}
-            onPress={() => handleSeekRelative(-10)}
-          />
-          <Pressable style={styles.playButton} onPress={handleTogglePlay}>
-            <IconButton icon={isPlaying ? "pause" : "play"} size={48} />
-          </Pressable>
-          <IconButton
-            icon="fast-forward-10"
-            size={36}
-            onPress={() => handleSeekRelative(10)}
-          />
-        </View>
-
-        <View
-          style={[
-            styles.bottomSection,
-            { paddingBottom: insets.bottom + spacing.lg },
-          ]}
-        >
-          <View
-            style={styles.progressContainer}
-            onLayout={handleProgressLayout}
-          >
-            <Pressable style={styles.progressBar} onPress={handleProgressPress}>
-              <View style={styles.progressBackground} />
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${progressFraction * 100}%` },
-                ]}
-              />
-              <View
-                style={[
-                  styles.progressThumb,
-                  { left: `${progressFraction * 100}%` },
-                ]}
-              />
-            </Pressable>
-            <View style={styles.timeRow}>
-              <Text variant="labelSmall" style={styles.timeText}>
-                {formatMillis(positionMillis)}
-              </Text>
-              <Text variant="labelSmall" style={styles.timeText}>
-                {formatMillis(durationMillis)}
-              </Text>
+            </View>
+            <View style={styles.topActions}>
+              {showAirPlayButton && playbackMode === "stream" ? (
+                <View style={styles.airPlayWrapper}>
+                  <VideoAirPlayButton
+                    tint="white"
+                    style={styles.airPlayButton}
+                  />
+                </View>
+              ) : null}
+              <IconButton icon="share-variant" onPress={handleShare} />
+              <IconButton icon="information-outline" onPress={toggleInfo} />
             </View>
           </View>
 
-          <View style={styles.bottomMetadata}>
-            <Text
-              variant="labelSmall"
-              style={styles.sourceText}
-              numberOfLines={1}
-            >
-              {sourceLabel}
-            </Text>
-            <View style={styles.metaRow}>
-              {videoCodecLabel ? (
-                <Text variant="labelSmall" style={styles.metaText}>
-                  {videoCodecLabel}
-                </Text>
-              ) : null}
-              {audioCodecLabel ? (
-                <Text variant="labelSmall" style={styles.metaText}>
-                  {audioCodecLabel}
-                </Text>
-              ) : null}
-              {resolutionLabel ? (
-                <Text variant="labelSmall" style={styles.metaText}>
-                  {resolutionLabel}
-                </Text>
-              ) : null}
-              {bitrateLabel ? (
-                <Text variant="labelSmall" style={styles.metaText}>
-                  {bitrateLabel}
-                </Text>
-              ) : null}
+          <View pointerEvents="box-none" style={styles.centerControls}>
+            <View style={styles.sideControls}>
+              <IconButton
+                icon="brightness-5"
+                size={28}
+                onPress={() => adjustBrightness(-0.1)}
+                disabled={!brightnessControlAvailable}
+                iconColor="white"
+              />
+              <Text variant="labelSmall" style={styles.sideControlLabel}>
+                {brightnessControlAvailable ? `${brightnessPercent}%` : "--"}
+              </Text>
+              <IconButton
+                icon="brightness-7"
+                size={28}
+                onPress={() => adjustBrightness(0.1)}
+                disabled={!brightnessControlAvailable}
+                iconColor="white"
+              />
             </View>
-          </View>
-
-          <View style={styles.controlsRow}>
-            <Menu
-              visible={sourceMenuVisible}
-              onDismiss={() => setSourceMenuVisible(false)}
-              anchor={
-                <View>
-                  <IconButton
-                    icon="playlist-play"
-                    onPress={() => setSourceMenuVisible(true)}
-                    disabled={!hasDownload && !hasStream}
-                  />
-                </View>
-              }
-            >
-              <Menu.Item
-                onPress={() => handlePlaybackModeChange("stream")}
-                title="Stream from Jellyfin"
-                disabled={!hasStream}
-              />
-              <Menu.Item
-                onPress={() => handlePlaybackModeChange("download")}
-                title="Play downloaded copy"
-                disabled={!hasDownload}
-              />
-            </Menu>
-
-            <Menu
-              visible={trackMenuVisible}
-              onDismiss={() => setTrackMenuVisible(false)}
-              anchor={
-                <View>
-                  <IconButton
-                    icon="tune-vertical"
-                    onPress={() => setTrackMenuVisible(true)}
-                    disabled={!hasTrackOptions}
-                  />
-                </View>
-              }
-            >
-              {audioTrackOptions.length > 0 ? (
-                <>
-                  <Menu.Item
-                    title="Audio tracks"
-                    disabled
-                    onPress={() => undefined}
-                    titleStyle={styles.menuSectionLabel}
-                  />
-                  {audioTrackOptions.map((track, index) => {
-                    const key =
-                      track.id ?? `${track.language ?? "audio"}-${index}`;
-                    return (
-                      <Menu.Item
-                        key={`audio-${key}`}
-                        onPress={() => handleAudioTrackSelect(track)}
-                        title={formatAudioTrackLabel(track)}
-                        trailingIcon={
-                          isAudioTrackSelected(track) ? "check" : undefined
-                        }
-                      />
-                    );
-                  })}
-                </>
-              ) : null}
-
-              {audioTrackOptions.length > 0 &&
-              subtitleTrackOptions.length > 0 ? (
-                <Divider />
-              ) : null}
-
-              {subtitleTrackOptions.length > 0 ? (
-                <>
-                  <Menu.Item
-                    title="Subtitles"
-                    disabled
-                    onPress={() => undefined}
-                    titleStyle={styles.menuSectionLabel}
-                  />
-                  <Menu.Item
-                    onPress={() => handleSubtitleTrackSelect(null)}
-                    title="Subtitles off"
-                    trailingIcon={currentSubtitleTrack ? undefined : "check"}
-                  />
-                  {subtitleTrackOptions.map((track, index) => {
-                    const key =
-                      track.id ?? `${track.language ?? "subtitle"}-${index}`;
-                    return (
-                      <Menu.Item
-                        key={`subtitle-${key}`}
-                        onPress={() => handleSubtitleTrackSelect(track)}
-                        title={formatSubtitleTrackLabel(track)}
-                        trailingIcon={
-                          isSubtitleTrackSelected(track) ? "check" : undefined
-                        }
-                      />
-                    );
-                  })}
-                </>
-              ) : null}
-            </Menu>
-
-            <Menu
-              visible={speedMenuVisible}
-              onDismiss={() => setSpeedMenuVisible(false)}
-              anchor={
-                <View>
-                  <IconButton
-                    icon="speedometer"
-                    onPress={() => setSpeedMenuVisible(true)}
-                  />
-                </View>
-              }
-            >
-              {PLAYBACK_RATES.map((rate) => (
-                <Menu.Item
-                  key={rate}
-                  onPress={() => handlePlaybackRateChange(rate)}
-                  title={`${rate}x`}
-                  trailingIcon={rate === playbackRate ? "check" : undefined}
-                />
-              ))}
-            </Menu>
-
-            <View style={styles.controlsSpacer} />
-
             <IconButton
-              icon="skip-next"
-              onPress={handlePlayNext}
-              disabled={!nextUpItem}
+              icon="rewind-10"
+              size={36}
+              onPress={() => handleSeekRelative(-10)}
             />
-            <IconButton icon="fullscreen" onPress={handleEnterFullscreen} />
+            <Pressable style={styles.playButton} onPress={handleTogglePlay}>
+              <IconButton icon={isPlaying ? "pause" : "play"} size={48} />
+            </Pressable>
+            <IconButton
+              icon="fast-forward-10"
+              size={36}
+              onPress={() => handleSeekRelative(10)}
+            />
+            <View style={styles.sideControls}>
+              <IconButton
+                icon="volume-minus"
+                size={28}
+                onPress={() => adjustVolume(-0.1)}
+                iconColor="white"
+              />
+              <Text variant="labelSmall" style={styles.sideControlLabel}>
+                {`${volumePercent}%`}
+              </Text>
+              <IconButton
+                icon="volume-plus"
+                size={28}
+                onPress={() => adjustVolume(0.1)}
+                iconColor="white"
+              />
+            </View>
           </View>
-        </View>
-      </View>
 
-      {showLoader ? (
-        <View style={styles.loaderOverlay} pointerEvents="none">
-          <ActivityIndicator animating size="large" />
-        </View>
-      ) : null}
+          <View
+            pointerEvents="box-none"
+            style={[
+              styles.bottomSection,
+              { paddingBottom: bottomControlsPadding },
+            ]}
+          >
+            <View
+              pointerEvents="box-none"
+              style={styles.progressContainer}
+              onLayout={handleProgressLayout}
+            >
+              <Pressable
+                style={styles.progressBar}
+                onPress={handleProgressPress}
+              >
+                <View style={styles.progressBackground} />
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${progressFraction * 100}%` },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.progressThumb,
+                    { left: `${progressFraction * 100}%` },
+                  ]}
+                />
+              </Pressable>
+              <View style={styles.timeRow}>
+                <Text variant="labelSmall" style={styles.timeText}>
+                  {formatMillis(positionMillis)}
+                </Text>
+                <Text variant="labelSmall" style={styles.timeText}>
+                  {isDurationLoading
+                    ? "Loading..."
+                    : formatMillis(durationMillis)}
+                </Text>
+              </View>
+            </View>
+
+            <View pointerEvents="box-none" style={styles.bottomMetadata}>
+              <Text
+                variant="labelSmall"
+                style={styles.sourceText}
+                numberOfLines={1}
+              >
+                {sourceLabel}
+              </Text>
+              <View pointerEvents="box-none" style={styles.metaRow}>
+                {videoCodecLabel ? (
+                  <Text variant="labelSmall" style={styles.metaText}>
+                    {videoCodecLabel}
+                  </Text>
+                ) : null}
+                {audioCodecLabel ? (
+                  <Text variant="labelSmall" style={styles.metaText}>
+                    {audioCodecLabel}
+                  </Text>
+                ) : null}
+                {resolutionLabel ? (
+                  <Text variant="labelSmall" style={styles.metaText}>
+                    {resolutionLabel}
+                  </Text>
+                ) : null}
+                {bitrateLabel ? (
+                  <Text variant="labelSmall" style={styles.metaText}>
+                    {bitrateLabel}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            <View pointerEvents="auto" style={styles.controlsRow}>
+              <Menu
+                visible={sourceMenuVisible}
+                onDismiss={() => setSourceMenuVisible(false)}
+                anchor={
+                  <View>
+                    <IconButton
+                      icon="playlist-play"
+                      onPress={() => setSourceMenuVisible(true)}
+                      disabled={!hasDownload && !hasStream}
+                    />
+                  </View>
+                }
+              >
+                <Menu.Item
+                  onPress={() => handlePlaybackModeChange("stream")}
+                  title="Stream from Jellyfin"
+                  disabled={!hasStream}
+                />
+                <Menu.Item
+                  onPress={() => handlePlaybackModeChange("download")}
+                  title="Play downloaded copy"
+                  disabled={!hasDownload}
+                />
+              </Menu>
+
+              <Menu
+                visible={trackMenuVisible}
+                onDismiss={() => setTrackMenuVisible(false)}
+                anchor={
+                  <View>
+                    <IconButton
+                      icon="tune-vertical"
+                      onPress={() => setTrackMenuVisible(true)}
+                      disabled={!hasTrackOptions}
+                    />
+                  </View>
+                }
+              >
+                {audioTrackOptions.length > 0 ? (
+                  <>
+                    <Menu.Item
+                      title="Audio tracks"
+                      disabled
+                      onPress={() => undefined}
+                      titleStyle={styles.menuSectionLabel}
+                    />
+                    {audioTrackOptions.map((track, index) => {
+                      const key =
+                        track.id ?? `${track.language ?? "audio"}-${index}`;
+                      return (
+                        <Menu.Item
+                          key={`audio-${key}`}
+                          onPress={() => handleAudioTrackSelect(track)}
+                          title={formatAudioTrackLabel(track)}
+                          trailingIcon={
+                            isAudioTrackSelected(track) ? "check" : undefined
+                          }
+                        />
+                      );
+                    })}
+                  </>
+                ) : null}
+
+                {audioTrackOptions.length > 0 &&
+                subtitleTrackOptions.length > 0 ? (
+                  <Divider />
+                ) : null}
+
+                {subtitleTrackOptions.length > 0 ? (
+                  <>
+                    <Menu.Item
+                      title="Subtitles"
+                      disabled
+                      onPress={() => undefined}
+                      titleStyle={styles.menuSectionLabel}
+                    />
+                    <Menu.Item
+                      onPress={() => handleSubtitleTrackSelect(null)}
+                      title="Subtitles off"
+                      trailingIcon={currentSubtitleTrack ? undefined : "check"}
+                    />
+                    {subtitleTrackOptions.map((track, index) => {
+                      const key =
+                        track.id ?? `${track.language ?? "subtitle"}-${index}`;
+                      return (
+                        <Menu.Item
+                          key={`subtitle-${key}`}
+                          onPress={() => handleSubtitleTrackSelect(track)}
+                          title={formatSubtitleTrackLabel(track)}
+                          trailingIcon={
+                            isSubtitleTrackSelected(track) ? "check" : undefined
+                          }
+                        />
+                      );
+                    })}
+                  </>
+                ) : null}
+              </Menu>
+
+              <Menu
+                visible={speedMenuVisible}
+                onDismiss={() => setSpeedMenuVisible(false)}
+                anchor={
+                  <View>
+                    <IconButton
+                      icon="speedometer"
+                      onPress={() => setSpeedMenuVisible(true)}
+                    />
+                  </View>
+                }
+              >
+                {PLAYBACK_RATES.map((rate) => (
+                  <Menu.Item
+                    key={rate}
+                    onPress={() => handlePlaybackRateChange(rate)}
+                    title={`${rate}x`}
+                    trailingIcon={rate === playbackRate ? "check" : undefined}
+                  />
+                ))}
+              </Menu>
+
+              <View style={styles.controlsSpacer} />
+
+              <IconButton
+                icon="skip-next"
+                onPress={handlePlayNext}
+                disabled={!nextUpItem}
+              />
+            </View>
+          </View>
+        </Pressable>
+      </Animated.View>
+
+      {showLoader ? <FullscreenLoading message={loadingMessage} /> : null}
 
       {nextUpItem && upNextVisible ? (
         <View style={styles.upNextOverlay} pointerEvents="auto">
@@ -1507,65 +1686,13 @@ const JellyfinPlayerScreen = () => {
         </View>
       ) : null}
 
-      {playbackMode === "stream" && hasDownload && playbackQuery.isError ? (
-        <HelperText type="info" visible style={styles.helperText}>
-          Streaming is unavailable right now. You can still play the downloaded
-          copy.
-        </HelperText>
-      ) : null}
-
-      {playbackErrorMessage && playbackMode === "stream" && !hasDownload ? (
-        <HelperText type="error" visible style={styles.helperText}>
-          {playbackErrorMessage}
-        </HelperText>
-      ) : null}
-
-      {brightnessOverlay !== null ? (
-        <View style={styles.gestureOverlayContainer} pointerEvents="none">
-          <View style={styles.gestureOverlay}>
-            <IconButton
-              icon="brightness-7"
-              size={32}
-              iconColor="white"
-              style={styles.gestureIcon}
-            />
-            <View style={styles.gestureBar}>
-              <View
-                style={[
-                  styles.gestureFill,
-                  { width: `${brightnessOverlay}%` },
-                  { backgroundColor: theme.colors.primary },
-                ]}
-              />
-            </View>
-            <Text style={styles.gestureText}>
-              {Math.round(brightnessOverlay)}%
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      {volumeOverlay !== null ? (
-        <View style={styles.gestureOverlayContainer} pointerEvents="none">
-          <View style={[styles.gestureOverlay, styles.gestureOverlayRight]}>
-            <IconButton
-              icon="volume-high"
-              size={32}
-              iconColor="white"
-              style={styles.gestureIcon}
-            />
-            <View style={styles.gestureBar}>
-              <View
-                style={[
-                  styles.gestureFill,
-                  { width: `${volumeOverlay}%` },
-                  { backgroundColor: theme.colors.primary },
-                ]}
-              />
-            </View>
-            <Text style={styles.gestureText}>{Math.round(volumeOverlay)}%</Text>
-          </View>
-        </View>
+      {playbackErrorMessage ? (
+        <FullscreenError
+          title="Playback Error"
+          message={playbackErrorMessage}
+          onRetry={handleRetry}
+          onGoBack={handleErrorGoBack}
+        />
       ) : null}
     </View>
   );
@@ -1577,14 +1704,12 @@ const createStyles = (theme: AppTheme) =>
       flex: 1,
       backgroundColor: "black",
     },
-    fallbackSafeArea: {
+    fallbackContainer: {
       flex: 1,
       backgroundColor: theme.colors.background,
       padding: spacing.lg,
-    },
-    videoSurface: {
-      flex: 1,
-      backgroundColor: "black",
+      justifyContent: "center",
+      alignItems: "center",
     },
     video: {
       width: "100%",
@@ -1601,19 +1726,23 @@ const createStyles = (theme: AppTheme) =>
       justifyContent: "space-between",
       paddingHorizontal: spacing.lg,
     },
+    overlayPressable: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: "space-between",
+    },
     gradientTop: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
-      height: 200,
+      height: 160,
     },
     gradientBottom: {
       position: "absolute",
       left: 0,
       right: 0,
       bottom: 0,
-      height: 280,
+      height: 240,
     },
     topBar: {
       flexDirection: "row",
@@ -1647,6 +1776,14 @@ const createStyles = (theme: AppTheme) =>
       justifyContent: "center",
       flexDirection: "row",
       gap: spacing.lg,
+    },
+    sideControls: {
+      alignItems: "center",
+      gap: spacing.xxxs,
+    },
+    sideControlLabel: {
+      color: "rgba(255,255,255,0.85)",
+      fontWeight: "600",
     },
     playButton: {
       width: 96,
@@ -1727,12 +1864,6 @@ const createStyles = (theme: AppTheme) =>
       fontWeight: "600",
       color: theme.colors.onSurfaceVariant,
     },
-    loaderOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(0,0,0,0.2)",
-    },
     infoOverlay: {
       ...StyleSheet.absoluteFillObject,
       alignItems: "center",
@@ -1764,16 +1895,6 @@ const createStyles = (theme: AppTheme) =>
       width: 160,
       height: 240,
       borderRadius: spacing.md,
-    },
-    helperText: {
-      position: "absolute",
-      left: spacing.lg,
-      right: spacing.lg,
-      bottom: spacing.lg,
-    },
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
-      opacity: 0.35,
     },
     airPlayWrapper: {
       width: 40,
@@ -1828,45 +1949,6 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       gap: spacing.sm,
       marginTop: spacing.sm,
-    },
-    gestureOverlayContainer: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: "center",
-      justifyContent: "center",
-      pointerEvents: "none",
-    },
-    gestureOverlay: {
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(0,0,0,0.7)",
-      borderRadius: spacing.lg,
-      padding: spacing.lg,
-      minWidth: 140,
-      gap: spacing.md,
-    },
-    gestureOverlayRight: {
-      alignSelf: "flex-end",
-      marginRight: spacing.lg,
-      marginBottom: spacing.xl,
-    },
-    gestureIcon: {
-      margin: 0,
-    },
-    gestureBar: {
-      width: 120,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: "rgba(255,255,255,0.25)",
-      overflow: "hidden",
-    },
-    gestureFill: {
-      height: "100%",
-      borderRadius: 2,
-    },
-    gestureText: {
-      color: "white",
-      fontWeight: "600",
-      fontSize: 14,
     },
   });
 

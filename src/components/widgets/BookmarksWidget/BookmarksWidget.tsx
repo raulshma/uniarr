@@ -312,16 +312,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   smallScrollContainer: {
-    maxHeight: 100,
+    maxHeight: 120,
   },
   mediumScrollContainer: {
-    maxHeight: 140,
+    maxHeight: 160,
   },
   largeScrollContainer: {
-    maxHeight: 180,
+    maxHeight: 210,
   },
   scrollContent: {
-    paddingBottom: spacing.xs,
+    paddingBottom: spacing.lg,
   },
   gridContainer: {
     flexDirection: "row",
