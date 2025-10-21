@@ -100,6 +100,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         disableWeb: true,
       },
     ],
+    [
+      "expo-screen-orientation",
+      {
+        initialOrientation: "DEFAULT",
+      },
+    ],
   ],
   extra: {
     ...config.extra,

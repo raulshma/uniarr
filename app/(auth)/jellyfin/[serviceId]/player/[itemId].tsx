@@ -1,42 +1,41 @@
+/**
+ * Jellyfin Video Player
+ *
+ * Modern implementation using expo-video (SDK 54) with landscape-only playback.
+ * Features:
+ * - Landscape-only orientation lock
+ * - Stream and offline playback support
+ * - Progress reporting to Jellyfin server
+ * - Custom controls with auto-hide
+ * - Audio/subtitle track selection
+ * - Playback speed controls
+ * - Elegant fullscreen UI
+ */
+
 import { useLocalSearchParams, useRouter } from "expo-router";
-import * as Brightness from "expo-brightness";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { LinearGradient } from "expo-linear-gradient";
-import { VideoAirPlayButton, VideoView, useVideoPlayer } from "expo-video";
+import { VideoView, useVideoPlayer } from "expo-video";
 import type { AudioTrack, SubtitleTrack, VideoSource } from "expo-video";
 import { useEvent } from "expo";
 import { setAudioModeAsync } from "expo-audio";
-import { Image } from "expo-image";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
-  ActivityIndicator,
   Animated,
   GestureResponderEvent,
   LayoutChangeEvent,
-  Platform,
   Pressable,
-  Share,
   StyleSheet,
   View,
 } from "react-native";
-import {
-  Button,
-  Divider,
-  IconButton,
-  Menu,
-  Text,
-  useTheme,
-} from "react-native-paper";
-
-import { useQuery } from "@tanstack/react-query";
+import { IconButton, Menu, Text, useTheme } from "react-native-paper";
 
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { EmptyState } from "@/components/common/EmptyState";
 import { FullscreenLoading } from "@/components/common/FullscreenLoading";
-import { FullscreenError } from "@/components/common/FullscreenError";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { useJellyfinPlaybackInfo } from "@/hooks/useJellyfinPlaybackInfo";
-import { queryKeys } from "@/hooks/queryKeys";
 import {
   selectGetConnector,
   useConnectorsStore,
@@ -44,222 +43,140 @@ import {
 import { useDownloadStore } from "@/store/downloadStore";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
-import type { JellyfinItem } from "@/models/jellyfin.types";
 
-const PLAYBACK_RATES: readonly number[] = [0.5, 0.75, 1, 1.25, 1.5, 2];
+// ============================================================================
+// Constants
+// ============================================================================
 
-const formatMillis = (millis?: number): string => {
-  if (typeof millis !== "number" || Number.isNaN(millis) || millis < 0) {
+const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const CONTROLS_HIDE_DELAY_MS = 4000;
+const SEEK_STEP_SECONDS = 10;
+const PROGRESS_REPORT_INTERVAL_MS = 10000;
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+const formatTime = (seconds?: number): string => {
+  if (typeof seconds !== "number" || Number.isNaN(seconds) || seconds < 0) {
     return "0:00";
   }
-
-  const totalSeconds = Math.floor(millis / 1000);
-  const seconds = totalSeconds % 60;
-  const minutes = Math.floor(totalSeconds / 60) % 60;
-  const hours = Math.floor(totalSeconds / 3600);
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  const totalSecs = Math.floor(seconds);
+  const secs = totalSecs % 60;
+  const mins = Math.floor(totalSecs / 60) % 60;
+  const hrs = Math.floor(totalSecs / 3600);
+  return hrs > 0
+    ? `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+    : `${mins}:${String(secs).padStart(2, "0")}`;
 };
 
-const formatBitrate = (bitrate?: number | null): string => {
-  if (!bitrate || bitrate <= 0) {
-    return "Unknown";
-  }
-  return `${(bitrate / 1_000_000).toFixed(1)} Mbps`;
+const formatTrackLabel = (track: AudioTrack | SubtitleTrack): string => {
+  const parts: string[] = [];
+  if (track.label) parts.push(track.label);
+  if (track.language) parts.push(track.language.toUpperCase());
+  return parts.length > 0 ? parts.join(" - ") : "Track";
 };
 
-const formatResolution = (
-  width?: number | null,
-  height?: number | null,
-): string | undefined => {
-  if (!width || !height) {
-    return undefined;
-  }
-  return `${width}×${height}`;
-};
-
-const formatAudioTrackLabel = (track: AudioTrack): string => {
-  if (track.label && track.language) {
-    return `${track.label} (${track.language.toUpperCase()})`;
-  }
-  if (track.label) {
-    return track.label;
-  }
-  if (track.language) {
-    return track.language.toUpperCase();
-  }
-  return "Audio track";
-};
-
-const formatSubtitleTrackLabel = (track: SubtitleTrack): string => {
-  if (track.label && track.language) {
-    return `${track.label} (${track.language.toUpperCase()})`;
-  }
-  if (track.label) {
-    return track.label;
-  }
-  if (track.language) {
-    return track.language.toUpperCase();
-  }
-  return "Subtitle";
-};
-
-const ensureFileUri = (uri: string | undefined): string | undefined => {
-  if (!uri) {
-    return undefined;
-  }
+const ensureFileUri = (uri?: string): string | undefined => {
+  if (!uri) return undefined;
   return uri.startsWith("file://") ? uri : `file://${uri}`;
-};
-
-const formatEpisodeCode = (item?: JellyfinItem | null): string | undefined => {
-  if (!item) {
-    return undefined;
-  }
-  const season =
-    typeof item.ParentIndexNumber === "number"
-      ? String(item.ParentIndexNumber).padStart(2, "0")
-      : undefined;
-  const episode =
-    typeof item.IndexNumber === "number"
-      ? String(item.IndexNumber).padStart(2, "0")
-      : undefined;
-
-  if (season && episode) {
-    return `S${season}E${episode}`;
-  }
-
-  if (episode) {
-    return `Episode ${episode}`;
-  }
-
-  return undefined;
 };
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);
 
+// ============================================================================
+// Main Component
+// ============================================================================
+
 const JellyfinPlayerScreen = () => {
-  "use no memo";
-  const {
-    serviceId: rawServiceId,
-    itemId: rawItemId,
-    source: rawSource,
-    startTicks: rawStartTicks,
-  } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     serviceId?: string;
     itemId?: string;
     source?: string;
     startTicks?: string;
   }>();
-  const serviceId = typeof rawServiceId === "string" ? rawServiceId : undefined;
-  const itemId = typeof rawItemId === "string" ? rawItemId : undefined;
+
+  const serviceId =
+    typeof params.serviceId === "string" ? params.serviceId : undefined;
+  const itemId = typeof params.itemId === "string" ? params.itemId : undefined;
   const sourcePreference =
-    rawSource === "download" || rawSource === "stream" ? rawSource : undefined;
-  const startTicks =
-    typeof rawStartTicks === "string" && rawStartTicks.trim().length > 0
-      ? Number(rawStartTicks)
+    params.source === "download" || params.source === "stream"
+      ? params.source
       : undefined;
-  const startPositionMillis = Number.isFinite(startTicks)
-    ? Math.floor((startTicks ?? 0) / 10_000)
-    : undefined;
+  const startTicks =
+    typeof params.startTicks === "string" && params.startTicks.trim().length > 0
+      ? Number(params.startTicks)
+      : undefined;
+  const startPositionSeconds = Number.isFinite(startTicks)
+    ? Math.floor((startTicks ?? 0) / 10_000_000)
+    : 0;
 
   const theme = useTheme<AppTheme>();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
 
-  const getConnector = useConnectorsStore(selectGetConnector);
-  useEffect(() => {
-    let cancelled = false;
+  // ============================================================================
+  // Refs
+  // ============================================================================
 
-    const ensureConnector = async () => {
-      if (!serviceId) {
-        return;
-      }
-      if (getConnector(serviceId)) {
-        return;
-      }
+  const videoViewRef = useRef<any>(null);
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressBarWidthRef = useRef(0);
+  const lastReportedPositionRef = useRef(-1);
+  const streamingContextRef = useRef<{
+    itemId: string;
+    mediaSourceId: string;
+    playSessionId?: string;
+  } | null>(null);
+  const isMountedRef = useRef(true);
+
+  // ============================================================================
+  // State
+  // ============================================================================
+
+  const [playbackMode, setPlaybackMode] = useState<"download" | "stream">(
+    "stream",
+  );
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [sourceMenuVisible, setSourceMenuVisible] = useState(false);
+  const [speedMenuVisible, setSpeedMenuVisible] = useState(false);
+  const [trackMenuVisible, setTrackMenuVisible] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Loading...");
+
+  const controlsOpacityAnim = useRef(new Animated.Value(1)).current;
+
+  // ============================================================================
+  // Data Fetching
+  // ============================================================================
+
+  const getConnector = useConnectorsStore(selectGetConnector);
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      if (!serviceId || getConnector(serviceId)) return;
       try {
         await ConnectorManager.getInstance().loadSavedServices();
       } catch {
-        // ignore connector bootstrap failures here; hook will surface errors
-      }
-      if (cancelled) {
-        return;
+        // Connector errors handled by hooks
       }
     };
-
-    void ensureConnector();
-
-    return () => {
-      cancelled = true;
-    };
+    void bootstrap();
   }, [getConnector, serviceId]);
 
   const connector = useMemo(() => {
-    if (!serviceId) {
-      return undefined;
-    }
+    if (!serviceId) return undefined;
     const instance = getConnector(serviceId);
-    if (!instance || instance.config.type !== "jellyfin") {
-      return undefined;
-    }
+    if (!instance || instance.config.type !== "jellyfin") return undefined;
     return instance as JellyfinConnector;
   }, [getConnector, serviceId]);
 
   const itemQuery = useJellyfinItemDetails({ serviceId, itemId });
   const playbackQuery = useJellyfinPlaybackInfo({ serviceId, itemId });
 
-  // Manage metadata loading states
-  useEffect(() => {
-    if (itemQuery.isLoading || playbackQuery.isLoading) {
-      setMetadataLoading(true);
-      setLoadingMessage(
-        itemQuery.isLoading
-          ? "Loading media metadata..."
-          : "Loading playback information...",
-      );
-    } else {
-      setMetadataLoading(false);
-    }
-  }, [itemQuery.isLoading, playbackQuery.isLoading]);
-
-  const seriesId = useMemo(() => {
-    const item = itemQuery.data;
-    if (!item) {
-      return undefined;
-    }
-    if (typeof item.SeriesId === "string" && item.SeriesId.length > 0) {
-      return item.SeriesId;
-    }
-    if (item.Type === "Series" && typeof item.Id === "string") {
-      return item.Id;
-    }
-    return undefined;
-  }, [itemQuery.data]);
-
-  const nextUpQuery = useQuery<JellyfinItem | undefined>({
-    queryKey:
-      serviceId && seriesId
-        ? queryKeys.jellyfin.nextUp(serviceId, seriesId, {
-            currentItemId: itemId ?? null,
-          })
-        : queryKeys.jellyfin.base,
-    enabled: Boolean(serviceId && seriesId && connector),
-    staleTime: 120_000,
-    queryFn: async () => {
-      if (!connector || !seriesId) {
-        return undefined;
-      }
-      return connector.getNextUpEpisode(seriesId, itemId);
-    },
-  });
-
-  const downloadSelector = useMemo(
-    () => (state: ReturnType<typeof useDownloadStore.getState>) => {
+  const downloadSelector = useCallback(
+    (state: ReturnType<typeof useDownloadStore.getState>) => {
       for (const download of state.downloads.values()) {
         if (
           download.serviceConfig.id === serviceId &&
@@ -279,265 +196,65 @@ const JellyfinPlayerScreen = () => {
   const hasDownload = Boolean(localFileUri);
   const hasStream = Boolean(playbackQuery.data?.streamUrl);
 
-  const [playbackMode, setPlaybackMode] = useState<"download" | "stream">(
-    () => {
-      if (sourcePreference) {
-        if (sourcePreference === "download" && hasDownload) {
-          return "download";
-        }
-        if (sourcePreference === "stream") {
-          return "stream";
-        }
-      }
-      return hasDownload ? "download" : "stream";
-    },
-  );
-  const [playbackRate, setPlaybackRate] = useState<number>(1);
-  const [sourceMenuVisible, setSourceMenuVisible] = useState(false);
-  const [speedMenuVisible, setSpeedMenuVisible] = useState(false);
-  const [trackMenuVisible, setTrackMenuVisible] = useState(false);
-  const [infoVisible, setInfoVisible] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const [playbackError, setPlaybackError] = useState<string | null>(null);
-  const [upNextVisible, setUpNextVisible] = useState(false);
-  const [brightnessLevel, setBrightnessLevel] = useState<number>(1);
-  const [brightnessControlAvailable, setBrightnessControlAvailable] =
-    useState<boolean>(Platform.OS !== "web");
-  const [volumeLevel, setVolumeLevel] = useState<number>(1);
-  const [mediaLoading, setMediaLoading] = useState<boolean>(false);
-  const [metadataLoading, setMetadataLoading] = useState<boolean>(false);
-  const [loadingMessage, setLoadingMessage] = useState<string>("Loading...");
-
-  // Controls visibility animation
-  const controlsOpacityAnim = useRef(new Animated.Value(1)).current;
-  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  // Set initial playback mode based on availability
   useEffect(() => {
-    setUpNextVisible(false);
-  }, [itemId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (Platform.OS === "web") {
-      setBrightnessControlAvailable(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const initializeBrightness = async () => {
-      try {
-        if (Platform.OS === "android") {
-          const permission = await Brightness.getPermissionsAsync();
-          if (permission.status !== "granted") {
-            const request = await Brightness.requestPermissionsAsync();
-            if (request.status !== "granted") {
-              if (!cancelled) {
-                setBrightnessControlAvailable(false);
-              }
-              return;
-            }
-          }
-        }
-
-        const systemBrightness = await Brightness.getBrightnessAsync();
-        if (!cancelled && typeof systemBrightness === "number") {
-          setBrightnessLevel(clamp(systemBrightness, 0, 1));
-        }
-        if (!cancelled) {
-          setBrightnessControlAvailable(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setBrightnessControlAvailable(false);
-        }
-      }
-    };
-
-    void initializeBrightness();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (playbackMode === "download" && !hasDownload && hasStream) {
+    if (sourcePreference === "download" && hasDownload) {
+      setPlaybackMode("download");
+    } else if (sourcePreference === "stream" && hasStream) {
+      setPlaybackMode("stream");
+    } else if (hasDownload) {
+      setPlaybackMode("download");
+    } else {
       setPlaybackMode("stream");
     }
-  }, [hasDownload, hasStream, playbackMode]);
+  }, [sourcePreference, hasDownload, hasStream]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        await setAudioModeAsync({
-          playsInSilentMode: true,
-          shouldPlayInBackground: false,
-          interruptionMode: "mixWithOthers",
-          interruptionModeAndroid: "duckOthers",
-        });
-      } catch {
-        // ignore audio mode configuration failures
-      }
-    })();
-  }, []);
-
-  const playbackInfo = playbackQuery.data;
-  const mediaSource = playbackInfo?.mediaSource;
-  const streamUrl = playbackInfo?.streamUrl;
-  const nextUpItem = nextUpQuery.data;
-  const showAirPlayButton = Platform.OS === "ios";
-
-  useEffect(() => {
-    if (!nextUpItem) {
-      setUpNextVisible(false);
-    }
-  }, [nextUpItem]);
+  // ============================================================================
+  // Video Source
+  // ============================================================================
 
   const playbackSource = useMemo<VideoSource | null>(() => {
     if (playbackMode === "download" && localFileUri) {
       return { uri: localFileUri };
     }
-    if (playbackMode === "stream" && streamUrl) {
-      return { uri: streamUrl };
+    if (playbackMode === "stream" && playbackQuery.data?.streamUrl) {
+      return { uri: playbackQuery.data.streamUrl };
     }
     return null;
-  }, [localFileUri, playbackMode, streamUrl]);
+  }, [playbackMode, localFileUri, playbackQuery.data?.streamUrl]);
 
-  const startPositionSeconds = useMemo(() => {
-    if (typeof startPositionMillis === "number" && startPositionMillis > 0) {
-      return startPositionMillis / 1000;
-    }
-    return undefined;
-  }, [startPositionMillis]);
+  // ============================================================================
+  // Video Player Setup
+  // ============================================================================
 
-  const player = useVideoPlayer(null, (playerInstance) => {
-    playerInstance.timeUpdateEventInterval = 0.5;
+  const player = useVideoPlayer(playbackSource, (playerInstance) => {
+    playerInstance.timeUpdateEventInterval = 1;
     playerInstance.staysActiveInBackground = false;
     playerInstance.showNowPlayingNotification = false;
     playerInstance.preservesPitch = true;
     playerInstance.playbackRate = playbackRate;
+    playerInstance.volume = 1.0;
+    playerInstance.muted = false;
+    if (startPositionSeconds > 0) {
+      playerInstance.currentTime = startPositionSeconds;
+    }
   });
 
-  // Note: some player implementations expose `allowsExternalPlayback` but
-  // mutating the player object returned from the hook can trigger static
-  // analysis warnings and is not strictly required for core playback in-app.
-  // We intentionally avoid mutating the returned player object here.
-
-  const videoViewRef = useRef<any>(null);
-  const pendingSeekSecondsRef = useRef<number | undefined>(
-    startPositionSeconds,
-  );
-  const progressBarWidth = useRef(0);
-  const lastKnownSecondsRef = useRef<number>(startPositionSeconds ?? 0);
-  const startReportedRef = useRef(false);
-  const streamingContextRef = useRef<{
-    readonly itemId: string;
-    readonly mediaSourceId: string;
-    readonly playSessionId?: string;
-  } | null>(null);
-  const lastProgressTicksRef = useRef<number>(-1);
-  const isPlayerMountedRef = useRef(true);
-
-  const applyBrightnessLevel = useCallback(
-    (value: number) => {
-      if (Platform.OS === "web") {
-        return;
-      }
-
-      const nextValue = clamp(value, 0, 1);
-
-      void (async () => {
-        try {
-          await Brightness.setBrightnessAsync(nextValue);
-          if (Platform.OS === "android") {
-            try {
-              await Brightness.setSystemBrightnessAsync(nextValue);
-            } catch {
-              // ignore system brightness errors on Android
-            }
-          }
-        } catch {
-          if (isPlayerMountedRef.current) {
-            setBrightnessControlAvailable(false);
-          }
-        }
-      })();
-    },
-    [isPlayerMountedRef, setBrightnessControlAvailable],
-  );
-
-  const adjustBrightness = useCallback(
-    (delta: number) => {
-      if (!brightnessControlAvailable) {
-        return;
-      }
-      setControlsVisible(true);
-      setBrightnessLevel((prev) => {
-        const baseline = Number.isFinite(prev) ? prev : 0.5;
-        const next = clamp(baseline + delta, 0, 1);
-        applyBrightnessLevel(next);
-        return next;
-      });
-    },
-    [applyBrightnessLevel, brightnessControlAvailable, setControlsVisible],
-  );
-
-  const adjustVolume = useCallback(
-    (delta: number) => {
-      setControlsVisible(true);
-      setVolumeLevel((prev) => {
-        const baseline = Number.isFinite(prev) ? prev : 1;
-        return clamp(baseline + delta, 0, 1);
-      });
-    },
-    [setControlsVisible],
-  );
-
-  useEffect(() => {
-    try {
-      // Some player implementations require imperative assignment here.
-      // eslint-disable-next-line react-compiler/react-compiler
-      player.volume = clamp(volumeLevel, 0, 1);
-    } catch {
-      // ignore volume adjustment errors
-    }
-  }, [player, volumeLevel]);
-
-  useEffect(() => {
-    pendingSeekSecondsRef.current = startPositionSeconds;
-  }, [startPositionSeconds]);
-
-  useEffect(() => {
-    if (typeof startPositionSeconds === "number") {
-      lastKnownSecondsRef.current = Math.max(0, startPositionSeconds);
-    }
-  }, [startPositionSeconds]);
-
-  useEffect(() => {
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-        controlsTimeoutRef.current = null;
-      }
-      isPlayerMountedRef.current = false;
-    };
-  }, []);
-
+  // Player events
   const statusEvent = useEvent(player, "statusChange", {
     status: player.status,
-    error: undefined,
   });
   const playingEvent = useEvent(player, "playingChange", {
     isPlaying: player.playing,
   });
   const timeEvent = useEvent(player, "timeUpdate", {
     currentTime: player.currentTime ?? 0,
-    currentLiveTimestamp: player.currentLiveTimestamp ?? null,
-    currentOffsetFromLive: player.currentOffsetFromLive ?? null,
     bufferedPosition: player.bufferedPosition ?? 0,
+    currentLiveTimestamp: null,
+    currentOffsetFromLive: null,
   });
+  const playToEndEvent = useEvent(player, "playToEnd");
+
   const availableAudioTracksEvent = useEvent(
     player,
     "availableAudioTracksChange",
@@ -553,203 +270,142 @@ const JellyfinPlayerScreen = () => {
     },
   );
   const audioTrackEvent = useEvent(player, "audioTrackChange", {
-    audioTrack: player.audioTrack ?? null,
+    audioTrack: player.audioTrack,
   });
   const subtitleTrackEvent = useEvent(player, "subtitleTrackChange", {
-    subtitleTrack: player.subtitleTrack ?? null,
+    subtitleTrack: player.subtitleTrack,
   });
-  const playToEndEvent = useEvent(player, "playToEnd");
 
-  useEffect(() => {
-    if (typeof timeEvent?.currentTime === "number") {
-      lastKnownSecondsRef.current = Math.max(0, timeEvent.currentTime);
-    }
-  }, [timeEvent?.currentTime]);
+  const playerStatus = statusEvent?.status ?? player.status;
+  const isPlaying = playingEvent?.isPlaying ?? player.playing;
+  const currentTime = timeEvent?.currentTime ?? player.currentTime ?? 0;
+  const duration = player.duration ?? 0;
 
-  const playerStatus = statusEvent?.status ?? player.status ?? "idle";
-  const isReadyToPlay = playerStatus === "readyToPlay";
-  const isPlaying = playingEvent?.isPlaying ?? player.playing ?? false;
-
-  const currentAudioTrack =
-    audioTrackEvent?.audioTrack ?? player.audioTrack ?? null;
+  const currentAudioTrack = audioTrackEvent?.audioTrack ?? player.audioTrack;
   const currentSubtitleTrack =
-    subtitleTrackEvent?.subtitleTrack ?? player.subtitleTrack ?? null;
+    subtitleTrackEvent?.subtitleTrack ?? player.subtitleTrack;
+  const audioTracks =
+    availableAudioTracksEvent?.availableAudioTracks ??
+    player.availableAudioTracks ??
+    [];
+  const subtitleTracks =
+    availableSubtitleTracksEvent?.availableSubtitleTracks ??
+    player.availableSubtitleTracks ??
+    [];
 
-  const audioTrackOptions = useMemo(() => {
-    const audioTracks =
-      availableAudioTracksEvent?.availableAudioTracks ??
-      player.availableAudioTracks ??
-      [];
-    return audioTracks.filter((track): track is AudioTrack => Boolean(track));
-  }, [
-    availableAudioTracksEvent?.availableAudioTracks,
-    player.availableAudioTracks,
-  ]);
-
-  const subtitleTrackOptions = useMemo(() => {
-    const subtitleTracks =
-      availableSubtitleTracksEvent?.availableSubtitleTracks ??
-      player.availableSubtitleTracks ??
-      [];
-    return subtitleTracks.filter((track): track is SubtitleTrack =>
-      Boolean(track),
-    ) as SubtitleTrack[];
-  }, [
-    availableSubtitleTracksEvent?.availableSubtitleTracks,
-    player.availableSubtitleTracks,
-  ]);
-
-  const isAudioTrackSelected = useCallback(
-    (track: AudioTrack) => {
-      if (!currentAudioTrack) {
-        return false;
-      }
-      if (currentAudioTrack.id && track.id) {
-        return currentAudioTrack.id === track.id;
-      }
-      if (currentAudioTrack.label && track.label) {
-        return currentAudioTrack.label === track.label;
-      }
-      if (currentAudioTrack.language && track.language) {
-        return currentAudioTrack.language === track.language;
-      }
-      return false;
-    },
-    [currentAudioTrack],
-  );
-
-  const isSubtitleTrackSelected = useCallback(
-    (track: SubtitleTrack) => {
-      if (!currentSubtitleTrack) {
-        return false;
-      }
-      if (currentSubtitleTrack.id && track.id) {
-        return currentSubtitleTrack.id === track.id;
-      }
-      if (currentSubtitleTrack.label && track.label) {
-        return currentSubtitleTrack.label === track.label;
-      }
-      if (currentSubtitleTrack.language && track.language) {
-        return currentSubtitleTrack.language === track.language;
-      }
-      return false;
-    },
-    [currentSubtitleTrack],
-  );
-
-  const hasTrackOptions =
-    audioTrackOptions.length > 1 || subtitleTrackOptions.length > 0;
-
-  const playbackSourceKey = useMemo(() => {
-    if (!playbackSource) {
-      return null;
-    }
-
-    if (typeof playbackSource === "string") {
-      return `${playbackMode}:${playbackSource}`;
-    }
-
-    if (typeof playbackSource === "number") {
-      return `${playbackMode}:asset-${playbackSource}`;
-    }
-
-    if (typeof playbackSource === "object") {
-      if (
-        "assetId" in playbackSource &&
-        typeof playbackSource.assetId === "number"
-      ) {
-        return `${playbackMode}:asset-${playbackSource.assetId}`;
-      }
-
-      if ("uri" in playbackSource && playbackSource.uri) {
-        return `${playbackMode}:${playbackSource.uri}`;
-      }
-    }
-
-    return `${playbackMode}:unknown`;
-  }, [playbackMode, playbackSource]);
+  // ============================================================================
+  // Lifecycle & Orientation
+  // ============================================================================
 
   useEffect(() => {
-    startReportedRef.current = false;
-    streamingContextRef.current = null;
-    lastProgressTicksRef.current = -1;
-  }, [playbackSourceKey, playbackMode]);
+    // Lock to landscape on mount
+    void ScreenOrientation.lockAsync(
+      ScreenOrientation.OrientationLock.LANDSCAPE,
+    );
 
-  useEffect(() => {
-    if (!playbackSource || !playbackSourceKey) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        if (!cancelled) {
-          setMediaLoading(true);
-          setLoadingMessage(
-            playbackMode === "download"
-              ? "Preparing offline playback..."
-              : "Preparing video stream...",
-          );
-        }
-        await player.replaceAsync(playbackSource);
-        if (!cancelled) {
-          setLoadingMessage("Initializing player...");
-        }
-        player.play();
-        if (!cancelled) {
-          setPlaybackError(null);
-          setMediaLoading(false);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setPlaybackError(
-            error instanceof Error ? error.message : "Unable to load media.",
-          );
-          setMediaLoading(false);
-        }
-      }
-    };
-
-    void load();
+    // Configure audio session for video playback
+    void setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+    });
 
     return () => {
-      cancelled = true;
-      if (!cancelled) {
-        setMediaLoading(false);
+      isMountedRef.current = false;
+      // Unlock orientation on unmount
+      void ScreenOrientation.unlockAsync();
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [player, playbackSource, playbackSourceKey, playbackMode]);
+  }, []);
 
-  // Handle initial seek position when player is ready
+  // ============================================================================
+  // Progress Reporting (Jellyfin)
+  // ============================================================================
+
   useEffect(() => {
     if (
-      typeof pendingSeekSecondsRef.current === "number" &&
-      playerStatus === "readyToPlay"
-    ) {
-      const seekPosition = pendingSeekSecondsRef.current;
-      // Seeking on player instance is an intentional imperative operation
-      player.currentTime = seekPosition;
-      pendingSeekSecondsRef.current = undefined;
-    }
-  }, [playerStatus, player]);
+      playbackMode !== "stream" ||
+      !connector ||
+      !itemId ||
+      !playbackQuery.data
+    )
+      return;
 
+    const interval = setInterval(() => {
+      if (!isMountedRef.current) return;
+
+      const positionTicks = Math.floor(currentTime * 10_000_000);
+      const positionSeconds = Math.floor(currentTime);
+
+      // Only report if position changed significantly
+      if (Math.abs(positionSeconds - lastReportedPositionRef.current) < 5)
+        return;
+
+      lastReportedPositionRef.current = positionSeconds;
+
+      const mediaSourceId = playbackQuery.data.mediaSource?.Id;
+      const playSessionId =
+        playbackQuery.data.playback?.PlaySessionId ?? undefined;
+
+      if (!mediaSourceId) return;
+
+      // Store streaming context for cleanup
+      streamingContextRef.current = {
+        itemId,
+        mediaSourceId,
+        playSessionId,
+      };
+
+      // Report progress to Jellyfin
+      void connector.reportPlaybackStopped({
+        itemId,
+        mediaSourceId,
+        playSessionId,
+        positionTicks,
+      });
+    }, PROGRESS_REPORT_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [playbackMode, connector, itemId, playbackQuery.data, currentTime]);
+
+  // Final progress report on unmount
   useEffect(() => {
-    if (statusEvent?.error) {
-      setPlaybackError(statusEvent.error.message ?? "Playback error.");
-    } else if (playerStatus === "readyToPlay") {
-      setPlaybackError(null);
-    }
-  }, [playerStatus, statusEvent]);
+    return () => {
+      if (
+        playbackMode !== "stream" ||
+        !connector ||
+        !streamingContextRef.current
+      )
+        return;
+
+      const {
+        itemId: ctxItemId,
+        mediaSourceId,
+        playSessionId,
+      } = streamingContextRef.current;
+      const positionTicks = Math.floor(currentTime * 10_000_000);
+
+      void connector.reportPlaybackStopped({
+        itemId: ctxItemId,
+        mediaSourceId,
+        playSessionId: playSessionId ?? undefined,
+        positionTicks,
+      });
+    };
+  }, [playbackMode, connector, currentTime]);
+
+  // ============================================================================
+  // Controls Auto-Hide
+  // ============================================================================
 
   const resetHideControlsTimer = useCallback(() => {
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
       controlsTimeoutRef.current = null;
     }
-    if (!isPlaying) {
-      return; // Don't auto-hide when paused
-    }
+    if (!isPlaying) return;
+
     controlsTimeoutRef.current = setTimeout(() => {
       setControlsVisible(false);
       Animated.timing(controlsOpacityAnim, {
@@ -757,7 +413,7 @@ const JellyfinPlayerScreen = () => {
         duration: 300,
         useNativeDriver: true,
       }).start();
-    }, 4000); // Hide after 4 seconds of playing for better fullscreen experience
+    }, CONTROLS_HIDE_DELAY_MS);
   }, [isPlaying, controlsOpacityAnim]);
 
   useEffect(() => {
@@ -767,174 +423,83 @@ const JellyfinPlayerScreen = () => {
   }, [controlsVisible, resetHideControlsTimer]);
 
   useEffect(() => {
-    if (!isReadyToPlay) {
-      return;
-    }
-
+    if (playerStatus !== "readyToPlay") return;
     if (isPlaying) {
       resetHideControlsTimer();
     } else if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
       controlsTimeoutRef.current = null;
     }
-  }, [isPlaying, isReadyToPlay, resetHideControlsTimer]);
+  }, [isPlaying, playerStatus, resetHideControlsTimer]);
 
-  useEffect(() => {
-    player.playbackRate = playbackRate;
-  }, [player, playbackRate]);
-
-  useEffect(() => {
-    if (!controlsVisible) {
-      setSourceMenuVisible(false);
-      setSpeedMenuVisible(false);
-      setTrackMenuVisible(false);
-    }
-  }, [controlsVisible]);
-
-  useEffect(() => {
-    if (!hasTrackOptions) {
-      setTrackMenuVisible(false);
-    }
-  }, [hasTrackOptions]);
-
-  const handleProgressLayout = useCallback((event: LayoutChangeEvent) => {
-    progressBarWidth.current = event.nativeEvent.layout.width;
-  }, []);
+  // ============================================================================
+  // Playback Controls
+  // ============================================================================
 
   const toggleControls = useCallback(() => {
     setControlsVisible((prev) => {
       const next = !prev;
+      Animated.timing(controlsOpacityAnim, {
+        toValue: next ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
       if (next) {
-        // Fade in controls
-        Animated.timing(controlsOpacityAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
         resetHideControlsTimer();
-      } else {
-        // Fade out controls
-        Animated.timing(controlsOpacityAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-        if (controlsTimeoutRef.current) {
-          clearTimeout(controlsTimeoutRef.current);
-          controlsTimeoutRef.current = null;
-        }
+      } else if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
       }
       return next;
     });
   }, [controlsOpacityAnim, resetHideControlsTimer]);
 
-  const handleTogglePlay = useCallback(() => {
+  const togglePlayPause = useCallback(() => {
     if (isPlaying) {
       player.pause();
-      setControlsVisible(true);
     } else {
       player.play();
     }
   }, [isPlaying, player]);
 
-  const handleSeekRelative = useCallback(
+  const seekRelative = useCallback(
     (seconds: number) => {
-      const durationSeconds =
-        (player.duration && player.duration > 0
-          ? player.duration
-          : undefined) ??
-        (mediaSource?.RunTimeTicks ? mediaSource.RunTimeTicks / 10_000_000 : 0);
-
-      if (durationSeconds <= 0) {
-        return;
-      }
-
-      const currentSeconds = timeEvent?.currentTime ?? player.currentTime ?? 0;
-      const targetSeconds = Math.min(
-        Math.max(currentSeconds + seconds, 0),
-        durationSeconds,
-      );
-      pendingSeekSecondsRef.current = undefined;
-
-      // Prevent orientation changes during seek
-      try {
-        player.currentTime = targetSeconds;
-      } catch (error) {
-        console.warn("Seek operation failed:", error);
-      }
+      if (duration <= 0) return;
+      const targetTime = clamp(currentTime + seconds, 0, duration);
+      // eslint-disable-next-line react-compiler/react-compiler
+      player.currentTime = targetTime;
+      setControlsVisible(true);
     },
-    [mediaSource?.RunTimeTicks, player, timeEvent],
+    [currentTime, duration, player],
   );
 
-  const handleProgressPress = useCallback(
+  const handleProgressBarPress = useCallback(
     (event: GestureResponderEvent) => {
-      const durationSeconds =
-        (player.duration && player.duration > 0
-          ? player.duration
-          : undefined) ??
-        (mediaSource?.RunTimeTicks ? mediaSource.RunTimeTicks / 10_000_000 : 0);
-
-      if (durationSeconds <= 0) {
-        return;
-      }
-
-      const width = progressBarWidth.current || 1;
-      const fraction = Math.min(
-        Math.max(event.nativeEvent.locationX / width, 0),
+      if (duration <= 0 || progressBarWidthRef.current <= 0) return;
+      const fraction = clamp(
+        event.nativeEvent.locationX / progressBarWidthRef.current,
+        0,
         1,
       );
-      pendingSeekSecondsRef.current = undefined;
 
-      // Prevent orientation changes during seek
-      try {
-        player.currentTime = durationSeconds * fraction;
-      } catch (error) {
-        console.warn("Seek operation failed:", error);
-      }
+      player.currentTime = duration * fraction;
+      setControlsVisible(true);
     },
-    [mediaSource?.RunTimeTicks, player],
+    [duration, player],
   );
 
-  const reportStop = useCallback(() => {
-    if (
-      playbackMode !== "stream" ||
-      !connector ||
-      !streamingContextRef.current ||
-      !startReportedRef.current
-    ) {
-      return;
-    }
+  const handleProgressBarLayout = useCallback((event: LayoutChangeEvent) => {
+    progressBarWidthRef.current = event.nativeEvent.layout.width;
+  }, []);
 
-    const ticks = Math.max(
-      0,
-      Math.floor(lastKnownSecondsRef.current * 10_000_000),
-    );
-    const context = streamingContextRef.current;
-    streamingContextRef.current = null;
-    startReportedRef.current = false;
-    lastProgressTicksRef.current = -1;
+  const handleBack = useCallback(() => {
+    player.pause();
+    router.back();
+  }, [player, router]);
 
-    void connector.reportPlaybackStopped({
-      itemId: context.itemId,
-      mediaSourceId: context.mediaSourceId,
-      playSessionId: context.playSessionId,
-      positionTicks: ticks,
-    });
-  }, [connector, playbackMode]);
-
-  useEffect(() => {
-    return () => {
-      reportStop();
-      // Safely pause player - check if mounted and try-catch for released object
-      if (isPlayerMountedRef.current) {
-        try {
-          player.pause();
-        } catch {
-          // ignore errors from released player instance
-        }
-      }
-    };
-  }, [player, reportStop]);
+  // ============================================================================
+  // Menu Handlers
+  // ============================================================================
 
   const handlePlaybackModeChange = useCallback(
     (mode: "download" | "stream") => {
@@ -942,199 +507,95 @@ const JellyfinPlayerScreen = () => {
         setSourceMenuVisible(false);
         return;
       }
-
-      if (playbackMode === "stream" && mode === "download") {
-        reportStop();
-      }
-
-      const resumeSeconds =
-        timeEvent?.currentTime ??
-        player.currentTime ??
-        pendingSeekSecondsRef.current ??
-        0;
-
-      pendingSeekSecondsRef.current = resumeSeconds;
+      const resumeTime = currentTime;
       player.pause();
       setPlaybackMode(mode);
       setSourceMenuVisible(false);
-      setControlsVisible(true);
+      // Player will reload with new source; seek after load
+      setTimeout(() => {
+        if (resumeTime > 0) {
+          player.currentTime = resumeTime;
+        }
+      }, 500);
     },
-    [playbackMode, player, reportStop, timeEvent],
+    [playbackMode, currentTime, player],
   );
 
   const handlePlaybackRateChange = useCallback(
     (rate: number) => {
       setPlaybackRate(rate);
-      setSpeedMenuVisible(false);
       player.playbackRate = rate;
+      setSpeedMenuVisible(false);
     },
     [player],
   );
 
-  const handleAudioTrackSelect = useCallback(
-    (track: AudioTrack) => {
-      player.audioTrack = track;
-      setTrackMenuVisible(false);
-    },
-    [player],
-  );
-
-  const handleSubtitleTrackSelect = useCallback(
-    (track: SubtitleTrack | null) => {
-      player.subtitleTrack = track;
-      setTrackMenuVisible(false);
-    },
-    [player],
-  );
-
-  const handleFullscreenEnterEvent = useCallback(() => {
-    setControlsVisible(true);
-    resetHideControlsTimer();
-  }, [resetHideControlsTimer]);
-
-  const handleFullscreenExitEvent = useCallback(() => {
-    setControlsVisible(true);
-    resetHideControlsTimer();
-  }, [resetHideControlsTimer]);
-
-  const handleShare = useCallback(async () => {
-    const item = itemQuery.data;
-    if (!item) {
-      return;
-    }
-
-    const message = [item.Name, item.Overview].filter(Boolean).join("\n\n");
-    try {
-      await Share.share({ message });
-    } catch {
-      // ignore share errors
-    }
-  }, [itemQuery.data]);
-
-  const handlePlayNext = useCallback(() => {
-    if (!serviceId || !nextUpItem?.Id) {
-      return;
-    }
-
-    player.pause();
-    reportStop();
-    setUpNextVisible(false);
-
-    const params: Record<string, string> = {
-      serviceId,
-      itemId: nextUpItem.Id,
-      source: playbackMode,
-    };
-
-    const resumeTicks = (
-      nextUpItem as unknown as {
-        UserData?: { PlaybackPositionTicks?: number };
+  const isTrackSelected = useCallback(
+    (
+      track: AudioTrack | SubtitleTrack,
+      currentTrack: AudioTrack | SubtitleTrack | null,
+    ) => {
+      if (!currentTrack) return false;
+      if (
+        "id" in track &&
+        "id" in currentTrack &&
+        track.id &&
+        currentTrack.id
+      ) {
+        return track.id === currentTrack.id;
       }
-    )?.UserData?.PlaybackPositionTicks;
-    if (typeof resumeTicks === "number" && resumeTicks > 0) {
-      params.startTicks = String(resumeTicks);
-    }
-
-    router.replace({
-      pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
-      params,
-    });
-  }, [nextUpItem, playbackMode, player, reportStop, router, serviceId]);
-
-  const handleDismissUpNext = useCallback(() => {
-    setUpNextVisible(false);
-    setControlsVisible(true);
-  }, []);
-
-  const handleBack = useCallback(() => {
-    player.pause();
-    reportStop();
-    router.back();
-  }, [player, reportStop, router]);
-
-  const toggleInfo = useCallback(() => {
-    setInfoVisible((prev) => !prev);
-  }, []);
-
-  const handleRetry = useCallback(() => {
-    setPlaybackError(null);
-    if (playbackQuery.refetch) {
-      playbackQuery.refetch();
-    }
-  }, [playbackQuery]);
-
-  const handleErrorGoBack = useCallback(() => {
-    handleBack();
-  }, [handleBack]);
-
-  const playbackErrorMessage = playbackError
-    ? playbackError
-    : playbackQuery.error instanceof Error
-      ? playbackQuery.error.message
-      : playbackQuery.error
-        ? "Unable to load playback information."
-        : null;
-
-  const videoStream = useMemo(
-    () => mediaSource?.MediaStreams?.find((stream) => stream?.Type === "Video"),
-    [mediaSource],
-  );
-
-  const audioStream = useMemo(
-    () =>
-      mediaSource?.MediaStreams?.find(
-        (stream) => stream?.Type === "Audio" && stream?.IsDefault,
-      ) ??
-      mediaSource?.MediaStreams?.find((stream) => stream?.Type === "Audio"),
-    [mediaSource],
-  );
-
-  useEffect(() => {
-    if (!playToEndEvent) {
-      return;
-    }
-
-    player.pause();
-    reportStop();
-    if (nextUpItem) {
-      setUpNextVisible(true);
-      setControlsVisible(true);
-    }
-  }, [nextUpItem, playToEndEvent, player, reportStop]);
-
-  useEffect(() => {
-    if (upNextVisible) {
-      setControlsVisible(true);
-    }
-  }, [upNextVisible]);
-
-  const brightnessPercent = Math.round(clamp(brightnessLevel, 0, 1) * 100);
-  const volumePercent = Math.round(clamp(volumeLevel, 0, 1) * 100);
-  // Minimal padding for fullscreen experience
-  const topControlsPadding = spacing.md;
-  const bottomControlsPadding = spacing.md;
-  const topGradientPadding = spacing.xs;
-  const bottomGradientPadding = spacing.sm;
-
-  // Single, clean fullscreen trigger when video is ready to play
-  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
-  useEffect(() => {
-    if (
-      playbackSource &&
-      playerStatus === "readyToPlay" &&
-      !hasEnteredFullscreen &&
-      videoViewRef.current
-    ) {
-      // Enter fullscreen only once when video is ready
-      try {
-        void videoViewRef.current.enterFullscreen();
-        setHasEnteredFullscreen(true);
-      } catch {
-        // Fullscreen may not be available on all platforms
-        setHasEnteredFullscreen(true); // Don't retry
+      if (track.label && currentTrack.label) {
+        return track.label === currentTrack.label;
       }
+      if (track.language && currentTrack.language) {
+        return track.language === currentTrack.language;
+      }
+      return false;
+    },
+    [],
+  );
+
+  // ============================================================================
+  // Loading States
+  // ============================================================================
+
+  useEffect(() => {
+    if (itemQuery.isLoading) {
+      setLoadingMessage("Loading media metadata...");
+    } else if (playbackQuery.isLoading) {
+      setLoadingMessage("Loading playback information...");
+    } else if (playerStatus === "loading") {
+      setLoadingMessage(
+        playbackMode === "download"
+          ? "Preparing offline playback..."
+          : "Buffering video stream...",
+      );
     }
-  }, [playbackSource, playerStatus, hasEnteredFullscreen]);
+  }, [
+    itemQuery.isLoading,
+    playbackQuery.isLoading,
+    playerStatus,
+    playbackMode,
+  ]);
+
+  const showLoader =
+    itemQuery.isLoading ||
+    playbackQuery.isLoading ||
+    (playerStatus !== "readyToPlay" && playerStatus !== "error");
+
+  // ============================================================================
+  // Playback End
+  // ============================================================================
+
+  useEffect(() => {
+    if (!playToEndEvent) return;
+    player.pause();
+    setControlsVisible(true);
+  }, [playToEndEvent, player]);
+
+  // ============================================================================
+  // Render Guards
+  // ============================================================================
 
   if (!serviceId || !itemId) {
     return (
@@ -1149,12 +610,16 @@ const JellyfinPlayerScreen = () => {
     );
   }
 
-  if (playbackMode === "stream" && !hasDownload && playbackQuery.isError) {
+  if (playbackQuery.isError && !hasDownload) {
     return (
       <View style={styles.fallbackContainer}>
         <EmptyState
           title="Playback unavailable"
-          description={playbackErrorMessage ?? "Unable to start streaming."}
+          description={
+            playbackQuery.error instanceof Error
+              ? playbackQuery.error.message
+              : "Unable to start streaming."
+          }
           actionLabel="Retry"
           onActionPress={() => void playbackQuery.refetch()}
         />
@@ -1162,543 +627,250 @@ const JellyfinPlayerScreen = () => {
     );
   }
 
-  const posterTag =
-    (itemQuery.data as unknown as { PrimaryImageTag?: string })
-      ?.PrimaryImageTag ?? itemQuery.data?.ImageTags?.Primary;
+  // ============================================================================
+  // Render UI
+  // ============================================================================
 
-  const posterUri =
-    connector && itemQuery.data?.Id && posterTag
-      ? connector.getImageUrl(itemQuery.data.Id, "Primary", {
-          tag: posterTag,
-          width: 640,
-        })
-      : undefined;
-
-  const positionMillis = (() => {
-    if (typeof timeEvent?.currentTime === "number") {
-      return Math.max(0, timeEvent.currentTime) * 1000;
-    }
-    if (typeof player.currentTime === "number") {
-      return Math.max(0, player.currentTime) * 1000;
-    }
-    if (typeof pendingSeekSecondsRef.current === "number") {
-      return Math.max(0, pendingSeekSecondsRef.current) * 1000;
-    }
-    return 0;
-  })();
-
-  const durationMillis = (() => {
-    if (typeof player.duration === "number" && player.duration > 0) {
-      return player.duration * 1000;
-    }
-    if (mediaSource?.RunTimeTicks) {
-      return Math.floor(mediaSource.RunTimeTicks / 10_000);
-    }
-    return 0;
-  })();
-
-  const isDurationLoading =
-    durationMillis === 0 &&
-    (mediaLoading || metadataLoading || playerStatus !== "readyToPlay");
-  const progressFraction = durationMillis
-    ? Math.min(Math.max(positionMillis / durationMillis, 0), 1)
-    : 0;
-
-  const title = itemQuery.data?.Name ?? "Untitled";
-  const subtitle = (() => {
-    const year = itemQuery.data?.ProductionYear
-      ? String(itemQuery.data.ProductionYear)
-      : itemQuery.data?.PremiereDate
-        ? String(new Date(itemQuery.data.PremiereDate).getFullYear())
-        : undefined;
-    const runtime = durationMillis
-      ? `${Math.round(durationMillis / 60000)}m`
-      : undefined;
-    if (year && runtime) {
-      return `${year} • ${runtime}`;
-    }
-    return year ?? runtime ?? undefined;
-  })();
-
-  const sourceLabel =
-    playbackMode === "download"
-      ? "Offline playback"
-      : "Streaming from Jellyfin";
-
-  const resolutionLabel = formatResolution(
-    videoStream?.Width ?? undefined,
-    videoStream?.Height ?? undefined,
-  );
-  const bitrateLabel = formatBitrate(
-    videoStream?.BitRate ?? audioStream?.BitRate ?? mediaSource?.Bitrate,
-  );
-  const videoCodecLabel = videoStream?.Codec
-    ? videoStream.Codec.toUpperCase()
-    : undefined;
-  const audioCodecLabel = audioStream?.Codec
-    ? `${audioStream.Codec.toUpperCase()} ${audioStream.Channels ?? ""}ch`
-    : undefined;
-
-  const nextUpEpisodeCode = formatEpisodeCode(nextUpItem);
-  const nextUpRuntimeLabel = nextUpItem?.RunTimeTicks
-    ? `${Math.round(nextUpItem.RunTimeTicks / 600_000_000)}m`
-    : undefined;
-  const nextUpSubtitleLabel = [nextUpEpisodeCode, nextUpRuntimeLabel]
-    .filter(Boolean)
-    .join(" • ");
-  const nextUpPosterTag =
-    (nextUpItem as unknown as { ImageTags?: { Primary?: string } })?.ImageTags
-      ?.Primary ??
-    (nextUpItem as unknown as { ParentThumbImageTag?: string })
-      ?.ParentThumbImageTag ??
-    (nextUpItem as unknown as { ImageTags?: { Thumb?: string } })?.ImageTags
-      ?.Thumb ??
-    undefined;
-  const nextUpPosterUri =
-    connector && nextUpItem?.Id
-      ? connector.getImageUrl(
-          nextUpItem.Id,
-          "Primary",
-          nextUpPosterTag
-            ? {
-                tag: nextUpPosterTag,
-                width: 480,
-              }
-            : undefined,
-        )
-      : undefined;
-
-  const showLoader =
-    !playbackSource ||
-    (playerStatus !== "readyToPlay" && playerStatus !== "error") ||
-    metadataLoading ||
-    mediaLoading;
+  const progress = duration > 0 ? clamp(currentTime / duration, 0, 1) : 0;
+  const hasTrackOptions = audioTracks.length > 1 || subtitleTracks.length > 0;
 
   return (
     <View style={styles.container}>
+      {/* Video Player */}
       {playbackSource ? (
         <VideoView
+          ref={videoViewRef}
           style={styles.video}
           player={player}
           nativeControls={false}
-          fullscreenOptions={{
-            enable: true,
-            orientation: "landscape",
-          }}
-          allowsPictureInPicture={false}
           contentFit="contain"
+          allowsFullscreen={false}
+          allowsPictureInPicture={false}
           pointerEvents="none"
-          onFullscreenEnter={handleFullscreenEnterEvent}
-          onFullscreenExit={handleFullscreenExitEvent}
-          ref={videoViewRef}
         />
       ) : (
-        <View style={styles.videoFallback}>
-          <ActivityIndicator animating size="large" />
-        </View>
+        <View style={styles.videoFallback} />
       )}
 
+      {/* Gradients */}
       <LinearGradient
         pointerEvents="none"
-        colors={["rgba(0,0,0,0.6)", "transparent"]}
-        style={[styles.gradientTop, { paddingTop: topGradientPadding }]}
+        colors={["rgba(0,0,0,0.7)", "transparent"]}
+        style={styles.gradientTop}
       />
       <LinearGradient
         pointerEvents="none"
         colors={["transparent", "rgba(0,0,0,0.85)"]}
-        style={[
-          styles.gradientBottom,
-          { paddingBottom: bottomGradientPadding },
-        ]}
+        style={styles.gradientBottom}
       />
 
+      {/* Controls Overlay */}
       <Animated.View
-        style={[
-          styles.overlay,
-          {
-            opacity: controlsOpacityAnim,
-            pointerEvents: controlsVisible ? "auto" : "none",
-          },
-        ]}
+        style={[styles.overlay, { opacity: controlsOpacityAnim }]}
         pointerEvents={controlsVisible ? "auto" : "none"}
       >
         <Pressable style={styles.overlayPressable} onPress={toggleControls}>
-          <View
-            pointerEvents="box-none"
-            style={[styles.topBar, { paddingTop: topControlsPadding }]}
-          >
+          {/* Top Bar */}
+          <View style={styles.topBar}>
             <View style={styles.topLeft}>
-              <IconButton icon="arrow-left" onPress={handleBack} />
+              <IconButton
+                icon="arrow-left"
+                iconColor="white"
+                onPress={handleBack}
+              />
               <View style={styles.titleGroup}>
                 <Text
                   variant="titleMedium"
                   style={styles.titleText}
                   numberOfLines={1}
                 >
-                  {title}
+                  {itemQuery.data?.Name ?? "Video"}
                 </Text>
-                {subtitle ? (
-                  <Text
-                    variant="bodySmall"
-                    style={styles.subtitleText}
-                    numberOfLines={1}
-                  >
-                    {subtitle}
-                  </Text>
-                ) : null}
               </View>
-            </View>
-            <View style={styles.topActions}>
-              {showAirPlayButton && playbackMode === "stream" ? (
-                <View style={styles.airPlayWrapper}>
-                  <VideoAirPlayButton
-                    tint="white"
-                    style={styles.airPlayButton}
-                  />
-                </View>
-              ) : null}
-              <IconButton icon="share-variant" onPress={handleShare} />
-              <IconButton icon="information-outline" onPress={toggleInfo} />
             </View>
           </View>
 
-          <View pointerEvents="box-none" style={styles.centerControls}>
-            <View style={styles.sideControls}>
-              <IconButton
-                icon="brightness-5"
-                size={28}
-                onPress={() => adjustBrightness(-0.1)}
-                disabled={!brightnessControlAvailable}
-                iconColor="white"
-              />
-              <Text variant="labelSmall" style={styles.sideControlLabel}>
-                {brightnessControlAvailable ? `${brightnessPercent}%` : "--"}
-              </Text>
-              <IconButton
-                icon="brightness-7"
-                size={28}
-                onPress={() => adjustBrightness(0.1)}
-                disabled={!brightnessControlAvailable}
-                iconColor="white"
-              />
-            </View>
+          {/* Center Controls */}
+          <View style={styles.centerControls}>
             <IconButton
               icon="rewind-10"
-              size={36}
-              onPress={() => handleSeekRelative(-10)}
+              iconColor="white"
+              size={40}
+              onPress={() => seekRelative(-SEEK_STEP_SECONDS)}
             />
-            <Pressable style={styles.playButton} onPress={handleTogglePlay}>
-              <IconButton icon={isPlaying ? "pause" : "play"} size={48} />
+            <Pressable style={styles.playButton} onPress={togglePlayPause}>
+              <IconButton
+                icon={isPlaying ? "pause" : "play"}
+                iconColor="white"
+                size={56}
+              />
             </Pressable>
             <IconButton
               icon="fast-forward-10"
-              size={36}
-              onPress={() => handleSeekRelative(10)}
+              iconColor="white"
+              size={40}
+              onPress={() => seekRelative(SEEK_STEP_SECONDS)}
             />
-            <View style={styles.sideControls}>
-              <IconButton
-                icon="volume-minus"
-                size={28}
-                onPress={() => adjustVolume(-0.1)}
-                iconColor="white"
-              />
-              <Text variant="labelSmall" style={styles.sideControlLabel}>
-                {`${volumePercent}%`}
-              </Text>
-              <IconButton
-                icon="volume-plus"
-                size={28}
-                onPress={() => adjustVolume(0.1)}
-                iconColor="white"
-              />
-            </View>
           </View>
 
-          <View
-            pointerEvents="box-none"
-            style={[
-              styles.bottomSection,
-              { paddingBottom: bottomControlsPadding },
-            ]}
-          >
+          {/* Bottom Section */}
+          <View style={styles.bottomSection}>
+            {/* Progress Bar */}
             <View
-              pointerEvents="box-none"
               style={styles.progressContainer}
-              onLayout={handleProgressLayout}
+              onLayout={handleProgressBarLayout}
             >
               <Pressable
                 style={styles.progressBar}
-                onPress={handleProgressPress}
+                onPress={handleProgressBarPress}
               >
                 <View style={styles.progressBackground} />
                 <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${progressFraction * 100}%` },
-                  ]}
+                  style={[styles.progressFill, { width: `${progress * 100}%` }]}
                 />
                 <View
-                  style={[
-                    styles.progressThumb,
-                    { left: `${progressFraction * 100}%` },
-                  ]}
+                  style={[styles.progressThumb, { left: `${progress * 100}%` }]}
                 />
               </Pressable>
               <View style={styles.timeRow}>
                 <Text variant="labelSmall" style={styles.timeText}>
-                  {formatMillis(positionMillis)}
+                  {formatTime(currentTime)}
                 </Text>
                 <Text variant="labelSmall" style={styles.timeText}>
-                  {isDurationLoading
-                    ? "Loading..."
-                    : formatMillis(durationMillis)}
+                  {formatTime(duration)}
                 </Text>
               </View>
             </View>
 
-            <View pointerEvents="box-none" style={styles.bottomMetadata}>
-              <Text
-                variant="labelSmall"
-                style={styles.sourceText}
-                numberOfLines={1}
-              >
-                {sourceLabel}
-              </Text>
-              <View pointerEvents="box-none" style={styles.metaRow}>
-                {videoCodecLabel ? (
-                  <Text variant="labelSmall" style={styles.metaText}>
-                    {videoCodecLabel}
-                  </Text>
-                ) : null}
-                {audioCodecLabel ? (
-                  <Text variant="labelSmall" style={styles.metaText}>
-                    {audioCodecLabel}
-                  </Text>
-                ) : null}
-                {resolutionLabel ? (
-                  <Text variant="labelSmall" style={styles.metaText}>
-                    {resolutionLabel}
-                  </Text>
-                ) : null}
-                {bitrateLabel ? (
-                  <Text variant="labelSmall" style={styles.metaText}>
-                    {bitrateLabel}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-
-            <View pointerEvents="auto" style={styles.controlsRow}>
+            {/* Controls Row */}
+            <View style={styles.controlsRow}>
+              {/* Source Menu */}
               <Menu
                 visible={sourceMenuVisible}
                 onDismiss={() => setSourceMenuVisible(false)}
                 anchor={
-                  <View>
-                    <IconButton
-                      icon="playlist-play"
-                      onPress={() => setSourceMenuVisible(true)}
-                      disabled={!hasDownload && !hasStream}
-                    />
-                  </View>
+                  <IconButton
+                    icon="playlist-play"
+                    iconColor="white"
+                    onPress={() => setSourceMenuVisible(true)}
+                    disabled={!hasDownload && !hasStream}
+                  />
                 }
               >
                 <Menu.Item
                   onPress={() => handlePlaybackModeChange("stream")}
                   title="Stream from Jellyfin"
                   disabled={!hasStream}
+                  leadingIcon={playbackMode === "stream" ? "check" : undefined}
                 />
                 <Menu.Item
                   onPress={() => handlePlaybackModeChange("download")}
                   title="Play downloaded copy"
                   disabled={!hasDownload}
+                  leadingIcon={
+                    playbackMode === "download" ? "check" : undefined
+                  }
                 />
               </Menu>
 
+              {/* Track Menu */}
               <Menu
                 visible={trackMenuVisible}
                 onDismiss={() => setTrackMenuVisible(false)}
                 anchor={
-                  <View>
-                    <IconButton
-                      icon="tune-vertical"
-                      onPress={() => setTrackMenuVisible(true)}
-                      disabled={!hasTrackOptions}
-                    />
-                  </View>
+                  <IconButton
+                    icon="tune-vertical"
+                    iconColor="white"
+                    onPress={() => setTrackMenuVisible(true)}
+                    disabled={!hasTrackOptions}
+                  />
                 }
               >
-                {audioTrackOptions.length > 0 ? (
+                {audioTracks.length > 0 && (
                   <>
-                    <Menu.Item
-                      title="Audio tracks"
-                      disabled
-                      onPress={() => undefined}
-                      titleStyle={styles.menuSectionLabel}
-                    />
-                    {audioTrackOptions.map((track, index) => {
-                      const key =
-                        track.id ?? `${track.language ?? "audio"}-${index}`;
-                      return (
-                        <Menu.Item
-                          key={`audio-${key}`}
-                          onPress={() => handleAudioTrackSelect(track)}
-                          title={formatAudioTrackLabel(track)}
-                          trailingIcon={
-                            isAudioTrackSelected(track) ? "check" : undefined
-                          }
-                        />
-                      );
-                    })}
+                    <Menu.Item title="Audio Tracks" disabled />
+                    {audioTracks.map((track, idx) => (
+                      <Menu.Item
+                        key={track.id ?? `audio-${idx}`}
+                        onPress={() => {
+                          player.audioTrack = track;
+                          setTrackMenuVisible(false);
+                        }}
+                        title={formatTrackLabel(track)}
+                        leadingIcon={
+                          isTrackSelected(track, currentAudioTrack)
+                            ? "check"
+                            : undefined
+                        }
+                      />
+                    ))}
                   </>
-                ) : null}
-
-                {audioTrackOptions.length > 0 &&
-                subtitleTrackOptions.length > 0 ? (
-                  <Divider />
-                ) : null}
-
-                {subtitleTrackOptions.length > 0 ? (
+                )}
+                {subtitleTracks.length > 0 && (
                   <>
+                    <Menu.Item title="Subtitles" disabled />
                     <Menu.Item
-                      title="Subtitles"
-                      disabled
-                      onPress={() => undefined}
-                      titleStyle={styles.menuSectionLabel}
+                      onPress={() => {
+                        player.subtitleTrack = null;
+                        setTrackMenuVisible(false);
+                      }}
+                      title="Subtitles Off"
+                      leadingIcon={!currentSubtitleTrack ? "check" : undefined}
                     />
-                    <Menu.Item
-                      onPress={() => handleSubtitleTrackSelect(null)}
-                      title="Subtitles off"
-                      trailingIcon={currentSubtitleTrack ? undefined : "check"}
-                    />
-                    {subtitleTrackOptions.map((track, index) => {
-                      const key =
-                        track.id ?? `${track.language ?? "subtitle"}-${index}`;
-                      return (
-                        <Menu.Item
-                          key={`subtitle-${key}`}
-                          onPress={() => handleSubtitleTrackSelect(track)}
-                          title={formatSubtitleTrackLabel(track)}
-                          trailingIcon={
-                            isSubtitleTrackSelected(track) ? "check" : undefined
-                          }
-                        />
-                      );
-                    })}
+                    {subtitleTracks.map((track, idx) => (
+                      <Menu.Item
+                        key={track.id ?? `subtitle-${idx}`}
+                        onPress={() => {
+                          player.subtitleTrack = track;
+                          setTrackMenuVisible(false);
+                        }}
+                        title={formatTrackLabel(track)}
+                        leadingIcon={
+                          isTrackSelected(track, currentSubtitleTrack)
+                            ? "check"
+                            : undefined
+                        }
+                      />
+                    ))}
                   </>
-                ) : null}
+                )}
               </Menu>
 
+              {/* Speed Menu */}
               <Menu
                 visible={speedMenuVisible}
                 onDismiss={() => setSpeedMenuVisible(false)}
                 anchor={
-                  <View>
-                    <IconButton
-                      icon="speedometer"
-                      onPress={() => setSpeedMenuVisible(true)}
-                    />
-                  </View>
+                  <IconButton
+                    icon="speedometer"
+                    iconColor="white"
+                    onPress={() => setSpeedMenuVisible(true)}
+                  />
                 }
               >
                 {PLAYBACK_RATES.map((rate) => (
                   <Menu.Item
                     key={rate}
                     onPress={() => handlePlaybackRateChange(rate)}
-                    title={`${rate}x`}
-                    trailingIcon={rate === playbackRate ? "check" : undefined}
+                    title={`${rate}×`}
+                    leadingIcon={rate === playbackRate ? "check" : undefined}
                   />
                 ))}
               </Menu>
-
-              <View style={styles.controlsSpacer} />
-
-              <IconButton
-                icon="skip-next"
-                onPress={handlePlayNext}
-                disabled={!nextUpItem}
-              />
             </View>
           </View>
         </Pressable>
       </Animated.View>
 
-      {showLoader ? <FullscreenLoading message={loadingMessage} /> : null}
-
-      {nextUpItem && upNextVisible ? (
-        <View style={styles.upNextOverlay} pointerEvents="auto">
-          <View style={styles.upNextCard}>
-            {nextUpPosterUri ? (
-              <Image
-                source={{ uri: nextUpPosterUri }}
-                style={styles.upNextPoster}
-              />
-            ) : null}
-            <View style={styles.upNextInfo}>
-              <Text variant="labelSmall" style={styles.upNextLabel}>
-                Up next
-              </Text>
-              <Text variant="titleMedium" style={styles.upNextTitle}>
-                {nextUpItem.Name ?? "Next episode"}
-              </Text>
-              {nextUpSubtitleLabel ? (
-                <Text variant="bodySmall" style={styles.upNextSubtitle}>
-                  {nextUpSubtitleLabel}
-                </Text>
-              ) : null}
-              <View style={styles.upNextActions}>
-                <Button mode="contained" onPress={handlePlayNext}>
-                  Play next
-                </Button>
-                <Button mode="text" onPress={handleDismissUpNext}>
-                  Not now
-                </Button>
-              </View>
-            </View>
-          </View>
-        </View>
-      ) : null}
-
-      {infoVisible ? (
-        <View style={styles.infoOverlay}>
-          <View style={styles.infoCard}>
-            <Text variant="titleMedium" style={styles.infoTitle}>
-              Media information
-            </Text>
-            {posterUri ? (
-              <Image source={{ uri: posterUri }} style={styles.infoPoster} />
-            ) : null}
-            <View style={styles.infoList}>
-              <Text variant="bodySmall" style={styles.infoRow}>
-                Video: {videoCodecLabel ?? "Unknown"}
-              </Text>
-              <Text variant="bodySmall" style={styles.infoRow}>
-                Audio: {audioCodecLabel ?? "Unknown"}
-              </Text>
-              <Text variant="bodySmall" style={styles.infoRow}>
-                Resolution: {resolutionLabel ?? "Unknown"}
-              </Text>
-              <Text variant="bodySmall" style={styles.infoRow}>
-                Bitrate: {bitrateLabel}
-              </Text>
-            </View>
-            <Button mode="contained" onPress={() => setInfoVisible(false)}>
-              Close
-            </Button>
-          </View>
-        </View>
-      ) : null}
-
-      {playbackErrorMessage ? (
-        <FullscreenError
-          title="Playback Error"
-          message={playbackErrorMessage}
-          onRetry={handleRetry}
-          onGoBack={handleErrorGoBack}
-        />
-      ) : null}
+      {/* Loading Overlay */}
+      {showLoader && <FullscreenLoading message={loadingMessage} />}
     </View>
   );
 };
+
+// ============================================================================
+// Styles
+// ============================================================================
 
 const createStyles = (theme: AppTheme) =>
   StyleSheet.create({
@@ -1719,38 +891,38 @@ const createStyles = (theme: AppTheme) =>
     },
     videoFallback: {
       flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
       backgroundColor: "black",
     },
     overlay: {
       ...StyleSheet.absoluteFillObject,
       justifyContent: "space-between",
       paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
     },
     overlayPressable: {
       ...StyleSheet.absoluteFillObject,
       justifyContent: "space-between",
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
     },
     gradientTop: {
       position: "absolute",
       top: 0,
       left: 0,
       right: 0,
-      height: 160,
+      height: 120,
     },
     gradientBottom: {
       position: "absolute",
       left: 0,
       right: 0,
       bottom: 0,
-      height: 240,
+      height: 200,
     },
     topBar: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingBottom: spacing.md,
     },
     topLeft: {
       flexDirection: "row",
@@ -1765,27 +937,11 @@ const createStyles = (theme: AppTheme) =>
       color: "white",
       fontWeight: "700",
     },
-    subtitleText: {
-      color: "rgba(255,255,255,0.8)",
-    },
-    topActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
     centerControls: {
       alignItems: "center",
       justifyContent: "center",
       flexDirection: "row",
-      gap: spacing.lg,
-    },
-    sideControls: {
-      alignItems: "center",
-      gap: spacing.xxxs,
-    },
-    sideControlLabel: {
-      color: "rgba(255,255,255,0.85)",
-      fontWeight: "600",
+      gap: spacing.xl,
     },
     playButton: {
       width: 96,
@@ -1794,8 +950,8 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: "rgba(0,0,0,0.5)",
       alignItems: "center",
       justifyContent: "center",
-      borderWidth: 1,
-      borderColor: "rgba(255,255,255,0.15)",
+      borderWidth: 2,
+      borderColor: "rgba(255,255,255,0.2)",
     },
     bottomSection: {
       gap: spacing.md,
@@ -1804,7 +960,7 @@ const createStyles = (theme: AppTheme) =>
       gap: spacing.xs,
     },
     progressBar: {
-      height: 16,
+      height: 20,
       justifyContent: "center",
     },
     progressBackground: {
@@ -1813,7 +969,7 @@ const createStyles = (theme: AppTheme) =>
       right: 0,
       height: 4,
       borderRadius: 2,
-      backgroundColor: "rgba(255,255,255,0.25)",
+      backgroundColor: "rgba(255,255,255,0.3)",
     },
     progressFill: {
       position: "absolute",
@@ -1824,133 +980,26 @@ const createStyles = (theme: AppTheme) =>
     },
     progressThumb: {
       position: "absolute",
-      width: 12,
-      height: 12,
-      borderRadius: 6,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
       backgroundColor: theme.colors.primary,
-      marginLeft: -6,
+      marginLeft: -7,
       borderWidth: 2,
-      borderColor: "black",
+      borderColor: "white",
     },
     timeRow: {
       flexDirection: "row",
       justifyContent: "space-between",
     },
     timeText: {
-      color: "rgba(255,255,255,0.8)",
-    },
-    bottomMetadata: {
-      gap: spacing.xxxs,
-    },
-    sourceText: {
-      color: theme.colors.primary,
-      fontWeight: "600",
-    },
-    metaRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.xs,
-    },
-    metaText: {
-      color: "rgba(255,255,255,0.7)",
+      color: "rgba(255,255,255,0.9)",
+      fontWeight: "500",
     },
     controlsRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.sm,
-    },
-    controlsSpacer: {
-      flex: 1,
-    },
-    menuSectionLabel: {
-      fontWeight: "600",
-      color: theme.colors.onSurfaceVariant,
-    },
-    infoOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: "center",
-      justifyContent: "center",
-      padding: spacing.lg,
-      backgroundColor: "rgba(0,0,0,0.6)",
-    },
-    infoCard: {
-      width: "100%",
-      maxWidth: 360,
-      borderRadius: spacing.lg,
-      backgroundColor: theme.colors.surface,
-      padding: spacing.lg,
-      alignItems: "center",
-      gap: spacing.md,
-    },
-    infoTitle: {
-      color: theme.colors.onSurface,
-      fontWeight: "700",
-    },
-    infoList: {
-      alignSelf: "stretch",
-      gap: spacing.xs,
-    },
-    infoRow: {
-      color: theme.colors.onSurfaceVariant,
-    },
-    infoPoster: {
-      width: 160,
-      height: 240,
-      borderRadius: spacing.md,
-    },
-    airPlayWrapper: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    airPlayButton: {
-      width: 24,
-      height: 24,
-    },
-    upNextOverlay: {
-      position: "absolute",
-      left: spacing.lg,
-      right: spacing.lg,
-      bottom: spacing.xl,
-    },
-    upNextCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.md,
-      backgroundColor: "rgba(18, 18, 18, 0.92)",
-      borderRadius: spacing.lg,
-      padding: spacing.md,
-      borderWidth: 1,
-      borderColor: "rgba(255,255,255,0.1)",
-    },
-    upNextPoster: {
-      width: 100,
-      height: 150,
-      borderRadius: spacing.md,
-    },
-    upNextInfo: {
-      flex: 1,
-      gap: spacing.xs,
-    },
-    upNextLabel: {
-      textTransform: "uppercase",
-      letterSpacing: 1,
-      color: theme.colors.primary,
-      fontWeight: "600",
-    },
-    upNextTitle: {
-      color: "white",
-      fontWeight: "700",
-    },
-    upNextSubtitle: {
-      color: "rgba(255,255,255,0.75)",
-    },
-    upNextActions: {
-      flexDirection: "row",
-      gap: spacing.sm,
-      marginTop: spacing.sm,
     },
   });
 
