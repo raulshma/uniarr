@@ -25,6 +25,7 @@ class ImageCacheService {
   private isInitialized = false;
   private inFlightPrefetches = new Map<string, Promise<string | null>>();
   private prefetchQueue: string[] = [];
+  private queuedPrefetches = new Set<string>();
   private isProcessingQueue = false;
   private memoryCacheHits = 0;
   private diskCacheHits = 0;
@@ -364,8 +365,25 @@ class ImageCacheService {
    * Add URLs to background prefetch queue
    */
   private addToPrefetchQueue(urls: string[]): void {
-    this.prefetchQueue.push(...urls);
-    void this.processPrefetchQueue();
+    let addedAny = false;
+
+    for (const url of urls) {
+      if (!url) {
+        continue;
+      }
+
+      if (this.queuedPrefetches.has(url) || this.inFlightPrefetches.has(url)) {
+        continue;
+      }
+
+      this.prefetchQueue.push(url);
+      this.queuedPrefetches.add(url);
+      addedAny = true;
+    }
+
+    if (addedAny) {
+      void this.processPrefetchQueue();
+    }
   }
 
   /**
@@ -393,6 +411,8 @@ class ImageCacheService {
             }),
           ),
         );
+
+        batch.forEach((url) => this.queuedPrefetches.delete(url));
 
         // Small delay between batches to allow UI work
         await new Promise((resolve) => setTimeout(resolve, 50));

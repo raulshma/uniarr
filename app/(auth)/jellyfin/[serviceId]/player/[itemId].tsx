@@ -310,7 +310,7 @@ const JellyfinPlayerScreen = () => {
 
   // Controls visibility animation
   const controlsOpacityAnim = useRef(new Animated.Value(1)).current;
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setUpNextVisible(false);
@@ -429,7 +429,6 @@ const JellyfinPlayerScreen = () => {
   const pendingSeekSecondsRef = useRef<number | undefined>(
     startPositionSeconds,
   );
-  const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBarWidth = useRef(0);
   const lastKnownSecondsRef = useRef<number>(startPositionSeconds ?? 0);
   const startReportedRef = useRef(false);
@@ -517,10 +516,10 @@ const JellyfinPlayerScreen = () => {
   }, [startPositionSeconds]);
 
   useEffect(() => {
-    const timer = hideControlsTimer.current;
     return () => {
-      if (timer) {
-        clearTimeout(timer);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
       }
       isPlayerMountedRef.current = false;
     };
@@ -746,6 +745,7 @@ const JellyfinPlayerScreen = () => {
   const resetHideControlsTimer = useCallback(() => {
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
     }
     if (!isPlaying) {
       return; // Don't auto-hide when paused
@@ -775,6 +775,7 @@ const JellyfinPlayerScreen = () => {
       resetHideControlsTimer();
     } else if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
     }
   }, [isPlaying, isReadyToPlay, resetHideControlsTimer]);
 
@@ -820,6 +821,7 @@ const JellyfinPlayerScreen = () => {
         }).start();
         if (controlsTimeoutRef.current) {
           clearTimeout(controlsTimeoutRef.current);
+          controlsTimeoutRef.current = null;
         }
       }
       return next;

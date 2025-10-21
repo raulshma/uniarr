@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Alert, Platform } from "react-native";
 
 import {
@@ -39,7 +39,7 @@ export const useWebhookNotifications = (
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [config, setConfig] = useState<WebhookConfig | null>(null);
-  const [listenerId, setListenerId] = useState<string | null>(null);
+  const listenerRef = useRef<string | null>(null);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -69,17 +69,11 @@ export const useWebhookNotifications = (
       loadNotifications();
       loadConfig();
     }
-
-    return () => {
-      if (listenerId) {
-        webhookService.removeEventListener(listenerId);
-      }
-    };
-  }, [autoLoad, listenerId, loadConfig, loadNotifications]);
+  }, [autoLoad, loadConfig, loadNotifications]);
 
   // Set up event listener for real-time updates
   useEffect(() => {
-    const setupListener = async () => {
+    const setupListener = () => {
       try {
         const id = webhookService.addEventListener(
           "new-notification",
@@ -97,13 +91,20 @@ export const useWebhookNotifications = (
             }
           },
         );
-        setListenerId(id);
+        listenerRef.current = id;
       } catch (error) {
         logger.error("Failed to setup webhook listener", { error });
       }
     };
 
     setupListener();
+
+    return () => {
+      if (listenerRef.current) {
+        webhookService.removeEventListener(listenerRef.current);
+        listenerRef.current = null;
+      }
+    };
   }, [loadNotifications, showAlerts]);
 
   const markAsRead = useCallback(async (notificationId: string) => {

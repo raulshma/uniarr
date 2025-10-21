@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { alert } from "@/services/dialogService";
 
@@ -13,6 +13,29 @@ export interface VoiceCommandHandlerReturn {
 export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const pendingAlertsRef = useRef<Set<ReturnType<typeof setTimeout>>>(
+    new Set(),
+  );
+
+  useEffect(() => {
+    const current = pendingAlertsRef.current;
+
+    return () => {
+      current.forEach((timeoutId) => {
+        clearTimeout(timeoutId);
+      });
+      current.clear();
+    };
+  }, []);
+
+  const scheduleAlert = useCallback((fn: () => void, delay: number) => {
+    const timeoutId = setTimeout(() => {
+      pendingAlertsRef.current.delete(timeoutId);
+      fn();
+    }, delay);
+
+    pendingAlertsRef.current.add(timeoutId);
+  }, []);
 
   const handleSearchMedia = useCallback(
     async (query?: string): Promise<void> => {
@@ -29,7 +52,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
 
       try {
         router.push("/(auth)/search");
-        setTimeout(() => {
+        scheduleAlert(() => {
           alert(
             "Search Results",
             `Searching for "${query}" across all services...`,
@@ -46,7 +69,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
         alert("Search Error", "Failed to search for media");
       }
     },
-    [router],
+    [router, scheduleAlert],
   );
 
   const handleCheckServices = useCallback(async (): Promise<void> => {
@@ -110,7 +133,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
 
       try {
         router.push("/(auth)/search");
-        setTimeout(() => {
+        scheduleAlert(() => {
           alert(
             "Add Media",
             `Searching for "${mediaName}" to add to your services...`,
@@ -127,7 +150,7 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
         alert("Add Media Error", "Failed to add media");
       }
     },
-    [router],
+    [router, scheduleAlert],
   );
 
   const handleManageRequests = useCallback(async (): Promise<void> => {
@@ -175,13 +198,15 @@ export const useVoiceCommandHandler = (): VoiceCommandHandlerReturn => {
             break;
 
           default:
-            console.warn("Unknown voice command action:", action);
+            // Unknown actions are surfaced to the user via a dialog instead of
+            // console logging so lint rules about console usage are satisfied.
             alert("Voice Command", `Received unknown command: ${action}`, [
               { text: "OK" },
             ]);
         }
-      } catch (error) {
-        console.error("Error processing voice command:", error);
+      } catch {
+        // Surface a user-friendly error dialog. Avoid console.error to comply
+        // with project lint rules about console usage.
         alert(
           "Voice Command Error",
           "Failed to process voice command. Please try again.",

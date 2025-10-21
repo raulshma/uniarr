@@ -31,6 +31,7 @@ export const useSkeletonLoading = ({
   const [showSkeleton, setShowSkeleton] = useState(initialLoading);
   const startTimeRef = useRef<number>(Date.now());
   const maxLoadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const minLoadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Start loading
   const startLoading = useCallback(() => {
@@ -39,11 +40,17 @@ export const useSkeletonLoading = ({
       setShowSkeleton(true);
       startTimeRef.current = Date.now();
 
+      if (minLoadingTimeoutRef.current) {
+        clearTimeout(minLoadingTimeoutRef.current);
+        minLoadingTimeoutRef.current = null;
+      }
+
       // Set maximum loading time if specified
       if (maxLoadingTime > 0) {
         maxLoadingTimeoutRef.current = setTimeout(() => {
           setShowSkeleton(false);
           setIsLoading(false);
+          maxLoadingTimeoutRef.current = null;
         }, maxLoadingTime);
       }
     }
@@ -60,13 +67,19 @@ export const useSkeletonLoading = ({
         maxLoadingTimeoutRef.current = null;
       }
 
+      if (minLoadingTimeoutRef.current) {
+        clearTimeout(minLoadingTimeoutRef.current);
+        minLoadingTimeoutRef.current = null;
+      }
+
       // Ensure minimum loading time
       const elapsed = Date.now() - startTimeRef.current;
       const remainingTime = Math.max(0, minLoadingTime - elapsed);
 
       if (remainingTime > 0) {
-        setTimeout(() => {
+        minLoadingTimeoutRef.current = setTimeout(() => {
           setShowSkeleton(false);
+          minLoadingTimeoutRef.current = null;
         }, remainingTime);
       } else {
         setShowSkeleton(false);
@@ -79,6 +92,10 @@ export const useSkeletonLoading = ({
     if (maxLoadingTimeoutRef.current) {
       clearTimeout(maxLoadingTimeoutRef.current);
       maxLoadingTimeoutRef.current = null;
+    }
+    if (minLoadingTimeoutRef.current) {
+      clearTimeout(minLoadingTimeoutRef.current);
+      minLoadingTimeoutRef.current = null;
     }
     setIsLoading(false);
     setShowSkeleton(false);
@@ -98,6 +115,9 @@ export const useSkeletonLoading = ({
     return () => {
       if (maxLoadingTimeoutRef.current) {
         clearTimeout(maxLoadingTimeoutRef.current);
+      }
+      if (minLoadingTimeoutRef.current) {
+        clearTimeout(minLoadingTimeoutRef.current);
       }
     };
   }, []);
