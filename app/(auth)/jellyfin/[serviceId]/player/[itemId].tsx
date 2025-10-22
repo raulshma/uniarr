@@ -593,18 +593,20 @@ const JellyfinPlayerScreen = () => {
 
   const seekRelative = useCallback(
     (seconds: number) => {
-      if (duration <= 0 || !player) return;
-
-      // Use seekBy for relative seeking - more efficient than currentTime
-      player.seekBy(seconds);
+      if (!player) return;
+      try {
+        player.seekBy(seconds);
+      } catch {
+        // Ignore seek errors
+      }
       setControlsVisible(true);
     },
-    [duration, player],
+    [player],
   );
 
   const handleProgressBarPress = useCallback(
     (event: GestureResponderEvent) => {
-      if (duration <= 0 || progressBarWidthRef.current <= 0) return;
+      if (duration <= 0 || progressBarWidthRef.current <= 0 || !player) return;
       const fraction = clamp(
         event.nativeEvent.locationX / progressBarWidthRef.current,
         0,
@@ -612,10 +614,14 @@ const JellyfinPlayerScreen = () => {
       );
       const targetTime = duration * fraction;
 
-      const current = player.currentTime ?? 0;
-      const delta = targetTime - current;
-      if (Math.abs(delta) > 0.01) {
-        player.seekBy(delta);
+      try {
+        const current = player.currentTime ?? 0;
+        const delta = targetTime - current;
+        if (Math.abs(delta) > 0.01) {
+          player.seekBy(delta);
+        }
+      } catch {
+        // Ignore seek errors
       }
       setControlsVisible(true);
     },
