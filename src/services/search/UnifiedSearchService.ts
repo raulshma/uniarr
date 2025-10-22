@@ -31,7 +31,11 @@ type JellyseerrSearchResult =
 
 const HISTORY_STORAGE_KEY = "UnifiedSearch_history";
 const HISTORY_LIMIT = 12;
-const SEARCH_TIMEOUT_MS = 2000;
+
+// Mobile networks and VPN tunnels can introduce noticeable latency. Keep
+// per-connector search requests reasonably responsive without failing too fast.
+const DEFAULT_SEARCH_TIMEOUT_MS = 10_000;
+const MAX_SEARCH_TIMEOUT_MS = 20_000;
 
 const normalizeTerm = (term: string): string => term.trim();
 
@@ -326,12 +330,17 @@ export class UnifiedSearchService {
           }),
       };
 
+      const timeoutMs = this.resolveSearchTimeout(connector);
+      const timeoutLabel =
+        connector.config.name ??
+        `${connector.config.type} (${connector.config.id})`;
       const rawResults = await this.withTimeout(
         searchFn(
           term,
           Object.keys(searchOptions).length > 0 ? searchOptions : undefined,
         ),
-        SEARCH_TIMEOUT_MS,
+        timeoutMs,
+        `Search timed out after ${timeoutMs}ms for ${timeoutLabel}.`,
       );
       const mapped = this.mapResults(rawResults, connector, options.mediaTypes);
       const limit = options.limitPerService ?? 25;
@@ -810,10 +819,28 @@ export class UnifiedSearchService {
     return Number.isNaN(timestamp) ? undefined : timestamp;
   }
 
-  private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  private resolveSearchTimeout(connector: IConnector): number {
+    const configuredTimeout = connector.config.timeout;
+
+    if (
+      typeof configuredTimeout === "number" &&
+      Number.isFinite(configuredTimeout) &&
+      configuredTimeout > 0
+    ) {
+      return Math.min(configuredTimeout, MAX_SEARCH_TIMEOUT_MS);
+    }
+
+    return DEFAULT_SEARCH_TIMEOUT_MS;
+  }
+
+  private withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    message?: string,
+  ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
-        reject(new Error("Search timeout"));
+        reject(new Error(message ?? "Search timeout"));
       }, timeoutMs);
 
       promise
