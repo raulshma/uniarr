@@ -23,6 +23,7 @@ export interface BackupExportOptions {
   includeRecentIPs: boolean;
   includeDownloadConfig: boolean;
   includeServicesViewState: boolean;
+  includeWidgetsConfig: boolean;
   encryptSensitive: boolean;
   password?: string;
 }
@@ -54,6 +55,10 @@ export interface BackupSelectionConfig {
     sensitive: boolean;
   };
   servicesViewState: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  widgetsConfig: {
     enabled: boolean;
     sensitive: boolean;
   };
@@ -123,6 +128,7 @@ export interface EncryptedBackupData {
       sortKey: "name" | "status" | "type";
       sortDirection: "asc" | "desc";
     };
+    widgetsConfig?: any[];
   };
 }
 
@@ -190,6 +196,7 @@ export interface BackupData {
       sortKey: "name" | "status" | "type";
       sortDirection: "asc" | "desc";
     };
+    widgetsConfig?: any[];
   };
 }
 
@@ -611,6 +618,25 @@ class BackupRestoreService {
         }
       }
 
+      // Collect widgets configuration
+      if (options.includeWidgetsConfig) {
+        const widgetsStorageKey = "WidgetService:widgets";
+        const widgetsData = await AsyncStorage.getItem(widgetsStorageKey);
+        if (widgetsData) {
+          try {
+            backupData.appData.widgetsConfig = JSON.parse(widgetsData);
+          } catch (parseError) {
+            await logger.warn("Failed to parse widgets configuration", {
+              location: "BackupRestoreService.createSelectiveBackup",
+              error:
+                parseError instanceof Error
+                  ? parseError.message
+                  : String(parseError),
+            });
+          }
+        }
+      }
+
       // Encrypt sensitive data if needed
       if (
         options.encryptSensitive &&
@@ -736,6 +762,24 @@ class BackupRestoreService {
         }
       }
 
+      // Fetch widgets configuration
+      let widgetsConfig = undefined;
+      const widgetsStorageKey = "WidgetService:widgets";
+      const widgetsData = await AsyncStorage.getItem(widgetsStorageKey);
+      if (widgetsData) {
+        try {
+          widgetsConfig = JSON.parse(widgetsData);
+        } catch (parseError) {
+          await logger.warn("Failed to parse widgets configuration", {
+            location: "BackupRestoreService.createBackup",
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          });
+        }
+      }
+
       // Prepare backup data structure
       const backupData: BackupData = {
         version: "1.1",
@@ -769,6 +813,7 @@ class BackupRestoreService {
           },
           ...(downloadConfig && { downloadConfig }),
           ...(servicesViewState && { servicesViewState }),
+          ...(widgetsConfig && { widgetsConfig }),
         },
       };
 
@@ -790,6 +835,7 @@ class BackupRestoreService {
         hasTmdbCredentials: !!tmdbApiKey,
         hasDownloadConfig: !!downloadConfig,
         hasServicesViewState: !!servicesViewState,
+        hasWidgetsConfig: !!widgetsConfig,
       });
 
       return filePath;
@@ -1091,6 +1137,23 @@ class BackupRestoreService {
         });
       }
 
+      // Restore widgets configuration if available
+      if (
+        backupData.appData.widgetsConfig &&
+        Array.isArray(backupData.appData.widgetsConfig)
+      ) {
+        const widgetsStorageKey = "WidgetService:widgets";
+        await AsyncStorage.setItem(
+          widgetsStorageKey,
+          JSON.stringify(backupData.appData.widgetsConfig),
+        );
+
+        await logger.info("Widgets configuration restored", {
+          location: "BackupRestoreService.restoreBackup",
+          widgetCount: backupData.appData.widgetsConfig.length,
+        });
+      }
+
       await logger.info("Backup restore completed successfully", {
         location: "BackupRestoreService.restoreBackup",
       });
@@ -1179,6 +1242,7 @@ class BackupRestoreService {
       includeRecentIPs: true,
       includeDownloadConfig: true,
       includeServicesViewState: true,
+      includeWidgetsConfig: true,
       encryptSensitive: false,
     };
   }
@@ -1216,6 +1280,10 @@ class BackupRestoreService {
       servicesViewState: {
         enabled: true,
         sensitive: false, // View state is not sensitive (UI preferences)
+      },
+      widgetsConfig: {
+        enabled: true,
+        sensitive: false, // Widgets configuration is not sensitive (UI layout)
       },
     };
   }

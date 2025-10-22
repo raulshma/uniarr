@@ -467,6 +467,27 @@ const BackupExportScreen = () => {
                 </Text>
               </View>
             </View>
+
+            {/* Widgets Configuration */}
+            <View style={styles.checkboxContainer}>
+              <Checkbox
+                status={options.includeWidgetsConfig ? "checked" : "unchecked"}
+                onPress={() =>
+                  handleOptionChange(
+                    "includeWidgetsConfig",
+                    !options.includeWidgetsConfig,
+                  )
+                }
+              />
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.checkboxLabel}>
+                  Dashboard Widget Configurations
+                </Text>
+                <Text style={styles.sensitiveLabel}>
+                  Widget layout and settings
+                </Text>
+              </View>
+            </View>
           </Card>
         </View>
 
@@ -524,7 +545,8 @@ const BackupExportScreen = () => {
                   !options.includeNetworkHistory &&
                   !options.includeRecentIPs &&
                   !options.includeDownloadConfig &&
-                  !options.includeServicesViewState)
+                  !options.includeServicesViewState &&
+                  !options.includeWidgetsConfig)
               }
               onPress={handleCreateBackup}
             >
