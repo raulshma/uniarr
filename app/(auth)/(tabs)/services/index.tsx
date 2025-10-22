@@ -35,6 +35,7 @@ import type { ServiceConfig, ServiceType } from "@/models/service.types";
 import { logger } from "@/services/logger/LoggerService";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
+import { borderRadius } from "@/constants/sizes";
 
 type ServiceOverviewItem = {
   config: ServiceConfig;
@@ -240,8 +241,8 @@ const ServicesScreen = () => {
           backgroundColor: theme.colors.elevation.level1,
           marginHorizontal: spacing.md,
           marginVertical: spacing.xs,
-          borderRadius: 12,
-          padding: spacing.md,
+          borderRadius: borderRadius.xxxl,
+          padding: spacing.sm,
         },
         serviceContent: {
           flexDirection: "row",

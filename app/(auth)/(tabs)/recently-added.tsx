@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useRecentlyAdded";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { borderRadius } from "@/constants/sizes";
 
 const RecentlyAddedScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -47,7 +48,7 @@ const RecentlyAddedScreen = () => {
         mediaItem: {
           backgroundColor: theme.colors.elevation.level1,
           marginVertical: spacing.xs,
-          borderRadius: 12,
+          borderRadius: borderRadius.xxxl,
         },
         mediaContent: {
           flexDirection: "row",
@@ -57,7 +58,7 @@ const RecentlyAddedScreen = () => {
         mediaIcon: {
           width: 48,
           height: 48,
-          borderRadius: 24,
+          borderRadius: borderRadius.xxxl,
           backgroundColor: theme.colors.surfaceVariant,
           alignItems: "center",
           justifyContent: "center",

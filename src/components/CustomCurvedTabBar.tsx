@@ -27,8 +27,8 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
   const insets = useSafeAreaInsets();
 
   // Use centralized size tokens
-  const TAB_BAR_HEIGHT = touchSizes.xl + 9; // 65 = 56 + 9 for curve
-  const CENTER_BUTTON_SIZE = touchSizes.lg + 8; // 56 = 48 + 8
+  const TAB_BAR_HEIGHT = 49; // Match standard tab bar height to prevent jumping
+  const CENTER_BUTTON_SIZE = touchSizes.lg + 8; // 48 = 40 + 8
   const TAB_ICON_SIZE = iconSizes.lg; // 24
   const CENTER_ICON_SIZE = iconSizes.xl; // 28
   const TAB_TOUCH_TARGET = 60; // Fixed width for each tab area
@@ -88,7 +88,7 @@ const CustomCurvedTabBar: React.FC<BottomTabBarProps> = ({
           alignItems: "center",
           justifyContent: "center",
           position: "absolute",
-          bottom: 30,
+          bottom: 22,
           left: screenWidth / 2 - CENTER_BUTTON_SIZE / 2,
           ...getComponentElevation("floatingButton", theme),
         },

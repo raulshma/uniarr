@@ -56,6 +56,8 @@ const PersonDetails = () => {
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        // Exclude top inset on the SafeAreaView so the Appbar sits flush under the
+        // status bar. The Appbar component already accounts for appropriate heights.
         safeArea: { flex: 1, backgroundColor: theme.colors.background },
         header: {
           backgroundColor: theme.colors.surface,
@@ -312,7 +314,9 @@ const PersonDetails = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    // Exclude the top edge so we don't get an extra spacer under the status bar.
+    // The edges prop is handled by react-native-safe-area-context.
+    <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <Appbar.Header mode="small" elevated={false} style={styles.header}>
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content

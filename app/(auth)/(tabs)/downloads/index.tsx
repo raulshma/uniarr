@@ -37,6 +37,7 @@ import {
   isTorrentCompleted,
   isTorrentPaused,
 } from "@/utils/torrent.utils";
+import { borderRadius } from "@/constants/sizes";
 
 type TorrentWithService = Torrent & {
   serviceId: string;
@@ -206,7 +207,7 @@ const DownloadsScreen = () => {
         torrentItem: {
           backgroundColor: theme.colors.elevation.level1,
           borderRadius: spacing.md,
-          padding: spacing.md,
+          padding: spacing.lg,
           marginBottom: spacing.sm,
         },
         torrentHeader: {
@@ -230,7 +231,7 @@ const DownloadsScreen = () => {
         actionButton: {
           width: 32,
           height: 32,
-          borderRadius: 16,
+          borderRadius: borderRadius.xl,
           backgroundColor: theme.colors.elevation.level2,
           justifyContent: "center",
           alignItems: "center",

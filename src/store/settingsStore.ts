@@ -49,6 +49,8 @@ type SettingsData = {
   logLevel: LogLevel;
   // Haptic feedback setting
   hapticFeedback: boolean;
+  // Hydration tracking
+  _hasHydrated: boolean;
   // (thumbnail generation removed)
 };
 
@@ -150,6 +152,7 @@ const createDefaultSettings = (): SettingsData => ({
   maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
   logLevel: LogLevel.DEBUG,
   hapticFeedback: true,
+  _hasHydrated: false,
   // (thumbnail defaults removed)
 });
 
@@ -324,6 +327,9 @@ export const useSettingsStore = create<SettingsState>()(
         } catch {
           // don't crash on logger wiring
         }
+
+        // Mark as hydrated
+        state._hasHydrated = true;
       },
       migrate: (persistedState) => {
         if (!persistedState) {
@@ -372,6 +378,7 @@ export const useSettingsStore = create<SettingsState>()(
             partial.criticalHealthAlertsBypassQuietHours ??
             baseDefaults.criticalHealthAlertsBypassQuietHours,
           useNativeTabs: partial.useNativeTabs ?? baseDefaults.useNativeTabs,
+          _hasHydrated: true,
         } satisfies SettingsData;
       },
     },
@@ -419,3 +426,4 @@ export const selectLastCalendarView = (state: SettingsState) =>
   state.lastCalendarView;
 export const selectUseNativeTabs = (state: SettingsState) =>
   state.useNativeTabs;
+export const selectHasHydrated = (state: SettingsState) => state._hasHydrated;
