@@ -43,6 +43,21 @@ const PRESET_NAMES = {
   tracker: "Tracker",
   cobalt: "Cobalt",
   modern: "Modern",
+  minimal: "Minimal",
+  midnightDune: "Midnight Dune",
+  neonArcade: "Neon Arcade",
+  calmSlate: "Calm Slate",
+  sunrise: "Sunrise",
+  twilight: "Twilight",
+  aurora: "Aurora",
+  desertBloom: "Desert Bloom",
+  arctic: "Arctic",
+  retroWave: "Retro Wave",
+  focus: "Focus",
+  noirContrast: "Noir Contrast",
+  warmPaper: "Warm Paper",
+  terminal: "Terminal",
+  pastel: "Pastel",
 };
 
 export default function ThemeEditorScreen() {
