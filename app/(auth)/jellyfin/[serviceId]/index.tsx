@@ -445,7 +445,7 @@ const JellyfinLibraryScreen = () => {
                     mediaTypes: activeSegmentConfig.mediaTypes,
                     sortBy: "SortName",
                     sortOrder: "Ascending",
-                    limit: 60,
+                    limit: 30,
                   },
                 ),
                 "consolidated",
@@ -474,7 +474,7 @@ const JellyfinLibraryScreen = () => {
             mediaTypes: activeSegmentConfig.mediaTypes,
             sortBy: "SortName",
             sortOrder: "Ascending" as const,
-            limit: 60,
+            limit: 30,
           };
 
           try {
@@ -493,7 +493,7 @@ const JellyfinLibraryScreen = () => {
                 {
                   sortBy: "SortName",
                   sortOrder: "Ascending" as const,
-                  limit: 60,
+                  limit: 30,
                 },
               );
             }
@@ -618,7 +618,10 @@ const JellyfinLibraryScreen = () => {
     return result;
   }, [items, libraryState.activeSegment]);
 
-  // Optimized series metadata fetching - batch fetch with better caching
+  // Optimized series metadata fetching - batch fetch with better caching and concurrency limiting
+  // Limit to 20 items to avoid overwhelming the network with too many concurrent requests
+  const MAX_SERIES_METADATA_BATCH = 20;
+
   const seriesIds = useMemo(() => {
     if (libraryState.activeSegment !== "tv") return [];
 
@@ -628,7 +631,10 @@ const JellyfinLibraryScreen = () => {
       const navId = getInternalStringField(it, "__navigationId") || it.Id;
       if (navId) ids.add(navId);
     }
-    return Array.from(ids);
+
+    // Limit to the first N items to avoid network overload
+    // This prevents hundreds of concurrent requests when user first loads a large TV library
+    return Array.from(ids).slice(0, MAX_SERIES_METADATA_BATCH);
   }, [displayItems, libraryState.activeSegment]);
 
   // Batch fetch series metadata with optimized caching and error handling
@@ -636,7 +642,7 @@ const JellyfinLibraryScreen = () => {
     queries: seriesIds.map((seriesId) => ({
       queryKey: queryKeys.jellyfin.item(serviceId ?? "unknown", seriesId),
       enabled: Boolean(serviceId && seriesId),
-      staleTime: 2 * 60 * 60_000, // 2 hours - series metadata is stable
+      staleTime: 24 * 60 * 60_000, // 24 hours - series metadata is very stable
       refetchOnWindowFocus: false,
       retry: 1, // Only retry once to avoid long loading times
       queryFn: async () => {

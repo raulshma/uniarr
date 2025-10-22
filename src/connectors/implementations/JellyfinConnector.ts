@@ -314,8 +314,21 @@ export class JellyfinConnector
         itemId,
       );
 
+      const requiresTranscoding = Boolean(
+        mediaSource?.TranscodingUrl && mediaSource?.SupportsTranscoding,
+      );
+      const supportsDirectPlayback = Boolean(
+        mediaSource?.SupportsDirectPlay ?? mediaSource?.SupportsDirectStream,
+      );
+      const useStaticStream = Boolean(
+        supportsDirectPlayback &&
+          !requiresTranscoding &&
+          !mediaSource?.IsInfiniteStream,
+      );
+
       const streamUrl = this.buildStreamUrl(itemId, selectedMediaSourceId, {
-        isStatic: false,
+        isStatic: useStaticStream,
+        context: useStaticStream ? "Static" : "Streaming",
         playSessionId: playback.PlaySessionId ?? undefined,
         audioStreamIndex: options.audioStreamIndex,
         subtitleStreamIndex: options.subtitleStreamIndex,
@@ -1071,10 +1084,12 @@ export class JellyfinConnector
     mediaSourceId: string,
     options: {
       readonly isStatic?: boolean;
+      readonly context?: "Streaming" | "Static";
       readonly playSessionId?: string;
       readonly audioStreamIndex?: number;
       readonly subtitleStreamIndex?: number;
       readonly maxStreamingBitrate?: number;
+      readonly startTimeTicks?: number;
     } = {},
   ): string {
     const base = this.getBaseUrl();
@@ -1085,6 +1100,9 @@ export class JellyfinConnector
 
     if (options.isStatic) {
       params.append("static", "true");
+    }
+    if (options.context) {
+      params.append("context", options.context);
     }
     if (options.playSessionId) {
       params.append("playSessionId", options.playSessionId);
@@ -1097,6 +1115,9 @@ export class JellyfinConnector
     }
     if (options.maxStreamingBitrate !== undefined) {
       params.append("maxStreamingBitrate", String(options.maxStreamingBitrate));
+    }
+    if (options.startTimeTicks !== undefined) {
+      params.append("startTimeTicks", String(options.startTimeTicks));
     }
 
     const apiKey = this.getApiKey();

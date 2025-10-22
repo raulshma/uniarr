@@ -41,6 +41,30 @@ import {
   useConnectorsStore,
 } from "@/store/connectorsStore";
 import { useDownloadStore } from "@/store/downloadStore";
+import {
+  useJellyfinPlayerStore,
+  selectPlaybackMode,
+  selectSetPlaybackMode,
+  selectPlaybackRate,
+  selectSetPlaybackRate,
+  selectPlayerVolume,
+  selectSetPlayerVolume,
+  selectPlayerBrightness,
+  selectSetPlayerBrightness,
+  selectControlsVisible,
+  selectSetControlsVisible,
+  selectSourceMenuVisible,
+  selectSetSourceMenuVisible,
+  selectSpeedMenuVisible,
+  selectSetSpeedMenuVisible,
+  selectTrackMenuVisible,
+  selectSetTrackMenuVisible,
+  selectShowVolumeSlider,
+  selectSetShowVolumeSlider,
+  selectShowBrightnessSlider,
+  selectSetShowBrightnessSlider,
+  selectResetPlayerUi,
+} from "@/store/jellyfinPlayerStore";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 
@@ -123,6 +147,8 @@ const JellyfinPlayerScreen = () => {
   const videoViewRef = useRef<any>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBarWidthRef = useRef(0);
+  const volumeSliderWidthRef = useRef(0);
+  const brightnessSliderWidthRef = useRef(0);
   const lastReportedPositionRef = useRef(-1);
   const streamingContextRef = useRef<{
     itemId: string;
@@ -134,26 +160,50 @@ const JellyfinPlayerScreen = () => {
   const pendingResumePositionRef = useRef<number | null>(null);
   const resumePlaybackAfterSourceRef = useRef(false);
   const lastLoadedSourceKeyRef = useRef<string | null>(null);
+  const sourceInitializedRef = useRef(false);
+  const isSeekingRef = useRef(false);
 
   // ============================================================================
   // State
   // ============================================================================
 
-  const [playbackMode, setPlaybackMode] = useState<"download" | "stream">(
-    "stream",
+  const playbackMode = useJellyfinPlayerStore(selectPlaybackMode);
+  const setPlaybackMode = useJellyfinPlayerStore(selectSetPlaybackMode);
+  const playbackRate = useJellyfinPlayerStore(selectPlaybackRate);
+  const setPlaybackRate = useJellyfinPlayerStore(selectSetPlaybackRate);
+  const volume = useJellyfinPlayerStore(selectPlayerVolume);
+  const setVolume = useJellyfinPlayerStore(selectSetPlayerVolume);
+  const brightness = useJellyfinPlayerStore(selectPlayerBrightness);
+  const setBrightness = useJellyfinPlayerStore(selectSetPlayerBrightness);
+  const controlsVisible = useJellyfinPlayerStore(selectControlsVisible);
+  const setControlsVisible = useJellyfinPlayerStore(selectSetControlsVisible);
+  const sourceMenuVisible = useJellyfinPlayerStore(selectSourceMenuVisible);
+  const setSourceMenuVisible = useJellyfinPlayerStore(
+    selectSetSourceMenuVisible,
   );
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [volume, setVolume] = useState(1);
-  const [brightness, setBrightness] = useState(1);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const [sourceMenuVisible, setSourceMenuVisible] = useState(false);
-  const [speedMenuVisible, setSpeedMenuVisible] = useState(false);
-  const [trackMenuVisible, setTrackMenuVisible] = useState(false);
-  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [showBrightnessSlider, setShowBrightnessSlider] = useState(false);
+  const speedMenuVisible = useJellyfinPlayerStore(selectSpeedMenuVisible);
+  const setSpeedMenuVisible = useJellyfinPlayerStore(selectSetSpeedMenuVisible);
+  const trackMenuVisible = useJellyfinPlayerStore(selectTrackMenuVisible);
+  const setTrackMenuVisible = useJellyfinPlayerStore(selectSetTrackMenuVisible);
+  const showVolumeSlider = useJellyfinPlayerStore(selectShowVolumeSlider);
+  const setShowVolumeSlider = useJellyfinPlayerStore(selectSetShowVolumeSlider);
+  const showBrightnessSlider = useJellyfinPlayerStore(
+    selectShowBrightnessSlider,
+  );
+  const setShowBrightnessSlider = useJellyfinPlayerStore(
+    selectSetShowBrightnessSlider,
+  );
+  const resetPlayerUi = useJellyfinPlayerStore(selectResetPlayerUi);
   const [loadingMessage, setLoadingMessage] = useState("Loading...");
 
   const controlsOpacityAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    resetPlayerUi();
+    return () => {
+      resetPlayerUi();
+    };
+  }, [resetPlayerUi, serviceId, itemId]);
 
   // ============================================================================
   // Data Fetching
@@ -181,7 +231,11 @@ const JellyfinPlayerScreen = () => {
   }, [getConnector, serviceId]);
 
   const itemQuery = useJellyfinItemDetails({ serviceId, itemId });
-  const playbackQuery = useJellyfinPlaybackInfo({ serviceId, itemId });
+  const playbackQuery = useJellyfinPlaybackInfo({
+    serviceId,
+    itemId,
+    disableRefetch: true,
+  });
 
   const downloadSelector = useCallback(
     (state: ReturnType<typeof useDownloadStore.getState>) => {
@@ -231,21 +285,27 @@ const JellyfinPlayerScreen = () => {
     } else {
       setPlaybackMode("stream");
     }
-  }, [sourcePreference, hasDownload, hasStream]);
+  }, [sourcePreference, hasDownload, hasStream, setPlaybackMode]);
 
   // ============================================================================
   // Video Source
   // ============================================================================
 
+  // Stabilize stream URL to prevent unnecessary source reloads during playback
+  const stableStreamUrl = useMemo(
+    () => playbackQuery.data?.streamUrl,
+    [playbackQuery.data?.streamUrl],
+  );
+
   const playbackSource = useMemo<VideoSource | null>(() => {
     if (playbackMode === "download" && localFileUri) {
       return { uri: localFileUri };
     }
-    if (playbackMode === "stream" && playbackQuery.data?.streamUrl) {
-      return { uri: playbackQuery.data.streamUrl };
+    if (playbackMode === "stream" && stableStreamUrl) {
+      return { uri: stableStreamUrl };
     }
     return null;
-  }, [playbackMode, localFileUri, playbackQuery.data?.streamUrl]);
+  }, [playbackMode, localFileUri, stableStreamUrl]);
 
   const playbackSourceKey = useMemo(() => {
     if (!playbackSource) return "empty";
@@ -253,15 +313,10 @@ const JellyfinPlayerScreen = () => {
       return `download:${localFileUri ?? ""}`;
     }
     if (playbackMode === "stream") {
-      return `stream:${playbackQuery.data?.streamUrl ?? ""}`;
+      return `stream:${stableStreamUrl ?? ""}`;
     }
     return "unknown";
-  }, [
-    playbackMode,
-    localFileUri,
-    playbackQuery.data?.streamUrl,
-    playbackSource,
-  ]);
+  }, [playbackMode, localFileUri, stableStreamUrl, playbackSource]);
 
   // ============================================================================
   // Video Player Setup
@@ -277,7 +332,10 @@ const JellyfinPlayerScreen = () => {
   });
 
   useEffect(() => {
-    if (playbackSourceKey === lastLoadedSourceKeyRef.current) {
+    if (
+      playbackSourceKey === lastLoadedSourceKeyRef.current ||
+      isSeekingRef.current
+    ) {
       return;
     }
 
@@ -286,7 +344,14 @@ const JellyfinPlayerScreen = () => {
 
     const replaceSource = async () => {
       try {
+        // Save current position before replacing source
+        const savedPosition = player.currentTime ?? 0;
+        if (savedPosition > 0 && sourceInitializedRef.current) {
+          pendingResumePositionRef.current = savedPosition;
+        }
+
         await player.replaceAsync(playbackSource ?? null);
+        sourceInitializedRef.current = true;
       } catch {
         return;
       }
@@ -297,24 +362,43 @@ const JellyfinPlayerScreen = () => {
         return;
       }
 
+      // Wait a brief moment for the player to be ready after source replacement
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Apply initial start position or resume position
       if (!startPositionAppliedRef.current && startPositionSeconds > 0) {
         const current = player.currentTime ?? 0;
         const delta = startPositionSeconds - current;
         if (Math.abs(delta) > 0.01) {
-          player.seekBy(delta);
+          if ("seekTo" in player && typeof player.seekTo === "function") {
+            void (player.seekTo(startPositionSeconds) as Promise<void>).catch(
+              () => player.seekBy(delta),
+            );
+          } else {
+            player.seekBy(delta);
+          }
         }
         startPositionAppliedRef.current = true;
       } else if (typeof pendingResumePositionRef.current === "number") {
-        const current = player.currentTime ?? 0;
         const target = pendingResumePositionRef.current;
-        const delta = target - current;
-        if (Math.abs(delta) > 0.01) {
-          player.seekBy(delta);
+        if ("seekTo" in player && typeof player.seekTo === "function") {
+          void (player.seekTo(target) as Promise<void>).catch(() => {
+            const current = player.currentTime ?? 0;
+            const delta = target - current;
+            if (Math.abs(delta) > 0.01) {
+              player.seekBy(delta);
+            }
+          });
+        } else {
+          const current = player.currentTime ?? 0;
+          const delta = target - current;
+          if (Math.abs(delta) > 0.01) {
+            player.seekBy(delta);
+          }
         }
       }
 
       try {
-        // eslint-disable-next-line react-compiler/react-compiler
         player.playbackRate = playbackRate;
       } catch {
         // Ignore playback rate update errors
@@ -528,19 +612,25 @@ const JellyfinPlayerScreen = () => {
 
     controlsTimeoutRef.current = setTimeout(() => {
       setControlsVisible(false);
-      Animated.timing(controlsOpacityAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
     }, CONTROLS_HIDE_DELAY_MS);
-  }, [isPlaying, controlsOpacityAnim]);
+  }, [isPlaying, setControlsVisible]);
 
   useEffect(() => {
     if (controlsVisible) {
       resetHideControlsTimer();
+    } else if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
     }
   }, [controlsVisible, resetHideControlsTimer]);
+
+  useEffect(() => {
+    Animated.timing(controlsOpacityAnim, {
+      toValue: controlsVisible ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [controlsVisible, controlsOpacityAnim]);
 
   useEffect(() => {
     if (!player) return;
@@ -566,22 +656,15 @@ const JellyfinPlayerScreen = () => {
   // ============================================================================
 
   const toggleControls = useCallback(() => {
-    setControlsVisible((prev) => {
-      const next = !prev;
-      Animated.timing(controlsOpacityAnim, {
-        toValue: next ? 1 : 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-      if (next) {
-        resetHideControlsTimer();
-      } else if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-        controlsTimeoutRef.current = null;
-      }
-      return next;
-    });
-  }, [controlsOpacityAnim, resetHideControlsTimer]);
+    const next = !controlsVisible;
+    setControlsVisible(next);
+    if (next) {
+      resetHideControlsTimer();
+    } else if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
+    }
+  }, [controlsVisible, resetHideControlsTimer, setControlsVisible]);
 
   const togglePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -600,8 +683,9 @@ const JellyfinPlayerScreen = () => {
         // Ignore seek errors
       }
       setControlsVisible(true);
+      resetHideControlsTimer();
     },
-    [player],
+    [player, resetHideControlsTimer, setControlsVisible],
   );
 
   const handleProgressBarPress = useCallback(
@@ -614,23 +698,60 @@ const JellyfinPlayerScreen = () => {
       );
       const targetTime = duration * fraction;
 
+      isSeekingRef.current = true;
+
+      const seekRelativeFallback = () => {
+        try {
+          const current = player.currentTime ?? 0;
+          const delta = targetTime - current;
+          if (Math.abs(delta) > 0.01) {
+            player.seekBy(delta);
+          }
+        } catch {
+          // Ignore seek errors
+        } finally {
+          isSeekingRef.current = false;
+        }
+      };
+
       try {
-        const current = player.currentTime ?? 0;
-        const delta = targetTime - current;
-        if (Math.abs(delta) > 0.01) {
-          player.seekBy(delta);
+        if ("seekTo" in player && typeof player.seekTo === "function") {
+          const result = player.seekTo(targetTime);
+          if (result && typeof (result as Promise<void>).catch === "function") {
+            void (result as Promise<void>)
+              .catch(() => seekRelativeFallback())
+              .finally(() => {
+                isSeekingRef.current = false;
+              });
+          } else {
+            isSeekingRef.current = false;
+          }
+        } else {
+          seekRelativeFallback();
         }
       } catch {
-        // Ignore seek errors
+        seekRelativeFallback();
       }
       setControlsVisible(true);
+      resetHideControlsTimer();
     },
-    [duration, player],
+    [duration, player, resetHideControlsTimer, setControlsVisible],
   );
 
   const handleProgressBarLayout = useCallback((event: LayoutChangeEvent) => {
     progressBarWidthRef.current = event.nativeEvent.layout.width;
   }, []);
+
+  const handleVolumeSliderLayout = useCallback((event: LayoutChangeEvent) => {
+    volumeSliderWidthRef.current = event.nativeEvent.layout.width;
+  }, []);
+
+  const handleBrightnessSliderLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      brightnessSliderWidthRef.current = event.nativeEvent.layout.width;
+    },
+    [],
+  );
 
   const handleBack = useCallback(() => {
     player.pause();
@@ -653,13 +774,23 @@ const JellyfinPlayerScreen = () => {
       setPlaybackMode(mode);
       setSourceMenuVisible(false);
     },
-    [playbackMode, currentTime, isPlaying, player],
+    [
+      playbackMode,
+      currentTime,
+      isPlaying,
+      player,
+      setPlaybackMode,
+      setSourceMenuVisible,
+    ],
   );
 
-  const handlePlaybackRateChange = useCallback((rate: number) => {
-    setPlaybackRate(rate);
-    setSpeedMenuVisible(false);
-  }, []);
+  const handlePlaybackRateChange = useCallback(
+    (rate: number) => {
+      setPlaybackRate(rate);
+      setSpeedMenuVisible(false);
+    },
+    [setPlaybackRate, setSpeedMenuVisible],
+  );
 
   const isTrackSelected = useCallback(
     (
@@ -722,7 +853,7 @@ const JellyfinPlayerScreen = () => {
     if (!playToEndEvent) return;
     player.pause();
     setControlsVisible(true);
-  }, [playToEndEvent, player]);
+  }, [playToEndEvent, player, setControlsVisible]);
 
   // ============================================================================
   // Render Guards
@@ -795,298 +926,320 @@ const JellyfinPlayerScreen = () => {
         style={styles.gradientBottom}
       />
 
+      {/* Interaction Surface */}
+      <Pressable
+        style={styles.interactionLayer}
+        pointerEvents={controlsVisible ? "none" : "auto"}
+        onPress={toggleControls}
+        accessibilityRole="button"
+        accessibilityLabel="Show playback controls"
+      />
+
       {/* Controls Overlay */}
       <Animated.View
         style={[styles.overlay, { opacity: controlsOpacityAnim }]}
-        pointerEvents="auto"
+        pointerEvents={controlsVisible ? "auto" : "none"}
       >
         <Pressable
-          style={styles.overlayPressable}
+          style={styles.overlayBackdrop}
           onPress={toggleControls}
-          hitSlop={0}
-        >
+          accessibilityRole="button"
+          accessibilityLabel="Hide playback controls"
+        />
+
+        <View style={styles.overlayContent} pointerEvents="box-none">
           {/* Top Bar */}
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <View style={styles.topBar}>
-              <View style={styles.topLeft}>
-                <IconButton
-                  icon="arrow-left"
-                  iconColor="white"
-                  onPress={handleBack}
-                />
-                <View style={styles.titleGroup}>
-                  <Text
-                    variant="titleMedium"
-                    style={styles.titleText}
-                    numberOfLines={1}
-                  >
-                    {itemQuery.data?.Name ?? "Video"}
-                  </Text>
-                </View>
+          <View style={styles.topBar}>
+            <View style={styles.topLeft}>
+              <IconButton
+                icon="arrow-left"
+                iconColor="white"
+                onPress={handleBack}
+              />
+              <View style={styles.titleGroup}>
+                <Text
+                  variant="titleMedium"
+                  style={styles.titleText}
+                  numberOfLines={1}
+                >
+                  {itemQuery.data?.Name ?? "Video"}
+                </Text>
               </View>
             </View>
-          </Pressable>
+          </View>
 
           {/* Center Controls */}
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <View style={styles.centerControls}>
+          <View style={styles.centerControls}>
+            <IconButton
+              icon="rewind-10"
+              iconColor="white"
+              size={40}
+              onPress={() => seekRelative(-SEEK_STEP_SECONDS)}
+            />
+            <Pressable style={styles.playButton} onPress={togglePlayPause}>
               <IconButton
-                icon="rewind-10"
+                icon={isPlaying ? "pause" : "play"}
                 iconColor="white"
-                size={40}
-                onPress={() => seekRelative(-SEEK_STEP_SECONDS)}
+                size={56}
               />
-              <Pressable style={styles.playButton} onPress={togglePlayPause}>
-                <IconButton
-                  icon={isPlaying ? "pause" : "play"}
-                  iconColor="white"
-                  size={56}
-                />
-              </Pressable>
-              <IconButton
-                icon="fast-forward-10"
-                iconColor="white"
-                size={40}
-                onPress={() => seekRelative(SEEK_STEP_SECONDS)}
-              />
-            </View>
-          </Pressable>
+            </Pressable>
+            <IconButton
+              icon="fast-forward-10"
+              iconColor="white"
+              size={40}
+              onPress={() => seekRelative(SEEK_STEP_SECONDS)}
+            />
+          </View>
 
           {/* Bottom Section */}
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <View style={styles.bottomSection}>
-              {/* Progress Bar */}
-              <View
-                style={styles.progressContainer}
+          <View style={styles.bottomSection}>
+            {/* Progress Bar */}
+            <View style={styles.progressContainer}>
+              <Pressable
+                style={styles.progressBar}
+                onPress={handleProgressBarPress}
                 onLayout={handleProgressBarLayout}
               >
+                <View style={styles.progressBackground} />
+                <View
+                  style={[styles.progressFill, { width: `${progress * 100}%` }]}
+                />
+                <View
+                  style={[styles.progressThumb, { left: `${progress * 100}%` }]}
+                />
+              </Pressable>
+              <View style={styles.timeRow}>
+                <Text variant="labelSmall" style={styles.timeText}>
+                  {formatTime(currentTime)}
+                </Text>
+                <Text variant="labelSmall" style={styles.timeText}>
+                  {formatTime(duration)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Controls Row */}
+            <View style={styles.controlsRow}>
+              {/* Source Menu */}
+              <Menu
+                visible={sourceMenuVisible}
+                onDismiss={() => setSourceMenuVisible(false)}
+                anchor={
+                  <IconButton
+                    icon="playlist-play"
+                    iconColor="white"
+                    onPress={() => {
+                      setSourceMenuVisible(true);
+                      setControlsVisible(true);
+                      resetHideControlsTimer();
+                    }}
+                    disabled={!hasDownload && !hasStream}
+                  />
+                }
+              >
+                <Menu.Item
+                  onPress={() => handlePlaybackModeChange("stream")}
+                  title="Stream from Jellyfin"
+                  disabled={!hasStream}
+                  leadingIcon={playbackMode === "stream" ? "check" : undefined}
+                />
+                <Menu.Item
+                  onPress={() => handlePlaybackModeChange("download")}
+                  title="Play downloaded copy"
+                  disabled={!hasDownload}
+                  leadingIcon={
+                    playbackMode === "download" ? "check" : undefined
+                  }
+                />
+              </Menu>
+
+              {/* Track Menu */}
+              <Menu
+                visible={trackMenuVisible}
+                onDismiss={() => setTrackMenuVisible(false)}
+                anchor={
+                  <IconButton
+                    icon="tune-vertical"
+                    iconColor="white"
+                    onPress={() => {
+                      setTrackMenuVisible(true);
+                      setControlsVisible(true);
+                      resetHideControlsTimer();
+                    }}
+                    disabled={!hasTrackOptions}
+                  />
+                }
+              >
+                {audioTracks.length > 0 && (
+                  <>
+                    <Menu.Item title="Audio Tracks" disabled />
+                    {audioTracks.map((track, idx) => (
+                      <Menu.Item
+                        key={track.id ?? `audio-${idx}`}
+                        onPress={() => {
+                          player.audioTrack = track;
+                          setTrackMenuVisible(false);
+                        }}
+                        title={formatTrackLabel(track)}
+                        leadingIcon={
+                          isTrackSelected(track, currentAudioTrack)
+                            ? "check"
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </>
+                )}
+                {subtitleTracks.length > 0 && (
+                  <>
+                    <Menu.Item title="Subtitles" disabled />
+                    <Menu.Item
+                      onPress={() => {
+                        player.subtitleTrack = null;
+                        setTrackMenuVisible(false);
+                      }}
+                      title="Subtitles Off"
+                      leadingIcon={!currentSubtitleTrack ? "check" : undefined}
+                    />
+                    {subtitleTracks.map((track, idx) => (
+                      <Menu.Item
+                        key={track.id ?? `subtitle-${idx}`}
+                        onPress={() => {
+                          player.subtitleTrack = track;
+                          setTrackMenuVisible(false);
+                        }}
+                        title={formatTrackLabel(track)}
+                        leadingIcon={
+                          isTrackSelected(track, currentSubtitleTrack)
+                            ? "check"
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </>
+                )}
+              </Menu>
+
+              {/* Speed Menu */}
+              <Menu
+                visible={speedMenuVisible}
+                onDismiss={() => setSpeedMenuVisible(false)}
+                anchor={
+                  <IconButton
+                    icon="speedometer"
+                    iconColor="white"
+                    onPress={() => {
+                      setSpeedMenuVisible(true);
+                      setControlsVisible(true);
+                      resetHideControlsTimer();
+                    }}
+                  />
+                }
+              >
+                {PLAYBACK_RATES.map((rate) => (
+                  <Menu.Item
+                    key={rate}
+                    onPress={() => handlePlaybackRateChange(rate)}
+                    title={`${rate}×`}
+                    leadingIcon={rate === playbackRate ? "check" : undefined}
+                  />
+                ))}
+              </Menu>
+
+              {/* Volume Button */}
+              <IconButton
+                icon="volume-high"
+                iconColor="white"
+                onPress={() => {
+                  setShowVolumeSlider(!showVolumeSlider);
+                  setShowBrightnessSlider(false);
+                  setControlsVisible(true);
+                  resetHideControlsTimer();
+                }}
+              />
+
+              {/* Brightness Button */}
+              <IconButton
+                icon="brightness-7"
+                iconColor="white"
+                onPress={() => {
+                  setShowBrightnessSlider(!showBrightnessSlider);
+                  setShowVolumeSlider(false);
+                  setControlsVisible(true);
+                  resetHideControlsTimer();
+                }}
+              />
+            </View>
+
+            {/* Volume Slider */}
+            {showVolumeSlider && (
+              <View style={styles.sliderContainer}>
+                <Text variant="labelSmall" style={styles.sliderLabel}>
+                  Volume: {Math.round(volume * 100)}%
+                </Text>
                 <Pressable
-                  style={styles.progressBar}
-                  onPress={handleProgressBarPress}
+                  style={styles.sliderTrack}
+                  onLayout={handleVolumeSliderLayout}
+                  onPress={(event) => {
+                    const width = event.nativeEvent.locationX;
+                    const totalWidth = volumeSliderWidthRef.current;
+                    if (totalWidth > 0) {
+                      const newVolume = clamp(width / totalWidth, 0, 1);
+                      setVolume(newVolume);
+                      setControlsVisible(true);
+                      resetHideControlsTimer();
+                    }
+                  }}
                 >
-                  <View style={styles.progressBackground} />
+                  <View style={styles.sliderBackground} />
+                  <View
+                    style={[styles.sliderFill, { width: `${volume * 100}%` }]}
+                  />
+                  <View
+                    style={[styles.sliderThumb, { left: `${volume * 100}%` }]}
+                  />
+                </Pressable>
+              </View>
+            )}
+
+            {/* Brightness Slider */}
+            {showBrightnessSlider && (
+              <View style={styles.sliderContainer}>
+                <Text variant="labelSmall" style={styles.sliderLabel}>
+                  Brightness: {Math.round(brightness * 100)}%
+                </Text>
+                <Pressable
+                  style={styles.sliderTrack}
+                  onLayout={handleBrightnessSliderLayout}
+                  onPress={(event) => {
+                    const width = event.nativeEvent.locationX;
+                    const totalWidth = brightnessSliderWidthRef.current;
+                    if (totalWidth > 0) {
+                      const newBrightness = clamp(width / totalWidth, 0, 1);
+                      setBrightness(newBrightness);
+                      setControlsVisible(true);
+                      resetHideControlsTimer();
+                    }
+                  }}
+                >
+                  <View style={styles.sliderBackground} />
                   <View
                     style={[
-                      styles.progressFill,
-                      { width: `${progress * 100}%` },
+                      styles.sliderFill,
+                      { width: `${brightness * 100}%` },
                     ]}
                   />
                   <View
                     style={[
-                      styles.progressThumb,
-                      { left: `${progress * 100}%` },
+                      styles.sliderThumb,
+                      { left: `${brightness * 100}%` },
                     ]}
                   />
                 </Pressable>
-                <View style={styles.timeRow}>
-                  <Text variant="labelSmall" style={styles.timeText}>
-                    {formatTime(currentTime)}
-                  </Text>
-                  <Text variant="labelSmall" style={styles.timeText}>
-                    {formatTime(duration)}
-                  </Text>
-                </View>
               </View>
-
-              {/* Controls Row */}
-              <View style={styles.controlsRow}>
-                {/* Source Menu */}
-                <Menu
-                  visible={sourceMenuVisible}
-                  onDismiss={() => setSourceMenuVisible(false)}
-                  anchor={
-                    <IconButton
-                      icon="playlist-play"
-                      iconColor="white"
-                      onPress={() => setSourceMenuVisible(true)}
-                      disabled={!hasDownload && !hasStream}
-                    />
-                  }
-                >
-                  <Menu.Item
-                    onPress={() => handlePlaybackModeChange("stream")}
-                    title="Stream from Jellyfin"
-                    disabled={!hasStream}
-                    leadingIcon={
-                      playbackMode === "stream" ? "check" : undefined
-                    }
-                  />
-                  <Menu.Item
-                    onPress={() => handlePlaybackModeChange("download")}
-                    title="Play downloaded copy"
-                    disabled={!hasDownload}
-                    leadingIcon={
-                      playbackMode === "download" ? "check" : undefined
-                    }
-                  />
-                </Menu>
-
-                {/* Track Menu */}
-                <Menu
-                  visible={trackMenuVisible}
-                  onDismiss={() => setTrackMenuVisible(false)}
-                  anchor={
-                    <IconButton
-                      icon="tune-vertical"
-                      iconColor="white"
-                      onPress={() => setTrackMenuVisible(true)}
-                      disabled={!hasTrackOptions}
-                    />
-                  }
-                >
-                  {audioTracks.length > 0 && (
-                    <>
-                      <Menu.Item title="Audio Tracks" disabled />
-                      {audioTracks.map((track, idx) => (
-                        <Menu.Item
-                          key={track.id ?? `audio-${idx}`}
-                          onPress={() => {
-                            player.audioTrack = track;
-                            setTrackMenuVisible(false);
-                          }}
-                          title={formatTrackLabel(track)}
-                          leadingIcon={
-                            isTrackSelected(track, currentAudioTrack)
-                              ? "check"
-                              : undefined
-                          }
-                        />
-                      ))}
-                    </>
-                  )}
-                  {subtitleTracks.length > 0 && (
-                    <>
-                      <Menu.Item title="Subtitles" disabled />
-                      <Menu.Item
-                        onPress={() => {
-                          player.subtitleTrack = null;
-                          setTrackMenuVisible(false);
-                        }}
-                        title="Subtitles Off"
-                        leadingIcon={
-                          !currentSubtitleTrack ? "check" : undefined
-                        }
-                      />
-                      {subtitleTracks.map((track, idx) => (
-                        <Menu.Item
-                          key={track.id ?? `subtitle-${idx}`}
-                          onPress={() => {
-                            player.subtitleTrack = track;
-                            setTrackMenuVisible(false);
-                          }}
-                          title={formatTrackLabel(track)}
-                          leadingIcon={
-                            isTrackSelected(track, currentSubtitleTrack)
-                              ? "check"
-                              : undefined
-                          }
-                        />
-                      ))}
-                    </>
-                  )}
-                </Menu>
-
-                {/* Speed Menu */}
-                <Menu
-                  visible={speedMenuVisible}
-                  onDismiss={() => setSpeedMenuVisible(false)}
-                  anchor={
-                    <IconButton
-                      icon="speedometer"
-                      iconColor="white"
-                      onPress={() => setSpeedMenuVisible(true)}
-                    />
-                  }
-                >
-                  {PLAYBACK_RATES.map((rate) => (
-                    <Menu.Item
-                      key={rate}
-                      onPress={() => handlePlaybackRateChange(rate)}
-                      title={`${rate}×`}
-                      leadingIcon={rate === playbackRate ? "check" : undefined}
-                    />
-                  ))}
-                </Menu>
-
-                {/* Volume Button */}
-                <IconButton
-                  icon="volume-high"
-                  iconColor="white"
-                  onPress={() => setShowVolumeSlider(!showVolumeSlider)}
-                />
-
-                {/* Brightness Button */}
-                <IconButton
-                  icon="brightness-7"
-                  iconColor="white"
-                  onPress={() => setShowBrightnessSlider(!showBrightnessSlider)}
-                />
-              </View>
-
-              {/* Volume Slider */}
-              {showVolumeSlider && (
-                <View style={styles.sliderContainer}>
-                  <Text variant="labelSmall" style={styles.sliderLabel}>
-                    Volume: {Math.round(volume * 100)}%
-                  </Text>
-                  <Pressable
-                    style={styles.sliderTrack}
-                    onPress={(event) => {
-                      const width = event.nativeEvent.locationX;
-                      const totalWidth = progressBarWidthRef.current;
-                      if (totalWidth > 0) {
-                        const newVolume = clamp(width / totalWidth, 0, 1);
-                        setVolume(newVolume);
-                      }
-                    }}
-                  >
-                    <View style={styles.sliderBackground} />
-                    <View
-                      style={[styles.sliderFill, { width: `${volume * 100}%` }]}
-                    />
-                    <View
-                      style={[styles.sliderThumb, { left: `${volume * 100}%` }]}
-                    />
-                  </Pressable>
-                </View>
-              )}
-
-              {/* Brightness Slider */}
-              {showBrightnessSlider && (
-                <View style={styles.sliderContainer}>
-                  <Text variant="labelSmall" style={styles.sliderLabel}>
-                    Brightness: {Math.round(brightness * 100)}%
-                  </Text>
-                  <Pressable
-                    style={styles.sliderTrack}
-                    onPress={(event) => {
-                      const width = event.nativeEvent.locationX;
-                      const totalWidth = progressBarWidthRef.current;
-                      if (totalWidth > 0) {
-                        const newBrightness = clamp(width / totalWidth, 0, 1);
-                        setBrightness(newBrightness);
-                      }
-                    }}
-                  >
-                    <View style={styles.sliderBackground} />
-                    <View
-                      style={[
-                        styles.sliderFill,
-                        { width: `${brightness * 100}%` },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.sliderThumb,
-                        { left: `${brightness * 100}%` },
-                      ]}
-                    />
-                  </Pressable>
-                </View>
-              )}
-            </View>
-          </Pressable>
-        </Pressable>
+            )}
+          </View>
+        </View>
       </Animated.View>
 
       {/* Loading Overlay */}
@@ -1122,15 +1275,18 @@ const createStyles = (theme: AppTheme) =>
     },
     overlay: {
       ...StyleSheet.absoluteFillObject,
+    },
+    overlayContent: {
+      flex: 1,
       justifyContent: "space-between",
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
     },
-    overlayPressable: {
+    overlayBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      justifyContent: "space-between",
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
+    },
+    interactionLayer: {
+      ...StyleSheet.absoluteFillObject,
     },
     gradientTop: {
       position: "absolute",

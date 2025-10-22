@@ -20,6 +20,7 @@ interface UseJellyfinPlaybackInfoOptions {
   readonly subtitleStreamIndex?: number;
   readonly maxStreamingBitrate?: number;
   readonly enabled?: boolean;
+  readonly disableRefetch?: boolean;
 }
 
 export interface JellyfinPlaybackInfoResult {
@@ -54,6 +55,7 @@ export const useJellyfinPlaybackInfo = (
     subtitleStreamIndex,
     maxStreamingBitrate,
     enabled = true,
+    disableRefetch = true,
   } = options;
 
   const getConnector = useConnectorsStore(selectGetConnector);
@@ -70,7 +72,9 @@ export const useJellyfinPlaybackInfo = (
           })
         : queryKeys.jellyfin.base,
     enabled: isEnabled,
-    staleTime: 30_000,
+    staleTime: disableRefetch ? Infinity : 30_000,
+    refetchOnWindowFocus: !disableRefetch,
+    refetchOnReconnect: !disableRefetch,
     queryFn: async () => {
       if (!serviceId || !itemId) {
         throw new Error("Jellyfin playback requires service and item id.");
