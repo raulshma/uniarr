@@ -27,6 +27,7 @@ import { spacing } from "@/theme/spacing";
 import { getComponentElevation } from "@/constants/elevation";
 import { borderRadius } from "@/constants/sizes";
 import { useUnifiedSearch } from "@/hooks/useUnifiedSearch";
+import useDebouncedValueHook from "@/hooks/useDebouncedValue";
 import type {
   SearchHistoryEntry,
   UnifiedSearchMediaType,
@@ -106,6 +107,11 @@ export const UnifiedSearchPanel: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>("Any");
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
+  // Debounce the user's input to avoid issuing a search request on every keystroke.
+  // This follows best-practice for search inputs on mobile to reduce network
+  // traffic and improve perceived performance. 350ms is a reasonable default.
+  const debouncedTerm = useDebouncedValueHook(searchTerm, 350);
+
   const {
     results,
     errors,
@@ -118,7 +124,7 @@ export const UnifiedSearchPanel: React.FC = () => {
     recordSearch,
     removeHistoryEntry,
     clearHistory,
-  } = useUnifiedSearch(searchTerm, {
+  } = useUnifiedSearch(debouncedTerm, {
     serviceIds: serviceFilters,
     mediaTypes: mediaFilters,
   });
