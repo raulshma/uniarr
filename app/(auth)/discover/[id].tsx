@@ -52,6 +52,12 @@ const DiscoverItemDetails = () => {
     return undefined;
   }, [sections, id]);
 
+  const tmdbDetailsQuery = useTmdbDetails(
+    item?.mediaType === "series" ? "tv" : "movie",
+    item?.tmdbId ?? null,
+    { enabled: !!item?.tmdbId },
+  );
+
   const [dialogVisible, setDialogVisible] = React.useState(false);
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>("");
 
@@ -160,8 +166,33 @@ const DiscoverItemDetails = () => {
             </View>
           ) : null}
 
+          {tmdbDetailsQuery.data?.details?.genres &&
+          tmdbDetailsQuery.data.details.genres.length > 0 ? (
+            <View style={{ marginBottom: spacing.lg }}>
+              <Text
+                variant="titleMedium"
+                style={{
+                  color: theme.colors.onSurface,
+                  fontWeight: "700",
+                  marginBottom: spacing.xs,
+                }}
+              >
+                Genres
+              </Text>
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {tmdbDetailsQuery.data.details.genres
+                  .map((g) => g.name)
+                  .filter(Boolean)
+                  .join(", ")}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Cast */}
-          <CastRow item={item} />
+          <CastRow item={item} tmdbDetailsData={tmdbDetailsQuery.data} />
 
           {/* Ratings */}
           <RatingsOverview rating={item.rating} votes={item.voteCount} />
@@ -246,7 +277,8 @@ export default DiscoverItemDetails;
 
 const CastRow: React.FC<{
   item: import("@/models/discover.types").DiscoverMediaItem;
-}> = ({ item }) => {
+  tmdbDetailsData: ReturnType<typeof useTmdbDetails>["data"];
+}> = ({ item, tmdbDetailsData }) => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
 
@@ -262,12 +294,25 @@ const CastRow: React.FC<{
     item.sourceId!,
   );
 
-  // Fetch credits from TMDB for TMDB items
-  const tmdbDetailsQuery = useTmdbDetails(
-    item.mediaType === "series" ? "tv" : "movie",
-    item.tmdbId!,
-    { enabled: item.source === "tmdb" && !!item.tmdbId },
-  );
+  // Use TMDB details data passed from parent
+  const tmdbCast = useMemo(() => {
+    const rawCast = tmdbDetailsData?.credits?.cast;
+    if (!Array.isArray(rawCast)) {
+      return [];
+    }
+
+    return rawCast.slice(0, MAX_VISIBLE).map((person) => ({
+      id: person.id,
+      name:
+        typeof person.name === "string"
+          ? person.name
+          : (person.original_name ?? "Unknown"),
+      profilePath:
+        typeof person.profile_path === "string"
+          ? person.profile_path
+          : undefined,
+    }));
+  }, [tmdbDetailsData?.credits?.cast]);
 
   const styles = useMemo(
     () =>
@@ -294,26 +339,6 @@ const CastRow: React.FC<{
       }),
     [AVATAR_SIZE],
   );
-
-  // Map TMDB cast data to match Jellyseerr structure for consistent rendering
-  const tmdbCast = useMemo(() => {
-    const rawCast = tmdbDetailsQuery?.data?.credits?.cast;
-    if (!Array.isArray(rawCast)) {
-      return [];
-    }
-
-    return rawCast.slice(0, MAX_VISIBLE).map((person) => ({
-      id: person.id,
-      name:
-        typeof person.name === "string"
-          ? person.name
-          : (person.original_name ?? "Unknown"),
-      profilePath:
-        typeof person.profile_path === "string"
-          ? person.profile_path
-          : undefined,
-    }));
-  }, [tmdbDetailsQuery?.data?.credits?.cast]);
 
   // Use either Jellyseerr or TMDB cast data
   const shouldFetchJellyseerrCredits =

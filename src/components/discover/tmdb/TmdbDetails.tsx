@@ -166,6 +166,20 @@ export const TmdbDetails: React.FC<Props> = ({
               </View>
             ) : null}
 
+            {detailsQuery.data?.details?.genres ? (
+              <View>
+                <Text variant="titleMedium" style={styles.sectionTitle}>
+                  Genres
+                </Text>
+                <Text variant="bodyMedium" style={styles.overview}>
+                  {detailsQuery.data.details.genres
+                    .map((g) => g.name)
+                    .filter(Boolean)
+                    .join(", ")}
+                </Text>
+              </View>
+            ) : null}
+
             {providers ? (
               <View>
                 <Text variant="titleMedium" style={styles.sectionTitle}>

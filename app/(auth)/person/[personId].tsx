@@ -31,27 +31,47 @@ const PersonDetails = () => {
   // Process credits for display - move these hooks before conditional returns
   const processedMovieCredits = useMemo(() => {
     if (!person?.movieCredits?.cast) return [];
-    return person.movieCredits.cast
+    const uniqueCredits = person.movieCredits.cast
       .filter((credit) => credit.release_date)
+      .reduce(
+        (acc, credit) => {
+          if (!acc.some((c) => c.id === credit.id)) {
+            acc.push(credit);
+          }
+          return acc;
+        },
+        [] as typeof person.movieCredits.cast,
+      )
       .sort((a, b) => {
         const dateA = new Date(a.release_date!).getTime();
         const dateB = new Date(b.release_date!).getTime();
         return dateB - dateA; // Most recent first
       })
       .slice(0, 20); // Limit to 20 most recent
-  }, [person?.movieCredits]);
+    return uniqueCredits;
+  }, [person]);
 
   const processedTvCredits = useMemo(() => {
     if (!person?.tvCredits?.cast) return [];
-    return person.tvCredits.cast
+    const uniqueCredits = person.tvCredits.cast
       .filter((credit) => credit.first_air_date)
+      .reduce(
+        (acc, credit) => {
+          if (!acc.some((c) => c.id === credit.id)) {
+            acc.push(credit);
+          }
+          return acc;
+        },
+        [] as typeof person.tvCredits.cast,
+      )
       .sort((a, b) => {
         const dateA = new Date(a.first_air_date!).getTime();
         const dateB = new Date(b.first_air_date!).getTime();
         return dateB - dateA; // Most recent first
       })
       .slice(0, 20); // Limit to 20 most recent
-  }, [person?.tvCredits]);
+    return uniqueCredits;
+  }, [person]);
 
   const styles = useMemo(
     () =>
