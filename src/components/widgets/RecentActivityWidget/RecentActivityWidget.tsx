@@ -23,6 +23,7 @@ type RecentActivityItem = {
   episode: string;
   show: string;
   date: string;
+  timestamp?: number;
   image?: string;
 };
 
@@ -48,6 +49,29 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   const fetchRecentActivity = useCallback(async (): Promise<
     RecentActivityItem[]
   > => {
+    const formatRelativeTimeLocal = (input?: Date): string | undefined => {
+      if (!input) return undefined;
+
+      const diffMs = Date.now() - input.getTime();
+      if (diffMs < 0) return "Just now";
+
+      const minutes = Math.floor(diffMs / 60000);
+      if (minutes < 1) return "Just now";
+      if (minutes < 60) return `${minutes}m ago`;
+
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+
+      const days = Math.floor(hours / 24);
+      if (days < 7) return `${days}d ago`;
+
+      const weeks = Math.floor(days / 7);
+      if (weeks < 5) return `${weeks}w ago`;
+
+      const months = Math.floor(days / 30);
+      return `${months}mo ago`;
+    };
+
     try {
       const manager = ConnectorManager.getInstance();
       await manager.loadSavedServices();
@@ -86,6 +110,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
                   const itemKey = `sonarr-${series.id}-${(record as any).episode?.episodeNumber}`;
                   if (!recentActivityMap.has(itemKey)) {
+                    const dateObj = new Date((record as any).date);
                     recentActivityMap.set(itemKey, {
                       id: itemKey,
                       title: series.title || "Unknown",
@@ -93,9 +118,8 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
                         ? `S${(record as any).episode.seasonNumber?.toString().padStart(2, "0")}E${(record as any).episode.episodeNumber?.toString().padStart(2, "0")}`
                         : "",
                       show: series.title || "",
-                      date:
-                        formatRelativeTime(new Date((record as any).date)) ||
-                        "Unknown",
+                      date: formatRelativeTimeLocal(dateObj) || "Unknown",
+                      timestamp: dateObj.getTime(),
                       image: imageUrl,
                     });
                   }
@@ -138,14 +162,14 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
                   const itemKey = `radarr-${movie.id}`;
                   if (!recentActivityMap.has(itemKey)) {
+                    const dateObj = new Date((record as any).date);
                     recentActivityMap.set(itemKey, {
                       id: itemKey,
                       title: movie.title || "Unknown",
                       episode: "Movie",
                       show: movie.title || "",
-                      date:
-                        formatRelativeTime(new Date((record as any).date)) ||
-                        "Unknown",
+                      date: formatRelativeTimeLocal(dateObj) || "Unknown",
+                      timestamp: dateObj.getTime(),
                       image: imageUrl,
                     });
                   }
@@ -158,11 +182,13 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         }
       }
 
-      // Convert map to array, sort by date, and limit
+      // Convert map to array, sort by date (most recent first), and limit
       return Array.from(recentActivityMap.values())
         .sort((a, b) => {
-          // Sort by date - most recent first
-          return a.id.localeCompare(b.id);
+          // Sort by timestamp in descending order (most recent first)
+          const timestampA = a.timestamp ?? 0;
+          const timestampB = b.timestamp ?? 0;
+          return timestampB - timestampA;
         })
         .slice(0, 10);
     } catch (error) {
@@ -205,29 +231,6 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   useEffect(() => {
     loadRecentActivity();
   }, [loadRecentActivity]);
-
-  const formatRelativeTime = (input?: Date): string | undefined => {
-    if (!input) return undefined;
-
-    const diffMs = Date.now() - input.getTime();
-    if (diffMs < 0) return "Just now";
-
-    const minutes = Math.floor(diffMs / 60000);
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d ago`;
-
-    const weeks = Math.floor(days / 7);
-    if (weeks < 5) return `${weeks}w ago`;
-
-    const months = Math.floor(days / 30);
-    return `${months}mo ago`;
-  };
 
   const handleItemPress = useCallback(
     (item: RecentActivityItem) => {
