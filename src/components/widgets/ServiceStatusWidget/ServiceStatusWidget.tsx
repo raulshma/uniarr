@@ -104,7 +104,6 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
     setRefreshing(true);
     await loadServiceStatuses();
     setRefreshing(false);
-    onRefresh?.();
   };
 
   const getStatusColor = (status: string) => {

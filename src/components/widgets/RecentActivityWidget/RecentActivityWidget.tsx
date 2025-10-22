@@ -248,8 +248,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   const handleRefresh = useCallback(() => {
     onPress();
     loadRecentActivity();
-    onRefresh?.();
-  }, [onPress, onRefresh, loadRecentActivity]);
+  }, [onPress, loadRecentActivity]);
 
   const styles = useMemo(
     () =>

@@ -73,9 +73,14 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
     }, []),
   );
 
-  const handleRefresh = async () => {
+  const handleGlobalRefresh = async () => {
     onPress();
     await loadWidgets();
+  };
+
+  // No-op refresh callback - widgets handle their own refresh internally
+  const handleWidgetRefresh = () => {
+    onPress();
   };
 
   const renderWidget = (widget: Widget) => {
@@ -85,7 +90,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           <ServiceStatusWidget
             key={widget.id}
             widget={widget}
-            onRefresh={handleRefresh}
+            onRefresh={handleWidgetRefresh}
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
@@ -94,7 +99,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           <ShortcutsWidget
             key={widget.id}
             widget={widget}
-            onRefresh={handleRefresh}
+            onRefresh={handleWidgetRefresh}
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
@@ -103,7 +108,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           <DownloadProgressWidget
             key={widget.id}
             widget={widget}
-            onRefresh={handleRefresh}
+            onRefresh={handleWidgetRefresh}
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
@@ -112,7 +117,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           <RecentActivityWidget
             key={widget.id}
             widget={widget}
-            onRefresh={handleRefresh}
+            onRefresh={handleWidgetRefresh}
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
@@ -121,7 +126,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           <StatisticsWidget
             key={widget.id}
             widget={widget}
-            onRefresh={handleRefresh}
+            onRefresh={handleWidgetRefresh}
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
@@ -130,7 +135,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           <CalendarPreviewWidget
             key={widget.id}
             widget={widget}
-            onRefresh={handleRefresh}
+            onRefresh={handleWidgetRefresh}
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
@@ -139,7 +144,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           <BookmarksWidget
             key={widget.id}
             widget={widget}
-            onRefresh={handleRefresh}
+            onRefresh={handleWidgetRefresh}
             onEdit={editing ? () => handleEditWidget(widget) : undefined}
           />
         );
@@ -343,7 +348,10 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           icon="cog"
           size="small"
           style={styles.fab}
-          onPress={() => setEditing(true)}
+          onPress={() => {
+            onPress();
+            setEditing(true);
+          }}
         />
       )}
 

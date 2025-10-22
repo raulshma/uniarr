@@ -201,7 +201,6 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
   const handleRefresh = () => {
     onPress();
     loadStatistics();
-    onRefresh?.();
   };
 
   const handleFilterSelect = (selectedFilter: "all" | "recent" | "month") => {

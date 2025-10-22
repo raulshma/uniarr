@@ -116,7 +116,6 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
     setRefreshing(true);
     await loadDownloads();
     setRefreshing(false);
-    onRefresh?.();
   };
 
   const formatBytes = (bytes: number): string => {

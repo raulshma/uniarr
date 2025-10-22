@@ -129,8 +129,6 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
           );
         }
       });
-
-      onRefresh?.();
     } catch (error) {
       console.error("Failed to refresh bookmarks:", error);
     } finally {
