@@ -1,14 +1,20 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { View, StyleSheet, ScrollView, Modal } from "react-native";
+import { View, StyleSheet, Modal } from "react-native";
 import { Text, FAB, useTheme, Button } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { gapSizes } from "@/constants/sizes";
-import { createFlexLayout } from "@/utils/style.utils";
+import { Card } from "@/components/common/Card";
+import { TabHeader } from "@/components/common/TabHeader";
+import {
+  AnimatedListItem,
+  AnimatedScrollView as AnimatedScroll,
+} from "@/components/common/AnimatedComponents";
 
 import ServiceStatusWidget from "../ServiceStatusWidget/ServiceStatusWidget";
 import DownloadProgressWidget from "../DownloadProgressWidget/DownloadProgressWidget";
@@ -72,11 +78,6 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
       };
     }, []),
   );
-
-  const handleGlobalRefresh = async () => {
-    onPress();
-    await loadWidgets();
-  };
 
   // No-op refresh callback - widgets handle their own refresh internally
   const handleWidgetRefresh = () => {
@@ -194,6 +195,24 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
     await loadWidgets();
   };
 
+  const handleDismissModal = () => {
+    onPress();
+    setEditing(false);
+  };
+
+  const getWidgetIcon = (type: string): any => {
+    const iconMap: Record<string, string> = {
+      "service-status": "server-network",
+      shortcuts: "gesture-tap",
+      "download-progress": "download",
+      "recent-activity": "clock-time-three",
+      statistics: "chart-box",
+      "calendar-preview": "calendar",
+      bookmarks: "bookmark",
+    };
+    return iconMap[type] || "widgets";
+  };
+
   // widget size helper removed (unused)
 
   const styles = useMemo(
@@ -260,28 +279,45 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           flexDirection: "row",
           gap: gapSizes.lg,
         },
+        /* Modal styles updated for design consistency */
+        modalOverlay: {
+          flex: 1,
+          backgroundColor: theme.colors.background,
+        },
+        modalScrollContainer: {
+          paddingBottom: theme.custom.spacing.lg,
+        },
+        modalContent: {
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingTop: theme.custom.spacing.md,
+          paddingBottom: theme.custom.spacing.lg,
+          gap: theme.custom.spacing.sm,
+        },
+        widgetListCard: {
+          backgroundColor: theme.colors.elevation.level1,
+          marginVertical: theme.custom.spacing.xs / 2,
+        },
+        widgetListContent: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: theme.custom.spacing.md,
+        },
+        widgetIcon: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: theme.colors.surfaceVariant,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        widgetListInfo: {
+          flex: 1,
+        },
         emptyModalState: {
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
           paddingVertical: theme.custom.spacing.xxl,
-        },
-        fullScreenModal: {
-          flex: 1,
-        },
-        modalHeader: {
-          ...createFlexLayout("row", "lg", {
-            justify: "space-between",
-            align: "center",
-          }),
-          paddingVertical: theme.custom.spacing.lg, // 20 -> lg
-          borderBottomWidth: 1,
-        },
-        modalScrollContent: {
-          flex: 1,
-          paddingHorizontal: theme.custom.spacing.lg, // 24 -> lg
-          paddingTop: theme.custom.spacing.xs, // 8 -> xs
-          paddingBottom: theme.custom.spacing.lg, // 24 -> lg
         },
       }),
     [theme],
@@ -360,105 +396,106 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
         visible={editing}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setEditing(false)}
+        onRequestClose={handleDismissModal}
       >
-        <View
-          style={[
-            styles.fullScreenModal,
-            { backgroundColor: theme.colors.background },
-          ]}
-        >
-          {/* Header */}
-          <View
-            style={[
-              styles.modalHeader,
-              { borderBottomColor: theme.colors.outline },
-            ]}
-          >
-            <Text
-              variant="headlineLarge"
-              style={{ color: theme.colors.onBackground }}
-            >
-              Widget Settings
-            </Text>
-            <Button
-              mode="text"
-              onPress={() => setEditing(false)}
-              textColor={theme.colors.primary}
-              labelStyle={{ fontWeight: "600" }}
-            >
-              Done
-            </Button>
-          </View>
+        <SafeAreaView style={styles.modalOverlay}>
+          <AnimatedScroll contentContainerStyle={styles.modalScrollContainer}>
+            <TabHeader
+              title="Widget Settings"
+              showTitle={true}
+              leftAction={{
+                icon: "close",
+                onPress: handleDismissModal,
+              }}
+            />
 
-          {/* Content */}
-          <ScrollView
-            style={styles.modalScrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {widgets.length > 0 ? (
-              widgets.map((widget) => (
-                <View
-                  key={widget.id}
-                  style={[
-                    styles.widgetListItem,
-                    { borderBottomColor: theme.colors.outline },
-                  ]}
-                >
-                  <View style={styles.widgetInfo}>
-                    <Text
-                      variant="titleLarge"
-                      style={{ color: theme.colors.onBackground }}
+            <View style={styles.modalContent}>
+              {widgets.length > 0 ? (
+                widgets.map((widget, index) => (
+                  <AnimatedListItem
+                    key={widget.id}
+                    index={index}
+                    totalItems={widgets.length}
+                  >
+                    <Card
+                      variant="custom"
+                      style={styles.widgetListCard}
+                      onPress={() => {
+                        onPress();
+                        handleEditWidget(widget);
+                      }}
                     >
-                      {widget.title}
-                    </Text>
-                    <Text
-                      variant="bodyMedium"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      {widget.type}
-                    </Text>
-                  </View>
-                  <View style={styles.widgetActions}>
-                    <Button
-                      mode={widget.enabled ? "outlined" : "contained"}
-                      onPress={() => handleToggleWidget(widget.id)}
-                    >
-                      {widget.enabled ? "Disable" : "Enable"}
-                    </Button>
-                  </View>
+                      <View style={styles.widgetListContent}>
+                        <View style={styles.widgetIcon}>
+                          <MaterialCommunityIcons
+                            name={getWidgetIcon(widget.type)}
+                            size={20}
+                            color={theme.colors.primary}
+                          />
+                        </View>
+                        <View style={styles.widgetListInfo}>
+                          <Text
+                            variant="titleSmall"
+                            style={{ color: theme.colors.onSurface }}
+                          >
+                            {widget.title}
+                          </Text>
+                          <Text
+                            variant="bodySmall"
+                            style={{
+                              color: theme.colors.onSurfaceVariant,
+                              marginTop: 2,
+                            }}
+                          >
+                            {widget.type}
+                          </Text>
+                        </View>
+                        <Button
+                          mode={widget.enabled ? "outlined" : "contained"}
+                          compact
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            handleToggleWidget(widget.id);
+                          }}
+                          style={{ marginLeft: "auto" }}
+                        >
+                          {widget.enabled ? "Disable" : "Enable"}
+                        </Button>
+                      </View>
+                    </Card>
+                  </AnimatedListItem>
+                ))
+              ) : (
+                <View style={styles.emptyModalState}>
+                  <MaterialCommunityIcons
+                    name="widgets-outline"
+                    size={theme.custom.sizes.iconSizes.xxxl}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="titleMedium"
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      marginTop: theme.custom.spacing.md,
+                    }}
+                  >
+                    No widgets available
+                  </Text>
+                  <Text
+                    variant="bodyMedium"
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      marginTop: theme.custom.spacing.sm,
+                      textAlign: "center",
+                    }}
+                  >
+                    Please check your widget configuration
+                  </Text>
                 </View>
-              ))
-            ) : (
-              <View style={styles.emptyModalState}>
-                <MaterialCommunityIcons
-                  name="widgets-outline"
-                  size={theme.custom.sizes.iconSizes.xxxl}
-                  color={theme.colors.onSurfaceVariant}
-                />
-                <Text
-                  variant="titleMedium"
-                  style={{
-                    color: theme.colors.onSurfaceVariant,
-                    marginTop: theme.custom.spacing.md,
-                  }}
-                >
-                  No widgets available
-                </Text>
-                <Text
-                  variant="bodyMedium"
-                  style={{
-                    color: theme.colors.onSurfaceVariant,
-                    marginTop: theme.custom.spacing.sm,
-                    textAlign: "center",
-                  }}
-                >
-                  Please check your widget configuration
-                </Text>
-              </View>
-            )}
-          </ScrollView>
-        </View>
+              )}
+            </View>
+          </AnimatedScroll>
+        </SafeAreaView>
       </Modal>
     </View>
   );
