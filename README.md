@@ -46,7 +46,23 @@ UniArr provides a single, intuitive interface for managing all your media manage
 
 ## Screenshots
 
-_Coming soon_
+<img width="300" height="520" alt="Screenshot_20251023-011701" src="https://github.com/user-attachments/assets/fb0d9ddf-1011-46b6-86df-663c503770f4" />
+<img width="300" height="520" alt="Screenshot_20251023-011614" src="https://github.com/user-attachments/assets/b1fae191-6edf-4736-b8a1-d0556376713c" />
+<img width="300" height="520" alt="Screenshot_20251023-011402" src="https://github.com/user-attachments/assets/92ca0ba6-a191-493b-9f79-75b4d217ee04" />
+<img width="300" height="520" alt="Screenshot_20251023-011352" src="https://github.com/user-attachments/assets/9e31fd6c-9760-421f-8c4b-d5cab7afd6b6" />
+<img width="300" height="520" alt="Screenshot_20251023-011325" src="https://github.com/user-attachments/assets/f99d87ec-044e-488e-b8af-d8f675e82260" />
+<img width="300" height="520" alt="Screenshot_20251023-011315" src="https://github.com/user-attachments/assets/df221e25-42fe-4f9e-9db8-5c0706774a0b" />
+<img width="300" height="520" alt="Screenshot_20251023-011236" src="https://github.com/user-attachments/assets/6513d9ba-7db4-4268-aa94-56f0c2fa5b62" />
+<img width="300" height="520" alt="Screenshot_20251023-012213" src="https://github.com/user-attachments/assets/ff0f1f70-9c7f-4c5c-9cab-140ad76db278" />
+<img width="300" height="520" alt="Screenshot_20251023-012202" src="https://github.com/user-attachments/assets/90a13200-5b78-4329-b203-8be7bb490a85" />
+<img width="300" height="520" alt="Screenshot_20251023-012147" src="https://github.com/user-attachments/assets/6b20a262-44c1-4531-a9cd-f5514ccba264" />
+<img width="300" height="520" alt="Screenshot_20251023-012014" src="https://github.com/user-attachments/assets/ff95d037-70a5-47d3-a844-5398d22e2799" />
+<img width="300" height="520" alt="Screenshot_20251023-011953" src="https://github.com/user-attachments/assets/c026d302-0bb4-487f-a2c6-b31c5619690d" />
+<img width="300" height="520" alt="Screenshot_20251023-011935" src="https://github.com/user-attachments/assets/10e1df07-967c-424e-ba1e-ab1f0dbdb136" />
+<img width="300" height="520" alt="Screenshot_20251023-011906" src="https://github.com/user-attachments/assets/37c5d2b7-032b-41f3-a322-79d99beee6ea" />
+<img width="300" height="520" alt="Screenshot_20251023-011851" src="https://github.com/user-attachments/assets/a500be6a-b7bd-4274-aca7-524b9ce0cc09" />
+<img width="300" height="520" alt="Screenshot_20251023-011832" src="https://github.com/user-attachments/assets/ff554f6b-8ca6-499f-ba3c-0ff7e1e7a047" />
+
 
 ## Requirements
 
