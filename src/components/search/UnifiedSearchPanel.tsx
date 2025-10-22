@@ -176,9 +176,11 @@ export const UnifiedSearchPanel: React.FC = () => {
           borderRadius: 20,
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.sm,
-          minWidth: 80,
+          minWidth: 0,
+          maxWidth: 240,
           alignItems: "center",
           justifyContent: "center",
+          overflow: "hidden",
         },
         mainFilterPillActive: {
           backgroundColor: theme.colors.primary,
@@ -187,6 +189,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           fontSize: 14,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
+          flexShrink: 1,
         },
         mainFilterTextActive: {
           color: theme.colors.onPrimary,
@@ -210,9 +213,11 @@ export const UnifiedSearchPanel: React.FC = () => {
           borderRadius: 20,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
-          minWidth: 70,
+          minWidth: 0,
+          maxWidth: 220,
           alignItems: "center",
           justifyContent: "center",
+          overflow: "hidden",
           flexDirection: "row",
           gap: spacing.xs,
         },
@@ -223,6 +228,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           fontSize: 14,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
+          flexShrink: 1,
         },
         serviceFilterTextActive: {
           color: theme.colors.onPrimary,
@@ -261,17 +267,22 @@ export const UnifiedSearchPanel: React.FC = () => {
         },
         resultCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: borderRadius.xl,
-          marginBottom: spacing.sm,
+          borderRadius: borderRadius.lg,
+          marginBottom: spacing.xs,
+          padding: 0,
+          overflow: "hidden",
         },
         resultContent: {
           flexDirection: "row",
-          padding: spacing.sm,
+          paddingVertical: spacing.xs,
+          paddingRight: spacing.sm,
+          paddingLeft: spacing.xs,
+          alignItems: "center",
         },
         posterContainer: {
-          width: theme.custom.sizes.posterSizes.sm,
-          height: theme.custom.sizes.posterSizes.md,
-          borderRadius: borderRadius.lg,
+          width: theme.custom.sizes.posterSizes.sm - 8,
+          height: theme.custom.sizes.posterSizes.sm * 1.4 - 8,
+          borderRadius: borderRadius.md,
           backgroundColor: theme.colors.surfaceVariant,
           marginRight: spacing.sm,
           overflow: "hidden",
@@ -290,45 +301,46 @@ export const UnifiedSearchPanel: React.FC = () => {
         },
         resultInfo: {
           flex: 1,
-          justifyContent: "space-between",
+          justifyContent: "center",
         },
         resultTitle: {
           color: theme.colors.onSurface,
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: "600",
-          marginBottom: spacing.xs,
-          lineHeight: 22,
+          marginBottom: spacing.xs / 2,
+          lineHeight: 18,
         },
         resultSubtitle: {
           color: theme.colors.onSurfaceVariant,
-          fontSize: 14,
-          marginBottom: spacing.sm,
+          fontSize: 12,
+          marginBottom: 0,
         },
         genreContainer: {
           flexDirection: "row",
           flexWrap: "wrap",
           gap: spacing.xs,
-          marginBottom: spacing.sm,
+          marginBottom: 0,
         },
         genreChip: {
-          height: 28,
-          paddingHorizontal: spacing.sm,
+          height: 22,
+          paddingHorizontal: spacing.xs,
+          marginRight: spacing.xs,
         },
         resultActions: {
           flexDirection: "row",
-          gap: spacing.sm,
+          gap: spacing.xs,
           alignItems: "center",
         },
         actionButton: {
-          width: theme.custom.sizes.touchSizes.md,
-          height: theme.custom.sizes.touchSizes.md,
+          width: theme.custom.sizes.touchSizes.sm,
+          height: theme.custom.sizes.touchSizes.sm,
           borderRadius: borderRadius.round,
           justifyContent: "center",
           alignItems: "center",
         },
         downloadButtonContainer: {
-          width: theme.custom.sizes.touchSizes.md,
-          height: theme.custom.sizes.touchSizes.md,
+          width: theme.custom.sizes.touchSizes.sm,
+          height: theme.custom.sizes.touchSizes.sm,
           borderRadius: borderRadius.round,
           justifyContent: "center",
           alignItems: "center",
@@ -460,6 +472,42 @@ export const UnifiedSearchPanel: React.FC = () => {
           fontStyle: "italic",
           opacity: 0.6,
           marginTop: spacing.sm,
+        },
+        /* Compact card helper styles */
+        resultHeaderRow: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        },
+        titleColumn: {
+          flex: 1,
+          paddingRight: spacing.sm,
+        },
+        rightColumn: {
+          alignItems: "flex-end",
+        },
+        serviceBadge: {
+          backgroundColor: theme.colors.surfaceVariant,
+          paddingHorizontal: 8,
+          paddingVertical: 4,
+          borderRadius: 8,
+        },
+        serviceBadgeText: {
+          fontSize: 11,
+          color: theme.colors.onSurfaceVariant,
+        },
+        spacerSmall: {
+          height: spacing.sm,
+        },
+        iconCompact: {
+          margin: 0,
+          padding: 4,
+        },
+        iconWithBg: {
+          margin: 0,
+          padding: 4,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderRadius: borderRadius.round,
         },
       }),
     [theme],
@@ -599,6 +647,106 @@ export const UnifiedSearchPanel: React.FC = () => {
     [recordSearch, router],
   );
 
+  const handleViewAction = useCallback(
+    (item: UnifiedSearchResult) => {
+      // Navigate to the appropriate detail screen for each service when possible
+      if (item.serviceType === "jellyseerr") {
+        const mediaType = item.mediaType === "series" ? "series" : "movie";
+        const mediaId =
+          item.externalIds?.tmdbId ?? item.externalIds?.serviceNativeId;
+        if (mediaId) {
+          router.push({
+            pathname: "/(auth)/jellyseerr/[serviceId]/[mediaType]/[mediaId]",
+            params: {
+              serviceId: item.serviceId,
+              mediaType,
+              mediaId: String(mediaId),
+            },
+          });
+          return;
+        }
+        router.push({
+          pathname: "/(auth)/jellyseerr/[serviceId]",
+          params: { serviceId: item.serviceId },
+        });
+        return;
+      }
+
+      if (item.serviceType === "jellyfin") {
+        const itemId = item.externalIds?.serviceNativeId;
+        if (itemId) {
+          router.push({
+            pathname: "/(auth)/jellyfin/[serviceId]/details/[itemId]",
+            params: { serviceId: item.serviceId, itemId: String(itemId) },
+          });
+          return;
+        }
+        router.push({
+          pathname: "/(auth)/jellyfin/[serviceId]",
+          params: { serviceId: item.serviceId },
+        });
+        return;
+      }
+
+      // Sonarr series detail
+      if (item.serviceType === "sonarr") {
+        const nativeId = item.externalIds?.serviceNativeId;
+        const tvdbId = item.externalIds?.tvdbId;
+        // Only navigate to series detail when we have a valid non-zero id
+        if (nativeId && String(nativeId) !== "0") {
+          router.push({
+            pathname: "/(auth)/sonarr/[serviceId]/series/[id]",
+            params: { serviceId: item.serviceId, id: String(nativeId) },
+          });
+          return;
+        }
+        if (tvdbId && String(tvdbId) !== "0") {
+          router.push({
+            pathname: "/(auth)/sonarr/[serviceId]/series/[id]",
+            params: { serviceId: item.serviceId, id: String(tvdbId) },
+          });
+          return;
+        }
+        // Fallback to service index if no usable id
+        router.push({
+          pathname: "/(auth)/sonarr/[serviceId]",
+          params: { serviceId: item.serviceId },
+        });
+        return;
+      }
+
+      // Radarr movie detail
+      if (item.serviceType === "radarr") {
+        const nativeId = item.externalIds?.serviceNativeId;
+        const tmdbId = item.externalIds?.tmdbId;
+        if (nativeId && String(nativeId) !== "0") {
+          router.push({
+            pathname: "/(auth)/radarr/[serviceId]/movies/[id]",
+            params: { serviceId: item.serviceId, id: String(nativeId) },
+          });
+          return;
+        }
+        if (tmdbId && String(tmdbId) !== "0") {
+          router.push({
+            pathname: "/(auth)/radarr/[serviceId]/movies/[id]",
+            params: { serviceId: item.serviceId, id: String(tmdbId) },
+          });
+          return;
+        }
+        // Fallback to service index if no usable id
+        router.push({
+          pathname: "/(auth)/radarr/[serviceId]",
+          params: { serviceId: item.serviceId },
+        });
+        return;
+      }
+
+      // Default: fall back to primary action
+      handlePrimaryAction(item);
+    },
+    [router, handlePrimaryAction],
+  );
+
   const renderResult = useCallback(
     (item: UnifiedSearchResult) => {
       const subtitleInfo = [];
@@ -634,90 +782,103 @@ export const UnifiedSearchPanel: React.FC = () => {
         );
       };
 
+      const serviceLabel =
+        serviceNameById.get(item.serviceId) ??
+        serviceTypeLabels[item.serviceType] ??
+        item.serviceType;
+
       return (
-        <View style={[styles.resultCard, cardElevationStyle]}>
+        <TouchableOpacity
+          onPress={() => handlePrimaryAction(item)}
+          activeOpacity={0.8}
+          style={[styles.resultCard, cardElevationStyle]}
+        >
           <View style={styles.resultContent}>
             <View style={styles.posterContainer}>{renderPoster()}</View>
 
             <View style={styles.resultInfo}>
-              <View>
-                <Text style={styles.resultTitle} numberOfLines={2}>
-                  {item.title}
-                </Text>
-                <Text style={styles.resultSubtitle}>
-                  {subtitleInfo.join(" • ")}
-                </Text>
-              </View>
+              <View style={styles.resultHeaderRow}>
+                <View style={styles.titleColumn}>
+                  <Text style={styles.resultTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.resultSubtitle} numberOfLines={1}>
+                    {subtitleInfo.join(" • ")}
+                  </Text>
 
-              <View>
-                {genreInfo.length > 0 && (
-                  <View style={styles.genreContainer}>
-                    {genreInfo.map((genre, index) => (
-                      <Chip
-                        key={index}
-                        compact
-                        mode="outlined"
-                        style={styles.genreChip}
-                        textStyle={{ fontSize: 12 }}
-                      >
-                        {genre}
-                      </Chip>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.resultActions}>
-                  <View
-                    style={[
-                      styles.actionButton,
-                      { backgroundColor: theme.colors.primary },
-                    ]}
-                  >
-                    <IconButton
-                      icon="eye"
-                      size={20}
-                      iconColor={theme.colors.onPrimary}
-                      onPress={() => handlePrimaryAction(item)}
-                    />
-                  </View>
-
-                  {item.serviceId && getConnector(item.serviceId)?.config && (
-                    <View style={styles.downloadButtonContainer}>
-                      <DownloadButton
-                        serviceConfig={getConnector(item.serviceId)!.config}
-                        contentId={item.id}
-                        size="small"
-                        variant="icon"
-                        onDownloadStart={(downloadId) => {
-                          console.log(`Download started: ${downloadId}`);
-                        }}
-                        onDownloadError={(error) => {
-                          console.error(`Download failed: ${error}`);
-                        }}
-                      />
+                  {genreInfo.length > 0 && (
+                    <View style={styles.genreContainer}>
+                      {genreInfo.slice(0, 3).map((genre, index) => (
+                        <Chip
+                          key={index}
+                          compact
+                          mode="outlined"
+                          style={styles.genreChip}
+                          textStyle={{ fontSize: 11 }}
+                        >
+                          {genre}
+                        </Chip>
+                      ))}
                     </View>
                   )}
+                </View>
 
-                  <View
-                    style={[
-                      styles.actionButton,
-                      { backgroundColor: theme.colors.surfaceVariant },
-                    ]}
-                  >
+                <View style={styles.rightColumn}>
+                  <View style={styles.serviceBadge}>
+                    <Text style={styles.serviceBadgeText}>{serviceLabel}</Text>
+                  </View>
+
+                  <View style={styles.spacerSmall} />
+
+                  <View style={styles.resultActions}>
+                    <IconButton
+                      icon="eye"
+                      size={18}
+                      iconColor={theme.colors.primary}
+                      onPress={() => handleViewAction(item)}
+                      style={styles.iconCompact}
+                    />
+
+                    {item.serviceId && getConnector(item.serviceId)?.config && (
+                      <View style={styles.downloadButtonContainer}>
+                        <DownloadButton
+                          serviceConfig={getConnector(item.serviceId)!.config}
+                          contentId={item.id}
+                          size="small"
+                          variant="icon"
+                          onDownloadStart={(downloadId) => {
+                            console.log(`Download started: ${downloadId}`);
+                          }}
+                          onDownloadError={(error) => {
+                            console.error(`Download failed: ${error}`);
+                          }}
+                        />
+                      </View>
+                    )}
+
                     <IconButton
                       icon="dots-vertical"
-                      size={20}
+                      size={18}
                       iconColor={theme.colors.onSurfaceVariant}
+                      style={styles.iconWithBg}
                     />
                   </View>
                 </View>
               </View>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       );
     },
-    [handlePrimaryAction, styles, theme, getConnector, cardElevationStyle],
+    [
+      handlePrimaryAction,
+      styles,
+      theme,
+      getConnector,
+      cardElevationStyle,
+      serviceNameById,
+      handleViewAction,
+    ],
   );
 
   const renderErrorHelper = useMemo(() => {
@@ -862,6 +1023,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                         serviceFilters.length === 0 &&
                           styles.mainFilterTextActive,
                       ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
                     >
                       All
                     </Text>
@@ -883,6 +1046,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                           serviceFilters.includes(service.serviceId) &&
                             styles.mainFilterTextActive,
                         ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                       >
                         {service.serviceName}
                       </Text>
@@ -911,6 +1076,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                           mediaFilters.includes(option) &&
                             styles.mainFilterTextActive,
                         ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                       >
                         {mediaTypeLabels[option]}
                       </Text>
@@ -947,6 +1114,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                           statusFilter === status &&
                             styles.mainFilterTextActive,
                         ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                       >
                         {status}
                       </Text>
@@ -988,7 +1157,13 @@ export const UnifiedSearchPanel: React.FC = () => {
                         { flexDirection: "row", gap: spacing.xs },
                       ]}
                     >
-                      <Text style={styles.mainFilterTextActive}>{genre}</Text>
+                      <Text
+                        style={styles.mainFilterTextActive}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {genre}
+                      </Text>
                       <IconButton
                         icon="close"
                         size={16}
@@ -1015,8 +1190,20 @@ export const UnifiedSearchPanel: React.FC = () => {
                       marginBottom: spacing.sm,
                     }}
                   >
-                    <Text style={styles.mainFilterText}>1990</Text>
-                    <Text style={styles.mainFilterText}>2024</Text>
+                    <Text
+                      style={styles.mainFilterText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      1990
+                    </Text>
+                    <Text
+                      style={styles.mainFilterText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      2024
+                    </Text>
                   </View>
                   <View
                     style={{
@@ -1147,7 +1334,9 @@ export const UnifiedSearchPanel: React.FC = () => {
                   closeIcon="close"
                   textStyle={{ fontSize: 14 }}
                 >
-                  {entry.term}
+                  <Text numberOfLines={1} ellipsizeMode="tail">
+                    {entry.term}
+                  </Text>
                 </Chip>
               ))}
             </View>
