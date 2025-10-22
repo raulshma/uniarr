@@ -130,6 +130,10 @@ const JellyfinPlayerScreen = () => {
     playSessionId?: string;
   } | null>(null);
   const isMountedRef = useRef(true);
+  const startPositionAppliedRef = useRef(startPositionSeconds <= 0);
+  const pendingResumePositionRef = useRef<number | null>(null);
+  const resumePlaybackAfterSourceRef = useRef(false);
+  const lastLoadedSourceKeyRef = useRef<string | null>(null);
 
   // ============================================================================
   // State
@@ -139,10 +143,14 @@ const JellyfinPlayerScreen = () => {
     "stream",
   );
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [volume, setVolume] = useState(1);
+  const [brightness, setBrightness] = useState(1);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [sourceMenuVisible, setSourceMenuVisible] = useState(false);
   const [speedMenuVisible, setSpeedMenuVisible] = useState(false);
   const [trackMenuVisible, setTrackMenuVisible] = useState(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [showBrightnessSlider, setShowBrightnessSlider] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Loading...");
 
   const controlsOpacityAnim = useRef(new Animated.Value(1)).current;
@@ -196,6 +204,22 @@ const JellyfinPlayerScreen = () => {
   const hasDownload = Boolean(localFileUri);
   const hasStream = Boolean(playbackQuery.data?.streamUrl);
 
+  useEffect(() => {
+    startPositionAppliedRef.current = startPositionSeconds <= 0;
+    pendingResumePositionRef.current = null;
+    resumePlaybackAfterSourceRef.current = false;
+    lastLoadedSourceKeyRef.current = null;
+    lastReportedPositionRef.current = -1;
+  }, [itemId, startPositionSeconds]);
+
+  useEffect(() => {
+    startPositionAppliedRef.current = startPositionSeconds <= 0;
+    pendingResumePositionRef.current = null;
+    resumePlaybackAfterSourceRef.current = false;
+    lastLoadedSourceKeyRef.current = null;
+    lastReportedPositionRef.current = -1;
+  }, [itemId, startPositionSeconds]);
+
   // Set initial playback mode based on availability
   useEffect(() => {
     if (sourcePreference === "download" && hasDownload) {
@@ -223,22 +247,99 @@ const JellyfinPlayerScreen = () => {
     return null;
   }, [playbackMode, localFileUri, playbackQuery.data?.streamUrl]);
 
+  const playbackSourceKey = useMemo(() => {
+    if (!playbackSource) return "empty";
+    if (playbackMode === "download") {
+      return `download:${localFileUri ?? ""}`;
+    }
+    if (playbackMode === "stream") {
+      return `stream:${playbackQuery.data?.streamUrl ?? ""}`;
+    }
+    return "unknown";
+  }, [
+    playbackMode,
+    localFileUri,
+    playbackQuery.data?.streamUrl,
+    playbackSource,
+  ]);
+
   // ============================================================================
   // Video Player Setup
   // ============================================================================
 
-  const player = useVideoPlayer(playbackSource, (playerInstance) => {
+  const player = useVideoPlayer(null, (playerInstance) => {
     playerInstance.timeUpdateEventInterval = 1;
     playerInstance.staysActiveInBackground = false;
     playerInstance.showNowPlayingNotification = false;
     playerInstance.preservesPitch = true;
-    playerInstance.playbackRate = playbackRate;
     playerInstance.volume = 1.0;
     playerInstance.muted = false;
-    if (startPositionSeconds > 0) {
-      playerInstance.currentTime = startPositionSeconds;
-    }
   });
+
+  useEffect(() => {
+    if (playbackSourceKey === lastLoadedSourceKeyRef.current) {
+      return;
+    }
+
+    lastLoadedSourceKeyRef.current = playbackSourceKey;
+    let cancelled = false;
+
+    const replaceSource = async () => {
+      try {
+        await player.replaceAsync(playbackSource ?? null);
+      } catch {
+        return;
+      }
+
+      if (cancelled || playbackSourceKey === "empty") {
+        resumePlaybackAfterSourceRef.current = false;
+        pendingResumePositionRef.current = null;
+        return;
+      }
+
+      if (!startPositionAppliedRef.current && startPositionSeconds > 0) {
+        const current = player.currentTime ?? 0;
+        const delta = startPositionSeconds - current;
+        if (Math.abs(delta) > 0.01) {
+          player.seekBy(delta);
+        }
+        startPositionAppliedRef.current = true;
+      } else if (typeof pendingResumePositionRef.current === "number") {
+        const current = player.currentTime ?? 0;
+        const target = pendingResumePositionRef.current;
+        const delta = target - current;
+        if (Math.abs(delta) > 0.01) {
+          player.seekBy(delta);
+        }
+      }
+
+      try {
+        // eslint-disable-next-line react-compiler/react-compiler
+        player.playbackRate = playbackRate;
+      } catch {
+        // Ignore playback rate update errors
+      }
+
+      pendingResumePositionRef.current = null;
+
+      if (resumePlaybackAfterSourceRef.current) {
+        player.play();
+      }
+      resumePlaybackAfterSourceRef.current = false;
+    };
+
+    void replaceSource();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    playbackSource,
+    playbackSourceKey,
+    playbackRate,
+    player,
+    startPositionSeconds,
+  ]);
 
   // Player events
   const statusEvent = useEvent(player, "statusChange", {
@@ -306,6 +407,15 @@ const JellyfinPlayerScreen = () => {
   // ============================================================================
   // Lifecycle & Orientation
   // ============================================================================
+
+  // Update player volume
+  useEffect(() => {
+    try {
+      player.volume = clamp(volume, 0, 1);
+    } catch {
+      // Ignore volume adjustment errors
+    }
+  }, [player, volume]);
 
   useEffect(() => {
     // Lock to landscape on mount
@@ -433,6 +543,15 @@ const JellyfinPlayerScreen = () => {
   }, [controlsVisible, resetHideControlsTimer]);
 
   useEffect(() => {
+    if (!player) return;
+    try {
+      player.playbackRate = playbackRate;
+    } catch {
+      // Ignore playback rate update errors
+    }
+  }, [player, playbackRate]);
+
+  useEffect(() => {
     if (playerStatus !== "readyToPlay") return;
     if (isPlaying) {
       resetHideControlsTimer();
@@ -474,13 +593,13 @@ const JellyfinPlayerScreen = () => {
 
   const seekRelative = useCallback(
     (seconds: number) => {
-      if (duration <= 0) return;
-      const targetTime = clamp(currentTime + seconds, 0, duration);
-      // eslint-disable-next-line react-compiler/react-compiler
-      player.currentTime = targetTime;
+      if (duration <= 0 || !player) return;
+
+      // Use seekBy for relative seeking - more efficient than currentTime
+      player.seekBy(seconds);
       setControlsVisible(true);
     },
-    [currentTime, duration, player],
+    [duration, player],
   );
 
   const handleProgressBarPress = useCallback(
@@ -491,8 +610,13 @@ const JellyfinPlayerScreen = () => {
         0,
         1,
       );
+      const targetTime = duration * fraction;
 
-      player.currentTime = duration * fraction;
+      const current = player.currentTime ?? 0;
+      const delta = targetTime - current;
+      if (Math.abs(delta) > 0.01) {
+        player.seekBy(delta);
+      }
       setControlsVisible(true);
     },
     [duration, player],
@@ -517,28 +641,19 @@ const JellyfinPlayerScreen = () => {
         setSourceMenuVisible(false);
         return;
       }
-      const resumeTime = currentTime;
+      pendingResumePositionRef.current = currentTime;
+      resumePlaybackAfterSourceRef.current = isPlaying;
       player.pause();
       setPlaybackMode(mode);
       setSourceMenuVisible(false);
-      // Player will reload with new source; seek after load
-      setTimeout(() => {
-        if (resumeTime > 0) {
-          player.currentTime = resumeTime;
-        }
-      }, 500);
     },
-    [playbackMode, currentTime, player],
+    [playbackMode, currentTime, isPlaying, player],
   );
 
-  const handlePlaybackRateChange = useCallback(
-    (rate: number) => {
-      setPlaybackRate(rate);
-      player.playbackRate = rate;
-      setSpeedMenuVisible(false);
-    },
-    [player],
-  );
+  const handlePlaybackRateChange = useCallback((rate: number) => {
+    setPlaybackRate(rate);
+    setSpeedMenuVisible(false);
+  }, []);
 
   const isTrackSelected = useCallback(
     (
@@ -886,7 +1001,83 @@ const JellyfinPlayerScreen = () => {
                     />
                   ))}
                 </Menu>
+
+                {/* Volume Button */}
+                <IconButton
+                  icon="volume-high"
+                  iconColor="white"
+                  onPress={() => setShowVolumeSlider(!showVolumeSlider)}
+                />
+
+                {/* Brightness Button */}
+                <IconButton
+                  icon="brightness-7"
+                  iconColor="white"
+                  onPress={() => setShowBrightnessSlider(!showBrightnessSlider)}
+                />
               </View>
+
+              {/* Volume Slider */}
+              {showVolumeSlider && (
+                <View style={styles.sliderContainer}>
+                  <Text variant="labelSmall" style={styles.sliderLabel}>
+                    Volume: {Math.round(volume * 100)}%
+                  </Text>
+                  <Pressable
+                    style={styles.sliderTrack}
+                    onPress={(event) => {
+                      const width = event.nativeEvent.locationX;
+                      const totalWidth = progressBarWidthRef.current;
+                      if (totalWidth > 0) {
+                        const newVolume = clamp(width / totalWidth, 0, 1);
+                        setVolume(newVolume);
+                      }
+                    }}
+                  >
+                    <View style={styles.sliderBackground} />
+                    <View
+                      style={[styles.sliderFill, { width: `${volume * 100}%` }]}
+                    />
+                    <View
+                      style={[styles.sliderThumb, { left: `${volume * 100}%` }]}
+                    />
+                  </Pressable>
+                </View>
+              )}
+
+              {/* Brightness Slider */}
+              {showBrightnessSlider && (
+                <View style={styles.sliderContainer}>
+                  <Text variant="labelSmall" style={styles.sliderLabel}>
+                    Brightness: {Math.round(brightness * 100)}%
+                  </Text>
+                  <Pressable
+                    style={styles.sliderTrack}
+                    onPress={(event) => {
+                      const width = event.nativeEvent.locationX;
+                      const totalWidth = progressBarWidthRef.current;
+                      if (totalWidth > 0) {
+                        const newBrightness = clamp(width / totalWidth, 0, 1);
+                        setBrightness(newBrightness);
+                      }
+                    }}
+                  >
+                    <View style={styles.sliderBackground} />
+                    <View
+                      style={[
+                        styles.sliderFill,
+                        { width: `${brightness * 100}%` },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.sliderThumb,
+                        { left: `${brightness * 100}%` },
+                      ]}
+                    />
+                  </Pressable>
+                </View>
+              )}
             </View>
           </Pressable>
         </Pressable>
@@ -1030,6 +1221,43 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.sm,
+    },
+    sliderContainer: {
+      gap: spacing.xs,
+      paddingHorizontal: spacing.sm,
+    },
+    sliderLabel: {
+      color: "rgba(255,255,255,0.9)",
+      fontWeight: "500",
+    },
+    sliderTrack: {
+      height: 20,
+      justifyContent: "center",
+    },
+    sliderBackground: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: "rgba(255,255,255,0.3)",
+    },
+    sliderFill: {
+      position: "absolute",
+      left: 0,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.primary,
+    },
+    sliderThumb: {
+      position: "absolute",
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: theme.colors.primary,
+      marginLeft: -6,
+      borderWidth: 2,
+      borderColor: "white",
     },
   });
 
