@@ -17,6 +17,7 @@ import {
   typography,
 } from "@/theme/typography";
 import { spacing } from "@/theme/spacing";
+import { generateSizeTokens, borderRadius } from "@/constants/sizes";
 
 export type CustomThemeConfig = {
   preset?: keyof typeof presetThemes;
@@ -24,6 +25,7 @@ export type CustomThemeConfig = {
   oledEnabled?: boolean;
   fontScale: FontScale;
   densityMode: DensityMode;
+  globalBorderRadius?: keyof typeof borderRadius;
   posterStyle: {
     borderRadius: number;
     shadowOpacity: number;
@@ -35,6 +37,7 @@ export type AppTheme = MD3Theme & {
   custom: {
     spacing: typeof spacing;
     typography: typeof typography;
+    sizes: ReturnType<typeof generateSizeTokens>;
     config?: CustomThemeConfig;
   };
 };
@@ -48,6 +51,7 @@ const createTheme = (
   custom: {
     spacing,
     typography,
+    sizes: generateSizeTokens(),
   },
 });
 
@@ -81,9 +85,13 @@ export const createCustomTheme = (
     config.oledEnabled,
   );
 
-  // Generate typography and spacing scales
+  // Generate typography, spacing, and size scales
   const typographyScale = generateTypographyScale(config.fontScale);
   const spacingScale = generateSpacingScale(config.densityMode);
+  const sizeScale = generateSizeTokens(
+    config.densityMode,
+    config.globalBorderRadius,
+  );
 
   const baseTheme = isDark ? MD3DarkTheme : MD3LightTheme;
 
@@ -93,6 +101,7 @@ export const createCustomTheme = (
     custom: {
       spacing: spacingScale,
       typography: typographyScale,
+      sizes: sizeScale,
       config,
     },
   };
@@ -114,6 +123,7 @@ export const defaultCustomThemeConfig: CustomThemeConfig = {
   oledEnabled: false,
   fontScale: "medium",
   densityMode: "comfortable",
+  globalBorderRadius: "md",
   posterStyle: {
     borderRadius: 8,
     shadowOpacity: 0.3,

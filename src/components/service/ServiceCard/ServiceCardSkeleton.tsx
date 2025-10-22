@@ -20,7 +20,7 @@ const ServiceCardSkeleton: React.FC<ServiceCardSkeletonProps> = ({ style }) => {
           flexDirection: "row",
           alignItems: "center",
           padding: theme.custom.spacing.md,
-          borderRadius: 12,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           backgroundColor: theme.colors.elevation.level1,
         },
         icon: {

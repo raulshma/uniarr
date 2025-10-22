@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   IconButton,
   Searchbar,
-  Chip,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -32,23 +31,12 @@ type JellyseerrSearchResult =
   | components["schemas"]["MovieResult"]
   | components["schemas"]["TvResult"];
 
-const FILTER_CATEGORIES = [
-  "All",
-  "Mecha",
-  "Slice of Life",
-  "Isekai",
-  "Shonen",
-] as const;
-
-type FilterCategory = (typeof FILTER_CATEGORIES)[number];
-
 const AnimeHubScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
   const { getAllConnectors } = useConnectorsStore();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState<FilterCategory>("All");
 
   // Find the first Jellyseerr service (optional)
   const jellyseerrService = useMemo(() => {
@@ -138,25 +126,6 @@ const AnimeHubScreen: React.FC = () => {
           borderRadius: 12,
           elevation: 0,
           marginBottom: spacing.md,
-        },
-        filterContainer: {
-          flexDirection: "row",
-          gap: spacing.xs,
-        },
-        filterChip: {
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 20,
-        },
-        filterChipSelected: {
-          backgroundColor: theme.colors.primary,
-        },
-        filterChipText: {
-          color: theme.colors.onSurfaceVariant,
-          fontSize: 13,
-        },
-        filterChipTextSelected: {
-          color: theme.colors.onPrimary,
-          fontWeight: "600",
         },
         scrollContent: {
           paddingBottom: spacing.xl * 2,
@@ -336,32 +305,6 @@ const AnimeHubScreen: React.FC = () => {
           icon="magnify"
           iconColor={theme.colors.onSurfaceVariant}
         />
-
-        {/* Filter Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContainer}
-        >
-          {FILTER_CATEGORIES.map((category) => (
-            <Chip
-              key={category}
-              selected={selectedFilter === category}
-              onPress={() => setSelectedFilter(category)}
-              style={[
-                styles.filterChip,
-                selectedFilter === category && styles.filterChipSelected,
-              ]}
-              textStyle={[
-                styles.filterChipText,
-                selectedFilter === category && styles.filterChipTextSelected,
-              ]}
-              mode="flat"
-            >
-              {category}
-            </Chip>
-          ))}
-        </ScrollView>
       </View>
 
       {/* Scrollable Content */}

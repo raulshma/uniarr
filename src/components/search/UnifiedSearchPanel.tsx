@@ -24,6 +24,8 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Button } from "@/components/common/Button";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { getComponentElevation } from "@/constants/elevation";
+import { borderRadius } from "@/constants/sizes";
 import { useUnifiedSearch } from "@/hooks/useUnifiedSearch";
 import type {
   SearchHistoryEntry,
@@ -83,6 +85,9 @@ export const UnifiedSearchPanel: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
   const getConnector = useConnectorsStore(selectGetConnector);
+
+  // Elevation styles
+  const cardElevationStyle = getComponentElevation("mediaCard", theme);
   const params = useLocalSearchParams<{
     query?: string;
     tmdbId?: string;
@@ -98,6 +103,7 @@ export const UnifiedSearchPanel: React.FC = () => {
   );
   const [qualityFilter, setQualityFilter] = useState<string>("Any");
   const [releaseTypeFilter, setReleaseTypeFilter] = useState<string>("Any");
+  const [statusFilter, setStatusFilter] = useState<string>("Any");
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
   const {
@@ -141,9 +147,9 @@ export const UnifiedSearchPanel: React.FC = () => {
           paddingBottom: spacing.xs,
         },
         searchInput: {
-          height: 52,
+          height: theme.custom.sizes.touchSizes.md,
           backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 26,
+          borderRadius: borderRadius.round,
           fontSize: 16,
           paddingHorizontal: spacing.lg,
         },
@@ -255,22 +261,17 @@ export const UnifiedSearchPanel: React.FC = () => {
         },
         resultCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: 16,
+          borderRadius: borderRadius.xl,
           marginBottom: spacing.sm,
-          elevation: 2,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
         },
         resultContent: {
           flexDirection: "row",
           padding: spacing.sm,
         },
         posterContainer: {
-          width: 68,
-          height: 102,
-          borderRadius: 10,
+          width: theme.custom.sizes.posterSizes.sm,
+          height: theme.custom.sizes.posterSizes.md,
+          borderRadius: borderRadius.lg,
           backgroundColor: theme.colors.surfaceVariant,
           marginRight: spacing.sm,
           overflow: "hidden",
@@ -319,16 +320,16 @@ export const UnifiedSearchPanel: React.FC = () => {
           alignItems: "center",
         },
         actionButton: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: theme.custom.sizes.touchSizes.md,
+          height: theme.custom.sizes.touchSizes.md,
+          borderRadius: borderRadius.round,
           justifyContent: "center",
           alignItems: "center",
         },
         downloadButtonContainer: {
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: theme.custom.sizes.touchSizes.md,
+          height: theme.custom.sizes.touchSizes.md,
+          borderRadius: borderRadius.round,
           justifyContent: "center",
           alignItems: "center",
         },
@@ -499,10 +500,13 @@ export const UnifiedSearchPanel: React.FC = () => {
   const clearAdvancedFilters = useCallback(() => {
     setQualityFilter("Any");
     setReleaseTypeFilter("Any");
+    setStatusFilter("Any");
   }, []);
 
   const hasAdvancedFilters =
-    qualityFilter !== "Any" || releaseTypeFilter !== "Any";
+    qualityFilter !== "Any" ||
+    releaseTypeFilter !== "Any" ||
+    statusFilter !== "Any";
 
   // If the route provides search params (e.g. from Discover card), prefill the search
   useEffect(() => {
@@ -623,7 +627,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           <View style={styles.posterFallback}>
             <IconButton
               icon="image"
-              size={32}
+              size={theme.custom.sizes.iconSizes.xxl}
               iconColor={theme.colors.onSurfaceVariant}
             />
           </View>
@@ -631,7 +635,7 @@ export const UnifiedSearchPanel: React.FC = () => {
       };
 
       return (
-        <View style={styles.resultCard}>
+        <View style={[styles.resultCard, cardElevationStyle]}>
           <View style={styles.resultContent}>
             <View style={styles.posterContainer}>{renderPoster()}</View>
 
@@ -713,7 +717,7 @@ export const UnifiedSearchPanel: React.FC = () => {
         </View>
       );
     },
-    [handlePrimaryAction, styles, theme, getConnector],
+    [handlePrimaryAction, styles, theme, getConnector, cardElevationStyle],
   );
 
   const renderErrorHelper = useMemo(() => {
@@ -786,11 +790,22 @@ export const UnifiedSearchPanel: React.FC = () => {
               </View>
             )}
             {hasAdvancedFilters && (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>
-                  Quality: {qualityFilter}
-                </Text>
-              </View>
+              <>
+                {qualityFilter !== "Any" && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>
+                      Quality: {qualityFilter}
+                    </Text>
+                  </View>
+                )}
+                {statusFilter !== "Any" && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>
+                      Status: {statusFilter}
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>
@@ -909,6 +924,7 @@ export const UnifiedSearchPanel: React.FC = () => {
                 <Text style={styles.advancedFilterTitle}>Status</Text>
                 <View style={[styles.mainFilterRow, { flexWrap: "wrap" }]}>
                   {[
+                    "Any",
                     "Owned",
                     "Monitored",
                     "Missing",
@@ -917,12 +933,23 @@ export const UnifiedSearchPanel: React.FC = () => {
                   ].map((status) => (
                     <TouchableOpacity
                       key={status}
-                      style={[styles.mainFilterPill]}
+                      style={[
+                        styles.mainFilterPill,
+                        statusFilter === status && styles.mainFilterPillActive,
+                      ]}
                       onPress={() => {
-                        // TODO: Implement status filtering
+                        setStatusFilter(status);
                       }}
                     >
-                      <Text style={styles.mainFilterText}>{status}</Text>
+                      <Text
+                        style={[
+                          styles.mainFilterText,
+                          statusFilter === status &&
+                            styles.mainFilterTextActive,
+                        ]}
+                      >
+                        {status}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -993,9 +1020,10 @@ export const UnifiedSearchPanel: React.FC = () => {
                   </View>
                   <View
                     style={{
-                      height: 6,
+                      height: theme.custom.sizes.controlSizes.slider.height,
                       backgroundColor: theme.colors.surfaceVariant,
-                      borderRadius: 3,
+                      borderRadius:
+                        theme.custom.sizes.controlSizes.slider.borderRadius,
                       position: "relative",
                       overflow: "hidden",
                     }}
@@ -1004,7 +1032,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                       style={{
                         height: "100%",
                         backgroundColor: theme.colors.primary,
-                        borderRadius: 3,
+                        borderRadius:
+                          theme.custom.sizes.controlSizes.slider.borderRadius,
                         marginLeft: "30%",
                         marginRight: "5%",
                       }}
@@ -1052,7 +1081,7 @@ export const UnifiedSearchPanel: React.FC = () => {
             <View style={styles.emptyState}>
               <IconButton
                 icon="movie-search"
-                size={48}
+                size={theme.custom.sizes.iconSizes.xxxl}
                 iconColor={theme.colors.onSurfaceVariant}
               />
               <Text style={styles.emptyStateText}>
@@ -1126,7 +1155,7 @@ export const UnifiedSearchPanel: React.FC = () => {
             <View style={styles.emptyState}>
               <IconButton
                 icon="movie-search"
-                size={48}
+                size={theme.custom.sizes.iconSizes.xxxl}
                 iconColor={theme.colors.onSurfaceVariant}
               />
               <Text style={styles.emptyStateText}>

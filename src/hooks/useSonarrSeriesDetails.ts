@@ -34,10 +34,25 @@ export interface UseSonarrSeriesDetailsResult {
   toggleMonitorAsync: (nextState: boolean) => Promise<void>;
   isTogglingMonitor: boolean;
   toggleMonitorError: unknown;
+  toggleSeasonMonitor: (seasonNumber: number, nextState: boolean) => void;
+  toggleSeasonMonitorAsync: (
+    seasonNumber: number,
+    nextState: boolean,
+  ) => Promise<void>;
+  isTogglingSeasonMonitor: boolean;
+  toggleSeasonMonitorError: unknown;
   triggerSearch: () => void;
   triggerSearchAsync: () => Promise<void>;
   isTriggeringSearch: boolean;
   triggerSearchError: unknown;
+  searchMissingEpisodes: () => void;
+  searchMissingEpisodesAsync: () => Promise<void>;
+  isSearchingMissing: boolean;
+  searchMissingError: unknown;
+  unmonitorAllEpisodes: () => void;
+  unmonitorAllEpisodesAsync: () => Promise<void>;
+  isUnmonitoringAll: boolean;
+  unmonitorAllError: unknown;
   deleteSeries: (options?: {
     deleteFiles?: boolean;
     addImportListExclusion?: boolean;
@@ -115,6 +130,36 @@ export const useSonarrSeriesDetails = ({
     },
   });
 
+  const toggleSeasonMonitorMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "seasonMonitor",
+    ],
+    mutationFn: async ({
+      seasonNumber,
+      nextState,
+    }: {
+      seasonNumber: number;
+      nextState: boolean;
+    }) => {
+      const connector = resolveConnector();
+      await connector.setSeasonMonitored(seriesId, seasonNumber, nextState);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceId),
+        }),
+      ]);
+    },
+  });
+
   const triggerSearchMutation = useMutation({
     mutationKey: [
       ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
@@ -123,6 +168,41 @@ export const useSonarrSeriesDetails = ({
     mutationFn: async () => {
       const connector = resolveConnector();
       await connector.triggerSearch(seriesId);
+    },
+  });
+
+  const searchMissingEpisodesMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "searchMissing",
+    ],
+    mutationFn: async () => {
+      const connector = resolveConnector();
+      await connector.searchMissingEpisodes(seriesId);
+    },
+  });
+
+  const unmonitorAllEpisodesMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "unmonitorAll",
+    ],
+    mutationFn: async () => {
+      const connector = resolveConnector();
+      await connector.unmonitorAllEpisodes(seriesId);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceId),
+        }),
+      ]);
     },
   });
 
@@ -167,10 +247,24 @@ export const useSonarrSeriesDetails = ({
     toggleMonitorAsync: toggleMonitorMutation.mutateAsync,
     isTogglingMonitor: toggleMonitorMutation.isPending,
     toggleMonitorError: toggleMonitorMutation.error,
+    toggleSeasonMonitor: (seasonNumber: number, nextState: boolean) =>
+      toggleSeasonMonitorMutation.mutate({ seasonNumber, nextState }),
+    toggleSeasonMonitorAsync: (seasonNumber: number, nextState: boolean) =>
+      toggleSeasonMonitorMutation.mutateAsync({ seasonNumber, nextState }),
+    isTogglingSeasonMonitor: toggleSeasonMonitorMutation.isPending,
+    toggleSeasonMonitorError: toggleSeasonMonitorMutation.error,
     triggerSearch: triggerSearchMutation.mutate,
     triggerSearchAsync: triggerSearchMutation.mutateAsync,
     isTriggeringSearch: triggerSearchMutation.isPending,
     triggerSearchError: triggerSearchMutation.error,
+    searchMissingEpisodes: searchMissingEpisodesMutation.mutate,
+    searchMissingEpisodesAsync: searchMissingEpisodesMutation.mutateAsync,
+    isSearchingMissing: searchMissingEpisodesMutation.isPending,
+    searchMissingError: searchMissingEpisodesMutation.error,
+    unmonitorAllEpisodes: unmonitorAllEpisodesMutation.mutate,
+    unmonitorAllEpisodesAsync: unmonitorAllEpisodesMutation.mutateAsync,
+    isUnmonitoringAll: unmonitorAllEpisodesMutation.isPending,
+    unmonitorAllError: unmonitorAllEpisodesMutation.error,
     deleteSeries: deleteSeriesMutation.mutate,
     deleteSeriesAsync: deleteSeriesMutation.mutateAsync,
     isDeleting: deleteSeriesMutation.isPending,

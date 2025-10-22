@@ -324,6 +324,306 @@ export const presetThemes: Record<string, ThemePreset> = {
       },
     },
   },
+  minimal: {
+    common: {
+      primary: "#445566",
+      secondary: "#1A1D21",
+      tertiary: "#E5E9F0",
+      error: "#D14343",
+    },
+    modes: {
+      light: {
+        background: "#F4F6F8",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E4E8EE",
+      },
+      dark: {
+        background: "#0F1115",
+        surface: "#161A20",
+        surfaceVariant: "#1F2630",
+      },
+    },
+  },
+  midnightDune: {
+    common: {
+      primary: "#CF8A3F",
+      secondary: "#101014",
+      tertiary: "#F5E2C8",
+      error: "#E05A33",
+    },
+    modes: {
+      light: {
+        background: "#FFF7ED",
+        surface: "#FFFFFF",
+        surfaceVariant: "#F0E1CF",
+      },
+      dark: {
+        background: "#140E07",
+        surface: "#1C140B",
+        surfaceVariant: "#2A1F13",
+      },
+    },
+  },
+  neonArcade: {
+    common: {
+      primary: "#FF5EE3",
+      secondary: "#131424",
+      tertiary: "#70F8FF",
+      error: "#FF3366",
+    },
+    modes: {
+      light: {
+        background: "#F5F7FF",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E3E7FF",
+      },
+      dark: {
+        background: "#050511",
+        surface: "#11112A",
+        surfaceVariant: "#1E1E3D",
+      },
+    },
+  },
+  calmSlate: {
+    common: {
+      primary: "#4A6FA5",
+      secondary: "#243042",
+      tertiary: "#AFC3DC",
+      error: "#E05858",
+    },
+    modes: {
+      light: {
+        background: "#F3F6FB",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E1E7F1",
+      },
+      dark: {
+        background: "#10151D",
+        surface: "#171E28",
+        surfaceVariant: "#212B39",
+      },
+    },
+  },
+  sunrise: {
+    common: {
+      primary: "#F76C5E",
+      secondary: "#2E2A40",
+      tertiary: "#F9C784",
+      error: "#D9384A",
+    },
+    modes: {
+      light: {
+        background: "#FFF6F0",
+        surface: "#FFFFFF",
+        surfaceVariant: "#F4DED4",
+      },
+      dark: {
+        background: "#1B1220",
+        surface: "#241827",
+        surfaceVariant: "#302237",
+      },
+    },
+  },
+  twilight: {
+    common: {
+      primary: "#7A4FFF",
+      secondary: "#151528",
+      tertiary: "#D2B7FF",
+      error: "#FF5A7C",
+    },
+    modes: {
+      light: {
+        background: "#F6F4FF",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E7E1FF",
+      },
+      dark: {
+        background: "#0C0B1A",
+        surface: "#17142A",
+        surfaceVariant: "#221E3A",
+      },
+    },
+  },
+  aurora: {
+    common: {
+      primary: "#3AB795",
+      secondary: "#0F2027",
+      tertiary: "#81E3D7",
+      error: "#FF6F59",
+    },
+    modes: {
+      light: {
+        background: "#F4FFFB",
+        surface: "#FFFFFF",
+        surfaceVariant: "#DDF5EE",
+      },
+      dark: {
+        background: "#071815",
+        surface: "#0E241F",
+        surfaceVariant: "#163530",
+      },
+    },
+  },
+  desertBloom: {
+    common: {
+      primary: "#D35D32",
+      secondary: "#3B291D",
+      tertiary: "#F2D9B1",
+      error: "#C44536",
+    },
+    modes: {
+      light: {
+        background: "#FFF3E6",
+        surface: "#FFFFFF",
+        surfaceVariant: "#F2DEC8",
+      },
+      dark: {
+        background: "#1B0E06",
+        surface: "#25150B",
+        surfaceVariant: "#322011",
+      },
+    },
+  },
+  arctic: {
+    common: {
+      primary: "#2E9CCA",
+      secondary: "#1B263B",
+      tertiary: "#9AD4F1",
+      error: "#FF4F5E",
+    },
+    modes: {
+      light: {
+        background: "#F1F8FD",
+        surface: "#FFFFFF",
+        surfaceVariant: "#DDEBF6",
+      },
+      dark: {
+        background: "#0A111E",
+        surface: "#121C2E",
+        surfaceVariant: "#1C2940",
+      },
+    },
+  },
+  retroWave: {
+    common: {
+      primary: "#FF77E9",
+      secondary: "#060C27",
+      tertiary: "#7DF9FF",
+      error: "#FF4060",
+    },
+    modes: {
+      light: {
+        background: "#F4F5FF",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E5E7FF",
+      },
+      dark: {
+        background: "#05051A",
+        surface: "#111133",
+        surfaceVariant: "#1D1D45",
+      },
+    },
+  },
+  focus: {
+    common: {
+      primary: "#4674FF",
+      secondary: "#131923",
+      tertiary: "#9DB2FF",
+      error: "#F1574A",
+    },
+    modes: {
+      light: {
+        background: "#F3F6FF",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E1E6F8",
+      },
+      dark: {
+        background: "#090E18",
+        surface: "#121A28",
+        surfaceVariant: "#1C2434",
+      },
+    },
+  },
+  noirContrast: {
+    common: {
+      primary: "#FFFFFF",
+      secondary: "#000000",
+      tertiary: "#9A9A9A",
+      error: "#FF4A4A",
+    },
+    modes: {
+      light: {
+        background: "#FFFFFF",
+        surface: "#F5F5F5",
+        surfaceVariant: "#E0E0E0",
+      },
+      dark: {
+        background: "#000000",
+        surface: "#0F0F0F",
+        surfaceVariant: "#1C1C1C",
+      },
+    },
+  },
+  warmPaper: {
+    common: {
+      primary: "#C27A32",
+      secondary: "#2F2415",
+      tertiary: "#F2E5D5",
+      error: "#D1495B",
+    },
+    modes: {
+      light: {
+        background: "#FFF9F2",
+        surface: "#FFFFFF",
+        surfaceVariant: "#F0E4D5",
+      },
+      dark: {
+        background: "#150C04",
+        surface: "#1D1309",
+        surfaceVariant: "#291C11",
+      },
+    },
+  },
+  terminal: {
+    common: {
+      primary: "#00FF88",
+      secondary: "#0A0F0C",
+      tertiary: "#65FFA6",
+      error: "#FF5C57",
+    },
+    modes: {
+      light: {
+        background: "#F4FFF8",
+        surface: "#FFFFFF",
+        surfaceVariant: "#DDF7E7",
+      },
+      dark: {
+        background: "#020905",
+        surface: "#07140A",
+        surfaceVariant: "#112015",
+      },
+    },
+  },
+  pastel: {
+    common: {
+      primary: "#FF9EB5",
+      secondary: "#3F4A5A",
+      tertiary: "#B6E2FF",
+      error: "#FF6F91",
+    },
+    modes: {
+      light: {
+        background: "#FFF5F8",
+        surface: "#FFFFFF",
+        surfaceVariant: "#F1E3F0",
+      },
+      dark: {
+        background: "#161822",
+        surface: "#1F2230",
+        surfaceVariant: "#2B2F40",
+      },
+    },
+  },
 };
 
 const FALLBACK_PRIMARY = "#8B6914";

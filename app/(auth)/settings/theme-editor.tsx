@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
@@ -22,9 +22,11 @@ import { router } from "expo-router";
 
 import { useThemeEditor } from "@/hooks/useThemeEditor";
 import { ColorPicker } from "@/components/common/ColorPicker";
+import type { AppTheme } from "@/constants/theme";
 import { DensityMode } from "@/theme/spacing";
 import { FontScale } from "@/theme/typography";
 import { presetThemes } from "@/theme/colors";
+import { borderRadius } from "@/constants/sizes";
 
 const PRESET_NAMES = {
   uniarr: "UniArr",
@@ -41,10 +43,25 @@ const PRESET_NAMES = {
   tracker: "Tracker",
   cobalt: "Cobalt",
   modern: "Modern",
+  minimal: "Minimal",
+  midnightDune: "Midnight Dune",
+  neonArcade: "Neon Arcade",
+  calmSlate: "Calm Slate",
+  sunrise: "Sunrise",
+  twilight: "Twilight",
+  aurora: "Aurora",
+  desertBloom: "Desert Bloom",
+  arctic: "Arctic",
+  retroWave: "Retro Wave",
+  focus: "Focus",
+  noirContrast: "Noir Contrast",
+  warmPaper: "Warm Paper",
+  terminal: "Terminal",
+  pastel: "Pastel",
 };
 
 export default function ThemeEditorScreen() {
-  const theme = useTheme();
+  const theme = useTheme<AppTheme>();
   const {
     config,
     updateConfig,
@@ -66,6 +83,12 @@ export default function ThemeEditorScreen() {
 
   const handleDensityChange = (densityMode: DensityMode) => {
     updateConfig({ densityMode });
+  };
+
+  const handleGlobalBorderRadiusChange = (
+    radius: keyof typeof borderRadius,
+  ) => {
+    updateConfig({ globalBorderRadius: radius });
   };
 
   const handleColorChange = (colorKey: string, value: string) => {
@@ -103,6 +126,90 @@ export default function ThemeEditorScreen() {
   };
 
   const insets = useSafeAreaInsets();
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+        },
+        safeArea: {
+          flex: 1,
+        },
+        scrollContent: {
+          paddingBottom: 16,
+        },
+        centered: {
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        loadingText: {
+          marginTop: 16,
+          textAlign: "center",
+        },
+        section: {
+          margin: theme.custom.spacing.md,
+          marginBottom: theme.custom.spacing.xs,
+        },
+        presetGrid: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 8,
+        },
+        presetChip: {
+          margin: theme.custom.spacing.xs,
+        },
+        colorPreview: {
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          borderWidth: 1,
+        },
+        numberInput: {
+          width: 60,
+          textAlign: "center",
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingVertical: 6,
+        },
+        previewContainer: {
+          padding: theme.custom.spacing.md,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
+          borderWidth: 1,
+        },
+        previewCard: {
+          padding: theme.custom.spacing.md,
+          shadowColor: "#000",
+          shadowOffset: {
+            width: 0,
+            height: 2,
+          },
+          shadowOpacity: 0.25,
+          shadowRadius: 3.84,
+          elevation: 5,
+        },
+        actions: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          padding: theme.custom.spacing.md,
+          paddingTop: theme.custom.spacing.xs,
+          borderTopWidth: 1,
+        },
+        footer: {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 20,
+          elevation: 8,
+        },
+        actionButton: {
+          flex: 1,
+          marginHorizontal: theme.custom.spacing.xs,
+        },
+      }),
+    [theme],
+  );
 
   if (isLoading) {
     return (
@@ -247,6 +354,37 @@ export default function ThemeEditorScreen() {
                 { value: "spacious", label: "Spacious" },
               ]}
             />
+          </Card.Content>
+        </Card>
+
+        <Card style={styles.section}>
+          <Card.Title title="Border Radius" />
+          <Card.Content>
+            <SegmentedButtons
+              value={config.globalBorderRadius || "md"}
+              onValueChange={handleGlobalBorderRadiusChange}
+              buttons={[
+                { value: "none", label: "None" },
+                { value: "xs", label: "XS" },
+                { value: "sm", label: "SM" },
+                { value: "md", label: "MD" },
+                { value: "lg", label: "LG" },
+                { value: "xl", label: "XL" },
+                { value: "xxl", label: "XXL" },
+                { value: "xxxl", label: "XXXL" },
+                { value: "round", label: "Round" },
+              ]}
+              style={{ marginTop: theme.custom.spacing.sm }}
+            />
+            <Text
+              variant="bodySmall"
+              style={{
+                marginTop: theme.custom.spacing.sm,
+                color: theme.colors.onSurfaceVariant,
+              }}
+            >
+              Current: {borderRadius[config.globalBorderRadius || "md"]}px
+            </Text>
           </Card.Content>
         </Card>
 
@@ -450,83 +588,3 @@ export default function ThemeEditorScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 16,
-  },
-  centered: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 16,
-    textAlign: "center",
-  },
-  section: {
-    margin: 16,
-    marginBottom: 8,
-  },
-  presetGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  presetChip: {
-    margin: 4,
-  },
-  colorPreview: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  numberInput: {
-    width: 60,
-    textAlign: "center",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 6,
-  },
-  previewContainer: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  previewCard: {
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    paddingTop: 8,
-    borderTopWidth: 1,
-  },
-  footer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 20,
-    elevation: 8,
-  },
-  actionButton: {
-    flex: 1,
-    marginHorizontal: 8,
-  },
-});

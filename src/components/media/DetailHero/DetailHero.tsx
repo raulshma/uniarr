@@ -27,6 +27,9 @@ import { imageCacheService } from "@/services/image/ImageCacheService";
 import { useThumbhash } from "@/hooks/useThumbhash";
 import { spacing } from "@/theme/spacing";
 import type { AppTheme } from "@/constants/theme";
+import { posterSizes, controlSizes } from "@/constants/sizes";
+import { getComponentElevation } from "@/constants/elevation";
+import { createFlexLayout } from "@/utils/style.utils";
 
 export type DetailHeroProps = {
   posterUri?: string;
@@ -48,9 +51,9 @@ const AnimatedScrollView = Animated.createAnimatedComponent(
 const DetailHero: React.FC<DetailHeroProps> = ({
   posterUri,
   backdropUri,
-  posterSize = 160,
-  heroHeight = 320,
-  actionBarHeight = 48,
+  posterSize = posterSizes.xl, // 160 -> centralized
+  heroHeight = spacing.xxxxl * 4, // 320 -> centralized (80 * 4)
+  actionBarHeight = controlSizes.switch.height, // 48 -> centralized
   onBack,
   onShare,
   onMal,
@@ -206,6 +209,9 @@ const DetailHero: React.FC<DetailHeroProps> = ({
     };
   }, [heroUri, heroHeight]);
 
+  // Create styles with theme access
+  const styles = createStyles(theme, heroHeight, posterSize, actionBarHeight);
+
   return (
     <View style={styles.scaffold}>
       <Animated.View style={[styles.heroArea, heroAnimatedStyle]}>
@@ -253,7 +259,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
             accessibilityLabel="Go back"
             onPress={handleBack}
           />
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={createFlexLayout("row", "sm", { align: "center" })}>
             {isFetching ? (
               <Text
                 variant="labelMedium"
@@ -288,7 +294,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
 
       <AnimatedScrollView
         contentContainerStyle={{
-          paddingBottom: 32,
+          paddingBottom: spacing.xl, // 32 -> xl
           paddingTop: heroHeight * 0.5,
         }}
         onScroll={onScroll}
@@ -302,43 +308,47 @@ const DetailHero: React.FC<DetailHeroProps> = ({
 
 export default DetailHero;
 
-const styles = StyleSheet.create({
-  scaffold: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
-  heroArea: {
-    height: 320,
-    position: "relative",
-    overflow: "hidden",
-  },
-  heroImage: {
-    ...RNStyleSheet.absoluteFillObject,
-    width: "100%",
-    height: "100%",
-  },
-  heroGradient: {
-    ...RNStyleSheet.absoluteFillObject,
-  },
-  heroActions: {
-    position: "absolute",
-    left: spacing.md,
-    right: spacing.md,
-    height: 48,
-    zIndex: 30,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  heroPoster: {
-    position: "absolute",
-    top: 320 - 160 * 0.75,
-    left: spacing.lg,
-    shadowColor: "#000",
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 12,
-    zIndex: 20,
-  },
-});
+// Create styles inside component to access theme
+const createStyles = (
+  theme: AppTheme,
+  heroHeight: number,
+  posterSize: number,
+  actionBarHeight: number,
+) =>
+  StyleSheet.create({
+    scaffold: {
+      flex: 1,
+      backgroundColor: "transparent",
+    },
+    heroArea: {
+      height: heroHeight,
+      position: "relative",
+      overflow: "hidden",
+    },
+    heroImage: {
+      ...RNStyleSheet.absoluteFillObject,
+      width: "100%",
+      height: "100%",
+    },
+    heroGradient: {
+      ...RNStyleSheet.absoluteFillObject,
+    },
+    heroActions: {
+      position: "absolute",
+      left: spacing.md,
+      right: spacing.md,
+      height: actionBarHeight,
+      zIndex: 30,
+      ...createFlexLayout("row", "md", {
+        justify: "space-between",
+        align: "center",
+      }),
+    },
+    heroPoster: {
+      position: "absolute",
+      top: heroHeight - posterSize * 0.75,
+      left: spacing.lg,
+      zIndex: 20,
+      ...getComponentElevation("poster", theme),
+    },
+  });

@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { Alert } from "react-native";
+import { validateDateString } from "./calendar.utils";
 
 /**
  * Navigation utilities for consistent routing patterns across the app
@@ -156,6 +157,7 @@ export const NAVIGATION_ROUTES = {
 
   // Calendar
   CALENDAR: "/(auth)/calendar",
+  CALENDAR_WITH_DATE: (date: string) => `/(auth)/calendar?date=${date}`,
 
   // Anime
   ANIME_HUB: "/(auth)/anime-hub",
@@ -221,6 +223,30 @@ export const ROUTE_VALIDATORS = {
     return params;
   },
 } as const;
+
+/**
+ * Calendar navigation utilities
+ */
+export const createCalendarNavigation = () => ({
+  navigateToCalendar: (router: ReturnType<typeof useRouter>, date?: string) => {
+    if (date && validateDateString(date)) {
+      navigateToRoute(router, NAVIGATION_ROUTES.CALENDAR_WITH_DATE(date), {
+        date,
+      });
+    } else {
+      navigateToRoute(router, NAVIGATION_ROUTES.CALENDAR);
+    }
+  },
+
+  navigateToToday: (router: ReturnType<typeof useRouter>) => {
+    const today = new Date().toISOString().split("T")[0];
+    if (today) {
+      navigateToRoute(router, NAVIGATION_ROUTES.CALENDAR_WITH_DATE(today), {
+        date: today,
+      });
+    }
+  },
+});
 
 /**
  * Navigation hooks for common patterns

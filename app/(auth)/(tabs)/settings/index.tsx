@@ -36,6 +36,7 @@ import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { NotificationCategory } from "@/models/notification.types";
 import { getCategoryFriendlyName } from "@/utils/quietHours.utils";
+import { borderRadius } from "@/constants/sizes";
 // Backup & restore moved to its own settings screen
 
 // Helper function to format bytes
@@ -142,14 +143,14 @@ const SettingsScreen = () => {
       marginTop: spacing.xs,
     },
     themeChip: {
-      borderRadius: 12,
+      borderRadius: borderRadius.lg,
       height: 32,
     },
     settingCard: {
       backgroundColor: theme.colors.elevation.level1,
       marginHorizontal: spacing.xs,
       marginVertical: spacing.xs / 2,
-      borderRadius: 8,
+      borderRadius: borderRadius.xxl,
       padding: spacing.sm,
     },
     settingContent: {
@@ -159,7 +160,7 @@ const SettingsScreen = () => {
     settingIcon: {
       width: 36,
       height: 36,
-      borderRadius: 18,
+      borderRadius: borderRadius.xl,
       backgroundColor: theme.colors.surfaceVariant,
       alignItems: "center",
       justifyContent: "center",
@@ -203,7 +204,7 @@ const SettingsScreen = () => {
       backgroundColor: theme.colors.elevation.level1,
       marginHorizontal: spacing.xs,
       marginVertical: spacing.xs / 2,
-      borderRadius: 8,
+      borderRadius: borderRadius.md,
       padding: spacing.sm,
     },
     notificationItem: {
@@ -214,7 +215,7 @@ const SettingsScreen = () => {
     notificationIcon: {
       width: 24,
       height: 24,
-      borderRadius: 12,
+      borderRadius: borderRadius.lg,
       backgroundColor: theme.colors.surfaceVariant,
       alignItems: "center",
       justifyContent: "center",

@@ -38,6 +38,7 @@ import type {
   JellyfinLibraryView,
   JellyfinResumeItem,
   JellyfinSession,
+  JellyfinSessionPlayState,
 } from "@/models/jellyfin.types";
 import { spacing } from "@/theme/spacing";
 
@@ -390,9 +391,9 @@ const JellyfinLibraryScreen = () => {
         queryKey: serviceId
           ? [
               ...queryKeys.jellyfin.resume(serviceId, { limit: 12 }),
-              "consolidated", // Add unique suffix to prevent duplicates
+              "consolidated",
             ]
-          : queryKeys.jellyfin.base,
+          : [...queryKeys.jellyfin.base, "resume"],
         enabled: Boolean(serviceId),
         staleTime: 60_000, // 1 minute - resume data changes frequently
         refetchOnWindowFocus: false,
@@ -409,12 +410,15 @@ const JellyfinLibraryScreen = () => {
       {
         queryKey:
           serviceId && libraryState.selectedLibraryId
-            ? queryKeys.jellyfin.latest(
-                serviceId,
-                libraryState.selectedLibraryId,
-                { limit: 16 },
-              )
-            : queryKeys.jellyfin.base,
+            ? [
+                ...queryKeys.jellyfin.latest(
+                  serviceId,
+                  libraryState.selectedLibraryId,
+                  { limit: 16 },
+                ),
+                "consolidated",
+              ]
+            : [...queryKeys.jellyfin.base, "latest"],
         enabled: Boolean(serviceId && libraryState.selectedLibraryId),
         staleTime: 5 * 60_000, // 5 minutes - latest items are relatively stable
         refetchOnWindowFocus: false,
@@ -431,19 +435,22 @@ const JellyfinLibraryScreen = () => {
       {
         queryKey:
           serviceId && libraryState.selectedLibraryId
-            ? queryKeys.jellyfin.libraryItems(
-                serviceId,
-                libraryState.selectedLibraryId,
-                {
-                  search: libraryState.debouncedSearch.toLowerCase(),
-                  includeItemTypes: activeSegmentConfig.includeItemTypes,
-                  mediaTypes: activeSegmentConfig.mediaTypes,
-                  sortBy: "SortName",
-                  sortOrder: "Ascending",
-                  limit: 60,
-                },
-              )
-            : queryKeys.jellyfin.base,
+            ? [
+                ...queryKeys.jellyfin.libraryItems(
+                  serviceId,
+                  libraryState.selectedLibraryId,
+                  {
+                    search: libraryState.debouncedSearch.toLowerCase(),
+                    includeItemTypes: activeSegmentConfig.includeItemTypes,
+                    mediaTypes: activeSegmentConfig.mediaTypes,
+                    sortBy: "SortName",
+                    sortOrder: "Ascending",
+                    limit: 30,
+                  },
+                ),
+                "consolidated",
+              ]
+            : [...queryKeys.jellyfin.base, "libraryItems"],
         enabled: Boolean(serviceId && libraryState.selectedLibraryId),
         staleTime: 30_000,
         placeholderData: (previous?: JellyfinItem[] | undefined) =>
@@ -467,7 +474,7 @@ const JellyfinLibraryScreen = () => {
             mediaTypes: activeSegmentConfig.mediaTypes,
             sortBy: "SortName",
             sortOrder: "Ascending" as const,
-            limit: 60,
+            limit: 30,
           };
 
           try {
@@ -486,7 +493,7 @@ const JellyfinLibraryScreen = () => {
                 {
                   sortBy: "SortName",
                   sortOrder: "Ascending" as const,
-                  limit: 60,
+                  limit: 30,
                 },
               );
             }
@@ -611,7 +618,10 @@ const JellyfinLibraryScreen = () => {
     return result;
   }, [items, libraryState.activeSegment]);
 
-  // Optimized series metadata fetching - batch fetch with better caching
+  // Optimized series metadata fetching - batch fetch with better caching and concurrency limiting
+  // Limit to 20 items to avoid overwhelming the network with too many concurrent requests
+  const MAX_SERIES_METADATA_BATCH = 20;
+
   const seriesIds = useMemo(() => {
     if (libraryState.activeSegment !== "tv") return [];
 
@@ -621,7 +631,10 @@ const JellyfinLibraryScreen = () => {
       const navId = getInternalStringField(it, "__navigationId") || it.Id;
       if (navId) ids.add(navId);
     }
-    return Array.from(ids);
+
+    // Limit to the first N items to avoid network overload
+    // This prevents hundreds of concurrent requests when user first loads a large TV library
+    return Array.from(ids).slice(0, MAX_SERIES_METADATA_BATCH);
   }, [displayItems, libraryState.activeSegment]);
 
   // Batch fetch series metadata with optimized caching and error handling
@@ -629,7 +642,7 @@ const JellyfinLibraryScreen = () => {
     queries: seriesIds.map((seriesId) => ({
       queryKey: queryKeys.jellyfin.item(serviceId ?? "unknown", seriesId),
       enabled: Boolean(serviceId && seriesId),
-      staleTime: 2 * 60 * 60_000, // 2 hours - series metadata is stable
+      staleTime: 24 * 60 * 60_000, // 24 hours - series metadata is very stable
       refetchOnWindowFocus: false,
       retry: 1, // Only retry once to avoid long loading times
       queryFn: async () => {
@@ -771,6 +784,43 @@ const JellyfinLibraryScreen = () => {
     [router, serviceId],
   );
 
+  const openPlayer = useCallback(
+    (itemId: string, resumeTicks?: number | null) => {
+      if (!serviceId || !itemId) {
+        return;
+      }
+
+      const params: Record<string, string> = {
+        serviceId,
+        itemId,
+      };
+
+      if (typeof resumeTicks === "number" && resumeTicks > 0) {
+        params.startTicks = String(Math.floor(resumeTicks));
+      }
+
+      router.push({
+        pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+        params,
+      });
+    },
+    [router, serviceId],
+  );
+
+  const handlePlayItem = useCallback(
+    (item: JellyfinItem, resumeTicks?: number | null) => {
+      if (!item?.Id) {
+        return;
+      }
+
+      const ticksCandidate =
+        resumeTicks ?? item.UserData?.PlaybackPositionTicks ?? null;
+
+      openPlayer(item.Id, ticksCandidate);
+    },
+    [openPlayer],
+  );
+
   const handleRefresh = useCallback(async () => {
     // Refresh all queries in parallel for better performance
     await Promise.all([
@@ -816,7 +866,7 @@ const JellyfinLibraryScreen = () => {
 
   // Optimized render functions with stable dependencies
   const renderNowPlayingItem = useCallback(
-    ({ item }: { item: JellyfinSession; index: number }) => {
+    ({ item, index }: { item: JellyfinSession; index: number }) => {
       const playing = item.NowPlayingItem;
       if (!playing) return null;
 
@@ -832,7 +882,12 @@ const JellyfinLibraryScreen = () => {
           ]}
           onPress={() => handleOpenItem(playing.Id)}
         >
-          <MediaPoster uri={posterUri} size={72} borderRadius={10} />
+          <MediaPoster
+            key={`now-playing-${item.Id || playing.Id || "unknown"}-${index}`}
+            uri={posterUri}
+            size={72}
+            borderRadius={10}
+          />
           <View style={styles.nowPlayingMeta}>
             <Text
               variant="bodyMedium"
@@ -850,6 +905,17 @@ const JellyfinLibraryScreen = () => {
             </Text>
           </View>
           <IconButton
+            icon="play-circle"
+            accessibilityLabel="Play locally"
+            onPress={() =>
+              handlePlayItem(
+                playing as JellyfinItem,
+                (item.PlayState as JellyfinSessionPlayState | undefined)
+                  ?.PositionTicks ?? null,
+              )
+            }
+          />
+          <IconButton
             icon="dots-vertical"
             accessibilityLabel="Session actions"
             onPress={() => void handleOpenNowPlaying()}
@@ -861,6 +927,7 @@ const JellyfinLibraryScreen = () => {
       connector,
       handleOpenItem,
       handleOpenNowPlaying,
+      handlePlayItem,
       styles.cardPressed,
       styles.nowPlayingRow,
       styles.nowPlayingMeta,
@@ -870,7 +937,7 @@ const JellyfinLibraryScreen = () => {
   );
 
   const renderResumeItem = useCallback(
-    ({ item }: { item: JellyfinResumeItem; index: number }) => {
+    ({ item, index }: { item: JellyfinResumeItem; index: number }) => {
       const title = item.SeriesName ?? item.Name ?? "Untitled";
       const posterUri = buildPosterUri(connector, item, 420);
 
@@ -905,14 +972,24 @@ const JellyfinLibraryScreen = () => {
           >
             <View style={styles.resumePosterContainer}>
               <MediaPoster
+                key={`resume-poster-${item.Id || item.Name || "unknown"}-${index}`}
                 uri={posterUri}
                 size={posterSize - 8}
                 borderRadius={12}
                 accessibilityLabel={`Continue watching ${title}`}
               />
-              <View style={styles.playOverlay} pointerEvents="none">
+              <Pressable
+                style={styles.playOverlay}
+                hitSlop={10}
+                onPress={() =>
+                  handlePlayItem(
+                    item as JellyfinItem,
+                    item.UserData?.PlaybackPositionTicks ?? null,
+                  )
+                }
+              >
                 <Icon source="play" size={28} color={theme.colors.onPrimary} />
-              </View>
+              </Pressable>
               {typeof progress === "number" ? (
                 <View style={styles.resumePosterProgressRail}>
                   <View
@@ -951,6 +1028,7 @@ const JellyfinLibraryScreen = () => {
     [
       connector,
       handleOpenItem,
+      handlePlayItem,
       serviceId,
       windowWidth,
       theme,
@@ -981,6 +1059,11 @@ const JellyfinLibraryScreen = () => {
       const subtitle = deriveSubtitle(item, libraryState.activeSegment);
       const positionStyle =
         index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight;
+      const isPlayable =
+        item.Type === "Movie" ||
+        item.Type === "Episode" ||
+        item.Type === "Video" ||
+        item.MediaType === "Video";
 
       // Optimized column sizing with pre-computed values
       const contentHorizontalPadding = spacing.lg * 2;
@@ -1007,10 +1090,33 @@ const JellyfinLibraryScreen = () => {
           >
             <View style={styles.posterFrame}>
               <MediaPoster
+                key={`poster-${item.Id || item.Name || "unknown"}-${index}`}
                 uri={posterUri}
                 size={posterSize}
                 borderRadius={12}
               />
+              {isPlayable ? (
+                <Pressable
+                  style={styles.gridPlayOverlay}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Play ${item.Name ?? "item"}`}
+                  onPress={(event) => {
+                    event.stopPropagation?.();
+                    handlePlayItem(
+                      item,
+                      item.UserData?.PlaybackPositionTicks ?? null,
+                    );
+                  }}
+                >
+                  <View style={styles.gridPlayButton}>
+                    <Icon
+                      source="play"
+                      size={20}
+                      color={theme.colors.onPrimary}
+                    />
+                  </View>
+                </Pressable>
+              ) : null}
               {/* Download button overlay on poster */}
               {connector && serviceId && item.Id && (
                 <View style={styles.downloadOverlay}>
@@ -1048,6 +1154,7 @@ const JellyfinLibraryScreen = () => {
     [
       libraryState.activeSegment,
       connector,
+      handlePlayItem,
       handleOpenItem,
       serviceId,
       windowWidth,
@@ -1057,8 +1164,11 @@ const JellyfinLibraryScreen = () => {
       styles.gridCardRight,
       styles.posterFrame,
       styles.downloadOverlay,
+      styles.gridPlayOverlay,
+      styles.gridPlayButton,
       styles.gridTitle,
       styles.gridSubtitle,
+      theme.colors.onPrimary,
     ],
   );
 
@@ -1138,7 +1248,11 @@ const JellyfinLibraryScreen = () => {
 
             <FlashList
               data={continueWatchingItems}
-              keyExtractor={(item) => item.Id ?? item.Name ?? ""}
+              keyExtractor={(item, index) => {
+                // Create a unique key using item Id and index to prevent virtualized list recycling issues
+                const baseKey = item.Id || item.Name || "unknown";
+                return `${baseKey}-${index}`;
+              }}
               renderItem={renderResumeItem}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1312,7 +1426,11 @@ const JellyfinLibraryScreen = () => {
       >
         <FlashList
           data={displayItemsEnriched}
-          keyExtractor={(item) => item.Id ?? item.Name ?? ""}
+          keyExtractor={(item, index) => {
+            // Create a unique key using item Id and index to prevent virtualized list recycling issues
+            const baseKey = item.Id || item.Name || "unknown";
+            return `${baseKey}-${index}`;
+          }}
           renderItem={renderLibraryItem}
           numColumns={2}
           contentContainerStyle={styles.listContent}
@@ -1634,6 +1752,22 @@ const createStyles = (theme: AppTheme) =>
       padding: 0,
       borderRadius: 12,
       alignItems: "center",
+    },
+    gridPlayOverlay: {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: [{ translateX: -18 }, { translateY: -18 }],
+      zIndex: 2,
+    },
+    gridPlayButton: {
+      backgroundColor: "rgba(0, 0, 0, 0.65)",
+      borderRadius: 20,
+      padding: spacing.xs,
+      alignItems: "center",
+      justifyContent: "center",
+      width: 36,
+      height: 36,
     },
     downloadOverlay: {
       position: "absolute",

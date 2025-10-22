@@ -9,6 +9,7 @@ import { isDownloadConnector } from "@/connectors/base/IDownloadConnector";
 import { ConnectorFactory } from "@/connectors/factory/ConnectorFactory";
 import { logger } from "@/services/logger/LoggerService";
 import { secureStorage } from "@/services/storage/SecureStorage";
+import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
 
 interface AddConnectorOptions {
   persist?: boolean;
@@ -66,6 +67,7 @@ export class ConnectorManager {
     if (existing) {
       existing.dispose();
       this.connectors.delete(config.id);
+      ServiceAuthHelper.clearServiceSession(existing.config);
     }
 
     const connector = ConnectorFactory.create(config);
@@ -112,6 +114,7 @@ export class ConnectorManager {
       return;
     }
 
+    ServiceAuthHelper.clearServiceSession(connector.config);
     connector.dispose();
     this.connectors.delete(id);
     this.updateStore?.(this.connectors);
@@ -242,6 +245,7 @@ export class ConnectorManager {
   /** Dispose all managed connectors and clear internal state. */
   dispose(): void {
     for (const connector of this.connectors.values()) {
+      ServiceAuthHelper.clearServiceSession(connector.config);
       connector.dispose();
     }
     this.connectors.clear();

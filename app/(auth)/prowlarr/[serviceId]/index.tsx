@@ -494,11 +494,11 @@ const ProwlarrIndexerListScreen = () => {
         <EmptyState
           icon="radar"
           title="No Indexers Found"
-          description="Add your first indexer to start managing your torrent indexers."
-          actionLabel="Add Indexer"
+          description="Configure your Prowlarr indexers to start managing your torrent sources."
+          actionLabel="Manage Indexers"
           onActionPress={() => {
-            // TODO: Navigate to add indexer screen
-            alert("Add Indexer", "Add indexer functionality coming soon");
+            // Navigate to statistics page where indexer management is available
+            router.push(`/(auth)/prowlarr/${serviceId}/statistics`);
           }}
         />
       </SafeAreaView>

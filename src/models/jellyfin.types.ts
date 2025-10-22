@@ -19,6 +19,12 @@ export type JellyfinMediaStream = components["schemas"]["MediaStream"];
 
 export type JellyfinMediaSource = components["schemas"]["MediaSourceInfo"];
 
+export type JellyfinPlaybackInfoResponse =
+  components["schemas"]["PlaybackInfoResponse"];
+
+export type JellyfinPlaybackStopInfo =
+  components["schemas"]["PlaybackStopInfo"];
+
 type _JellyfinLibraryViewResponse = NonNullable<
   paths["/UserViews"]["get"]["responses"][200]["content"]["application/json"]
 >;

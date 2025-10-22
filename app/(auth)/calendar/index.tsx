@@ -16,15 +16,19 @@ import {
   isYesterday,
   parseISO,
 } from "date-fns";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import BottomDrawer from "@/components/common/BottomDrawer";
 import { TabHeader } from "@/components/common/TabHeader";
-import { MediaReleaseCard } from "@/components/calendar";
+import {
+  MediaReleaseCard,
+  EnhancedCalendarHeader,
+} from "@/components/calendar";
 import { useCalendar } from "@/hooks/useCalendar";
+import { validateDateString } from "@/utils/calendar.utils";
 import type { AppTheme } from "@/constants/theme";
 import type {
   CalendarDay,
@@ -56,6 +60,7 @@ const cloneFilters = (filters: CalendarFilters): CalendarFilters => ({
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
+  const localSearchParams = useLocalSearchParams<{ date?: string }>();
   const {
     state,
     calendarData,
@@ -66,7 +71,19 @@ const CalendarScreen = () => {
     setFilters,
     clearFilters,
     goToToday,
+    goToDate,
   } = useCalendar();
+
+  // Handle date parameter from URL (e.g., from widget navigation)
+  useEffect(() => {
+    if (localSearchParams.date) {
+      const urlDate = localSearchParams.date;
+      // Validate the date format
+      if (validateDateString(urlDate)) {
+        goToDate(urlDate);
+      }
+    }
+  }, [localSearchParams.date, goToDate]);
 
   const VIEW_SEGMENTS: {
     label: string;
@@ -97,169 +114,173 @@ const CalendarScreen = () => {
     }
   }, [isFilterDrawerVisible, state.filters]);
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    headerContent: {
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingBottom: theme.custom.spacing.md,
-      gap: theme.custom.spacing.md,
-    },
-    segmentsRow: {
-      flexDirection: "row",
-      backgroundColor: theme.colors.surfaceVariant,
-      borderRadius: 28,
-      padding: 4,
-      gap: 4,
-      alignSelf: "center",
-      width: "90%",
-    },
-    segmentButton: {
-      flex: 1,
-      borderRadius: 24,
-      paddingVertical: theme.custom.spacing.sm,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    segmentActive: {
-      backgroundColor: theme.colors.primary,
-    },
-    segmentLabel: {
-      fontSize: theme.custom.typography.labelLarge.fontSize,
-      fontFamily: theme.custom.typography.labelLarge.fontFamily,
-      fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
-      color: theme.colors.onSurfaceVariant,
-      letterSpacing: theme.custom.typography.labelLarge.letterSpacing,
-    },
-    segmentLabelActive: {
-      color: theme.colors.onPrimary,
-    },
-    sectionHeader: {
-      paddingHorizontal: theme.custom.spacing.md,
-    },
-    headingText: {
-      fontSize: theme.custom.typography.headlineSmall.fontSize,
-      fontFamily: theme.custom.typography.headlineSmall.fontFamily,
-      fontWeight: theme.custom.typography.headlineSmall.fontWeight as any,
-      color: theme.colors.onBackground,
-      letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
-    },
-    subheadingText: {
-      marginTop: theme.custom.spacing.xs,
-      fontSize: theme.custom.typography.bodySmall.fontSize,
-      fontFamily: theme.custom.typography.bodySmall.fontFamily,
-      fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
-      color: theme.colors.onSurfaceVariant,
-      letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
-    },
-    filtersRow: {
-      paddingHorizontal: theme.custom.spacing.md,
-      marginTop: theme.custom.spacing.sm,
-    },
-    filtersButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      alignSelf: "flex-start",
-      gap: theme.custom.spacing.xs,
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingVertical: theme.custom.spacing.sm,
-      borderRadius: 999,
-      backgroundColor: theme.colors.surfaceVariant,
-    },
-    filtersButtonActive: {
-      backgroundColor: theme.colors.primary,
-    },
-    filtersButtonLabel: {
-      fontSize: theme.custom.typography.labelLarge.fontSize,
-      fontFamily: theme.custom.typography.labelLarge.fontFamily,
-      fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
-      color: theme.colors.onSurfaceVariant,
-    },
-    filtersButtonLabelActive: {
-      color: theme.colors.onPrimary,
-    },
-    listContent: {
-      padding: theme.custom.spacing.md,
-      paddingBottom: theme.custom.spacing.xl * 2,
-      gap: theme.custom.spacing.sm,
-    },
-    emptyWrapper: {
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingTop: theme.custom.spacing.lg,
-    },
-    drawerSection: {
-      marginBottom: theme.custom.spacing.lg,
-      gap: theme.custom.spacing.sm,
-    },
-    drawerSectionTitle: {
-      fontSize: theme.custom.typography.titleMedium.fontSize,
-      fontFamily: theme.custom.typography.titleMedium.fontFamily,
-      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
-      color: theme.colors.onSurface,
-      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-    },
-    pillGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: theme.custom.spacing.sm,
-    },
-    pill: {
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingVertical: theme.custom.spacing.sm,
-      borderRadius: 999,
-      backgroundColor: theme.colors.surfaceVariant,
-    },
-    pillActive: {
-      backgroundColor: theme.colors.primary,
-    },
-    pillLabel: {
-      fontSize: theme.custom.typography.labelLarge.fontSize,
-      fontFamily: theme.custom.typography.labelLarge.fontFamily,
-      fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
-      color: theme.colors.onSurfaceVariant,
-    },
-    pillLabelActive: {
-      color: theme.colors.onPrimary,
-    },
-    dateRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.custom.spacing.sm,
-    },
-    dateField: {
-      flex: 1,
-      borderRadius: 14,
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingVertical: theme.custom.spacing.md,
-      backgroundColor: theme.colors.surfaceVariant,
-      borderWidth: 1,
-      borderColor: "transparent",
-    },
-    dateFieldActive: {
-      borderColor: theme.colors.primary,
-    },
-    dateFieldLabel: {
-      fontSize: theme.custom.typography.labelSmall.fontSize,
-      fontFamily: theme.custom.typography.labelSmall.fontFamily,
-      fontWeight: theme.custom.typography.labelSmall.fontWeight as any,
-      color: theme.colors.onSurfaceVariant,
-      marginBottom: theme.custom.spacing.xs,
-    },
-    dateFieldValue: {
-      fontSize: theme.custom.typography.bodyLarge.fontSize,
-      fontFamily: theme.custom.typography.bodyLarge.fontFamily,
-      fontWeight: theme.custom.typography.bodyLarge.fontWeight as any,
-      color: theme.colors.onSurface,
-    },
-    drawerActions: {
-      gap: theme.custom.spacing.sm,
-    },
-    clearButton: {
-      alignSelf: "center",
-    },
-  });
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: theme.colors.background,
+        },
+        headerContent: {
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingBottom: theme.custom.spacing.lg,
+          gap: theme.custom.spacing.lg,
+        },
+        segmentsRow: {
+          flexDirection: "row",
+          backgroundColor: theme.colors.surfaceVariant,
+          borderRadius: 28,
+          padding: 4,
+          gap: 4,
+          alignSelf: "center",
+          width: "90%",
+        },
+        segmentButton: {
+          flex: 1,
+          borderRadius: 24,
+          paddingVertical: theme.custom.spacing.sm,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        segmentActive: {
+          backgroundColor: theme.colors.primary,
+        },
+        segmentLabel: {
+          fontSize: theme.custom.typography.labelLarge.fontSize,
+          fontFamily: theme.custom.typography.labelLarge.fontFamily,
+          fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
+          color: theme.colors.onSurfaceVariant,
+          letterSpacing: theme.custom.typography.labelLarge.letterSpacing,
+        },
+        segmentLabelActive: {
+          color: theme.colors.onPrimary,
+        },
+        sectionHeader: {
+          paddingHorizontal: theme.custom.spacing.lg,
+        },
+        headingText: {
+          fontSize: theme.custom.typography.headlineSmall.fontSize,
+          fontFamily: theme.custom.typography.headlineSmall.fontFamily,
+          fontWeight: theme.custom.typography.headlineSmall.fontWeight as any,
+          color: theme.colors.onBackground,
+          letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
+        },
+        subheadingText: {
+          marginTop: theme.custom.spacing.xs,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
+          fontFamily: theme.custom.typography.bodySmall.fontFamily,
+          fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
+          color: theme.colors.onSurfaceVariant,
+          letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
+        },
+        filtersRow: {
+          paddingHorizontal: theme.custom.spacing.lg,
+          marginTop: theme.custom.spacing.sm,
+        },
+        filtersButton: {
+          flexDirection: "row",
+          alignItems: "center",
+          alignSelf: "flex-start",
+          gap: theme.custom.spacing.xs,
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingVertical: theme.custom.spacing.sm,
+          borderRadius: 999,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        filtersButtonActive: {
+          backgroundColor: theme.colors.primary,
+        },
+        filtersButtonLabel: {
+          fontSize: theme.custom.typography.labelLarge.fontSize,
+          fontFamily: theme.custom.typography.labelLarge.fontFamily,
+          fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
+          color: theme.colors.onSurfaceVariant,
+        },
+        filtersButtonLabelActive: {
+          color: theme.colors.onPrimary,
+        },
+        listContent: {
+          padding: theme.custom.spacing.lg,
+          paddingBottom: theme.custom.spacing.xl * 2,
+          gap: theme.custom.spacing.sm,
+        },
+        emptyWrapper: {
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingTop: theme.custom.spacing.lg,
+        },
+        drawerSection: {
+          marginBottom: theme.custom.spacing.lg,
+          gap: theme.custom.spacing.sm,
+        },
+        drawerSectionTitle: {
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontFamily: theme.custom.typography.titleMedium.fontFamily,
+          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+          color: theme.colors.onSurface,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+        },
+        pillGrid: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: theme.custom.spacing.sm,
+        },
+        pill: {
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingVertical: theme.custom.spacing.sm,
+          borderRadius: 999,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        pillActive: {
+          backgroundColor: theme.colors.primary,
+        },
+        pillLabel: {
+          fontSize: theme.custom.typography.labelLarge.fontSize,
+          fontFamily: theme.custom.typography.labelLarge.fontFamily,
+          fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
+          color: theme.colors.onSurfaceVariant,
+        },
+        pillLabelActive: {
+          color: theme.colors.onPrimary,
+        },
+        dateRow: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: theme.custom.spacing.sm,
+        },
+        dateField: {
+          flex: 1,
+          borderRadius: 14,
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingVertical: theme.custom.spacing.lg,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderWidth: 1,
+          borderColor: "transparent",
+        },
+        dateFieldActive: {
+          borderColor: theme.colors.primary,
+        },
+        dateFieldLabel: {
+          fontSize: theme.custom.typography.labelSmall.fontSize,
+          fontFamily: theme.custom.typography.labelSmall.fontFamily,
+          fontWeight: theme.custom.typography.labelSmall.fontWeight as any,
+          color: theme.colors.onSurfaceVariant,
+          marginBottom: theme.custom.spacing.xs,
+        },
+        dateFieldValue: {
+          fontSize: theme.custom.typography.bodyLarge.fontSize,
+          fontFamily: theme.custom.typography.bodyLarge.fontFamily,
+          fontWeight: theme.custom.typography.bodyLarge.fontWeight as any,
+          color: theme.colors.onSurface,
+        },
+        drawerActions: {
+          gap: theme.custom.spacing.sm,
+        },
+        clearButton: {
+          alignSelf: "center",
+        },
+      }),
+    [theme],
+  );
 
   const handleReleasePress = useCallback(
     (releaseId: string) => {
@@ -689,6 +710,14 @@ const CalendarScreen = () => {
         }}
       />
 
+      <EnhancedCalendarHeader
+        navigation={navigation}
+        view={state.view}
+        currentDate={state.currentDate}
+        onViewChange={setView}
+        style={{ marginBottom: theme.custom.spacing.sm }}
+      />
+
       <View style={styles.headerContent}>
         <View style={styles.segmentsRow}>
           {VIEW_SEGMENTS.map((segment) => {
@@ -761,7 +790,7 @@ const CalendarScreen = () => {
       >
         <View
           style={{
-            paddingHorizontal: theme.custom.spacing.md,
+            paddingHorizontal: theme.custom.spacing.lg,
             backgroundColor: theme.colors.surface,
           }}
         >

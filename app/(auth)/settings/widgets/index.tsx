@@ -181,17 +181,19 @@ const WidgetSettingsScreen = () => {
       backgroundColor: theme.colors.background,
     },
     scrollContainer: {
+      paddingHorizontal: spacing.md,
       paddingBottom: spacing.xxxxl,
     },
     section: {
       marginTop: spacing.md,
+      marginBottom: spacing.md,
     },
     sectionHeader: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       paddingHorizontal: spacing.xs,
-      marginBottom: spacing.sm,
+      marginBottom: spacing.md,
     },
     sectionTitle: {
       color: theme.colors.onBackground,
@@ -266,11 +268,11 @@ const WidgetSettingsScreen = () => {
       gap: spacing.xs,
     },
     actionButton: {
-      marginHorizontal: spacing.xs,
+      marginHorizontal: 0,
       marginVertical: spacing.xs / 2,
     },
     resetButton: {
-      marginHorizontal: spacing.xs,
+      marginHorizontal: 0,
       marginTop: spacing.md,
       marginBottom: spacing.xl,
     },

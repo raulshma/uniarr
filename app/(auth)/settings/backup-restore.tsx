@@ -469,13 +469,16 @@ const BackupRestoreScreen = () => {
           <Card style={styles.card}>
             <Text style={styles.sectionDescription}>
               • Standard backups include your app settings, service
-              configurations with credentials, TMDB API key, and network scan
-              history{"\n"}• Custom backups allow you to select exactly what to
-              export{"\n"}• Encrypted backups protect sensitive data with
-              password encryption (XOR-PBKDF2){"\n"}• Backups are stored in JSON
-              format for compatibility{"\n"}• You can share backups via email,
-              cloud storage, or other apps{"\n"}• Restoring a backup will
-              replace your current settings, services, and TMDB configuration
+              configurations with credentials, TMDB API key, network scan
+              history, download configuration, view preferences, and dashboard
+              widget configurations{"\n"}• Custom backups allow you to select
+              exactly what to export{"\n"}• Encrypted backups protect sensitive
+              data with password encryption (XOR-PBKDF2){"\n"}• Backups are
+              stored in JSON format for compatibility{"\n"}• You can share
+              backups via email, cloud storage, or other apps{"\n"}• Restoring a
+              backup will replace your current settings, services, TMDB
+              configuration, download settings, view preferences, and widget
+              configurations
             </Text>
           </Card>
         </View>

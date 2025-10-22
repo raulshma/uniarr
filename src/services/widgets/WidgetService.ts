@@ -8,7 +8,8 @@ export type WidgetType =
   | "recent-activity"
   | "statistics"
   | "calendar-preview"
-  | "shortcuts";
+  | "shortcuts"
+  | "bookmarks";
 
 export interface Widget {
   id: string;
@@ -169,6 +170,17 @@ class WidgetService {
         enabled: false,
         order: 5,
         size: "large",
+      },
+      {
+        id: "bookmarks",
+        type: "bookmarks",
+        title: "Bookmarks",
+        enabled: false,
+        order: 6,
+        size: "medium",
+        config: {
+          bookmarks: [],
+        },
       },
     ];
 
@@ -371,6 +383,12 @@ class WidgetService {
   getShortcutsWidgets(): Widget[] {
     return Array.from(this.widgets.values()).filter(
       (widget) => widget.type === "shortcuts" && widget.enabled,
+    );
+  }
+
+  getBookmarksWidgets(): Widget[] {
+    return Array.from(this.widgets.values()).filter(
+      (widget) => widget.type === "bookmarks" && widget.enabled,
     );
   }
 }

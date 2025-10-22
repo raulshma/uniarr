@@ -209,7 +209,8 @@ const NetworkScanScreen = () => {
   }, [activeTab, loadScanHistory]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    // Exclude top edge so the Appbar sits directly below the status bar
+    <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <Appbar.Header mode="small" elevated>
         <Appbar.BackAction
           onPress={() => router.back()}

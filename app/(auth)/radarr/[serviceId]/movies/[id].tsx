@@ -30,6 +30,9 @@ const RadarrMovieDetailsScreen = () => {
     movie,
     isLoading,
     isFetching,
+    isError,
+    error,
+    refetch,
     toggleMonitor,
     isTogglingMonitor,
     triggerSearch,
@@ -153,6 +156,22 @@ const RadarrMovieDetailsScreen = () => {
 
         {isLoading && !movie ? (
           <MovieDetailsSkeleton />
+        ) : isError ? (
+          <View style={{ flex: 1, justifyContent: "center" }}>
+            <EmptyState
+              title="Failed to load movie"
+              description={
+                error instanceof Error
+                  ? error.message
+                  : "Unable to load movie details."
+              }
+              actionLabel="Retry"
+              onActionPress={() => {
+                void refetch();
+              }}
+              icon="alert-circle-outline"
+            />
+          </View>
         ) : movie ? (
           <DetailHero
             posterUri={movie.posterUrl}

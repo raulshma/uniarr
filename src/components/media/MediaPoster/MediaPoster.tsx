@@ -20,11 +20,13 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AppTheme } from "@/constants/theme";
 import { imageCacheService } from "@/services/image/ImageCacheService";
 import { useThumbhash } from "@/hooks/useThumbhash";
+import { posterSizes, aspectRatios, borderRadius } from "@/constants/sizes";
+import { getComponentElevation } from "@/constants/elevation";
 
 const sizeMap = {
-  small: 96,
-  medium: 128,
-  large: 160,
+  small: posterSizes.md,
+  medium: posterSizes.lg,
+  large: posterSizes.xl,
 } as const;
 
 export type MediaPosterSize = keyof typeof sizeMap;
@@ -56,8 +58,8 @@ export type MediaPosterProps = {
   priority?: "low" | "normal" | "high";
 };
 
-const DEFAULT_ASPECT_RATIO = 2 / 3;
-const DEFAULT_RADIUS = 12;
+const DEFAULT_ASPECT_RATIO = aspectRatios.poster;
+const DEFAULT_RADIUS = borderRadius.lg;
 
 const MediaPoster: React.FC<MediaPosterProps> = ({
   uri,
@@ -236,19 +238,11 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: theme.custom.config?.posterStyle.shadowOpacity ?? 0.3,
           shadowRadius: theme.custom.config?.posterStyle.shadowRadius ?? 4,
-          elevation: 5,
+          ...getComponentElevation("poster", theme),
         },
         style,
       ] as StyleProp<ViewStyle>,
-    [
-      dimensions,
-      effectiveBorderRadius,
-      style,
-      theme.colors.surfaceVariant,
-      theme.colors.shadow,
-      theme.custom.config?.posterStyle.shadowOpacity,
-      theme.custom.config?.posterStyle.shadowRadius,
-    ],
+    [dimensions, effectiveBorderRadius, style, theme],
   );
 
   const isFallback = imageState.error || !imageState.resolvedUri;

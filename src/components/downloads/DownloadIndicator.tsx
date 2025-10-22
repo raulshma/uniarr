@@ -116,7 +116,7 @@ const DownloadIndicator: React.FC<DownloadIndicatorProps> = ({
         { translateY: scaleAnimation.value === 0 ? 10 : 0 },
       ],
     };
-  });
+  }, [scaleAnimation]);
 
   // Handle press with haptic feedback
   const handlePress = () => {

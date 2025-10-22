@@ -23,6 +23,7 @@ import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useWebhookNotifications } from "@/hooks/useWebhookNotifications";
 import type { AppTheme } from "@/constants/theme";
+import { spacing } from "@/theme/spacing";
 import type { WebhookNotification } from "@/services/webhooks/WebhookService";
 
 export interface WebhookNotificationsProps {
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   headerActions: {
     flexDirection: "row",
@@ -336,10 +337,10 @@ const styles = StyleSheet.create({
   statsBar: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 12,
-    marginBottom: 16,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
     backgroundColor: "#f5f5f5",
-    borderRadius: 8,
+    borderRadius: 8, // TODO: Replace with theme.custom.sizes.borderRadius.md when moved inside component
   },
   statItem: {
     alignItems: "center",
@@ -347,8 +348,8 @@ const styles = StyleSheet.create({
   actionBar: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
-    gap: 8,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
   },
   actionButton: {
     flex: 1,
@@ -357,7 +358,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notificationCard: {
-    marginBottom: 8,
+    marginBottom: spacing.xs,
     backgroundColor: "#fafafa",
   },
   unreadCard: {
@@ -366,7 +367,7 @@ const styles = StyleSheet.create({
     borderLeftColor: "#2196F3",
   },
   notificationPressable: {
-    padding: 12,
+    padding: spacing.sm,
   },
   notificationHeader: {
     flexDirection: "row",
@@ -381,14 +382,14 @@ const styles = StyleSheet.create({
   },
   notificationTitle: {
     fontWeight: "600",
-    marginBottom: 4,
+    marginBottom: spacing.xxs,
   },
   unreadTitle: {
     color: "#1976D2",
   },
   notificationBody: {
     opacity: 0.8,
-    marginBottom: 4,
+    marginBottom: spacing.xxs,
   },
   notificationTime: {
     opacity: 0.6,
@@ -397,37 +398,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   unreadBadge: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: spacing.xs,
+    height: spacing.xs,
+    borderRadius: spacing.xs / 2,
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 48,
+    paddingVertical: spacing.xxxl,
   },
   emptyText: {
-    marginTop: 12,
+    marginTop: spacing.sm,
     fontWeight: "500",
   },
   emptySubtext: {
-    marginTop: 4,
+    marginTop: spacing.xxs,
     opacity: 0.7,
     textAlign: "center",
   },
   fab: {
     position: "absolute",
-    margin: 16,
+    margin: spacing.md,
     right: 0,
     bottom: 0,
   },
   modal: {
-    margin: 20,
-    borderRadius: 8,
+    margin: spacing.lg,
+    borderRadius: 8, // TODO: Replace with theme.custom.sizes.borderRadius.md when moved inside component
     maxHeight: "80%",
   },
   modalActions: {
-    padding: 16,
+    padding: spacing.md,
     borderTopWidth: 1,
     borderTopColor: "#e0e0e0",
   },

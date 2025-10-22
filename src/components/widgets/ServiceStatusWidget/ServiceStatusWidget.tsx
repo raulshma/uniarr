@@ -7,6 +7,8 @@ import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { borderRadius, iconSizes, touchSizes } from "@/constants/sizes";
+import { spacing as themeSpacing } from "@/theme/spacing";
 import type { Widget } from "@/services/widgets/WidgetService";
 
 export interface ServiceStatusWidgetProps {
@@ -102,7 +104,6 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
     setRefreshing(true);
     await loadServiceStatuses();
     setRefreshing(false);
-    onRefresh?.();
   };
 
   const getStatusColor = (status: string) => {
@@ -160,7 +161,7 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
             >
               <MaterialCommunityIcons
                 name={getServiceIcon(service.type)}
-                size={24}
+                size={iconSizes.lg} // 24
                 color={getStatusColor(service.status)}
               />
             </View>
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: themeSpacing.md,
   },
   headerActions: {
     flexDirection: "row",
@@ -271,16 +272,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   serviceCard: {
-    marginBottom: 8,
+    marginBottom: themeSpacing.sm,
   },
   serviceCardContent: {
-    padding: 12,
+    padding: themeSpacing.sm,
   },
   serviceHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 8,
+    marginBottom: themeSpacing.sm,
   },
   serviceInfo: {
     flexDirection: "row",
@@ -288,12 +289,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+    width: touchSizes.lg - 8, // 40 = 48 - 8
+    height: touchSizes.lg - 8,
+    borderRadius: borderRadius.sm,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: themeSpacing.sm,
   },
   serviceDetails: {
     flex: 1,
@@ -309,12 +310,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: themeSpacing.sm,
+    paddingVertical: themeSpacing.xs,
   },
   statusMessage: {
     fontStyle: "italic",
-    marginBottom: 8,
+    marginBottom: themeSpacing.sm,
     opacity: 0.8,
   },
   serviceFooter: {
@@ -328,14 +329,14 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 32,
+    paddingVertical: themeSpacing.xl,
   },
   emptyText: {
-    marginTop: 8,
+    marginTop: themeSpacing.sm,
     fontWeight: "500",
   },
   emptySubtext: {
-    marginTop: 4,
+    marginTop: themeSpacing.xs,
     opacity: 0.7,
     textAlign: "center",
   },

@@ -1,0 +1,649 @@
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TextInput as RNTextInput,
+  TouchableOpacity,
+  Image,
+  FlatList,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+} from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { Text, useTheme, Portal, Button } from "react-native-paper";
+import type { AppTheme } from "@/constants/theme";
+import { useHaptics } from "@/hooks/useHaptics";
+import { spacing } from "@/theme/spacing";
+import { getComponentElevation } from "@/constants/elevation";
+import { borderRadius } from "@/constants/sizes";
+
+export interface IconPickerProps {
+  visible: boolean;
+  onDismiss: () => void;
+  onIconSelect: (icon: { type: string; value: string }) => void;
+}
+
+// A curated list of friendly names — we'll further filter these at runtime
+// against the MaterialIcons glyph map exported by the vector-icons package
+// to avoid invalid icon name warnings. Note: duplicate 'book' removed here.
+const MATERIAL_ICONS = [
+  "home",
+  "settings",
+  "link",
+  "open_in_new",
+  "web",
+  "cloud",
+  "server",
+  "database",
+  "folder",
+  "download",
+  "upload",
+  "calendar",
+  "clock",
+  "search",
+  "heart",
+  "star",
+  "warning",
+  "check",
+  "close",
+  "edit",
+  "delete",
+  "content_copy",
+  "share",
+  "menu",
+  "book",
+  "play",
+  "pause",
+  "stop",
+];
+
+// GitHub API endpoint for dashboard-icons repository
+const GITHUB_API_URL =
+  "https://api.github.com/repos/homarr-labs/dashboard-icons/contents/svg";
+
+interface CDNIcon {
+  name: string;
+  path: string;
+}
+
+const IconPicker: React.FC<IconPickerProps> = ({
+  visible,
+  onDismiss,
+  onIconSelect,
+}) => {
+  const theme = useTheme<AppTheme>();
+  const { onPress: hapticPress } = useHaptics();
+
+  // Elevation styles
+  const modalElevationStyle = getComponentElevation("modal", theme);
+  const cardElevationStyle = getComponentElevation("card", theme);
+
+  const [tab, setTab] = useState<"material" | "cdn">("material");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [cdnSearchResults, setCdnSearchResults] = useState<CDNIcon[]>([]);
+  const [loading, setCdnLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Search for icons by name from GitHub API
+  const searchCdnIcons = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setCdnSearchResults([]);
+      setHasSearched(false);
+      setError(null);
+      return;
+    }
+
+    setCdnLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const response = await fetch(GITHUB_API_URL);
+      if (!response.ok) {
+        throw new Error(`GitHub API responded with ${response.status}`);
+      }
+
+      const data: any[] = await response.json();
+      const matchedIcons = data
+        .filter(
+          (file) =>
+            file.name.endsWith(".svg") &&
+            file.name.toLowerCase().includes(query.toLowerCase()),
+        )
+        .map((file) => ({
+          name: file.name.replace(/\.svg$/i, ""),
+          path: file.name,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, 100); // Limit results to 100
+
+      setCdnSearchResults(matchedIcons);
+      if (matchedIcons.length === 0) {
+        setError("No icons found matching your search");
+      }
+    } catch (err: any) {
+      logger.error("[IconPicker] Failed to search icons from GitHub", err);
+      setError("Failed to search icons");
+      setCdnSearchResults([]);
+    } finally {
+      setCdnLoading(false);
+    }
+  }, []);
+
+  // Build a runtime-validated list of material icons by checking the glyph map
+  // exported by the vector-icons MaterialIcons component. This avoids passing
+  // invalid names to the native icon renderer which logs warnings.
+  const [validMaterialIcons, setValidMaterialIcons] = useState<string[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    try {
+      // MaterialIcons.getRawGlyphMap exists in react-native-vector-icons
+      // (expo/vector-icons re-exports it). Fallback gracefully if absent.
+      const anyIcons = MaterialIcons as any;
+      const glyphMap: Record<string, number> =
+        anyIcons.getRawGlyphMap?.() ?? anyIcons.glyphMap ?? {};
+
+      const validated = MATERIAL_ICONS.filter((name) =>
+        Boolean(glyphMap && glyphMap[name]),
+      );
+
+      if (isMounted) setValidMaterialIcons(validated);
+    } catch {
+      // If anything goes wrong, fall back to the original list but avoid
+      // crashing. The renderer will still warn for invalid names in this case.
+      if (isMounted) setValidMaterialIcons(MATERIAL_ICONS);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Debounce search input for smoother filtering
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Search CDN icons when debounced search changes and on CDN tab
+  useEffect(() => {
+    if (tab !== "cdn") return;
+    if (debouncedSearch) {
+      searchCdnIcons(debouncedSearch);
+    } else {
+      setCdnSearchResults([]);
+      setHasSearched(false);
+      setError(null);
+    }
+  }, [debouncedSearch, tab, searchCdnIcons]);
+
+  const filteredMaterialIcons = validMaterialIcons.filter((icon) =>
+    icon.toLowerCase().includes(debouncedSearch.toLowerCase()),
+  );
+
+  // CDN icons are already filtered by the search function
+  const filteredCdnIcons = cdnSearchResults;
+
+  const handleMaterialIconSelect = (icon: string) => {
+    hapticPress();
+    onIconSelect({ type: "material-icon", value: icon });
+    onDismiss();
+  };
+
+  const handleCdnIconSelect = (icon: CDNIcon) => {
+    hapticPress();
+    onIconSelect({ type: "cdn-icon", value: icon.name });
+    onDismiss();
+  };
+
+  return (
+    <Portal>
+      {visible && (
+        <View style={styles.portalContainer} pointerEvents="box-none">
+          <TouchableWithoutFeedback onPress={onDismiss}>
+            <View style={styles.portalBackdrop} />
+          </TouchableWithoutFeedback>
+
+          <View
+            style={[
+              styles.portalCard,
+              { backgroundColor: theme.colors.surface },
+              modalElevationStyle,
+            ]}
+          >
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text variant="headlineSmall">Select Icon</Text>
+              <TouchableOpacity onPress={onDismiss}>
+                <MaterialIcons
+                  name="close"
+                  size={24}
+                  color={theme.colors.onSurface}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
+            <View
+              style={[
+                styles.searchContainer,
+                { borderColor: theme.colors.outline },
+              ]}
+            >
+              <MaterialIcons
+                name="search"
+                size={20}
+                color={theme.colors.onSurfaceVariant}
+                style={styles.searchIcon}
+              />
+              <RNTextInput
+                style={[styles.searchInput, { color: theme.colors.onSurface }]}
+                placeholder="Search icons..."
+                placeholderTextColor={theme.colors.onSurfaceVariant}
+                value={search}
+                onChangeText={setSearch}
+              />
+            </View>
+
+            {/* Tabs */}
+            <View
+              style={[
+                styles.tabsContainer,
+                { borderBottomColor: theme.colors.outline },
+              ]}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.tabButton,
+                  tab === "material" && {
+                    borderBottomColor: theme.colors.primary,
+                    borderBottomWidth: 2,
+                  },
+                ]}
+                onPress={() => setTab("material")}
+              >
+                <Text
+                  variant="labelLarge"
+                  style={{
+                    color:
+                      tab === "material"
+                        ? theme.colors.primary
+                        : theme.colors.onSurfaceVariant,
+                  }}
+                >
+                  Material Icons
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.tabButton,
+                  tab === "cdn" && {
+                    borderBottomColor: theme.colors.primary,
+                    borderBottomWidth: 2,
+                  },
+                ]}
+                onPress={() => setTab("cdn")}
+              >
+                <Text
+                  variant="labelLarge"
+                  style={{
+                    color:
+                      tab === "cdn"
+                        ? theme.colors.primary
+                        : theme.colors.onSurfaceVariant,
+                  }}
+                >
+                  Dashboard Icons
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Content (same as before) */}
+            {tab === "material" ? (
+              <ScrollView
+                style={styles.iconsContainer}
+                contentContainerStyle={styles.iconsContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.iconGrid}>
+                  {filteredMaterialIcons.length === 0 ? (
+                    <View style={styles.noResults}>
+                      <Text variant="bodySmall">No icons found</Text>
+                    </View>
+                  ) : (
+                    filteredMaterialIcons.map((icon) => (
+                      <TouchableOpacity
+                        key={icon}
+                        style={[
+                          styles.iconItem,
+                          {
+                            backgroundColor: theme.colors.surface,
+                            borderColor: theme.colors.outline,
+                            borderWidth: 1,
+                          },
+                          cardElevationStyle,
+                        ]}
+                        onPress={() => handleMaterialIconSelect(icon)}
+                      >
+                        <MaterialIcons
+                          name={icon as any}
+                          size={32}
+                          color={theme.colors.primary}
+                        />
+                        <Text variant="labelSmall" style={styles.iconLabel}>
+                          {icon}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              </ScrollView>
+            ) : (
+              <View style={styles.iconsContainer}>
+                {!hasSearched ? (
+                  <View style={styles.emptyStateContainer}>
+                    <MaterialIcons
+                      name="search"
+                      size={48}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                    <Text
+                      variant="bodySmall"
+                      style={[
+                        styles.emptyStateText,
+                        { color: theme.colors.onSurfaceVariant },
+                      ]}
+                    >
+                      Type an icon name to search
+                    </Text>
+                  </View>
+                ) : loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator
+                      size="large"
+                      color={theme.colors.primary}
+                    />
+                    <Text variant="bodySmall" style={styles.loadingText}>
+                      Searching icons...
+                    </Text>
+                  </View>
+                ) : error ? (
+                  <View style={styles.errorContainer}>
+                    <MaterialIcons
+                      name="error"
+                      size={48}
+                      color={theme.colors.error}
+                    />
+                    <Text variant="bodySmall" style={styles.errorText}>
+                      {error}
+                    </Text>
+                    {error.includes("search") && (
+                      <View style={{ marginTop: spacing.md }}>
+                        <Button
+                          mode="contained"
+                          onPress={() => searchCdnIcons(debouncedSearch)}
+                        >
+                          Retry
+                        </Button>
+                      </View>
+                    )}
+                  </View>
+                ) : filteredCdnIcons.length === 0 ? (
+                  <View style={styles.noResults}>
+                    <Text variant="bodySmall">No icons found</Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={filteredCdnIcons}
+                    keyExtractor={(item) => item.name}
+                    numColumns={4}
+                    columnWrapperStyle={styles.cdnIconRow}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={[
+                          styles.cdnIconItem,
+                          {
+                            backgroundColor: theme.colors.surface,
+                            borderColor: theme.colors.outline,
+                            borderWidth: 1,
+                          },
+                          cardElevationStyle,
+                        ]}
+                        onPress={() => handleCdnIconSelect(item)}
+                      >
+                        <CdnIconImage name={item.name} themeDark={theme.dark} />
+                        <Text
+                          variant="labelSmall"
+                          style={styles.iconLabel}
+                          numberOfLines={1}
+                        >
+                          {item.name}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    scrollEnabled
+                  />
+                )}
+              </View>
+            )}
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <Button mode="outlined" onPress={onDismiss}>
+                Cancel
+              </Button>
+            </View>
+          </View>
+        </View>
+      )}
+    </Portal>
+  );
+};
+
+const styles = StyleSheet.create({
+  modal: {
+    margin: spacing.lg,
+    borderRadius: borderRadius.xl,
+    maxHeight: "90%",
+  },
+  modalContent: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.1)",
+  },
+  tabsContainer: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    margin: spacing.md,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    fontSize: 14,
+  },
+  iconsContainer: {
+    // allow container to size to content and screen; remove fixed minHeight
+    flex: 0,
+    maxHeight: "60%",
+    minHeight: 120,
+  },
+  portalContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  portalBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  portalCard: {
+    width: "94%",
+    maxWidth: 720,
+    maxHeight: "92%",
+    borderRadius: borderRadius.xl,
+    overflow: "hidden",
+  },
+  iconsContent: {
+    padding: spacing.md,
+  },
+  iconGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "flex-start",
+  },
+  iconItem: {
+    width: "22%",
+    aspectRatio: 1,
+    borderRadius: borderRadius.lg,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+  },
+  iconLabel: {
+    marginTop: spacing.xs,
+    textAlign: "center",
+  },
+  cdnIconRow: {
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  cdnIconItem: {
+    width: "22%",
+    aspectRatio: 1,
+    borderRadius: borderRadius.lg,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.sm,
+  },
+  cdnImage: {
+    width: "80%",
+    height: "80%",
+  },
+  noResults: {
+    padding: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: spacing.md,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyStateText: {
+    marginTop: spacing.md,
+    textAlign: "center",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    marginTop: spacing.md,
+    textAlign: "center",
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.1)",
+  },
+});
+
+export default IconPicker;
+
+// Simple logger for error handling
+const logger = {
+  error: (msg: string, data?: any) => console.error(`[ERROR] ${msg}`, data),
+};
+
+// Small component to render CDN SVG icons with fallbacks to PNG
+const CdnIconImage: React.FC<{ name: string; themeDark?: boolean }> = ({
+  name,
+  themeDark = false,
+}) => {
+  const getUrlPriority = useCallback((iconName: string): string[] => {
+    return [
+      `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${iconName}.png`,
+      `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconName}.svg`,
+      `https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/png/${iconName}.png`,
+      `https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/${iconName}.svg`,
+    ];
+  }, []);
+
+  const initialUrl = getUrlPriority(name)[0] || "";
+  const [src, setSrc] = useState<string>(initialUrl);
+  const [urlIndex, setUrlIndex] = useState(0);
+
+  useEffect(() => {
+    setUrlIndex(0);
+    const urls = getUrlPriority(name);
+    setSrc(urls[0] || "");
+  }, [name, getUrlPriority]);
+
+  const handleError = () => {
+    const urls = getUrlPriority(name);
+    const nextIndex = urlIndex + 1;
+    if (nextIndex < urls.length) {
+      setUrlIndex(nextIndex);
+      setSrc(urls[nextIndex] || "");
+    }
+  };
+
+  return (
+    <Image
+      source={{ uri: src }}
+      style={styles.cdnImage}
+      resizeMode="contain"
+      onError={handleError}
+    />
+  );
+};

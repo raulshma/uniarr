@@ -13,6 +13,9 @@ import type {
   JellyfinSession,
   JellyfinSearchHintResult,
   JellyfinSearchOptions,
+  JellyfinMediaSource,
+  JellyfinPlaybackInfoResponse,
+  JellyfinPlaybackStopInfo,
 } from "@/models/jellyfin.types";
 import type {
   IDownloadConnector,
@@ -244,6 +247,129 @@ export class JellyfinConnector
       return response.data;
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  async getPlaybackInfo(
+    itemId: string,
+    options: {
+      readonly mediaSourceId?: string;
+      readonly audioStreamIndex?: number;
+      readonly subtitleStreamIndex?: number;
+      readonly maxStreamingBitrate?: number;
+    } = {},
+  ): Promise<{
+    readonly playback: JellyfinPlaybackInfoResponse;
+    readonly mediaSource: JellyfinMediaSource;
+    readonly streamUrl: string;
+  }> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    try {
+      const params: Record<string, unknown> = {
+        userId,
+      };
+
+      if (options.mediaSourceId) {
+        params.mediaSourceId = options.mediaSourceId;
+      }
+      if (options.audioStreamIndex !== undefined) {
+        params.audioStreamIndex = options.audioStreamIndex;
+      }
+      if (options.subtitleStreamIndex !== undefined) {
+        params.subtitleStreamIndex = options.subtitleStreamIndex;
+      }
+      if (options.maxStreamingBitrate !== undefined) {
+        params.maxStreamingBitrate = options.maxStreamingBitrate;
+      }
+
+      const response = await this.client.get<JellyfinPlaybackInfoResponse>(
+        `/Items/${itemId}/PlaybackInfo`,
+        { params },
+      );
+
+      const playback = response.data;
+
+      if (!playback) {
+        throw new Error("Jellyfin did not return playback information.");
+      }
+
+      const sources = Array.isArray(playback.MediaSources)
+        ? (playback.MediaSources as JellyfinMediaSource[])
+        : [];
+
+      if (sources.length === 0) {
+        throw new Error("No playable media sources were returned by Jellyfin.");
+      }
+
+      const mediaSource = options.mediaSourceId
+        ? (sources.find(
+            (candidate) => candidate?.Id === options.mediaSourceId,
+          ) ?? sources[0]!)
+        : sources[0]!;
+
+      const selectedMediaSourceId = this.resolveMediaSourceId(
+        mediaSource,
+        itemId,
+      );
+
+      const requiresTranscoding = Boolean(
+        mediaSource?.TranscodingUrl && mediaSource?.SupportsTranscoding,
+      );
+      const supportsDirectPlayback = Boolean(
+        mediaSource?.SupportsDirectPlay ?? mediaSource?.SupportsDirectStream,
+      );
+      const useStaticStream = Boolean(
+        supportsDirectPlayback &&
+          !requiresTranscoding &&
+          !mediaSource?.IsInfiniteStream,
+      );
+
+      const streamUrl = this.buildStreamUrl(itemId, selectedMediaSourceId, {
+        isStatic: useStaticStream,
+        context: useStaticStream ? "Static" : "Streaming",
+        playSessionId: playback.PlaySessionId ?? undefined,
+        audioStreamIndex: options.audioStreamIndex,
+        subtitleStreamIndex: options.subtitleStreamIndex,
+        maxStreamingBitrate: options.maxStreamingBitrate,
+      });
+
+      return {
+        playback,
+        mediaSource,
+        streamUrl,
+      };
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  async reportPlaybackStopped(options: {
+    readonly itemId: string;
+    readonly mediaSourceId: string;
+    readonly playSessionId?: string;
+    readonly positionTicks?: number;
+  }): Promise<void> {
+    await this.ensureAuthenticated();
+
+    const payload: JellyfinPlaybackStopInfo = {
+      ItemId: options.itemId,
+      MediaSourceId: options.mediaSourceId,
+      PositionTicks: options.positionTicks ?? 0,
+      PlaySessionId: options.playSessionId ?? null,
+      Failed: false,
+    };
+
+    try {
+      await this.client.post("/Sessions/Playing/Stopped", payload);
+    } catch (error) {
+      await logger.warn("Failed to report Jellyfin playback stop.", {
+        serviceId: this.config.id,
+        itemId: options.itemId,
+        mediaSourceId: options.mediaSourceId,
+        error,
+      });
     }
   }
 
@@ -953,6 +1079,66 @@ export class JellyfinConnector
 
   // ==================== HELPER METHODS ====================
 
+  private buildStreamUrl(
+    itemId: string,
+    mediaSourceId: string,
+    options: {
+      readonly isStatic?: boolean;
+      readonly context?: "Streaming" | "Static";
+      readonly playSessionId?: string;
+      readonly audioStreamIndex?: number;
+      readonly subtitleStreamIndex?: number;
+      readonly maxStreamingBitrate?: number;
+      readonly startTimeTicks?: number;
+    } = {},
+  ): string {
+    const base = this.getBaseUrl();
+    const params = new URLSearchParams();
+
+    params.append("mediaSourceId", mediaSourceId);
+    params.append("deviceId", this.config.id || "UniArr");
+
+    if (options.isStatic) {
+      params.append("static", "true");
+    }
+    if (options.context) {
+      params.append("context", options.context);
+    }
+    if (options.playSessionId) {
+      params.append("playSessionId", options.playSessionId);
+    }
+    if (options.audioStreamIndex !== undefined) {
+      params.append("audioStreamIndex", String(options.audioStreamIndex));
+    }
+    if (options.subtitleStreamIndex !== undefined) {
+      params.append("subtitleStreamIndex", String(options.subtitleStreamIndex));
+    }
+    if (options.maxStreamingBitrate !== undefined) {
+      params.append("maxStreamingBitrate", String(options.maxStreamingBitrate));
+    }
+    if (options.startTimeTicks !== undefined) {
+      params.append("startTimeTicks", String(options.startTimeTicks));
+    }
+
+    const apiKey = this.getApiKey();
+    if (apiKey) {
+      params.append("api_key", apiKey);
+    }
+
+    return `${base}/Videos/${itemId}/stream?${params.toString()}`;
+  }
+
+  private resolveMediaSourceId(
+    mediaSource: JellyfinMediaSource | undefined,
+    itemId: string,
+  ): string {
+    if (mediaSource?.Id && mediaSource.Id.length > 0) {
+      return mediaSource.Id;
+    }
+
+    return itemId;
+  }
+
   /**
    * Check if user has permission to download the item
    */
@@ -1054,6 +1240,75 @@ export class JellyfinConnector
     }
   }
 
+  async getNextUpEpisode(
+    seriesId: string,
+    currentItemId?: string,
+  ): Promise<JellyfinItem | undefined> {
+    await this.ensureAuthenticated();
+    const userId = await this.ensureUserId();
+
+    const params: Record<string, unknown> = {
+      userId,
+      seriesId,
+      enableImages: true,
+      fields: DEFAULT_ITEM_FIELDS,
+      limit: 3,
+    };
+
+    if (currentItemId) {
+      params.startItemId = currentItemId;
+    }
+
+    try {
+      const response = await this.client.get<JellyfinItemsResponse>(
+        "/Shows/NextUp",
+        { params },
+      );
+
+      const items = Array.isArray(response.data?.Items)
+        ? (response.data.Items as JellyfinItem[])
+        : [];
+
+      const candidate = items.find((item) => item?.Id !== currentItemId);
+      if (candidate) {
+        return candidate;
+      }
+    } catch (error) {
+      void logger.debug("Failed to fetch Jellyfin next up episode", {
+        seriesId,
+        currentItemId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    if (!currentItemId) {
+      return undefined;
+    }
+
+    try {
+      const episodes = await this.getSeriesEpisodes(seriesId);
+      if (episodes.length === 0) {
+        return undefined;
+      }
+
+      const currentIndex = episodes.findIndex(
+        (episode) => episode?.Id === currentItemId,
+      );
+
+      if (currentIndex >= 0 && currentIndex + 1 < episodes.length) {
+        return episodes[currentIndex + 1]!;
+      }
+    } catch (error) {
+      void logger.debug("Failed to resolve Jellyfin next episode fallback", {
+        seriesId,
+        currentItemId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return undefined;
+  }
+
   /**
    * Get download URL for a media source
    */
@@ -1061,10 +1316,14 @@ export class JellyfinConnector
     itemId: string,
     mediaSourceId: string,
   ): Promise<string> {
-    const baseUrl = this.getBaseUrl();
+    const effectiveMediaSourceId =
+      typeof mediaSourceId === "string" && mediaSourceId.length > 0
+        ? mediaSourceId
+        : itemId;
 
-    // Generate a download URL using Jellyfin's streaming endpoint
-    return `${baseUrl}/Videos/${itemId}/stream?static=true&mediaSourceId=${mediaSourceId}&deviceId=UniApp&api_key=${this.getApiKey()}`;
+    return this.buildStreamUrl(itemId, effectiveMediaSourceId, {
+      isStatic: true,
+    });
   }
 
   /**

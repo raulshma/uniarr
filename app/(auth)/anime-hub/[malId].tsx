@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   StyleSheet,
   View,
@@ -9,14 +9,274 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ActivityIndicator, Chip, Text, useTheme } from "react-native-paper";
+import {
+  ActivityIndicator,
+  Button,
+  Chip,
+  Text,
+  useTheme,
+} from "react-native-paper";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useJikanAnimeDetails } from "@/hooks/useJikanAnimeDetails";
-import type { JikanTrailer } from "@/models/jikan.types";
+import type { JikanTrailer, JikanAnimeFull } from "@/models/jikan.types";
+import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import { useConnectorsStore, selectConnectors } from "@/store/connectorsStore";
+import type { components as JellyseerrComponents } from "@/connectors/client-schemas/jellyseerr-openapi";
+import { alert } from "@/services/dialogService";
+import { isApiError } from "@/utils/error.utils";
+
+type JellyseerrSearchResult =
+  | JellyseerrComponents["schemas"]["MovieResult"]
+  | JellyseerrComponents["schemas"]["TvResult"];
+
+const MATCH_CONFIDENCE_THRESHOLD = 4;
+
+const normalizeTitle = (value?: string | null): string => {
+  if (!value) return "";
+  try {
+    return value
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+  } catch {
+    return value
+      .toString()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+  }
+};
+
+const buildAnimeTitleSet = (anime?: JikanAnimeFull): Set<string> => {
+  const titles = new Set<string>();
+  if (!anime) return titles;
+
+  const push = (candidate?: string | null) => {
+    const normalized = normalizeTitle(candidate);
+    if (normalized) {
+      titles.add(normalized);
+    }
+  };
+
+  push(anime.title);
+  push(anime.title_english ?? undefined);
+  push(anime.title_japanese ?? undefined);
+
+  if (Array.isArray(anime.titles)) {
+    for (const entry of anime.titles) {
+      push(entry?.title ?? undefined);
+    }
+  }
+
+  if (Array.isArray(anime.title_synonyms)) {
+    for (const synonym of anime.title_synonyms) {
+      push(synonym ?? undefined);
+    }
+  }
+
+  return titles;
+};
+
+const buildSearchQueries = (anime?: JikanAnimeFull): string[] => {
+  if (!anime) return [];
+
+  const queries = new Set<string>();
+  const push = (candidate?: string | null) => {
+    if (!candidate) return;
+    const trimmed = candidate.trim();
+    if (trimmed.length >= 3) {
+      queries.add(trimmed);
+    }
+  };
+
+  push(anime.title_english ?? undefined);
+  push(anime.title ?? undefined);
+  push(anime.title_japanese ?? undefined);
+
+  if (Array.isArray(anime.titles)) {
+    for (const entry of anime.titles) {
+      push(entry?.title ?? undefined);
+    }
+  }
+
+  if (Array.isArray(anime.title_synonyms)) {
+    for (const synonym of anime.title_synonyms) {
+      push(synonym ?? undefined);
+      if (synonym?.includes("(")) {
+        push(synonym.replace(/\(.*?\)/g, "").trim());
+      }
+    }
+  }
+
+  return Array.from(queries);
+};
+
+const parseYear = (value?: string | null): number | undefined => {
+  if (!value || value.length < 4) return undefined;
+  const year = Number.parseInt(value.slice(0, 4), 10);
+  return Number.isFinite(year) ? year : undefined;
+};
+
+const getAnimeYear = (anime?: JikanAnimeFull): number | undefined => {
+  if (!anime) return undefined;
+  if (typeof anime.year === "number" && Number.isFinite(anime.year)) {
+    return anime.year;
+  }
+
+  const propYear = anime.aired?.prop?.from?.year;
+  if (typeof propYear === "number" && Number.isFinite(propYear)) {
+    return propYear;
+  }
+
+  return parseYear(anime.aired?.from ?? undefined);
+};
+
+const getResultTitle = (result: JellyseerrSearchResult): string => {
+  const record = result as Record<string, unknown>;
+  const candidates = [
+    "title",
+    "name",
+    "originalTitle",
+    "originalName",
+  ] as const;
+
+  for (const key of candidates) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return "";
+};
+
+const getResultMediaType = (result: JellyseerrSearchResult): "movie" | "tv" => {
+  const record = result as Record<string, unknown>;
+  const raw = record.mediaType;
+
+  if (raw === "movie" || raw === "tv") {
+    return raw;
+  }
+
+  if (typeof record.title === "string") {
+    return "movie";
+  }
+
+  return "tv";
+};
+
+const getResultYear = (result: JellyseerrSearchResult): number | undefined => {
+  const record = result as Record<string, unknown>;
+  const raw =
+    (typeof record.releaseDate === "string" ? record.releaseDate : undefined) ??
+    (typeof record.firstAirDate === "string" ? record.firstAirDate : undefined);
+
+  return parseYear(raw);
+};
+
+const extractMediaId = (result: JellyseerrSearchResult): number | undefined => {
+  const record = result as Record<string, unknown>;
+  if (typeof record.id === "number" && Number.isFinite(record.id)) {
+    return record.id;
+  }
+
+  const mediaInfo = record.mediaInfo as Record<string, unknown> | undefined;
+  if (mediaInfo && typeof mediaInfo.tmdbId === "number") {
+    return mediaInfo.tmdbId;
+  }
+
+  return undefined;
+};
+
+const pickBestMatch = (
+  results: JellyseerrSearchResult[],
+  options: {
+    titleSet: Set<string>;
+    targetMediaType: "movie" | "tv";
+    targetYear?: number;
+  },
+): { result?: JellyseerrSearchResult; score: number } => {
+  let bestResult: JellyseerrSearchResult | undefined;
+  let bestScore = -Infinity;
+  const normalizedTitles = Array.from(options.titleSet);
+
+  for (const result of results) {
+    const mediaType = getResultMediaType(result);
+    if (mediaType !== options.targetMediaType) {
+      continue;
+    }
+
+    let score = 1; // base score for matching media type
+    const candidateTitle = normalizeTitle(getResultTitle(result));
+    const hasExactTitleMatch = candidateTitle
+      ? options.titleSet.has(candidateTitle)
+      : false;
+
+    const hasPartialTitleMatch =
+      candidateTitle.length > 3
+        ? normalizedTitles.some(
+            (title) =>
+              title.length > 3 &&
+              (candidateTitle.includes(title) ||
+                title.includes(candidateTitle)),
+          )
+        : false;
+
+    if (hasExactTitleMatch) {
+      score += 5;
+    } else if (hasPartialTitleMatch) {
+      score += 3;
+    }
+
+    const candidateYear = getResultYear(result);
+    const { targetYear } = options;
+    if (
+      targetYear !== undefined &&
+      candidateYear !== undefined &&
+      candidateYear === targetYear
+    ) {
+      score += 3;
+    } else if (
+      targetYear !== undefined &&
+      candidateYear !== undefined &&
+      Math.abs(candidateYear - targetYear) <= 1
+    ) {
+      score += 1;
+    }
+
+    if (typeof extractMediaId(result) === "number") {
+      score += 1;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestResult = result;
+    }
+  }
+
+  if (!bestResult) {
+    bestResult = results.find(
+      (result) => getResultMediaType(result) === options.targetMediaType,
+    );
+    bestScore = bestResult ? 0 : -Infinity;
+  }
+
+  return { result: bestResult, score: bestScore };
+};
+
+const mapAnimeTypeToMediaType = (type?: string | null): "movie" | "tv" => {
+  if (!type) return "tv";
+  const normalized = type.toLowerCase();
+  if (normalized === "movie" || normalized === "film") {
+    return "movie";
+  }
+  return "tv";
+};
 
 const AnimeHubDetailScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
@@ -27,6 +287,16 @@ const AnimeHubDetailScreen: React.FC = () => {
 
   const { anime, isLoading, isError, refetch } =
     useJikanAnimeDetails(validMalId);
+
+  const connectors = useConnectorsStore(selectConnectors);
+  const jellyseerrConnectors = useMemo(() => {
+    return Array.from(connectors.values()).filter(
+      (connector): connector is JellyseerrConnector =>
+        connector.config.type === "jellyseerr" && connector.config.enabled,
+    );
+  }, [connectors]);
+
+  const [isRequesting, setIsRequesting] = useState(false);
 
   const styles = useMemo(
     () =>
@@ -184,6 +454,10 @@ const AnimeHubDetailScreen: React.FC = () => {
           padding: spacing.md,
           marginBottom: spacing.md,
         },
+        primaryActions: {
+          marginTop: spacing.md,
+          gap: spacing.sm,
+        },
         infoCard: {
           backgroundColor: theme.colors.surfaceVariant,
           borderRadius: 12,
@@ -194,6 +468,9 @@ const AnimeHubDetailScreen: React.FC = () => {
           color: theme.colors.onSurface,
           marginBottom: spacing.sm,
           fontWeight: "600",
+        },
+        helperText: {
+          color: theme.colors.onSurfaceVariant,
         },
         statsOverview: {
           backgroundColor: theme.colors.surfaceVariant,
@@ -245,6 +522,194 @@ const AnimeHubDetailScreen: React.FC = () => {
       await Linking.openURL(url);
     }
   };
+
+  const requestThroughConnector = useCallback(
+    async (connector: JellyseerrConnector) => {
+      if (!anime) {
+        alert(
+          "Anime details unavailable",
+          "Wait for the MyAnimeList details to finish loading and try again.",
+        );
+        return;
+      }
+
+      if (isRequesting) {
+        return;
+      }
+
+      const targetMediaType = mapAnimeTypeToMediaType(
+        typeof anime.type === "string" ? anime.type : undefined,
+      );
+      const animeMetadata = anime as unknown as JikanAnimeFull;
+      const titleSet = buildAnimeTitleSet(animeMetadata);
+      const targetYear = getAnimeYear(animeMetadata);
+      const searchQueries = buildSearchQueries(animeMetadata);
+
+      if (!searchQueries.length) {
+        alert(
+          "Cannot search Jellyseerr",
+          "This title's names are too short for Jellyseerr search. Use the Jellyseerr detail screen to request it manually.",
+        );
+        return;
+      }
+
+      setIsRequesting(true);
+      try {
+        let matchedResult: JellyseerrSearchResult | undefined;
+        let matchedScore = -Infinity;
+        let matchedQuery: string | undefined;
+        let lastError: unknown;
+
+        for (const query of searchQueries) {
+          try {
+            const results = await connector.search(query);
+            if (!Array.isArray(results) || results.length === 0) {
+              continue;
+            }
+
+            const { result, score } = pickBestMatch(results, {
+              titleSet,
+              targetMediaType,
+              targetYear,
+            });
+
+            if (result && score > matchedScore) {
+              matchedResult = result;
+              matchedScore = score;
+              matchedQuery = query;
+            }
+
+            if (result && score >= MATCH_CONFIDENCE_THRESHOLD) {
+              break;
+            }
+          } catch (searchError) {
+            lastError = searchError;
+          }
+        }
+
+        if (!matchedResult) {
+          const fallbackMessage =
+            isApiError(lastError) && lastError.message
+              ? lastError.message
+              : "Try searching manually from the Jellyseerr screen.";
+          alert("No Jellyseerr match found", fallbackMessage);
+          return;
+        }
+
+        const mediaId = extractMediaId(matchedResult);
+        if (typeof mediaId !== "number") {
+          alert(
+            "Missing TMDB identifier",
+            "Jellyseerr did not provide a TMDB id for the matched result.",
+          );
+          return;
+        }
+
+        if (matchedScore < MATCH_CONFIDENCE_THRESHOLD) {
+          const candidateTitle =
+            getResultTitle(matchedResult) || matchedQuery || "Unknown title";
+          const candidateYear = getResultYear(matchedResult);
+
+          alert(
+            "Manual confirmation needed",
+            `Found "${candidateTitle}"${
+              candidateYear ? ` (${candidateYear})` : ""
+            } in Jellyseerr, but the match could not be confirmed automatically. Review it manually before requesting to avoid incorrect downloads.`,
+            [
+              {
+                text: "Open Jellyseerr",
+                onPress: () =>
+                  void router.push({
+                    pathname:
+                      "/(auth)/jellyseerr/[serviceId]/[mediaType]/[mediaId]",
+                    params: {
+                      serviceId: connector.config.id,
+                      mediaType: targetMediaType,
+                      mediaId: String(mediaId),
+                    },
+                  }),
+              },
+              { text: "Cancel", style: "cancel" },
+            ],
+          );
+          return;
+        }
+
+        const payload: Parameters<JellyseerrConnector["createRequest"]>[0] = {
+          mediaId,
+          mediaType: targetMediaType,
+        };
+
+        if (targetMediaType === "tv") {
+          payload.seasons = "all";
+        }
+
+        await connector.createRequest(payload);
+
+        const destinationLabel =
+          targetMediaType === "movie" ? "Radarr" : "Sonarr";
+        const displayTitle =
+          getResultTitle(matchedResult) || anime.title || searchQueries[0];
+
+        alert(
+          "Request submitted",
+          `${displayTitle} was sent to Jellyseerr (${connector.config.name}). ${destinationLabel} will process the download once the request is approved.`,
+        );
+      } catch (error) {
+        const message = isApiError(error)
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Something went wrong while creating the request.";
+        alert("Jellyseerr request failed", message);
+      } finally {
+        setIsRequesting(false);
+      }
+    },
+    [anime, isRequesting, router],
+  );
+
+  const handleRequestPress = useCallback(() => {
+    if (isRequesting) {
+      return;
+    }
+
+    if (!anime) {
+      alert(
+        "Anime details unavailable",
+        "Wait for the MyAnimeList details to finish loading and try again.",
+      );
+      return;
+    }
+
+    if (jellyseerrConnectors.length === 0) {
+      alert(
+        "Add a Jellyseerr service",
+        "Connect a Jellyseerr instance in Settings → Services to send automated requests to Radarr/Sonarr.",
+      );
+      return;
+    }
+
+    if (jellyseerrConnectors.length === 1) {
+      const [singleConnector] = jellyseerrConnectors;
+      if (singleConnector) {
+        void requestThroughConnector(singleConnector);
+      }
+      return;
+    }
+
+    alert(
+      "Choose Jellyseerr service",
+      "Select which Jellyseerr instance should handle this request.",
+      [
+        ...jellyseerrConnectors.map((connector: JellyseerrConnector) => ({
+          text: connector.config.name,
+          onPress: () => void requestThroughConnector(connector),
+        })),
+        { text: "Cancel", style: "cancel" },
+      ],
+    );
+  }, [anime, isRequesting, jellyseerrConnectors, requestThroughConnector]);
 
   if (isLoading && !anime) {
     return (
@@ -339,6 +804,25 @@ const AnimeHubDetailScreen: React.FC = () => {
                   </Chip>
                 ))}
               </View>
+            </View>
+
+            <View style={styles.primaryActions}>
+              <Button
+                mode="contained"
+                onPress={handleRequestPress}
+                loading={isRequesting}
+                disabled={isRequesting}
+              >
+                {isRequesting
+                  ? "Submitting request..."
+                  : "Request via Jellyseerr"}
+              </Button>
+              {jellyseerrConnectors.length === 0 ? (
+                <Text variant="bodySmall" style={styles.helperText}>
+                  Connect a Jellyseerr service to forward anime requests to
+                  Radarr/Sonarr automatically.
+                </Text>
+              ) : null}
             </View>
           </View>
 

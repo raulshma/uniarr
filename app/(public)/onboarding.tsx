@@ -7,7 +7,6 @@ import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { type AppTheme } from "@/constants/theme";
-import { spacing } from "@/theme/spacing";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -78,22 +77,22 @@ const OnboardingScreen = () => {
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.xl,
+          paddingHorizontal: theme.custom.spacing.lg,
+          paddingVertical: theme.custom.spacing.xl,
         },
         stepContainer: {
           width: screenWidth,
           alignItems: "center",
           justifyContent: "center",
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal: theme.custom.spacing.lg,
         },
         iconContainer: {
-          width: 120,
+          width: 120, // Keep original size for this specific hero element
           height: 120,
-          borderRadius: 60,
+          borderRadius: 60, // Perfect circle
           alignItems: "center",
           justifyContent: "center",
-          marginBottom: spacing.xl,
+          marginBottom: theme.custom.spacing.xl,
           shadowColor: "#000",
           shadowOffset: {
             width: 0,
@@ -107,37 +106,35 @@ const OnboardingScreen = () => {
         title: {
           color: theme.colors.onBackground,
           textAlign: "center",
-          marginBottom: spacing.sm,
-          lineHeight: 36,
+          marginBottom: theme.custom.spacing.sm,
         },
         subtitle: {
           color: theme.colors.primary,
           textAlign: "center",
-          marginBottom: spacing.md,
+          marginBottom: theme.custom.spacing.md,
         },
         description: {
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
-          lineHeight: 24,
-          marginBottom: spacing.xl,
+          marginBottom: theme.custom.spacing.xl,
           maxWidth: 280,
         },
         pagination: {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
-          marginBottom: spacing.xl,
-          gap: spacing.sm,
+          marginBottom: theme.custom.spacing.xl,
+          gap: theme.custom.spacing.sm,
         },
         paginationDot: {
-          width: 8,
+          width: 8, // Keep original size for pagination dots
           height: 8,
-          borderRadius: 4,
+          borderRadius: 4, // Perfect circle
           backgroundColor: theme.colors.outlineVariant,
         },
         paginationDotActive: {
           backgroundColor: theme.colors.primary,
-          width: 24,
+          width: 24, // Keep original active width
         },
         buttonContainer: {
           flexDirection: "row",
@@ -145,7 +142,7 @@ const OnboardingScreen = () => {
           justifyContent: "space-between",
           width: "100%",
           maxWidth: 280,
-          gap: spacing.md,
+          gap: theme.custom.spacing.md,
         },
         button: {
           flex: 1,

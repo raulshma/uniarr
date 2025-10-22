@@ -49,6 +49,124 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        scanSummary: {
+          marginBottom: 16,
+        },
+        scanSummaryContent: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        },
+        scanSummaryText: {
+          textAlign: "center",
+        },
+        servicesCard: {
+          gap: 0,
+        },
+        servicesScrollContainer: {
+          // Allow content to expand fully; parent screen scrolls
+        },
+        servicesHeader: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: "rgba(0, 0, 0, 0.12)",
+        },
+        servicesTitle: {
+          fontWeight: "600",
+        },
+        serviceItem: {
+          marginHorizontal: 0,
+          marginVertical: 0,
+          borderRadius: theme.custom.sizes.borderRadius.none,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: "rgba(0, 0, 0, 0.12)",
+        },
+        serviceContent: {
+          flexDirection: "row",
+          alignItems: "flex-start",
+          paddingVertical: 6,
+        },
+        serviceIcon: {
+          marginRight: 0,
+        },
+        serviceInfo: {
+          flex: 1,
+          marginLeft: 16,
+          justifyContent: "center",
+        },
+        serviceName: {
+          fontWeight: "500",
+        },
+        serviceDetails: {
+          marginTop: 2,
+        },
+        serviceTypeIcon: {
+          marginRight: 0,
+        },
+        serviceTypeTitle: {
+          fontWeight: "600",
+        },
+        serviceHeaderRow: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 4,
+        },
+        healthIndicator: {
+          borderRadius: theme.custom.sizes.borderRadius.lg,
+          padding: 2,
+        },
+        healthIcon: {
+          margin: 0,
+        },
+        serviceDetailsRow: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 6,
+          marginTop: 6,
+        },
+        serviceChip: {
+          // Allow chip to size itself to content to avoid clipping on Android
+        },
+        serviceChipText: {
+          fontSize: 11,
+        },
+        serviceUrl: {
+          marginTop: 2,
+        },
+        serviceVersion: {
+          marginTop: 2,
+        },
+        authRequired: {
+          marginTop: 2,
+          fontWeight: "500",
+        },
+        serviceTypeHeader: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          backgroundColor: "rgba(0, 0, 0, 0.04)",
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: "rgba(0, 0, 0, 0.12)",
+        },
+        serviceTypeHeaderContent: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+        },
+      }),
+    [theme],
+  );
+
   const serviceIconMap = useMemo(
     () => ({
       sonarr: "server",
@@ -470,113 +588,3 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
 };
 
 export default NetworkScanResults;
-
-const styles = StyleSheet.create({
-  scanSummary: {
-    marginBottom: 16,
-  },
-  scanSummaryContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  scanSummaryText: {
-    textAlign: "center",
-  },
-  servicesCard: {
-    gap: 0,
-  },
-  servicesScrollContainer: {
-    // Allow content to expand fully; parent screen scrolls
-  },
-  servicesHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(0, 0, 0, 0.12)",
-  },
-  servicesTitle: {
-    fontWeight: "600",
-  },
-  serviceItem: {
-    marginHorizontal: 0,
-    marginVertical: 0,
-    borderRadius: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(0, 0, 0, 0.12)",
-  },
-  serviceContent: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 6,
-  },
-  serviceIcon: {
-    marginRight: 0,
-  },
-  serviceInfo: {
-    flex: 1,
-    flexShrink: 1,
-  },
-  serviceName: {
-    fontWeight: "500",
-  },
-  serviceUrl: {
-    marginTop: 2,
-  },
-  serviceVersion: {
-    marginTop: 2,
-  },
-  authRequired: {
-    marginTop: 2,
-    fontWeight: "500",
-  },
-  serviceTypeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "rgba(0, 0, 0, 0.04)",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(0, 0, 0, 0.12)",
-  },
-  serviceTypeHeaderContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  serviceTypeIcon: {
-    marginRight: 0,
-  },
-  serviceTypeTitle: {
-    fontWeight: "600",
-  },
-  serviceHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  healthIndicator: {
-    borderRadius: 12,
-    padding: 2,
-  },
-  healthIcon: {
-    margin: 0,
-  },
-  serviceDetailsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 6,
-  },
-  serviceChip: {
-    // Allow chip to size itself to content to avoid clipping on Android
-  },
-  serviceChipText: {
-    fontSize: 11,
-  },
-});

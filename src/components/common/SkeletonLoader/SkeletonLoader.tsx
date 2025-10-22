@@ -86,7 +86,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
     return {
       transform: [{ translateX }],
     };
-  });
+  }, [shimmerAnim]);
 
   // Get colors based on variant
   const getColors = () => {

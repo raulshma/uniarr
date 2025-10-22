@@ -14,6 +14,8 @@ import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import type { Widget } from "@/services/widgets/WidgetService";
+import { borderRadius } from "@/constants/sizes";
+import { spacing } from "@/theme/spacing";
 import { useDownloadStore, selectDownloads } from "@/store/downloadStore";
 import type { DownloadItem } from "@/models/download.types";
 
@@ -114,7 +116,6 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
     setRefreshing(true);
     await loadDownloads();
     setRefreshing(false);
-    onRefresh?.();
   };
 
   const formatBytes = (bytes: number): string => {
@@ -332,7 +333,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   downloadContent: {
-    padding: 12,
+    padding: spacing.sm,
   },
   downloadHeader: {
     flexDirection: "row",
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
   protocolIcon: {
     width: 32,
     height: 32,
-    borderRadius: 6,
+    borderRadius: borderRadius.xs,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -366,8 +367,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   progressSection: {
     gap: 4,
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: borderRadius.xs,
   },
   progressDetails: {
     flexDirection: "row",
@@ -386,24 +387,24 @@ const styles = StyleSheet.create({
   },
   completedSection: {
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
   moreText: {
     textAlign: "center",
     opacity: 0.7,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 32,
+    paddingVertical: spacing.xl,
   },
   emptyText: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     fontWeight: "500",
   },
   emptySubtext: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     opacity: 0.7,
     textAlign: "center",
   },
