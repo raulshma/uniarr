@@ -134,7 +134,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
     } finally {
       setRefreshing(false);
     }
-  }, [bookmarks, onRefresh]);
+  }, [bookmarks]);
 
   const getGridLayout = () => {
     const { size } = widget;
