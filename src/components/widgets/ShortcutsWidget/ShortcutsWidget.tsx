@@ -284,7 +284,7 @@ const useStyles = (theme: AppTheme) =>
     gridContainer: {
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "flex-start",
+      justifyContent: "space-between",
       alignItems: "flex-start",
       gap: spacing.sm,
     },
