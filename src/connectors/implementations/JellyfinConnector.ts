@@ -29,6 +29,25 @@ import { logger } from "@/services/logger/LoggerService";
 
 const DEFAULT_RESUME_TYPES = ["Movie", "Episode"];
 const DEFAULT_SEARCH_TYPES = ["Movie", "Series", "Episode"];
+
+// Minimal fields for library listings - excludes expensive operations like People/Taglines
+const LIBRARY_ITEM_FIELDS = [
+  "PrimaryImageAspectRatio",
+  "Overview",
+  "ParentId",
+  "SeriesInfo",
+  "ProviderIds",
+  "Genres",
+  "Studios",
+  "RunTimeTicks",
+  "PremiereDate",
+  "ProductionYear",
+  "OfficialRating",
+  "IndexNumber",
+  "ParentIndexNumber",
+].join(",");
+
+// Full fields for detailed item views - includes People, Taglines, etc.
 const DEFAULT_ITEM_FIELDS = [
   "PrimaryImageAspectRatio",
   "Overview",
@@ -181,6 +200,11 @@ export class JellyfinConnector
       readonly sortOrder?: "Ascending" | "Descending";
       readonly limit?: number;
       readonly startIndex?: number;
+      /**
+       * Use full item fields including People/Taglines.
+       * @default false - uses optimized fields for better performance
+       */
+      readonly includeFullDetails?: boolean;
     } = {},
   ): Promise<JellyfinItem[]> {
     await this.ensureAuthenticated();
@@ -190,7 +214,10 @@ export class JellyfinConnector
       ParentId: libraryId,
       Recursive: true,
       EnableImages: true,
-      Fields: DEFAULT_ITEM_FIELDS,
+      // Use minimal fields by default for better performance; opt-in to full fields if needed
+      Fields: options.includeFullDetails
+        ? DEFAULT_ITEM_FIELDS
+        : LIBRARY_ITEM_FIELDS,
       SortBy: options.sortBy ?? "SortName",
       SortOrder: options.sortOrder ?? "Ascending",
       IncludeItemTypes: options.includeItemTypes?.length
