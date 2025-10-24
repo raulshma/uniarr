@@ -154,6 +154,7 @@ export const TmdbListItem: React.FC<Props> = ({ item, onAdd, onPress }) => {
             size={125}
             borderRadius={8}
             showPlaceholderLabel
+            priority="high"
           />
         </View>
 

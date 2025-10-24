@@ -62,6 +62,7 @@ export const TmdbCard: React.FC<Props> = ({ item, onAdd, onPress }) => {
           size={160}
           borderRadius={12}
           showPlaceholderLabel
+          priority="high"
           overlay={
             <IconButton
               icon="plus"
