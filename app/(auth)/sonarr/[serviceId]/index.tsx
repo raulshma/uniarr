@@ -587,7 +587,10 @@ const SonarrSeriesListScreen = () => {
               anchor={
                 <TouchableRipple
                   borderless={false}
-                  style={styles.filterButton}
+                  style={[
+                    styles.filterButton,
+                    { flex: 1, marginRight: spacing.sm },
+                  ]}
                   onPress={() => setStatusMenuVisible(true)}
                 >
                   <View style={styles.filterButtonContent}>
@@ -614,45 +617,43 @@ const SonarrSeriesListScreen = () => {
                 />
               ))}
             </Menu>
+            <TouchableRipple
+              borderless={false}
+              style={[
+                styles.filterButton,
+                { flex: 1, marginLeft: spacing.sm },
+                hasActiveFilters && {
+                  backgroundColor: theme.colors.primaryContainer,
+                },
+              ]}
+              onPress={handleOpenFilterModal}
+            >
+              <View style={styles.filterButtonContent}>
+                <Icon
+                  source="filter-variant"
+                  size={20}
+                  color={
+                    hasActiveFilters
+                      ? theme.colors.onPrimaryContainer
+                      : theme.colors.onSurfaceVariant
+                  }
+                />
+                <Text
+                  variant="bodyMedium"
+                  style={[
+                    styles.filterButtonLabel,
+                    { marginLeft: spacing.sm },
+                    hasActiveFilters && {
+                      color: theme.colors.onPrimaryContainer,
+                    },
+                  ]}
+                >
+                  Advanced Filters
+                  {hasActiveFilters && " (Active)"}
+                </Text>
+              </View>
+            </TouchableRipple>
           </View>
-        </View>
-        {/* Advanced Filters Button */}
-        <View style={{ marginBottom: spacing.md }}>
-          <TouchableRipple
-            borderless={false}
-            style={[
-              styles.filterButton,
-              hasActiveFilters && {
-                backgroundColor: theme.colors.primaryContainer,
-              },
-            ]}
-            onPress={handleOpenFilterModal}
-          >
-            <View style={styles.filterButtonContent}>
-              <Icon
-                source="filter-variant"
-                size={20}
-                color={
-                  hasActiveFilters
-                    ? theme.colors.onPrimaryContainer
-                    : theme.colors.onSurfaceVariant
-                }
-              />
-              <Text
-                variant="bodyMedium"
-                style={[
-                  styles.filterButtonLabel,
-                  { marginLeft: spacing.sm },
-                  hasActiveFilters && {
-                    color: theme.colors.onPrimaryContainer,
-                  },
-                ]}
-              >
-                Advanced Filters
-                {hasActiveFilters && " (Active)"}
-              </Text>
-            </View>
-          </TouchableRipple>
         </View>
         {/* Active Filter Chips */}
         {hasActiveFilters && (

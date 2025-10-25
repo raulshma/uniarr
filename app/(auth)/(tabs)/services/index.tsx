@@ -1,5 +1,4 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
@@ -205,12 +204,6 @@ const ServicesScreen = () => {
     refetchInterval: 60000,
     staleTime: 30000,
   });
-
-  useFocusEffect(
-    useCallback(() => {
-      void refetch();
-    }, [refetch]),
-  );
 
   const services = useMemo(() => data ?? [], [data]);
   const showSkeleton = isLoading && services.length === 0;
