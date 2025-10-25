@@ -14,7 +14,10 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AnimatedListItem } from "@/components/common/AnimatedComponents";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
@@ -34,6 +37,7 @@ import {
   type LibraryFilters,
 } from "@/store/libraryFilterStore";
 import { spacing } from "@/theme/spacing";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const FILTER_ALL = "all";
 const FILTER_OWNED = "owned";
@@ -209,6 +213,10 @@ const RadarrMoviesListScreen = () => {
 
   const isRefreshing = isFetching && !isLoading;
   const isInitialLoad = isBootstrapping || isLoading;
+  const animationsEnabled = shouldAnimateLayout(
+    isLoading || isBootstrapping,
+    isFetching,
+  );
 
   // Advanced filter handlers
   const handleOpenFilterModal = useCallback(() => {
@@ -413,7 +421,11 @@ const RadarrMoviesListScreen = () => {
   const renderMovieItem = useCallback(
     ({ item, index }: { item: Movie; index: number }) => {
       return (
-        <AnimatedListItem index={index}>
+        <AnimatedListItem
+          index={index}
+          totalItems={filteredMovies.length}
+          animated={animationsEnabled}
+        >
           <View>
             <MovieListItem
               id={item.id}
@@ -435,7 +447,7 @@ const RadarrMoviesListScreen = () => {
         </AnimatedListItem>
       );
     },
-    [handleMoviePress],
+    [animationsEnabled, filteredMovies.length, handleMoviePress],
   );
 
   const keyExtractor = useCallback((item: Movie) => item.id.toString(), []);
@@ -443,7 +455,11 @@ const RadarrMoviesListScreen = () => {
   // Header used as the FlashList ListHeaderComponent
   const listHeader = useMemo(
     () => (
-      <View style={styles.listHeader}>
+      <AnimatedSection
+        animated={animationsEnabled}
+        style={styles.listHeader}
+        delay={50}
+      >
         <View style={styles.headerRow}>
           <View>
             <Text variant="headlineSmall" style={styles.headerTitle}>
@@ -588,9 +604,10 @@ const RadarrMoviesListScreen = () => {
             </ScrollView>
           </View>
         )}
-      </View>
+      </AnimatedSection>
     ),
     [
+      animationsEnabled,
       filteredMovies.length,
       totalMovies,
       handleAddMovie,
@@ -611,26 +628,34 @@ const RadarrMoviesListScreen = () => {
   const listEmptyComponent = useMemo(() => {
     if (filteredMovies.length === 0 && totalMovies > 0) {
       return (
-        <View>
+        <AnimatedSection animated={animationsEnabled} delay={75}>
           <EmptyState
             title="No movies match your filters"
             description="Try a different search query or reset the filters."
             actionLabel="Clear filters"
             onActionPress={handleClearFilters}
           />
-        </View>
+        </AnimatedSection>
       );
     }
 
     return (
-      <EmptyState
-        title="No movies available"
-        description="Add a movie in Radarr or adjust your filters to see it here."
-        actionLabel="Add Movie"
-        onActionPress={handleAddMovie}
-      />
+      <AnimatedSection animated={animationsEnabled} delay={100}>
+        <EmptyState
+          title="No movies available"
+          description="Add a movie in Radarr or adjust your filters to see it here."
+          actionLabel="Add Movie"
+          onActionPress={handleAddMovie}
+        />
+      </AnimatedSection>
     );
-  }, [filteredMovies.length, handleAddMovie, handleClearFilters, totalMovies]);
+  }, [
+    animationsEnabled,
+    filteredMovies.length,
+    handleAddMovie,
+    handleClearFilters,
+    totalMovies,
+  ]);
 
   if (!hasValidServiceId) {
     return (
@@ -753,9 +778,18 @@ const RadarrMoviesListScreen = () => {
           renderItem={renderMovieItem}
           ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
           contentContainerStyle={styles.listContent}
+          estimatedItemSize={180}
+          removeClippedSubviews
+          keyboardShouldPersistTaps="handled"
           ListHeaderComponent={listHeader}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>{listEmptyComponent}</View>
+            <AnimatedSection
+              animated={animationsEnabled}
+              style={styles.emptyContainer}
+              delay={125}
+            >
+              {listEmptyComponent}
+            </AnimatedSection>
           }
           refreshControl={
             <ListRefreshControl

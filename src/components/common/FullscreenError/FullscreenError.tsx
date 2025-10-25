@@ -1,6 +1,7 @@
 import React from "react";
-import { StyleSheet, View } from "react-native";
-import { Icon, Text, useTheme } from "react-native-paper";
+import { StyleSheet } from "react-native";
+import Animated, { FadeIn, FadeInUp, ZoomIn } from "react-native-reanimated";
+import { Icon, useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
 import { Button } from "@/components/common/Button";
@@ -27,34 +28,44 @@ const FullscreenError: React.FC<FullscreenErrorProps> = ({
   const theme = useTheme<AppTheme>();
 
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(300)}
       style={[styles.container, { backgroundColor: "rgba(0,0,0,0.85)" }]}
       accessibilityRole="alert"
       testID={testID}
     >
-      <View style={styles.contentCard}>
-        <View style={styles.errorIcon}>
+      <Animated.View
+        entering={FadeInUp.duration(400).springify()}
+        style={styles.contentCard}
+      >
+        <Animated.View
+          entering={ZoomIn.duration(300).delay(200)}
+          style={styles.errorIcon}
+        >
           <Icon
             source="alert-circle-outline"
             size={64}
             color={theme.colors.error}
           />
-        </View>
-        <Text
-          variant="headlineMedium"
+        </Animated.View>
+        <Animated.Text
+          entering={FadeIn.duration(300).delay(300)}
           style={[styles.title, { color: theme.colors.onErrorContainer }]}
         >
           {title}
-        </Text>
+        </Animated.Text>
         {message ? (
-          <Text
-            variant="bodyLarge"
+          <Animated.Text
+            entering={FadeIn.duration(300).delay(400)}
             style={[styles.message, { color: theme.colors.onErrorContainer }]}
           >
             {message}
-          </Text>
+          </Animated.Text>
         ) : null}
-        <View style={styles.buttonContainer}>
+        <Animated.View
+          entering={FadeIn.duration(300).delay(500)}
+          style={styles.buttonContainer}
+        >
           {onRetry ? (
             <Button
               mode="contained"
@@ -75,9 +86,9 @@ const FullscreenError: React.FC<FullscreenErrorProps> = ({
               {goBackLabel}
             </Button>
           ) : null}
-        </View>
-      </View>
-    </View>
+        </Animated.View>
+      </Animated.View>
+    </Animated.View>
   );
 };
 

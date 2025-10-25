@@ -4,8 +4,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
+  withSequence,
   withTiming,
-  interpolate,
 } from "react-native-reanimated";
 import { useTheme } from "react-native-paper";
 
@@ -65,28 +65,29 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
-  // Animation value for shimmer effect
-  const shimmerAnim = useSharedValue(0);
+  // Animation value for pulse effect
+  const pulseAnim = useSharedValue(1);
 
-  // Start shimmer animation
+  // Start pulse animation
   React.useEffect(() => {
     if (!shimmer) return;
 
-    shimmerAnim.value = withRepeat(
-      withTiming(1, { duration: shimmerDuration }),
+    pulseAnim.value = withRepeat(
+      withSequence(
+        withTiming(0.5, { duration: shimmerDuration / 2 }),
+        withTiming(1, { duration: shimmerDuration / 2 }),
+      ),
       -1,
       true,
     );
-  }, [shimmer, shimmerDuration, shimmerAnim]);
+  }, [shimmer, shimmerDuration, pulseAnim]);
 
-  // Animated style for shimmer
-  const shimmerStyle = useAnimatedStyle(() => {
-    const translateX = interpolate(shimmerAnim.value, [0, 1], [-200, 200]);
-
+  // Animated style for pulse
+  const pulseStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateX }],
+      opacity: pulseAnim.value,
     };
-  }, [shimmerAnim]);
+  }, [pulseAnim]);
 
   // Get colors based on variant
   const getColors = () => {
@@ -129,33 +130,12 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
     return <View style={containerStyle} />;
   }
 
-  return (
-    <View style={containerStyle}>
-      <Animated.View
-        style={[
-          styles.shimmer,
-          {
-            backgroundColor: colors.shimmer,
-            opacity: 0.1,
-          },
-          shimmerStyle,
-        ]}
-      />
-    </View>
-  );
+  return <Animated.View style={[containerStyle, pulseStyle]} />;
 };
 
 const styles = StyleSheet.create({
   container: {
     position: "relative",
-  },
-  shimmer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: 100,
   },
 });
 

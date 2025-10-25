@@ -1,19 +1,40 @@
 import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { IconButton, Text, useTheme } from "react-native-paper";
 
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import {
+  COMPONENT_ANIMATIONS,
+  PERFORMANCE_OPTIMIZATIONS,
+} from "@/utils/animations.utils";
 
 interface Props {
   item: DiscoverMediaItem;
   onAdd: (item: DiscoverMediaItem) => void;
   onPress: (item: DiscoverMediaItem) => void;
+  /**
+   * Whether to animate the card entrance
+   * @default true
+   */
+  animated?: boolean;
+  /**
+   * Animation delay in milliseconds
+   * @default 0
+   */
+  animationDelay?: number;
 }
 
-export const TmdbCard: React.FC<Props> = ({ item, onAdd, onPress }) => {
+export const TmdbCard: React.FC<Props> = ({
+  item,
+  onAdd,
+  onPress,
+  animated = true,
+  animationDelay = 0,
+}) => {
   const theme = useTheme<AppTheme>();
 
   const styles = useMemo(
@@ -50,36 +71,49 @@ export const TmdbCard: React.FC<Props> = ({ item, onAdd, onPress }) => {
     [theme],
   );
 
+  const animationProps = animated
+    ? {
+        entering: COMPONENT_ANIMATIONS.CARD_ENTRANCE(animationDelay),
+      }
+    : {};
+
   return (
-    <Pressable
-      accessibilityRole="button"
+    <Animated.View
       style={styles.container}
-      onPress={() => onPress(item)}
+      {...animationProps}
+      removeClippedSubviews={PERFORMANCE_OPTIMIZATIONS.removeClippedSubviews}
+      collapsable={PERFORMANCE_OPTIMIZATIONS.collapsable}
     >
-      <View style={styles.posterWrapper}>
-        <MediaPoster
-          uri={item.posterUrl}
-          size={160}
-          borderRadius={12}
-          showPlaceholderLabel
-          priority="high"
-          overlay={
-            <IconButton
-              icon="plus"
-              size={20}
-              mode="contained"
-              style={styles.addButton}
-              iconColor={theme.colors.onPrimary}
-              onPress={() => onAdd(item)}
-              accessibilityLabel={`Add ${item.title}`}
-            />
-          }
-        />
-      </View>
-      <Text numberOfLines={2} style={styles.title}>
-        {item.title}
-      </Text>
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        style={styles.container}
+        onPress={() => onPress(item)}
+      >
+        <View style={styles.posterWrapper}>
+          <MediaPoster
+            uri={item.posterUrl}
+            size={160}
+            borderRadius={12}
+            showPlaceholderLabel
+            priority="high"
+            overlay={
+              <IconButton
+                icon="plus"
+                size={20}
+                mode="contained"
+                style={styles.addButton}
+                iconColor={theme.colors.onPrimary}
+                onPress={() => onAdd(item)}
+                accessibilityLabel={`Add ${item.title}`}
+              />
+            }
+          />
+        </View>
+        <Text numberOfLines={2} style={styles.title}>
+          {item.title}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 };
 

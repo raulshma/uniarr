@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text, useTheme, IconButton } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { FlashList } from "@shopify/flash-list";
 
 import { TabHeader } from "@/components/common/TabHeader";
 
@@ -22,6 +23,7 @@ import {
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const RecentlyAddedScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -30,6 +32,8 @@ const RecentlyAddedScreen = () => {
   const { recentlyAdded, isLoading, isError, error, refetch } =
     useRecentlyAdded();
   // MediaCard intentionally not used here; import was removed to avoid lint warnings
+
+  const animationsEnabled = shouldAnimateLayout(isLoading, false);
 
   const styles = useMemo(
     () =>
@@ -137,7 +141,11 @@ const RecentlyAddedScreen = () => {
 
   const renderMediaItem = useCallback(
     ({ item, index }: { item: RecentlyAddedItem; index: number }) => (
-      <AnimatedListItem index={index} totalItems={recentlyAdded.items.length}>
+      <AnimatedListItem
+        index={index}
+        totalItems={recentlyAdded.items.length}
+        animated={animationsEnabled}
+      >
         <Card
           variant="custom"
           style={styles.mediaItem}
@@ -168,7 +176,13 @@ const RecentlyAddedScreen = () => {
         </Card>
       </AnimatedListItem>
     ),
-    [handleMediaPress, styles, theme, recentlyAdded.items.length],
+    [
+      handleMediaPress,
+      styles,
+      theme,
+      recentlyAdded.items.length,
+      animationsEnabled,
+    ],
   );
 
   const formatRelativeTime = (input: Date): string => {
@@ -243,6 +257,7 @@ const RecentlyAddedScreen = () => {
               index={index}
               totalItems={6}
               style={{ marginBottom: spacing.sm }}
+              animated={animationsEnabled}
             >
               <ListRowSkeleton />
             </AnimatedListItem>
@@ -256,19 +271,30 @@ const RecentlyAddedScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <TabHeader showBackButton={true} onBackPress={() => router.back()} />
 
-      <AnimatedScrollView
-        style={styles.listContent}
+      <FlashList<RecentlyAddedItem>
+        data={recentlyAdded.items}
+        keyExtractor={(item: RecentlyAddedItem) => item.id}
+        renderItem={({
+          item,
+          index,
+        }: {
+          item: RecentlyAddedItem;
+          index: number;
+        }) => renderMediaItem({ item, index })}
         contentContainerStyle={styles.listContentContainer}
-      >
-        {recentlyAdded.items.map((item, index) => (
-          <View key={item.id}>{renderMediaItem({ item, index })}</View>
-        ))}
-        {recentlyAdded.items.length === 0 && (
-          <AnimatedSection style={styles.emptyContainer} delay={100}>
+        ListEmptyComponent={
+          <AnimatedSection
+            style={styles.emptyContainer}
+            delay={100}
+            animated={animationsEnabled}
+          >
             {listEmptyComponent}
           </AnimatedSection>
-        )}
-      </AnimatedScrollView>
+        }
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews
+        keyboardShouldPersistTaps="handled"
+      />
     </SafeAreaView>
   );
 };

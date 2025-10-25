@@ -285,7 +285,7 @@ const BazarrSubtitlesScreen = () => {
   );
 
   // Render item based on type
-  const renderItem = useCallback(
+  const renderBazarrItem = useCallback(
     ({
       item,
       index,
@@ -449,12 +449,12 @@ const BazarrSubtitlesScreen = () => {
       )}
 
       {/* Content list */}
-      <FlashList
+      <FlashList<BazarrMovie | BazarrEpisode | BazarrMissingSubtitle>
         data={filteredItems}
-        renderItem={(props) =>
-          renderItem({ ...props, index: props.index ?? 0 })
-        }
-        keyExtractor={(item) => {
+        renderItem={renderBazarrItem}
+        keyExtractor={(
+          item: BazarrMovie | BazarrEpisode | BazarrMissingSubtitle,
+        ) => {
           if ("id" in item && "language" in item) {
             // Missing subtitle
             return `missing-${item.id}`;

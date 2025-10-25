@@ -37,6 +37,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import type { NotificationCategory } from "@/models/notification.types";
 import { getCategoryFriendlyName } from "@/utils/quietHours.utils";
 import { borderRadius } from "@/constants/sizes";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 // Backup & restore moved to its own settings screen
 
 // Helper function to format bytes
@@ -112,6 +113,56 @@ const SettingsScreen = () => {
   const [isFetchingCacheUsage, setIsFetchingCacheUsage] = useState(false);
   const [isClearingImageCache, setIsClearingImageCache] = useState(false);
 
+  const isBusy = isFetchingCacheUsage || isClearingImageCache;
+  const animationsEnabled = shouldAnimateLayout(isBusy, false);
+
+  const colorScheme = useColorScheme();
+  const isCurrentThemeDark = useMemo(() => {
+    if (themePreference === "dark") return true;
+    if (themePreference === "light") return false;
+    return colorScheme === "dark";
+  }, [themePreference, colorScheme]);
+
+  const appearanceItemsCount = useMemo(
+    () => (isCurrentThemeDark ? 4 : 3),
+    [isCurrentThemeDark],
+  );
+
+  const notificationItemsCount = useMemo(
+    () => (notificationsEnabled ? 6 : 2),
+    [notificationsEnabled],
+  );
+
+  const settingsSummary = useMemo(
+    () => [
+      {
+        label: "Theme",
+        value:
+          themePreference === "system"
+            ? `System (${colorScheme ?? "auto"})`
+            : themePreference.charAt(0).toUpperCase() +
+              themePreference.slice(1),
+      },
+      {
+        label: "Notifications",
+        value: notificationsEnabled ? "Enabled" : "Disabled",
+      },
+      {
+        label: "Cache usage",
+        value: isFetchingCacheUsage
+          ? "Calculating…"
+          : imageCacheUsage.formattedSize,
+      },
+    ],
+    [
+      themePreference,
+      colorScheme,
+      notificationsEnabled,
+      isFetchingCacheUsage,
+      imageCacheUsage.formattedSize,
+    ],
+  );
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -120,6 +171,40 @@ const SettingsScreen = () => {
     scrollContainer: {
       paddingHorizontal: spacing.sm,
       paddingBottom: spacing.xxxxl,
+    },
+    summarySection: {
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.xs,
+      gap: spacing.sm,
+    },
+    summaryTitle: {
+      color: theme.colors.onBackground,
+      fontSize: theme.custom.typography.titleMedium.fontSize,
+      fontFamily: theme.custom.typography.titleMedium.fontFamily,
+      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+    },
+    summaryGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.sm,
+    },
+    summaryCard: {
+      flexBasis: "48%",
+      backgroundColor: theme.colors.elevation.level1,
+      borderRadius: borderRadius.lg,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+    },
+    summaryLabel: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: theme.custom.typography.bodySmall.fontSize,
+      marginBottom: spacing.xxs,
+    },
+    summaryValue: {
+      color: theme.colors.onSurface,
+      fontSize: theme.custom.typography.titleSmall.fontSize,
+      fontWeight: "600",
     },
     listSpacer: {
       height: spacing.xs,
@@ -330,15 +415,6 @@ const SettingsScreen = () => {
     };
   };
 
-  // Check if current theme is dark (either directly or via system setting)
-  const colorScheme = useColorScheme();
-  const isCurrentThemeDark = useMemo(() => {
-    if (themePreference === "dark") return true;
-    if (themePreference === "light") return false;
-    // system theme - check the actual system color scheme
-    return colorScheme === "dark";
-  }, [themePreference, colorScheme]);
-
   const quietHoursValue = useMemo(() => {
     const enabled = Object.entries(quietHours).filter(
       ([, config]) => config.enabled,
@@ -358,7 +434,10 @@ const SettingsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AnimatedScrollView contentContainerStyle={styles.scrollContainer}>
+      <AnimatedScrollView
+        contentContainerStyle={styles.scrollContainer}
+        animated={animationsEnabled}
+      >
         {/* Header */}
         <TabHeader
           rightAction={{
@@ -368,10 +447,40 @@ const SettingsScreen = () => {
           }}
         />
 
+        <AnimatedSection
+          style={styles.summarySection}
+          delay={25}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.summaryTitle}>Overview</Text>
+          <View style={styles.summaryGrid}>
+            {settingsSummary.map((metric, index) => (
+              <AnimatedListItem
+                key={metric.label}
+                index={index}
+                totalItems={settingsSummary.length}
+                style={styles.summaryCard}
+                animated={animationsEnabled}
+              >
+                <Text style={styles.summaryLabel}>{metric.label}</Text>
+                <Text style={styles.summaryValue}>{metric.value}</Text>
+              </AnimatedListItem>
+            ))}
+          </View>
+        </AnimatedSection>
+
         {/* Appearance Section */}
-        <AnimatedSection style={styles.section} delay={50}>
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <AnimatedListItem index={0} totalItems={4}>
+          <AnimatedListItem
+            index={0}
+            totalItems={appearanceItemsCount}
+            animated={animationsEnabled}
+          >
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -442,7 +551,11 @@ const SettingsScreen = () => {
           </AnimatedListItem>
           {/* OLED Mode Toggle - Only show when dark theme is active */}
           {isCurrentThemeDark && (
-            <AnimatedListItem index={1} totalItems={4}>
+            <AnimatedListItem
+              index={1}
+              totalItems={appearanceItemsCount}
+              animated={animationsEnabled}
+            >
               <Card variant="custom" style={styles.settingCard}>
                 <View style={styles.settingContent}>
                   <View style={styles.settingIcon}>
@@ -467,7 +580,11 @@ const SettingsScreen = () => {
               </Card>
             </AnimatedListItem>
           )}
-          <AnimatedListItem index={isCurrentThemeDark ? 2 : 1} totalItems={4}>
+          <AnimatedListItem
+            index={isCurrentThemeDark ? 2 : 1}
+            totalItems={appearanceItemsCount}
+            animated={animationsEnabled}
+          >
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -493,7 +610,11 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={isCurrentThemeDark ? 3 : 2} totalItems={4}>
+          <AnimatedListItem
+            index={isCurrentThemeDark ? 3 : 2}
+            totalItems={appearanceItemsCount}
+            animated={animationsEnabled}
+          >
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -520,9 +641,17 @@ const SettingsScreen = () => {
         </AnimatedSection>
 
         {/* Notifications Section */}
-        <AnimatedSection style={styles.section} delay={100}>
+        <AnimatedSection
+          style={styles.section}
+          delay={100}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Notifications</Text>
-          <AnimatedListItem index={0} totalItems={1}>
+          <AnimatedListItem
+            index={0}
+            totalItems={notificationItemsCount}
+            animated={animationsEnabled}
+          >
             <Card variant="custom" style={styles.notificationGroup}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -544,7 +673,12 @@ const SettingsScreen = () => {
 
               {notificationsEnabled && (
                 <>
-                  <View style={styles.notificationItem}>
+                  <AnimatedListItem
+                    style={styles.notificationItem}
+                    index={1}
+                    totalItems={notificationItemsCount}
+                    animated={animationsEnabled}
+                  >
                     <View style={styles.notificationIcon}>
                       <IconButton
                         icon="check-circle"
@@ -562,9 +696,14 @@ const SettingsScreen = () => {
                       onValueChange={setDownloadNotificationsEnabled}
                       color={theme.colors.primary}
                     />
-                  </View>
+                  </AnimatedListItem>
 
-                  <View style={styles.notificationItem}>
+                  <AnimatedListItem
+                    style={styles.notificationItem}
+                    index={2}
+                    totalItems={notificationItemsCount}
+                    animated={animationsEnabled}
+                  >
                     <View style={styles.notificationIcon}>
                       <IconButton
                         icon="alert-circle"
@@ -580,9 +719,14 @@ const SettingsScreen = () => {
                       onValueChange={setFailedDownloadNotificationsEnabled}
                       color={theme.colors.primary}
                     />
-                  </View>
+                  </AnimatedListItem>
 
-                  <View style={styles.notificationItem}>
+                  <AnimatedListItem
+                    style={styles.notificationItem}
+                    index={3}
+                    totalItems={notificationItemsCount}
+                    animated={animationsEnabled}
+                  >
                     <View style={styles.notificationIcon}>
                       <IconButton
                         icon="account-plus"
@@ -598,9 +742,14 @@ const SettingsScreen = () => {
                       onValueChange={setRequestNotificationsEnabled}
                       color={theme.colors.primary}
                     />
-                  </View>
+                  </AnimatedListItem>
 
-                  <View style={styles.notificationItem}>
+                  <AnimatedListItem
+                    style={styles.notificationItem}
+                    index={4}
+                    totalItems={notificationItemsCount}
+                    animated={animationsEnabled}
+                  >
                     <View style={styles.notificationIcon}>
                       <IconButton
                         icon="server-network"
@@ -616,12 +765,15 @@ const SettingsScreen = () => {
                       onValueChange={setServiceHealthNotificationsEnabled}
                       color={theme.colors.primary}
                     />
-                  </View>
+                  </AnimatedListItem>
                 </>
               )}
 
-              <View
+              <AnimatedListItem
                 style={[styles.notificationItem, { marginTop: spacing.xs }]}
+                index={notificationsEnabled ? 5 : 1}
+                totalItems={notificationItemsCount}
+                animated={animationsEnabled}
               >
                 <View style={styles.notificationIcon}>
                   <IconButton
@@ -641,15 +793,23 @@ const SettingsScreen = () => {
                   iconColor={theme.colors.outline}
                   onPress={() => router.push("/(auth)/settings/quiet-hours")}
                 />
-              </View>
+              </AnimatedListItem>
             </Card>
           </AnimatedListItem>
         </AnimatedSection>
 
         {/* Quick Actions Section */}
-        <AnimatedSection style={styles.section} delay={150}>
+        <AnimatedSection
+          style={styles.section}
+          delay={150}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <AnimatedListItem index={0} totalItems={2}>
+          <AnimatedListItem
+            index={0}
+            totalItems={2}
+            animated={animationsEnabled}
+          >
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -677,7 +837,11 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
+          <AnimatedListItem
+            index={1}
+            totalItems={2}
+            animated={animationsEnabled}
+          >
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -708,9 +872,17 @@ const SettingsScreen = () => {
         </AnimatedSection>
 
         {/* Storage Section */}
-        <AnimatedSection style={styles.section} delay={200}>
+        <AnimatedSection
+          style={styles.section}
+          delay={200}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Storage</Text>
-          <AnimatedListItem index={0} totalItems={2}>
+          <AnimatedListItem
+            index={0}
+            totalItems={2}
+            animated={animationsEnabled}
+          >
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -749,7 +921,11 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
+          <AnimatedListItem
+            index={1}
+            totalItems={2}
+            animated={animationsEnabled}
+          >
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -780,9 +956,17 @@ const SettingsScreen = () => {
         </AnimatedSection>
 
         {/* Services Section */}
-        <AnimatedSection style={styles.section} delay={250}>
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Services</Text>
-          <AnimatedListItem index={0} totalItems={3}>
+          <AnimatedListItem
+            index={0}
+            totalItems={4}
+            animated={animationsEnabled}
+          >
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -810,7 +994,11 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={3}>
+          <AnimatedListItem
+            index={1}
+            totalItems={4}
+            animated={animationsEnabled}
+          >
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -838,7 +1026,11 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={2} totalItems={4}>
+          <AnimatedListItem
+            index={2}
+            totalItems={4}
+            animated={animationsEnabled}
+          >
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -866,7 +1058,11 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={3} totalItems={4}>
+          <AnimatedListItem
+            index={3}
+            totalItems={4}
+            animated={animationsEnabled}
+          >
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -897,9 +1093,17 @@ const SettingsScreen = () => {
         </AnimatedSection>
 
         {/* System Section */}
-        <AnimatedSection style={styles.section} delay={300}>
+        <AnimatedSection
+          style={styles.section}
+          delay={300}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>System</Text>
-          <AnimatedListItem index={0} totalItems={2}>
+          <AnimatedListItem
+            index={0}
+            totalItems={3}
+            animated={animationsEnabled}
+          >
             <Card
               variant="custom"
               style={styles.settingCard}
@@ -927,7 +1131,11 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
+          <AnimatedListItem
+            index={1}
+            totalItems={3}
+            animated={animationsEnabled}
+          >
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -944,7 +1152,11 @@ const SettingsScreen = () => {
               </View>
             </Card>
           </AnimatedListItem>
-          <AnimatedListItem index={2} totalItems={2}>
+          <AnimatedListItem
+            index={2}
+            totalItems={3}
+            animated={animationsEnabled}
+          >
             <Card variant="custom" style={styles.settingCard}>
               <View style={styles.settingContent}>
                 <View style={styles.settingIcon}>
@@ -975,9 +1187,17 @@ const SettingsScreen = () => {
 
         {/* Developer Tools (dev only) */}
         {isDev && (
-          <AnimatedSection style={styles.section} delay={350}>
+          <AnimatedSection
+            style={styles.section}
+            delay={350}
+            animated={animationsEnabled}
+          >
             <Text style={styles.sectionTitle}>Development</Text>
-            <AnimatedListItem index={0} totalItems={1}>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
               <Card
                 variant="custom"
                 style={styles.settingCard}
@@ -1013,6 +1233,7 @@ const SettingsScreen = () => {
           index={0}
           totalItems={1}
           style={{ marginTop: spacing.md }}
+          animated={animationsEnabled}
         >
           <Button
             mode="outlined"

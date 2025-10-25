@@ -1,6 +1,15 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
-import { View, StyleSheet } from "react-native";
-import { useTheme, Text } from "react-native-paper";
+import { StyleSheet } from "react-native";
+import Animated, {
+  FadeIn,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+  withRepeat,
+} from "react-native-reanimated";
+import { useTheme, Icon } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -55,34 +64,66 @@ const DefaultFallback = ({ error, reset }: ErrorBoundaryFallbackProps) => {
       ? error.message
       : "Please try again in a moment.";
 
+  const rotation = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotateZ: `${rotation.value}deg` }],
+    };
+  });
+
+  React.useEffect(() => {
+    rotation.value = withSequence(
+      withTiming(-10, { duration: 50 }),
+      withRepeat(withTiming(10, { duration: 100 }), 5, true),
+      withTiming(0, { duration: 50 }),
+    );
+  }, [rotation]);
+
+  const AnimatedIcon = () => (
+    <Animated.View style={animatedStyle}>
+      <Icon
+        source="alert-circle-outline"
+        size={48}
+        color={theme.colors.onSurfaceVariant}
+      />
+    </Animated.View>
+  );
+
   return (
-    <View
+    <Animated.View
+      entering={FadeInUp.duration(400).springify()}
       style={[
         styles.fallbackContainer,
         { backgroundColor: theme.colors.background },
       ]}
     >
-      <EmptyState
-        title="Something went wrong"
-        description={description}
-        icon="alert-circle-outline"
-        actionLabel="Try again"
-        onActionPress={reset}
-      >
-        {isDevelopment && error.stack ? (
-          <Text
-            variant="bodySmall"
-            style={{
-              marginTop: theme.custom.spacing.sm,
-              color: theme.colors.onSurfaceVariant,
-              textAlign: "center",
-            }}
-          >
-            {error.stack.split("\n").slice(0, 2).join("\n")}
-          </Text>
-        ) : null}
-      </EmptyState>
-    </View>
+      <Animated.View entering={FadeIn.duration(300).delay(200)}>
+        <EmptyState
+          title="Something went wrong"
+          description={description}
+          customIcon={<AnimatedIcon />}
+          actionLabel="Try again"
+          onActionPress={reset}
+        >
+          {isDevelopment && error.stack ? (
+            <Animated.Text
+              entering={FadeIn.duration(300).delay(400)}
+              style={{
+                marginTop: theme.custom.spacing.sm,
+                color: theme.colors.onSurfaceVariant,
+                textAlign: "center",
+                fontSize: theme.custom.typography.bodySmall.fontSize,
+                fontFamily: theme.custom.typography.bodySmall.fontFamily,
+                lineHeight: theme.custom.typography.bodySmall.lineHeight,
+              }}
+            >
+              {error.stack.split("\n").slice(0, 2).join("\n")}
+            </Animated.Text>
+          ) : null}
+        </EmptyState>
+      </Animated.View>
+    </Animated.View>
   );
 };
 

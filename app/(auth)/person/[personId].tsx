@@ -9,6 +9,7 @@ import type { AppTheme } from "@/constants/theme";
 import { usePersonDetails } from "@/hooks/tmdb/usePersonDetails";
 import { buildProfileUrl, buildPosterUrl } from "@/utils/tmdb.utils";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { spacing } from "@/theme/spacing";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
 
@@ -458,31 +459,32 @@ const PersonDetails = () => {
             <Text variant="titleLarge" style={styles.sectionTitle}>
               Movies
             </Text>
-            {processedMovieCredits.map((credit) => (
-              <Pressable
-                key={`movie-${credit.id}`}
-                onPress={() => handleMediaPress("movie", credit.id)}
-                style={styles.creditRow}
-              >
-                <MediaPoster
-                  uri={buildPosterUrl(credit.poster_path)}
-                  size={60}
-                  aspectRatio={2 / 3}
-                  borderRadius={8}
-                  style={styles.creditPoster}
-                />
-                <View style={styles.creditInfo}>
-                  <Text variant="bodyLarge" style={styles.creditTitle}>
-                    {credit.title || "Unknown Movie"}
-                  </Text>
-                  <Text variant="bodyMedium" style={styles.creditRole}>
-                    {credit.character || "Actor"}
-                  </Text>
-                  <Text variant="bodySmall" style={styles.creditYear}>
-                    {new Date(credit.release_date!).getFullYear()}
-                  </Text>
-                </View>
-              </Pressable>
+            {processedMovieCredits.map((credit, index) => (
+              <AnimatedListItem key={`movie-${credit.id}`} index={index}>
+                <Pressable
+                  onPress={() => handleMediaPress("movie", credit.id)}
+                  style={styles.creditRow}
+                >
+                  <MediaPoster
+                    uri={buildPosterUrl(credit.poster_path)}
+                    size={60}
+                    aspectRatio={2 / 3}
+                    borderRadius={8}
+                    style={styles.creditPoster}
+                  />
+                  <View style={styles.creditInfo}>
+                    <Text variant="bodyLarge" style={styles.creditTitle}>
+                      {credit.title || "Unknown Movie"}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.creditRole}>
+                      {credit.character || "Actor"}
+                    </Text>
+                    <Text variant="bodySmall" style={styles.creditYear}>
+                      {new Date(credit.release_date!).getFullYear()}
+                    </Text>
+                  </View>
+                </Pressable>
+              </AnimatedListItem>
             ))}
           </View>
         )}
@@ -493,33 +495,34 @@ const PersonDetails = () => {
             <Text variant="titleLarge" style={styles.sectionTitle}>
               TV Shows
             </Text>
-            {processedTvCredits.map((credit) => (
-              <Pressable
-                key={`tv-${credit.id}`}
-                onPress={() => handleMediaPress("tv", credit.id)}
-                style={styles.creditRow}
-              >
-                <MediaPoster
-                  uri={buildPosterUrl(credit.poster_path)}
-                  size={60}
-                  aspectRatio={2 / 3}
-                  borderRadius={8}
-                  style={styles.creditPoster}
-                />
-                <View style={styles.creditInfo}>
-                  <Text variant="bodyLarge" style={styles.creditTitle}>
-                    {credit.name || "Unknown TV Show"}
-                  </Text>
-                  <Text variant="bodyMedium" style={styles.creditRole}>
-                    {credit.character || "Actor"}
-                  </Text>
-                  <Text variant="bodySmall" style={styles.creditYear}>
-                    {new Date(credit.first_air_date!).getFullYear()}
-                    {credit.episode_count &&
-                      ` (${credit.episode_count} episodes)`}
-                  </Text>
-                </View>
-              </Pressable>
+            {processedTvCredits.map((credit, index) => (
+              <AnimatedListItem key={`tv-${credit.id}`} index={index}>
+                <Pressable
+                  onPress={() => handleMediaPress("tv", credit.id)}
+                  style={styles.creditRow}
+                >
+                  <MediaPoster
+                    uri={buildPosterUrl(credit.poster_path)}
+                    size={60}
+                    aspectRatio={2 / 3}
+                    borderRadius={8}
+                    style={styles.creditPoster}
+                  />
+                  <View style={styles.creditInfo}>
+                    <Text variant="bodyLarge" style={styles.creditTitle}>
+                      {credit.name || "Unknown TV Show"}
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.creditRole}>
+                      {credit.character || "Actor"}
+                    </Text>
+                    <Text variant="bodySmall" style={styles.creditYear}>
+                      {new Date(credit.first_air_date!).getFullYear()}
+                      {credit.episode_count &&
+                        ` (${credit.episode_count} episodes)`}
+                    </Text>
+                  </View>
+                </Pressable>
+              </AnimatedListItem>
             ))}
           </View>
         )}

@@ -3,6 +3,7 @@ import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, View } from "react-native";
 import { Text, IconButton, useTheme } from "react-native-paper";
 import Animated, {
+  FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -255,7 +256,10 @@ const EnhancedCalendarHeader: React.FC<EnhancedCalendarHeaderProps> = ({
   const { month, year } = getCurrentMonthYear();
 
   return (
-    <View style={[styles.container, style]}>
+    <Animated.View
+      entering={FadeIn.duration(300)}
+      style={[styles.container, style]}
+    >
       <View style={styles.leftSection}>
         <Animated.View style={prevButtonStyle}>
           <IconButton
@@ -330,7 +334,7 @@ const EnhancedCalendarHeader: React.FC<EnhancedCalendarHeaderProps> = ({
         onClose={() => setShowMonthYearPicker(false)}
         onToday={handleTodayFromPicker}
       />
-    </View>
+    </Animated.View>
   );
 };
 

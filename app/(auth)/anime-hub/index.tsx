@@ -25,6 +25,7 @@ import {
 } from "@/hooks/useJikanDiscover";
 import { useConnectorsStore } from "@/store/connectorsStore";
 import { AnimeCard } from "@/components/anime";
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
 type JellyseerrSearchResult =
@@ -246,7 +247,13 @@ const AnimeHubScreen: React.FC = () => {
     return undefined;
   };
 
-  const renderAnimeItem = ({ item }: { item: JellyseerrSearchResult }) => {
+  const renderAnimeItem = ({
+    item,
+    index,
+  }: {
+    item: JellyseerrSearchResult;
+    index: number;
+  }) => {
     const idNum = getJellyId(item) as number;
     const title = getJellyTitle(item);
     const poster = getJellyPosterPath(item);
@@ -256,26 +263,36 @@ const AnimeHubScreen: React.FC = () => {
     const rating = getJellyVoteAverage(item);
 
     return (
-      <AnimeCard
-        id={idNum}
-        title={title}
-        posterUrl={posterUrl}
-        rating={rating}
-        onPress={() => handleCardPress(item)}
-        width={160}
-      />
+      <AnimatedListItem index={index}>
+        <AnimeCard
+          id={idNum}
+          title={title}
+          posterUrl={posterUrl}
+          rating={rating}
+          onPress={() => handleCardPress(item)}
+          width={160}
+        />
+      </AnimatedListItem>
     );
   };
 
-  const renderJikanItem = ({ item }: { item: JikanDiscoverItem }) => (
-    <AnimeCard
-      id={item.id}
-      title={item.title}
-      posterUrl={item.posterUrl}
-      rating={item.rating}
-      onPress={() => void handleJikanCardPress(item)}
-      width={160}
-    />
+  const renderJikanItem = ({
+    item,
+    index,
+  }: {
+    item: JikanDiscoverItem;
+    index: number;
+  }) => (
+    <AnimatedListItem index={index}>
+      <AnimeCard
+        id={item.id}
+        title={item.title}
+        posterUrl={item.posterUrl}
+        rating={item.rating}
+        onPress={() => void handleJikanCardPress(item)}
+        width={160}
+      />
+    </AnimatedListItem>
   );
 
   return (
@@ -329,8 +346,8 @@ const AnimeHubScreen: React.FC = () => {
             </View>
             <FlatList
               data={recommendations}
-              renderItem={renderAnimeItem}
-              keyExtractor={(item) => `rec-${item.id}`}
+              renderItem={({ item, index }) => renderAnimeItem({ item, index })}
+              keyExtractor={(item, index) => `rec-${item.id}-${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.list}
@@ -411,8 +428,8 @@ const AnimeHubScreen: React.FC = () => {
             </View>
             <FlatList
               data={trending}
-              renderItem={renderAnimeItem}
-              keyExtractor={(item) => `trend-${item.id}`}
+              renderItem={({ item, index }) => renderAnimeItem({ item, index })}
+              keyExtractor={(item, index) => `trend-${item.id}-${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.list}
@@ -428,8 +445,8 @@ const AnimeHubScreen: React.FC = () => {
             </View>
             <FlatList
               data={movies}
-              renderItem={renderAnimeItem}
-              keyExtractor={(item) => `movie-${item.id}`}
+              renderItem={({ item, index }) => renderAnimeItem({ item, index })}
+              keyExtractor={(item, index) => `movie-${item.id}-${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.list}
@@ -445,7 +462,7 @@ const AnimeHubScreen: React.FC = () => {
             </View>
             <FlatList
               data={jikan.top}
-              renderItem={renderJikanItem}
+              renderItem={({ item, index }) => renderJikanItem({ item, index })}
               keyExtractor={(item, index) => `jikan-top-${item.id}-${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -462,7 +479,7 @@ const AnimeHubScreen: React.FC = () => {
             </View>
             <FlatList
               data={jikan.recommendations}
-              renderItem={renderJikanItem}
+              renderItem={({ item, index }) => renderJikanItem({ item, index })}
               keyExtractor={(item, index) => `jikan-rec-${item.id}-${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -479,7 +496,7 @@ const AnimeHubScreen: React.FC = () => {
             </View>
             <FlatList
               data={jikan.now}
-              renderItem={renderJikanItem}
+              renderItem={({ item, index }) => renderJikanItem({ item, index })}
               keyExtractor={(item, index) => `jikan-now-${item.id}-${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -496,7 +513,7 @@ const AnimeHubScreen: React.FC = () => {
             </View>
             <FlatList
               data={jikan.upcoming}
-              renderItem={renderJikanItem}
+              renderItem={({ item, index }) => renderJikanItem({ item, index })}
               keyExtractor={(item, index) => `jikan-up-${item.id}-${index}`}
               horizontal
               showsHorizontalScrollIndicator={false}

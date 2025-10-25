@@ -99,9 +99,9 @@ export const TmdbResultsGrid: React.FC<Props> = ({
   };
 
   return (
-    <FlashList
+    <FlashList<DiscoverMediaItem>
       data={items}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item: DiscoverMediaItem) => item.id}
       renderItem={renderItem}
       ListEmptyComponent={renderEmpty}
       ListFooterComponent={renderFooter}

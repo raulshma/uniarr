@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
+import Animated from "react-native-reanimated";
 import { IconButton, Text, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -11,6 +12,7 @@ import { widgetService } from "@/services/widgets/WidgetService";
 import { getComponentElevation } from "@/constants/elevation";
 import { borderRadius } from "@/constants/sizes";
 import { healthCheckService } from "@/services/bookmarks/HealthCheckService";
+import { COMPONENT_ANIMATIONS } from "@/utils/animations.utils";
 import BookmarkItem from "./BookmarkItem";
 import type {
   Bookmark,
@@ -270,17 +272,27 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
           />
         }
       >
-        <View style={styles.gridContainer}>
-          {enabledBookmarks.map((bookmark) => (
-            <BookmarkItem
+        <Animated.View
+          style={styles.gridContainer}
+          entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
+        >
+          {enabledBookmarks.map((bookmark, index) => (
+            <Animated.View
               key={bookmark.id}
-              bookmark={bookmark}
-              health={health.get(bookmark.id)}
-              onPress={handleBookmarkPress}
-              size={widget.size}
-            />
+              entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, 50).delay(
+                150,
+              )}
+              style={[]}
+            >
+              <BookmarkItem
+                bookmark={bookmark}
+                health={health.get(bookmark.id)}
+                onPress={handleBookmarkPress}
+                size={widget.size}
+              />
+            </Animated.View>
           ))}
-        </View>
+        </Animated.View>
       </ScrollView>
     </View>
   );

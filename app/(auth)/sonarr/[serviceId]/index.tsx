@@ -16,7 +16,10 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AnimatedListItem } from "@/components/common/AnimatedComponents";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -37,6 +40,7 @@ import { useSonarrFilterMetadata } from "@/hooks/useLibraryFilterMetadata";
 import type { Series } from "@/models/media.types";
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 import {
   useLibraryFilterStore,
   type LibraryFilters,
@@ -196,6 +200,10 @@ const SonarrSeriesListScreen = () => {
 
   const isRefreshing = isFetching && !isLoading;
   const isInitialLoad = isBootstrapping || isLoading;
+  const animationsEnabled = shouldAnimateLayout(
+    isLoading || isBootstrapping,
+    isFetching,
+  );
 
   // Advanced filter handlers
   const handleOpenFilterModal = useCallback(() => {
@@ -463,7 +471,11 @@ const SonarrSeriesListScreen = () => {
         totalEpisodes > 0 ? Math.min(availableEpisodes / totalEpisodes, 1) : 0;
 
       return (
-        <AnimatedListItem index={index}>
+        <AnimatedListItem
+          index={index}
+          totalItems={filteredSeries.length}
+          animated={animationsEnabled}
+        >
           <View>
             <MediaSelectableItem
               item={item}
@@ -518,14 +530,24 @@ const SonarrSeriesListScreen = () => {
         </AnimatedListItem>
       );
     },
-    [handleSeriesPress, handleSeriesLongPress, styles],
+    [
+      animationsEnabled,
+      filteredSeries.length,
+      handleSeriesLongPress,
+      handleSeriesPress,
+      styles,
+    ],
   );
 
   const keyExtractor = useCallback((item: Series) => item.id.toString(), []);
 
   const listHeader = useMemo(
     () => (
-      <View style={styles.listHeader}>
+      <AnimatedSection
+        animated={animationsEnabled}
+        style={styles.listHeader}
+        delay={50}
+      >
         <View style={styles.topBar}>
           <View style={styles.topBarSpacer} />
           <Text variant="headlineSmall" style={styles.topBarTitle}>
@@ -685,9 +707,10 @@ const SonarrSeriesListScreen = () => {
             </ScrollView>
           </View>
         )}
-      </View>
+      </AnimatedSection>
     ),
     [
+      animationsEnabled,
       filterValue,
       handleAddSeries,
       handleStatusChange,
@@ -708,24 +731,43 @@ const SonarrSeriesListScreen = () => {
   const listEmptyComponent = useMemo(() => {
     if (filteredSeries.length === 0 && totalSeries > 0) {
       return (
-        <EmptyState
-          title="No series match your filters"
-          description="Try a different search query or reset the filters."
-          actionLabel="Clear filters"
-          onActionPress={handleClearFilters}
-        />
+        <AnimatedSection
+          animated={animationsEnabled}
+          style={styles.emptyContainer}
+          delay={75}
+        >
+          <EmptyState
+            title="No series match your filters"
+            description="Try a different search query or reset the filters."
+            actionLabel="Clear filters"
+            onActionPress={handleClearFilters}
+          />
+        </AnimatedSection>
       );
     }
 
     return (
-      <EmptyState
-        title="No series available"
-        description="Add a series in Sonarr or adjust your filters to see it here."
-        actionLabel="Add Series"
-        onActionPress={handleAddSeries}
-      />
+      <AnimatedSection
+        animated={animationsEnabled}
+        style={styles.emptyContainer}
+        delay={100}
+      >
+        <EmptyState
+          title="No series available"
+          description="Add a series in Sonarr or adjust your filters to see it here."
+          actionLabel="Add Series"
+          onActionPress={handleAddSeries}
+        />
+      </AnimatedSection>
     );
-  }, [filteredSeries.length, handleAddSeries, handleClearFilters, totalSeries]);
+  }, [
+    animationsEnabled,
+    filteredSeries.length,
+    handleAddSeries,
+    handleClearFilters,
+    styles.emptyContainer,
+    totalSeries,
+  ]);
 
   if (!hasValidServiceId) {
     return (
@@ -816,16 +858,16 @@ const SonarrSeriesListScreen = () => {
     <MediaSelectorProvider>
       <SafeAreaView style={styles.safeArea}>
         <View style={{ flex: 1 }}>
-          <FlashList
+          <FlashList<Series>
             data={filteredSeries}
             keyExtractor={keyExtractor}
             renderItem={renderSeriesItem}
             ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
             contentContainerStyle={styles.listContent}
+            removeClippedSubviews
+            keyboardShouldPersistTaps="handled"
             ListHeaderComponent={listHeader}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>{listEmptyComponent}</View>
-            }
+            ListEmptyComponent={listEmptyComponent}
             refreshControl={
               <ListRefreshControl
                 refreshing={isRefreshing}

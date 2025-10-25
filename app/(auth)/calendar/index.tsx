@@ -652,11 +652,17 @@ const CalendarScreen = () => {
     }
 
     return (
-      <FlashList
+      <FlashList<MediaRelease>
         data={releasesForView}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: MediaRelease) => item.id}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item, index }) => (
+        renderItem={({
+          item,
+          index,
+        }: {
+          item: MediaRelease;
+          index: number;
+        }) => (
           <AnimatedListItem
             index={index}
             totalItems={releasesForView.length}

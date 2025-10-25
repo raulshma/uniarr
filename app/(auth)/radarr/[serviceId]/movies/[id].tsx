@@ -4,16 +4,17 @@ import { StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
+import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import { MediaDetails } from "@/components/media/MediaDetails";
 import { MovieDetailsSkeleton } from "@/components/media/skeletons";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import type { AppTheme } from "@/constants/theme";
 import { useRadarrMovieDetails } from "@/hooks/useRadarrMovieDetails";
 import { spacing } from "@/theme/spacing";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const RadarrMovieDetailsScreen = () => {
   const router = useRouter();
@@ -43,6 +44,13 @@ const RadarrMovieDetailsScreen = () => {
     serviceId: serviceKey,
     movieId: numericMovieId,
   });
+
+  const isMutating = isTogglingMonitor || isTriggeringSearch || isDeleting;
+  const animationsEnabled = shouldAnimateLayout(
+    isLoading,
+    isFetching,
+    isMutating,
+  );
 
   const styles = useMemo(
     () =>
@@ -131,10 +139,10 @@ const RadarrMovieDetailsScreen = () => {
     <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <View style={styles.container}>
         {!movie ? (
-          <Animated.View
+          <AnimatedSection
+            animated={animationsEnabled}
             style={styles.header}
-            entering={FadeInDown.delay(200).springify()}
-            layout={Layout.springify()}
+            delay={150}
           >
             <Button
               mode="text"
@@ -151,13 +159,17 @@ const RadarrMovieDetailsScreen = () => {
                 Refreshing…
               </Text>
             ) : null}
-          </Animated.View>
+          </AnimatedSection>
         ) : null}
 
         {isLoading && !movie ? (
           <MovieDetailsSkeleton />
         ) : isError ? (
-          <View style={{ flex: 1, justifyContent: "center" }}>
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={{ flex: 1, justifyContent: "center" }}
+            delay={100}
+          >
             <EmptyState
               title="Failed to load movie"
               description={
@@ -171,43 +183,53 @@ const RadarrMovieDetailsScreen = () => {
               }}
               icon="alert-circle-outline"
             />
-          </View>
+          </AnimatedSection>
         ) : movie ? (
-          <DetailHero
-            posterUri={movie.posterUrl}
-            backdropUri={movie.backdropUrl}
-            onBack={handleClose}
-            isFetching={isFetching}
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={{ flex: 1 }}
+            delay={150}
           >
-            <MediaDetails
-              title={movie.title}
-              year={movie.year}
-              status={movie.status}
-              overview={movie.overview}
-              genres={movie.genres}
-              runtimeMinutes={movie.runtime}
-              network={movie.studio}
+            <DetailHero
               posterUri={movie.posterUrl}
               backdropUri={movie.backdropUrl}
-              monitored={movie.monitored}
-              hasFile={movie.hasFile}
-              movieFile={movie.movieFile}
-              type="movie"
-              rating={movie.ratings?.value}
-              tmdbId={movie.tmdbId}
-              imdbId={movie.imdbId}
-              onToggleMonitor={handleToggleMonitor}
-              onSearchPress={handleTriggerSearch}
-              onDeletePress={handleDeleteMovie}
-              isUpdatingMonitor={isTogglingMonitor}
-              isSearching={isTriggeringSearch}
-              isDeleting={isDeleting}
-              showPoster={false}
-              disableScroll={true}
-            />
-          </DetailHero>
+              onBack={handleClose}
+              isFetching={isFetching}
+            >
+              <MediaDetails
+                title={movie.title}
+                year={movie.year}
+                status={movie.status}
+                overview={movie.overview}
+                genres={movie.genres}
+                runtimeMinutes={movie.runtime}
+                network={movie.studio}
+                posterUri={movie.posterUrl}
+                backdropUri={movie.backdropUrl}
+                monitored={movie.monitored}
+                hasFile={movie.hasFile}
+                movieFile={movie.movieFile}
+                type="movie"
+                rating={movie.ratings?.value}
+                tmdbId={movie.tmdbId}
+                imdbId={movie.imdbId}
+                onToggleMonitor={handleToggleMonitor}
+                onSearchPress={handleTriggerSearch}
+                onDeletePress={handleDeleteMovie}
+                isUpdatingMonitor={isTogglingMonitor}
+                isSearching={isTriggeringSearch}
+                isDeleting={isDeleting}
+                showPoster={false}
+                disableScroll={true}
+              />
+            </DetailHero>
+          </AnimatedSection>
         ) : (
-          <View style={{ flex: 1, justifyContent: "center" }}>
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={{ flex: 1, justifyContent: "center" }}
+            delay={100}
+          >
             <EmptyState
               title="No movie data"
               description="We couldn't load details for this movie."
@@ -215,7 +237,7 @@ const RadarrMovieDetailsScreen = () => {
               onActionPress={handleClose}
               icon="alert-circle-outline"
             />
-          </View>
+          </AnimatedSection>
         )}
       </View>
     </SafeAreaView>

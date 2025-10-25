@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, View } from "react-native";
+import { FadeIn, FadeOut } from "react-native-reanimated";
 import { Text, Chip, Button, useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
@@ -9,6 +10,7 @@ import type {
   MediaType,
   ReleaseStatus,
 } from "@/models/calendar.types";
+import { AnimatedView } from "@/components/common/AnimatedComponents";
 import { Card } from "@/components/common/Card";
 
 export type CalendarFiltersProps = {
@@ -157,28 +159,35 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
       </View>
 
       {isExpanded && (
-        <View style={styles.content}>
+        <AnimatedView
+          style={styles.content}
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(200)}
+        >
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Media Types</Text>
             <View style={styles.chipsContainer}>
-              {mediaTypes.map(({ value, label }) => {
+              {mediaTypes.map(({ value, label }, index) => {
                 const isActive = filters.mediaTypes.includes(value);
                 return (
-                  <Chip
-                    key={value}
-                    mode="flat"
-                    selected={isActive}
-                    onPress={() => handleMediaTypeToggle(value)}
-                    style={[
-                      styles.chip,
-                      isActive ? styles.activeChip : styles.inactiveChip,
-                    ]}
-                    textStyle={
-                      isActive ? styles.activeChipText : styles.inactiveChipText
-                    }
-                  >
-                    {label}
-                  </Chip>
+                  <AnimatedView key={value} entering={FadeIn.delay(index * 50)}>
+                    <Chip
+                      mode="flat"
+                      selected={isActive}
+                      onPress={() => handleMediaTypeToggle(value)}
+                      style={[
+                        styles.chip,
+                        isActive ? styles.activeChip : styles.inactiveChip,
+                      ]}
+                      textStyle={
+                        isActive
+                          ? styles.activeChipText
+                          : styles.inactiveChipText
+                      }
+                    >
+                      {label}
+                    </Chip>
+                  </AnimatedView>
                 );
               })}
             </View>
@@ -187,24 +196,27 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Status</Text>
             <View style={styles.chipsContainer}>
-              {statuses.map(({ value, label }) => {
+              {statuses.map(({ value, label }, index) => {
                 const isActive = filters.statuses.includes(value);
                 return (
-                  <Chip
-                    key={value}
-                    mode="flat"
-                    selected={isActive}
-                    onPress={() => handleStatusToggle(value)}
-                    style={[
-                      styles.chip,
-                      isActive ? styles.activeChip : styles.inactiveChip,
-                    ]}
-                    textStyle={
-                      isActive ? styles.activeChipText : styles.inactiveChipText
-                    }
-                  >
-                    {label}
-                  </Chip>
+                  <AnimatedView key={value} entering={FadeIn.delay(index * 50)}>
+                    <Chip
+                      mode="flat"
+                      selected={isActive}
+                      onPress={() => handleStatusToggle(value)}
+                      style={[
+                        styles.chip,
+                        isActive ? styles.activeChip : styles.inactiveChip,
+                      ]}
+                      textStyle={
+                        isActive
+                          ? styles.activeChipText
+                          : styles.inactiveChipText
+                      }
+                    >
+                      {label}
+                    </Chip>
+                  </AnimatedView>
                 );
               })}
             </View>
@@ -221,7 +233,7 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
               </Button>
             </View>
           )}
-        </View>
+        </AnimatedView>
       )}
     </Card>
   );

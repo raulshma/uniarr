@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
+import Animated from "react-native-reanimated";
 import {
   useTheme,
   Text,
@@ -20,6 +21,7 @@ import type { DownloadStorageInfo } from "@/models/download.types";
 import { formatBytes } from "@/utils/torrent.utils";
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
+import { COMPONENT_ANIMATIONS } from "@/utils/animations.utils";
 
 interface StorageManagerProps {
   /** Auto-refresh interval in seconds */
@@ -185,192 +187,202 @@ const StorageManagerComponent: React.FC<StorageManagerProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text variant="titleMedium" style={styles.title}>
-        Storage Management
-      </Text>
+      <Animated.View entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE()}>
+        <Text variant="titleMedium" style={styles.title}>
+          Storage Management
+        </Text>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Overall Storage Status */}
-        <Surface style={styles.surface}>
-          <Text variant="titleSmall" style={styles.sectionTitle}>
-            Overall Storage
-          </Text>
-
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text variant="bodyMedium" style={styles.progressLabel}>
-                Total Storage Used
-              </Text>
-              <Text variant="bodyMedium" style={styles.progressValue}>
-                {usagePercentage.toFixed(1)}%
-              </Text>
-            </View>
-            <ProgressBar
-              progress={usagePercentage / 100}
-              color={getUsageColor(usagePercentage)}
-              style={styles.progressBar}
-            />
-            <Text variant="bodySmall" style={styles.progressDescription}>
-              {formatBytes(storageInfo.totalSpace - storageInfo.freeSpace)} of{" "}
-              {formatBytes(storageInfo.totalSpace)} used
+        <Animated.View entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}>
+          <Surface style={styles.surface}>
+            <Text variant="titleSmall" style={styles.sectionTitle}>
+              Overall Storage
             </Text>
-          </View>
 
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text variant="bodyMedium" style={styles.progressLabel}>
-                Downloads Storage
-              </Text>
-              <Text variant="bodyMedium" style={styles.progressValue}>
-                {downloadUsagePercentage.toFixed(1)}%
+            <View style={styles.progressSection}>
+              <View style={styles.progressHeader}>
+                <Text variant="bodyMedium" style={styles.progressLabel}>
+                  Total Storage Used
+                </Text>
+                <Text variant="bodyMedium" style={styles.progressValue}>
+                  {usagePercentage.toFixed(1)}%
+                </Text>
+              </View>
+              <ProgressBar
+                progress={usagePercentage / 100}
+                color={getUsageColor(usagePercentage)}
+                style={styles.progressBar}
+              />
+              <Text variant="bodySmall" style={styles.progressDescription}>
+                {formatBytes(storageInfo.totalSpace - storageInfo.freeSpace)} of{" "}
+                {formatBytes(storageInfo.totalSpace)} used
               </Text>
             </View>
-            <ProgressBar
-              progress={downloadUsagePercentage / 100}
-              color={theme.colors.primary}
-              style={styles.progressBar}
-            />
-            <Text variant="bodySmall" style={styles.progressDescription}>
-              {formatBytes(storageInfo.usedSpace)} of{" "}
-              {formatBytes(storageInfo.totalSpace)} used for downloads
-            </Text>
-          </View>
 
-          <View style={styles.storageStats}>
-            <View style={styles.statItem}>
-              <Text variant="headlineSmall" style={styles.statValue}>
-                {formatBytes(storageInfo.freeSpace)}
-              </Text>
-              <Text variant="bodySmall" style={styles.statLabel}>
-                Free Space
+            <View style={styles.progressSection}>
+              <View style={styles.progressHeader}>
+                <Text variant="bodyMedium" style={styles.progressLabel}>
+                  Downloads Storage
+                </Text>
+                <Text variant="bodyMedium" style={styles.progressValue}>
+                  {downloadUsagePercentage.toFixed(1)}%
+                </Text>
+              </View>
+              <ProgressBar
+                progress={downloadUsagePercentage / 100}
+                color={theme.colors.primary}
+                style={styles.progressBar}
+              />
+              <Text variant="bodySmall" style={styles.progressDescription}>
+                {formatBytes(storageInfo.usedSpace)} of{" "}
+                {formatBytes(storageInfo.totalSpace)} used for downloads
               </Text>
             </View>
-            <View style={styles.statItem}>
-              <Text variant="headlineSmall" style={styles.statValue}>
-                {storageInfo.fileCount}
-              </Text>
-              <Text variant="bodySmall" style={styles.statLabel}>
-                Download Files
-              </Text>
+
+            <View style={styles.storageStats}>
+              <View style={styles.statItem}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {formatBytes(storageInfo.freeSpace)}
+                </Text>
+                <Text variant="bodySmall" style={styles.statLabel}>
+                  Free Space
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {storageInfo.fileCount}
+                </Text>
+                <Text variant="bodySmall" style={styles.statLabel}>
+                  Download Files
+                </Text>
+              </View>
             </View>
-          </View>
-        </Surface>
+          </Surface>
+        </Animated.View>
 
         {/* Storage Recommendations */}
         {storageRecommendations && (
-          <Surface style={styles.surface}>
-            <View style={styles.recommendationHeader}>
-              <Text variant="titleSmall" style={styles.sectionTitle}>
-                Storage Status
-              </Text>
-              <Chip
-                style={[
-                  styles.priorityChip,
-                  {
-                    backgroundColor:
-                      storageRecommendations.priority === "critical"
-                        ? theme.colors.errorContainer
-                        : storageRecommendations.priority === "high"
-                          ? theme.colors.tertiaryContainer
-                          : storageRecommendations.priority === "medium"
-                            ? theme.colors.secondaryContainer
-                            : theme.colors.primaryContainer,
-                  },
-                ]}
-              >
-                {storageRecommendations.priority}
-              </Chip>
-            </View>
+          <Animated.View entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(200)}>
+            <Surface style={styles.surface}>
+              <View style={styles.recommendationHeader}>
+                <Text variant="titleSmall" style={styles.sectionTitle}>
+                  Storage Status
+                </Text>
+                <Chip
+                  style={[
+                    styles.priorityChip,
+                    {
+                      backgroundColor:
+                        storageRecommendations.priority === "critical"
+                          ? theme.colors.errorContainer
+                          : storageRecommendations.priority === "high"
+                            ? theme.colors.tertiaryContainer
+                            : storageRecommendations.priority === "medium"
+                              ? theme.colors.secondaryContainer
+                              : theme.colors.primaryContainer,
+                    },
+                  ]}
+                >
+                  {storageRecommendations.priority}
+                </Chip>
+              </View>
 
-            <Text variant="bodyMedium" style={styles.recommendationMessage}>
-              {storageRecommendations.message}
-            </Text>
-
-            <View style={styles.recommendationActions}>
-              <Text variant="titleSmall" style={styles.actionsTitle}>
-                Recommended Actions:
+              <Text variant="bodyMedium" style={styles.recommendationMessage}>
+                {storageRecommendations.message}
               </Text>
-              {storageRecommendations.actions.map(
-                (action: string, index: number) => (
-                  <Text
-                    key={index}
-                    variant="bodySmall"
-                    style={styles.actionItem}
-                  >
-                    • {action}
-                  </Text>
-                ),
-              )}
-            </View>
-          </Surface>
+
+              <View style={styles.recommendationActions}>
+                <Text variant="titleSmall" style={styles.actionsTitle}>
+                  Recommended Actions:
+                </Text>
+                {storageRecommendations.actions.map(
+                  (action: string, index: number) => (
+                    <Text
+                      key={index}
+                      variant="bodySmall"
+                      style={styles.actionItem}
+                    >
+                      • {action}
+                    </Text>
+                  ),
+                )}
+              </View>
+            </Surface>
+          </Animated.View>
         )}
 
         {/* Quick Actions */}
-        <Surface style={styles.surface}>
-          <Text variant="titleSmall" style={styles.sectionTitle}>
-            Quick Actions
-          </Text>
+        <Animated.View entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(300)}>
+          <Surface style={styles.surface}>
+            <Text variant="titleSmall" style={styles.sectionTitle}>
+              Quick Actions
+            </Text>
 
-          <List.Item
-            title="Clear Old Downloads"
-            description="Remove downloads older than specified criteria"
-            left={(props) => <List.Icon {...props} icon="trash-can" />}
-            onPress={() => setCleanupDialogVisible(true)}
-          />
+            <List.Item
+              title="Clear Old Downloads"
+              description="Remove downloads older than specified criteria"
+              left={(props) => <List.Icon {...props} icon="trash-can" />}
+              onPress={() => setCleanupDialogVisible(true)}
+            />
 
-          <List.Item
-            title="Clean Orphaned Files"
-            description="Remove downloads that no longer exist on disk"
-            left={(props) => <List.Icon {...props} icon="broom" />}
-            onPress={handleOrphanedCleanup}
-          />
+            <List.Item
+              title="Clean Orphaned Files"
+              description="Remove downloads that no longer exist on disk"
+              left={(props) => <List.Icon {...props} icon="broom" />}
+              onPress={handleOrphanedCleanup}
+            />
 
-          <List.Item
-            title="Refresh Storage Info"
-            description="Update storage usage statistics"
-            left={(props) => <List.Icon {...props} icon="refresh" />}
-            onPress={loadStorageInfo}
-            disabled={isLoading}
-          />
-        </Surface>
+            <List.Item
+              title="Refresh Storage Info"
+              description="Update storage usage statistics"
+              left={(props) => <List.Icon {...props} icon="refresh" />}
+              onPress={loadStorageInfo}
+              disabled={isLoading}
+            />
+          </Surface>
+        </Animated.View>
 
         {/* Detailed Breakdown */}
         {showDetailed && (
-          <Surface style={styles.surface}>
-            <Text variant="titleSmall" style={styles.sectionTitle}>
-              Detailed Breakdown
-            </Text>
-
-            <Card style={styles.detailCard}>
-              <Text variant="titleSmall" style={styles.detailCardTitle}>
-                Download Statistics
+          <Animated.View entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(400)}>
+            <Surface style={styles.surface}>
+              <Text variant="titleSmall" style={styles.sectionTitle}>
+                Detailed Breakdown
               </Text>
-              <View style={styles.detailRow}>
-                <Text variant="bodySmall">Total Downloads:</Text>
-                <Text variant="bodySmall">
-                  {
-                    allDownloads.filter((d) => d.state.status === "completed")
-                      .length
-                  }
+
+              <Card style={styles.detailCard}>
+                <Text variant="titleSmall" style={styles.detailCardTitle}>
+                  Download Statistics
                 </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text variant="bodySmall">Failed Downloads:</Text>
-                <Text variant="bodySmall">
-                  {
-                    allDownloads.filter((d) => d.state.status === "failed")
-                      .length
-                  }
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text variant="bodySmall">Download Directory:</Text>
-                <Text variant="bodySmall" numberOfLines={1}>
-                  {storageManager.getDownloadDirectory()}
-                </Text>
-              </View>
-            </Card>
-          </Surface>
+                <View style={styles.detailRow}>
+                  <Text variant="bodySmall">Total Downloads:</Text>
+                  <Text variant="bodySmall">
+                    {
+                      allDownloads.filter((d) => d.state.status === "completed")
+                        .length
+                    }
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text variant="bodySmall">Failed Downloads:</Text>
+                  <Text variant="bodySmall">
+                    {
+                      allDownloads.filter((d) => d.state.status === "failed")
+                        .length
+                    }
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text variant="bodySmall">Download Directory:</Text>
+                  <Text variant="bodySmall" numberOfLines={1}>
+                    {storageManager.getDownloadDirectory()}
+                  </Text>
+                </View>
+              </Card>
+            </Surface>
+          </Animated.View>
         )}
       </ScrollView>
 

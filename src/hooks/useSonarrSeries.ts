@@ -68,7 +68,10 @@ export const useSonarrSeries = ({
   );
 
   const seriesQuery = useQuery({
-    queryKey: queryKeys.sonarr.seriesList(serviceId, filters),
+    queryKey: queryKeys.sonarr.seriesList(
+      serviceId,
+      filters as Record<string, unknown> | undefined,
+    ),
     queryFn: async () => {
       const connector = resolveConnector();
       return connector.getSeries(filters);

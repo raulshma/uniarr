@@ -38,6 +38,7 @@ import {
   isTorrentPaused,
 } from "@/utils/torrent.utils";
 import { borderRadius } from "@/constants/sizes";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 type TorrentWithService = Torrent & {
   serviceId: string;
@@ -192,6 +193,28 @@ const DownloadsScreen = () => {
 
   const hasTorrents = overview.torrents.length > 0;
   const isRefreshing = isFetching && !isLoading;
+  const animationsEnabled = shouldAnimateLayout(isLoading, isFetching);
+
+  const { total, active, completed, paused, downloadSpeed, uploadSpeed } =
+    overview.totals;
+
+  const summaryMetrics = useMemo(
+    () => [
+      { label: "Total", value: total },
+      { label: "Active", value: active },
+      { label: "Completed", value: completed },
+      { label: "Paused", value: paused },
+    ],
+    [active, completed, paused, total],
+  );
+
+  const transferMetrics = useMemo(
+    () => [
+      { label: "Download speed", value: formatSpeed(downloadSpeed) },
+      { label: "Upload speed", value: formatSpeed(uploadSpeed) },
+    ],
+    [downloadSpeed, uploadSpeed],
+  );
 
   const styles = useMemo(
     () =>
@@ -203,6 +226,59 @@ const DownloadsScreen = () => {
         listContent: {
           paddingHorizontal: spacing.md,
           paddingBottom: 80,
+        },
+        summarySection: {
+          marginBottom: spacing.lg,
+          gap: spacing.sm,
+        },
+        summaryTitle: {
+          color: theme.colors.onSurface,
+          fontSize: 18,
+          fontWeight: "600",
+        },
+        summaryGrid: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          rowGap: spacing.sm,
+        },
+        summaryCard: {
+          width: "48%",
+          backgroundColor: theme.colors.elevation.level2,
+          borderRadius: spacing.md,
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.md,
+        },
+        summaryValue: {
+          color: theme.colors.onSurface,
+          fontSize: 20,
+          fontWeight: "700",
+        },
+        summaryLabel: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 12,
+          marginTop: spacing.xs,
+        },
+        speedRow: {
+          flexDirection: "row",
+          gap: spacing.sm,
+        },
+        speedChip: {
+          flex: 1,
+          backgroundColor: theme.colors.elevation.level2,
+          borderRadius: borderRadius.lg,
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.md,
+        },
+        speedLabel: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 12,
+          marginBottom: spacing.xs,
+        },
+        speedValue: {
+          color: theme.colors.primary,
+          fontSize: 14,
+          fontWeight: "600",
         },
         torrentItem: {
           backgroundColor: theme.colors.elevation.level1,
@@ -352,7 +428,11 @@ const DownloadsScreen = () => {
       };
 
       return (
-        <AnimatedListItem index={index} totalItems={overview.torrents.length}>
+        <AnimatedListItem
+          animated={animationsEnabled}
+          index={index}
+          totalItems={overview.torrents.length}
+        >
           <View style={styles.torrentItem}>
             <View style={styles.torrentHeader}>
               <Text style={styles.torrentName} numberOfLines={2}>
@@ -382,7 +462,10 @@ const DownloadsScreen = () => {
               </View>
             </View>
 
-            <AnimatedProgress style={styles.progressContainer}>
+            <AnimatedProgress
+              animated={animationsEnabled}
+              style={styles.progressContainer}
+            >
               <ProgressBar
                 progress={progress}
                 color={theme.colors.primary}
@@ -398,7 +481,13 @@ const DownloadsScreen = () => {
         </AnimatedListItem>
       );
     },
-    [handleTorrentAction, styles, theme.colors, overview.torrents.length],
+    [
+      animationsEnabled,
+      handleTorrentAction,
+      styles,
+      theme.colors,
+      overview.torrents.length,
+    ],
   );
 
   const listEmptyComponent = useMemo(() => {
@@ -438,7 +527,11 @@ const DownloadsScreen = () => {
             accessibilityLabel: "Add service",
           }}
         />
-        <AnimatedSection style={styles.listContent} delay={100}>
+        <AnimatedSection
+          animated={animationsEnabled}
+          style={styles.listContent}
+          delay={100}
+        >
           <View style={{ marginBottom: spacing.lg }}>
             <SkeletonPlaceholder
               width="60%"
@@ -451,6 +544,7 @@ const DownloadsScreen = () => {
           {Array.from({ length: 5 }).map((_, index) => (
             <AnimatedListItem
               key={index}
+              animated={animationsEnabled}
               index={index}
               totalItems={5}
               style={{ marginBottom: spacing.md }}
@@ -477,10 +571,53 @@ const DownloadsScreen = () => {
 
       <FlashList<TorrentWithService>
         data={overview.torrents}
-        keyExtractor={(item) => item.hash}
+        keyExtractor={(item: TorrentWithService) => item.hash}
         renderItem={renderTorrentItem}
+        ListHeaderComponent={
+          hasTorrents ? (
+            <AnimatedSection
+              animated={animationsEnabled}
+              style={styles.summarySection}
+              delay={50}
+            >
+              <Text style={styles.summaryTitle}>Queue overview</Text>
+              <View style={styles.summaryGrid}>
+                {summaryMetrics.map((metric, index) => (
+                  <AnimatedListItem
+                    key={metric.label}
+                    animated={animationsEnabled}
+                    index={index}
+                    totalItems={summaryMetrics.length + transferMetrics.length}
+                    style={styles.summaryCard}
+                  >
+                    <Text style={styles.summaryValue}>{metric.value}</Text>
+                    <Text style={styles.summaryLabel}>{metric.label}</Text>
+                  </AnimatedListItem>
+                ))}
+              </View>
+              <View style={styles.speedRow}>
+                {transferMetrics.map((metric, index) => (
+                  <AnimatedListItem
+                    key={metric.label}
+                    animated={animationsEnabled}
+                    index={summaryMetrics.length + index}
+                    totalItems={summaryMetrics.length + transferMetrics.length}
+                    style={styles.speedChip}
+                  >
+                    <Text style={styles.speedLabel}>{metric.label}</Text>
+                    <Text style={styles.speedValue}>{metric.value}</Text>
+                  </AnimatedListItem>
+                ))}
+              </View>
+            </AnimatedSection>
+          ) : null
+        }
         ListEmptyComponent={
-          <AnimatedSection style={styles.emptyContainer} delay={100}>
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={styles.emptyContainer}
+            delay={100}
+          >
             {listEmptyComponent}
           </AnimatedSection>
         }
@@ -491,6 +628,9 @@ const DownloadsScreen = () => {
             onRefresh={() => refetch()}
           />
         }
+        estimatedItemSize={160}
+        removeClippedSubviews
+        keyboardShouldPersistTaps="handled"
       />
     </SafeAreaView>
   );

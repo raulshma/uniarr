@@ -69,7 +69,10 @@ export const useRadarrMovies = ({
   const queryClient = useQueryClient();
 
   const moviesQuery = useQuery({
-    queryKey: queryKeys.radarr.moviesList(serviceId, filters),
+    queryKey: queryKeys.radarr.moviesList(
+      serviceId,
+      filters as Record<string, unknown> | undefined,
+    ),
     queryFn: async () => {
       const connector = resolveConnector();
       return connector.getMovies(filters);

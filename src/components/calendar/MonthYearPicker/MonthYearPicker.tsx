@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
+import Animated, { Easing, FadeIn } from "react-native-reanimated";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -22,6 +23,8 @@ export type MonthYearPickerProps = {
   onClose: () => void;
   onToday?: () => void;
 };
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const MonthYearPicker: React.FC<MonthYearPickerProps> = ({
   visible,
@@ -114,15 +117,17 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({
   return (
     <Portal>
       <View style={styles.overlay}>
-        <Pressable
+        <AnimatedPressable
           style={styles.backdrop}
           onPress={handleCancel}
           accessibilityRole="button"
           accessibilityLabel="Dismiss picker"
+          entering={FadeIn.duration(300)}
         />
 
-        <View
+        <Animated.View
           style={[styles.container, { backgroundColor: theme.colors.surface }]}
+          entering={FadeIn.duration(300).easing(Easing.in(Easing.quad))}
         >
           <Text style={[styles.title, { color: theme.colors.onSurface }]}>
             Select Month & Year
@@ -195,7 +200,7 @@ const MonthYearPicker: React.FC<MonthYearPickerProps> = ({
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Portal>
   );

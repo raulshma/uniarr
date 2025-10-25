@@ -15,6 +15,8 @@ export type CalendarListViewProps = {
   style?: StyleProp<ViewStyle>;
 };
 
+type ReleasesByDate = { date: string; releases: MediaRelease[] };
+
 const CalendarListView: React.FC<CalendarListViewProps> = ({
   releases,
   onReleasePress,
@@ -60,7 +62,7 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
     },
   });
 
-  const releasesByDate = useMemo(() => {
+  const releasesByDate = useMemo<ReleasesByDate[]>(() => {
     const grouped: { [date: string]: MediaRelease[] } = {};
 
     releases.forEach((release) => {
@@ -113,7 +115,7 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
   const renderDateSection = ({
     item,
     index,
-  }: ListRenderItemInfo<{ date: string; releases: MediaRelease[] }>) => {
+  }: ListRenderItemInfo<ReleasesByDate>) => {
     const { relativeDate, fullDate } = formatDate(item.date);
 
     return (
@@ -149,10 +151,10 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      <FlashList
+      <FlashList<ReleasesByDate>
         data={releasesByDate}
         renderItem={renderDateSection}
-        keyExtractor={(item) => item.date}
+        keyExtractor={(item: ReleasesByDate) => item.date}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         removeClippedSubviews={false}

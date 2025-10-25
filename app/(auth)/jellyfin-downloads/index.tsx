@@ -47,6 +47,8 @@ type JellyfinDownloadItem = DownloadItem & {
   isJellyfinDownload: boolean;
 };
 
+type DownloadsListItem = JellyfinDownloadItem | { type: "divider" };
+
 type JellyfinDownloadsOverview = {
   activeDownloads: JellyfinDownloadItem[];
   completedDownloads: JellyfinDownloadItem[];
@@ -630,7 +632,7 @@ const JellyfinDownloadsScreen = () => {
     );
   }, [styles, searchQuery, hasDownloads, overview, allowAnimations]);
 
-  const allDownloads = useMemo(() => {
+  const allDownloads = useMemo<DownloadsListItem[]>(() => {
     return [
       ...overview.activeDownloads,
       ...(overview.activeDownloads.length > 0 &&
@@ -658,33 +660,27 @@ const JellyfinDownloadsScreen = () => {
         </AnimatedSection>
 
         {hasDownloads ? (
-          <FlashList
+          <FlashList<DownloadsListItem>
             data={allDownloads}
-            keyExtractor={(item, index) => {
-              if (
-                typeof item === "object" &&
-                item !== null &&
-                "type" in item &&
-                item.type === "divider"
-              ) {
+            keyExtractor={(item: DownloadsListItem, index: number) => {
+              if ("type" in item) {
                 return `divider-${index}`;
               }
-              const download = item as JellyfinDownloadItem;
-              return download.id;
+              return item.id;
             }}
-            renderItem={(props) => {
-              const item = props.item;
-              if (
-                typeof item === "object" &&
-                item !== null &&
-                "type" in item &&
-                item.type === "divider"
-              ) {
+            renderItem={({
+              item,
+              index,
+            }: {
+              item: DownloadsListItem;
+              index: number;
+            }) => {
+              if ("type" in item) {
                 return <Divider style={{ marginVertical: spacing.md }} />;
               }
               return renderDownloadItem({
-                item: item as JellyfinDownloadItem,
-                index: props.index,
+                item,
+                index,
               });
             }}
             ListHeaderComponent={renderListHeader}
@@ -697,7 +693,7 @@ const JellyfinDownloadsScreen = () => {
             }
           />
         ) : (
-          <FlashList
+          <FlashList<DownloadsListItem>
             data={[]}
             renderItem={() => null}
             keyExtractor={() => "empty"}

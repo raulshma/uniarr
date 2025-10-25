@@ -22,7 +22,10 @@ import { TabHeader } from "@/components/common/TabHeader";
 import { Card } from "@/components/common/Card";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
-import { AnimatedListItem } from "@/components/common/AnimatedComponents";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import { ServiceStatus } from "@/components/service/ServiceStatus";
 import type { ServiceStatusState } from "@/components/service/ServiceStatus";
 import { ServiceCardSkeleton } from "@/components/service/ServiceCard";
@@ -36,6 +39,7 @@ import { logger } from "@/services/logger/LoggerService";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 type ServiceOverviewItem = {
   config: ServiceConfig;
@@ -210,8 +214,43 @@ const ServicesScreen = () => {
 
   const services = data ?? [];
   const isRefreshing = isFetching && !isLoading;
+  const animationsEnabled = shouldAnimateLayout(isLoading, isFetching);
+
+  const totalServices = services.length;
+  const overviewMetrics = useMemo(
+    () => [
+      { label: "Configured", value: totalServices },
+      {
+        label: "Online",
+        value: services.filter((service) => service.status === "online").length,
+      },
+      {
+        label: "Degraded",
+        value: services.filter((service) => service.status === "degraded")
+          .length,
+      },
+      {
+        label: "Offline",
+        value: services.filter((service) => service.status === "offline")
+          .length,
+      },
+    ],
+    [services, totalServices],
+  );
+
+  const averageLatency = useMemo(() => {
+    const latencies = services
+      .map((service) => service.latency)
+      .filter((latency): latency is number => typeof latency === "number");
+    if (latencies.length === 0) {
+      return "—";
+    }
+    const sum = latencies.reduce((acc, latency) => acc + latency, 0);
+    return `${Math.round(sum / latencies.length)} ms`;
+  }, [services]);
 
   // We render the tab header outside of the list so it remains fixed.
+
   const listData: ServiceOverviewItem[] = services;
 
   const styles = useMemo(
@@ -224,6 +263,55 @@ const ServicesScreen = () => {
         content: {
           flex: 1,
           paddingHorizontal: spacing.xxs,
+        },
+        summarySection: {
+          paddingHorizontal: spacing.md,
+          marginTop: spacing.md,
+          gap: spacing.sm,
+        },
+        summaryTitle: {
+          color: theme.colors.onSurface,
+          fontSize: 18,
+          fontWeight: "600",
+        },
+        summaryGrid: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          rowGap: spacing.sm,
+        },
+        summaryCard: {
+          width: "48%",
+          backgroundColor: theme.colors.elevation.level2,
+          borderRadius: spacing.lg,
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.md,
+        },
+        summaryValue: {
+          color: theme.colors.onSurface,
+          fontSize: 20,
+          fontWeight: "700",
+        },
+        summaryLabel: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 12,
+          marginTop: spacing.xs,
+        },
+        latencyChip: {
+          backgroundColor: theme.colors.elevation.level2,
+          borderRadius: borderRadius.lg,
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.md,
+        },
+        latencyLabel: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 12,
+          marginBottom: spacing.xs,
+        },
+        latencyValue: {
+          color: theme.colors.primary,
+          fontSize: 14,
+          fontWeight: "600",
         },
         section: {
           marginTop: spacing.lg,
@@ -437,7 +525,11 @@ const ServicesScreen = () => {
       const iconName = serviceIcons[item.config.type];
 
       return (
-        <AnimatedListItem index={index} totalItems={services.length}>
+        <AnimatedListItem
+          animated={animationsEnabled}
+          index={index}
+          totalItems={services.length}
+        >
           <Card
             variant="custom"
             style={styles.serviceCard}
@@ -597,6 +689,40 @@ const ServicesScreen = () => {
           services.length === 0 ? { flex: 1 } : undefined,
           { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
         ]}
+        ListHeaderComponent={
+          totalServices > 0 ? (
+            <AnimatedSection
+              animated={animationsEnabled}
+              style={styles.summarySection}
+              delay={50}
+            >
+              <Text style={styles.summaryTitle}>Service overview</Text>
+              <View style={styles.summaryGrid}>
+                {overviewMetrics.map((metric, index) => (
+                  <AnimatedListItem
+                    key={metric.label}
+                    animated={animationsEnabled}
+                    index={index}
+                    totalItems={overviewMetrics.length + 1}
+                    style={styles.summaryCard}
+                  >
+                    <Text style={styles.summaryValue}>{metric.value}</Text>
+                    <Text style={styles.summaryLabel}>{metric.label}</Text>
+                  </AnimatedListItem>
+                ))}
+              </View>
+              <AnimatedListItem
+                animated={animationsEnabled}
+                index={overviewMetrics.length}
+                totalItems={overviewMetrics.length + 1}
+                style={styles.latencyChip}
+              >
+                <Text style={styles.latencyLabel}>Average latency</Text>
+                <Text style={styles.latencyValue}>{averageLatency}</Text>
+              </AnimatedListItem>
+            </AnimatedSection>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>{listEmptyComponent}</View>
         }
@@ -610,6 +736,7 @@ const ServicesScreen = () => {
         getItemType={getItemType}
         removeClippedSubviews={true}
         scrollEventThrottle={16}
+        estimatedItemSize={140}
       />
 
       <Portal>

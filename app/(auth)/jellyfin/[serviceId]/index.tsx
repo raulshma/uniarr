@@ -71,6 +71,8 @@ const getInternalStringField = (
 
 type CollectionSegmentKey = "movies" | "tv" | "music";
 
+type EnrichedJellyfinItem = JellyfinItem & { __posterSourceId?: string };
+
 const collectionSegments: readonly {
   readonly key: CollectionSegmentKey;
   readonly label: string;
@@ -688,13 +690,15 @@ const JellyfinLibraryScreen = () => {
     return map;
   }, [seriesIds, seriesQueries]);
 
-  const displayItemsEnriched = useMemo(() => {
-    if (libraryState.activeSegment !== "tv") return displayItems;
+  const displayItemsEnriched = useMemo<EnrichedJellyfinItem[]>(() => {
+    if (libraryState.activeSegment !== "tv") {
+      return displayItems as EnrichedJellyfinItem[];
+    }
 
     const enriched = displayItems.map((it) => {
       const navId = getInternalStringField(it, "__navigationId") ?? it.Id;
       const meta = navId ? seriesMetaMap.get(navId) : undefined;
-      if (!meta) return it;
+      if (!meta) return it as EnrichedJellyfinItem;
 
       // Create a stable enriched item to prevent unnecessary re-renders
       const existingPosterSourceId = getInternalStringField(
@@ -737,7 +741,7 @@ const JellyfinLibraryScreen = () => {
               ?.ImageTags
           : (it as unknown as { ImageTags?: Record<string, string> })
               ?.ImageTags,
-      } as JellyfinItem & { __posterSourceId?: string };
+      } as EnrichedJellyfinItem;
     });
 
     return enriched;
@@ -1249,9 +1253,9 @@ const JellyfinLibraryScreen = () => {
               />
             </View>
 
-            <FlashList
+            <FlashList<JellyfinResumeItem>
               data={continueWatchingItems}
-              keyExtractor={(item, index) => {
+              keyExtractor={(item: JellyfinResumeItem, index: number) => {
                 // Create a unique key using item Id and index to prevent virtualized list recycling issues
                 const baseKey = item.Id || item.Name || "unknown";
                 return `${baseKey}-${index}`;
@@ -1427,9 +1431,9 @@ const JellyfinLibraryScreen = () => {
         ]}
         pointerEvents={libraryState.contentInteractive ? "auto" : "none"}
       >
-        <FlashList
+        <FlashList<EnrichedJellyfinItem>
           data={displayItemsEnriched}
-          keyExtractor={(item, index) => {
+          keyExtractor={(item: EnrichedJellyfinItem, index: number) => {
             // Create a unique key using item Id and index to prevent virtualized list recycling issues
             const baseKey = item.Id || item.Name || "unknown";
             return `${baseKey}-${index}`;
