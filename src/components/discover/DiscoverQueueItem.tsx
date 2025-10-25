@@ -1,9 +1,10 @@
 import React from "react";
 import { View, StyleSheet, Dimensions } from "react-native";
 import { Image, ImageBackground } from "expo-image";
-import { Text, Button } from "react-native-paper";
+import { Text, Button, Chip } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import type { DiscoverMediaItem } from "@/models/discover.types";
+import { useCheckInLibrary } from "@/hooks/useCheckInLibrary";
 import { spacing } from "@/theme/spacing";
 import { useThumbhash } from "@/hooks/useThumbhash";
 
@@ -20,6 +21,14 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
   onAdd,
   onDetails,
 }) => {
+  // Check if item is in library
+  const inLibraryQuery = useCheckInLibrary({
+    tmdbId: item.tmdbId,
+    tvdbId: item.tvdbId,
+    sourceId: item.sourceId,
+    mediaType: item.mediaType,
+  });
+
   const styles = StyleSheet.create({
     container: {
       width,
@@ -168,13 +177,35 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
             {item.overview}
           </Text>
         )}
+        {inLibraryQuery.foundServices.length > 0 && (
+          <View style={{ alignItems: "center", marginBottom: spacing.md }}>
+            <Chip
+              icon="check-circle"
+              mode="outlined"
+              style={{
+                borderColor: "rgba(255,255,255,0.8)",
+              }}
+              textStyle={{ color: "#FFFFFF" }}
+            >
+              In Library
+            </Chip>
+          </View>
+        )}
         <View style={styles.buttons}>
           <Button
             mode="contained"
             onPress={() => onAdd(item)}
             style={styles.button}
+            disabled={
+              inLibraryQuery.foundServices.length > 0 ||
+              inLibraryQuery.isLoading
+            }
           >
-            Add
+            {inLibraryQuery.isLoading
+              ? "Checking..."
+              : inLibraryQuery.foundServices.length > 0
+                ? "Added"
+                : "Add"}
           </Button>
           {onDetails && (
             <Button

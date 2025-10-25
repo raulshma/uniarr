@@ -8,6 +8,7 @@ import {
   Portal,
   Dialog,
   RadioButton,
+  Chip,
 } from "react-native-paper";
 import { Button } from "@/components/common/Button";
 import { alert } from "@/services/dialogService";
@@ -15,6 +16,7 @@ import DetailHero from "@/components/media/DetailHero/DetailHero";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { useJellyseerrMediaCredits } from "@/hooks/useJellyseerrMediaCredits";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
+import { useCheckInLibrary } from "@/hooks/useCheckInLibrary";
 import type { AppTheme } from "@/constants/theme";
 import { buildProfileUrl } from "@/utils/tmdb.utils";
 import { useTmdbDetails } from "@/hooks/tmdb/useTmdbDetails";
@@ -58,11 +60,33 @@ const DiscoverItemDetails = () => {
     { enabled: !!item?.tmdbId },
   );
 
+  // Check if item is already in the user's library (lazy check on detail view mount)
+  const inLibraryQuery = useCheckInLibrary({
+    tmdbId: item?.tmdbId,
+    tvdbId: item?.tvdbId,
+    sourceId: item?.sourceId,
+    mediaType: item?.mediaType ?? "movie",
+    enabled: !!item,
+  });
+
   const [dialogVisible, setDialogVisible] = React.useState(false);
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>("");
 
   const openServicePicker = useCallback(() => {
     if (!item) return;
+
+    // If item is already in library, offer to open it instead
+    if (inLibraryQuery.foundServices.length > 0) {
+      const found = inLibraryQuery.foundServices[0];
+      if (found) {
+        void alert(
+          "Already in Library",
+          `This ${item.mediaType === "series" ? "series" : "movie"} is already in ${found.name}.`,
+        );
+      }
+      return;
+    }
+
     const options =
       item.mediaType === "series" ? services.sonarr : services.radarr;
     if (!options || options.length === 0) {
@@ -96,7 +120,7 @@ const DiscoverItemDetails = () => {
       return options[0]!.id ?? "";
     });
     setDialogVisible(true);
-  }, [item, router, services]);
+  }, [item, router, services, inLibraryQuery.foundServices]);
 
   const handleRelatedPress = useCallback(
     (relatedId: string) => {
@@ -144,16 +168,36 @@ const DiscoverItemDetails = () => {
         onBack={() => router.back()}
       >
         <ScrollView contentContainerStyle={styles.content}>
-          <Text
-            variant="headlineLarge"
+          <View
             style={{
-              color: theme.colors.onSurface,
-              fontWeight: "700",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.sm,
               marginBottom: spacing.sm,
+              justifyContent: "space-between",
             }}
           >
-            {item.title}
-          </Text>
+            <Text
+              variant="headlineLarge"
+              style={{
+                color: theme.colors.onSurface,
+                fontWeight: "700",
+                flex: 1,
+              }}
+            >
+              {item.title}
+            </Text>
+            {inLibraryQuery.foundServices.length > 0 && (
+              <Chip
+                icon="check-circle"
+                mode="outlined"
+                style={{ borderColor: theme.colors.primary }}
+                textStyle={{ color: theme.colors.primary }}
+              >
+                In Library
+              </Chip>
+            )}
+          </View>
 
           {item.overview ? (
             <View style={styles.synopsis}>
@@ -200,9 +244,14 @@ const DiscoverItemDetails = () => {
           <Button
             mode="contained"
             onPress={openServicePicker}
+            disabled={inLibraryQuery.isLoading}
             style={styles.addButton}
           >
-            Add to Library
+            {inLibraryQuery.isLoading
+              ? "Checking..."
+              : inLibraryQuery.foundServices.length > 0
+                ? "Already in Library"
+                : "Add to Library"}
           </Button>
 
           {/* Related Items */}

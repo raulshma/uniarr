@@ -16,6 +16,7 @@ import {
   RadioButton,
   Text,
   useTheme,
+  Badge,
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 
@@ -30,6 +31,7 @@ import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { SectionSkeleton } from "@/components/discover";
 import type { AppTheme } from "@/constants/theme";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
+import { useCheckInLibrary } from "@/hooks/useCheckInLibrary";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import { spacing } from "@/theme/spacing";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
@@ -51,6 +53,14 @@ const DiscoverCard = ({
   onPress: (media: DiscoverMediaItem) => void;
 }) => {
   const theme = useTheme<AppTheme>();
+
+  // Check if item is in library
+  const inLibraryQuery = useCheckInLibrary({
+    tmdbId: item.tmdbId,
+    tvdbId: item.tvdbId,
+    sourceId: item.sourceId,
+    mediaType: item.mediaType,
+  });
 
   const styles = useMemo(
     () =>
@@ -79,6 +89,12 @@ const DiscoverCard = ({
           zIndex: 100,
           elevation: 100,
         },
+        badge: {
+          position: "absolute",
+          top: spacing.xs,
+          left: spacing.xs,
+          backgroundColor: theme.colors.primary,
+        },
       }),
     [theme],
   );
@@ -90,6 +106,11 @@ const DiscoverCard = ({
       accessibilityRole="button"
     >
       <View style={styles.posterWrapper}>
+        {inLibraryQuery.foundServices.length > 0 && (
+          <Badge style={styles.badge} size={20}>
+            ✓
+          </Badge>
+        )}
         <MediaPoster
           uri={item.posterUrl}
           size={152}
@@ -101,6 +122,7 @@ const DiscoverCard = ({
               style={styles.addButton}
               iconColor={theme.colors.onPrimary}
               onPress={() => onAdd(item)}
+              disabled={inLibraryQuery.foundServices.length > 0}
               accessibilityLabel={`Add ${item.title}`}
             />
           }

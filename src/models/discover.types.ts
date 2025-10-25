@@ -10,6 +10,13 @@ export interface DiscoverServiceSummary {
   type: ServiceType;
 }
 
+export interface FoundInLibrary {
+  readonly serviceId: string;
+  readonly name: string;
+  readonly connectorType: "radarr" | "sonarr";
+  readonly remoteId: number;
+}
+
 export interface DiscoverMediaItem {
   id: string;
   title: string;
@@ -34,6 +41,8 @@ export interface DiscoverMediaItem {
   tvdbId?: number;
   imdbId?: string;
   source: DiscoverSource;
+  /** Services where this item is already in the user's library (populated by lazy check). */
+  foundInLibraries?: FoundInLibrary[];
 }
 
 export interface DiscoverSection {
