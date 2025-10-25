@@ -658,7 +658,11 @@ const CalendarScreen = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item, index }) => (
-          <AnimatedListItem index={index} totalItems={releasesForView.length}>
+          <AnimatedListItem
+            index={index}
+            totalItems={releasesForView.length}
+            animated={false}
+          >
             <MediaReleaseCard
               release={item}
               onPress={() => handleReleasePress(item.id)}
@@ -667,6 +671,8 @@ const CalendarScreen = () => {
           </AnimatedListItem>
         )}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
       />
     );
   };

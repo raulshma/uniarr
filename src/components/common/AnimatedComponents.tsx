@@ -6,7 +6,6 @@ import Animated, {
   FadeOut,
   SlideInUp,
   SlideOutDown,
-  EntryExitTransition,
   LinearTransition,
 } from "react-native-reanimated";
 import {
@@ -186,7 +185,6 @@ export const AnimatedListItem: React.FC<AnimatedListItemProps> = React.memo(
         style={style}
         entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, staggerDelay)}
         exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
-        layout={EntryExitTransition}
         {...PERFORMANCE_OPTIMIZATIONS}
       >
         {children}

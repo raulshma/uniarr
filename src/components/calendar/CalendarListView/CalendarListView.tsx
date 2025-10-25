@@ -8,11 +8,6 @@ import type { ListRenderItemInfo } from "@shopify/flash-list";
 import type { AppTheme } from "@/constants/theme";
 import type { MediaRelease } from "@/models/calendar.types";
 import { MediaReleaseCard } from "../MediaReleaseCard";
-import {
-  AnimatedListItem,
-  AnimatedSection,
-  AnimatedView,
-} from "@/components/common/AnimatedComponents";
 
 export type CalendarListViewProps = {
   releases: MediaRelease[];
@@ -122,28 +117,21 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
     const { relativeDate, fullDate } = formatDate(item.date);
 
     return (
-      <AnimatedSection style={styles.section} delay={index * 80}>
-        <AnimatedView>
-          <Text style={styles.sectionTitle}>
-            {relativeDate} • {fullDate}
-          </Text>
-        </AnimatedView>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          {relativeDate} • {fullDate}
+        </Text>
         <View style={styles.releasesList}>
-          {item.releases.map((release, releaseIndex) => (
-            <AnimatedListItem
+          {item.releases.map((release) => (
+            <MediaReleaseCard
               key={release.id}
-              index={releaseIndex}
-              staggerDelay={60}
-            >
-              <MediaReleaseCard
-                release={release}
-                onPress={() => onReleasePress?.(release.id)}
-                animated={false}
-              />
-            </AnimatedListItem>
+              release={release}
+              onPress={() => onReleasePress?.(release.id)}
+              animated={false}
+            />
           ))}
         </View>
-      </AnimatedSection>
+      </View>
     );
   };
 
@@ -151,9 +139,9 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
     return (
       <View style={[styles.container, style]}>
         <View style={styles.content}>
-          <AnimatedView style={styles.emptyState}>
+          <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No releases found</Text>
-          </AnimatedView>
+          </View>
         </View>
       </View>
     );
@@ -167,6 +155,8 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
         keyExtractor={(item) => item.date}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
       />
     </View>
   );
