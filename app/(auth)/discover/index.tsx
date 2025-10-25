@@ -17,6 +17,7 @@ import {
   Text,
   useTheme,
   Badge,
+  TouchableRipple,
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 
@@ -32,6 +33,7 @@ import { SectionSkeleton } from "@/components/discover";
 import type { AppTheme } from "@/constants/theme";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 import { useCheckInLibrary } from "@/hooks/useCheckInLibrary";
+import { imageCacheService } from "@/services/image/ImageCacheService";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import { spacing } from "@/theme/spacing";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
@@ -69,6 +71,9 @@ const DiscoverCard = ({
           width: 152,
           marginRight: spacing.md,
         },
+        innerWrapper: {
+          flex: 1,
+        },
         posterWrapper: {
           marginBottom: spacing.xs,
           position: "relative",
@@ -100,38 +105,41 @@ const DiscoverCard = ({
   );
 
   return (
-    <Pressable
+    <TouchableRipple
       onPress={() => onPress(item)}
-      style={styles.container}
+      borderless={false}
       accessibilityRole="button"
+      style={styles.container}
     >
-      <View style={styles.posterWrapper}>
-        {inLibraryQuery.foundServices.length > 0 && (
-          <Badge style={styles.badge} size={20}>
-            ✓
-          </Badge>
-        )}
-        <MediaPoster
-          uri={item.posterUrl}
-          size={152}
-          overlay={
-            <IconButton
-              icon="plus"
-              size={20}
-              mode="contained"
-              style={styles.addButton}
-              iconColor={theme.colors.onPrimary}
-              onPress={() => onAdd(item)}
-              disabled={inLibraryQuery.foundServices.length > 0}
-              accessibilityLabel={`Add ${item.title}`}
-            />
-          }
-        />
+      <View style={styles.innerWrapper} pointerEvents="box-none">
+        <View style={styles.posterWrapper} pointerEvents="box-none">
+          {inLibraryQuery.foundServices.length > 0 && (
+            <Badge style={styles.badge} size={20}>
+              ✓
+            </Badge>
+          )}
+          <MediaPoster
+            uri={item.posterUrl}
+            size={152}
+            overlay={
+              <IconButton
+                icon="plus"
+                size={20}
+                mode="contained"
+                style={styles.addButton}
+                iconColor={theme.colors.onPrimary}
+                onPress={() => onAdd(item)}
+                disabled={inLibraryQuery.foundServices.length > 0}
+                accessibilityLabel={`Add ${item.title}`}
+              />
+            }
+          />
+        </View>
+        <Text numberOfLines={2} style={styles.title}>
+          {item.title}
+        </Text>
       </View>
-      <Text numberOfLines={2} style={styles.title}>
-        {item.title}
-      </Text>
-    </Pressable>
+    </TouchableRipple>
   );
 };
 
@@ -272,6 +280,14 @@ const DiscoverScreen = () => {
 
   const handleCardPress = useCallback(
     (item: DiscoverMediaItem) => {
+      // Prefetch images when card is pressed to speed up detail screen load
+      if (item.posterUrl) {
+        void imageCacheService.prefetch(item.posterUrl);
+      }
+      if (item.backdropUrl) {
+        void imageCacheService.prefetch(item.backdropUrl);
+      }
+
       router.push({ pathname: `/(auth)/discover/${item.id}` });
     },
     [router],

@@ -26,6 +26,7 @@ import { spacing } from "@/theme/spacing";
 import { avatarSizes } from "@/constants/sizes";
 import RelatedItems from "@/components/discover/RelatedItems";
 import { YouTubePlayer } from "@/components/media/VideoPlayer";
+import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
 
 const DiscoverItemDetails = () => {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -184,133 +185,142 @@ const DiscoverItemDetails = () => {
         backdropUri={item.backdropUrl}
         onBack={() => router.back()}
       >
-        <ScrollView contentContainerStyle={styles.content}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: spacing.sm,
-              marginBottom: spacing.sm,
-              justifyContent: "space-between",
-            }}
-          >
-            <Text
-              variant="headlineLarge"
+        {tmdbDetailsQuery.isLoading && !tmdbDetailsQuery.data ? (
+          <ScrollView contentContainerStyle={styles.content}>
+            <DetailPageSkeleton />
+          </ScrollView>
+        ) : (
+          <ScrollView contentContainerStyle={styles.content}>
+            <View
               style={{
-                color: theme.colors.onSurface,
-                fontWeight: "700",
-                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                marginBottom: spacing.sm,
+                justifyContent: "space-between",
               }}
             >
-              {item.title}
-            </Text>
-            {inLibraryQuery.foundServices.length > 0 && (
-              <Chip
-                icon="check-circle"
-                mode="outlined"
-                style={{ borderColor: theme.colors.primary }}
-                textStyle={{ color: theme.colors.primary }}
-              >
-                In Library
-              </Chip>
-            )}
-          </View>
-
-          {item.overview ? (
-            <View style={styles.synopsis}>
               <Text
-                variant="bodyLarge"
-                style={{ color: theme.colors.onSurfaceVariant, lineHeight: 22 }}
-              >
-                {item.overview}
-              </Text>
-            </View>
-          ) : null}
-
-          {tmdbDetailsQuery.data?.details?.genres &&
-          tmdbDetailsQuery.data.details.genres.length > 0 ? (
-            <View style={{ marginBottom: spacing.lg }}>
-              <Text
-                variant="titleMedium"
+                variant="headlineLarge"
                 style={{
                   color: theme.colors.onSurface,
                   fontWeight: "700",
-                  marginBottom: spacing.xs,
+                  flex: 1,
                 }}
               >
-                Genres
+                {item.title}
               </Text>
-              <Text
-                variant="bodyMedium"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                {tmdbDetailsQuery.data.details.genres
-                  .map((g) => g.name)
-                  .filter(Boolean)
-                  .join(", ")}
-              </Text>
+              {inLibraryQuery.foundServices.length > 0 && (
+                <Chip
+                  icon="check-circle"
+                  mode="outlined"
+                  style={{ borderColor: theme.colors.primary }}
+                  textStyle={{ color: theme.colors.primary }}
+                >
+                  In Library
+                </Chip>
+              )}
             </View>
-          ) : null}
 
-          {/* Cast */}
-          <CastRow item={item} tmdbDetailsData={tmdbDetailsQuery.data} />
+            {item.overview ? (
+              <View style={styles.synopsis}>
+                <Text
+                  variant="bodyLarge"
+                  style={{
+                    color: theme.colors.onSurfaceVariant,
+                    lineHeight: 22,
+                  }}
+                >
+                  {item.overview}
+                </Text>
+              </View>
+            ) : null}
 
-          {/* Ratings */}
-          <RatingsOverview rating={item.rating} votes={item.voteCount} />
+            {tmdbDetailsQuery.data?.details?.genres &&
+            tmdbDetailsQuery.data.details.genres.length > 0 ? (
+              <View style={{ marginBottom: spacing.lg }}>
+                <Text
+                  variant="titleMedium"
+                  style={{
+                    color: theme.colors.onSurface,
+                    fontWeight: "700",
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  Genres
+                </Text>
+                <Text
+                  variant="bodyMedium"
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                >
+                  {tmdbDetailsQuery.data.details.genres
+                    .map((g) => g.name)
+                    .filter(Boolean)
+                    .join(", ")}
+                </Text>
+              </View>
+            ) : null}
 
-          {/* Release Date & Runtime */}
-          <ReleaseMetadata item={item} tmdbDetails={tmdbDetailsQuery.data} />
+            {/* Cast */}
+            <CastRow item={item} tmdbDetailsData={tmdbDetailsQuery.data} />
 
-          {/* Trailer */}
-          {tmdbDetailsQuery.data?.videos?.results &&
-          tmdbDetailsQuery.data.videos.results.length > 0 ? (
-            <View style={{ marginBottom: spacing.lg }}>
-              <YouTubePlayer
-                videoKey={
-                  tmdbDetailsQuery.data.videos.results.find(
-                    (v: any) =>
-                      v.site?.toLowerCase() === "youtube" &&
-                      v.type?.toLowerCase() === "trailer",
-                  )?.key
-                }
-              />
-            </View>
-          ) : null}
+            {/* Ratings */}
+            <RatingsOverview rating={item.rating} votes={item.voteCount} />
 
-          {/* Watch Providers */}
-          <WatchProvidersSection
-            watchProvidersData={
-              tmdbDetailsQuery.data?.watchProviders?.results as any
-            }
-          />
+            {/* Release Date & Runtime */}
+            <ReleaseMetadata item={item} tmdbDetails={tmdbDetailsQuery.data} />
 
-          {/* Sources / Releases */}
-          <ReleasesList
-            isLoading={releasesQuery.isLoading}
-            isOpen={showReleases}
-            onToggle={() => setShowReleases(!showReleases)}
-            releases={releasesQuery.data ?? []}
-          />
+            {/* Trailer */}
+            {tmdbDetailsQuery.data?.videos?.results &&
+            tmdbDetailsQuery.data.videos.results.length > 0 ? (
+              <View style={{ marginBottom: spacing.lg }}>
+                <YouTubePlayer
+                  videoKey={
+                    tmdbDetailsQuery.data.videos.results.find(
+                      (v: any) =>
+                        v.site?.toLowerCase() === "youtube" &&
+                        v.type?.toLowerCase() === "trailer",
+                    )?.key
+                  }
+                />
+              </View>
+            ) : null}
 
-          <Button
-            mode="contained"
-            onPress={openServicePicker}
-            disabled={inLibraryQuery.isLoading}
-            style={styles.addButton}
-          >
-            {inLibraryQuery.isLoading
-              ? "Checking..."
-              : inLibraryQuery.foundServices.length > 0
-                ? "Already in Library"
-                : "Add to Library"}
-          </Button>
+            {/* Watch Providers */}
+            <WatchProvidersSection
+              watchProvidersData={
+                tmdbDetailsQuery.data?.watchProviders?.results as any
+              }
+            />
 
-          {/* Related Items */}
-          <RelatedItems
-            currentId={item.id}
-            onPress={(id: string) => handleRelatedPress(id)}
-          />
-        </ScrollView>
+            {/* Sources / Releases */}
+            <ReleasesList
+              isLoading={releasesQuery.isLoading}
+              isOpen={showReleases}
+              onToggle={() => setShowReleases(!showReleases)}
+              releases={releasesQuery.data ?? []}
+            />
+
+            <Button
+              mode="contained"
+              onPress={openServicePicker}
+              disabled={inLibraryQuery.isLoading}
+              style={styles.addButton}
+            >
+              {inLibraryQuery.isLoading
+                ? "Checking..."
+                : inLibraryQuery.foundServices.length > 0
+                  ? "Already in Library"
+                  : "Add to Library"}
+            </Button>
+
+            {/* Related Items */}
+            <RelatedItems
+              currentId={item.id}
+              onPress={(id: string) => handleRelatedPress(id)}
+            />
+          </ScrollView>
+        )}
       </DetailHero>
       <Portal>
         <Dialog

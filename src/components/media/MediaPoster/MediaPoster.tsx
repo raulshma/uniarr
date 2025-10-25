@@ -275,9 +275,9 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
         accessibilityRole="imagebutton"
         accessibilityLabel={effectiveLabel}
       >
-        <View style={containerStyle} pointerEvents="none">
+        <View style={containerStyle} pointerEvents="box-none">
           {content}
-          {overlay}
+          {overlay && <View pointerEvents="auto">{overlay}</View>}
         </View>
       </Pressable>
     );
