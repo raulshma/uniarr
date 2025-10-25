@@ -106,6 +106,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         initialOrientation: "DEFAULT",
       },
     ],
+    ["react-native-localize", { locales: ["en"] }],
   ],
   extra: {
     ...config.extra,

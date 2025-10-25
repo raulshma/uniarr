@@ -14,12 +14,15 @@ import type {
 import type { SearchOptions } from "@/connectors/base/IConnector";
 import { handleApiError } from "@/utils/error.utils";
 import type { components } from "@/connectors/client-schemas/sonarr-openapi";
+import type { NormalizedRelease } from "@/models/discover.types";
+import { normalizeSonarrRelease } from "@/services/ReleaseService";
 
 // Local aliases for the Sonarr OpenAPI-generated schemas. Using these aliases
 // keeps the rest of the file readable and allows us to change the underlying
 // source of truth without updating every usage site.
 type SonarrEpisode = components["schemas"]["EpisodeResource"];
 type SonarrQuality = components["schemas"]["Quality"];
+type SonarrRelease = components["schemas"]["ReleaseResource"];
 
 export interface SonarrQueueItem {
   readonly id: number;
@@ -450,6 +453,78 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         endpoint: "/api/v3/command",
       });
     }
+  }
+
+  /**
+   * Get available releases/candidates for a series (from indexers).
+   * Probes multiple candidate endpoints based on Sonarr API versions.
+   */
+  async getReleases(
+    seriesId: number,
+    options?: {
+      season?: number;
+      episode?: number;
+      indexerId?: number;
+      minSeeders?: number;
+    },
+  ): Promise<NormalizedRelease[]> {
+    const candidateEndpoints = [
+      "/api/v3/release",
+      `/api/v3/series/${seriesId}/releases`,
+      "/api/v3/releases",
+    ];
+
+    for (const endpoint of candidateEndpoints) {
+      try {
+        const params: Record<string, unknown> = { seriesId };
+        if (options?.season !== undefined) {
+          params.season = options.season;
+        }
+        if (options?.episode !== undefined) {
+          params.episode = options.episode;
+        }
+        if (options?.indexerId) {
+          params.indexerId = options.indexerId;
+        }
+
+        const response = await this.client.get<SonarrRelease[]>(endpoint, {
+          params,
+        });
+
+        if (Array.isArray(response.data)) {
+          return response.data
+            .filter((r) => {
+              if (options?.minSeeders !== undefined && r.seeders !== null) {
+                return (r.seeders ?? 0) >= options.minSeeders;
+              }
+              return true;
+            })
+            .map((r) => normalizeSonarrRelease(r, this.config.id));
+        }
+      } catch (error) {
+        const axiosError = error as unknown as {
+          response?: { status?: number };
+        };
+        const status = axiosError?.response?.status;
+        if (status !== 404) {
+          logger.warn("[SonarrConnector] Unexpected error fetching releases", {
+            serviceId: this.config.id,
+            endpoint,
+            status,
+            seriesId,
+          });
+        }
+        // Try next candidate endpoint
+      }
+    }
+
+    logger.warn("[SonarrConnector] Unable to find working releases endpoint", {
+      serviceId: this.config.id,
+      seriesId,
+      tried: candidateEndpoints,
+    });
+
+    return [];
   }
 
   async renameSeries(options: SonarrRenameSeriesOptions): Promise<void> {

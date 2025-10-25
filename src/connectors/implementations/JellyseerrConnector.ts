@@ -438,6 +438,50 @@ export class JellyseerrConnector extends BaseConnector<
     }
   }
 
+  /**
+   * Lookup a Sonarr series by TMDB ID using the Jellyseerr service endpoint.
+   * Implementation-only method; resolves a TMDB id to a Sonarr internal series id.
+   * @returns The Sonarr internal series id if found, undefined if not found or error occurs.
+   */
+  async serviceLookupForSonarr(tmdbId: number): Promise<number | undefined> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint = `${API_PREFIX}/service/sonarr/lookup/${tmdbId}`;
+      const response = await this.getWithRetry<{
+        id?: number;
+        tvdbId?: number;
+      }>(endpoint, undefined, "serviceLookupForSonarr");
+
+      if (response.data?.id && typeof response.data.id === "number") {
+        logger.debug("[JellyseerrConnector] Sonarr service lookup succeeded", {
+          serviceId: this.config.id,
+          tmdbId,
+          sonarrId: response.data.id,
+        });
+        return response.data.id;
+      }
+
+      logger.debug(
+        "[JellyseerrConnector] Sonarr service lookup returned no id",
+        {
+          serviceId: this.config.id,
+          tmdbId,
+          response: JSON.stringify(response.data),
+        },
+      );
+      return undefined;
+    } catch (error) {
+      // Log but don't throw; allow caller to fall back gracefully
+      logger.warn("[JellyseerrConnector] Sonarr service lookup failed", {
+        serviceId: this.config.id,
+        tmdbId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
   async getRequests(
     options?: JellyseerrRequestQueryOptions,
   ): Promise<JellyseerrRequestList> {

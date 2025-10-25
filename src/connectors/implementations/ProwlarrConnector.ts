@@ -2,6 +2,9 @@ import { BaseConnector } from "@/connectors/base/BaseConnector";
 import type { SearchOptions } from "@/connectors/base/IConnector";
 import type { components } from "@/connectors/client-schemas/prowlarr-openapi";
 import { handleApiError } from "@/utils/error.utils";
+import type { NormalizedRelease } from "@/models/discover.types";
+import { normalizeProwlarrRelease } from "@/services/ReleaseService";
+import { logger } from "@/services/logger/LoggerService";
 
 // Map the project's previous manual types to the generated OpenAPI types
 type ProwlarrIndexerResource = components["schemas"]["IndexerResource"];
@@ -359,6 +362,71 @@ export class ProwlarrConnector extends BaseConnector<
       throw new Error(
         `Failed to execute command ${commandName}: ${diagnostic.message}`,
       );
+    }
+  }
+
+  /**
+   * Search for releases across configured indexers.
+   * Supports search via query string, TMDB ID, IMDB ID, or title+year.
+   */
+  async searchReleases(options?: {
+    query?: string;
+    tmdbId?: number;
+    imdbId?: string;
+    title?: string;
+    year?: number;
+    indexerIds?: number[];
+    minSeeders?: number;
+  }): Promise<NormalizedRelease[]> {
+    try {
+      const params: Record<string, unknown> = {};
+
+      // Build search parameters from provided options
+      if (options?.query) {
+        params.query = options.query;
+      } else if (options?.tmdbId) {
+        params.tmdbId = options.tmdbId;
+      } else if (options?.imdbId) {
+        params.imdbId = options.imdbId;
+      } else if (options?.title) {
+        params.query = options.year
+          ? `${options.title} ${options.year}`
+          : options.title;
+      }
+
+      if (options?.indexerIds && options.indexerIds.length > 0) {
+        params.indexerIds = options.indexerIds.join(",");
+      }
+
+      // Use /api/v1/search endpoint to query all or specified indexers
+      const response = await this.client.get("/api/v1/search", { params });
+
+      if (!Array.isArray(response.data)) {
+        logger.warn("[ProwlarrConnector] Invalid search response format", {
+          serviceId: this.config.id,
+          dataType: typeof response.data,
+        });
+        return [];
+      }
+
+      return response.data
+        .filter((r: any) => {
+          if (options?.minSeeders !== undefined && r.seeders !== null) {
+            return (r.seeders ?? 0) >= options.minSeeders;
+          }
+          return true;
+        })
+        .map((r: any) => normalizeProwlarrRelease(r, this.config.id));
+    } catch (error) {
+      logger.warn("[ProwlarrConnector] Release search failed", {
+        serviceId: this.config.id,
+        operation: "searchReleases",
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Return empty array on error instead of throwing
+      // so discover detail page doesn't break if indexer search fails
+      return [];
     }
   }
 

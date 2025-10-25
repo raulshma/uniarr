@@ -64,3 +64,33 @@ export interface UnifiedDiscoverPayload {
   sections: DiscoverSection[];
   services: UnifiedDiscoverServices;
 }
+
+/**
+ * Normalized release metadata shape shared across Radarr, Sonarr, Prowlarr, and QBittorrent.
+ * Allows unified UI display of release candidates from multiple sources.
+ */
+export interface NormalizedRelease {
+  id?: string | number;
+  title?: string;
+  indexer?: string;
+  indexerId?: number;
+  releaseGroup?: string;
+  quality?: {
+    name?: string;
+    resolution?: number;
+    source?: string;
+  };
+  /** Size in bytes */
+  size?: number;
+  seeders?: number | null;
+  leechers?: number | null;
+  downloadUrl?: string | null;
+  magnetUrl?: string | null;
+  infoUrl?: string | null;
+  protocol?: string | null;
+  publishDate?: string | null;
+  /** Custom score for ranking (higher = better) */
+  score?: number;
+  /** Source connector: 'radarr' | 'sonarr' | 'prowlarr' | 'qbittorrent' */
+  sourceConnector?: string;
+}

@@ -52,6 +52,8 @@ type SettingsData = {
   // Jellyfin server addresses for deep linking
   jellyfinLocalAddress?: string;
   jellyfinPublicAddress?: string;
+  // Preferred Jellyseerr service for TMDB -> Sonarr mappings
+  preferredJellyseerrServiceId?: string;
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -85,6 +87,7 @@ interface SettingsState extends SettingsData {
   setHapticFeedback: (enabled: boolean) => void;
   setJellyfinLocalAddress: (address: string | undefined) => void;
   setJellyfinPublicAddress: (address: string | undefined) => void;
+  setPreferredJellyseerrServiceId: (serviceId: string | undefined) => void;
   // (thumbnail setters removed)
 }
 
@@ -159,6 +162,7 @@ const createDefaultSettings = (): SettingsData => ({
   hapticFeedback: true,
   jellyfinLocalAddress: undefined,
   jellyfinPublicAddress: undefined,
+  preferredJellyseerrServiceId: undefined,
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
@@ -216,6 +220,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ jellyfinLocalAddress: address }),
       setJellyfinPublicAddress: (address: string | undefined) =>
         set({ jellyfinPublicAddress: address }),
+      setPreferredJellyseerrServiceId: (serviceId: string | undefined) =>
+        set({ preferredJellyseerrServiceId: serviceId }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -249,10 +255,11 @@ export const useSettingsStore = create<SettingsState>()(
         hapticFeedback: state.hapticFeedback,
         jellyfinLocalAddress: state.jellyfinLocalAddress,
         jellyfinPublicAddress: state.jellyfinPublicAddress,
+        preferredJellyseerrServiceId: state.preferredJellyseerrServiceId,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 8,
+      version: 9,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -391,13 +398,14 @@ export const useSettingsStore = create<SettingsState>()(
             partial.criticalHealthAlertsBypassQuietHours ??
             baseDefaults.criticalHealthAlertsBypassQuietHours,
           useNativeTabs: partial.useNativeTabs ?? baseDefaults.useNativeTabs,
+          preferredJellyseerrServiceId:
+            partial.preferredJellyseerrServiceId ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
     },
   ),
 );
-
 export const selectThemePreference = (state: SettingsState): ThemePreference =>
   state.theme;
 export const selectCustomThemeConfig = (
@@ -444,3 +452,5 @@ export const selectJellyfinLocalAddress = (state: SettingsState) =>
   state.jellyfinLocalAddress;
 export const selectJellyfinPublicAddress = (state: SettingsState) =>
   state.jellyfinPublicAddress;
+export const selectPreferredJellyseerrServiceId = (state: SettingsState) =>
+  state.preferredJellyseerrServiceId;

@@ -17,6 +17,7 @@ import type {
 } from "@/connectors/implementations/TmdbConnector";
 import { ensureTmdbConnector } from "@/services/tmdb/TmdbConnectorProvider";
 import { queryKeys } from "@/hooks/queryKeys";
+import { logger } from "@/services/logger/LoggerService";
 
 type MediaDetailsMap = {
   movie: {
@@ -44,12 +45,66 @@ export interface UseTmdbDetailsOptions {
   language?: string;
 }
 
+/**
+ * Gets the device locale language code (e.g., "en", "es", "fr").
+ * Fallback to "en" if unavailable.
+ */
+const getDeviceLanguage = (): string => {
+  try {
+    // Use JS-only Intl fallback to avoid native modules in Expo managed workflow.
+    const resolved = Intl?.DateTimeFormat?.()?.resolvedOptions?.()?.locale;
+    if (typeof resolved === "string" && resolved.length > 0) {
+      // locale may be like 'en-US' -> take primary language
+      const split = resolved.split("-");
+      const primary = split && split[0] ? split[0] : "en";
+      return primary.toLowerCase();
+    }
+  } catch (error) {
+    logger.warn(
+      "Failed to get device language via Intl",
+      error as unknown as Record<string | number, unknown>,
+    );
+  }
+
+  // Last-resort default
+  return "en";
+};
+
+/**
+ * Gets the device region code (e.g., "US", "GB", "CA").
+ * Used for watch provider region-aware selection (TMDB watchProviders).
+ * Fallback to "US" if unavailable.
+ */
+export const getDeviceRegion = (): string => {
+  try {
+    // Use JS-only Intl fallback
+    const resolved = Intl?.DateTimeFormat?.()?.resolvedOptions?.()?.locale;
+    if (typeof resolved === "string" && resolved.length > 0) {
+      // locale may be like 'en-US' -> extract region part
+      const split = resolved.split("-");
+      if (split.length > 1 && split[1]) {
+        return split[1].toUpperCase();
+      }
+    }
+  } catch (error) {
+    logger.warn(
+      "Failed to get device region via Intl",
+      error as unknown as Record<string | number, unknown>,
+    );
+  }
+
+  // Last-resort default
+  return "US";
+};
+
 export const useTmdbDetails = <TType extends TmdbMediaType>(
   mediaType: TType,
   tmdbId: number | null,
   options: UseTmdbDetailsOptions = {},
 ) => {
-  const { enabled = true, language } = options;
+  const { enabled = true } = options;
+  // Use provided language or auto-detect device language
+  const language = options.language ?? getDeviceLanguage();
 
   return useQuery<MediaDetailsMap[TType], Error>({
     enabled: enabled && Boolean(tmdbId),

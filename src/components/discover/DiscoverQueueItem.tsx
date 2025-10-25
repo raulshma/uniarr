@@ -14,12 +14,15 @@ interface DiscoverQueueItemProps {
   item: DiscoverMediaItem;
   onAdd: (item: DiscoverMediaItem) => void;
   onDetails?: (item: DiscoverMediaItem) => void;
+  /** Optional runtime in minutes (for movies) or minutes-per-episode (for series) */
+  runtime?: number;
 }
 
 const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
   item,
   onAdd,
   onDetails,
+  runtime,
 }) => {
   // Check if item is in library
   const inLibraryQuery = useCheckInLibrary({
@@ -170,6 +173,7 @@ const DiscoverQueueItem: React.FC<DiscoverQueueItemProps> = ({
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.subtitle}>
           {item.year ? `${item.year}` : ""}
+          {runtime ? ` • ${runtime}m` : ""}
           {item.rating ? ` • ${item.rating.toFixed(1)}/10` : ""}
         </Text>
         {item.overview && (

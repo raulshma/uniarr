@@ -334,6 +334,7 @@ export const queryKeys = {
   discover: {
     base: ["discover"] as const,
     unified: ["discover", "unified"] as const,
+    releases: ["discover", "releases"] as const,
     jikanDetail: (malId: number): QueryKeyBuilder =>
       ["discover", "jikan", "detail", malId] as const,
   },
