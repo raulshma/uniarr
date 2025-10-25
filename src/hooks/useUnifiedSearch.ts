@@ -27,6 +27,12 @@ interface UseUnifiedSearchConfig {
   readonly limitPerService?: number;
   readonly enabled?: boolean;
   readonly autoRecordHistory?: boolean;
+  readonly quality?: string;
+  readonly status?: string;
+  readonly genres?: string[];
+  readonly releaseYearMin?: number;
+  readonly releaseYearMax?: number;
+  readonly releaseType?: string;
 }
 
 interface UseUnifiedSearchResult {
@@ -79,14 +85,34 @@ export const useUnifiedSearch = (
     () => normalizeArray(config.mediaTypes),
     [config.mediaTypes],
   );
+  const normalizedGenres = useMemo(
+    () => normalizeArray(config.genres),
+    [config.genres],
+  );
 
   const searchOptions = useMemo<UnifiedSearchOptions>(
     () => ({
       serviceIds: normalizedServiceIds,
       mediaTypes: normalizedMediaTypes,
       limitPerService: config.limitPerService,
+      quality: config.quality,
+      status: config.status,
+      genres: normalizedGenres,
+      releaseYearMin: config.releaseYearMin,
+      releaseYearMax: config.releaseYearMax,
+      releaseType: config.releaseType,
     }),
-    [config.limitPerService, normalizedMediaTypes, normalizedServiceIds],
+    [
+      config.limitPerService,
+      config.quality,
+      config.releaseType,
+      config.releaseYearMax,
+      config.releaseYearMin,
+      config.status,
+      normalizedGenres,
+      normalizedMediaTypes,
+      normalizedServiceIds,
+    ],
   );
 
   const searchQuery = useQuery<UnifiedSearchResponse, Error>({

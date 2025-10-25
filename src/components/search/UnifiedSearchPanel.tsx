@@ -69,6 +69,48 @@ const mediaFilterOptions: UnifiedSearchMediaType[] = [
   "request",
 ];
 
+const allGenres = [
+  "Action",
+  "Adventure",
+  "Animation",
+  "Comedy",
+  "Crime",
+  "Documentary",
+  "Drama",
+  "Family",
+  "Fantasy",
+  "Film-Noir",
+  "Game-Show",
+  "History",
+  "Horror",
+  "Music",
+  "Musical",
+  "Mystery",
+  "News",
+  "Reality-TV",
+  "Romance",
+  "Sci-Fi",
+  "Sport",
+  "Talk-Show",
+  "Thriller",
+  "War",
+  "Western",
+];
+
+const qualityOptions = [
+  "Any",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+];
+
 const formatRuntime = (minutes?: number): string => {
   if (!minutes) return "";
   const hours = Math.floor(minutes / 60);
@@ -110,6 +152,10 @@ export const UnifiedSearchPanel: React.FC = () => {
   const [qualityFilter, setQualityFilter] = useState<string>("Any");
   const [releaseTypeFilter, setReleaseTypeFilter] = useState<string>("Any");
   const [statusFilter, setStatusFilter] = useState<string>("Any");
+  const [genreFilters, setGenreFilters] = useState<string[]>([]);
+  const [genreSearch, setGenreSearch] = useState<string>("");
+  const [releaseYearMin, setReleaseYearMin] = useState<number>(1990);
+  const [releaseYearMax, setReleaseYearMax] = useState<number>(2025);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
 
   // Debounce the user's input to avoid issuing a search request on every keystroke.
@@ -132,6 +178,12 @@ export const UnifiedSearchPanel: React.FC = () => {
   } = useUnifiedSearch(debouncedTerm, {
     serviceIds: serviceFilters,
     mediaTypes: mediaFilters,
+    quality: qualityFilter !== "Any" ? qualityFilter : undefined,
+    status: statusFilter !== "Any" ? statusFilter : undefined,
+    genres: genreFilters.length > 0 ? genreFilters : undefined,
+    releaseYearMin: releaseYearMin !== 1990 ? releaseYearMin : undefined,
+    releaseYearMax: releaseYearMax !== 2025 ? releaseYearMax : undefined,
+    releaseType: releaseTypeFilter !== "Any" ? releaseTypeFilter : undefined,
   });
 
   const serviceNameById = useMemo(() => {
@@ -552,6 +604,18 @@ export const UnifiedSearchPanel: React.FC = () => {
     });
   }, []);
 
+  const toggleGenre = useCallback((genre: string) => {
+    setGenreFilters((current) => {
+      const next = new Set(current);
+      if (next.has(genre)) {
+        next.delete(genre);
+      } else {
+        next.add(genre);
+      }
+      return Array.from(next);
+    });
+  }, []);
+
   const clearServiceFilters = useCallback(() => {
     setServiceFilters([]);
   }, []);
@@ -564,12 +628,18 @@ export const UnifiedSearchPanel: React.FC = () => {
     setQualityFilter("Any");
     setReleaseTypeFilter("Any");
     setStatusFilter("Any");
+    setGenreFilters([]);
+    setReleaseYearMin(1990);
+    setReleaseYearMax(2025);
   }, []);
 
   const hasAdvancedFilters =
     qualityFilter !== "Any" ||
     releaseTypeFilter !== "Any" ||
-    statusFilter !== "Any";
+    statusFilter !== "Any" ||
+    genreFilters.length > 0 ||
+    releaseYearMin !== 1990 ||
+    releaseYearMax !== 2025;
 
   // If the route provides search params (e.g. from Discover card), prefill the search
   useEffect(() => {
@@ -1001,6 +1071,20 @@ export const UnifiedSearchPanel: React.FC = () => {
                     </Text>
                   </View>
                 )}
+                {genreFilters.length > 0 && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>
+                      Genres: {genreFilters.join(", ")}
+                    </Text>
+                  </View>
+                )}
+                {(releaseYearMin !== 1990 || releaseYearMax !== 2025) && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>
+                      Years: {releaseYearMin}-{releaseYearMax}
+                    </Text>
+                  </View>
+                )}
               </>
             )}
           </View>
@@ -1121,6 +1205,36 @@ export const UnifiedSearchPanel: React.FC = () => {
                 </View>
               </View>
 
+              {/* Quality Filters */}
+              <View style={styles.filterDrawerSection}>
+                <Text style={styles.advancedFilterTitle}>Quality (Rating)</Text>
+                <View style={[styles.mainFilterRow, { flexWrap: "wrap" }]}>
+                  {qualityOptions.map((quality) => (
+                    <TouchableOpacity
+                      key={quality}
+                      style={[
+                        styles.mainFilterPill,
+                        qualityFilter === quality &&
+                          styles.mainFilterPillActive,
+                      ]}
+                      onPress={() => setQualityFilter(quality)}
+                    >
+                      <Text
+                        style={[
+                          styles.mainFilterText,
+                          qualityFilter === quality &&
+                            styles.mainFilterTextActive,
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {quality === "Any" ? "Any" : `${quality}+`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
               {/* Status Filters */}
               <View style={styles.filterDrawerSection}>
                 <Text style={styles.advancedFilterTitle}>Status</Text>
@@ -1167,6 +1281,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                     mode="flat"
                     placeholder="Search genres..."
                     placeholderTextColor={theme.colors.onSurfaceVariant}
+                    value={genreSearch}
+                    onChangeText={setGenreSearch}
                     style={styles.searchInput}
                     contentStyle={{
                       backgroundColor: "transparent",
@@ -1174,7 +1290,6 @@ export const UnifiedSearchPanel: React.FC = () => {
                     }}
                     underlineStyle={{ display: "none" }}
                     left={<TextInput.Icon icon="magnify" size={20} />}
-                    right={<TextInput.Icon icon="chevron-down" size={20} />}
                   />
                 </View>
                 <View
@@ -1183,30 +1298,33 @@ export const UnifiedSearchPanel: React.FC = () => {
                     { flexWrap: "wrap", marginTop: spacing.sm },
                   ]}
                 >
-                  {["Action", "Sci-Fi"].map((genre) => (
-                    <View
-                      key={genre}
-                      style={[
-                        styles.mainFilterPill,
-                        styles.mainFilterPillActive,
-                        { flexDirection: "row", gap: spacing.xs },
-                      ]}
-                    >
-                      <Text
-                        style={styles.mainFilterTextActive}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
+                  {allGenres
+                    .filter((genre) =>
+                      genre.toLowerCase().includes(genreSearch.toLowerCase()),
+                    )
+                    .map((genre) => (
+                      <TouchableOpacity
+                        key={genre}
+                        style={[
+                          styles.mainFilterPill,
+                          genreFilters.includes(genre) &&
+                            styles.mainFilterPillActive,
+                        ]}
+                        onPress={() => toggleGenre(genre)}
                       >
-                        {genre}
-                      </Text>
-                      <IconButton
-                        icon="close"
-                        size={16}
-                        iconColor={theme.colors.onPrimary}
-                        style={{ margin: 0, padding: 0 }}
-                      />
-                    </View>
-                  ))}
+                        <Text
+                          style={[
+                            styles.mainFilterText,
+                            genreFilters.includes(genre) &&
+                              styles.mainFilterTextActive,
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {genre}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                 </View>
               </View>
 
@@ -1230,15 +1348,63 @@ export const UnifiedSearchPanel: React.FC = () => {
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
-                      1990
+                      {releaseYearMin}
                     </Text>
                     <Text
                       style={styles.mainFilterText}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
-                      2024
+                      {releaseYearMax}
                     </Text>
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: spacing.sm,
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <TextInput
+                        mode="outlined"
+                        placeholder="From"
+                        keyboardType="number-pad"
+                        value={String(releaseYearMin)}
+                        onChangeText={(val) => {
+                          const num = parseInt(val, 10);
+                          if (
+                            !Number.isNaN(num) &&
+                            num >= 1900 &&
+                            num <= 2100
+                          ) {
+                            setReleaseYearMin(num);
+                          }
+                        }}
+                        style={{ height: 40 }}
+                        dense
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <TextInput
+                        mode="outlined"
+                        placeholder="To"
+                        keyboardType="number-pad"
+                        value={String(releaseYearMax)}
+                        onChangeText={(val) => {
+                          const num = parseInt(val, 10);
+                          if (
+                            !Number.isNaN(num) &&
+                            num >= 1900 &&
+                            num <= 2100
+                          ) {
+                            setReleaseYearMax(num);
+                          }
+                        }}
+                        style={{ height: 40 }}
+                        dense
+                      />
+                    </View>
                   </View>
                   <View
                     style={{
@@ -1256,8 +1422,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                         backgroundColor: theme.colors.primary,
                         borderRadius:
                           theme.custom.sizes.controlSizes.slider.borderRadius,
-                        marginLeft: "30%",
-                        marginRight: "5%",
+                        marginLeft: `${((releaseYearMin - 1900) / (2100 - 1900)) * 100}%`,
+                        marginRight: `${((2100 - releaseYearMax) / (2100 - 1900)) * 100}%`,
                       }}
                     />
                   </View>

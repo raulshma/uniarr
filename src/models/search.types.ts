@@ -67,4 +67,10 @@ export interface UnifiedSearchOptions {
   readonly serviceIds?: string[];
   readonly mediaTypes?: UnifiedSearchMediaType[];
   readonly limitPerService?: number;
+  readonly quality?: string;
+  readonly status?: string;
+  readonly genres?: string[];
+  readonly releaseYearMin?: number;
+  readonly releaseYearMax?: number;
+  readonly releaseType?: string;
 }

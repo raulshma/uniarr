@@ -382,6 +382,19 @@ const CastRow: React.FC<{
   const visibleCast = cast.slice(0, MAX_VISIBLE);
   const extras = Math.max(0, cast.length - MAX_VISIBLE);
 
+  // Helper to get the profile image URL based on the source
+  const getProfileImageUrl = (person: any): string | undefined => {
+    // For Jellyseerr cast: profileUrl is already a full URL
+    if ("profileUrl" in person && person.profileUrl) {
+      return person.profileUrl;
+    }
+    // For TMDB cast: profilePath needs to be converted to full URL
+    if ("profilePath" in person && person.profilePath) {
+      return buildProfileUrl(person.profilePath);
+    }
+    return undefined;
+  };
+
   return (
     <View style={styles.row}>
       <Text
@@ -406,7 +419,7 @@ const CastRow: React.FC<{
             style={{ marginLeft: idx === 0 ? 0 : -OVERLAP, zIndex: idx + 1 }}
           >
             <MediaPoster
-              uri={buildProfileUrl(person.profilePath)}
+              uri={getProfileImageUrl(person)}
               size={AVATAR_SIZE}
               aspectRatio={1}
               borderRadius={AVATAR_SIZE / 2}

@@ -126,9 +126,10 @@ export class UnifiedSearchService {
     }
 
     const results = this.deduplicateAndSort(aggregateResults);
+    const filtered = this.applyAdvancedFilters(results, options);
 
     return {
-      results,
+      results: filtered,
       errors: aggErrors,
       durationMs: Date.now() - start,
     };
@@ -749,6 +750,85 @@ export class UnifiedSearchService {
           studios: item.Studios?.join(", "),
         },
       } as UnifiedSearchResult;
+    });
+  }
+
+  private applyAdvancedFilters(
+    results: UnifiedSearchResult[],
+    options: UnifiedSearchOptions,
+  ): UnifiedSearchResult[] {
+    return results.filter((result) => {
+      // Filter by status
+      if (options.status && options.status !== "Any") {
+        const status = options.status.toLowerCase();
+
+        if (status === "owned" || status === "available") {
+          if (!result.isInLibrary) return false;
+        } else if (status === "monitored") {
+          // Monitored items exist in the system (sonarr/radarr metadata)
+          if (!result.isInLibrary) return false;
+        } else if (status === "missing") {
+          // Missing items are in the system but not fully available
+          if (result.isInLibrary !== false) return false;
+        } else if (status === "requested") {
+          // Requested items have isRequested flag set
+          if (!result.isRequested) return false;
+        }
+      }
+
+      // Filter by quality (rating)
+      if (options.quality && options.quality !== "Any") {
+        const qualityThreshold = Number(options.quality);
+        if (!Number.isNaN(qualityThreshold)) {
+          if ((result.rating ?? 0) < qualityThreshold) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by release year range
+      if (
+        options.releaseYearMin !== undefined ||
+        options.releaseYearMax !== undefined
+      ) {
+        const year = result.year;
+        if (year !== undefined) {
+          if (
+            options.releaseYearMin !== undefined &&
+            year < options.releaseYearMin
+          ) {
+            return false;
+          }
+          if (
+            options.releaseYearMax !== undefined &&
+            year > options.releaseYearMax
+          ) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by genres
+      if (options.genres && options.genres.length > 0) {
+        const genresStr = result.extra?.genres as string | undefined;
+        if (genresStr) {
+          const itemGenres = genresStr
+            .split(",")
+            .map((g) => g.trim().toLowerCase());
+          const filterGenres = options.genres.map((g) => g.toLowerCase());
+          const hasMatchingGenre = filterGenres.some((fg) =>
+            itemGenres.some((ig) => ig.includes(fg) || fg.includes(ig)),
+          );
+          if (!hasMatchingGenre) {
+            return false;
+          }
+        } else {
+          // If genres filter is applied but item has no genres, exclude it
+          return false;
+        }
+      }
+
+      return true;
     });
   }
 

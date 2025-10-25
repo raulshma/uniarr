@@ -7,8 +7,13 @@ import {
   selectGetConnector,
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
-import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
-type JellyseerrCreditPerson = components["schemas"]["Cast"];
+
+type MappedCreditPerson = {
+  readonly id?: number;
+  readonly name?: string;
+  readonly character?: string;
+  readonly profileUrl?: string;
+};
 
 export const useJellyseerrMediaCredits = (
   serviceId: string,
@@ -19,7 +24,7 @@ export const useJellyseerrMediaCredits = (
   const connector = getConnector(serviceId) as JellyseerrConnector | undefined;
   const enabled = Boolean(connector && mediaId);
 
-  return useQuery<JellyseerrCreditPerson[], Error>({
+  return useQuery<MappedCreditPerson[], Error>({
     queryKey: queryKeys.jellyseerr.mediaCredits(
       serviceId,
       mediaType,
