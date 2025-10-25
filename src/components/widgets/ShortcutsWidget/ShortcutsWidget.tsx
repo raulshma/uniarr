@@ -121,7 +121,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
         return {
           container: styles.largeContainer,
           scrollContainer: styles.largeScrollContainer,
-          columns: 3,
+          columns: 2,
         };
       default: // medium
         return {
@@ -296,17 +296,17 @@ const useStyles = (theme: AppTheme) =>
     gridContainer: {
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "space-between",
+      justifyContent: "space-around",
       alignItems: "flex-start",
-      gap: spacing.sm,
+      gap: spacing.md,
     },
     loadingSkeleton: {
       flex: 1,
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "space-between",
+      justifyContent: "space-around",
       alignItems: "flex-start",
-      gap: spacing.sm,
+      gap: spacing.md,
       paddingVertical: spacing.sm,
     },
     skeletonShortcut: {

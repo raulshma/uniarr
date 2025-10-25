@@ -88,41 +88,43 @@ const ShortcutItem: React.FC<ShortcutItemProps> = ({
 const useThemeAwareStyles = (theme: AppTheme) =>
   StyleSheet.create({
     container: {
+      flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      borderRadius: borderRadius.lg, // 12
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.sm,
-      minHeight: touchSizes.xl + 24, // 80 = 56 + 24
-      minWidth: touchSizes.xl + 24,
-      maxWidth: iconSizes.xxxl + 56, // 120 = 64 + 56
+      justifyContent: "flex-start",
+      borderRadius: borderRadius.xxl, // 20 - More rounded for cylinder shape
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      minHeight: touchSizes.lg, // 48 - Shorter for horizontal pill
+      minWidth: touchSizes.xl + 80, // Wider for horizontal pill
+      maxWidth: iconSizes.xxxl + 120, // 184 = 64 + 120 - Much wider for pill shape
       ...getComponentElevation("widgetCard", theme),
     },
     smallContainer: {
-      minHeight: touchSizes.lg + 12, // 60 = 48 + 12
-      minWidth: touchSizes.lg + 12,
-      maxWidth: touchSizes.xl + 34, // 90
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.xs,
-    },
-    mediumContainer: {
-      minHeight: touchSizes.xl + 24, // 80 = 56 + 24
-      minWidth: touchSizes.xl + 24,
-      maxWidth: iconSizes.xxxl + 56, // 120 = 64 + 56
-      paddingVertical: spacing.md,
+      minHeight: touchSizes.md, // 44 - Short pill
+      minWidth: touchSizes.lg + 60, // Wider pill
+      maxWidth: touchSizes.xl + 80, // 136 - Wide pill
+      paddingVertical: spacing.xs,
       paddingHorizontal: spacing.sm,
     },
-    largeContainer: {
-      minHeight: touchSizes.xl + 44, // 100 = 56 + 44
-      minWidth: touchSizes.xl + 44,
-      maxWidth: iconSizes.xxxl + 76, // 140 = 64 + 76
-      paddingVertical: spacing.lg,
+    mediumContainer: {
+      minHeight: touchSizes.lg, // 48 - Short pill
+      minWidth: touchSizes.xl + 100, // Wider pill
+      maxWidth: iconSizes.xxxl + 120, // 184 = 64 + 120 - Wide pill
+      paddingVertical: spacing.xs,
       paddingHorizontal: spacing.md,
     },
+    largeContainer: {
+      minHeight: touchSizes.lg + 8, // 56 - Short pill
+      minWidth: touchSizes.xl + 96, // Wider pill
+      maxWidth: iconSizes.xxxl + 140, // 204 = 64 + 140 - Wide pill
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+    },
     label: {
-      marginTop: spacing.xs,
-      textAlign: "center",
+      marginLeft: spacing.sm,
+      textAlign: "left",
       fontWeight: "500",
+      flex: 1,
     },
     disabled: {
       opacity: 0.5,
