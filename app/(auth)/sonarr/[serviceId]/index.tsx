@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import {
+  Chip,
   Icon,
   IconButton,
   Menu,
@@ -28,12 +29,18 @@ import {
 } from "@/components/media/MediaSelector";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { SeriesListItemSkeleton } from "@/components/media/skeletons";
+import { LibraryFilterModal } from "@/components/library/LibraryFilterModal";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useSonarrSeries } from "@/hooks/useSonarrSeries";
+import { useSonarrFilterMetadata } from "@/hooks/useLibraryFilterMetadata";
 import type { Series } from "@/models/media.types";
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
+import {
+  useLibraryFilterStore,
+  type LibraryFilters,
+} from "@/store/libraryFilterStore";
 
 const FILTER_ALL = "all";
 const FILTER_MONITORED = "monitored";
@@ -74,9 +81,55 @@ const SonarrSeriesListScreen = () => {
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<Series | null>(null);
   const [isEditorVisible, setIsEditorVisible] = useState(false);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+
+  // Keep default filters stable to avoid infinite re-renders when store data is missing
+  const defaultFilters = useMemo<LibraryFilters>(
+    () => ({
+      tags: [],
+      qualityProfileId: undefined,
+      monitored: undefined,
+    }),
+    [],
+  );
+
+  const filtersFromStore = useLibraryFilterStore(
+    useCallback(
+      (state) => state.serviceFilters[serviceId]?.filters,
+      [serviceId],
+    ),
+  );
+  const filters = filtersFromStore ?? defaultFilters;
+
+  const filterMetadata = useLibraryFilterStore(
+    useCallback(
+      (state) => state.serviceFilters[serviceId]?.metadata,
+      [serviceId],
+    ),
+  );
+
+  const hasActiveFilters = useLibraryFilterStore(
+    useCallback(
+      (state) => {
+        const serviceFilters = state.serviceFilters[serviceId]?.filters;
+        if (!serviceFilters) return false;
+        return (
+          serviceFilters.tags.length > 0 ||
+          serviceFilters.qualityProfileId !== undefined ||
+          serviceFilters.monitored !== undefined
+        );
+      },
+      [serviceId],
+    ),
+  );
+  const setFilters = useLibraryFilterStore((state) => state.setFilters);
+  const resetFilters = useLibraryFilterStore((state) => state.resetFilters);
+
+  // Fetch filter metadata
+  useSonarrFilterMetadata({ serviceId });
 
   const { series, isLoading, isFetching, isError, error, refetch } =
-    useSonarrSeries(serviceId);
+    useSonarrSeries({ serviceId, filters });
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -143,6 +196,52 @@ const SonarrSeriesListScreen = () => {
 
   const isRefreshing = isFetching && !isLoading;
   const isInitialLoad = isBootstrapping || isLoading;
+
+  // Advanced filter handlers
+  const handleOpenFilterModal = useCallback(() => {
+    setIsFilterModalVisible(true);
+  }, []);
+
+  const handleCloseFilterModal = useCallback(() => {
+    setIsFilterModalVisible(false);
+  }, []);
+
+  const handleApplyFilters = useCallback(
+    (newFilters: typeof filters) => {
+      setFilters(serviceId, newFilters);
+      setIsFilterModalVisible(false);
+    },
+    [serviceId, setFilters],
+  );
+
+  const handleResetFilters = useCallback(() => {
+    resetFilters(serviceId);
+    setIsFilterModalVisible(false);
+  }, [serviceId, resetFilters]);
+
+  const handleRemoveTag = useCallback(
+    (tagId: number) => {
+      setFilters(serviceId, {
+        ...filters,
+        tags: filters.tags.filter((id) => id !== tagId),
+      });
+    },
+    [serviceId, filters, setFilters],
+  );
+
+  const handleRemoveQualityProfile = useCallback(() => {
+    setFilters(serviceId, {
+      ...filters,
+      qualityProfileId: undefined,
+    });
+  }, [serviceId, filters, setFilters]);
+
+  const handleRemoveMonitoredFilter = useCallback(() => {
+    setFilters(serviceId, {
+      ...filters,
+      monitored: undefined,
+    });
+  }, [serviceId, filters, setFilters]);
 
   const filteredSeries = useMemo(() => {
     if (!series) {
@@ -495,6 +594,97 @@ const SonarrSeriesListScreen = () => {
             </Menu>
           </View>
         </View>
+        {/* Advanced Filters Button */}
+        <View style={{ marginBottom: spacing.md }}>
+          <TouchableRipple
+            borderless={false}
+            style={[
+              styles.filterButton,
+              hasActiveFilters && {
+                backgroundColor: theme.colors.primaryContainer,
+              },
+            ]}
+            onPress={handleOpenFilterModal}
+          >
+            <View style={styles.filterButtonContent}>
+              <Icon
+                source="filter-variant"
+                size={20}
+                color={
+                  hasActiveFilters
+                    ? theme.colors.onPrimaryContainer
+                    : theme.colors.onSurfaceVariant
+                }
+              />
+              <Text
+                variant="bodyMedium"
+                style={[
+                  styles.filterButtonLabel,
+                  { marginLeft: spacing.sm },
+                  hasActiveFilters && {
+                    color: theme.colors.onPrimaryContainer,
+                  },
+                ]}
+              >
+                Advanced Filters
+                {hasActiveFilters && " (Active)"}
+              </Text>
+            </View>
+          </TouchableRipple>
+        </View>
+        {/* Active Filter Chips */}
+        {hasActiveFilters && (
+          <View style={{ marginBottom: spacing.md }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                gap: spacing.sm,
+              }}
+            >
+              {filters.tags.map((tagId) => {
+                const tag = filterMetadata?.tags.find((t) => t.id === tagId);
+                return tag ? (
+                  <Chip
+                    key={tagId}
+                    mode="flat"
+                    onClose={() => handleRemoveTag(tagId)}
+                    style={{ backgroundColor: theme.colors.primaryContainer }}
+                    textStyle={{ color: theme.colors.onPrimaryContainer }}
+                  >
+                    Tag: {tag.label}
+                  </Chip>
+                ) : null;
+              })}
+              {filters.qualityProfileId && (
+                <Chip
+                  mode="flat"
+                  onClose={handleRemoveQualityProfile}
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                  textStyle={{ color: theme.colors.onPrimaryContainer }}
+                >
+                  Quality:{" "}
+                  {
+                    filterMetadata?.qualityProfiles.find(
+                      (p) => p.id === filters.qualityProfileId,
+                    )?.name
+                  }
+                </Chip>
+              )}
+              {filters.monitored !== undefined && (
+                <Chip
+                  mode="flat"
+                  onClose={handleRemoveMonitoredFilter}
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                  textStyle={{ color: theme.colors.onPrimaryContainer }}
+                >
+                  {filters.monitored ? "Monitored" : "Unmonitored"}
+                </Chip>
+              )}
+            </ScrollView>
+          </View>
+        )}
       </View>
     ),
     [
@@ -505,6 +695,13 @@ const SonarrSeriesListScreen = () => {
       statusMenuVisible,
       styles,
       theme,
+      filters,
+      filterMetadata,
+      hasActiveFilters,
+      handleOpenFilterModal,
+      handleRemoveTag,
+      handleRemoveQualityProfile,
+      handleRemoveMonitoredFilter,
     ],
   );
 
@@ -644,6 +841,14 @@ const SonarrSeriesListScreen = () => {
           onDismiss={handleEditorDismiss}
           onSave={handleEditorSave}
           serviceId={serviceId}
+        />
+        <LibraryFilterModal
+          visible={isFilterModalVisible}
+          filters={filters}
+          metadata={filterMetadata}
+          onDismiss={handleCloseFilterModal}
+          onApply={handleApplyFilters}
+          onReset={handleResetFilters}
         />
       </SafeAreaView>
     </MediaSelectorProvider>

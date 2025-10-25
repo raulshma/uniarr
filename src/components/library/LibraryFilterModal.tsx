@@ -57,6 +57,7 @@ export const LibraryFilterModal: React.FC<LibraryFilterModalProps> = ({
       StyleSheet.create({
         dialog: {
           backgroundColor: theme.colors.surface,
+          maxHeight: "90%",
         },
         content: {
           paddingHorizontal: spacing.lg,
