@@ -8,7 +8,7 @@ import {
   Animated,
 } from "react-native";
 import { Image } from "expo-image";
-import { Text, useTheme } from "react-native-paper";
+import { Text, useTheme, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { AppTheme } from "@/constants/theme";
@@ -270,16 +270,16 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
 
   if (onPress) {
     return (
-      <Pressable
+      <TouchableRipple
         onPress={onPress}
+        borderless={false}
         accessibilityRole="imagebutton"
-        accessibilityLabel={effectiveLabel}
       >
         <View style={containerStyle} pointerEvents="box-none">
           {content}
           {overlay && <View pointerEvents="auto">{overlay}</View>}
         </View>
-      </Pressable>
+      </TouchableRipple>
     );
   }
 

@@ -17,7 +17,6 @@ import {
   Text,
   useTheme,
   Badge,
-  TouchableRipple,
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 
@@ -104,13 +103,12 @@ const DiscoverCard = ({
     [theme],
   );
 
+  const handlePress = useCallback(() => {
+    onPress(item);
+  }, [item, onPress]);
+
   return (
-    <TouchableRipple
-      onPress={() => onPress(item)}
-      borderless={false}
-      accessibilityRole="button"
-      style={styles.container}
-    >
+    <View style={styles.container} pointerEvents="box-none">
       <View style={styles.innerWrapper} pointerEvents="box-none">
         <View style={styles.posterWrapper} pointerEvents="box-none">
           {inLibraryQuery.foundServices.length > 0 && (
@@ -121,6 +119,7 @@ const DiscoverCard = ({
           <MediaPoster
             uri={item.posterUrl}
             size={152}
+            onPress={handlePress}
             overlay={
               <IconButton
                 icon="plus"
@@ -139,7 +138,7 @@ const DiscoverCard = ({
           {item.title}
         </Text>
       </View>
-    </TouchableRipple>
+    </View>
   );
 };
 
