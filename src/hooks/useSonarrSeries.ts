@@ -15,6 +15,12 @@ import {
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 import { IConnector } from "@/connectors/base/IConnector";
+import type { LibraryFilters } from "@/store/libraryFilterStore";
+
+interface UseSonarrSeriesOptions {
+  serviceId: string;
+  filters?: LibraryFilters;
+}
 
 interface UseSonarrSeriesResult {
   series: Series[] | undefined;
@@ -47,7 +53,10 @@ const ensureSonarrConnector = (
   return connector as SonarrConnector;
 };
 
-export const useSonarrSeries = (serviceId: string): UseSonarrSeriesResult => {
+export const useSonarrSeries = ({
+  serviceId,
+  filters,
+}: UseSonarrSeriesOptions): UseSonarrSeriesResult => {
   const queryClient = useQueryClient();
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
@@ -59,10 +68,10 @@ export const useSonarrSeries = (serviceId: string): UseSonarrSeriesResult => {
   );
 
   const seriesQuery = useQuery({
-    queryKey: queryKeys.sonarr.seriesList(serviceId),
+    queryKey: queryKeys.sonarr.seriesList(serviceId, filters),
     queryFn: async () => {
       const connector = resolveConnector();
-      return connector.getSeries();
+      return connector.getSeries(filters);
     },
     enabled: hasConnector,
     staleTime: 5 * 60 * 1000,

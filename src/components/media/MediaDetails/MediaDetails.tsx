@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Linking, ScrollView, View } from "react-native";
 import {
   Chip,
   Text,
@@ -17,6 +17,12 @@ import type { ServiceConfig } from "@/models/service.types";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { DownloadButton } from "@/components/downloads";
 import type { MediaKind } from "@/components/media/MediaCard";
+import {
+  useSettingsStore,
+  selectJellyfinLocalAddress,
+  selectJellyfinPublicAddress,
+} from "@/store/settingsStore";
+import { alert } from "@/services/dialogService";
 
 export type MediaDetailsProps = {
   title: string;
@@ -41,6 +47,10 @@ export type MediaDetailsProps = {
   };
   seasons?: Season[];
   type: MediaKind;
+  // External IDs for Jellyfin deep linking
+  tmdbId?: number;
+  tvdbId?: number;
+  imdbId?: string;
   onToggleMonitor?: (nextState: boolean) => void;
   onSearchPress?: () => void;
   onDeletePress?: () => void;
@@ -94,6 +104,9 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   movieFile,
   seasons,
   type,
+  tmdbId,
+  tvdbId,
+  imdbId,
   onToggleMonitor,
   onSearchPress,
   onDeletePress,
@@ -116,6 +129,9 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   const theme = useTheme<AppTheme>();
   // episodesModalVisible removed — seasons use inline selectedSeason state instead
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+
+  const jellyfinLocalAddress = useSettingsStore(selectJellyfinLocalAddress);
+  const jellyfinPublicAddress = useSettingsStore(selectJellyfinPublicAddress);
 
   const handleMonitorPress = useCallback(() => {
     if (!onToggleMonitor) {
@@ -141,6 +157,52 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
     },
     [onToggleSeasonMonitor],
   );
+
+  const handleViewOnJellyfin = useCallback(async () => {
+    // Determine which Jellyfin address to use (prefer public, fallback to local)
+    const jellyfinAddress = jellyfinPublicAddress || jellyfinLocalAddress;
+
+    if (!jellyfinAddress) {
+      alert(
+        "Jellyfin Not Configured",
+        "Please configure your Jellyfin server address in settings to use this feature.",
+      );
+      return;
+    }
+
+    // Construct search URL using external IDs (IMDB preferred for broadest compatibility)
+    let searchUrl: string;
+    if (imdbId) {
+      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=imdb:${imdbId}`;
+    } else if (tmdbId) {
+      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=tmdb:${tmdbId}`;
+    } else if (tvdbId) {
+      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=tvdb:${tvdbId}`;
+    } else {
+      alert(
+        "No External IDs",
+        "This media item doesn't have external IDs (IMDB, TMDB, TVDB) required for Jellyfin linking.",
+      );
+      return;
+    }
+
+    try {
+      const canOpen = await Linking.canOpenURL(searchUrl);
+      if (canOpen) {
+        await Linking.openURL(searchUrl);
+      } else {
+        alert(
+          "Cannot Open Link",
+          "Unable to open Jellyfin link. Please check your Jellyfin server address in settings.",
+        );
+      }
+    } catch (error) {
+      alert(
+        "Error Opening Jellyfin",
+        `Failed to open Jellyfin: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  }, [jellyfinLocalAddress, jellyfinPublicAddress, imdbId, tmdbId, tvdbId]);
 
   const showSeasons = type === "series" && seasons?.length;
   const showEpisodes = showSeasons && (selectedSeason || seasons?.length === 1);
@@ -362,7 +424,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
 
       {/* Action Buttons */}
       <View style={{ paddingHorizontal: 20 }}>
-        <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
           {onSearchPress ? (
             <Button
               mode="contained"
@@ -397,6 +459,23 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             {monitored ? "Unmonitor" : "Monitor"}
           </Button>
         </View>
+
+        {/* View on Jellyfin button - show if we have external IDs */}
+        {(imdbId || tmdbId || tvdbId) && (
+          <Button
+            mode="outlined"
+            onPress={handleViewOnJellyfin}
+            icon="play-circle-outline"
+            textColor={theme.colors.primary}
+            style={{
+              borderRadius: 8,
+              borderColor: theme.colors.primary,
+            }}
+            labelStyle={{ fontWeight: "600" }}
+          >
+            View on Jellyfin
+          </Button>
+        )}
       </View>
 
       {/* Seasons - Only show for series */}

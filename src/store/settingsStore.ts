@@ -49,6 +49,9 @@ type SettingsData = {
   logLevel: LogLevel;
   // Haptic feedback setting
   hapticFeedback: boolean;
+  // Jellyfin server addresses for deep linking
+  jellyfinLocalAddress?: string;
+  jellyfinPublicAddress?: string;
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -80,6 +83,8 @@ interface SettingsState extends SettingsData {
   setMaxImageCacheSize: (size: number) => void;
   setLogLevel: (level: LogLevel) => void;
   setHapticFeedback: (enabled: boolean) => void;
+  setJellyfinLocalAddress: (address: string | undefined) => void;
+  setJellyfinPublicAddress: (address: string | undefined) => void;
   // (thumbnail setters removed)
 }
 
@@ -152,6 +157,8 @@ const createDefaultSettings = (): SettingsData => ({
   maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
   logLevel: LogLevel.DEBUG,
   hapticFeedback: true,
+  jellyfinLocalAddress: undefined,
+  jellyfinPublicAddress: undefined,
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
@@ -205,6 +212,10 @@ export const useSettingsStore = create<SettingsState>()(
       setMaxImageCacheSize: (size: number) =>
         set({ maxImageCacheSize: clampMaxImageCacheSize(size) }),
       setHapticFeedback: (enabled: boolean) => set({ hapticFeedback: enabled }),
+      setJellyfinLocalAddress: (address: string | undefined) =>
+        set({ jellyfinLocalAddress: address }),
+      setJellyfinPublicAddress: (address: string | undefined) =>
+        set({ jellyfinPublicAddress: address }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -236,10 +247,12 @@ export const useSettingsStore = create<SettingsState>()(
         maxImageCacheSize: state.maxImageCacheSize,
         logLevel: state.logLevel,
         hapticFeedback: state.hapticFeedback,
+        jellyfinLocalAddress: state.jellyfinLocalAddress,
+        jellyfinPublicAddress: state.jellyfinPublicAddress,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 7,
+      version: 8,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -427,3 +440,7 @@ export const selectLastCalendarView = (state: SettingsState) =>
 export const selectUseNativeTabs = (state: SettingsState) =>
   state.useNativeTabs;
 export const selectHasHydrated = (state: SettingsState) => state._hasHydrated;
+export const selectJellyfinLocalAddress = (state: SettingsState) =>
+  state.jellyfinLocalAddress;
+export const selectJellyfinPublicAddress = (state: SettingsState) =>
+  state.jellyfinPublicAddress;

@@ -138,12 +138,27 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
-  async getSeries(): Promise<Series[]> {
+  async getSeries(filters?: {
+    tags?: number[];
+    qualityProfileId?: number;
+    monitored?: boolean;
+  }): Promise<Series[]> {
     try {
-      const response =
-        await this.client.get<components["schemas"]["SeriesResource"][]>(
-          "/api/v3/series",
-        );
+      const params: Record<string, unknown> = {};
+
+      if (filters?.tags && filters.tags.length > 0) {
+        params.tags = filters.tags.join(",");
+      }
+      if (filters?.qualityProfileId !== undefined) {
+        params.qualityProfileId = filters.qualityProfileId;
+      }
+      if (filters?.monitored !== undefined) {
+        params.monitored = filters.monitored;
+      }
+
+      const response = await this.client.get<
+        components["schemas"]["SeriesResource"][]
+      >("/api/v3/series", { params });
       return response.data.map((item) => this.mapSeries(item));
     } catch (error) {
       throw handleApiError(error, {

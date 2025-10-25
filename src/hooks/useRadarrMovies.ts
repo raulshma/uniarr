@@ -15,6 +15,12 @@ import {
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 import { IConnector } from "@/connectors/base/IConnector";
+import type { LibraryFilters } from "@/store/libraryFilterStore";
+
+interface UseRadarrMoviesOptions {
+  serviceId: string;
+  filters?: LibraryFilters;
+}
 
 interface UseRadarrMoviesResult {
   movies: Movie[] | undefined;
@@ -47,7 +53,10 @@ const ensureRadarrConnector = (
   return connector as RadarrConnector;
 };
 
-export const useRadarrMovies = (serviceId: string): UseRadarrMoviesResult => {
+export const useRadarrMovies = ({
+  serviceId,
+  filters,
+}: UseRadarrMoviesOptions): UseRadarrMoviesResult => {
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
@@ -60,10 +69,10 @@ export const useRadarrMovies = (serviceId: string): UseRadarrMoviesResult => {
   const queryClient = useQueryClient();
 
   const moviesQuery = useQuery({
-    queryKey: queryKeys.radarr.moviesList(serviceId),
+    queryKey: queryKeys.radarr.moviesList(serviceId, filters),
     queryFn: async () => {
       const connector = resolveConnector();
-      return connector.getMovies();
+      return connector.getMovies(filters);
     },
     enabled: hasConnector,
     staleTime: 5 * 60 * 1000,

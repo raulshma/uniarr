@@ -236,6 +236,9 @@ const SonarrSeriesDetailsScreen = () => {
               seasons={series.seasons}
               runtimeMinutes={runtimeMinutes}
               type="series"
+              tmdbId={series.tmdbId}
+              tvdbId={series.tvdbId}
+              imdbId={series.imdbId}
               onToggleMonitor={handleToggleMonitor}
               onToggleSeasonMonitor={toggleSeasonMonitor}
               onSearchPress={handleTriggerSearch}

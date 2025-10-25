@@ -117,10 +117,27 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getMovies(): Promise<Movie[]> {
+  async getMovies(filters?: {
+    tags?: number[];
+    qualityProfileId?: number;
+    monitored?: boolean;
+  }): Promise<Movie[]> {
     try {
+      const params: Record<string, unknown> = {};
+
+      if (filters?.tags && filters.tags.length > 0) {
+        params.tags = filters.tags.join(",");
+      }
+      if (filters?.qualityProfileId !== undefined) {
+        params.qualityProfileId = filters.qualityProfileId;
+      }
+      if (filters?.monitored !== undefined) {
+        params.monitored = filters.monitored;
+      }
+
       const response = await this.client.get<RadarrMovie[]>(
         `${RADARR_API_PREFIX}/movie`,
+        { params },
       );
       return (response.data ?? []).map((item) => this.mapMovie(item));
     } catch (error) {

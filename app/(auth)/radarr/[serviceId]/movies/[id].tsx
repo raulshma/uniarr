@@ -194,6 +194,8 @@ const RadarrMovieDetailsScreen = () => {
               movieFile={movie.movieFile}
               type="movie"
               rating={movie.ratings?.value}
+              tmdbId={movie.tmdbId}
+              imdbId={movie.imdbId}
               onToggleMonitor={handleToggleMonitor}
               onSearchPress={handleTriggerSearch}
               onDeletePress={handleDeleteMovie}
