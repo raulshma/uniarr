@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { Alert } from "react-native";
 import { validateDateString } from "./calendar.utils";
+import { alert } from "@/services/dialogService";
 
 /**
  * Navigation utilities for consistent routing patterns across the app
@@ -51,7 +51,7 @@ export function navigateToRoute<
 
       if (missingParams.length > 0) {
         console.warn("Missing required navigation parameters:", missingParams);
-        Alert.alert(
+        alert(
           "Navigation Error",
           "Missing required information to navigate to this page.",
         );
@@ -82,10 +82,7 @@ export function navigateToRoute<
     }
   } catch (error) {
     console.error("Navigation failed:", error);
-    Alert.alert(
-      "Navigation Error",
-      "Unable to navigate to the requested page.",
-    );
+    alert("Navigation Error", "Unable to navigate to the requested page.");
   }
 }
 

@@ -23,7 +23,6 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import BottomDrawer from "@/components/common/BottomDrawer";
-import { TabHeader } from "@/components/common/TabHeader";
 import {
   MediaReleaseCard,
   EnhancedCalendarHeader,
@@ -709,17 +708,6 @@ const CalendarScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TabHeader
-        title="Release Calendar"
-        showTitle
-        showBackButton={false}
-        rightAction={{
-          icon: "cog",
-          onPress: openFilters,
-          accessibilityLabel: "Open filters",
-        }}
-      />
-
       <EnhancedCalendarHeader
         navigation={navigation}
         view={state.view}

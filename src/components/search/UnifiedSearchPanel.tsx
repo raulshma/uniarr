@@ -20,9 +20,12 @@ import {
 } from "react-native-paper";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
-// Card and AnimatedSection intentionally omitted — not used in this file
 import { Button } from "@/components/common/Button";
-import { AnimatedListItem } from "@/components/common/AnimatedComponents";
+import {
+  AnimatedCard,
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { getComponentElevation } from "@/constants/elevation";
@@ -39,6 +42,7 @@ import {
   selectGetConnector,
 } from "@/store/connectorsStore";
 import DownloadButton from "@/components/downloads/DownloadButton";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const mediaTypeLabels: Record<UnifiedSearchMediaType, string> = {
   series: "Series",
@@ -140,6 +144,7 @@ export const UnifiedSearchPanel: React.FC = () => {
 
   const hasActiveQuery = searchTerm.trim().length >= minSearchLength;
   const isBusy = isLoading || isFetching;
+  const allowAnimations = shouldAnimateLayout(isBusy, isFetching);
 
   const styles = useMemo(
     () =>
@@ -278,6 +283,9 @@ export const UnifiedSearchPanel: React.FC = () => {
           marginBottom: spacing.xs,
           padding: 0,
           overflow: "hidden",
+        },
+        resultTouchable: {
+          flex: 1,
         },
         resultContent: {
           flexDirection: "row",
@@ -755,7 +763,7 @@ export const UnifiedSearchPanel: React.FC = () => {
   );
 
   const renderResult = useCallback(
-    (item: UnifiedSearchResult) => {
+    (item: UnifiedSearchResult, index: number) => {
       const subtitleInfo = [];
       if (item.year) subtitleInfo.push(String(item.year));
       if (item.runtime) subtitleInfo.push(formatRuntime(item.runtime));
@@ -795,86 +803,97 @@ export const UnifiedSearchPanel: React.FC = () => {
         item.serviceType;
 
       return (
-        <TouchableOpacity
-          onPress={() => handlePrimaryAction(item)}
-          activeOpacity={0.8}
+        <AnimatedCard
           style={[styles.resultCard, cardElevationStyle]}
+          delay={index * 40}
+          animated={allowAnimations}
         >
-          <View style={styles.resultContent}>
-            <View style={styles.posterContainer}>{renderPoster()}</View>
+          <TouchableOpacity
+            onPress={() => handlePrimaryAction(item)}
+            activeOpacity={0.8}
+            style={styles.resultTouchable}
+          >
+            <View style={styles.resultContent}>
+              <View style={styles.posterContainer}>{renderPoster()}</View>
 
-            <View style={styles.resultInfo}>
-              <View style={styles.resultHeaderRow}>
-                <View style={styles.titleColumn}>
-                  <Text style={styles.resultTitle} numberOfLines={2}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.resultSubtitle} numberOfLines={1}>
-                    {subtitleInfo.join(" • ")}
-                  </Text>
+              <View style={styles.resultInfo}>
+                <View style={styles.resultHeaderRow}>
+                  <View style={styles.titleColumn}>
+                    <Text style={styles.resultTitle} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.resultSubtitle} numberOfLines={1}>
+                      {subtitleInfo.join(" • ")}
+                    </Text>
 
-                  {genreInfo.length > 0 && (
-                    <View style={styles.genreContainer}>
-                      {genreInfo.slice(0, 3).map((genre, index) => (
-                        <Chip
-                          key={index}
-                          compact
-                          mode="outlined"
-                          style={styles.genreChip}
-                          textStyle={{ fontSize: 11 }}
-                        >
-                          {genre}
-                        </Chip>
-                      ))}
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.rightColumn}>
-                  <View style={styles.serviceBadge}>
-                    <Text style={styles.serviceBadgeText}>{serviceLabel}</Text>
-                  </View>
-
-                  <View style={styles.spacerSmall} />
-
-                  <View style={styles.resultActions}>
-                    <IconButton
-                      icon="eye"
-                      size={18}
-                      iconColor={theme.colors.primary}
-                      onPress={() => handleViewAction(item)}
-                      style={styles.iconCompact}
-                    />
-
-                    {item.serviceId && getConnector(item.serviceId)?.config && (
-                      <View style={styles.downloadButtonContainer}>
-                        <DownloadButton
-                          serviceConfig={getConnector(item.serviceId)!.config}
-                          contentId={item.id}
-                          size="small"
-                          variant="icon"
-                          onDownloadStart={(downloadId) => {
-                            console.log(`Download started: ${downloadId}`);
-                          }}
-                          onDownloadError={(error) => {
-                            console.error(`Download failed: ${error}`);
-                          }}
-                        />
+                    {genreInfo.length > 0 && (
+                      <View style={styles.genreContainer}>
+                        {genreInfo.slice(0, 3).map((genre, index) => (
+                          <Chip
+                            key={index}
+                            compact
+                            mode="outlined"
+                            style={styles.genreChip}
+                            textStyle={{ fontSize: 11 }}
+                          >
+                            {genre}
+                          </Chip>
+                        ))}
                       </View>
                     )}
+                  </View>
 
-                    <IconButton
-                      icon="dots-vertical"
-                      size={18}
-                      iconColor={theme.colors.onSurfaceVariant}
-                      style={styles.iconWithBg}
-                    />
+                  <View style={styles.rightColumn}>
+                    <View style={styles.serviceBadge}>
+                      <Text style={styles.serviceBadgeText}>
+                        {serviceLabel}
+                      </Text>
+                    </View>
+
+                    <View style={styles.spacerSmall} />
+
+                    <View style={styles.resultActions}>
+                      <IconButton
+                        icon="eye"
+                        size={18}
+                        iconColor={theme.colors.primary}
+                        onPress={() => handleViewAction(item)}
+                        style={styles.iconCompact}
+                      />
+
+                      {item.serviceId &&
+                        getConnector(item.serviceId)?.config && (
+                          <View style={styles.downloadButtonContainer}>
+                            <DownloadButton
+                              serviceConfig={
+                                getConnector(item.serviceId)!.config
+                              }
+                              contentId={item.id}
+                              size="small"
+                              variant="icon"
+                              onDownloadStart={(downloadId) => {
+                                console.log(`Download started: ${downloadId}`);
+                              }}
+                              onDownloadError={(error) => {
+                                console.error(`Download failed: ${error}`);
+                              }}
+                            />
+                          </View>
+                        )}
+
+                      <IconButton
+                        icon="dots-vertical"
+                        size={18}
+                        iconColor={theme.colors.onSurfaceVariant}
+                        style={styles.iconWithBg}
+                      />
+                    </View>
                   </View>
                 </View>
               </View>
             </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </AnimatedCard>
       );
     },
     [
@@ -885,6 +904,7 @@ export const UnifiedSearchPanel: React.FC = () => {
       cardElevationStyle,
       serviceNameById,
       handleViewAction,
+      allowAnimations,
     ],
   );
 
@@ -911,7 +931,11 @@ export const UnifiedSearchPanel: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Search Input */}
-      <View style={styles.searchContainer}>
+      <AnimatedSection
+        style={styles.searchContainer}
+        delay={0}
+        animated={allowAnimations}
+      >
         <TextInput
           mode="flat"
           placeholder="Search"
@@ -933,13 +957,17 @@ export const UnifiedSearchPanel: React.FC = () => {
             />
           }
         />
-      </View>
+      </AnimatedSection>
 
       {/* Filter Summary */}
       {(mediaFilters.length > 0 ||
         serviceFilters.length > 0 ||
         hasAdvancedFilters) && (
-        <View style={styles.filterSummaryRow}>
+        <AnimatedSection
+          style={styles.filterSummaryRow}
+          delay={60}
+          animated={allowAnimations}
+        >
           <Text style={styles.filterSummaryText}>Active filters:</Text>
           <View style={styles.filterSummaryBadges}>
             {mediaFilters.length > 0 && (
@@ -976,7 +1004,7 @@ export const UnifiedSearchPanel: React.FC = () => {
               </>
             )}
           </View>
-        </View>
+        </AnimatedSection>
       )}
 
       {/* Filter Drawer */}
@@ -1264,7 +1292,11 @@ export const UnifiedSearchPanel: React.FC = () => {
 
       {/* Results or History */}
       {hasActiveQuery ? (
-        <View style={styles.resultContainer}>
+        <AnimatedSection
+          style={styles.resultContainer}
+          delay={100}
+          animated={allowAnimations}
+        >
           {isBusy && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator animating size="large" />
@@ -1287,8 +1319,13 @@ export const UnifiedSearchPanel: React.FC = () => {
           <FlatList
             data={results}
             renderItem={({ item, index }) => (
-              <AnimatedListItem index={index} totalItems={results.length}>
-                {renderResult(item)}
+              <AnimatedListItem
+                index={index}
+                totalItems={results.length}
+                staggerDelay={60}
+                animated={allowAnimations}
+              >
+                {renderResult(item, index)}
               </AnimatedListItem>
             )}
             keyExtractor={(item) => item.id}
@@ -1307,9 +1344,13 @@ export const UnifiedSearchPanel: React.FC = () => {
               </Text>
             </View>
           )}
-        </View>
+        </AnimatedSection>
       ) : (
-        <View style={styles.historyContainer}>
+        <AnimatedSection
+          style={styles.historyContainer}
+          delay={80}
+          animated={allowAnimations}
+        >
           <View style={styles.historyHeader}>
             <Text
               style={{
@@ -1363,7 +1404,7 @@ export const UnifiedSearchPanel: React.FC = () => {
               </Text>
             </View>
           )}
-        </View>
+        </AnimatedSection>
       )}
 
       {renderErrorHelper}

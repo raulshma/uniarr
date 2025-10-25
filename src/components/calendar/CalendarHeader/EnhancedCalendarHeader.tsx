@@ -48,7 +48,7 @@ const EnhancedCalendarHeader: React.FC<EnhancedCalendarHeaderProps> = ({
         align: "center",
       }),
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingVertical: spacing.xs,
       backgroundColor: theme.colors.surface,
       ...getComponentElevation("widgetHeader", theme),
     },
@@ -68,11 +68,11 @@ const EnhancedCalendarHeader: React.FC<EnhancedCalendarHeaderProps> = ({
       flex: 1,
     },
     title: {
-      fontSize: theme.custom.typography.titleLarge.fontSize,
-      fontFamily: theme.custom.typography.titleLarge.fontFamily,
-      fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
-      lineHeight: theme.custom.typography.titleLarge.lineHeight,
-      letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
+      fontSize: theme.custom.typography.titleMedium.fontSize,
+      fontFamily: theme.custom.typography.titleMedium.fontFamily,
+      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+      lineHeight: theme.custom.typography.titleMedium.lineHeight,
+      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
       color: theme.colors.onSurface,
       textAlign: "center",
     },
@@ -289,6 +289,8 @@ const EnhancedCalendarHeader: React.FC<EnhancedCalendarHeaderProps> = ({
             onPress={handleTitlePress}
             accessibilityRole="button"
             accessibilityLabel="Tap to select month and year"
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
             {navigation.currentPeriod}
           </Text>
@@ -298,7 +300,7 @@ const EnhancedCalendarHeader: React.FC<EnhancedCalendarHeaderProps> = ({
       <View style={styles.rightSection}>
         <Animated.View style={todayButtonStyle}>
           <IconButton
-            icon="today"
+            icon="calendar-today"
             size={iconSizes.md} // 24 -> centralized
             iconColor={theme.colors.primary}
             onPress={handleTodayPress}

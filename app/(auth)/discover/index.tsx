@@ -20,7 +20,11 @@ import {
 import { useRouter } from "expo-router";
 
 import { EmptyState } from "@/components/common/EmptyState";
-import { AnimatedListItem } from "@/components/common/AnimatedComponents";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+  PageTransition,
+} from "@/components/common/AnimatedComponents";
 import { TabHeader } from "@/components/common/TabHeader";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { SectionSkeleton } from "@/components/discover";
@@ -30,8 +34,12 @@ import type { DiscoverMediaItem } from "@/models/discover.types";
 import { spacing } from "@/theme/spacing";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
 import { useSettingsStore } from "@/store/settingsStore";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const placeholderText = "Search for movies, shows, and more";
+type DiscoverSection = ReturnType<
+  typeof useUnifiedDiscover
+>["sections"][number];
 
 const DiscoverCard = ({
   item,
@@ -53,7 +61,6 @@ const DiscoverCard = ({
         },
         posterWrapper: {
           marginBottom: spacing.xs,
-          // anchor overlays inside the poster area so absolute elements position correctly
           position: "relative",
         },
         title: {
@@ -128,6 +135,9 @@ const DiscoverScreen = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
+        page: {
+          flex: 1,
+        },
         content: {
           paddingVertical: spacing.md,
           paddingHorizontal: spacing.md,
@@ -150,6 +160,9 @@ const DiscoverScreen = () => {
         },
         sectionsContainer: {
           gap: spacing.lg,
+        },
+        sectionContainer: {
+          gap: spacing.sm,
         },
         searchBarWrapper: {
           marginBottom: spacing.lg,
@@ -188,6 +201,7 @@ const DiscoverScreen = () => {
   );
 
   const isRefreshing = isFetching && !isLoading;
+  const allowAnimations = shouldAnimateLayout(isLoading, isFetching);
 
   const openUnifiedSearch = useCallback(() => {
     router.push("/(auth)/search");
@@ -236,8 +250,6 @@ const DiscoverScreen = () => {
 
   const handleCardPress = useCallback(
     (item: DiscoverMediaItem) => {
-      // Navigate to a unified discover details page for this item
-      // Use the discover item id so the details screen can resolve it
       router.push({ pathname: `/(auth)/discover/${item.id}` });
     },
     [router],
@@ -276,187 +288,189 @@ const DiscoverScreen = () => {
     handleDialogDismiss();
   }, [dialogItem, handleDialogDismiss, router, selectedServiceId]);
 
-  const renderSection = useCallback(
-    (
-      sectionId: string,
-      sectionTitle: string,
-      subtitle: string | undefined,
-      items: DiscoverMediaItem[],
-    ) => {
-      // Show skeleton for placeholder sections (these should always show skeletons)
-      // or when items are empty and we're currently fetching data
-      const shouldShowSkeleton =
-        sectionId.startsWith("placeholder-") ||
-        (items.length === 0 && isFetching);
+  const renderSection = (
+    section: DiscoverSection,
+    order: number,
+  ): React.ReactElement => {
+    const { id: sectionId, title, subtitle, items } = section;
 
-      if (shouldShowSkeleton) {
-        return <SectionSkeleton />;
-      }
+    const shouldShowSkeleton =
+      sectionId.startsWith("placeholder-") ||
+      (items.length === 0 && isFetching);
 
-      return (
-        <View>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>{sectionTitle}</Text>
-              {subtitle ? (
-                <Text style={styles.sectionSubtitle}>{subtitle}</Text>
-              ) : null}
-            </View>
-            <PaperButton
-              mode="text"
-              compact
-              onPress={() => openSectionPage(sectionId)}
-              textColor={theme.colors.primary}
-            >
-              View all
-            </PaperButton>
+    if (shouldShowSkeleton) {
+      return <SectionSkeleton />;
+    }
+
+    const entranceDelay = Math.min(order * 80, 320);
+
+    return (
+      <AnimatedSection
+        delay={entranceDelay}
+        animated={allowAnimations}
+        style={styles.sectionContainer}
+      >
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>{title}</Text>
+            {subtitle ? (
+              <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+            ) : null}
           </View>
-          <FlatList
-            data={items}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item, index }) => (
-              <AnimatedListItem index={index} totalItems={items.length}>
-                <DiscoverCard
-                  item={item}
-                  onPress={handleCardPress}
-                  onAdd={openServicePicker}
-                />
-              </AnimatedListItem>
-            )}
-          />
+          <PaperButton
+            mode="text"
+            compact
+            onPress={() => openSectionPage(sectionId)}
+            textColor={theme.colors.primary}
+          >
+            View all
+          </PaperButton>
         </View>
-      );
-    },
-    [
-      handleCardPress,
-      openServicePicker,
-      openSectionPage,
-      styles.listContent,
-      styles.sectionHeader,
-      styles.sectionSubtitle,
-      styles.sectionTitle,
-      theme.colors.primary,
-      isFetching,
-    ],
-  );
+        <FlatList
+          data={items}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item, index }) => (
+            <AnimatedListItem
+              index={index}
+              totalItems={items.length}
+              staggerDelay={50}
+              animated={allowAnimations}
+            >
+              <DiscoverCard
+                item={item}
+                onPress={handleCardPress}
+                onAdd={openServicePicker}
+              />
+            </AnimatedListItem>
+          )}
+        />
+      </AnimatedSection>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <TabHeader
-        title="Discover"
-        showTitle={true}
-        leftAction={
-          tmdbEnabled && tmdbKey
-            ? {
-                icon: "movie-open",
-                onPress: openTmdbDiscover,
-                accessibilityLabel: "Open TMDB discover",
-              }
-            : undefined
-        }
-        rightAction={{
-          icon: "cog",
-          onPress: openSettings,
-          accessibilityLabel: "Open settings",
-        }}
-      />
-
-      <FlatList
-        data={sections}
-        keyExtractor={(section) => section.id}
-        renderItem={({ item }) =>
-          renderSection(item.id, item.title, item.subtitle, item.items)
-        }
-        contentContainerStyle={[styles.content, styles.sectionsContainer]}
-        ListHeaderComponent={
-          <View style={styles.searchBarWrapper}>
-            <Pressable
-              style={styles.searchBar}
-              onPress={openUnifiedSearch}
-              accessibilityRole="button"
-            >
-              <IconButton
-                icon="magnify"
-                size={24}
-                onPress={openUnifiedSearch}
-                accessibilityLabel="Open search"
-              />
-              <Text style={styles.searchPlaceholder}>{placeholderText}</Text>
-            </Pressable>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyWrapper}>
-            {isError ? (
-              <EmptyState
-                title="Unable to load recommendations"
-                description={
-                  error instanceof Error
-                    ? error.message
-                    : "Try refreshing to retry the request."
-                }
-                actionLabel="Retry"
-                onActionPress={() => void refetch()}
-              />
-            ) : (
-              <EmptyState
-                title="No recommendations yet"
-                description="Configure Jellyseerr to see trending picks or refresh to try again."
-                actionLabel="Refresh"
-                onActionPress={() => void refetch()}
-              />
-            )}
-          </View>
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => void refetch()}
-            tintColor={theme.colors.primary}
+      <PageTransition style={styles.page} transitionType="fade">
+        <AnimatedSection animated={allowAnimations} delay={0}>
+          <TabHeader
+            title="Discover"
+            showTitle
+            leftAction={
+              tmdbEnabled && tmdbKey
+                ? {
+                    icon: "movie-open",
+                    onPress: openTmdbDiscover,
+                    accessibilityLabel: "Open TMDB discover",
+                  }
+                : undefined
+            }
+            rightAction={{
+              icon: "cog",
+              onPress: openSettings,
+              accessibilityLabel: "Open settings",
+            }}
           />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+        </AnimatedSection>
 
-      <Portal>
-        <Dialog visible={dialogVisible} onDismiss={handleDialogDismiss}>
-          <Dialog.Title>Add to service</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium" style={{ marginBottom: spacing.sm }}>
-              Choose where to add{" "}
-              <Text style={{ fontWeight: "600" }}>{dialogItem?.title}</Text>
-            </Text>
-            <RadioButton.Group
-              onValueChange={(value) => setSelectedServiceId(value)}
-              value={selectedServiceId}
+        <FlatList
+          data={sections}
+          keyExtractor={(section) => section.id}
+          renderItem={({ item, index }) => renderSection(item, index)}
+          contentContainerStyle={[styles.content, styles.sectionsContainer]}
+          ListHeaderComponent={
+            <AnimatedSection
+              style={styles.searchBarWrapper}
+              delay={50}
+              animated={allowAnimations}
             >
-              {(dialogItem?.mediaType === "series"
-                ? services.sonarr
-                : services.radarr
-              ).map((service) => (
-                <RadioButton.Item
-                  key={service.id}
-                  value={service.id}
-                  label={service.name}
-                  style={styles.dialogRadio}
+              <Pressable
+                style={styles.searchBar}
+                onPress={openUnifiedSearch}
+                accessibilityRole="button"
+              >
+                <IconButton
+                  icon="magnify"
+                  size={24}
+                  onPress={openUnifiedSearch}
+                  accessibilityLabel="Open search"
                 />
-              ))}
-            </RadioButton.Group>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <PaperButton onPress={handleDialogDismiss}>Cancel</PaperButton>
-            <PaperButton
-              onPress={handleConfirmAdd}
-              disabled={!selectedServiceId}
-            >
-              Add
-            </PaperButton>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+                <Text style={styles.searchPlaceholder}>{placeholderText}</Text>
+              </Pressable>
+            </AnimatedSection>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyWrapper}>
+              {isError ? (
+                <EmptyState
+                  title="Unable to load recommendations"
+                  description={
+                    error instanceof Error
+                      ? error.message
+                      : "Try refreshing to retry the request."
+                  }
+                  actionLabel="Retry"
+                  onActionPress={() => void refetch()}
+                />
+              ) : (
+                <EmptyState
+                  title="No recommendations yet"
+                  description="Configure Jellyseerr to see trending picks or refresh to try again."
+                  actionLabel="Refresh"
+                  onActionPress={() => void refetch()}
+                />
+              )}
+            </View>
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => void refetch()}
+              tintColor={theme.colors.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+
+        <Portal>
+          <Dialog visible={dialogVisible} onDismiss={handleDialogDismiss}>
+            <Dialog.Title>Add to service</Dialog.Title>
+            <Dialog.Content>
+              <Text variant="bodyMedium" style={{ marginBottom: spacing.sm }}>
+                Choose where to add{" "}
+                <Text style={{ fontWeight: "600" }}>{dialogItem?.title}</Text>
+              </Text>
+              <RadioButton.Group
+                onValueChange={(value) => setSelectedServiceId(value)}
+                value={selectedServiceId}
+              >
+                {(dialogItem?.mediaType === "series"
+                  ? services.sonarr
+                  : services.radarr
+                ).map((service) => (
+                  <RadioButton.Item
+                    key={service.id}
+                    value={service.id}
+                    label={service.name}
+                    style={styles.dialogRadio}
+                  />
+                ))}
+              </RadioButton.Group>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <PaperButton onPress={handleDialogDismiss}>Cancel</PaperButton>
+              <PaperButton
+                onPress={handleConfirmAdd}
+                disabled={!selectedServiceId}
+              >
+                Add
+              </PaperButton>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      </PageTransition>
     </SafeAreaView>
   );
 };
