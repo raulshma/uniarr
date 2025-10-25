@@ -11,7 +11,7 @@ import {
   AnimatedListItem,
   AnimatedView,
 } from "@/components/common/AnimatedComponents";
-import { COMPONENT_ANIMATIONS, Layout } from "@/utils/animations.utils";
+import { COMPONENT_ANIMATIONS } from "@/utils/animations.utils";
 
 export type CalendarDayCellProps = {
   day: CalendarDay;
@@ -142,17 +142,13 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
     return [
       styles.pressable,
       pressed && {
-        opacity: 0.7,
         transform: [{ scale: 0.95 }],
       },
     ];
   };
 
   return (
-    <Animated.View
-      style={[getContainerStyle(), style]}
-      layout={Layout.springify()}
-    >
+    <Animated.View style={[getContainerStyle(), style]}>
       <AnimatedView
         entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
           animationIndex * staggerDelay,

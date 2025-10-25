@@ -163,10 +163,10 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
             <View key={index} style={styles.skeletonShortcut}>
               <View style={styles.skeletonIcon} />
               <SkeletonPlaceholder
-                width="70%"
-                height={12}
+                width={60}
+                height={14}
                 borderRadius={4}
-                style={{ marginTop: spacing.xs }}
+                style={{ marginLeft: spacing.sm }}
               />
             </View>
           ))}
@@ -310,16 +310,23 @@ const useStyles = (theme: AppTheme) =>
       paddingVertical: spacing.sm,
     },
     skeletonShortcut: {
+      flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      width: "48%",
-      padding: spacing.md,
+      justifyContent: "flex-start",
+      borderRadius: borderRadius.xxl,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      minHeight: 48,
+      minWidth: 160,
+      maxWidth: 184,
+      backgroundColor: theme.colors.surfaceVariant,
     },
     skeletonIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: theme.colors.surfaceVariant,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: theme.colors.onSurfaceVariant,
+      opacity: 0.3,
     },
     emptyContainer: {
       flex: 1,
