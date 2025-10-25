@@ -35,6 +35,22 @@ export const AnimatedView: React.FC<AnimatedViewProps> = ({
   const exitingAnimation = animated ? exiting : undefined;
   const layoutAnimation = animated ? layout : undefined;
 
+  // If both layout and entering/exiting animations are present, use wrapper pattern
+  // to prevent layout animation from overwriting opacity properties
+  if (layoutAnimation && (enteringAnimation || exitingAnimation)) {
+    return (
+      <Animated.View
+        style={style}
+        layout={layoutAnimation}
+        {...PERFORMANCE_OPTIMIZATIONS}
+      >
+        <Animated.View entering={enteringAnimation} exiting={exitingAnimation}>
+          {children}
+        </Animated.View>
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View
       style={style}
@@ -244,6 +260,7 @@ export const AnimatedProgress: React.FC<AnimatedProgressProps> = ({
 }) => {
   const layoutAnimation = animated ? LinearTransition.springify() : undefined;
 
+  // Note: This component only uses layout animations, so no conflict with opacity
   return (
     <Animated.View
       style={style}

@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, View, Pressable } from "react-native";
 import { Text, useTheme } from "react-native-paper";
+import Animated from "react-native-reanimated";
 
 import type { AppTheme } from "@/constants/theme";
 import type { CalendarDay } from "@/models/calendar.types";
@@ -148,73 +149,76 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   };
 
   return (
-    <AnimatedView
+    <Animated.View
       style={[getContainerStyle(), style]}
-      entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
-        animationIndex * staggerDelay,
-      )}
       layout={Layout.springify()}
-      animated={animated}
     >
-      <Pressable
-        style={getPressableStyle}
-        onPress={onPress}
-        onLongPress={onLongPress}
-        android_ripple={{
-          color: theme.colors.onSurfaceVariant,
-          borderless: false,
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={`${day.date}${hasReleases ? `, ${day.releases.length} releases` : ""}`}
-        accessibilityState={{ selected: isSelected }}
+      <AnimatedView
+        entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
+          animationIndex * staggerDelay,
+        )}
+        animated={animated}
       >
-        <View style={styles.content}>
-          <View style={styles.dateContainer}>
-            <Text style={[styles.dateText, getDateTextStyle()]}>
-              {dateNumber}
-            </Text>
-            {hasReleases && !isSelected && (
-              <View style={styles.selectedIndicator} />
-            )}
-          </View>
+        <Pressable
+          style={getPressableStyle}
+          onPress={onPress}
+          onLongPress={onLongPress}
+          android_ripple={{
+            color: theme.colors.onSurfaceVariant,
+            borderless: false,
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`${day.date}${hasReleases ? `, ${day.releases.length} releases` : ""}`}
+          accessibilityState={{ selected: isSelected }}
+        >
+          <View style={styles.content}>
+            <View style={styles.dateContainer}>
+              <Text style={[styles.dateText, getDateTextStyle()]}>
+                {dateNumber}
+              </Text>
+              {hasReleases && !isSelected && (
+                <View style={styles.selectedIndicator} />
+              )}
+            </View>
 
-          <View style={styles.releasesContainer}>
-            {visibleReleases.map((release, index) => (
-              <AnimatedListItem
-                key={release.id}
-                index={index}
-                staggerDelay={staggerDelay}
-                style={[
-                  styles.releaseItem,
-                  index === visibleReleases.length - 1 &&
-                    styles.releaseItemLast,
-                ]}
-                animated={animated}
-              >
-                <MediaReleaseCard
-                  release={release}
-                  compact
-                  onPress={() => onReleasePress?.(release.id)}
-                  animated={false}
-                />
-              </AnimatedListItem>
-            ))}
+            <View style={styles.releasesContainer}>
+              {visibleReleases.map((release, index) => (
+                <AnimatedListItem
+                  key={release.id}
+                  index={index}
+                  staggerDelay={staggerDelay}
+                  style={[
+                    styles.releaseItem,
+                    index === visibleReleases.length - 1 &&
+                      styles.releaseItemLast,
+                  ]}
+                  animated={animated}
+                >
+                  <MediaReleaseCard
+                    release={release}
+                    compact
+                    onPress={() => onReleasePress?.(release.id)}
+                    animated={false}
+                  />
+                </AnimatedListItem>
+              ))}
 
-            {hasMoreReleases && (
-              <AnimatedView
-                style={styles.moreIndicator}
-                entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
-                  (visibleReleases.length + 1) * staggerDelay,
-                )}
-                animated={animated}
-              >
-                <Text style={styles.moreText}>+{moreCount} more</Text>
-              </AnimatedView>
-            )}
+              {hasMoreReleases && (
+                <AnimatedView
+                  style={styles.moreIndicator}
+                  entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
+                    (visibleReleases.length + 1) * staggerDelay,
+                  )}
+                  animated={animated}
+                >
+                  <Text style={styles.moreText}>+{moreCount} more</Text>
+                </AnimatedView>
+              )}
+            </View>
           </View>
-        </View>
-      </Pressable>
-    </AnimatedView>
+        </Pressable>
+      </AnimatedView>
+    </Animated.View>
   );
 };
 

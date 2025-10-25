@@ -18,6 +18,9 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
 import { Button } from "@/components/common/Button";
@@ -157,6 +160,10 @@ export const UnifiedSearchPanel: React.FC = () => {
   const [releaseYearMin, setReleaseYearMin] = useState<number>(1990);
   const [releaseYearMax, setReleaseYearMax] = useState<number>(2025);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [yearPickerTarget, setYearPickerTarget] = useState<
+    "min" | "max" | null
+  >(null);
 
   // Debounce the user's input to avoid issuing a search request on every keystroke.
   // This follows best-practice for search inputs on mobile to reduce network
@@ -632,6 +639,27 @@ export const UnifiedSearchPanel: React.FC = () => {
     setReleaseYearMin(1990);
     setReleaseYearMax(2025);
   }, []);
+
+  const openYearPicker = useCallback((target: "min" | "max") => {
+    setYearPickerTarget(target);
+    setShowYearPicker(true);
+  }, []);
+
+  const handleYearPickerChange = useCallback(
+    (event: DateTimePickerEvent, date?: Date) => {
+      if (event.type === "set" && date && yearPickerTarget) {
+        const year = date.getFullYear();
+        if (yearPickerTarget === "min") {
+          setReleaseYearMin(year);
+        } else {
+          setReleaseYearMax(year);
+        }
+      }
+      setShowYearPicker(false);
+      setYearPickerTarget(null);
+    },
+    [yearPickerTarget],
+  );
 
   const hasAdvancedFilters =
     qualityFilter !== "Any" ||
@@ -1366,44 +1394,50 @@ export const UnifiedSearchPanel: React.FC = () => {
                     }}
                   >
                     <View style={{ flex: 1 }}>
-                      <TextInput
-                        mode="outlined"
-                        placeholder="From"
-                        keyboardType="number-pad"
-                        value={String(releaseYearMin)}
-                        onChangeText={(val) => {
-                          const num = parseInt(val, 10);
-                          if (
-                            !Number.isNaN(num) &&
-                            num >= 1900 &&
-                            num <= 2100
-                          ) {
-                            setReleaseYearMin(num);
-                          }
+                      <TouchableOpacity
+                        onPress={() => openYearPicker("min")}
+                        style={{
+                          height: 40,
+                          borderWidth: 1,
+                          borderColor: theme.colors.outline,
+                          borderRadius: 4,
+                          justifyContent: "center",
+                          paddingHorizontal: 12,
+                          backgroundColor: theme.colors.surface,
                         }}
-                        style={{ height: 40 }}
-                        dense
-                      />
+                      >
+                        <Text
+                          style={{
+                            color: theme.colors.onSurface,
+                            fontSize: 16,
+                          }}
+                        >
+                          {releaseYearMin}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <TextInput
-                        mode="outlined"
-                        placeholder="To"
-                        keyboardType="number-pad"
-                        value={String(releaseYearMax)}
-                        onChangeText={(val) => {
-                          const num = parseInt(val, 10);
-                          if (
-                            !Number.isNaN(num) &&
-                            num >= 1900 &&
-                            num <= 2100
-                          ) {
-                            setReleaseYearMax(num);
-                          }
+                      <TouchableOpacity
+                        onPress={() => openYearPicker("max")}
+                        style={{
+                          height: 40,
+                          borderWidth: 1,
+                          borderColor: theme.colors.outline,
+                          borderRadius: 4,
+                          justifyContent: "center",
+                          paddingHorizontal: 12,
+                          backgroundColor: theme.colors.surface,
                         }}
-                        style={{ height: 40 }}
-                        dense
-                      />
+                      >
+                        <Text
+                          style={{
+                            color: theme.colors.onSurface,
+                            fontSize: 16,
+                          }}
+                        >
+                          {releaseYearMax}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                   <View
@@ -1455,6 +1489,22 @@ export const UnifiedSearchPanel: React.FC = () => {
           </View>
         </Modal>
       </Portal>
+
+      {/* Year Picker */}
+      {showYearPicker && (
+        <DateTimePicker
+          value={
+            yearPickerTarget === "min"
+              ? new Date(releaseYearMin, 0, 1)
+              : new Date(releaseYearMax, 0, 1)
+          }
+          mode="date"
+          display="spinner"
+          onChange={handleYearPickerChange}
+          minimumDate={new Date(1900, 0, 1)}
+          maximumDate={new Date(2100, 0, 1)}
+        />
+      )}
 
       {/* Results or History */}
       {hasActiveQuery ? (
