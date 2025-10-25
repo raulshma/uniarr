@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import {
   IconButton,
@@ -212,9 +212,25 @@ const ServicesScreen = () => {
     }, [refetch]),
   );
 
-  const services = data ?? [];
+  const services = useMemo(() => data ?? [], [data]);
+  const showSkeleton = isLoading && services.length === 0;
   const isRefreshing = isFetching && !isLoading;
-  const animationsEnabled = shouldAnimateLayout(isLoading, isFetching);
+  const animationsEnabled =
+    !showSkeleton &&
+    !(isFetching && data && data.length > 0) &&
+    shouldAnimateLayout(isLoading, isFetching);
+  const refreshControl = useMemo(() => {
+    if (showSkeleton) {
+      return undefined;
+    }
+
+    return (
+      <ListRefreshControl
+        refreshing={isRefreshing}
+        onRefresh={() => refetch()}
+      />
+    );
+  }, [isRefreshing, refetch, showSkeleton]);
 
   const totalServices = services.length;
   const overviewMetrics = useMemo(
@@ -379,6 +395,18 @@ const ServicesScreen = () => {
         emptyContainer: {
           flexGrow: 1,
           paddingTop: spacing.xl,
+        },
+        skeletonContainer: {
+          paddingVertical: spacing.lg,
+          paddingBottom: spacing.xxxxl,
+          gap: spacing.md,
+        },
+        skeletonHeader: {
+          marginHorizontal: spacing.md,
+        },
+        skeletonCard: {
+          marginBottom: spacing.sm,
+          marginHorizontal: spacing.md,
         },
       }),
     [theme],
@@ -624,50 +652,6 @@ const ServicesScreen = () => {
     );
   }, [error, handleAddService, isError, refetch]);
 
-  if (isLoading && services.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <TabHeader
-          showBackButton={true}
-          onBackPress={handleBackPress}
-          rightAction={{
-            icon: "plus",
-            onPress: handleAddService,
-            accessibilityLabel: "Add service",
-          }}
-          style={{ paddingHorizontal: spacing.xxs }}
-        />
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={{
-            paddingVertical: spacing.lg,
-            paddingBottom: spacing.xxxxl,
-          }}
-        >
-          <View style={styles.section}>
-            <SkeletonPlaceholder
-              width="50%"
-              height={28}
-              borderRadius={10}
-              style={{ marginBottom: spacing.md }}
-            />
-            {Array.from({ length: 4 }).map((_, index) => (
-              <View
-                key={index}
-                style={{
-                  marginBottom: spacing.sm,
-                  marginHorizontal: spacing.md,
-                }}
-              >
-                <ServiceCardSkeleton />
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <TabHeader
@@ -679,6 +663,7 @@ const ServicesScreen = () => {
           accessibilityLabel: "Add service",
         }}
         style={{ paddingHorizontal: spacing.md }}
+        animated={!showSkeleton}
       />
       <FlashList
         style={styles.content}
@@ -690,7 +675,7 @@ const ServicesScreen = () => {
           { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
         ]}
         ListHeaderComponent={
-          totalServices > 0 ? (
+          !showSkeleton && totalServices > 0 ? (
             <AnimatedSection
               animated={animationsEnabled}
               style={styles.summarySection}
@@ -724,14 +709,28 @@ const ServicesScreen = () => {
           ) : null
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>{listEmptyComponent}</View>
+          <View style={styles.emptyContainer}>
+            {showSkeleton ? (
+              <View style={styles.skeletonContainer}>
+                <View style={styles.skeletonHeader}>
+                  <SkeletonPlaceholder
+                    width="50%"
+                    height={28}
+                    borderRadius={10}
+                  />
+                </View>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <View key={index} style={styles.skeletonCard}>
+                    <ServiceCardSkeleton />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              listEmptyComponent
+            )}
+          </View>
         }
-        refreshControl={
-          <ListRefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => refetch()}
-          />
-        }
+        refreshControl={refreshControl}
         showsVerticalScrollIndicator={false}
         getItemType={getItemType}
         removeClippedSubviews={true}

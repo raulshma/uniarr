@@ -31,16 +31,16 @@ export const AnimatedView: React.FC<AnimatedViewProps> = ({
   layout,
   animated = true,
 }) => {
-  if (!animated) {
-    return <View style={style}>{children}</View>;
-  }
+  const enteringAnimation = animated ? entering : undefined;
+  const exitingAnimation = animated ? exiting : undefined;
+  const layoutAnimation = animated ? layout : undefined;
 
   return (
     <Animated.View
       style={style}
-      entering={entering}
-      exiting={exiting}
-      layout={layout}
+      entering={enteringAnimation}
+      exiting={exitingAnimation}
+      layout={layoutAnimation}
       {...PERFORMANCE_OPTIMIZATIONS}
     >
       {children}
@@ -61,15 +61,18 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   delay = 0,
   animated = true,
 }) => {
-  if (!animated) {
-    return <View style={style}>{children}</View>;
-  }
+  const enteringAnimation = animated
+    ? COMPONENT_ANIMATIONS.CARD_ENTRANCE(delay)
+    : undefined;
+  const exitingAnimation = animated
+    ? FadeOut.duration(ANIMATION_DURATIONS.QUICK)
+    : undefined;
 
   return (
     <Animated.View
       style={style}
-      entering={COMPONENT_ANIMATIONS.CARD_ENTRANCE(delay)}
-      exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
+      entering={enteringAnimation}
+      exiting={exitingAnimation}
       {...PERFORMANCE_OPTIMIZATIONS}
     >
       {children}
@@ -85,15 +88,18 @@ interface AnimatedHeaderProps {
 
 export const AnimatedHeader: React.FC<AnimatedHeaderProps> = React.memo(
   ({ children, style, animated = true }) => {
-    if (!animated) {
-      return <View style={style}>{children}</View>;
-    }
+    const enteringAnimation = animated
+      ? FadeIn.duration(ANIMATION_DURATIONS.NORMAL)
+      : undefined;
+    const exitingAnimation = animated
+      ? FadeOut.duration(ANIMATION_DURATIONS.QUICK)
+      : undefined;
 
     return (
       <Animated.View
         style={style}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.NORMAL)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
+        entering={enteringAnimation}
+        exiting={exitingAnimation}
         {...PERFORMANCE_OPTIMIZATIONS}
       >
         {children}
@@ -113,12 +119,11 @@ export const AnimatedList: React.FC<AnimatedListProps> = ({
   style,
   animated = true,
 }) => {
-  if (!animated) {
-    return <View style={style}>{children}</View>;
-  }
-
   return (
-    <Animated.View style={style} {...PERFORMANCE_OPTIMIZATIONS}>
+    <Animated.View
+      style={style}
+      {...(animated ? PERFORMANCE_OPTIMIZATIONS : undefined)}
+    >
       {children}
     </Animated.View>
   );
@@ -137,15 +142,18 @@ export const AnimatedFilter: React.FC<AnimatedFilterProps> = ({
   delay = 0,
   animated = true,
 }) => {
-  if (!animated) {
-    return <View style={style}>{children}</View>;
-  }
+  const enteringAnimation = animated
+    ? FadeIn.duration(ANIMATION_DURATIONS.QUICK).delay(delay)
+    : undefined;
+  const exitingAnimation = animated
+    ? FadeOut.duration(ANIMATION_DURATIONS.QUICK)
+    : undefined;
 
   return (
     <Animated.View
       style={style}
-      entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK).delay(delay)}
-      exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
+      entering={enteringAnimation}
+      exiting={exitingAnimation}
       {...PERFORMANCE_OPTIMIZATIONS}
     >
       {children}
@@ -172,19 +180,18 @@ export const AnimatedListItem: React.FC<AnimatedListItemProps> = React.memo(
     staggerDelay = 50,
     animated = true,
   }) => {
-    if (!animated) {
-      return (
-        <View style={style} {...PERFORMANCE_OPTIMIZATIONS}>
-          {children}
-        </View>
-      );
-    }
+    const enteringAnimation = animated
+      ? COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, staggerDelay)
+      : undefined;
+    const exitingAnimation = animated
+      ? FadeOut.duration(ANIMATION_DURATIONS.QUICK)
+      : undefined;
 
     return (
       <Animated.View
         style={style}
-        entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, staggerDelay)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
+        entering={enteringAnimation}
+        exiting={exitingAnimation}
         {...PERFORMANCE_OPTIMIZATIONS}
       >
         {children}
@@ -203,19 +210,18 @@ interface AnimatedSectionProps {
 
 export const AnimatedSection: React.FC<AnimatedSectionProps> = React.memo(
   ({ children, style, delay = 0, animated = true }) => {
-    if (!animated) {
-      return (
-        <View style={style} {...PERFORMANCE_OPTIMIZATIONS}>
-          {children}
-        </View>
-      );
-    }
+    const enteringAnimation = animated
+      ? COMPONENT_ANIMATIONS.SECTION_ENTRANCE(delay)
+      : undefined;
+    const exitingAnimation = animated
+      ? FadeOut.duration(ANIMATION_DURATIONS.QUICK)
+      : undefined;
 
     return (
       <Animated.View
         style={style}
-        entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(delay)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
+        entering={enteringAnimation}
+        exiting={exitingAnimation}
         {...PERFORMANCE_OPTIMIZATIONS}
       >
         {children}
@@ -236,14 +242,12 @@ export const AnimatedProgress: React.FC<AnimatedProgressProps> = ({
   style,
   animated = true,
 }) => {
-  if (!animated) {
-    return <View style={style}>{children}</View>;
-  }
+  const layoutAnimation = animated ? LinearTransition.springify() : undefined;
 
   return (
     <Animated.View
       style={style}
-      layout={LinearTransition.springify()}
+      layout={layoutAnimation}
       {...PERFORMANCE_OPTIMIZATIONS}
     >
       {children}
@@ -263,15 +267,18 @@ export const AnimatedStatus: React.FC<AnimatedStatusProps> = ({
   style,
   animated = true,
 }) => {
-  if (!animated) {
-    return <View style={style}>{children}</View>;
-  }
+  const enteringAnimation = animated
+    ? FadeIn.duration(ANIMATION_DURATIONS.QUICK)
+    : undefined;
+  const exitingAnimation = animated
+    ? FadeOut.duration(ANIMATION_DURATIONS.QUICK)
+    : undefined;
 
   return (
     <Animated.View
       style={style}
-      entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-      exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
+      entering={enteringAnimation}
+      exiting={exitingAnimation}
       {...PERFORMANCE_OPTIMIZATIONS}
     >
       {children}
