@@ -12,7 +12,13 @@ import { widgetService } from "@/services/widgets/WidgetService";
 import { getComponentElevation } from "@/constants/elevation";
 import { borderRadius } from "@/constants/sizes";
 import { healthCheckService } from "@/services/bookmarks/HealthCheckService";
-import { COMPONENT_ANIMATIONS } from "@/utils/animations.utils";
+import {
+  COMPONENT_ANIMATIONS,
+  FadeIn,
+  FadeOut,
+  ANIMATION_DURATIONS,
+} from "@/utils/animations.utils";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import BookmarkItem from "./BookmarkItem";
 import type {
   Bookmark,
@@ -168,13 +174,15 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 
   if (loading) {
     return (
-      <View
+      <Animated.View
         style={[
           styles.container,
           gridLayout.container,
           { backgroundColor: theme.colors.surface },
           containerElevationStyle,
         ]}
+        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
       >
         <View style={styles.header}>
           <Text variant="titleMedium" style={styles.title}>
@@ -187,17 +195,26 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
             iconColor={theme.colors.onSurfaceVariant}
           />
         </View>
-        <View style={styles.loadingContainer}>
-          <MaterialCommunityIcons
-            name="loading"
-            size={theme.custom.sizes.iconSizes.lg}
-            color={theme.colors.primary}
-          />
-          <Text variant="bodySmall" style={styles.loadingText}>
-            Loading bookmarks...
-          </Text>
+        <View style={styles.loadingSkeleton}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <View key={index} style={styles.skeletonBookmark}>
+              <View style={styles.skeletonIcon} />
+              <SkeletonPlaceholder
+                width="80%"
+                height={12}
+                borderRadius={4}
+                style={{ marginTop: spacing.xs }}
+              />
+              <SkeletonPlaceholder
+                width="60%"
+                height={10}
+                borderRadius={4}
+                style={{ marginTop: spacing.xs }}
+              />
+            </View>
+          ))}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
@@ -340,15 +357,26 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: spacing.sm,
   },
-  loadingContainer: {
+  loadingSkeleton: {
     flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  skeletonBookmark: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: spacing.lg,
+    width: "48%",
+    padding: spacing.sm,
   },
-  loadingText: {
-    marginTop: spacing.sm,
-    opacity: 0.7,
+  skeletonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.1)",
   },
   emptyContainer: {
     flex: 1,

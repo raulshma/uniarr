@@ -1,16 +1,18 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { StyleSheet, View, TouchableOpacity, FlatList } from "react-native";
-import {
-  Text,
-  IconButton,
-  useTheme,
-  ActivityIndicator,
-} from "react-native-paper";
+import { Text, IconButton, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { useHaptics } from "@/hooks/useHaptics";
+import {
+  FadeIn,
+  FadeOut,
+  ANIMATION_DURATIONS,
+  Animated,
+} from "@/utils/animations.utils";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { getComponentElevation } from "@/constants/elevation";
@@ -337,11 +339,45 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           textAlign: "center",
           paddingVertical: spacing.md,
         },
-        loadingState: {
+        loadingSkeleton: {
+          gap: spacing.md,
+        },
+        skeletonCard: {
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.custom.sizes.borderRadius.xl,
+          padding: spacing.md,
+          flexDirection: "row",
+          ...getComponentElevation("widgetCard", theme),
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+        },
+        skeletonImage: {
+          width: theme.custom.sizes.additionalCardSizes.portrait.width,
+          height: theme.custom.sizes.additionalCardSizes.portrait.height,
+          borderRadius: theme.custom.sizes.borderRadius.md,
+          marginRight: spacing.md,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        skeletonContent: {
           flex: 1,
-          alignItems: "center",
           justifyContent: "center",
-          paddingVertical: spacing.xl,
+        },
+        skeletonTitle: {
+          width: "80%",
+          height: 16,
+          borderRadius: 4,
+          marginBottom: spacing.xs,
+        },
+        skeletonMeta: {
+          width: "60%",
+          height: 14,
+          borderRadius: 4,
+          marginBottom: spacing.xs,
+        },
+        skeletonDate: {
+          width: "40%",
+          height: 12,
+          borderRadius: 4,
         },
       }),
     [theme],
@@ -407,14 +443,27 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <Animated.View
+        style={styles.container}
+        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Recent Activity</Text>
         </View>
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+        <View style={styles.loadingSkeleton}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <View key={index} style={styles.skeletonCard}>
+              <View style={styles.skeletonImage} />
+              <View style={styles.skeletonContent}>
+                <SkeletonPlaceholder style={styles.skeletonTitle} />
+                <SkeletonPlaceholder style={styles.skeletonMeta} />
+                <SkeletonPlaceholder style={styles.skeletonDate} />
+              </View>
+            </View>
+          ))}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 

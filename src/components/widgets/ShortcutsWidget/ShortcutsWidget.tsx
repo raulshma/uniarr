@@ -10,7 +10,14 @@ import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
 import type { Widget } from "@/services/widgets/WidgetService";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { widgetService } from "@/services/widgets/WidgetService";
+import {
+  FadeIn,
+  FadeOut,
+  ANIMATION_DURATIONS,
+  Animated,
+} from "@/utils/animations.utils";
 import ShortcutItem from "./ShortcutItem";
 import type { Shortcut } from "./ShortcutsWidget.types";
 
@@ -129,12 +136,14 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
 
   if (loading) {
     return (
-      <View
+      <Animated.View
         style={[
           styles.container,
           gridLayout.container,
           { backgroundColor: theme.colors.surface },
         ]}
+        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
       >
         <View style={styles.header}>
           <Text variant="titleMedium" style={styles.title}>
@@ -149,17 +158,20 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
             />
           )}
         </View>
-        <View style={styles.loadingContainer}>
-          <MaterialCommunityIcons
-            name="loading"
-            size={theme.custom.sizes.iconSizes.lg}
-            color={theme.colors.primary}
-          />
-          <Text variant="bodySmall" style={styles.loadingText}>
-            Loading shortcuts...
-          </Text>
+        <View style={styles.loadingSkeleton}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <View key={index} style={styles.skeletonShortcut}>
+              <View style={styles.skeletonIcon} />
+              <SkeletonPlaceholder
+                width="70%"
+                height={12}
+                borderRadius={4}
+                style={{ marginTop: spacing.xs }}
+              />
+            </View>
+          ))}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
@@ -288,15 +300,26 @@ const useStyles = (theme: AppTheme) =>
       alignItems: "flex-start",
       gap: spacing.sm,
     },
-    loadingContainer: {
+    loadingSkeleton: {
       flex: 1,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: spacing.sm,
+      paddingVertical: spacing.sm,
+    },
+    skeletonShortcut: {
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: spacing.lg,
+      width: "48%",
+      padding: spacing.md,
     },
-    loadingText: {
-      marginTop: spacing.sm,
-      opacity: 0.7,
+    skeletonIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.surfaceVariant,
     },
     emptyContainer: {
       flex: 1,
