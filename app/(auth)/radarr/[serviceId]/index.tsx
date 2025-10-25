@@ -6,8 +6,8 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import { Chip, Searchbar, Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Animations disabled on this list page for snappy UX. Detail pages keep animations.
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
@@ -306,24 +306,26 @@ const RadarrMoviesListScreen = () => {
   const renderMovieItem = useCallback(
     ({ item, index }: { item: Movie; index: number }) => {
       return (
-        <View>
-          <MovieListItem
-            id={item.id}
-            title={item.title}
-            year={item.year}
-            runtime={item.runtime}
-            sizeOnDisk={item.statistics?.sizeOnDisk}
-            status={item.status}
-            subtitle={item.studio}
-            monitored={item.monitored}
-            downloadStatus={deriveDownloadStatus(item)}
-            posterUri={item.posterUrl}
-            genres={item.genres}
-            studio={item.studio}
-            statistics={item.statistics}
-            onPress={() => handleMoviePress(item)}
-          />
-        </View>
+        <AnimatedListItem index={index}>
+          <View>
+            <MovieListItem
+              id={item.id}
+              title={item.title}
+              year={item.year}
+              runtime={item.runtime}
+              sizeOnDisk={item.statistics?.sizeOnDisk}
+              status={item.status}
+              subtitle={item.studio}
+              monitored={item.monitored}
+              downloadStatus={deriveDownloadStatus(item)}
+              posterUri={item.posterUrl}
+              genres={item.genres}
+              studio={item.studio}
+              statistics={item.statistics}
+              onPress={() => handleMoviePress(item)}
+            />
+          </View>
+        </AnimatedListItem>
       );
     },
     [handleMoviePress],

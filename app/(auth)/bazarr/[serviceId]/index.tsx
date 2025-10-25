@@ -15,8 +15,8 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Reanimated entering animations removed for list pages to improve snappiness.
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
@@ -288,33 +288,32 @@ const BazarrSubtitlesScreen = () => {
   const renderItem = useCallback(
     ({
       item,
+      index,
     }: {
       item: BazarrMovie | BazarrEpisode | BazarrMissingSubtitle;
+      index: number;
     }) => {
-      if (
+      const itemContent =
         "language" in item &&
         "code2" in item.language &&
-        "movieFileId" in item
-      ) {
-        // This is a missing subtitle
-        return (
+        "movieFileId" in item ? (
+          // This is a missing subtitle
           <MissingSubtitleItem
             item={item}
             onPress={() => handleItemPress(item)}
           />
+        ) : (
+          // This is a movie or episode
+          <MediaItem
+            item={item as BazarrMovie | BazarrEpisode}
+            onPress={() => handleItemPress(item)}
+            onSearchSubtitles={() =>
+              handleSearchSubtitles(item as BazarrMovie | BazarrEpisode)
+            }
+          />
         );
-      }
 
-      // This is a movie or episode
-      return (
-        <MediaItem
-          item={item as BazarrMovie | BazarrEpisode}
-          onPress={() => handleItemPress(item)}
-          onSearchSubtitles={() =>
-            handleSearchSubtitles(item as BazarrMovie | BazarrEpisode)
-          }
-        />
-      );
+      return <AnimatedListItem index={index}>{itemContent}</AnimatedListItem>;
     },
     [handleItemPress, handleSearchSubtitles],
   );
@@ -452,7 +451,9 @@ const BazarrSubtitlesScreen = () => {
       {/* Content list */}
       <FlashList
         data={filteredItems}
-        renderItem={renderItem}
+        renderItem={(props) =>
+          renderItem({ ...props, index: props.index ?? 0 })
+        }
         keyExtractor={(item) => {
           if ("id" in item && "language" in item) {
             // Missing subtitle

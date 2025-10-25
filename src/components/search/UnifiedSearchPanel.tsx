@@ -22,6 +22,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 
 // Card and AnimatedSection intentionally omitted — not used in this file
 import { Button } from "@/components/common/Button";
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { getComponentElevation } from "@/constants/elevation";
@@ -1285,7 +1286,11 @@ export const UnifiedSearchPanel: React.FC = () => {
 
           <FlatList
             data={results}
-            renderItem={({ item }) => renderResult(item)}
+            renderItem={({ item, index }) => (
+              <AnimatedListItem index={index} totalItems={results.length}>
+                {renderResult(item)}
+              </AnimatedListItem>
+            )}
             keyExtractor={(item) => item.id}
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}

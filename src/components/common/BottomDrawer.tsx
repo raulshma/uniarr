@@ -13,6 +13,7 @@ import BottomSheet, {
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
 import Animated, { SlideInDown, SlideOutDown } from "react-native-reanimated";
+import { ANIMATION_DURATIONS } from "@/utils/animations.utils";
 
 type Props = {
   visible: boolean;
@@ -147,8 +148,8 @@ const BottomDrawer: React.FC<Props> = ({
 
   return (
     <Animated.View
-      entering={SlideInDown.duration(300).springify()}
-      exiting={SlideOutDown.duration(200)}
+      entering={SlideInDown.duration(ANIMATION_DURATIONS.NORMAL).springify()}
+      exiting={SlideOutDown.duration(ANIMATION_DURATIONS.QUICK)}
       style={StyleSheet.absoluteFill}
     >
       <BottomSheet

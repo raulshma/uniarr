@@ -8,6 +8,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 
 import { useTheme } from "@/hooks/useTheme";
+import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
 
 type StatisticsData = {
@@ -486,45 +487,50 @@ const DashboardScreen = () => {
     switch (item.type) {
       case "header":
         return (
-          <View style={styles.headerSection}>
-            <View style={styles.headerContainer}>
-              <View style={styles.profileSection}>
-                <Avatar.Text
-                  size={48}
-                  label="arr"
-                  style={styles.profileAvatar}
-                  labelStyle={{ color: theme.colors.onPrimaryContainer }}
-                />
-                <View style={styles.profileInfo}>
-                  <Text style={styles.profileName}>Dashboard</Text>
-                  <Text style={styles.profileSubtitle}>Welcome back</Text>
+          <AnimatedSection delay={0}>
+            <View style={styles.headerSection}>
+              <View style={styles.headerContainer}>
+                <View style={styles.profileSection}>
+                  <Avatar.Text
+                    size={48}
+                    label="arr"
+                    style={styles.profileAvatar}
+                    labelStyle={{ color: theme.colors.onPrimaryContainer }}
+                  />
+                  <View style={styles.profileInfo}>
+                    <Text style={styles.profileName}>Dashboard</Text>
+                    <Text style={styles.profileSubtitle}>Welcome back</Text>
+                  </View>
+                </View>
+                <View style={styles.headerActions}>
+                  <IconButton
+                    icon="download"
+                    size={24}
+                    iconColor={theme.colors.onSurfaceVariant}
+                    style={styles.settingsButton}
+                    onPress={() => router.push("/(auth)/jellyfin-downloads")}
+                  />
+                  <IconButton
+                    icon="cog"
+                    size={24}
+                    iconColor={theme.colors.onSurfaceVariant}
+                    style={styles.settingsButton}
+                    onPress={() => router.push("/(auth)/settings")}
+                  />
                 </View>
               </View>
-              <View style={styles.headerActions}>
-                <IconButton
-                  icon="download"
-                  size={24}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  style={styles.settingsButton}
-                  onPress={() => router.push("/(auth)/jellyfin-downloads")}
-                />
-                <IconButton
-                  icon="cog"
-                  size={24}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  style={styles.settingsButton}
-                  onPress={() => router.push("/(auth)/settings")}
-                />
-              </View>
             </View>
-          </View>
+          </AnimatedSection>
         );
 
       case "widgets":
         return (
-          <View style={{ paddingHorizontal: theme.custom.spacing.lg }}>
+          <AnimatedSection
+            delay={100}
+            style={{ paddingHorizontal: theme.custom.spacing.lg }}
+          >
             <WidgetContainer editable={true} />
-          </View>
+          </AnimatedSection>
         );
 
       default:

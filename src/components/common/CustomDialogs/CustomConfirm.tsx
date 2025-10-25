@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Portal, Text, useTheme } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
+import { ANIMATION_DURATIONS } from "@/utils/animations.utils";
 
 export type CustomConfirmProps = {
   visible: boolean;
@@ -57,12 +58,12 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: 24,
-          duration: 200,
+          duration: ANIMATION_DURATIONS.QUICK,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
           toValue: 0,
-          duration: 160,
+          duration: ANIMATION_DURATIONS.QUICK - 50,
           useNativeDriver: true,
         }),
       ]).start(() => {
@@ -88,12 +89,12 @@ const CustomConfirm: React.FC<CustomConfirmProps> = ({
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: 0,
-          duration: 300,
+          duration: ANIMATION_DURATIONS.NORMAL,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 220,
+          duration: ANIMATION_DURATIONS.NORMAL - 80,
           useNativeDriver: true,
         }),
       ]).start();

@@ -15,8 +15,8 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Reanimated entering/exiting animations removed for snappy UX on list pages.
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { EmptyState } from "@/components/common/EmptyState";
 import BottomDrawer, { DrawerItem } from "@/components/common/BottomDrawer";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
@@ -273,98 +273,106 @@ const ProwlarrIndexerListScreen = () => {
   }, [rescanIndexers]);
 
   // Render indexer item
-  const renderIndexerItem = ({ item }: { item: ProwlarrIndexerResource }) => (
-    <Pressable
-      onLongPress={() => {
-        const next = new Set(selectedIds);
-        if (next.has(item.id)) next.delete(item.id);
-        else next.add(item.id);
-        setSelectedIds(next);
-      }}
-      onPress={() => {
-        if (multiSelectActive) {
+  const renderIndexerItem = ({
+    item,
+    index,
+  }: {
+    item: ProwlarrIndexerResource;
+    index: number;
+  }) => (
+    <AnimatedListItem index={index}>
+      <Pressable
+        onLongPress={() => {
           const next = new Set(selectedIds);
           if (next.has(item.id)) next.delete(item.id);
           else next.add(item.id);
           setSelectedIds(next);
-        }
-      }}
-    >
-      <View
-        style={[
-          styles.indexerItem,
-          {
-            borderColor: theme.colors.outline,
-            backgroundColor: theme.colors.surface,
-          },
-        ]}
+        }}
+        onPress={() => {
+          if (multiSelectActive) {
+            const next = new Set(selectedIds);
+            if (next.has(item.id)) next.delete(item.id);
+            else next.add(item.id);
+            setSelectedIds(next);
+          }
+        }}
       >
-        <View style={styles.indexerContent}>
-          <Icon
-            source={
-              multiSelectActive
-                ? selectedIds.has(item.id)
-                  ? "checkbox-marked"
-                  : "checkbox-blank-outline"
-                : "radar"
-            }
-            size={24}
-            color={
-              multiSelectActive
-                ? selectedIds.has(item.id)
-                  ? theme.colors.primary
-                  : theme.colors.onSurfaceVariant
-                : item.enable
-                  ? theme.colors.primary
-                  : theme.colors.outline
-            }
-          />
-          <View style={styles.indexerInfo}>
-            <Text variant="bodyLarge" style={styles.indexerName}>
-              {item.name}
-            </Text>
-            <Text
-              variant="bodyMedium"
-              style={[
-                styles.indexerImplementation,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-            >
-              {item.implementationName}
-            </Text>
-            <Text
-              variant="bodySmall"
-              style={[
-                styles.indexerPriority,
-                { color: theme.colors.onSurfaceVariant },
-              ]}
-            >
-              Priority: {item.priority ?? "N/A"}
-            </Text>
-          </View>
-          <View style={styles.indexerActions}>
-            <View onStartShouldSetResponder={() => true}>
-              <IconButton
-                icon="dots-vertical"
-                size={20}
-                onPress={() => {
-                  // Toggle the bottom drawer for this item
-                  if (
-                    bottomDrawer &&
-                    bottomDrawer.type === "item" &&
-                    bottomDrawer.item?.id === item.id
-                  ) {
-                    setBottomDrawer(null);
-                  } else {
-                    setBottomDrawer({ type: "item", item });
-                  }
-                }}
-              />
+        <View
+          style={[
+            styles.indexerItem,
+            {
+              borderColor: theme.colors.outline,
+              backgroundColor: theme.colors.surface,
+            },
+          ]}
+        >
+          <View style={styles.indexerContent}>
+            <Icon
+              source={
+                multiSelectActive
+                  ? selectedIds.has(item.id)
+                    ? "checkbox-marked"
+                    : "checkbox-blank-outline"
+                  : "radar"
+              }
+              size={24}
+              color={
+                multiSelectActive
+                  ? selectedIds.has(item.id)
+                    ? theme.colors.primary
+                    : theme.colors.onSurfaceVariant
+                  : item.enable
+                    ? theme.colors.primary
+                    : theme.colors.outline
+              }
+            />
+            <View style={styles.indexerInfo}>
+              <Text variant="bodyLarge" style={styles.indexerName}>
+                {item.name}
+              </Text>
+              <Text
+                variant="bodyMedium"
+                style={[
+                  styles.indexerImplementation,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {item.implementationName}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.indexerPriority,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                Priority: {item.priority ?? "N/A"}
+              </Text>
+            </View>
+            <View style={styles.indexerActions}>
+              <View onStartShouldSetResponder={() => true}>
+                <IconButton
+                  icon="dots-vertical"
+                  size={20}
+                  onPress={() => {
+                    // Toggle the bottom drawer for this item
+                    if (
+                      bottomDrawer &&
+                      bottomDrawer.type === "item" &&
+                      bottomDrawer.item?.id === item.id
+                    ) {
+                      setBottomDrawer(null);
+                    } else {
+                      setBottomDrawer({ type: "item", item });
+                    }
+                  }}
+                />
+              </View>
             </View>
           </View>
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </AnimatedListItem>
   );
 
   // Loading state

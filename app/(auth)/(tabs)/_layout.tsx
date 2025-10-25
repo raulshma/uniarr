@@ -130,7 +130,8 @@ export default function TabsLayout() {
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         lazy: true,
-        animation: "none",
+        // Enable smooth fade transitions between tab screens
+        animation: "fade",
       }}
       tabBar={(props) => <CustomCurvedTabBar {...props} />}
     >

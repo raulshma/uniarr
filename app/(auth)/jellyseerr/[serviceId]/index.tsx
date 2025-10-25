@@ -16,6 +16,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
@@ -805,7 +806,7 @@ const JellyseerrRequestsScreen = () => {
   );
 
   const renderRequestItem = useCallback(
-    ({ item }: { item: JellyseerrRequest }) => {
+    ({ item, index }: { item: JellyseerrRequest; index: number }) => {
       const summary = buildMediaSummary(item);
       const downloadStatus = deriveDownloadStatus(summary.statusCode);
       const requesterName =
@@ -831,99 +832,103 @@ const JellyseerrRequestsScreen = () => {
       const isSelected = selectedRequests.has(item.id);
 
       return (
-        <View>
-          {bulkActionMode && (
-            <View
-              style={{
-                position: "absolute",
-                top: spacing.sm,
-                left: spacing.sm,
-                zIndex: 10,
-              }}
-            >
-              <IconButton
-                icon={isSelected ? "checkbox-marked" : "checkbox-blank-outline"}
-                size={24}
-                iconColor={
-                  isSelected ? theme.colors.primary : theme.colors.outline
-                }
-                onPress={() => handleSelectRequest(item.id)}
-              />
-            </View>
-          )}
-          <MediaCard
-            id={item.id}
-            title={summary.title || `Untitled Media`}
-            year={(() => {
-              const release = summary.releaseDate;
-              if (typeof release === "string" && release.length >= 4) {
-                const parsed = Number.parseInt(release.slice(0, 4), 10);
-                return Number.isFinite(parsed) ? parsed : undefined;
-              }
-              return undefined;
-            })()}
-            status={formatRequestStatusLabel(item.status ?? 0)}
-            subtitle={`Requested by ${requesterName}`}
-            downloadStatus={downloadStatus}
-            posterUri={summary.posterUri}
-            type={summary.mediaType}
-            statusBadge={renderStatusChip(
-              item.status as number | undefined,
-              item.is4k,
-            )}
-            footer={
-              <View style={styles.actionRow}>
-                {item.status === 1 ? (
-                  <Button
-                    mode="contained"
-                    icon="check"
-                    compact
-                    onPress={() => void handleApproveRequest(item)}
-                    loading={isApprovingCurrent}
-                    disabled={
-                      isApprovingCurrent ||
-                      isDecliningCurrent ||
-                      isDeletingCurrent
-                    }
-                  >
-                    Approve
-                  </Button>
-                ) : null}
-                {item.status === 1 || item.status === 2 ? (
-                  <Button
-                    mode="outlined"
-                    icon="close"
-                    compact
-                    onPress={() => void handleDeclineRequest(item)}
-                    loading={isDecliningCurrent}
-                    disabled={
-                      isApprovingCurrent ||
-                      isDecliningCurrent ||
-                      isDeletingCurrent
-                    }
-                  >
-                    Decline
-                  </Button>
-                ) : null}
-                <Button
-                  mode="text"
-                  icon="delete"
-                  compact
-                  onPress={() => void handleDeleteRequest(item)}
-                  loading={isDeletingCurrent}
-                  textColor={theme.colors.error}
-                  disabled={
-                    isDeletingCurrent ||
-                    isApprovingCurrent ||
-                    isDecliningCurrent
+        <AnimatedListItem index={index}>
+          <View>
+            {bulkActionMode && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: spacing.sm,
+                  left: spacing.sm,
+                  zIndex: 10,
+                }}
+              >
+                <IconButton
+                  icon={
+                    isSelected ? "checkbox-marked" : "checkbox-blank-outline"
                   }
-                >
-                  Delete
-                </Button>
+                  size={24}
+                  iconColor={
+                    isSelected ? theme.colors.primary : theme.colors.outline
+                  }
+                  onPress={() => handleSelectRequest(item.id)}
+                />
               </View>
-            }
-          />
-        </View>
+            )}
+            <MediaCard
+              id={item.id}
+              title={summary.title || `Untitled Media`}
+              year={(() => {
+                const release = summary.releaseDate;
+                if (typeof release === "string" && release.length >= 4) {
+                  const parsed = Number.parseInt(release.slice(0, 4), 10);
+                  return Number.isFinite(parsed) ? parsed : undefined;
+                }
+                return undefined;
+              })()}
+              status={formatRequestStatusLabel(item.status ?? 0)}
+              subtitle={`Requested by ${requesterName}`}
+              downloadStatus={downloadStatus}
+              posterUri={summary.posterUri}
+              type={summary.mediaType}
+              statusBadge={renderStatusChip(
+                item.status as number | undefined,
+                item.is4k,
+              )}
+              footer={
+                <View style={styles.actionRow}>
+                  {item.status === 1 ? (
+                    <Button
+                      mode="contained"
+                      icon="check"
+                      compact
+                      onPress={() => void handleApproveRequest(item)}
+                      loading={isApprovingCurrent}
+                      disabled={
+                        isApprovingCurrent ||
+                        isDecliningCurrent ||
+                        isDeletingCurrent
+                      }
+                    >
+                      Approve
+                    </Button>
+                  ) : null}
+                  {item.status === 1 || item.status === 2 ? (
+                    <Button
+                      mode="outlined"
+                      icon="close"
+                      compact
+                      onPress={() => void handleDeclineRequest(item)}
+                      loading={isDecliningCurrent}
+                      disabled={
+                        isApprovingCurrent ||
+                        isDecliningCurrent ||
+                        isDeletingCurrent
+                      }
+                    >
+                      Decline
+                    </Button>
+                  ) : null}
+                  <Button
+                    mode="text"
+                    icon="delete"
+                    compact
+                    onPress={() => void handleDeleteRequest(item)}
+                    loading={isDeletingCurrent}
+                    textColor={theme.colors.error}
+                    disabled={
+                      isDeletingCurrent ||
+                      isApprovingCurrent ||
+                      isDecliningCurrent
+                    }
+                  >
+                    Delete
+                  </Button>
+                </View>
+              }
+            />
+          </View>
+        </AnimatedListItem>
       );
     },
     [

@@ -1,18 +1,21 @@
 import React, { useMemo, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
-import { StyleSheet, View, Pressable } from "react-native";
+import { StyleSheet, Pressable, View } from "react-native";
 import { Icon, Text, useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
 import type { MediaRelease } from "@/models/calendar.types";
 import { formatTimeToRelease } from "@/utils/calendar.utils";
 import { MediaPoster } from "@/components/media/MediaPoster";
+import { AnimatedCard } from "@/components/common/AnimatedComponents";
 
 export type MediaReleaseCardProps = {
   release: MediaRelease;
   compact?: boolean;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  animated?: boolean;
+  animationDelay?: number;
 };
 
 const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
@@ -20,6 +23,8 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
   compact = false,
   onPress,
   style,
+  animated = true,
+  animationDelay = 0,
 }) => {
   const theme = useTheme<AppTheme>();
   const [isPressed, setIsPressed] = useState(false);
@@ -142,12 +147,14 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
     : theme.colors.onSurfaceVariant;
 
   return (
-    <View
+    <AnimatedCard
       style={[
         styles.container,
         isPressed && !compact ? { opacity: 0.9 } : null,
         style,
       ]}
+      delay={animationDelay}
+      animated={animated}
     >
       <Pressable
         style={styles.pressable}
@@ -181,7 +188,7 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
           </View>
         </View>
       </Pressable>
-    </View>
+    </AnimatedCard>
   );
 };
 

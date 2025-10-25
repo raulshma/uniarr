@@ -26,6 +26,7 @@ import Animated, {
   StretchInY,
   FlipInEasyX,
   FlipInEasyY,
+  Layout,
 } from "react-native-reanimated";
 
 /**
@@ -117,7 +118,8 @@ export const COMPONENT_ANIMATIONS = {
    * CARD_ENTRANCE: Zoom-in with fade for card components
    * Creates "pop" effect on initial appearance
    */
-  CARD_ENTRANCE: ZoomIn.duration(ANIMATION_DURATIONS.NORMAL).springify(),
+  CARD_ENTRANCE: (delay = 0) =>
+    ZoomIn.duration(ANIMATION_DURATIONS.NORMAL).delay(delay).springify(),
 
   /**
    * MODAL_BACKDROP: Quick fade for modal overlays
@@ -283,6 +285,7 @@ export {
   StretchInY,
   FlipInEasyX,
   FlipInEasyY,
+  Layout,
 };
 
 /**

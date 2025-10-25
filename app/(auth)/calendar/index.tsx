@@ -18,6 +18,7 @@ import {
 } from "date-fns";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
@@ -656,11 +657,14 @@ const CalendarScreen = () => {
         data={releasesForView}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <MediaReleaseCard
-            release={item}
-            onPress={() => handleReleasePress(item.id)}
-          />
+        renderItem={({ item, index }) => (
+          <AnimatedListItem index={index} totalItems={releasesForView.length}>
+            <MediaReleaseCard
+              release={item}
+              onPress={() => handleReleasePress(item.id)}
+              animated={false}
+            />
+          </AnimatedListItem>
         )}
         showsVerticalScrollIndicator={false}
       />

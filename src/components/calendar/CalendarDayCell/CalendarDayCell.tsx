@@ -6,6 +6,11 @@ import { Text, useTheme } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import type { CalendarDay } from "@/models/calendar.types";
 import { MediaReleaseCard } from "../MediaReleaseCard";
+import {
+  AnimatedListItem,
+  AnimatedView,
+} from "@/components/common/AnimatedComponents";
+import { COMPONENT_ANIMATIONS, Layout } from "@/utils/animations.utils";
 
 export type CalendarDayCellProps = {
   day: CalendarDay;
@@ -15,6 +20,9 @@ export type CalendarDayCellProps = {
   onLongPress?: () => void;
   onReleasePress?: (releaseId: string) => void;
   style?: StyleProp<ViewStyle>;
+  animationIndex?: number;
+  staggerDelay?: number;
+  animated?: boolean;
 };
 
 const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
@@ -25,6 +33,9 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   onLongPress,
   onReleasePress,
   style,
+  animationIndex = 0,
+  staggerDelay = 40,
+  animated = true,
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -137,7 +148,14 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   };
 
   return (
-    <View style={[getContainerStyle(), style]}>
+    <AnimatedView
+      style={[getContainerStyle(), style]}
+      entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
+        animationIndex * staggerDelay,
+      )}
+      layout={Layout.springify()}
+      animated={animated}
+    >
       <Pressable
         style={getPressableStyle}
         onPress={onPress}
@@ -162,31 +180,41 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
 
           <View style={styles.releasesContainer}>
             {visibleReleases.map((release, index) => (
-              <View
+              <AnimatedListItem
                 key={release.id}
+                index={index}
+                staggerDelay={staggerDelay}
                 style={[
                   styles.releaseItem,
                   index === visibleReleases.length - 1 &&
                     styles.releaseItemLast,
                 ]}
+                animated={animated}
               >
                 <MediaReleaseCard
                   release={release}
                   compact
                   onPress={() => onReleasePress?.(release.id)}
+                  animated={false}
                 />
-              </View>
+              </AnimatedListItem>
             ))}
 
             {hasMoreReleases && (
-              <View style={styles.moreIndicator}>
+              <AnimatedView
+                style={styles.moreIndicator}
+                entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
+                  (visibleReleases.length + 1) * staggerDelay,
+                )}
+                animated={animated}
+              >
                 <Text style={styles.moreText}>+{moreCount} more</Text>
-              </View>
+              </AnimatedView>
             )}
           </View>
         </View>
       </Pressable>
-    </View>
+    </AnimatedView>
   );
 };
 

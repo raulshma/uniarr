@@ -14,8 +14,8 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Animations disabled on this list page for snappy UX. Detail pages retain their animations.
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -364,57 +364,59 @@ const SonarrSeriesListScreen = () => {
         totalEpisodes > 0 ? Math.min(availableEpisodes / totalEpisodes, 1) : 0;
 
       return (
-        <View>
-          <MediaSelectableItem
-            item={item}
-            onPress={handleSeriesPress}
-            onLongPress={handleSeriesLongPress}
-            onPressSeries={handleSeriesPress}
-          >
-            <Pressable
-              style={({ pressed }) => [
-                styles.seriesCard,
-                pressed && styles.seriesCardPressed,
-              ]}
+        <AnimatedListItem index={index}>
+          <View>
+            <MediaSelectableItem
+              item={item}
+              onPress={handleSeriesPress}
+              onLongPress={handleSeriesLongPress}
+              onPressSeries={handleSeriesPress}
             >
-              <MediaPoster
-                uri={item.posterUrl}
-                size={96}
-                borderRadius={16}
-                style={styles.seriesPoster}
-              />
-              <View style={styles.seriesMeta}>
-                <Text
-                  variant="titleMedium"
-                  numberOfLines={1}
-                  style={styles.seriesTitle}
-                >
-                  {item.title}
-                </Text>
-                <Text
-                  variant="bodyMedium"
-                  numberOfLines={1}
-                  style={styles.seriesStatus}
-                >
-                  {item.status ?? "Status unavailable"}
-                </Text>
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.round(progress * 100)}%` },
-                    ]}
-                  />
+              <Pressable
+                style={({ pressed }) => [
+                  styles.seriesCard,
+                  pressed && styles.seriesCardPressed,
+                ]}
+              >
+                <MediaPoster
+                  uri={item.posterUrl}
+                  size={96}
+                  borderRadius={16}
+                  style={styles.seriesPoster}
+                />
+                <View style={styles.seriesMeta}>
+                  <Text
+                    variant="titleMedium"
+                    numberOfLines={1}
+                    style={styles.seriesTitle}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    variant="bodyMedium"
+                    numberOfLines={1}
+                    style={styles.seriesStatus}
+                  >
+                    {item.status ?? "Status unavailable"}
+                  </Text>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${Math.round(progress * 100)}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text variant="bodySmall" style={styles.episodesMeta}>
+                    {totalEpisodes > 0
+                      ? `${availableEpisodes} / ${totalEpisodes} episodes`
+                      : "Episodes unavailable"}
+                  </Text>
                 </View>
-                <Text variant="bodySmall" style={styles.episodesMeta}>
-                  {totalEpisodes > 0
-                    ? `${availableEpisodes} / ${totalEpisodes} episodes`
-                    : "Episodes unavailable"}
-                </Text>
-              </View>
-            </Pressable>
-          </MediaSelectableItem>
-        </View>
+              </Pressable>
+            </MediaSelectableItem>
+          </View>
+        </AnimatedListItem>
       );
     },
     [handleSeriesPress, handleSeriesLongPress, styles],

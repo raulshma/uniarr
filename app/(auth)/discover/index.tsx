@@ -20,6 +20,7 @@ import {
 import { useRouter } from "expo-router";
 
 import { EmptyState } from "@/components/common/EmptyState";
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { TabHeader } from "@/components/common/TabHeader";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { SectionSkeleton } from "@/components/discover";
@@ -316,12 +317,14 @@ const DiscoverScreen = () => {
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <DiscoverCard
-                item={item}
-                onPress={handleCardPress}
-                onAdd={openServicePicker}
-              />
+            renderItem={({ item, index }) => (
+              <AnimatedListItem index={index} totalItems={items.length}>
+                <DiscoverCard
+                  item={item}
+                  onPress={handleCardPress}
+                  onAdd={openServicePicker}
+                />
+              </AnimatedListItem>
             )}
           />
         </View>

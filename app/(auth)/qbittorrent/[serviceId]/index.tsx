@@ -14,6 +14,7 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
@@ -406,7 +407,7 @@ const QBittorrentServiceScreen = () => {
   );
 
   const renderTorrentItem = useCallback(
-    ({ item }: { item: Torrent }) => {
+    ({ item, index }: { item: Torrent; index: number }) => {
       const paused = isTorrentPaused(item);
       const progress = Math.max(0, Math.min(1, item.progress));
       const percent = Math.round(progress * 1000) / 10;
@@ -417,65 +418,67 @@ const QBittorrentServiceScreen = () => {
       const isActionPending = pendingHash === item.hash && isMutating;
 
       return (
-        <View style={themeStyles.torrentCard}>
-          <View style={themeStyles.torrentHeader}>
-            <Text
-              variant="titleMedium"
-              numberOfLines={2}
-              style={themeStyles.torrentName}
-            >
-              {item.name}
-            </Text>
-            <Text variant="bodyMedium" style={themeStyles.torrentStatus}>
-              {statusLabel}
-            </Text>
-          </View>
-          <View style={themeStyles.progressContainer}>
-            <ProgressBar progress={progress} color={theme.colors.primary} />
-            <View style={themeStyles.metaRow}>
-              <Text variant="bodySmall" style={themeStyles.metaText}>
-                DL {formatSpeed(item.downloadSpeed)}
+        <AnimatedListItem index={index}>
+          <View style={themeStyles.torrentCard}>
+            <View style={themeStyles.torrentHeader}>
+              <Text
+                variant="titleMedium"
+                numberOfLines={2}
+                style={themeStyles.torrentName}
+              >
+                {item.name}
               </Text>
-              <Text variant="bodySmall" style={themeStyles.metaText}>
-                UL {formatSpeed(item.uploadSpeed)}
+              <Text variant="bodyMedium" style={themeStyles.torrentStatus}>
+                {statusLabel}
               </Text>
+            </View>
+            <View style={themeStyles.progressContainer}>
+              <ProgressBar progress={progress} color={theme.colors.primary} />
+              <View style={themeStyles.metaRow}>
+                <Text variant="bodySmall" style={themeStyles.metaText}>
+                  DL {formatSpeed(item.downloadSpeed)}
+                </Text>
+                <Text variant="bodySmall" style={themeStyles.metaText}>
+                  UL {formatSpeed(item.uploadSpeed)}
+                </Text>
+                <Text variant="bodySmall" style={themeStyles.metaText}>
+                  ETA {etaLabel}
+                </Text>
+                <Text variant="bodySmall" style={themeStyles.metaText}>
+                  {percent.toFixed(1)}%
+                </Text>
+                <Text variant="bodySmall" style={themeStyles.metaText}>
+                  {formatBytes(item.downloaded)} / {formatBytes(item.size)}
+                </Text>
+              </View>
+            </View>
+            <View style={themeStyles.actionRow}>
+              <View style={themeStyles.actionButtons}>
+                <IconButton
+                  icon={actionIcon}
+                  size={24}
+                  onPress={() => void performPauseResume(item, action)}
+                  disabled={isMutating || isActionPending}
+                />
+                <IconButton
+                  icon="refresh"
+                  size={24}
+                  onPress={() => void handleForceRecheck(item)}
+                  disabled={isMutating}
+                />
+                <IconButton
+                  icon="delete"
+                  size={24}
+                  onPress={() => confirmDeleteTorrent(item)}
+                  disabled={isMutating}
+                />
+              </View>
               <Text variant="bodySmall" style={themeStyles.metaText}>
-                ETA {etaLabel}
-              </Text>
-              <Text variant="bodySmall" style={themeStyles.metaText}>
-                {percent.toFixed(1)}%
-              </Text>
-              <Text variant="bodySmall" style={themeStyles.metaText}>
-                {formatBytes(item.downloaded)} / {formatBytes(item.size)}
+                Ratio {item.ratio.toFixed(2)}
               </Text>
             </View>
           </View>
-          <View style={themeStyles.actionRow}>
-            <View style={themeStyles.actionButtons}>
-              <IconButton
-                icon={actionIcon}
-                size={24}
-                onPress={() => void performPauseResume(item, action)}
-                disabled={isMutating || isActionPending}
-              />
-              <IconButton
-                icon="refresh"
-                size={24}
-                onPress={() => void handleForceRecheck(item)}
-                disabled={isMutating}
-              />
-              <IconButton
-                icon="delete"
-                size={24}
-                onPress={() => confirmDeleteTorrent(item)}
-                disabled={isMutating}
-              />
-            </View>
-            <Text variant="bodySmall" style={themeStyles.metaText}>
-              Ratio {item.ratio.toFixed(2)}
-            </Text>
-          </View>
-        </View>
+        </AnimatedListItem>
       );
     },
     [

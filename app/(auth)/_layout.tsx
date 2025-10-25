@@ -12,8 +12,9 @@ const AuthenticatedLayout = () => {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: theme.colors.background },
-        // Disable default navigation animations to make navigation snappy.
-        animation: "none",
+        // Enable smooth fade transitions between screens
+        animation: "fade",
+        animationDuration: 300,
       }}
     >
       <Stack.Screen name="(tabs)" />

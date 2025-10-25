@@ -6,6 +6,7 @@ import { Text, useTheme } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import type { CalendarMonth } from "@/models/calendar.types";
 import { CalendarDayCell } from "../CalendarDayCell";
+import { AnimatedSection } from "@/components/common/AnimatedComponents";
 
 export type CalendarMonthViewProps = {
   data: CalendarMonth;
@@ -76,13 +77,15 @@ const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
 
   const renderWeek = (week: (typeof data.weeks)[0], weekIndex: number) => {
     const isLastWeek = weekIndex === data.weeks.length - 1;
+    const cellBaseIndex = weekIndex * week.days.length;
 
     return (
-      <View
+      <AnimatedSection
         key={`week-${weekIndex}`}
         style={[styles.week, isLastWeek && styles.weekLast]}
+        delay={weekIndex * 60}
       >
-        {week.days.map((day) => (
+        {week.days.map((day, dayIndex) => (
           <CalendarDayCell
             key={day.date}
             day={day}
@@ -92,9 +95,10 @@ const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
             onLongPress={() => onDayLongPress?.(day.date)}
             onReleasePress={onReleasePress}
             style={{ flex: 1 }}
+            animationIndex={cellBaseIndex + dayIndex}
           />
         ))}
-      </View>
+      </AnimatedSection>
     );
   };
 

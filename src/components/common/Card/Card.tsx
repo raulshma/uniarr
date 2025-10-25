@@ -9,9 +9,15 @@ import {
 
 import type { AppTheme } from "@/constants/theme";
 import { borderRadius } from "@/constants/sizes";
+import {
+  ANIMATION_DURATIONS,
+  Animated,
+  COMPONENT_ANIMATIONS,
+  FadeOut,
+  PERFORMANCE_OPTIMIZATIONS,
+} from "@/utils/animations.utils";
 
-// Use native Pressable rather than an animated wrapper — keep behavior
-// but remove entrance/interaction animations for snappier UI.
+// Keep Pressable interactions consistent; entrance animations apply via wrapper.
 const AnimatedPressable = Pressable;
 
 const BASE_RADIUS = borderRadius.xl;
@@ -38,6 +44,10 @@ export type CardProps = Omit<
   contentStyle?: StyleProp<ViewStyle>;
   variant?: "default" | "outlined" | "custom";
   focusable?: boolean;
+  animated?: boolean;
+  animationDelay?: number;
+  enteringAnimation?: any;
+  exitingAnimation?: any;
 };
 
 const Card = forwardRef<PaperCardRef, CardProps>(
@@ -56,6 +66,10 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       focusable: focusableProp,
       accessibilityRole: accessibilityRoleProp,
       accessibilityState: accessibilityStateProp,
+      animated = true,
+      animationDelay = 0,
+      enteringAnimation,
+      exitingAnimation,
       ...rest
     },
     ref,
@@ -121,8 +135,15 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       Object.keys(combinedAccessibilityState).length > 0
         ? combinedAccessibilityState
         : undefined;
-    if (variant === "custom") {
-      return (
+    const resolvedEntering = enteringAnimation
+      ? enteringAnimation
+      : COMPONENT_ANIMATIONS.CARD_ENTRANCE(animationDelay);
+    const resolvedExiting = exitingAnimation
+      ? exitingAnimation
+      : FadeOut.duration(ANIMATION_DURATIONS.QUICK);
+
+    const content =
+      variant === "custom" ? (
         <AnimatedPressable
           style={[
             styles.customBase,
@@ -144,36 +165,45 @@ const Card = forwardRef<PaperCardRef, CardProps>(
             <View style={innerStyle}>{children}</View>
           ) : null}
         </AnimatedPressable>
+      ) : (
+        <PaperCard
+          ref={ref}
+          mode="elevated"
+          elevation={elevationMap[elevation]}
+          style={[
+            styles.base,
+            style,
+            focusable && isFocused ? baseFocusRingStyle : undefined,
+          ]}
+          onPress={onPress}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          accessibilityRole={resolvedAccessibilityRole}
+          accessibilityLabel={accessibilityLabel}
+          accessibilityHint={accessibilityHint}
+          accessibilityState={accessibilityState}
+          focusable={focusable}
+          disabled={isDisabled}
+          {...rest}
+        >
+          {React.Children.count(children) > 0 ? (
+            <View style={innerStyle}>{children}</View>
+          ) : null}
+        </PaperCard>
       );
+
+    if (!animated) {
+      return content;
     }
 
-    const cardElevation = elevationMap[elevation];
-
     return (
-      <PaperCard
-        ref={ref}
-        mode="elevated"
-        elevation={cardElevation}
-        style={[
-          styles.base,
-          style,
-          focusable && isFocused ? baseFocusRingStyle : undefined,
-        ]}
-        onPress={onPress}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        accessibilityRole={resolvedAccessibilityRole}
-        accessibilityLabel={accessibilityLabel}
-        accessibilityHint={accessibilityHint}
-        accessibilityState={accessibilityState}
-        focusable={focusable}
-        disabled={isDisabled}
-        {...rest}
+      <Animated.View
+        entering={resolvedEntering}
+        exiting={resolvedExiting}
+        {...PERFORMANCE_OPTIMIZATIONS}
       >
-        {React.Children.count(children) > 0 ? (
-          <View style={innerStyle}>{children}</View>
-        ) : null}
-      </PaperCard>
+        {content}
+      </Animated.View>
     );
   },
 );
