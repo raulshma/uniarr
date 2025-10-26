@@ -31,7 +31,7 @@ import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { SectionSkeleton } from "@/components/discover";
 import type { AppTheme } from "@/constants/theme";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
-import { useCheckInLibrary } from "@/hooks/useCheckInLibrary";
+import { useBatchCheckInLibrary } from "@/hooks/useBatchCheckInLibrary";
 import { imageCacheService } from "@/services/image/ImageCacheService";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import { spacing } from "@/theme/spacing";
@@ -44,103 +44,103 @@ type DiscoverSection = ReturnType<
   typeof useUnifiedDiscover
 >["sections"][number];
 
-const DiscoverCard = ({
-  item,
-  onAdd,
-  onPress,
-}: {
+interface DiscoverCardProps {
   item: DiscoverMediaItem;
+  isInLibrary: boolean;
   onAdd: (media: DiscoverMediaItem) => void;
   onPress: (media: DiscoverMediaItem) => void;
-}) => {
-  const theme = useTheme<AppTheme>();
+  theme: AppTheme;
+}
 
-  // Check if item is in library
-  const inLibraryQuery = useCheckInLibrary({
-    tmdbId: item.tmdbId,
-    tvdbId: item.tvdbId,
-    sourceId: item.sourceId,
-    mediaType: item.mediaType,
-  });
+const DiscoverCard = React.memo(
+  ({ item, isInLibrary, onAdd, onPress, theme }: DiscoverCardProps) => {
+    const styles = useMemo(
+      () =>
+        StyleSheet.create({
+          container: {
+            width: 152,
+            marginRight: spacing.md,
+          },
+          innerWrapper: {
+            flex: 1,
+          },
+          posterWrapper: {
+            marginBottom: spacing.xs,
+            position: "relative",
+          },
+          title: {
+            color: theme.colors.onBackground,
+            fontSize: theme.custom.typography.titleSmall.fontSize,
+            fontFamily: theme.custom.typography.titleSmall.fontFamily,
+            lineHeight: theme.custom.typography.titleSmall.lineHeight,
+            letterSpacing: theme.custom.typography.titleSmall.letterSpacing,
+            fontWeight: theme.custom.typography.titleSmall.fontWeight as any,
+          },
+          addButton: {
+            position: "absolute",
+            top: spacing.sm,
+            right: spacing.sm,
+            backgroundColor: theme.colors.primary,
+            zIndex: 100,
+            elevation: 100,
+          },
+          badge: {
+            position: "absolute",
+            top: spacing.xs,
+            left: spacing.xs,
+            backgroundColor: theme.colors.primary,
+          },
+        }),
+      [theme],
+    );
 
-  const styles = useMemo(
-    () =>
-      StyleSheet.create({
-        container: {
-          width: 152,
-          marginRight: spacing.md,
-        },
-        innerWrapper: {
-          flex: 1,
-        },
-        posterWrapper: {
-          marginBottom: spacing.xs,
-          position: "relative",
-        },
-        title: {
-          color: theme.colors.onBackground,
-          fontSize: theme.custom.typography.titleSmall.fontSize,
-          fontFamily: theme.custom.typography.titleSmall.fontFamily,
-          lineHeight: theme.custom.typography.titleSmall.lineHeight,
-          letterSpacing: theme.custom.typography.titleSmall.letterSpacing,
-          fontWeight: theme.custom.typography.titleSmall.fontWeight as any,
-        },
-        addButton: {
-          position: "absolute",
-          top: spacing.sm,
-          right: spacing.sm,
-          backgroundColor: theme.colors.primary,
-          zIndex: 100,
-          elevation: 100,
-        },
-        badge: {
-          position: "absolute",
-          top: spacing.xs,
-          left: spacing.xs,
-          backgroundColor: theme.colors.primary,
-        },
-      }),
-    [theme],
-  );
+    const handlePress = useCallback(() => {
+      onPress(item);
+    }, [item, onPress]);
 
-  const handlePress = useCallback(() => {
-    onPress(item);
-  }, [item, onPress]);
-
-  return (
-    <View style={styles.container} pointerEvents="box-none">
-      <View style={styles.innerWrapper} pointerEvents="box-none">
-        <View style={styles.posterWrapper} pointerEvents="box-none">
-          {inLibraryQuery.foundServices.length > 0 && (
-            <Badge style={styles.badge} size={20}>
-              ✓
-            </Badge>
-          )}
-          <MediaPoster
-            uri={item.posterUrl}
-            size={152}
-            onPress={handlePress}
-            overlay={
-              <IconButton
-                icon="plus"
-                size={20}
-                mode="contained"
-                style={styles.addButton}
-                iconColor={theme.colors.onPrimary}
-                onPress={() => onAdd(item)}
-                disabled={inLibraryQuery.foundServices.length > 0}
-                accessibilityLabel={`Add ${item.title}`}
-              />
-            }
-          />
+    return (
+      <View style={styles.container} pointerEvents="box-none">
+        <View style={styles.innerWrapper} pointerEvents="box-none">
+          <View style={styles.posterWrapper} pointerEvents="box-none">
+            {isInLibrary && (
+              <Badge style={styles.badge} size={20}>
+                ✓
+              </Badge>
+            )}
+            <MediaPoster
+              uri={item.posterUrl}
+              size={152}
+              onPress={handlePress}
+              overlay={
+                <IconButton
+                  icon="plus"
+                  size={20}
+                  mode="contained"
+                  style={styles.addButton}
+                  iconColor={theme.colors.onPrimary}
+                  onPress={() => onAdd(item)}
+                  disabled={isInLibrary}
+                  accessibilityLabel={`Add ${item.title}`}
+                />
+              }
+            />
+          </View>
+          <Text numberOfLines={2} style={styles.title}>
+            {item.title}
+          </Text>
         </View>
-        <Text numberOfLines={2} style={styles.title}>
-          {item.title}
-        </Text>
       </View>
-    </View>
-  );
-};
+    );
+  },
+  (prev, next) => {
+    // Custom comparison: only re-render if item id, isInLibrary, or theme changes
+    return (
+      prev.item.id === next.item.id &&
+      prev.isInLibrary === next.isInLibrary &&
+      prev.theme === next.theme
+    );
+  },
+);
 
 const DiscoverScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -150,6 +150,13 @@ const DiscoverScreen = () => {
 
   const { sections, services, isLoading, isFetching, isError, error, refetch } =
     useUnifiedDiscover();
+
+  // Batch check all items in all sections at once
+  const allItems = useMemo(() => {
+    return sections.flatMap((section) => section.items);
+  }, [sections]);
+
+  const { itemsInLibrary } = useBatchCheckInLibrary(allItems);
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogItem, setDialogItem] = useState<DiscoverMediaItem | undefined>(
@@ -379,8 +386,13 @@ const DiscoverScreen = () => {
             >
               <DiscoverCard
                 item={item}
+                isInLibrary={
+                  itemsInLibrary.has(item.id) &&
+                  (itemsInLibrary.get(item.id)?.services.length ?? 0) > 0
+                }
                 onPress={handleCardPress}
                 onAdd={openServicePicker}
+                theme={theme}
               />
             </AnimatedListItem>
           )}
@@ -415,11 +427,9 @@ const DiscoverScreen = () => {
 
         <FlatList
           data={sections}
-          key={`discover-${sections.length}-${isLoading ? "loading" : "loaded"}`} // Force re-mount when data loads
           keyExtractor={(section) => section.id}
           renderItem={({ item, index }) => renderSection(item, index)}
           contentContainerStyle={[styles.content, styles.sectionsContainer]}
-          extraData={sections.length} // Force re-render when sections change
           ListHeaderComponent={
             <AnimatedSection
               style={styles.searchBarWrapper}

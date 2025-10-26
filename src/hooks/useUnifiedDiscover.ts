@@ -26,6 +26,7 @@ import {
   mapTmdbTvToDiscover,
 } from "@/utils/tmdb.utils";
 import { logger } from "@/services/logger/LoggerService";
+import { imageCacheService } from "@/services/image/ImageCacheService";
 type JellyseerrSearchResult =
   | components["schemas"]["MovieResult"]
   | components["schemas"]["TvResult"];
@@ -387,7 +388,29 @@ export const useUnifiedDiscover = () => {
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const query = useQuery<UnifiedDiscoverPayload>({
     queryKey: [...queryKeys.discover.unified, { tmdbEnabled }] as const,
-    queryFn: () => fetchUnifiedDiscover(getConnectorsByType, { tmdbEnabled }),
+    queryFn: async () => {
+      const payload = await fetchUnifiedDiscover(getConnectorsByType, {
+        tmdbEnabled,
+      });
+
+      // Proactively prefetch all images after data loads
+      const allItems = payload.sections.flatMap((section) => section.items);
+      const imagesToPrefetch: string[] = [];
+
+      for (const item of allItems) {
+        if (item.posterUrl) imagesToPrefetch.push(item.posterUrl);
+        if (item.backdropUrl) imagesToPrefetch.push(item.backdropUrl);
+      }
+
+      // Batch prefetch with "low" priority (background task) to avoid blocking UI
+      if (imagesToPrefetch.length > 0) {
+        void imageCacheService.prefetchList(imagesToPrefetch, {
+          priority: "low",
+        });
+      }
+
+      return payload;
+    },
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     placeholderData: () => ({
