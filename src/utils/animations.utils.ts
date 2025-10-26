@@ -206,9 +206,14 @@ export const staggerDelay = (
  *
  * Recommended props for Animated.View to minimize battery drain
  * Apply to all animated components
+ *
+ * Note: removeClippedSubviews is disabled to prevent clipping of list
+ * headers and items on initial render when combined with virtualization.
+ * This was causing discover pages and similar list-based screens to show
+ * invisible titles/items until scroll triggered a re-layout.
  */
 export const PERFORMANCE_OPTIMIZATIONS = {
-  removeClippedSubviews: true, // Hide views outside bounds
+  removeClippedSubviews: false, // Disabled: prevents initial clipping in virtualized lists
   collapsable: true, // Allow collapse when not rendered
 } as const;
 

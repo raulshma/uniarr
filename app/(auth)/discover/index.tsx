@@ -231,6 +231,7 @@ const DiscoverScreen = () => {
 
   const isRefreshing = isFetching && !isLoading;
   const allowAnimations = shouldAnimateLayout(isLoading, isFetching);
+  const allowHeaderAnimations = shouldAnimateLayout(false, isFetching); // Header should animate even during initial load
 
   const openUnifiedSearch = useCallback(() => {
     router.push("/(auth)/search");
@@ -391,7 +392,7 @@ const DiscoverScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <PageTransition style={styles.page} transitionType="fade">
-        <AnimatedSection animated={allowAnimations} delay={0}>
+        <AnimatedSection animated={allowHeaderAnimations} delay={0}>
           <TabHeader
             title="Discover"
             showTitle
@@ -414,9 +415,11 @@ const DiscoverScreen = () => {
 
         <FlatList
           data={sections}
+          key={`discover-${sections.length}-${isLoading ? "loading" : "loaded"}`} // Force re-mount when data loads
           keyExtractor={(section) => section.id}
           renderItem={({ item, index }) => renderSection(item, index)}
           contentContainerStyle={[styles.content, styles.sectionsContainer]}
+          extraData={sections.length} // Force re-render when sections change
           ListHeaderComponent={
             <AnimatedSection
               style={styles.searchBarWrapper}
