@@ -10,6 +10,7 @@ import { FlashList } from "@shopify/flash-list";
 import { useTheme } from "@/hooks/useTheme";
 import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
+import { useWidgetServiceInitialization } from "@/hooks/useWidgetServiceInitialization";
 
 type StatisticsData = {
   shows: number;
@@ -73,6 +74,9 @@ const DashboardScreen = () => {
   const theme = useTheme();
   const { onPress } = useHaptics();
   const [refreshing, setRefreshing] = React.useState(false);
+
+  // Initialize WidgetService early to prevent loading issues
+  useWidgetServiceInitialization();
 
   const handleRefresh = useCallback(async () => {
     onPress();
@@ -527,7 +531,10 @@ const DashboardScreen = () => {
         return (
           <AnimatedSection
             delay={100}
-            style={{ paddingHorizontal: theme.custom.spacing.lg }}
+            style={{
+              paddingHorizontal: theme.custom.spacing.lg,
+              marginTop: theme.custom.spacing.md,
+            }}
           >
             <WidgetContainer editable={true} />
           </AnimatedSection>
