@@ -21,6 +21,7 @@ import { useDiscoverReleases } from "@/hooks/useDiscoverReleases";
 import type { AppTheme } from "@/constants/theme";
 import { buildProfileUrl } from "@/utils/tmdb.utils";
 import { useTmdbDetails, getDeviceRegion } from "@/hooks/tmdb/useTmdbDetails";
+import { useRelatedItems } from "@/hooks/useRelatedItems";
 import RatingsOverview from "@/components/media/RatingsOverview";
 import { spacing } from "@/theme/spacing";
 import { avatarSizes } from "@/constants/sizes";
@@ -61,6 +62,13 @@ const DiscoverItemDetails = () => {
     item?.mediaType === "series" ? "tv" : "movie",
     item?.tmdbId ?? null,
     { enabled: !!item?.tmdbId },
+  );
+
+  // Fetch real related items (recommendations and similar) from TMDB
+  const relatedItemsQuery = useRelatedItems(
+    item?.mediaType,
+    item?.tmdbId,
+    !!item?.tmdbId,
   );
 
   // Check if item is already in the user's library (lazy check on detail view mount)
@@ -318,6 +326,14 @@ const DiscoverItemDetails = () => {
             <RelatedItems
               currentId={item.id}
               onPress={(id: string) => handleRelatedPress(id)}
+              relatedItems={
+                relatedItemsQuery.recommendations.length > 0
+                  ? relatedItemsQuery.recommendations
+                  : relatedItemsQuery.similar.length > 0
+                    ? relatedItemsQuery.similar
+                    : undefined
+              }
+              isLoadingRelated={relatedItemsQuery.isLoading}
             />
           </ScrollView>
         )}
