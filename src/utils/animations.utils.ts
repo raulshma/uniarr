@@ -144,7 +144,7 @@ export const COMPONENT_ANIMATIONS = {
    * Used for grouped content within pages
    */
   // prettier-ignore
-  SECTION_ENTRANCE: (delay = 0) => SlideInUp.duration(ANIMATION_DURATIONS.NORMAL).delay(delay).springify(),
+  SECTION_ENTRANCE: (delay = 0) => FadeIn.duration(ANIMATION_DURATIONS.NORMAL).delay(delay).springify(),
 
   /**
    * LOADING_ENTRANCE: Subtle fade for skeleton loaders

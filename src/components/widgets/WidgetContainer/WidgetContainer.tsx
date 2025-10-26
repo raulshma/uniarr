@@ -324,6 +324,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
         },
         loadingSkeleton: {
           gap: theme.custom.spacing.lg,
+          paddingTop: 0,
         },
         skeletonWidget: {
           borderRadius: theme.custom.sizes.borderRadius.xl,

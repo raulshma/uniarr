@@ -112,7 +112,7 @@ const DashboardScreen = () => {
         // Header Section
         headerSection: {
           paddingHorizontal: theme.custom.spacing.lg,
-          paddingTop: theme.custom.spacing.lg,
+          paddingTop: theme.custom.spacing.sm,
           paddingBottom: theme.custom.spacing.md,
         },
         headerContainer: {
@@ -533,7 +533,7 @@ const DashboardScreen = () => {
             delay={100}
             style={{
               paddingHorizontal: theme.custom.spacing.lg,
-              marginTop: theme.custom.spacing.md,
+              marginTop: theme.custom.spacing.sm,
             }}
           >
             <WidgetContainer editable={true} />

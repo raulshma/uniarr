@@ -37,7 +37,6 @@ type SettingsData = {
   criticalHealthAlertsBypassQuietHours: boolean;
   // Remember last selected calendar view (week/day/month/list)
   lastCalendarView: CalendarView;
-  useNativeTabs: boolean;
   tmdbEnabled: boolean;
   // Number of retry attempts to perform for Jellyseerr requests when the server
   // returns 5xx errors. This value represents the number of retry attempts
@@ -79,7 +78,6 @@ interface SettingsState extends SettingsData {
   setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
   reset: () => void;
   setLastCalendarView: (view: CalendarView) => void;
-  setUseNativeTabs: (enabled: boolean) => void;
   setTmdbEnabled: (enabled: boolean) => void;
   setJellyseerrRetryAttempts: (attempts: number) => void;
   setMaxImageCacheSize: (size: number) => void;
@@ -154,7 +152,6 @@ const createDefaultSettings = (): SettingsData => ({
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
   lastCalendarView: "week",
-  useNativeTabs: true,
   tmdbEnabled: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
   maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
@@ -209,7 +206,6 @@ export const useSettingsStore = create<SettingsState>()(
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
       setLastCalendarView: (view: CalendarView) =>
         set({ lastCalendarView: view }),
-      setUseNativeTabs: (enabled: boolean) => set({ useNativeTabs: enabled }),
       setTmdbEnabled: (enabled: boolean) => set({ tmdbEnabled: enabled }),
       setJellyseerrRetryAttempts: (attempts: number) =>
         set({ jellyseerrRetryAttempts: clampRetryAttempts(attempts) }),
@@ -247,7 +243,6 @@ export const useSettingsStore = create<SettingsState>()(
         criticalHealthAlertsBypassQuietHours:
           state.criticalHealthAlertsBypassQuietHours,
         lastCalendarView: state.lastCalendarView,
-        useNativeTabs: state.useNativeTabs,
         tmdbEnabled: state.tmdbEnabled,
         jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
         maxImageCacheSize: state.maxImageCacheSize,
@@ -397,7 +392,6 @@ export const useSettingsStore = create<SettingsState>()(
           criticalHealthAlertsBypassQuietHours:
             partial.criticalHealthAlertsBypassQuietHours ??
             baseDefaults.criticalHealthAlertsBypassQuietHours,
-          useNativeTabs: partial.useNativeTabs ?? baseDefaults.useNativeTabs,
           preferredJellyseerrServiceId:
             partial.preferredJellyseerrServiceId ?? undefined,
           _hasHydrated: true,
@@ -445,8 +439,6 @@ export const selectCriticalHealthAlertsBypassQuietHours = (
 
 export const selectLastCalendarView = (state: SettingsState) =>
   state.lastCalendarView;
-export const selectUseNativeTabs = (state: SettingsState) =>
-  state.useNativeTabs;
 export const selectHasHydrated = (state: SettingsState) => state._hasHydrated;
 export const selectJellyfinLocalAddress = (state: SettingsState) =>
   state.jellyfinLocalAddress;

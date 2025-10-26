@@ -91,8 +91,6 @@ const SettingsScreen = () => {
     setRequestNotificationsEnabled,
     setServiceHealthNotificationsEnabled,
     setRefreshIntervalMinutes,
-    useNativeTabs,
-    setUseNativeTabs,
     jellyseerrRetryAttempts,
     setJellyseerrRetryAttempts,
     tmdbEnabled,
@@ -124,7 +122,7 @@ const SettingsScreen = () => {
   }, [themePreference, colorScheme]);
 
   const appearanceItemsCount = useMemo(
-    () => (isCurrentThemeDark ? 4 : 3),
+    () => (isCurrentThemeDark ? 3 : 2),
     [isCurrentThemeDark],
   );
 
@@ -606,34 +604,6 @@ const SettingsScreen = () => {
                   icon="chevron-right"
                   size={18}
                   iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem
-            index={isCurrentThemeDark ? 3 : 2}
-            totalItems={appearanceItemsCount}
-            animated={animationsEnabled}
-          >
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="tab"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Navigation Style</Text>
-                  <Text style={styles.settingValue}>
-                    {useNativeTabs ? "Native Tabs" : "Curved Bar"}
-                  </Text>
-                </View>
-                <Switch
-                  value={useNativeTabs}
-                  onValueChange={setUseNativeTabs}
-                  color={theme.colors.primary}
                 />
               </View>
             </Card>
