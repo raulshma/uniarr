@@ -7,6 +7,7 @@ import { Image } from "expo-image";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useHackerNewsStoryContent } from "@/hooks/useHackerNewsStoryContent";
 import { logger } from "@/services/logger/LoggerService";
 import {
   fetchHackerNewsStories,
@@ -18,6 +19,9 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
+import ContentDrawer from "@/components/widgets/ContentDrawer";
+import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import { HapticPressable } from "@/components/common/HapticPressable";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -62,11 +66,26 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
   onRefresh,
 }) => {
   const theme = useTheme<AppTheme>();
-  const { onPress } = useHaptics();
+  const { onPress, onLongPress } = useHaptics();
   const [stories, setStories] = useState<HackerNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // State for image preview modal
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string>("");
+
+  // State for content drawer
+  const [contentDrawerVisible, setContentDrawerVisible] = useState(false);
+  const [selectedStory, setSelectedStory] = useState<HackerNewsItem | null>(
+    null,
+  );
+
+  // Lazy load content for selected story
+  const { content, loading: contentLoading } = useHackerNewsStoryContent(
+    selectedStory?.id || 0,
+  );
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
 
@@ -132,113 +151,180 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
     }
   };
 
+  const handleLongPressImage = async (imageUri: string) => {
+    onLongPress();
+    setSelectedImageUri(imageUri);
+    setImageModalVisible(true);
+  };
+
+  const handleLongPressItem = (story: HackerNewsItem) => {
+    onLongPress();
+    setSelectedStory(story);
+    setContentDrawerVisible(true);
+  };
+
   return (
-    <Card
-      contentPadding="sm"
-      style={StyleSheet.flatten([
-        styles.card,
-        {
-          backgroundColor: theme.colors.surface,
-          borderRadius: borderRadius.xxl,
-          padding: spacing.sm,
-        },
-      ])}
-    >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-          {widget.title}
-        </Text>
-        <View style={styles.actions}>
-          {onEdit && (
+    <>
+      <Card
+        contentPadding="sm"
+        style={StyleSheet.flatten([
+          styles.card,
+          {
+            backgroundColor: theme.colors.surface,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
+      >
+        <View style={styles.header}>
+          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+            {widget.title}
+          </Text>
+          <View style={styles.actions}>
+            {onEdit && (
+              <IconButton
+                icon="cog"
+                size={20}
+                onPress={() => {
+                  onPress();
+                  onEdit();
+                }}
+              />
+            )}
             <IconButton
-              icon="cog"
+              icon={refreshing ? "progress-clock" : "refresh"}
               size={20}
-              onPress={() => {
-                onPress();
-                onEdit();
-              }}
+              onPress={handleRefresh}
+              disabled={refreshing}
             />
-          )}
-          <IconButton
-            icon={refreshing ? "progress-clock" : "refresh"}
-            size={20}
-            onPress={handleRefresh}
-            disabled={refreshing}
+          </View>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <SkeletonPlaceholder
+                key={index}
+                height={64}
+                borderRadius={12}
+                style={{ marginBottom: index < 3 ? 12 : 0 }}
+              />
+            ))}
+          </View>
+        ) : stories.length === 0 ? (
+          <SettingsListItem
+            title="No stories available at the moment."
+            groupPosition="single"
           />
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <SkeletonPlaceholder
-              key={index}
-              height={64}
-              borderRadius={12}
-              style={{ marginBottom: index < 3 ? 12 : 0 }}
-            />
-          ))}
-        </View>
-      ) : stories.length === 0 ? (
-        <SettingsListItem
-          title="No stories available at the moment."
-          groupPosition="single"
-        />
-      ) : (
-        <View>
-          {stories.map((story, index) => (
-            <SettingsListItem
-              key={story.id}
-              title={story.title}
-              subtitle={`${story.score ?? 0} points by ${story.by} • ${formatDistanceToNow(new Date(story.time * 1000), { addSuffix: true })}`}
-              left={
-                story.image
-                  ? {
-                      node: (
-                        <Image
-                          source={{ uri: story.image }}
-                          style={{ width: 40, height: 40, borderRadius: 20 }}
-                        />
-                      ),
-                    }
-                  : {
-                      node: (
-                        <Text
-                          variant="titleMedium"
-                          style={{ color: theme.colors.primary }}
-                        >
-                          {index + 1}
-                        </Text>
-                      ),
-                    }
-              }
-              trailing={
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                  style={{ margin: 0 }}
+        ) : (
+          <View>
+            {stories.map((story, index) => (
+              <HapticPressable
+                key={story.id}
+                onLongPress={() => handleLongPressItem(story)}
+                hapticOnLongPress
+              >
+                <SettingsListItem
+                  title={story.title}
+                  subtitle={`${story.score ?? 0} points by ${story.by} • ${formatDistanceToNow(new Date(story.time * 1000), { addSuffix: true })}${story.descendants ? ` • ${story.descendants} comments` : ""}`}
+                  left={
+                    story.image
+                      ? {
+                          node: (
+                            <HapticPressable
+                              onLongPress={() =>
+                                handleLongPressImage(story.image!)
+                              }
+                              hapticOnLongPress
+                            >
+                              <Image
+                                source={{ uri: story.image }}
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 20,
+                                }}
+                              />
+                            </HapticPressable>
+                          ),
+                        }
+                      : {
+                          node: (
+                            <Text
+                              variant="titleMedium"
+                              style={{ color: theme.colors.primary }}
+                            >
+                              {index + 1}
+                            </Text>
+                          ),
+                        }
+                  }
+                  trailing={
+                    <IconButton
+                      icon="chevron-right"
+                      size={16}
+                      iconColor={theme.colors.outline}
+                      style={{ margin: 0 }}
+                    />
+                  }
+                  onPress={() => openStory(story)}
+                  groupPosition={
+                    index === 0
+                      ? "top"
+                      : index === stories.length - 1
+                        ? "bottom"
+                        : "middle"
+                  }
                 />
-              }
-              onPress={() => openStory(story)}
-              groupPosition={
-                index === 0
-                  ? "top"
-                  : index === stories.length - 1
-                    ? "bottom"
-                    : "middle"
-              }
-            />
-          ))}
-        </View>
-      )}
+              </HapticPressable>
+            ))}
+          </View>
+        )}
 
-      {error && (
-        <Text variant="bodySmall" style={styles.error}>
-          {error}
-        </Text>
-      )}
-    </Card>
+        {error && (
+          <Text variant="bodySmall" style={styles.error}>
+            {error}
+          </Text>
+        )}
+      </Card>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        visible={imageModalVisible}
+        imageUri={selectedImageUri}
+        fileName="Story Favicon"
+        fileSize="Image"
+        onClose={() => setImageModalVisible(false)}
+      />
+
+      {/* Content Drawer */}
+      <ContentDrawer
+        visible={contentDrawerVisible}
+        onDismiss={() => {
+          setContentDrawerVisible(false);
+          setSelectedStory(null);
+        }}
+        title={selectedStory?.title || "Story"}
+        content={content}
+        metadata={{
+          score: selectedStory?.score,
+          author: selectedStory?.by,
+          date: selectedStory?.time
+            ? formatDistanceToNow(new Date(selectedStory.time * 1000), {
+                addSuffix: true,
+              })
+            : undefined,
+          comments: selectedStory?.descendants,
+        }}
+        actionUrl={
+          selectedStory?.url
+            ? selectedStory.url
+            : `https://news.ycombinator.com/item?id=${selectedStory?.id || ""}`
+        }
+        actionLabel="Open on Hacker News"
+        loading={contentLoading}
+      />
+    </>
   );
 };
 

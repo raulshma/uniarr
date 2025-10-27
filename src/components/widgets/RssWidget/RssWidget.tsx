@@ -18,6 +18,9 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
+import ContentDrawer from "@/components/widgets/ContentDrawer";
+import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import { HapticPressable } from "@/components/common/HapticPressable";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -53,11 +56,19 @@ const normalizeConfig = (config: Widget["config"]): RssWidgetConfig => {
 
 const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
   const theme = useTheme<AppTheme>();
-  const { onPress } = useHaptics();
+  const { onPress, onLongPress } = useHaptics();
   const [items, setItems] = useState<RssFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // State for image preview modal
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string>("");
+
+  // State for content drawer
+  const [contentDrawerVisible, setContentDrawerVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<RssFeedItem | null>(null);
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
 
@@ -132,6 +143,18 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
     }
   };
 
+  const handleLongPressImage = async (imageUri: string) => {
+    onLongPress();
+    setSelectedImageUri(imageUri);
+    setImageModalVisible(true);
+  };
+
+  const handleLongPressItem = (item: RssFeedItem) => {
+    onLongPress();
+    setSelectedItem(item);
+    setContentDrawerVisible(true);
+  };
+
   if (!feedsConfigured) {
     return (
       <View
@@ -155,112 +178,162 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
   }
 
   return (
-    <Card
-      contentPadding="sm"
-      style={StyleSheet.flatten([
-        styles.card,
-        {
-          backgroundColor: theme.colors.surface,
-          borderRadius: borderRadius.xxl,
-          padding: spacing.sm,
-        },
-      ])}
-    >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-          {widget.title}
-        </Text>
-        <View style={styles.actions}>
-          {onEdit && (
+    <>
+      <Card
+        contentPadding="sm"
+        style={StyleSheet.flatten([
+          styles.card,
+          {
+            backgroundColor: theme.colors.surface,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
+      >
+        <View style={styles.header}>
+          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+            {widget.title}
+          </Text>
+          <View style={styles.actions}>
+            {onEdit && (
+              <IconButton
+                icon="cog"
+                size={20}
+                onPress={() => {
+                  onPress();
+                  onEdit();
+                }}
+              />
+            )}
             <IconButton
-              icon="cog"
+              icon={isRefreshing ? "progress-clock" : "refresh"}
               size={20}
-              onPress={() => {
-                onPress();
-                onEdit();
-              }}
+              onPress={handleRefresh}
+              disabled={isRefreshing}
             />
-          )}
-          <IconButton
-            icon={isRefreshing ? "progress-clock" : "refresh"}
-            size={20}
-            onPress={handleRefresh}
-            disabled={isRefreshing}
+          </View>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <SkeletonPlaceholder
+                key={index}
+                height={64}
+                borderRadius={12}
+                style={{ marginBottom: index < 2 ? 12 : 0 }}
+              />
+            ))}
+          </View>
+        ) : items.length === 0 ? (
+          <SettingsListItem
+            title="No articles available. Try refreshing in a bit."
+            groupPosition="single"
           />
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <SkeletonPlaceholder
-              key={index}
-              height={64}
-              borderRadius={12}
-              style={{ marginBottom: index < 2 ? 12 : 0 }}
-            />
-          ))}
-        </View>
-      ) : items.length === 0 ? (
-        <SettingsListItem
-          title="No articles available. Try refreshing in a bit."
-          groupPosition="single"
-        />
-      ) : (
-        <View>
-          {items.map((item, index) => (
-            <SettingsListItem
-              key={item.id}
-              title={item.title}
-              subtitle={
-                item.source && item.publishedAt
-                  ? `${item.source} • ${formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true })}`
-                  : item.source ||
-                    (item.publishedAt
-                      ? formatDistanceToNow(new Date(item.publishedAt), {
-                          addSuffix: true,
-                        })
-                      : undefined)
-              }
-              left={
-                item.image
-                  ? {
-                      node: (
-                        <Image
-                          source={{ uri: item.image }}
-                          style={{ width: 40, height: 40, borderRadius: 20 }}
-                        />
-                      ),
-                    }
-                  : { iconName: "rss" }
-              }
-              trailing={
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                  style={{ margin: 0 }}
+        ) : (
+          <View>
+            {items.map((item, index) => (
+              <HapticPressable
+                key={item.id}
+                onLongPress={() => handleLongPressItem(item)}
+                hapticOnLongPress
+              >
+                <SettingsListItem
+                  title={item.title}
+                  subtitle={
+                    item.source && item.publishedAt
+                      ? `${item.source} • ${formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true })}`
+                      : item.source ||
+                        (item.publishedAt
+                          ? formatDistanceToNow(new Date(item.publishedAt), {
+                              addSuffix: true,
+                            })
+                          : undefined)
+                  }
+                  left={
+                    item.image
+                      ? {
+                          node: (
+                            <HapticPressable
+                              onLongPress={() =>
+                                handleLongPressImage(item.image!)
+                              }
+                              hapticOnLongPress
+                            >
+                              <Image
+                                source={{ uri: item.image }}
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 20,
+                                }}
+                              />
+                            </HapticPressable>
+                          ),
+                        }
+                      : { iconName: "rss" }
+                  }
+                  trailing={
+                    <IconButton
+                      icon="chevron-right"
+                      size={16}
+                      iconColor={theme.colors.outline}
+                      style={{ margin: 0 }}
+                    />
+                  }
+                  onPress={() => openLink(item.link)}
+                  groupPosition={
+                    index === 0
+                      ? "top"
+                      : index === items.length - 1
+                        ? "bottom"
+                        : "middle"
+                  }
                 />
-              }
-              onPress={() => openLink(item.link)}
-              groupPosition={
-                index === 0
-                  ? "top"
-                  : index === items.length - 1
-                    ? "bottom"
-                    : "middle"
-              }
-            />
-          ))}
-        </View>
-      )}
+              </HapticPressable>
+            ))}
+          </View>
+        )}
 
-      {error && (
-        <Text variant="bodySmall" style={styles.error}>
-          {error}
-        </Text>
-      )}
-    </Card>
+        {error && (
+          <Text variant="bodySmall" style={styles.error}>
+            {error}
+          </Text>
+        )}
+      </Card>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        visible={imageModalVisible}
+        imageUri={selectedImageUri}
+        fileName="Article Thumbnail"
+        fileSize="Image"
+        onClose={() => setImageModalVisible(false)}
+      />
+
+      {/* Content Drawer */}
+      <ContentDrawer
+        visible={contentDrawerVisible}
+        onDismiss={() => {
+          setContentDrawerVisible(false);
+          setSelectedItem(null);
+        }}
+        title={selectedItem?.title || "Article"}
+        content={selectedItem?.summary}
+        metadata={{
+          author: selectedItem?.author,
+          date: selectedItem?.publishedAt
+            ? formatDistanceToNow(new Date(selectedItem.publishedAt), {
+                addSuffix: true,
+              })
+            : undefined,
+          source: selectedItem?.source,
+        }}
+        actionUrl={selectedItem?.link || ""}
+        actionLabel="Open Full Article"
+        loading={false}
+      />
+    </>
   );
 };
 

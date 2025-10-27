@@ -8,6 +8,7 @@ import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useRedditPostContent } from "@/hooks/useRedditPostContent";
 import { logger } from "@/services/logger/LoggerService";
 import {
   fetchRedditPosts,
@@ -20,6 +21,9 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
+import ContentDrawer from "@/components/widgets/ContentDrawer";
+import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import { HapticPressable } from "@/components/common/HapticPressable";
 
 const CACHE_TTL_MS = 20 * 60 * 1000;
 
@@ -81,11 +85,24 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
   onRefresh,
 }) => {
   const theme = useTheme<AppTheme>();
-  const { onPress } = useHaptics();
+  const { onPress, onLongPress } = useHaptics();
   const [posts, setPosts] = useState<RedditPostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // State for image preview modal
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string>("");
+
+  // State for content drawer
+  const [contentDrawerVisible, setContentDrawerVisible] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<RedditPostItem | null>(null);
+
+  // Lazy load content for selected post
+  const { content, loading: contentLoading } = useRedditPostContent(
+    selectedPost?.permalink || "",
+  );
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const hasSources = config.subreddits && config.subreddits.length > 0;
@@ -146,6 +163,18 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
     ],
   );
 
+  const handleLongPressImage = async (imageUri: string) => {
+    onLongPress();
+    setSelectedImageUri(imageUri);
+    setImageModalVisible(true);
+  };
+
+  const handleLongPressItem = (post: RedditPostItem) => {
+    onLongPress();
+    setSelectedPost(post);
+    setContentDrawerVisible(true);
+  };
+
   useEffect(() => {
     void loadPosts();
   }, [loadPosts]);
@@ -191,103 +220,152 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
   }
 
   return (
-    <Card
-      contentPadding="sm"
-      style={StyleSheet.flatten([
-        styles.card,
-        {
-          backgroundColor: theme.colors.surface,
-          borderRadius: borderRadius.xxl,
-          padding: spacing.sm,
-        },
-      ])}
-    >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-          {widget.title}
-        </Text>
-        <View style={styles.actions}>
-          {onEdit && (
+    <>
+      <Card
+        contentPadding="sm"
+        style={StyleSheet.flatten([
+          styles.card,
+          {
+            backgroundColor: theme.colors.surface,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
+      >
+        <View style={styles.header}>
+          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+            {widget.title}
+          </Text>
+          <View style={styles.actions}>
+            {onEdit && (
+              <IconButton
+                icon="cog"
+                size={20}
+                onPress={() => {
+                  onPress();
+                  onEdit();
+                }}
+              />
+            )}
             <IconButton
-              icon="cog"
+              icon={refreshing ? "progress-clock" : "refresh"}
               size={20}
-              onPress={() => {
-                onPress();
-                onEdit();
-              }}
+              onPress={handleRefresh}
+              disabled={refreshing}
             />
-          )}
-          <IconButton
-            icon={refreshing ? "progress-clock" : "refresh"}
-            size={20}
-            onPress={handleRefresh}
-            disabled={refreshing}
+          </View>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <SkeletonPlaceholder
+                key={index}
+                height={64}
+                borderRadius={12}
+                style={{ marginBottom: index < 2 ? 12 : 0 }}
+              />
+            ))}
+          </View>
+        ) : posts.length === 0 ? (
+          <SettingsListItem
+            title="No posts right now. Try again soon."
+            groupPosition="single"
           />
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <SkeletonPlaceholder
-              key={index}
-              height={64}
-              borderRadius={12}
-              style={{ marginBottom: index < 2 ? 12 : 0 }}
-            />
-          ))}
-        </View>
-      ) : posts.length === 0 ? (
-        <SettingsListItem
-          title="No posts right now. Try again soon."
-          groupPosition="single"
-        />
-      ) : (
-        <View>
-          {posts.map((post, index) => (
-            <SettingsListItem
-              key={post.id}
-              title={post.title}
-              subtitle={`r/${post.subreddit} • u/${post.author} • ${formatDistanceToNow(new Date(post.createdUtc * 1000), { addSuffix: true })} • ${post.score} upvotes • ${post.comments} comments`}
-              left={
-                post.thumbnail
-                  ? {
-                      node: (
-                        <Image
-                          source={{ uri: post.thumbnail }}
-                          style={{ width: 40, height: 40, borderRadius: 20 }}
-                        />
-                      ),
-                    }
-                  : { iconName: "reddit" }
-              }
-              trailing={
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                  style={{ margin: 0 }}
+        ) : (
+          <View>
+            {posts.map((post, index) => (
+              <HapticPressable
+                key={post.id}
+                onLongPress={() => handleLongPressItem(post)}
+                hapticOnLongPress
+              >
+                <SettingsListItem
+                  title={post.title}
+                  subtitle={`r/${post.subreddit} • u/${post.author} • ${formatDistanceToNow(new Date(post.createdUtc * 1000), { addSuffix: true })} • ${post.score} upvotes • ${post.comments} comments`}
+                  left={
+                    post.thumbnail
+                      ? {
+                          node: (
+                            <HapticPressable
+                              onLongPress={() =>
+                                handleLongPressImage(post.thumbnail!)
+                              }
+                              hapticOnLongPress
+                            >
+                              <Image
+                                source={{ uri: post.thumbnail }}
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 20,
+                                }}
+                              />
+                            </HapticPressable>
+                          ),
+                        }
+                      : { iconName: "reddit" }
+                  }
+                  trailing={
+                    <IconButton
+                      icon="chevron-right"
+                      size={16}
+                      iconColor={theme.colors.outline}
+                      style={{ margin: 0 }}
+                    />
+                  }
+                  onPress={() => openLink(post.permalink || post.url)}
+                  groupPosition={
+                    index === 0
+                      ? "top"
+                      : index === posts.length - 1
+                        ? "bottom"
+                        : "middle"
+                  }
                 />
-              }
-              onPress={() => openLink(post.permalink || post.url)}
-              groupPosition={
-                index === 0
-                  ? "top"
-                  : index === posts.length - 1
-                    ? "bottom"
-                    : "middle"
-              }
-            />
-          ))}
-        </View>
-      )}
+              </HapticPressable>
+            ))}
+          </View>
+        )}
 
-      {error && (
-        <Text variant="bodySmall" style={styles.error}>
-          {error}
-        </Text>
-      )}
-    </Card>
+        {error && (
+          <Text variant="bodySmall" style={styles.error}>
+            {error}
+          </Text>
+        )}
+      </Card>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        visible={imageModalVisible}
+        imageUri={selectedImageUri}
+        fileName="Post Thumbnail"
+        fileSize="Image"
+        onClose={() => setImageModalVisible(false)}
+      />
+
+      {/* Content Drawer */}
+      <ContentDrawer
+        visible={contentDrawerVisible}
+        onDismiss={() => {
+          setContentDrawerVisible(false);
+          setSelectedPost(null);
+        }}
+        title={selectedPost?.title || "Post"}
+        content={content}
+        metadata={{
+          score: selectedPost?.score,
+          author: selectedPost?.author,
+          comments: selectedPost?.comments,
+          source: selectedPost?.subreddit
+            ? `r/${selectedPost.subreddit}`
+            : undefined,
+        }}
+        actionUrl={selectedPost?.permalink || ""}
+        actionLabel="Open on Reddit"
+        loading={contentLoading}
+      />
+    </>
   );
 };
 

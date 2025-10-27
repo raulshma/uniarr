@@ -19,6 +19,7 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
+import { HapticPressable } from "@/components/common/HapticPressable";
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -69,7 +70,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
   onRefresh,
 }) => {
   const theme = useTheme<AppTheme>();
-  const { onPress } = useHaptics();
+  const { onPress, onLongPress } = useHaptics();
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,6 +182,41 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
     }
   };
 
+  const handleLongPressVideo = async (videoUrl: string, videoId: string) => {
+    onLongPress();
+
+    // Extract videoId from URL if not provided
+    const id =
+      videoId ||
+      new URL(videoUrl).searchParams.get("v") ||
+      videoUrl.split("v=")[1];
+
+    if (!id) {
+      void openVideo(videoUrl);
+      return;
+    }
+
+    try {
+      // Try YouTube app deep link first
+      const youtubeAppUrl = `youtube://watch?v=${id}`;
+      const canOpenYoutubeApp = await Linking.canOpenURL(youtubeAppUrl);
+
+      if (canOpenYoutubeApp) {
+        await Linking.openURL(youtubeAppUrl);
+      } else {
+        // Fallback to web URL
+        await Linking.openURL(videoUrl);
+      }
+    } catch (error) {
+      void logger.warn("YouTubeWidget: failed to open video with deep link", {
+        videoId: id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Fallback to web URL
+      void openVideo(videoUrl);
+    }
+  };
+
   if (!apiKey) {
     return (
       <View
@@ -280,39 +316,48 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
       ) : (
         <View>
           {videos.map((video, index) => (
-            <SettingsListItem
+            <HapticPressable
               key={video.id}
-              title={video.title}
-              subtitle={`${video.channelTitle} • ${formatDistanceToNow(new Date(video.publishedAt), { addSuffix: true })}`}
-              left={
-                video.thumbnailUrl
-                  ? {
-                      node: (
-                        <Image
-                          source={{ uri: video.thumbnailUrl }}
-                          style={{ width: 40, height: 40, borderRadius: 20 }}
-                        />
-                      ),
-                    }
-                  : { iconName: "youtube" }
-              }
-              trailing={
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                  style={{ margin: 0 }}
-                />
-              }
-              onPress={() => openVideo(video.videoUrl)}
-              groupPosition={
-                index === 0
-                  ? "top"
-                  : index === videos.length - 1
-                    ? "bottom"
-                    : "middle"
-              }
-            />
+              onLongPress={() => handleLongPressVideo(video.videoUrl, video.id)}
+              hapticOnLongPress
+            >
+              <SettingsListItem
+                title={video.title}
+                subtitle={`${video.channelTitle} • ${formatDistanceToNow(new Date(video.publishedAt), { addSuffix: true })}`}
+                left={
+                  video.thumbnailUrl
+                    ? {
+                        node: (
+                          <Image
+                            source={{ uri: video.thumbnailUrl }}
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                            }}
+                          />
+                        ),
+                      }
+                    : { iconName: "youtube" }
+                }
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                    style={{ margin: 0 }}
+                  />
+                }
+                onPress={() => openVideo(video.videoUrl)}
+                groupPosition={
+                  index === 0
+                    ? "top"
+                    : index === videos.length - 1
+                      ? "bottom"
+                      : "middle"
+                }
+              />
+            </HapticPressable>
           ))}
         </View>
       )}
