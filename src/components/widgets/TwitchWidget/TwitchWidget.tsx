@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, View } from "react-native";
 import { Button, IconButton, Text, useTheme } from "react-native-paper";
 
-import { Card } from "@/components/common";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
 import { getComponentElevation } from "@/constants/elevation";
@@ -17,6 +16,12 @@ import { widgetCredentialService } from "@/services/widgets/WidgetCredentialServ
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
+import {
+  Card,
+  SettingsGroup,
+  SettingsListItem,
+  getGroupPositions,
+} from "@/components/common";
 
 const LIVE_CACHE_TTL_MS = 5 * 60 * 1000;
 const OFFLINE_CACHE_TTL_MS = 20 * 60 * 1000;
@@ -71,6 +76,46 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress } = useHaptics();
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        card: {
+          borderRadius: borderRadius.xxl,
+          overflow: "hidden",
+        },
+        headerContainer: {
+          paddingHorizontal: spacing.sm,
+          paddingTop: spacing.sm,
+          backgroundColor: theme.colors.surface,
+        },
+        header: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        },
+        actions: {
+          flexDirection: "row",
+          alignItems: "center",
+        },
+        settingsGroup: {
+          marginHorizontal: spacing.sm,
+          marginBottom: spacing.sm,
+        },
+        loadingContainer: {
+          gap: 1,
+        },
+        errorContainer: {
+          paddingHorizontal: spacing.sm,
+          paddingBottom: spacing.sm,
+        },
+        error: {
+          color: "#ff6b6b",
+        },
+      }),
+    [theme],
+  );
+
   const [credentials, setCredentials] = useState<TwitchCredentials | null>(
     null,
   );
@@ -231,153 +276,96 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
         styles.card,
         {
           backgroundColor: theme.colors.surface,
-          borderRadius: borderRadius.xxl,
-          padding: spacing.sm,
         },
         getComponentElevation("widget", theme),
       ])}
     >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-          {widget.title}
-        </Text>
-        <View style={styles.actions}>
-          {onEdit && (
+      <View style={styles.headerContainer}>
+        <View style={styles.header}>
+          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+            {widget.title}
+          </Text>
+          <View style={styles.actions}>
+            {onEdit && (
+              <IconButton
+                icon="cog"
+                size={20}
+                onPress={() => {
+                  onPress();
+                  onEdit();
+                }}
+              />
+            )}
             <IconButton
-              icon="cog"
+              icon={refreshing ? "progress-clock" : "refresh"}
               size={20}
-              onPress={() => {
-                onPress();
-                onEdit();
-              }}
+              onPress={handleRefresh}
+              disabled={refreshing}
             />
-          )}
-          <IconButton
-            icon={refreshing ? "progress-clock" : "refresh"}
-            size={20}
-            onPress={handleRefresh}
-            disabled={refreshing}
-          />
+          </View>
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <SkeletonPlaceholder
-              key={index}
-              height={72}
-              borderRadius={12}
-              style={{ marginBottom: index < 2 ? 12 : 0 }}
-            />
-          ))}
-        </View>
-      ) : channels.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            {config.offlineMessage ?? "No channels are live right now."}
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {channels.map((channel) => (
-            <View key={channel.login} style={styles.listItem}>
-              <View style={styles.channelHeader}>
-                <Text
-                  variant="titleSmall"
-                  style={{ color: theme.colors.onSurface }}
-                >
-                  {channel.displayName}
-                </Text>
-                <Text
-                  variant="bodySmall"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {channel.isLive ? "Live" : "Offline"}
-                </Text>
-              </View>
-              {channel.isLive && (
-                <Text
-                  variant="bodyMedium"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {channel.title}
-                </Text>
-              )}
-              <View style={styles.channelActions}>
+      <SettingsGroup style={styles.settingsGroup}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <SkeletonPlaceholder
+                key={index}
+                height={48}
+                borderRadius={
+                  index === 0
+                    ? borderRadius.lg
+                    : index === 2
+                      ? borderRadius.lg
+                      : 0
+                }
+                style={{ marginBottom: index < 2 ? 1 : 0 }}
+              />
+            ))}
+          </View>
+        ) : channels.length === 0 ? (
+          <SettingsListItem
+            title={config.offlineMessage ?? "No channels are live right now."}
+            left={{ iconName: "twitch" }}
+            groupPosition="single"
+          />
+        ) : (
+          channels.map((channel, index) => (
+            <SettingsListItem
+              key={channel.login}
+              title={channel.displayName}
+              subtitle={
+                channel.isLive
+                  ? `${channel.title} • ${channel.viewerCount} viewers`
+                  : "Offline"
+              }
+              left={{ iconName: "twitch" }}
+              trailing={
                 <Button
                   mode="outlined"
                   compact
                   onPress={() => openChannel(channel.login)}
                 >
-                  Open in Twitch
+                  Open
                 </Button>
-                {channel.viewerCount !== undefined && channel.isLive && (
-                  <Text
-                    variant="bodySmall"
-                    style={{ color: theme.colors.onSurfaceVariant }}
-                  >
-                    {`${channel.viewerCount} viewers`}
-                  </Text>
-                )}
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
+              }
+              onPress={() => openChannel(channel.login)}
+              groupPosition={getGroupPositions(channels.length)[index]}
+            />
+          ))
+        )}
+      </SettingsGroup>
 
       {error && (
-        <Text variant="bodySmall" style={styles.error}>
-          {error}
-        </Text>
+        <View style={styles.errorContainer}>
+          <Text variant="bodySmall" style={styles.error}>
+            {error}
+          </Text>
+        </View>
       )}
     </Card>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 24,
-    overflow: "hidden",
-    gap: 16,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  loadingContainer: {
-    gap: 12,
-  },
-  list: {
-    gap: 12,
-  },
-  listItem: {
-    gap: 8,
-  },
-  channelHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  channelActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  emptyState: {
-    alignItems: "flex-start",
-  },
-  error: {
-    color: "#ff6b6b",
-  },
-});
 
 export default TwitchWidget;
