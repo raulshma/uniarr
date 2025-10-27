@@ -26,6 +26,12 @@ import StatisticsWidget from "../StatisticsWidget/StatisticsWidget";
 import CalendarPreviewWidget from "../CalendarPreviewWidget/CalendarPreviewWidget";
 import ShortcutsWidget from "../ShortcutsWidget/ShortcutsWidget";
 import BookmarksWidget from "../BookmarksWidget/BookmarksWidget";
+import RssWidget from "../RssWidget/RssWidget";
+import RedditWidget from "../RedditWidget/RedditWidget";
+import HackerNewsWidget from "../HackerNewsWidget/HackerNewsWidget";
+import WeatherWidget from "../WeatherWidget/WeatherWidget";
+import YouTubeWidget from "../YouTubeWidget/YouTubeWidget";
+import TwitchWidget from "../TwitchWidget/TwitchWidget";
 
 export interface WidgetContainerProps {
   /**
@@ -88,6 +94,8 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
   };
 
   const renderWidget = (widget: Widget) => {
+    const editHandler = editable ? () => handleEditWidget(widget) : undefined;
+
     switch (widget.type) {
       case "service-status":
         return (
@@ -95,7 +103,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "shortcuts":
@@ -104,7 +112,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "download-progress":
@@ -113,7 +121,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "recent-activity":
@@ -122,7 +130,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "statistics":
@@ -131,7 +139,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "calendar-preview":
@@ -140,7 +148,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "bookmarks":
@@ -149,7 +157,62 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
+            isEditing={editing}
+          />
+        );
+      case "rss-feed":
+        return (
+          <RssWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "subreddit":
+        return (
+          <RedditWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "hacker-news":
+        return (
+          <HackerNewsWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "weather":
+        return (
+          <WeatherWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "youtube":
+        return (
+          <YouTubeWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "twitch":
+        return (
+          <TwitchWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
           />
         );
       default:
@@ -164,29 +227,39 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
   const handleEditWidget = (widget: Widget) => {
     onPress();
-    // Navigate to widget-specific settings if available
+
+    const pushWidgetConfig = () =>
+      router.push({
+        pathname: "/(auth)/settings/widgets/configure",
+        params: { widgetId: widget.id },
+      });
+
     switch (widget.type) {
       case "service-status":
-        // Navigate to service connections settings
         router.push("/(auth)/settings/connections");
         break;
-      case "shortcuts":
-        // Navigate to shortcuts settings
-        router.push("/(auth)/settings/shortcuts");
-        break;
       case "bookmarks":
-        // Navigate to bookmarks settings
         router.push({
           pathname: "/(auth)/settings/bookmarks",
           params: { widgetId: widget.id },
         });
         break;
+      case "recent-activity":
+        router.push("/(auth)/settings/recent-activity-sources");
+        break;
+      case "shortcuts":
       case "download-progress":
-        // Navigate to download settings
-        router.push("/(auth)/settings/downloads");
+      case "statistics":
+      case "calendar-preview":
+      case "rss-feed":
+      case "subreddit":
+      case "hacker-news":
+      case "weather":
+      case "youtube":
+      case "twitch":
+        pushWidgetConfig();
         break;
       default:
-        // For widgets without specific settings, go to general widget settings
         router.push("/(auth)/settings/widgets");
         break;
     }
@@ -212,6 +285,12 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
       statistics: "chart-box",
       "calendar-preview": "calendar",
       bookmarks: "bookmark",
+      "rss-feed": "rss",
+      subreddit: "reddit",
+      "hacker-news": "newspaper-variant",
+      weather: "weather-partly-cloudy",
+      youtube: "youtube",
+      twitch: "twitch",
     };
     return iconMap[type] || "widgets";
   };

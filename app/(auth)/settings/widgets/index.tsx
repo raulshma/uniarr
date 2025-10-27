@@ -109,11 +109,56 @@ const WidgetSettingsScreen = () => {
 
   const handleConfigure = async (widget: Widget) => {
     onPress();
-    // For now we only have a settings page for recent activity widget
-    if (widget.type === "recent-activity") {
-      router.push("/(auth)/settings/recent-activity-sources");
+
+    switch (widget.type) {
+      case "service-status":
+        router.push("/(auth)/settings/connections");
+        return;
+      case "bookmarks":
+        router.push({
+          pathname: "/(auth)/settings/bookmarks",
+          params: { widgetId: widget.id },
+        });
+        return;
+      case "recent-activity":
+        router.push("/(auth)/settings/recent-activity-sources");
+        return;
+      case "shortcuts":
+      case "download-progress":
+      case "statistics":
+      case "calendar-preview":
+      case "rss-feed":
+      case "subreddit":
+      case "hacker-news":
+      case "weather":
+      case "youtube":
+      case "twitch":
+        router.push({
+          pathname: "/(auth)/settings/widgets/configure",
+          params: { widgetId: widget.id },
+        });
+        return;
+      default:
+        router.push("/(auth)/settings/widgets");
     }
   };
+
+  const isConfigurable = (widget: Widget) =>
+    [
+      "service-status",
+      "shortcuts",
+      "download-progress",
+      "recent-activity",
+      "statistics",
+      "calendar-preview",
+      "bookmarks",
+      "rss-feed",
+      "subreddit",
+      "hacker-news",
+      "weather",
+      "youtube",
+      "twitch",
+    ].includes(widget.type);
 
   const handleWidgetSizeChange = async (size: "small" | "medium" | "large") => {
     if (!selectedWidget) return;
@@ -354,7 +399,7 @@ const WidgetSettingsScreen = () => {
                           </View>
                         ) : (
                           <View style={styles.widgetActions}>
-                            {widget.type === "recent-activity" && (
+                            {isConfigurable(widget) && (
                               <Button
                                 mode="outlined"
                                 compact

@@ -30,6 +30,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
   widget,
   onRefresh,
   onEdit,
+  isEditing,
 }) => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
@@ -39,7 +40,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
   const [health, setHealth] = useState<Map<string, BookmarkHealth>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const isEditMode = Boolean(onEdit);
+  const isEditMode = Boolean(isEditing);
 
   const handleOpenConfig = useCallback(() => {
     void hapticPress();

@@ -47,6 +47,7 @@ export interface BookmarksWidgetProps {
   widget: Widget;
   onRefresh?: () => void;
   onEdit?: () => void;
+  isEditing?: boolean;
 }
 
 // Default health check configuration

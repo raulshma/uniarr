@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { StyleSheet, View, TouchableOpacity, FlatList } from "react-native";
+import { StyleSheet, View, FlatList } from "react-native";
 import { Text, IconButton, useTheme } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -24,6 +23,8 @@ import { createServiceNavigation } from "@/utils/navigation.utils";
 import { alert } from "@/services/dialogService";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { RecentActivityItem } from "@/models/recentActivity.types";
+import SettingsListItem from "@/components/common/SettingsListItem";
+import { borderRadius } from "@/constants/sizes";
 
 interface RecentActivityWidgetProps {
   widget: Widget;
@@ -419,7 +420,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
     () =>
       StyleSheet.create({
         container: {
-          flex: 1,
+          overflow: "hidden",
         },
         header: {
           flexDirection: "row",
@@ -544,41 +545,57 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   );
 
   const renderActivityCard = useCallback(
-    ({ item }: { item: RecentActivityItem }) => (
-      <TouchableOpacity
-        style={styles.activityCard}
-        onPress={() => handleItemPress(item)}
-        activeOpacity={0.7}
-      >
-        {item.image ? (
-          <MediaPoster
-            uri={item.image}
-            size={60}
-            borderRadius={8}
-            style={styles.activityImage}
+    ({ item, index }: { item: RecentActivityItem; index: number }) => (
+      <SettingsListItem
+        title={item.title}
+        subtitle={`${item.show} • ${item.episode} • ${item.date}`}
+        left={{
+          node: item.image ? (
+            <MediaPoster
+              uri={item.image}
+              size={60}
+              borderRadius={8}
+              style={styles.activityImage}
+            />
+          ) : (
+            <View style={styles.activityImage} />
+          ),
+        }}
+        trailing={
+          <IconButton
+            icon="chevron-right"
+            size={16}
+            iconColor={theme.colors.outline}
+            style={{ margin: 0 }}
           />
-        ) : (
-          <View style={styles.activityImage} />
-        )}
-        <View style={styles.activityContent}>
-          <Text style={styles.activityTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text style={styles.activityMeta} numberOfLines={1}>
-            {item.show} • {item.episode}
-          </Text>
-          <Text style={styles.activityDate}>{item.date}</Text>
-        </View>
-      </TouchableOpacity>
+        }
+        onPress={() => handleItemPress(item)}
+        groupPosition={
+          index === 0
+            ? "top"
+            : index === recentActivity.length - 1
+              ? "bottom"
+              : "middle"
+        }
+      />
     ),
-    [handleItemPress, styles],
+    [handleItemPress, styles, recentActivity.length, theme.colors.outline],
   );
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <View
+        style={StyleSheet.flatten([
+          styles.container,
+          {
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
+      >
         <View style={styles.header}>
-          <Text style={styles.title}>Recent Activity</Text>
+          <Text style={styles.title}>{widget.title}</Text>
           <View style={styles.actions}>
             <IconButton
               icon="refresh"
@@ -604,23 +621,28 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   if (loading) {
     return (
       <Animated.View
-        style={styles.container}
+        style={StyleSheet.flatten([
+          styles.container,
+          {
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
         entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
         exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Recent Activity</Text>
+          <Text style={styles.title}>{widget.title}</Text>
         </View>
         <View style={styles.loadingSkeleton}>
           {Array.from({ length: 3 }).map((_, index) => (
-            <View key={index} style={styles.skeletonCard}>
-              <View style={styles.skeletonImage} />
-              <View style={styles.skeletonContent}>
-                <SkeletonPlaceholder style={styles.skeletonTitle} />
-                <SkeletonPlaceholder style={styles.skeletonMeta} />
-                <SkeletonPlaceholder style={styles.skeletonDate} />
-              </View>
-            </View>
+            <SkeletonPlaceholder
+              key={index}
+              height={64}
+              borderRadius={12}
+              style={{ marginBottom: index < 2 ? 12 : 0 }}
+            />
           ))}
         </View>
       </Animated.View>
@@ -629,9 +651,18 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
   if (recentActivity.length === 0) {
     return (
-      <View style={styles.container}>
+      <View
+        style={StyleSheet.flatten([
+          styles.container,
+          {
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
+      >
         <View style={styles.header}>
-          <Text style={styles.title}>Recent Activity</Text>
+          <Text style={styles.title}>{widget.title}</Text>
           <View style={styles.actions}>
             <IconButton
               icon="refresh"
@@ -649,23 +680,24 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
             )}
           </View>
         </View>
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons
-            name="clock-outline"
-            size={48}
-            color={theme.colors.onSurfaceVariant}
-            style={styles.emptyIcon}
-          />
-          <Text style={styles.emptyText}>No recent activity</Text>
-        </View>
+        <SettingsListItem title="No recent activity" groupPosition="single" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={StyleSheet.flatten([
+        styles.container,
+        {
+          backgroundColor: theme.colors.elevation.level1,
+          borderRadius: borderRadius.xxl,
+          padding: spacing.sm,
+        },
+      ])}
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>Recent Activity</Text>
+        <Text style={styles.title}>{widget.title}</Text>
         <View style={styles.actions}>
           <IconButton
             icon="refresh"
