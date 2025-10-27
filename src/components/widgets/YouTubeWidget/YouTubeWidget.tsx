@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, View } from "react-native";
 import { IconButton, Text, useTheme } from "react-native-paper";
 import { formatDistanceToNow } from "date-fns";
+import { Image } from "expo-image";
 
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
@@ -283,7 +284,18 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
               key={video.id}
               title={video.title}
               subtitle={`${video.channelTitle} • ${formatDistanceToNow(new Date(video.publishedAt), { addSuffix: true })}`}
-              left={{ iconName: "youtube" }}
+              left={
+                video.thumbnailUrl
+                  ? {
+                      node: (
+                        <Image
+                          source={{ uri: video.thumbnailUrl }}
+                          style={{ width: 40, height: 40, borderRadius: 20 }}
+                        />
+                      ),
+                    }
+                  : { iconName: "youtube" }
+              }
               trailing={
                 <IconButton
                   icon="chevron-right"
