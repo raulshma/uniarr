@@ -413,6 +413,26 @@ class WidgetService {
     await this.clearWidgetData();
   }
 
+  async restoreWidgets(widgets: Widget[]): Promise<void> {
+    await this.ensureInitialized();
+    try {
+      // Replace current widgets with restored ones
+      this.widgets.clear();
+      widgets.forEach((widget) => this.widgets.set(widget.id, widget));
+      await this.saveWidgets();
+
+      // Clear widget cache data for fresh data on restore
+      await this.clearWidgetData();
+
+      logger.debug("[WidgetService] Widgets restored from backup", {
+        widgetCount: widgets.length,
+      });
+    } catch (error) {
+      logger.error("[WidgetService] Failed to restore widgets", { error });
+      throw error;
+    }
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();

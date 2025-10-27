@@ -187,3 +187,29 @@ export const sanitizeServiceVersion = (
 
   return sanitized;
 };
+
+/**
+ * Widget profile validation schema
+ */
+export const widgetProfileSchema = z.object({
+  id: z.string().min(1, "Profile ID is required"),
+  name: z.string().trim().min(1, "Profile name is required"),
+  description: z.string().optional(),
+  widgets: z.array(
+    z.object({
+      id: z.string(),
+      type: z.string(),
+      title: z.string(),
+      enabled: z.boolean(),
+      order: z.number(),
+      size: z.enum(["small", "medium", "large"]),
+      config: z.record(z.string(), z.unknown()).optional(),
+      lastUpdated: z.string().optional(),
+    }),
+  ),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  version: z.string().optional(),
+});
+
+export type WidgetProfileInput = z.infer<typeof widgetProfileSchema>;

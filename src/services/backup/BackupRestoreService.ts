@@ -24,6 +24,10 @@ export interface BackupExportOptions {
   includeDownloadConfig: boolean;
   includeServicesViewState: boolean;
   includeWidgetsConfig: boolean;
+  includeWidgetConfigCredentials: boolean;
+  includeWidgetSecureCredentials: boolean;
+  includeWidgetProfiles: boolean;
+  includeWidgetProfileCredentials: boolean;
   encryptSensitive: boolean;
   password?: string;
 }
@@ -61,6 +65,12 @@ export interface BackupSelectionConfig {
   widgetsConfig: {
     enabled: boolean;
     sensitive: boolean;
+    includeCredentials: boolean;
+  };
+  widgetProfiles: {
+    enabled: boolean;
+    sensitive: boolean;
+    includeCredentials: boolean;
   };
 }
 
@@ -129,6 +139,9 @@ export interface EncryptedBackupData {
       sortDirection: "asc" | "desc";
     };
     widgetsConfig?: any[];
+    widgetsCredentials?: Record<string, any>;
+    widgetSecureCredentials?: Record<string, any>;
+    widgetProfiles?: any[];
   };
 }
 
@@ -197,6 +210,9 @@ export interface BackupData {
       sortDirection: "asc" | "desc";
     };
     widgetsConfig?: any[];
+    widgetsCredentials?: Record<string, any>;
+    widgetSecureCredentials?: Record<string, any>;
+    widgetProfiles?: any[];
   };
 }
 
@@ -637,12 +653,139 @@ class BackupRestoreService {
         }
       }
 
+      // Collect widget profiles
+      if (options.includeWidgetProfiles) {
+        try {
+          const widgetProfiles = await this.exportWidgetProfilesToBackup();
+          if (widgetProfiles.length > 0) {
+            backupData.appData.widgetProfiles = widgetProfiles;
+          }
+        } catch (profileError) {
+          await logger.warn("Failed to collect widget profiles", {
+            location: "BackupRestoreService.createSelectiveBackup",
+            error:
+              profileError instanceof Error
+                ? profileError.message
+                : String(profileError),
+          });
+        }
+      }
+
+      // Collect widget credentials if requested
+      if (
+        options.includeWidgetConfigCredentials ||
+        options.includeWidgetProfileCredentials
+      ) {
+        try {
+          const widgetsCredentials: Record<string, any> = {};
+
+          // Extract credentials from widgets config
+          if (options.includeWidgetConfigCredentials) {
+            const widgetsStorageKey = "WidgetService:widgets";
+            const widgetsData = await AsyncStorage.getItem(widgetsStorageKey);
+            if (widgetsData) {
+              const widgets = JSON.parse(widgetsData) as {
+                id: string;
+                config?: Record<string, any>;
+              }[];
+              for (const widget of widgets) {
+                if (widget.config) {
+                  widgetsCredentials[widget.id] = {
+                    ...widget.config,
+                  };
+                }
+              }
+            }
+          }
+
+          // Extract credentials from widget profiles
+          if (options.includeWidgetProfileCredentials) {
+            try {
+              const profiles = await this.exportWidgetProfilesToBackup();
+              for (const profile of profiles) {
+                if (!widgetsCredentials[profile.id]) {
+                  widgetsCredentials[profile.id] = {};
+                }
+                widgetsCredentials[`${profile.id}:profile`] = {
+                  profileId: profile.id,
+                  name: profile.name,
+                };
+              }
+            } catch (error) {
+              await logger.warn("Failed to extract profile credentials", {
+                location: "BackupRestoreService.createSelectiveBackup",
+                error,
+              });
+            }
+          }
+
+          if (Object.keys(widgetsCredentials).length > 0) {
+            if (options.encryptSensitive) {
+              sensitiveData.widgetsCredentials = widgetsCredentials;
+            } else {
+              backupData.appData.widgetsCredentials = widgetsCredentials;
+            }
+
+            await logger.info("Widget credentials collected for backup", {
+              location: "BackupRestoreService.createSelectiveBackup",
+              credentialCount: Object.keys(widgetsCredentials).length,
+            });
+          }
+        } catch (credentialError) {
+          await logger.warn("Failed to collect widget credentials", {
+            location: "BackupRestoreService.createSelectiveBackup",
+            error:
+              credentialError instanceof Error
+                ? credentialError.message
+                : String(credentialError),
+          });
+        }
+      }
+
+      // Collect widget secure credentials if requested
+      if (options.includeWidgetSecureCredentials) {
+        try {
+          const { widgetCredentialService } = await import(
+            "@/services/widgets/WidgetCredentialService"
+          );
+
+          const widgetSecureCredentials =
+            await widgetCredentialService.getAllCredentials();
+
+          if (Object.keys(widgetSecureCredentials).length > 0) {
+            if (options.encryptSensitive) {
+              sensitiveData.widgetSecureCredentials = widgetSecureCredentials;
+            } else {
+              backupData.appData.widgetSecureCredentials =
+                widgetSecureCredentials;
+            }
+
+            await logger.info(
+              "Widget secure credentials collected for backup",
+              {
+                location: "BackupRestoreService.createSelectiveBackup",
+                credentialCount: Object.keys(widgetSecureCredentials).length,
+              },
+            );
+          }
+        } catch (secureCredentialError) {
+          await logger.warn("Failed to collect widget secure credentials", {
+            location: "BackupRestoreService.createSelectiveBackup",
+            error:
+              secureCredentialError instanceof Error
+                ? secureCredentialError.message
+                : String(secureCredentialError),
+          });
+        }
+      }
+
       // Encrypt sensitive data if needed
       if (
         options.encryptSensitive &&
         (options.includeServiceCredentials ||
           options.includeTmdbCredentials ||
-          options.includeSettings)
+          options.includeSettings ||
+          options.includeWidgetSecureCredentials)
       ) {
         if (!options.password) {
           throw new Error("Password is required for encrypted backup");
@@ -1142,16 +1285,136 @@ class BackupRestoreService {
         backupData.appData.widgetsConfig &&
         Array.isArray(backupData.appData.widgetsConfig)
       ) {
-        const widgetsStorageKey = "WidgetService:widgets";
-        await AsyncStorage.setItem(
-          widgetsStorageKey,
-          JSON.stringify(backupData.appData.widgetsConfig),
+        // Import WidgetService dynamically to avoid circular dependencies
+        const { widgetService } = await import(
+          "@/services/widgets/WidgetService"
         );
+
+        // Use restoreWidgets which clears cache and rebuilds state
+        await widgetService.restoreWidgets(backupData.appData.widgetsConfig);
 
         await logger.info("Widgets configuration restored", {
           location: "BackupRestoreService.restoreBackup",
           widgetCount: backupData.appData.widgetsConfig.length,
         });
+      }
+
+      // Restore widget profiles if available
+      if (
+        backupData.appData.widgetProfiles &&
+        Array.isArray(backupData.appData.widgetProfiles)
+      ) {
+        try {
+          await this.restoreWidgetProfiles(backupData.appData.widgetProfiles);
+
+          await logger.info("Widget profiles restored", {
+            location: "BackupRestoreService.restoreBackup",
+            profileCount: backupData.appData.widgetProfiles.length,
+          });
+        } catch (profileError) {
+          await logger.warn("Failed to restore widget profiles", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              profileError instanceof Error
+                ? profileError.message
+                : String(profileError),
+          });
+        }
+      }
+
+      // Restore widget credentials if available
+      if (
+        backupData.appData.widgetsCredentials &&
+        typeof backupData.appData.widgetsCredentials === "object"
+      ) {
+        try {
+          const widgetCredentials = backupData.appData.widgetsCredentials;
+          const widgetsStorageKey = "WidgetService:widgets";
+          const widgetsData = await AsyncStorage.getItem(widgetsStorageKey);
+
+          if (widgetsData) {
+            const widgets = JSON.parse(widgetsData) as {
+              id: string;
+              config?: Record<string, any>;
+            }[];
+
+            // Restore credentials to widgets
+            for (const widget of widgets) {
+              if (
+                widgetCredentials[widget.id] &&
+                typeof widgetCredentials[widget.id] === "object"
+              ) {
+                widget.config = {
+                  ...widget.config,
+                  ...widgetCredentials[widget.id],
+                };
+              }
+            }
+
+            // Save updated widgets back to storage
+            await AsyncStorage.setItem(
+              widgetsStorageKey,
+              JSON.stringify(widgets),
+            );
+          }
+
+          await logger.info("Widget credentials restored", {
+            location: "BackupRestoreService.restoreBackup",
+            credentialCount: Object.keys(widgetCredentials).length,
+          });
+        } catch (credentialError) {
+          await logger.warn("Failed to restore widget credentials", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              credentialError instanceof Error
+                ? credentialError.message
+                : String(credentialError),
+          });
+        }
+      }
+
+      // Restore widget secure credentials if available
+      if (
+        backupData.appData.widgetSecureCredentials &&
+        typeof backupData.appData.widgetSecureCredentials === "object"
+      ) {
+        try {
+          const { widgetCredentialService } = await import(
+            "@/services/widgets/WidgetCredentialService"
+          );
+
+          const widgetSecureCredentials =
+            backupData.appData.widgetSecureCredentials;
+
+          // Restore each set of credentials to SecureStore
+          for (const [widgetId, credentials] of Object.entries(
+            widgetSecureCredentials,
+          )) {
+            if (
+              credentials &&
+              typeof credentials === "object" &&
+              Object.keys(credentials).length > 0
+            ) {
+              await widgetCredentialService.setCredentials(
+                widgetId,
+                credentials as Record<string, string>,
+              );
+            }
+          }
+
+          await logger.info("Widget secure credentials restored", {
+            location: "BackupRestoreService.restoreBackup",
+            credentialCount: Object.keys(widgetSecureCredentials).length,
+          });
+        } catch (secureCredentialError) {
+          await logger.warn("Failed to restore widget secure credentials", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              secureCredentialError instanceof Error
+                ? secureCredentialError.message
+                : String(secureCredentialError),
+          });
+        }
       }
 
       await logger.info("Backup restore completed successfully", {
@@ -1243,6 +1506,10 @@ class BackupRestoreService {
       includeDownloadConfig: true,
       includeServicesViewState: true,
       includeWidgetsConfig: true,
+      includeWidgetConfigCredentials: true,
+      includeWidgetSecureCredentials: false,
+      includeWidgetProfiles: true,
+      includeWidgetProfileCredentials: true,
       encryptSensitive: false,
     };
   }
@@ -1283,7 +1550,13 @@ class BackupRestoreService {
       },
       widgetsConfig: {
         enabled: true,
-        sensitive: false, // Widgets configuration is not sensitive (UI layout)
+        sensitive: false,
+        includeCredentials: true,
+      },
+      widgetProfiles: {
+        enabled: true,
+        sensitive: false,
+        includeCredentials: true,
       },
     };
   }
@@ -1409,6 +1682,98 @@ class BackupRestoreService {
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
+    }
+  }
+
+  /**
+   * Export widget profiles to backup directory
+   */
+  async exportWidgetProfilesToBackup(): Promise<any[]> {
+    try {
+      const { widgetProfileService } = await import(
+        "@/services/widgets/WidgetProfileService"
+      );
+
+      const profiles = await widgetProfileService.listProfiles();
+
+      if (profiles.length === 0) {
+        await logger.debug(
+          "[BackupRestoreService] No widget profiles to export",
+        );
+        return [];
+      }
+
+      await logger.info("[BackupRestoreService] Exported widget profiles", {
+        count: profiles.length,
+      });
+
+      return profiles;
+    } catch (error) {
+      await logger.error(
+        "[BackupRestoreService] Failed to export widget profiles",
+        {
+          error,
+        },
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Restore widget profiles from backup
+   */
+  async restoreWidgetProfiles(profiles: any[]): Promise<void> {
+    try {
+      if (!Array.isArray(profiles) || profiles.length === 0) {
+        return;
+      }
+
+      const { widgetProfileService } = await import(
+        "@/services/widgets/WidgetProfileService"
+      );
+
+      for (const profile of profiles) {
+        // Validate profile structure before saving
+        const isValid = await widgetProfileService.validateProfile(profile);
+        if (!isValid) {
+          await logger.warn(
+            "[BackupRestoreService] Skipping invalid widget profile",
+            {
+              profileName: profile.name,
+            },
+          );
+          continue;
+        }
+
+        try {
+          // Save profile with same ID and metadata
+          await widgetProfileService.saveProfile(
+            profile.name,
+            profile.widgets,
+            profile.description,
+          );
+        } catch (error) {
+          await logger.warn(
+            "[BackupRestoreService] Failed to restore individual widget profile",
+            {
+              profileName: profile.name,
+              error,
+            },
+          );
+        }
+      }
+
+      await logger.info("[BackupRestoreService] Widget profiles restored", {
+        count: profiles.length,
+      });
+    } catch (error) {
+      await logger.error(
+        "[BackupRestoreService] Failed to restore widget profiles",
+        {
+          error,
+        },
+      );
+      throw error;
     }
   }
 }

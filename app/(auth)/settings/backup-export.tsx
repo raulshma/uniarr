@@ -284,7 +284,8 @@ const BackupExportScreen = () => {
   const hasSelectedSensitiveItems =
     (options.includeServiceConfigs && options.includeServiceCredentials) ||
     options.includeTmdbCredentials ||
-    options.includeSettings;
+    options.includeSettings ||
+    options.includeWidgetSecureCredentials;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -488,6 +489,64 @@ const BackupExportScreen = () => {
                 </Text>
               </View>
             </View>
+
+            {/* Widget Config Credentials */}
+            {options.includeWidgetsConfig && (
+              <View
+                style={[styles.checkboxContainer, { marginLeft: spacing.lg }]}
+              >
+                <Checkbox
+                  status={
+                    options.includeWidgetConfigCredentials
+                      ? "checked"
+                      : "unchecked"
+                  }
+                  onPress={() =>
+                    handleOptionChange(
+                      "includeWidgetConfigCredentials",
+                      !options.includeWidgetConfigCredentials,
+                    )
+                  }
+                />
+                <View style={{ flex: 1, marginLeft: spacing.md }}>
+                  <Text style={styles.checkboxLabel}>
+                    Widget Config Credentials
+                  </Text>
+                  <Text style={styles.sensitiveLabel}>
+                    Embedded widget settings
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Widget Secure Credentials */}
+            {options.includeWidgetsConfig && (
+              <View
+                style={[styles.checkboxContainer, { marginLeft: spacing.lg }]}
+              >
+                <Checkbox
+                  status={
+                    options.includeWidgetSecureCredentials
+                      ? "checked"
+                      : "unchecked"
+                  }
+                  onPress={() =>
+                    handleOptionChange(
+                      "includeWidgetSecureCredentials",
+                      !options.includeWidgetSecureCredentials,
+                    )
+                  }
+                />
+                <View style={{ flex: 1, marginLeft: spacing.md }}>
+                  <Text style={styles.checkboxLabel}>
+                    Widget Secure Credentials
+                  </Text>
+                  <Text style={styles.sensitiveLabel}>
+                    API keys and secure tokens
+                  </Text>
+                </View>
+              </View>
+            )}
           </Card>
         </View>
 
