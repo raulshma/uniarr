@@ -743,7 +743,7 @@ const SettingsScreen = () => {
           <SettingsGroup>
             <AnimatedListItem
               index={0}
-              totalItems={2}
+              totalItems={3}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -759,27 +759,38 @@ const SettingsScreen = () => {
                 }
                 left={{ iconName: "folder" }}
                 trailing={
-                  <Button
-                    mode="contained-tonal"
-                    compact
-                    onPress={handleClearImageCache}
-                    loading={isClearingImageCache}
-                    disabled={
-                      isClearingImageCache ||
-                      isFetchingCacheUsage ||
-                      imageCacheUsage.size === 0
-                    }
-                    style={{ height: 32 }}
-                  >
-                    Clear
-                  </Button>
+                  <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                    <Button
+                      mode="outlined"
+                      compact
+                      onPress={() => router.push("/(auth)/settings/cache-view")}
+                      disabled={isFetchingCacheUsage}
+                      style={{ height: 32 }}
+                    >
+                      View
+                    </Button>
+                    <Button
+                      mode="contained-tonal"
+                      compact
+                      onPress={handleClearImageCache}
+                      loading={isClearingImageCache}
+                      disabled={
+                        isClearingImageCache ||
+                        isFetchingCacheUsage ||
+                        imageCacheUsage.size === 0
+                      }
+                      style={{ height: 32 }}
+                    >
+                      Clear
+                    </Button>
+                  </View>
                 }
                 groupPosition="top"
               />
             </AnimatedListItem>
             <AnimatedListItem
               index={1}
-              totalItems={2}
+              totalItems={3}
               animated={animationsEnabled}
             >
               <SettingsListItem

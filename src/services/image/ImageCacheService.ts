@@ -15,6 +15,54 @@ export type ImageCacheUsage = {
   formattedSize: string;
 };
 
+export interface CacheFileInfo {
+  uri: string;
+  path: string;
+  size: number;
+  modifiedAt: number;
+  service?: string;
+  type: "poster" | "fanart" | "thumbnail" | "other";
+  format: string;
+  formattedSize: string;
+  age: number; // in milliseconds
+  ageFormatted: string;
+}
+
+export interface CacheAnalysis {
+  totalSize: number;
+  fileCount: number;
+  formattedSize: string;
+  byService: Record<
+    string,
+    { size: number; count: number; percentage: number }
+  >;
+  byType: Record<string, { size: number; count: number; percentage: number }>;
+  byAge: {
+    fresh: { size: number; count: number; percentage: number }; // < 1 day
+    recent: { size: number; count: number; percentage: number }; // 1-7 days
+    old: { size: number; count: number; percentage: number }; // 7-30 days
+    stale: { size: number; count: number; percentage: number }; // > 30 days
+  };
+  averageFileSize: number;
+  oldestFile: number;
+  newestFile: number;
+}
+
+export type CacheSortField =
+  | "name"
+  | "size"
+  | "date"
+  | "service"
+  | "type"
+  | "age";
+export type CacheFilterOptions = {
+  services?: string[];
+  types?: string[];
+  ageRange?: { min: number; max: number }; // in days
+  sizeRange?: { min: number; max: number }; // in bytes
+  searchTerm?: string;
+};
+
 const STORAGE_KEY = "ImageCacheService:trackedUris";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
@@ -448,6 +496,534 @@ class ImageCacheService {
     this.memoryCacheHits = 0;
     this.diskCacheHits = 0;
     this.cacheMisses = 0;
+  }
+
+  /**
+   * Get detailed cache file information for all cached files
+   */
+  async getDetailedCacheInfo(
+    filters?: CacheFilterOptions,
+    sortField: CacheSortField = "date",
+    sortOrder: "asc" | "desc" = "desc",
+  ): Promise<CacheFileInfo[]> {
+    await this.ensureInitialized();
+
+    const files: CacheFileInfo[] = [];
+    const uris = Array.from(this.trackedUris);
+    const countedPaths = new Set<string>();
+
+    // Process tracked URIs
+    await Promise.all(
+      uris.map(async (uri) => {
+        try {
+          let cachedPath = await this.getCachedPath(uri);
+          let effectiveUri = uri;
+
+          // Try connector-aware variants if not found
+          if (!cachedPath) {
+            try {
+              const connectors =
+                ConnectorManager.getInstance().getAllConnectors();
+              for (const connector of connectors) {
+                try {
+                  const base = connector.config.url.replace(/\/+$/, "");
+                  if (uri.startsWith(base) && connector.config.apiKey) {
+                    const parsed = new URL(uri);
+                    if (!parsed.searchParams.has("apikey")) {
+                      parsed.searchParams.set(
+                        "apikey",
+                        connector.config.apiKey,
+                      );
+                    }
+                    const fetchUri = parsed.toString();
+                    const altCachedPath = await this.getCachedPath(fetchUri);
+                    if (altCachedPath) {
+                      cachedPath = altCachedPath;
+                      effectiveUri = fetchUri;
+                      break;
+                    }
+                  }
+                } catch {
+                  // Ignore URL parsing / connector errors
+                }
+              }
+            } catch {
+              // Ignore failures looking up connectors
+            }
+          }
+
+          if (!cachedPath || countedPaths.has(cachedPath)) {
+            return;
+          }
+
+          const fileInfo = await FileSystem.getInfoAsync(cachedPath);
+          if (!fileInfo.exists || fileInfo.isDirectory) {
+            return;
+          }
+
+          const modifiedAt = fileInfo.modificationTime
+            ? fileInfo.modificationTime * 1000
+            : Date.now();
+          const age = Date.now() - modifiedAt;
+
+          if (age > CACHE_MAX_AGE_MS) {
+            // Skip stale files
+            return;
+          }
+
+          const cacheFileInfo = this.createCacheFileInfo(
+            effectiveUri,
+            cachedPath,
+            fileInfo.size ?? 0,
+            modifiedAt,
+            age,
+          );
+
+          if (this.matchesFilters(cacheFileInfo, filters)) {
+            files.push(cacheFileInfo);
+          }
+          countedPaths.add(cachedPath);
+        } catch (error) {
+          void logger.debug("Error processing cache file", {
+            uri,
+            error: this.stringifyError(error),
+          });
+        }
+      }),
+    );
+
+    // Also scan for untracked files
+    await this.scanUntrackedFiles(files, countedPaths, filters);
+
+    // Sort the results
+    files.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case "name":
+          comparison = a.path.localeCompare(b.path);
+          break;
+        case "size":
+          comparison = a.size - b.size;
+          break;
+        case "date":
+        case "age":
+          comparison = a.modifiedAt - b.modifiedAt;
+          break;
+        case "service":
+          comparison = (a.service || "").localeCompare(b.service || "");
+          break;
+        case "type":
+          comparison = a.type.localeCompare(b.type);
+          break;
+        default:
+          comparison = a.modifiedAt - b.modifiedAt;
+      }
+      return sortOrder === "desc" ? -comparison : comparison;
+    });
+
+    return files;
+  }
+
+  /**
+   * Get comprehensive cache analysis
+   */
+  async getCacheAnalysis(): Promise<CacheAnalysis> {
+    const files = await this.getDetailedCacheInfo();
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    const fileCount = files.length;
+
+    // Group by service
+    const byService: Record<
+      string,
+      { size: number; count: number; percentage: number }
+    > = {};
+    files.forEach((file) => {
+      const service = file.service || "Unknown";
+      if (!byService[service]) {
+        byService[service] = { size: 0, count: 0, percentage: 0 };
+      }
+      byService[service]!.size += file.size;
+      byService[service]!.count += 1;
+    });
+
+    // Calculate percentages
+    Object.values(byService).forEach((service) => {
+      service.percentage = totalSize > 0 ? (service.size / totalSize) * 100 : 0;
+    });
+
+    // Group by type
+    const byType: Record<
+      string,
+      { size: number; count: number; percentage: number }
+    > = {};
+    files.forEach((file) => {
+      if (!byType[file.type]) {
+        byType[file.type] = { size: 0, count: 0, percentage: 0 };
+      }
+      byType[file.type]!.size += file.size;
+      byType[file.type]!.count += 1;
+    });
+
+    Object.values(byType).forEach((type) => {
+      type.percentage = totalSize > 0 ? (type.size / totalSize) * 100 : 0;
+    });
+
+    // Group by age
+    const byAge = {
+      fresh: { size: 0, count: 0, percentage: 0 }, // < 1 day
+      recent: { size: 0, count: 0, percentage: 0 }, // 1-7 days
+      old: { size: 0, count: 0, percentage: 0 }, // 7-30 days
+      stale: { size: 0, count: 0, percentage: 0 }, // > 30 days
+    };
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    files.forEach((file) => {
+      const ageInDays = file.age / dayMs;
+      if (ageInDays < 1) {
+        byAge.fresh.size += file.size;
+        byAge.fresh.count += 1;
+      } else if (ageInDays < 7) {
+        byAge.recent.size += file.size;
+        byAge.recent.count += 1;
+      } else if (ageInDays < 30) {
+        byAge.old.size += file.size;
+        byAge.old.count += 1;
+      } else {
+        byAge.stale.size += file.size;
+        byAge.stale.count += 1;
+      }
+    });
+
+    Object.values(byAge).forEach((category) => {
+      category.percentage =
+        totalSize > 0 ? (category.size / totalSize) * 100 : 0;
+    });
+
+    const timestamps = files.map((f) => f.modifiedAt);
+    const oldestFile = timestamps.length > 0 ? Math.min(...timestamps) : 0;
+    const newestFile = timestamps.length > 0 ? Math.max(...timestamps) : 0;
+
+    return {
+      totalSize,
+      fileCount,
+      formattedSize: ImageCacheService.formatBytes(totalSize),
+      byService,
+      byType,
+      byAge,
+      averageFileSize: fileCount > 0 ? totalSize / fileCount : 0,
+      oldestFile,
+      newestFile,
+    };
+  }
+
+  /**
+   * Clear selected cache files
+   */
+  async clearSelectedFiles(
+    filePaths: string[],
+  ): Promise<{ success: number; failed: number }> {
+    let success = 0;
+    let failed = 0;
+
+    await Promise.allSettled(
+      filePaths.map(async (path) => {
+        try {
+          await FileSystem.deleteAsync(path, { idempotent: true });
+          success++;
+
+          // Remove from tracked URIs
+          for (const [, trackedUri] of this.trackedUris.entries()) {
+            const cachedPath = await this.getCachedPath(trackedUri);
+            if (cachedPath === path) {
+              this.trackedUris.delete(trackedUri);
+              break;
+            }
+          }
+        } catch (error) {
+          failed++;
+          void logger.warn("Failed to delete cache file", {
+            path,
+            error: this.stringifyError(error),
+          });
+        }
+      }),
+    );
+
+    // Persist changes to tracked URIs
+    if (success > 0) {
+      await this.persistTrackedUris();
+    }
+
+    return { success, failed };
+  }
+
+  /**
+   * Helper method to create CacheFileInfo objects
+   */
+  private createCacheFileInfo(
+    uri: string,
+    path: string,
+    size: number,
+    modifiedAt: number,
+    age: number,
+  ): CacheFileInfo {
+    const service = this.extractServiceFromUri(uri);
+    const type = this.extractFileTypeFromUri(uri);
+    const format = this.extractFileFormat(path);
+
+    // For expo-image, we want to keep the raw file path without file:// prefix
+    let resolvedPath = path;
+
+    // Only add file:// prefix for absolute paths that aren't in cache directory
+    if (
+      path &&
+      !path.startsWith("http") &&
+      !path.startsWith("file://") &&
+      !path.startsWith("content://")
+    ) {
+      // If it's not a cache file and starts with /, add file:// prefix
+      if (path.startsWith("/") && !path.includes("/cache/")) {
+        resolvedPath = `file://${path}`;
+      }
+      // For cache files and relative paths, keep them as-is for expo-image compatibility
+    }
+
+    return {
+      uri,
+      path: resolvedPath,
+      size,
+      modifiedAt,
+      service,
+      type,
+      format,
+      formattedSize: ImageCacheService.formatBytes(size),
+      age,
+      ageFormatted: this.formatAge(age),
+    };
+  }
+
+  /**
+   * Helper method to extract service name from URI
+   */
+  private extractServiceFromUri(uri: string): string | undefined {
+    try {
+      const connectors = ConnectorManager.getInstance().getAllConnectors();
+      for (const connector of connectors) {
+        const base = connector.config.url.replace(/\/+$/, "");
+        if (uri.startsWith(base)) {
+          return connector.config.name || "Unknown Service";
+        }
+      }
+    } catch {
+      // Ignore errors
+    }
+    return undefined;
+  }
+
+  /**
+   * Helper method to extract file type from URI
+   */
+  private extractFileTypeFromUri(
+    uri: string,
+  ): "poster" | "fanart" | "thumbnail" | "other" {
+    const lowerUri = uri.toLowerCase();
+    if (lowerUri.includes("poster")) return "poster";
+    if (lowerUri.includes("fanart") || lowerUri.includes("backdrop"))
+      return "fanart";
+    if (lowerUri.includes("thumb") || lowerUri.includes("thumbnail"))
+      return "thumbnail";
+    return "other";
+  }
+
+  /**
+   * Helper method to extract file format from path
+   */
+  private extractFileFormat(path: string): string {
+    try {
+      const match = path.match(/\.([a-z0-9]+)(?:\?|$)/i);
+      return match?.[1]?.toUpperCase() || "Unknown";
+    } catch {
+      return "Unknown";
+    }
+  }
+
+  /**
+   * Helper method to format age in human readable form
+   */
+  private formatAge(ageMs: number): string {
+    const minutes = Math.floor(ageMs / (60 * 1000));
+    const hours = Math.floor(ageMs / (60 * 60 * 1000));
+    const days = Math.floor(ageMs / (24 * 60 * 60 * 1000));
+
+    if (minutes < 60) {
+      return `${minutes}m ago`;
+    } else if (hours < 24) {
+      return `${hours}h ago`;
+    } else {
+      return `${days}d ago`;
+    }
+  }
+
+  /**
+   * Helper method to check if file matches filters
+   */
+  private matchesFilters(
+    file: CacheFileInfo,
+    filters?: CacheFilterOptions,
+  ): boolean {
+    if (!filters) return true;
+
+    // Service filter
+    if (filters.services && filters.services.length > 0) {
+      if (!file.service || !filters.services.includes(file.service)) {
+        return false;
+      }
+    }
+
+    // Type filter
+    if (filters.types && filters.types.length > 0) {
+      if (!filters.types.includes(file.type)) {
+        return false;
+      }
+    }
+
+    // Age filter
+    if (filters.ageRange) {
+      const ageInDays = file.age / (24 * 60 * 60 * 1000);
+      if (
+        ageInDays < filters.ageRange.min ||
+        ageInDays > filters.ageRange.max
+      ) {
+        return false;
+      }
+    }
+
+    // Size filter
+    if (filters.sizeRange) {
+      if (
+        file.size < filters.sizeRange.min ||
+        file.size > filters.sizeRange.max
+      ) {
+        return false;
+      }
+    }
+
+    // Search term filter
+    if (filters.searchTerm) {
+      const term = filters.searchTerm.toLowerCase();
+      if (
+        !file.path.toLowerCase().includes(term) &&
+        !file.service?.toLowerCase().includes(term) &&
+        !file.type.toLowerCase().includes(term)
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Scan for untracked files in cache directory
+   */
+  private async scanUntrackedFiles(
+    files: CacheFileInfo[],
+    countedPaths: Set<string>,
+    filters?: CacheFilterOptions,
+  ): Promise<void> {
+    try {
+      const cacheDir = FileSystem.cacheDirectory;
+      if (!cacheDir) return;
+
+      const entries = await FileSystem.readDirectoryAsync(cacheDir);
+      if (!Array.isArray(entries)) return;
+
+      const imageExtRegex = /\.(jpg|jpeg|png|webp|gif|bmp|img)$/i;
+
+      for (const name of entries) {
+        if (typeof name !== "string") continue;
+        const path = `${cacheDir}${name}`;
+
+        // Direct image files
+        if (imageExtRegex.test(name)) {
+          await this.processUntrackedFile(path, files, countedPaths, filters);
+          continue;
+        }
+
+        // Check subdirectories
+        try {
+          const info = await FileSystem.getInfoAsync(path);
+          if (info.exists && info.isDirectory) {
+            const subEntries = await FileSystem.readDirectoryAsync(path);
+            for (const subName of subEntries) {
+              if (
+                typeof subName === "string" &&
+                (imageExtRegex.test(subName) || subName.startsWith("image-"))
+              ) {
+                await this.processUntrackedFile(
+                  `${path}/${subName}`,
+                  files,
+                  countedPaths,
+                  filters,
+                );
+              }
+            }
+          }
+        } catch {
+          // Ignore directory errors
+        }
+      }
+    } catch (error) {
+      void logger.debug("Failed to scan untracked files", {
+        error: this.stringifyError(error),
+      });
+    }
+  }
+
+  /**
+   * Process a single untracked file
+   */
+  private async processUntrackedFile(
+    path: string,
+    files: CacheFileInfo[],
+    countedPaths: Set<string>,
+    filters?: CacheFilterOptions,
+  ): Promise<void> {
+    try {
+      if (countedPaths.has(path)) return;
+
+      const info = await FileSystem.getInfoAsync(path);
+      if (!info.exists || info.isDirectory) return;
+
+      const modifiedAt = info.modificationTime
+        ? info.modificationTime * 1000
+        : Date.now();
+      const age = Date.now() - modifiedAt;
+
+      if (age > CACHE_MAX_AGE_MS) {
+        // Remove stale files
+        await FileSystem.deleteAsync(path, { idempotent: true });
+        return;
+      }
+
+      const cacheFileInfo = this.createCacheFileInfo(
+        path, // Use path as URI for untracked files
+        path,
+        info.size ?? 0,
+        modifiedAt,
+        age,
+      );
+
+      if (this.matchesFilters(cacheFileInfo, filters)) {
+        files.push(cacheFileInfo);
+      }
+      countedPaths.add(path);
+    } catch (error) {
+      void logger.debug("Error processing untracked file", {
+        path,
+        error: this.stringifyError(error),
+      });
+    }
   }
 
   /**
