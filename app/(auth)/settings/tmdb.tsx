@@ -58,7 +58,6 @@ const TmdbSettingsScreen = () => {
         },
         section: {
           marginTop: spacing.md,
-          paddingHorizontal: spacing.md,
         },
         sectionTitle: {
           color: theme.colors.onBackground,
@@ -111,7 +110,6 @@ const TmdbSettingsScreen = () => {
           shadowRadius: 2,
           padding: spacing.md,
           marginTop: spacing.lg,
-          marginHorizontal: spacing.md,
         },
         tipsTitle: {
           color: theme.colors.onSurface,
@@ -411,7 +409,7 @@ const TmdbSettingsScreen = () => {
         </AnimatedSection>
 
         {/* Tips Section */}
-        <View style={styles.tipsCard}>
+        <AnimatedSection style={styles.tipsCard}>
           <Text style={styles.tipsTitle}>Tips</Text>
           <Text style={styles.tipText}>
             • TMDB accepts either a v3 API key or a v4 access token.
@@ -423,7 +421,7 @@ const TmdbSettingsScreen = () => {
           <Text style={styles.tipText}>
             • You can find your credentials under TMDB settings → API.
           </Text>
-        </View>
+        </AnimatedSection>
       </AnimatedScrollView>
     </SafeAreaView>
   );
