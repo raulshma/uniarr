@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, View } from "react-native";
 import { Button, IconButton, Text, useTheme } from "react-native-paper";
 
-import { Card } from "@/components/common/Card";
+import { Card } from "@/components/common";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
 import { getComponentElevation } from "@/constants/elevation";
@@ -15,6 +15,8 @@ import {
 } from "@/services/widgets/dataProviders";
 import { widgetCredentialService } from "@/services/widgets/WidgetCredentialService";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
+import { borderRadius } from "@/constants/sizes";
+import { spacing } from "@/theme/spacing";
 
 const LIVE_CACHE_TTL_MS = 5 * 60 * 1000;
 const OFFLINE_CACHE_TTL_MS = 20 * 60 * 1000;
@@ -32,7 +34,7 @@ interface TwitchWidgetConfig {
 
 interface TwitchCredentials {
   clientId?: string;
-  accessToken?: string;
+  clientSecret?: string;
 }
 
 interface TwitchCacheEntry {
@@ -80,14 +82,14 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const hasChannels = config.channelLogins && config.channelLogins.length > 0;
   const credentialsValid = Boolean(
-    credentials?.clientId && credentials?.accessToken,
+    credentials?.clientId && credentials?.clientSecret,
   );
 
   const loadCredentials = useCallback(async () => {
     const stored = await widgetCredentialService.getCredentials(widget.id);
     setCredentials({
       clientId: stored?.clientId,
-      accessToken: stored?.accessToken,
+      clientSecret: stored?.clientSecret,
     });
   }, [widget.id]);
 
@@ -122,7 +124,7 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
 
         const fresh = await fetchTwitchChannelStatus({
           clientId: credentials!.clientId!,
-          accessToken: credentials!.accessToken!,
+          clientSecret: credentials!.clientSecret!,
           channelLogins: config.channelLogins!,
         });
 
@@ -224,9 +226,14 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
 
   return (
     <Card
-      contentPadding="lg"
+      contentPadding="sm"
       style={StyleSheet.flatten([
         styles.card,
+        {
+          backgroundColor: theme.colors.surface,
+          borderRadius: borderRadius.xxl,
+          padding: spacing.sm,
+        },
         getComponentElevation("widget", theme),
       ])}
     >

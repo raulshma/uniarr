@@ -246,7 +246,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
 
   return (
     <Card
-      contentPadding="lg"
+      contentPadding="sm"
       style={StyleSheet.flatten([
         styles.card,
         {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View, Linking } from "react-native";
 import { IconButton, Text, useTheme } from "react-native-paper";
 import { formatDistanceToNow } from "date-fns";
+import { Image } from "expo-image";
 
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
@@ -18,6 +19,7 @@ import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
+import { Card } from "@/components/common";
 
 const CACHE_TTL_MS = 20 * 60 * 1000;
 
@@ -189,7 +191,8 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
   }
 
   return (
-    <View
+    <Card
+      contentPadding="sm"
       style={StyleSheet.flatten([
         styles.card,
         {
@@ -246,7 +249,18 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
               key={post.id}
               title={post.title}
               subtitle={`r/${post.subreddit} • u/${post.author} • ${formatDistanceToNow(new Date(post.createdUtc * 1000), { addSuffix: true })} • ${post.score} upvotes • ${post.comments} comments`}
-              left={{ iconName: "reddit" }}
+              left={
+                post.thumbnail
+                  ? {
+                      node: (
+                        <Image
+                          source={{ uri: post.thumbnail }}
+                          style={{ width: 40, height: 40, borderRadius: 20 }}
+                        />
+                      ),
+                    }
+                  : { iconName: "reddit" }
+              }
               trailing={
                 <IconButton
                   icon="chevron-right"
@@ -273,7 +287,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
           {error}
         </Text>
       )}
-    </View>
+    </Card>
   );
 };
 

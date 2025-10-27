@@ -17,7 +17,7 @@ import { widgetCredentialService } from "@/services/widgets/WidgetCredentialServ
 
 const schema = z.object({
   clientId: z.string().trim().min(1, "Client ID is required"),
-  accessToken: z.string().trim().min(1, "App access token is required"),
+  clientSecret: z.string().trim().min(1, "Client secret is required"),
   channelLogins: z
     .array(z.object({ value: z.string().trim().optional() }))
     .min(1, "Add at least one channel"),
@@ -46,7 +46,7 @@ const TwitchWidgetConfigForm: React.FC<TwitchWidgetConfigFormProps> = ({
 
     return {
       clientId: "",
-      accessToken: "",
+      clientSecret: "",
       channelLogins:
         logins.length > 0
           ? logins.map((value: string) => ({ value }))
@@ -82,8 +82,8 @@ const TwitchWidgetConfigForm: React.FC<TwitchWidgetConfigFormProps> = ({
       if (credentials?.clientId) {
         setValue("clientId", credentials.clientId, { shouldDirty: false });
       }
-      if (credentials?.accessToken) {
-        setValue("accessToken", credentials.accessToken, {
+      if (credentials?.clientSecret) {
+        setValue("clientSecret", credentials.clientSecret, {
           shouldDirty: false,
         });
       }
@@ -108,7 +108,7 @@ const TwitchWidgetConfigForm: React.FC<TwitchWidgetConfigFormProps> = ({
       setSaving(true);
       await widgetCredentialService.setCredentials(widget.id, {
         clientId: values.clientId.trim(),
-        accessToken: values.accessToken.trim(),
+        clientSecret: values.clientSecret.trim(),
       });
 
       await widgetService.updateWidget(widget.id, {
@@ -154,11 +154,11 @@ const TwitchWidgetConfigForm: React.FC<TwitchWidgetConfigFormProps> = ({
 
       <Controller
         control={control}
-        name="accessToken"
+        name="clientSecret"
         render={({ field: { value, onChange, onBlur } }) => (
           <TextInput
             mode="outlined"
-            label="App Access Token"
+            label="Client Secret"
             value={value}
             onChangeText={onChange}
             onBlur={onBlur}
@@ -168,8 +168,8 @@ const TwitchWidgetConfigForm: React.FC<TwitchWidgetConfigFormProps> = ({
           />
         )}
       />
-      {errors.accessToken && (
-        <HelperText type="error">{errors.accessToken.message}</HelperText>
+      {errors.clientSecret && (
+        <HelperText type="error">{errors.clientSecret.message}</HelperText>
       )}
 
       <Text variant="titleMedium" style={styles.sectionTitle}>

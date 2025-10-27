@@ -17,6 +17,7 @@ import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
+import { Card } from "@/components/common";
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -224,7 +225,8 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
   }
 
   return (
-    <View
+    <Card
+      contentPadding="sm"
       style={StyleSheet.flatten([
         styles.card,
         {
@@ -308,7 +310,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           {error}
         </Text>
       )}
-    </View>
+    </Card>
   );
 };
 

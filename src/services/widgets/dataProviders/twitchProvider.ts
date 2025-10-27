@@ -17,17 +17,24 @@ export interface TwitchChannelStatus {
 
 export interface FetchTwitchOptions {
   clientId: string;
-  accessToken: string;
+  clientSecret: string;
   channelLogins: string[];
 }
 
 const STREAMS_ENDPOINT = "https://api.twitch.tv/helix/streams";
 const USERS_ENDPOINT = "https://api.twitch.tv/helix/users";
+const OAUTH_TOKEN_ENDPOINT = "https://id.twitch.tv/oauth2/token";
 
 const buildHeaders = (clientId: string, accessToken: string) => ({
   "Client-Id": clientId,
   Authorization: `Bearer ${accessToken}`,
 });
+
+interface TwitchOAuthResponse {
+  access_token: string;
+  expires_in: number;
+  token_type: string;
+}
 
 interface TwitchStreamPayload {
   user_login: string;
@@ -44,6 +51,40 @@ interface TwitchUserPayload {
   display_name: string;
   profile_image_url?: string;
 }
+
+const getAccessToken = async (
+  clientId: string,
+  clientSecret: string,
+): Promise<string | null> => {
+  try {
+    const response = await axios.post(
+      OAUTH_TOKEN_ENDPOINT,
+      {
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: "client_credentials",
+      },
+      {
+        timeout: 6000,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      },
+    );
+
+    const data = response.data as TwitchOAuthResponse;
+    return data.access_token;
+  } catch (error) {
+    const apiError = handleApiError(error, {
+      operation: "getTwitchAccessToken",
+      endpoint: OAUTH_TOKEN_ENDPOINT,
+    });
+    void logger.warn("twitchProvider: failed to get access token", {
+      message: apiError.message,
+    });
+    return null;
+  }
+};
 
 const fetchStreams = async (
   clientId: string,
@@ -129,10 +170,15 @@ const fetchUsers = async (
 
 export const fetchTwitchChannelStatus = async ({
   clientId,
-  accessToken,
+  clientSecret,
   channelLogins,
 }: FetchTwitchOptions): Promise<TwitchChannelStatus[]> => {
-  if (!clientId || !accessToken || channelLogins.length === 0) {
+  if (!clientId || !clientSecret || channelLogins.length === 0) {
+    return [];
+  }
+
+  const accessToken = await getAccessToken(clientId, clientSecret);
+  if (!accessToken) {
     return [];
   }
 
