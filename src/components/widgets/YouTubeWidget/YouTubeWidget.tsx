@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, View } from "react-native";
-import { Button, IconButton, Text, useTheme } from "react-native-paper";
+import { IconButton, Text, useTheme } from "react-native-paper";
 import { formatDistanceToNow } from "date-fns";
 
-import { Card } from "@/components/common/Card";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
-import { getComponentElevation } from "@/constants/elevation";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { logger } from "@/services/logger/LoggerService";
@@ -16,6 +14,9 @@ import {
 } from "@/services/widgets/dataProviders";
 import { widgetCredentialService } from "@/services/widgets/WidgetCredentialService";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
+import SettingsListItem from "@/components/common/SettingsListItem";
+import { borderRadius } from "@/constants/sizes";
+import { spacing } from "@/theme/spacing";
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -180,11 +181,14 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
 
   if (!apiKey) {
     return (
-      <Card
-        contentPadding="lg"
+      <View
         style={StyleSheet.flatten([
           styles.card,
-          getComponentElevation("widget", theme),
+          {
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
         ])}
       >
         <WidgetConfigPlaceholder
@@ -193,17 +197,20 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           actionLabel="Add API key"
           onAction={onEdit}
         />
-      </Card>
+      </View>
     );
   }
 
   if (!hasChannels) {
     return (
-      <Card
-        contentPadding="lg"
+      <View
         style={StyleSheet.flatten([
           styles.card,
-          getComponentElevation("widget", theme),
+          {
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
         ])}
       >
         <WidgetConfigPlaceholder
@@ -212,16 +219,19 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           actionLabel="Select channels"
           onAction={onEdit}
         />
-      </Card>
+      </View>
     );
   }
 
   return (
-    <Card
-      contentPadding="lg"
+    <View
       style={StyleSheet.flatten([
         styles.card,
-        getComponentElevation("widget", theme),
+        {
+          backgroundColor: theme.colors.surface,
+          borderRadius: borderRadius.xxl,
+          padding: spacing.sm,
+        },
       ])}
     >
       <View style={styles.header}>
@@ -253,50 +263,42 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           {Array.from({ length: 3 }).map((_, index) => (
             <SkeletonPlaceholder
               key={index}
-              height={72}
+              height={64}
               borderRadius={12}
               style={{ marginBottom: index < 2 ? 12 : 0 }}
             />
           ))}
         </View>
       ) : videos.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onSurfaceVariant }}
-          >
-            No uploads yet. Try again later.
-          </Text>
-        </View>
+        <SettingsListItem
+          title="No uploads yet. Try again later."
+          groupPosition="single"
+        />
       ) : (
-        <View style={styles.list}>
-          {videos.map((video) => (
-            <View key={video.id} style={styles.listItem}>
-              <Button
-                mode="text"
-                onPress={() => openVideo(video.videoUrl)}
-                contentStyle={styles.linkContent}
-                labelStyle={{ color: theme.colors.primary }}
-              >
-                {video.title}
-              </Button>
-              <View style={styles.metaRow}>
-                <Text
-                  variant="bodySmall"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {video.channelTitle}
-                </Text>
-                <Text
-                  variant="bodySmall"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {formatDistanceToNow(new Date(video.publishedAt), {
-                    addSuffix: true,
-                  })}
-                </Text>
-              </View>
-            </View>
+        <View>
+          {videos.map((video, index) => (
+            <SettingsListItem
+              key={video.id}
+              title={video.title}
+              subtitle={`${video.channelTitle} • ${formatDistanceToNow(new Date(video.publishedAt), { addSuffix: true })}`}
+              left={{ iconName: "youtube" }}
+              trailing={
+                <IconButton
+                  icon="chevron-right"
+                  size={16}
+                  iconColor={theme.colors.outline}
+                  style={{ margin: 0 }}
+                />
+              }
+              onPress={() => openVideo(video.videoUrl)}
+              groupPosition={
+                index === 0
+                  ? "top"
+                  : index === videos.length - 1
+                    ? "bottom"
+                    : "middle"
+              }
+            />
           ))}
         </View>
       )}
@@ -306,15 +308,13 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           {error}
         </Text>
       )}
-    </Card>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 24,
     overflow: "hidden",
-    gap: 16,
   },
   header: {
     flexDirection: "row",
@@ -327,22 +327,6 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     gap: 12,
-  },
-  list: {
-    gap: 12,
-  },
-  listItem: {
-    gap: 8,
-  },
-  linkContent: {
-    paddingHorizontal: 0,
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  emptyState: {
-    alignItems: "flex-start",
   },
   error: {
     color: "#ff6b6b",

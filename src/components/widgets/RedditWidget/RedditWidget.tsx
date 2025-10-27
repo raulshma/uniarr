@@ -193,7 +193,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
       style={StyleSheet.flatten([
         styles.card,
         {
-          backgroundColor: theme.colors.elevation.level1,
+          backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.xxl,
           padding: spacing.sm,
         },
