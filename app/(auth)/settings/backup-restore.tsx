@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import {
   Text,
   useTheme,
@@ -12,16 +12,24 @@ import {
 import * as Sharing from "expo-sharing";
 
 import { TabHeader } from "@/components/common/TabHeader";
-import { Card } from "@/components/common/Card";
+import {
+  AnimatedListItem,
+  AnimatedScrollView,
+  AnimatedSection,
+  SettingsListItem,
+  SettingsGroup,
+} from "@/components/common";
 import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
 import { backupRestoreService } from "@/services/backup/BackupRestoreService";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const BackupRestoreScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const animationsEnabled = shouldAnimateLayout(false, false);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [recentBackups, setRecentBackups] = useState<
@@ -241,21 +249,26 @@ const BackupRestoreScreen = () => {
       backgroundColor: theme.colors.background,
     },
     scrollContainer: {
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.sm,
       paddingBottom: spacing.xxxxl,
     },
     section: {
-      marginTop: spacing.lg,
+      marginTop: spacing.md,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: spacing.xs,
+      marginBottom: spacing.sm,
     },
     sectionTitle: {
       color: theme.colors.onBackground,
-      fontSize: theme.custom.typography.titleLarge.fontSize,
-      fontFamily: theme.custom.typography.titleLarge.fontFamily,
-      lineHeight: theme.custom.typography.titleLarge.lineHeight,
-      letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
-      fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
-      marginBottom: spacing.md,
-      paddingHorizontal: spacing.xs,
+      fontSize: theme.custom.typography.titleMedium.fontSize,
+      fontFamily: theme.custom.typography.titleMedium.fontFamily,
+      lineHeight: theme.custom.typography.titleMedium.lineHeight,
+      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
     },
     sectionDescription: {
       color: theme.colors.onSurfaceVariant,
@@ -314,6 +327,11 @@ const BackupRestoreScreen = () => {
       alignItems: "center",
       paddingVertical: spacing.md,
     },
+    widgetActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
   });
 
   const formatDate = (timestamp: number) => {
@@ -328,74 +346,100 @@ const BackupRestoreScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <TabHeader
-          showTitle
-          title="Backup & Restore"
-          showBackButton
-          onBackPress={() => router.back()}
-        />
+      <AnimatedScrollView
+        contentContainerStyle={styles.scrollContainer}
+        animated={animationsEnabled}
+      >
+        <TabHeader title="Backup & Restore" />
 
         {/* Backup Actions Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Local Backup</Text>
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Local Backup</Text>
+          </View>
           <Text style={styles.sectionDescription}>
             Create a backup of your settings, service configurations,
             credentials, and TMDB API key. You can store it locally or share it.
           </Text>
 
-          <Card style={styles.card}>
-            <View style={styles.buttonContainer}>
-              <Button
-                mode="contained"
-                icon="backup-restore"
-                loading={isCreatingBackup}
-                disabled={isCreatingBackup || isRestoring}
-                onPress={handleCreateBackup}
-              >
-                {isCreatingBackup ? "Creating Backup..." : "Create Backup"}
-              </Button>
-              <Button
-                mode="outlined"
-                icon="upload-multiple"
-                disabled={isCreatingBackup || isRestoring}
-                onPress={handleRestoreBackup}
-              >
-                {isRestoring ? "Restoring..." : "Restore from File"}
-              </Button>
-            </View>
-          </Card>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={4}
+              animated={animationsEnabled}
+            >
+              <View style={styles.card}>
+                <View style={styles.buttonContainer}>
+                  <Button
+                    mode="contained"
+                    icon="backup-restore"
+                    loading={isCreatingBackup}
+                    disabled={isCreatingBackup || isRestoring}
+                    onPress={handleCreateBackup}
+                  >
+                    {isCreatingBackup ? "Creating Backup..." : "Create Backup"}
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    icon="upload-multiple"
+                    disabled={isCreatingBackup || isRestoring}
+                    onPress={handleRestoreBackup}
+                  >
+                    {isRestoring ? "Restoring..." : "Restore from File"}
+                  </Button>
+                </View>
+              </View>
+            </AnimatedListItem>
 
-          <Card style={styles.card}>
-            <Text style={styles.sectionDescription}>
-              Enhanced backup options with selective export and encryption:
-            </Text>
-            <View style={styles.buttonContainer}>
-              <Button
-                mode="contained-tonal"
-                icon="export"
-                disabled={isCreatingBackup || isRestoring}
-                onPress={() => router.push("/(auth)/settings/backup-export")}
-              >
-                Export Custom Backup
-              </Button>
-              <Button
-                mode="contained-tonal"
-                icon="lock-open-variant"
-                disabled={isCreatingBackup || isRestoring}
-                onPress={() =>
-                  router.push("/(auth)/settings/backup-restore-encrypted")
-                }
-              >
-                Restore Encrypted Backup
-              </Button>
-            </View>
-          </Card>
-        </View>
+            <AnimatedListItem
+              index={1}
+              totalItems={4}
+              animated={animationsEnabled}
+            >
+              <View style={styles.card}>
+                <Text style={styles.sectionDescription}>
+                  Enhanced backup options with selective export and encryption:
+                </Text>
+                <View style={styles.buttonContainer}>
+                  <Button
+                    mode="contained-tonal"
+                    icon="export"
+                    disabled={isCreatingBackup || isRestoring}
+                    onPress={() =>
+                      router.push("/(auth)/settings/backup-export")
+                    }
+                  >
+                    Export Custom Backup
+                  </Button>
+                  <Button
+                    mode="contained-tonal"
+                    icon="lock-open-variant"
+                    disabled={isCreatingBackup || isRestoring}
+                    onPress={() =>
+                      router.push("/(auth)/settings/backup-restore-encrypted")
+                    }
+                  >
+                    Restore Encrypted Backup
+                  </Button>
+                </View>
+              </View>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
 
         {/* Recent Backups Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Backups</Text>
+        <AnimatedSection
+          style={styles.section}
+          delay={100}
+          animated={animationsEnabled}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Backups</Text>
+          </View>
           <Text style={styles.sectionDescription}>
             Backups stored locally on this device. Swipe or tap to delete.
           </Text>
@@ -418,71 +462,105 @@ const BackupRestoreScreen = () => {
               <Text style={styles.emptyStateText}>No local backups yet</Text>
             </View>
           ) : (
-            <View>
-              {recentBackups.map((backup) => (
-                <View key={backup.path} style={styles.backupItem}>
-                  <View style={styles.backupInfo}>
-                    <Text style={styles.backupName}>
-                      {formatFileName(backup.name)}
-                    </Text>
-                    <Text style={styles.backupDate}>
-                      {formatDate(backup.modificationTime)}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: "row", gap: spacing.xs }}>
-                    <Button
-                      mode="contained-tonal"
-                      compact
-                      icon="upload"
-                      disabled={isCreatingBackup || isRestoring}
-                      onPress={() => {
-                        // Load and restore from local backup
-                        alert(
-                          "Restore Feature",
-                          "Use 'Restore from File' button to restore this backup.",
-                        );
-                      }}
-                    >
-                      Use
-                    </Button>
-                    <Button
-                      mode="contained-tonal"
-                      compact
-                      icon="delete"
-                      disabled={isCreatingBackup || isRestoring}
-                      onPress={() =>
-                        handleDeleteBackup(backup.path, backup.name)
+            <SettingsGroup>
+              {recentBackups.map((backup, index) => {
+                const isFirst = index === 0;
+                const isLast = index === recentBackups.length - 1;
+                let groupPosition: "top" | "middle" | "bottom" | "single";
+                if (recentBackups.length === 1) {
+                  groupPosition = "single";
+                } else if (isFirst) {
+                  groupPosition = "top";
+                } else if (isLast) {
+                  groupPosition = "bottom";
+                } else {
+                  groupPosition = "middle";
+                }
+
+                return (
+                  <AnimatedListItem
+                    key={backup.path}
+                    index={index}
+                    totalItems={recentBackups.length}
+                    animated={animationsEnabled}
+                  >
+                    <SettingsListItem
+                      title={formatFileName(backup.name)}
+                      subtitle={formatDate(backup.modificationTime)}
+                      left={{ iconName: "backup-restore" }}
+                      trailing={
+                        <View style={styles.widgetActions}>
+                          <Button
+                            mode="contained-tonal"
+                            compact
+                            icon="upload"
+                            disabled={isCreatingBackup || isRestoring}
+                            onPress={() => {
+                              // Load and restore from local backup
+                              alert(
+                                "Restore Feature",
+                                "Use 'Restore from File' button to restore this backup.",
+                              );
+                            }}
+                          >
+                            Use
+                          </Button>
+                          <Button
+                            mode="contained-tonal"
+                            compact
+                            icon="delete"
+                            disabled={isCreatingBackup || isRestoring}
+                            onPress={() =>
+                              handleDeleteBackup(backup.path, backup.name)
+                            }
+                          >
+                            Delete
+                          </Button>
+                        </View>
                       }
-                    >
-                      Delete
-                    </Button>
-                  </View>
-                </View>
-              ))}
-            </View>
+                      groupPosition={groupPosition}
+                    />
+                  </AnimatedListItem>
+                );
+              })}
+            </SettingsGroup>
           )}
-        </View>
+        </AnimatedSection>
 
         {/* Info Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About Backups</Text>
-          <Card style={styles.card}>
-            <Text style={styles.sectionDescription}>
-              • Standard backups include your app settings, service
-              configurations with credentials, TMDB API key, network scan
-              history, download configuration, view preferences, and dashboard
-              widget configurations{"\n"}• Custom backups allow you to select
-              exactly what to export{"\n"}• Encrypted backups protect sensitive
-              data with password encryption (XOR-PBKDF2){"\n"}• Backups are
-              stored in JSON format for compatibility{"\n"}• You can share
-              backups via email, cloud storage, or other apps{"\n"}• Restoring a
-              backup will replace your current settings, services, TMDB
-              configuration, download settings, view preferences, and widget
-              configurations
-            </Text>
-          </Card>
-        </View>
-      </ScrollView>
+        <AnimatedSection
+          style={styles.section}
+          delay={150}
+          animated={animationsEnabled}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>About Backups</Text>
+          </View>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <View style={styles.card}>
+                <Text style={styles.sectionDescription}>
+                  • Standard backups include your app settings, service
+                  configurations with credentials, TMDB API key, network scan
+                  history, download configuration, view preferences, and
+                  dashboard widget configurations{"\n"}• Custom backups allow
+                  you to select exactly what to export{"\n"}• Encrypted backups
+                  protect sensitive data with password encryption (XOR-PBKDF2)
+                  {"\n"}• Backups are stored in JSON format for compatibility
+                  {"\n"}• You can share backups via email, cloud storage, or
+                  other apps{"\n"}• Restoring a backup will replace your current
+                  settings, services, TMDB configuration, download settings,
+                  view preferences, and widget configurations
+                </Text>
+              </View>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+      </AnimatedScrollView>
     </SafeAreaView>
   );
 };
