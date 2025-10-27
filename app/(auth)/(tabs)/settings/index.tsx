@@ -14,7 +14,7 @@ import {
   Portal,
   Dialog,
 } from "react-native-paper";
-import { Card } from "@/components/common/Card";
+// Card removed for notifications group — using SettingsGroup instead
 import {
   CustomConfirm,
   AnimatedListItem,
@@ -133,35 +133,7 @@ const SettingsScreen = () => {
     [notificationsEnabled],
   );
 
-  const settingsSummary = useMemo(
-    () => [
-      {
-        label: "Theme",
-        value:
-          themePreference === "system"
-            ? `System (${colorScheme ?? "auto"})`
-            : themePreference.charAt(0).toUpperCase() +
-              themePreference.slice(1),
-      },
-      {
-        label: "Notifications",
-        value: notificationsEnabled ? "Enabled" : "Disabled",
-      },
-      {
-        label: "Cache usage",
-        value: isFetchingCacheUsage
-          ? "Calculating…"
-          : imageCacheUsage.formattedSize,
-      },
-    ],
-    [
-      themePreference,
-      colorScheme,
-      notificationsEnabled,
-      isFetchingCacheUsage,
-      imageCacheUsage.formattedSize,
-    ],
-  );
+  // Overview removed — metrics moved or omitted
 
   const styles = StyleSheet.create({
     container: {
@@ -172,40 +144,7 @@ const SettingsScreen = () => {
       paddingHorizontal: spacing.sm,
       paddingBottom: spacing.xxxxl,
     },
-    summarySection: {
-      marginTop: spacing.sm,
-      paddingHorizontal: spacing.xs,
-      gap: spacing.sm,
-    },
-    summaryTitle: {
-      color: theme.colors.onBackground,
-      fontSize: theme.custom.typography.titleMedium.fontSize,
-      fontFamily: theme.custom.typography.titleMedium.fontFamily,
-      letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-      fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
-    },
-    summaryGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.sm,
-    },
-    summaryCard: {
-      flexBasis: "48%",
-      backgroundColor: theme.colors.elevation.level1,
-      borderRadius: borderRadius.lg,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-    },
-    summaryLabel: {
-      color: theme.colors.onSurfaceVariant,
-      fontSize: theme.custom.typography.bodySmall.fontSize,
-      marginBottom: spacing.xxs,
-    },
-    summaryValue: {
-      color: theme.colors.onSurface,
-      fontSize: theme.custom.typography.titleSmall.fontSize,
-      fontWeight: "600",
-    },
+    // Overview styles removed
     listSpacer: {
       height: spacing.xs,
     },
@@ -447,27 +386,7 @@ const SettingsScreen = () => {
           }}
         />
 
-        <AnimatedSection
-          style={styles.summarySection}
-          delay={25}
-          animated={animationsEnabled}
-        >
-          <Text style={styles.summaryTitle}>Overview</Text>
-          <View style={styles.summaryGrid}>
-            {settingsSummary.map((metric, index) => (
-              <AnimatedListItem
-                key={metric.label}
-                index={index}
-                totalItems={settingsSummary.length}
-                style={styles.summaryCard}
-                animated={animationsEnabled}
-              >
-                <Text style={styles.summaryLabel}>{metric.label}</Text>
-                <Text style={styles.summaryValue}>{metric.value}</Text>
-              </AnimatedListItem>
-            ))}
-          </View>
-        </AnimatedSection>
+        {/* Overview removed */}
 
         {/* Appearance Section */}
         <AnimatedSection
@@ -596,155 +515,171 @@ const SettingsScreen = () => {
           animated={animationsEnabled}
         >
           <Text style={styles.sectionTitle}>Notifications</Text>
-          <AnimatedListItem
-            index={0}
-            totalItems={notificationItemsCount}
-            animated={animationsEnabled}
-          >
-            <Card variant="custom" style={styles.notificationGroup}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="bell"
-                    size={20}
-                    iconColor={theme.colors.primary}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={notificationItemsCount}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Enable Notifications"
+                left={{ iconName: "bell" }}
+                trailing={
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={setNotificationsEnabled}
+                    color={theme.colors.primary}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Enable Notifications</Text>
-                </View>
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  color={theme.colors.primary}
-                />
-              </View>
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
 
-              {notificationsEnabled && (
-                <>
-                  <AnimatedListItem
-                    style={styles.notificationItem}
-                    index={1}
-                    totalItems={notificationItemsCount}
-                    animated={animationsEnabled}
-                  >
-                    <View style={styles.notificationIcon}>
-                      <IconButton
-                        icon="check-circle"
-                        size={16}
-                        iconColor={theme.colors.primary}
+            {notificationsEnabled && (
+              <>
+                <AnimatedListItem
+                  index={1}
+                  totalItems={notificationItemsCount}
+                  animated={animationsEnabled}
+                >
+                  <SettingsListItem
+                    title="Completed Downloads"
+                    left={{
+                      node: (
+                        <IconButton
+                          icon="check-circle"
+                          size={16}
+                          iconColor={theme.colors.primary}
+                          style={{ margin: 0, width: 24, height: 24 }}
+                        />
+                      ),
+                    }}
+                    trailing={
+                      <Switch
+                        value={downloadNotificationsEnabled}
+                        onValueChange={setDownloadNotificationsEnabled}
+                        color={theme.colors.primary}
                       />
-                    </View>
-                    <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>
-                        Completed Downloads
-                      </Text>
-                    </View>
-                    <Switch
-                      value={downloadNotificationsEnabled}
-                      onValueChange={setDownloadNotificationsEnabled}
-                      color={theme.colors.primary}
-                    />
-                  </AnimatedListItem>
+                    }
+                    groupPosition="middle"
+                  />
+                </AnimatedListItem>
 
-                  <AnimatedListItem
-                    style={styles.notificationItem}
-                    index={2}
-                    totalItems={notificationItemsCount}
-                    animated={animationsEnabled}
-                  >
-                    <View style={styles.notificationIcon}>
-                      <IconButton
-                        icon="alert-circle"
-                        size={16}
-                        iconColor={theme.colors.primary}
+                <AnimatedListItem
+                  index={2}
+                  totalItems={notificationItemsCount}
+                  animated={animationsEnabled}
+                >
+                  <SettingsListItem
+                    title="Failed Downloads"
+                    left={{
+                      node: (
+                        <IconButton
+                          icon="alert-circle"
+                          size={16}
+                          iconColor={theme.colors.primary}
+                          style={{ margin: 0, width: 24, height: 24 }}
+                        />
+                      ),
+                    }}
+                    trailing={
+                      <Switch
+                        value={failedDownloadNotificationsEnabled}
+                        onValueChange={setFailedDownloadNotificationsEnabled}
+                        color={theme.colors.primary}
                       />
-                    </View>
-                    <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>Failed Downloads</Text>
-                    </View>
-                    <Switch
-                      value={failedDownloadNotificationsEnabled}
-                      onValueChange={setFailedDownloadNotificationsEnabled}
-                      color={theme.colors.primary}
-                    />
-                  </AnimatedListItem>
+                    }
+                    groupPosition="middle"
+                  />
+                </AnimatedListItem>
 
-                  <AnimatedListItem
-                    style={styles.notificationItem}
-                    index={3}
-                    totalItems={notificationItemsCount}
-                    animated={animationsEnabled}
-                  >
-                    <View style={styles.notificationIcon}>
-                      <IconButton
-                        icon="account-plus"
-                        size={16}
-                        iconColor={theme.colors.primary}
+                <AnimatedListItem
+                  index={3}
+                  totalItems={notificationItemsCount}
+                  animated={animationsEnabled}
+                >
+                  <SettingsListItem
+                    title="New Requests"
+                    left={{
+                      node: (
+                        <IconButton
+                          icon="account-plus"
+                          size={16}
+                          iconColor={theme.colors.primary}
+                          style={{ margin: 0, width: 24, height: 24 }}
+                        />
+                      ),
+                    }}
+                    trailing={
+                      <Switch
+                        value={requestNotificationsEnabled}
+                        onValueChange={setRequestNotificationsEnabled}
+                        color={theme.colors.primary}
                       />
-                    </View>
-                    <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>New Requests</Text>
-                    </View>
-                    <Switch
-                      value={requestNotificationsEnabled}
-                      onValueChange={setRequestNotificationsEnabled}
-                      color={theme.colors.primary}
-                    />
-                  </AnimatedListItem>
+                    }
+                    groupPosition="middle"
+                  />
+                </AnimatedListItem>
 
-                  <AnimatedListItem
-                    style={styles.notificationItem}
-                    index={4}
-                    totalItems={notificationItemsCount}
-                    animated={animationsEnabled}
-                  >
-                    <View style={styles.notificationIcon}>
-                      <IconButton
-                        icon="server-network"
-                        size={16}
-                        iconColor={theme.colors.primary}
+                <AnimatedListItem
+                  index={4}
+                  totalItems={notificationItemsCount}
+                  animated={animationsEnabled}
+                >
+                  <SettingsListItem
+                    title="Service Health"
+                    left={{
+                      node: (
+                        <IconButton
+                          icon="server-network"
+                          size={16}
+                          iconColor={theme.colors.primary}
+                          style={{ margin: 0, width: 24, height: 24 }}
+                        />
+                      ),
+                    }}
+                    trailing={
+                      <Switch
+                        value={serviceHealthNotificationsEnabled}
+                        onValueChange={setServiceHealthNotificationsEnabled}
+                        color={theme.colors.primary}
                       />
-                    </View>
-                    <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>Service Health</Text>
-                    </View>
-                    <Switch
-                      value={serviceHealthNotificationsEnabled}
-                      onValueChange={setServiceHealthNotificationsEnabled}
-                      color={theme.colors.primary}
-                    />
-                  </AnimatedListItem>
-                </>
-              )}
+                    }
+                    groupPosition="middle"
+                  />
+                </AnimatedListItem>
+              </>
+            )}
 
-              <AnimatedListItem
-                style={[styles.notificationItem, { marginTop: spacing.xs }]}
-                index={notificationsEnabled ? 5 : 1}
-                totalItems={notificationItemsCount}
-                animated={animationsEnabled}
-              >
-                <View style={styles.notificationIcon}>
+            <AnimatedListItem
+              index={notificationsEnabled ? 5 : 1}
+              totalItems={notificationItemsCount}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title={`Quiet Hours: ${quietHoursValue}`}
+                left={{
+                  node: (
+                    <IconButton
+                      icon="moon-waning-crescent"
+                      size={16}
+                      iconColor={theme.colors.primary}
+                      style={{ margin: 0, width: 24, height: 24 }}
+                    />
+                  ),
+                }}
+                trailing={
                   <IconButton
-                    icon="moon-waning-crescent"
+                    icon="chevron-right"
                     size={16}
-                    iconColor={theme.colors.primary}
+                    iconColor={theme.colors.outline}
+                    onPress={() => router.push("/(auth)/settings/quiet-hours")}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingValue}>
-                    Quiet Hours: {quietHoursValue}
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                  onPress={() => router.push("/(auth)/settings/quiet-hours")}
-                />
-              </AnimatedListItem>
-            </Card>
-          </AnimatedListItem>
+                }
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Quick Actions Section */}

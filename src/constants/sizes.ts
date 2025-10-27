@@ -92,13 +92,13 @@ export const buttonSizes = {
 // Border radius scale for consistent corner treatment
 export const borderRadius = {
   none: 0,
-  xs: 2, // Subtle rounding
-  sm: 4, // Small elements
-  md: 8, // Cards, buttons (current common value)
-  lg: 12, // Large cards
-  xl: 16, // Extra large cards
-  xxl: 20, // Hero elements
-  xxxl: 24, // Special elements
+  xs: 4, // Subtle rounding
+  sm: 8, // Small elements
+  md: 16, // Cards, buttons (current common value)
+  lg: 24, // Large cards
+  xl: 36, // Extra large cards
+  xxl: 40, // Hero elements
+  xxxl: 46, // Special elements
   round: 9999, // Fully circular
 } as const;
 

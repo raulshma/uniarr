@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import {
-  IconButton,
   Text,
   useTheme,
   Portal,
@@ -17,18 +16,17 @@ import { FlashList } from "@shopify/flash-list";
 
 import { TabHeader } from "@/components/common/TabHeader";
 
-// Button removed: unused in this file (kept minimal surface area)
-import { Card } from "@/components/common/Card";
+// Card is not needed here because we use the shared ServiceCard component
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import {
   AnimatedListItem,
   AnimatedSection,
 } from "@/components/common/AnimatedComponents";
-import { ServiceStatus } from "@/components/service/ServiceStatus";
 import type { ServiceStatusState } from "@/components/service/ServiceStatus";
 import { ServiceCardSkeleton } from "@/components/service/ServiceCard";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import ServiceCard from "@/components/service/ServiceCard/ServiceCard";
 import type { ConnectionResult } from "@/connectors/base/IConnector";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { queryKeys } from "@/hooks/queryKeys";
@@ -49,22 +47,7 @@ type ServiceOverviewItem = {
   version?: string;
 };
 
-const serviceTypeLabels: Record<ServiceType, string> = {
-  sonarr: "Sonarr",
-  radarr: "Radarr",
-  lidarr: "Lidarr",
-  jellyseerr: "Jellyseerr",
-  jellyfin: "Jellyfin",
-  qbittorrent: "qBittorrent",
-  transmission: "Transmission",
-  deluge: "Deluge",
-  sabnzbd: "SABnzbd",
-  nzbget: "NZBGet",
-  rtorrent: "rTorrent",
-  prowlarr: "Prowlarr",
-  bazarr: "Bazarr",
-  adguard: "AdGuard Home",
-};
+// serviceTypeLabels intentionally omitted here — defined where needed (add-service/edit-service)
 
 const serviceDisplayNames: Record<ServiceType, string> = {
   sonarr: "TV Shows",
@@ -81,6 +64,23 @@ const serviceDisplayNames: Record<ServiceType, string> = {
   prowlarr: "Indexer",
   bazarr: "Subtitle Manager",
   adguard: "DNS Protection",
+};
+
+const serviceTypeLabels: Record<ServiceType, string> = {
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+  lidarr: "Lidarr",
+  jellyseerr: "Jellyseerr",
+  jellyfin: "Jellyfin",
+  qbittorrent: "qBittorrent",
+  transmission: "Transmission",
+  deluge: "Deluge",
+  sabnzbd: "SABnzbd",
+  nzbget: "NZBGet",
+  rtorrent: "rTorrent",
+  prowlarr: "Prowlarr",
+  bazarr: "Bazarr",
+  adguard: "AdGuard Home",
 };
 
 const serviceIcons: Record<ServiceType, string> = {
@@ -472,10 +472,7 @@ const ServicesScreen = () => {
     [router],
   );
 
-  const handleServiceMenuPress = useCallback((service: ServiceOverviewItem) => {
-    setSelectedService(service);
-    setServiceMenuVisible(true);
-  }, []);
+  // service menu is opened via card edit/delete callbacks; keep modal below for confirmation
 
   const handleEditService = useCallback(() => {
     if (!selectedService) return;
@@ -538,12 +535,13 @@ const ServicesScreen = () => {
 
   // Header is rendered outside the scrollable area so it does not scroll with content.
 
-  const ServiceCard = React.memo(
+  const ServiceRow = React.memo(
     ({ item, index }: { item: ServiceOverviewItem; index: number }) => {
       const displayName =
         serviceDisplayNames[item.config.type] || item.config.name;
-      const serviceType = serviceTypeLabels[item.config.type];
       const iconName = serviceIcons[item.config.type];
+
+      const serviceTypeLabel = serviceTypeLabels[item.config.type];
 
       return (
         <AnimatedListItem
@@ -551,56 +549,29 @@ const ServicesScreen = () => {
           index={index}
           totalItems={services.length}
         >
-          <Card
-            variant="custom"
-            style={styles.serviceCard}
+          <ServiceCard
+            key={item.config.id}
+            id={item.config.id}
+            name={displayName}
+            url={item.config.url}
+            description={serviceTypeLabel}
+            status={item.status}
+            statusDescription={item.statusDescription}
+            latency={item.latency}
+            version={item.version}
+            lastCheckedAt={item.lastCheckedAt}
+            icon={iconName}
             onPress={() => handleServicePress(item)}
-          >
-            <View style={styles.serviceContent}>
-              <View style={styles.serviceIcon}>
-                <IconButton
-                  icon={iconName}
-                  size={24}
-                  iconColor={theme.colors.primary}
-                />
-              </View>
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceName}>{displayName}</Text>
-                <Text style={styles.serviceType}>{serviceType}</Text>
-                <View style={styles.serviceStatus}>
-                  <ServiceStatus
-                    status={item.status}
-                    showLabel={false}
-                    size="sm"
-                  />
-                  <Text
-                    style={{
-                      color:
-                        item.status === "online"
-                          ? theme.colors.primary
-                          : item.status === "offline"
-                            ? theme.colors.error
-                            : theme.colors.tertiary,
-                      fontSize: 14,
-                      marginLeft: 4,
-                    }}
-                  >
-                    {item.status === "online"
-                      ? "Connected"
-                      : item.status === "offline"
-                        ? "Offline"
-                        : "Degraded"}
-                  </Text>
-                </View>
-              </View>
-              <IconButton
-                icon="dots-vertical"
-                size={20}
-                iconColor={theme.colors.outline}
-                onPress={() => handleServiceMenuPress(item)}
-              />
-            </View>
-          </Card>
+            onEditPress={() => {
+              setSelectedService(item);
+              handleEditService();
+            }}
+            onDeletePress={() => {
+              setSelectedService(item);
+              handleDeleteService();
+            }}
+            style={styles.serviceCard}
+          />
         </AnimatedListItem>
       );
     },
@@ -608,9 +579,9 @@ const ServicesScreen = () => {
 
   const renderItem = useCallback(
     ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
-      <ServiceCard item={item} index={index} />
+      <ServiceRow item={item} index={index} />
     ),
-    [ServiceCard],
+    [ServiceRow],
   );
 
   const keyExtractor = useCallback(

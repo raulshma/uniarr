@@ -202,6 +202,7 @@ export class AdGuardHomeConnector extends BaseConnector {
       dnsQueries: stats.num_dns_queries ?? 0,
       adsBlocked: stats.num_blocked_filtering ?? 0,
       trackersBlocked: stats.num_replaced_safebrowsing ?? 0,
+      avgProcessingTimeSeconds: stats.avg_processing_time ?? undefined,
       blockedPercentage: this.calculateBlockedPercentage(
         stats.num_blocked_filtering,
         stats.num_dns_queries,

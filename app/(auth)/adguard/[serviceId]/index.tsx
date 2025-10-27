@@ -25,6 +25,21 @@ const numberFormatter = new Intl.NumberFormat();
 
 const formatPercentage = (value: number): string => `${value.toFixed(1)}%`;
 
+const formatResponseTime = (seconds?: number): string => {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) {
+    return "---";
+  }
+
+  const ms = seconds * 1000;
+  if (ms < 1000) {
+    const roundedMs = Math.round(ms);
+    return `${numberFormatter.format(roundedMs)} ms`;
+  }
+
+  const secsFixed = Number(seconds.toFixed(2));
+  return `${numberFormatter.format(secsFixed)} s`;
+};
+
 const AdGuardHomeDashboardScreen = () => {
   const { serviceId: rawServiceId } = useLocalSearchParams<{
     serviceId?: string;
@@ -299,8 +314,8 @@ const AdGuardHomeDashboardScreen = () => {
           value: numberFormatter.format(stats.adsBlocked),
         },
         {
-          label: "Trackers Blocked",
-          value: numberFormatter.format(stats.trackersBlocked),
+          label: "Avg Response Time",
+          value: formatResponseTime(stats.avgProcessingTimeSeconds),
         },
         {
           label: "Blocked Percentage",
