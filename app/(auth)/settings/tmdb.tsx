@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ScrollView, View, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -7,13 +7,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ActivityIndicator,
   Button,
-  Card,
   HelperText,
   Switch,
   Text,
   TextInput,
   useTheme,
 } from "react-native-paper";
+import { useRouter } from "expo-router";
 
 import { alert } from "@/services/dialogService";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
@@ -21,6 +21,14 @@ import { TmdbConnector } from "@/connectors/implementations/TmdbConnector";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
+import { TabHeader } from "@/components/common/TabHeader";
+import {
+  AnimatedScrollView,
+  AnimatedSection,
+  SettingsGroup,
+  SettingsListItem,
+} from "@/components/common";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const tmdbCredentialSchema = z.object({
   apiKey: z
@@ -34,6 +42,9 @@ type FormValues = z.infer<typeof tmdbCredentialSchema>;
 
 const TmdbSettingsScreen = () => {
   const theme = useTheme<AppTheme>();
+  const router = useRouter();
+  const animationsEnabled = shouldAnimateLayout(false, false);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -41,19 +52,32 @@ const TmdbSettingsScreen = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
-        content: {
-          paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.xxl,
-          gap: spacing.lg,
+        scrollContainer: {
+          paddingHorizontal: spacing.sm,
+          paddingBottom: spacing.xxxxl,
         },
-        sectionHeader: {
-          gap: spacing.xs,
+        section: {
+          marginTop: spacing.md,
+          paddingHorizontal: spacing.md,
         },
-        switchRow: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingVertical: spacing.sm,
+        sectionTitle: {
+          color: theme.colors.onBackground,
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontFamily: theme.custom.typography.titleMedium.fontFamily,
+          lineHeight: theme.custom.typography.titleMedium.lineHeight,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+          marginBottom: spacing.sm,
+          paddingHorizontal: spacing.xs,
+        },
+        subtitle: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
+          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
+          lineHeight: theme.custom.typography.bodyMedium.lineHeight,
+          letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
+          marginBottom: spacing.sm,
+          paddingHorizontal: spacing.xs,
         },
         formActions: {
           flexDirection: "row",
@@ -63,6 +87,48 @@ const TmdbSettingsScreen = () => {
         inlineActions: {
           flexDirection: "row",
           gap: spacing.sm,
+        },
+        inputCard: {
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.custom.spacing.xxl,
+          overflow: "hidden" as const,
+          elevation: 1,
+          shadowColor: theme.colors.shadow || "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: 2,
+          padding: spacing.md,
+          marginTop: spacing.md,
+        },
+        tipsCard: {
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.custom.spacing.xxl,
+          overflow: "hidden" as const,
+          elevation: 1,
+          shadowColor: theme.colors.shadow || "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: 2,
+          padding: spacing.md,
+          marginTop: spacing.lg,
+          marginHorizontal: spacing.md,
+        },
+        tipsTitle: {
+          color: theme.colors.onSurface,
+          fontSize: theme.custom.typography.titleSmall.fontSize,
+          fontFamily: theme.custom.typography.titleSmall.fontFamily,
+          fontWeight: theme.custom.typography.titleSmall.fontWeight as any,
+          letterSpacing: theme.custom.typography.titleSmall.letterSpacing,
+          lineHeight: theme.custom.typography.titleSmall.lineHeight,
+          marginBottom: spacing.sm,
+        },
+        tipText: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
+          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
+          lineHeight: theme.custom.typography.bodyMedium.lineHeight,
+          letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
+          marginBottom: spacing.xs,
         },
       }),
     [theme],
@@ -204,133 +270,161 @@ const TmdbSettingsScreen = () => {
     !isTesting &&
     !isRemoving;
 
-  return (
-    <SafeAreaView style={styles.container}>
-      {showLoader ? (
+  if (showLoader) {
+    return (
+      <SafeAreaView style={styles.container}>
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
           <ActivityIndicator animating size="large" />
         </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.sectionHeader}>
-            <Text variant="headlineMedium">TMDB Integration</Text>
-            <Text
-              variant="bodyMedium"
-              style={{ color: theme.colors.onSurfaceVariant }}
-            >
-              Store your TMDB credentials securely to unlock discover and search
-              features powered by TMDB.
-            </Text>
-          </View>
+      </SafeAreaView>
+    );
+  }
 
-          <Card mode="elevated">
-            <Card.Content>
-              <View style={styles.switchRow}>
-                <View style={{ flex: 1 }}>
-                  <Text variant="titleMedium">Enable TMDB Discover</Text>
-                  <Text
-                    variant="bodyMedium"
-                    style={{ color: theme.colors.onSurfaceVariant }}
-                  >
-                    When enabled, TMDB recommendations appear in Discover.
-                  </Text>
-                </View>
+  return (
+    <SafeAreaView style={styles.container}>
+      <AnimatedScrollView
+        contentContainerStyle={styles.scrollContainer}
+        animated={animationsEnabled}
+      >
+        <TabHeader
+          title="TMDB Integration"
+          showBackButton
+          onBackPress={() => router.back()}
+        />
+
+        <View style={styles.section}>
+          <Text style={styles.subtitle}>
+            Store your TMDB credentials securely to unlock discover and search
+            features powered by TMDB.
+          </Text>
+        </View>
+
+        {/* Enable TMDB Discover Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Integration Settings</Text>
+          <SettingsGroup>
+            <SettingsListItem
+              title="Enable TMDB Discover"
+              subtitle="When enabled, TMDB recommendations appear in Discover"
+              left={{ iconName: "movie-open-play" }}
+              trailing={
                 <Switch
                   value={tmdbEnabled}
                   onValueChange={handleToggleEnabled}
                   disabled={isSaving || isRemoving}
+                  color={theme.colors.primary}
                 />
-              </View>
-            </Card.Content>
-          </Card>
-
-          <Card mode="elevated">
-            <Card.Title
-              title="TMDB API Key or V4 Token"
-              subtitle="Keys are stored in encrypted secure storage."
+              }
+              groupPosition="single"
             />
-            <Card.Content>
-              <Controller
-                control={control}
-                name="apiKey"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <TextInput
-                    label="API Key"
-                    value={value}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    secureTextEntry
-                    right={<TextInput.Icon icon="key-variant" />}
-                  />
-                )}
-              />
-              <HelperText type="error" visible={Boolean(errors.apiKey)}>
-                {errors.apiKey?.message}
-              </HelperText>
+          </SettingsGroup>
+        </AnimatedSection>
 
-              <View style={styles.formActions}>
-                <Button
-                  mode="contained"
-                  onPress={handleSubmit(onSubmit)}
-                  loading={isSaving}
-                  disabled={isSaving}
-                >
-                  Save
-                </Button>
-                <Button
-                  mode="outlined"
-                  onPress={handleTest}
-                  loading={isTesting}
-                  disabled={isTesting}
-                >
-                  Test API Key
-                </Button>
-              </View>
+        {/* TMDB API Key Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={100}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>API Credentials</Text>
+          <SettingsGroup>
+            <SettingsListItem
+              title="TMDB API Key or V4 Token"
+              subtitle="Keys are stored in encrypted secure storage"
+              left={{ iconName: "key-variant" }}
+              groupPosition="single"
+            />
+          </SettingsGroup>
 
-              <View style={[styles.inlineActions, { marginTop: spacing.md }]}>
-                <Button
-                  mode="text"
-                  onPress={handleRemoveKey}
-                  disabled={isRemoving || (!apiKey && !watch("apiKey"))}
-                  textColor={theme.colors.error}
-                >
-                  Remove Key
-                </Button>
-                {isRemoving ? <ActivityIndicator animating /> : null}
-              </View>
-            </Card.Content>
-          </Card>
+          {/* API Key Input Card */}
+          <View style={styles.inputCard}>
+            <Controller
+              control={control}
+              name="apiKey"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  label="API Key"
+                  value={value}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry
+                  right={<TextInput.Icon icon="key-variant" />}
+                />
+              )}
+            />
+            <HelperText type="error" visible={Boolean(errors.apiKey)}>
+              {errors.apiKey?.message}
+            </HelperText>
 
-          <Card mode="outlined">
-            <Card.Title title="Tips" />
-            <Card.Content>
-              <Text
-                variant="bodyMedium"
-                style={{ color: theme.colors.onSurfaceVariant }}
+            <View style={styles.formActions}>
+              <Button
+                mode="contained"
+                onPress={handleSubmit(onSubmit)}
+                loading={isSaving}
+                disabled={isSaving}
               >
-                • TMDB accepts either a v3 API key or a v4 access token.
-              </Text>
-              <Text
-                variant="bodyMedium"
-                style={{ color: theme.colors.onSurfaceVariant }}
+                Save
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={handleTest}
+                loading={isTesting}
+                disabled={isTesting}
               >
-                • Keys never leave your device and are stored with
-                expo-secure-store.
-              </Text>
-              <Text
-                variant="bodyMedium"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                • You can find your credentials under TMDB settings → API.
-              </Text>
-            </Card.Content>
-          </Card>
-        </ScrollView>
-      )}
+                Test API Key
+              </Button>
+            </View>
+          </View>
+
+          {/* Remove Key Section */}
+          <SettingsGroup style={{ marginTop: spacing.md }}>
+            <SettingsListItem
+              title="Remove Credentials"
+              subtitle="Delete stored TMDB credentials"
+              left={{ iconName: "delete-outline" }}
+              onPress={handleRemoveKey}
+              trailing={
+                isRemoving ? (
+                  <ActivityIndicator animating />
+                ) : (
+                  <Button
+                    mode="text"
+                    disabled={isRemoving || (!apiKey && !watch("apiKey"))}
+                    textColor={theme.colors.error}
+                    compact
+                  >
+                    Remove
+                  </Button>
+                )
+              }
+              groupPosition="single"
+            />
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* Tips Section */}
+        <View style={styles.tipsCard}>
+          <Text style={styles.tipsTitle}>Tips</Text>
+          <Text style={styles.tipText}>
+            • TMDB accepts either a v3 API key or a v4 access token.
+          </Text>
+          <Text style={styles.tipText}>
+            • Keys never leave your device and are stored with
+            expo-secure-store.
+          </Text>
+          <Text style={styles.tipText}>
+            • You can find your credentials under TMDB settings → API.
+          </Text>
+        </View>
+      </AnimatedScrollView>
     </SafeAreaView>
   );
 };
