@@ -5,6 +5,15 @@ import { handleApiError } from "@/utils/error.utils";
 
 const API_BASE = "https://hacker-news.firebaseio.com/v0";
 
+const getFaviconUrl = (url: string): string | undefined => {
+  try {
+    const parsed = new URL(url);
+    return `https://www.google.com/s2/favicons?domain=${parsed.hostname}&sz=32`;
+  } catch {
+    return undefined;
+  }
+};
+
 export type HackerNewsFeedType = "topstories" | "beststories" | "newstories";
 
 export interface HackerNewsItem {
@@ -15,6 +24,7 @@ export interface HackerNewsItem {
   by: string;
   time: number;
   descendants?: number;
+  image?: string;
 }
 
 const fetchStoryIds = async (
@@ -72,6 +82,10 @@ const fetchStoryDetails = async (
       descendants:
         typeof payload.descendants === "number"
           ? payload.descendants
+          : undefined,
+      image:
+        typeof payload.url === "string"
+          ? getFaviconUrl(payload.url)
           : undefined,
     } satisfies HackerNewsItem;
   } catch (error) {

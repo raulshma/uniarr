@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, View } from "react-native";
 import { IconButton, Text, useTheme } from "react-native-paper";
 import { formatDistanceToNow } from "date-fns";
+import { Image } from "expo-image";
 
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
@@ -190,16 +191,27 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
               key={story.id}
               title={story.title}
               subtitle={`${story.score ?? 0} points by ${story.by} • ${formatDistanceToNow(new Date(story.time * 1000), { addSuffix: true })}`}
-              left={{
-                node: (
-                  <Text
-                    variant="titleMedium"
-                    style={{ color: theme.colors.primary }}
-                  >
-                    {index + 1}
-                  </Text>
-                ),
-              }}
+              left={
+                story.image
+                  ? {
+                      node: (
+                        <Image
+                          source={{ uri: story.image }}
+                          style={{ width: 40, height: 40, borderRadius: 20 }}
+                        />
+                      ),
+                    }
+                  : {
+                      node: (
+                        <Text
+                          variant="titleMedium"
+                          style={{ color: theme.colors.primary }}
+                        >
+                          {index + 1}
+                        </Text>
+                      ),
+                    }
+              }
               trailing={
                 <IconButton
                   icon="chevron-right"
