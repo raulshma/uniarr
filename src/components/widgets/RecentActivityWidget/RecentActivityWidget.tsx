@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { StyleSheet, View, TouchableOpacity, FlatList } from "react-native";
 import { Text, IconButton, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
@@ -18,16 +19,11 @@ import { spacing } from "@/theme/spacing";
 import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { secureStorage } from "@/services/storage/SecureStorage";
-
-type RecentActivityItem = {
-  id: string;
-  title: string;
-  episode: string;
-  show: string;
-  date: string;
-  timestamp?: number;
-  image?: string;
-};
+import { createCrossServiceKey } from "@/utils/dedupe.utils";
+import { createServiceNavigation } from "@/utils/navigation.utils";
+import { alert } from "@/services/dialogService";
+import { useSettingsStore } from "@/store/settingsStore";
+import type { RecentActivityItem } from "@/models/recentActivity.types";
 
 interface RecentActivityWidgetProps {
   widget: Widget;
@@ -40,7 +36,12 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   onRefresh,
   onEdit,
 }) => {
+  const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const recentActivitySourceIds = useSettingsStore(
+    (s) => s.recentActivitySourceServiceIds,
+  );
+
   const { onPress } = useHaptics();
   const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>(
     [],
@@ -80,10 +81,22 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       const configs = await secureStorage.getServiceConfigs();
       const enabledConfigs = configs.filter((config) => config.enabled);
 
-      const recentActivityMap = new Map<string, RecentActivityItem>();
+      // Filter by recent activity sources if set
+      let sourceConfigs = enabledConfigs;
+      if (
+        recentActivitySourceIds !== undefined &&
+        recentActivitySourceIds.length > 0
+      ) {
+        sourceConfigs = enabledConfigs.filter((c) =>
+          recentActivitySourceIds.includes(c.id),
+        );
+      }
+
+      // Map to aggregate items by cross-service key
+      const dedupeMap = new Map<string, RecentActivityItem>();
 
       // Fetch from Sonarr
-      const sonarrConfigs = enabledConfigs.filter(
+      const sonarrConfigs = sourceConfigs.filter(
         (config) => config.type === "sonarr",
       );
       for (const config of sonarrConfigs) {
@@ -99,6 +112,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
               for (const record of history.records.slice(0, 5)) {
                 if ((record as any).series) {
                   const series = (record as any).series;
+                  const episode = (record as any).episode;
                   let imageUrl: string | undefined;
 
                   if (series.images && series.images.length > 0) {
@@ -110,19 +124,75 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
                     }
                   }
 
-                  const itemKey = `sonarr-${series.id}-${(record as any).episode?.episodeNumber}`;
-                  if (!recentActivityMap.has(itemKey)) {
-                    const dateObj = new Date((record as any).date);
-                    recentActivityMap.set(itemKey, {
-                      id: itemKey,
+                  // Create cross-service key for deduplication
+                  const dedupeKey = createCrossServiceKey(
+                    {
+                      serviceId: config.id,
+                      serviceType: "sonarr",
+                      serviceName: config.name,
+                      nativeId: series.id,
+                      seriesId: series.id,
+                      episodeNumber: episode?.episodeNumber,
+                    },
+                    true, // isEpisode
+                  );
+
+                  const dateObj = new Date((record as any).date);
+                  const episodeDisplay = episode
+                    ? `S${episode.seasonNumber?.toString().padStart(2, "0")}E${episode.episodeNumber?.toString().padStart(2, "0")}`
+                    : "";
+
+                  if (dedupeMap.has(dedupeKey)) {
+                    // Merge origins for multi-service items
+                    const existing = dedupeMap.get(dedupeKey)!;
+                    if (!existing.originServiceIds.includes(config.id)) {
+                      existing.originServiceIds.push(config.id);
+                      existing.originServices.push({
+                        serviceId: config.id,
+                        serviceType: "sonarr",
+                        serviceName: config.name,
+                      });
+                      existing.serviceTypes = Array.from(
+                        new Set([...existing.serviceTypes, "sonarr"]),
+                      );
+                      // Update timestamp to most recent
+                      if (dateObj.getTime() > (existing.timestamp ?? 0)) {
+                        existing.timestamp = dateObj.getTime();
+                        existing.date =
+                          formatRelativeTimeLocal(dateObj) || "Unknown";
+                      }
+                      // Update image if we have one
+                      if (imageUrl && !existing.image) {
+                        existing.image = imageUrl;
+                      }
+                    }
+                  } else {
+                    dedupeMap.set(dedupeKey, {
+                      id: dedupeKey,
                       title: series.title || "Unknown",
-                      episode: (record as any).episode
-                        ? `S${(record as any).episode.seasonNumber?.toString().padStart(2, "0")}E${(record as any).episode.episodeNumber?.toString().padStart(2, "0")}`
-                        : "",
+                      episode: episodeDisplay,
                       show: series.title || "",
                       date: formatRelativeTimeLocal(dateObj) || "Unknown",
                       timestamp: dateObj.getTime(),
                       image: imageUrl,
+                      contentId: series.id,
+                      serviceTypes: ["sonarr"],
+                      originServiceIds: [config.id],
+                      originServices: [
+                        {
+                          serviceId: config.id,
+                          serviceType: "sonarr",
+                          serviceName: config.name,
+                        },
+                      ],
+                      isEpisode: !!episode,
+                      episodeInfo: episode
+                        ? {
+                            seriesId: series.id,
+                            seasonNumber: episode.seasonNumber,
+                            episodeNumber: episode.episodeNumber,
+                          }
+                        : undefined,
                     });
                   }
                 }
@@ -135,7 +205,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       }
 
       // Fetch from Radarr
-      const radarrConfigs = enabledConfigs.filter(
+      const radarrConfigs = sourceConfigs.filter(
         (config) => config.type === "radarr",
       );
       for (const config of radarrConfigs) {
@@ -162,17 +232,60 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
                     }
                   }
 
-                  const itemKey = `radarr-${movie.id}`;
-                  if (!recentActivityMap.has(itemKey)) {
-                    const dateObj = new Date((record as any).date);
-                    recentActivityMap.set(itemKey, {
-                      id: itemKey,
+                  // Create cross-service key
+                  const dedupeKey = createCrossServiceKey(
+                    {
+                      serviceId: config.id,
+                      serviceType: "radarr",
+                      serviceName: config.name,
+                      nativeId: movie.id,
+                    },
+                    false,
+                  );
+
+                  const dateObj = new Date((record as any).date);
+
+                  if (dedupeMap.has(dedupeKey)) {
+                    // Merge origins
+                    const existing = dedupeMap.get(dedupeKey)!;
+                    if (!existing.originServiceIds.includes(config.id)) {
+                      existing.originServiceIds.push(config.id);
+                      existing.originServices.push({
+                        serviceId: config.id,
+                        serviceType: "radarr",
+                        serviceName: config.name,
+                      });
+                      existing.serviceTypes = Array.from(
+                        new Set([...existing.serviceTypes, "radarr"]),
+                      );
+                      if (dateObj.getTime() > (existing.timestamp ?? 0)) {
+                        existing.timestamp = dateObj.getTime();
+                        existing.date =
+                          formatRelativeTimeLocal(dateObj) || "Unknown";
+                      }
+                      if (imageUrl && !existing.image) {
+                        existing.image = imageUrl;
+                      }
+                    }
+                  } else {
+                    dedupeMap.set(dedupeKey, {
+                      id: dedupeKey,
                       title: movie.title || "Unknown",
                       episode: "Movie",
                       show: movie.title || "",
                       date: formatRelativeTimeLocal(dateObj) || "Unknown",
                       timestamp: dateObj.getTime(),
                       image: imageUrl,
+                      contentId: movie.id,
+                      serviceTypes: ["radarr"],
+                      originServiceIds: [config.id],
+                      originServices: [
+                        {
+                          serviceId: config.id,
+                          serviceType: "radarr",
+                          serviceName: config.name,
+                        },
+                      ],
                     });
                   }
                 }
@@ -185,7 +298,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       }
 
       // Convert map to array, sort by date (most recent first), and limit
-      return Array.from(recentActivityMap.values())
+      return Array.from(dedupeMap.values())
         .sort((a, b) => {
           // Sort by timestamp in descending order (most recent first)
           const timestampA = a.timestamp ?? 0;
@@ -197,7 +310,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       console.error("Failed to fetch recent activity:", error);
       return [];
     }
-  }, []);
+  }, [recentActivitySourceIds]);
 
   const loadRecentActivity = useCallback(async () => {
     try {
@@ -206,7 +319,17 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         RecentActivityItem[]
       >(widget.id);
       if (cachedData) {
-        setRecentActivity(cachedData);
+        // Filter out cached items missing required navigation fields (backward compatibility)
+        const validatedData = cachedData.filter(
+          (item) =>
+            item.contentId !== undefined &&
+            item.contentId !== null &&
+            item.serviceTypes &&
+            item.serviceTypes.length > 0 &&
+            item.originServices &&
+            item.originServices.length > 0,
+        );
+        setRecentActivity(validatedData);
         setLoading(false);
         setError(null);
         // Don't return, continue to fetch fresh data in background
@@ -237,17 +360,54 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   const handleItemPress = useCallback(
     (item: RecentActivityItem) => {
       onPress();
-      // Navigate to appropriate service based on item ID
-      if (item.id.startsWith("sonarr-")) {
-        // Navigate to Sonarr series list
-        // This would require access to router - for now, just log
-        console.log("Navigate to Sonarr series:", item.id.split("-")[1]);
-      } else if (item.id.startsWith("radarr-")) {
-        // Navigate to Radarr movies list
-        console.log("Navigate to Radarr movies:", item.id.split("-")[1]);
+
+      // Validate required navigation fields
+      if (
+        item.contentId === undefined ||
+        item.contentId === null ||
+        !item.serviceTypes ||
+        item.serviceTypes.length === 0 ||
+        !item.originServices ||
+        item.originServices.length === 0
+      ) {
+        alert(
+          "This should not happen",
+          "Missing service or content information for this item.",
+        );
+        return;
+      }
+
+      // Handle single-origin items
+      if (item.originServices.length === 1) {
+        const origin = item.originServices[0]!;
+        // For Sonarr episodes, navigate to series detail
+        const itemId =
+          item.isEpisode && item.episodeInfo?.seriesId
+            ? item.episodeInfo.seriesId
+            : item.contentId;
+
+        createServiceNavigation(origin.serviceType).navigateToDetail(
+          router,
+          origin.serviceId,
+          itemId,
+        );
+      } else {
+        // Handle multi-origin aggregated items
+        // For now, navigate to the first origin (or preferred if set)
+        const origin = item.originServices[0]!;
+        const itemId =
+          item.isEpisode && item.episodeInfo?.seriesId
+            ? item.episodeInfo.seriesId
+            : item.contentId;
+
+        createServiceNavigation(origin.serviceType).navigateToDetail(
+          router,
+          origin.serviceId,
+          itemId,
+        );
       }
     },
-    [onPress],
+    [onPress, router],
   );
 
   const handleRefresh = useCallback(() => {

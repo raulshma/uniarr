@@ -53,6 +53,10 @@ type SettingsData = {
   jellyfinPublicAddress?: string;
   // Preferred Jellyseerr service for TMDB -> Sonarr mappings
   preferredJellyseerrServiceId?: string;
+  // Service IDs to include in Recent Activity (if undefined, include all enabled services)
+  recentActivitySourceServiceIds?: string[];
+  // Preferred service to navigate to when recent activity item has multiple origins
+  preferredRecentActivityServiceId?: string;
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -86,6 +90,8 @@ interface SettingsState extends SettingsData {
   setJellyfinLocalAddress: (address: string | undefined) => void;
   setJellyfinPublicAddress: (address: string | undefined) => void;
   setPreferredJellyseerrServiceId: (serviceId: string | undefined) => void;
+  setRecentActivitySourceServiceIds: (ids: string[] | undefined) => void;
+  setPreferredRecentActivityServiceId: (serviceId: string | undefined) => void;
   // (thumbnail setters removed)
 }
 
@@ -160,6 +166,8 @@ const createDefaultSettings = (): SettingsData => ({
   jellyfinLocalAddress: undefined,
   jellyfinPublicAddress: undefined,
   preferredJellyseerrServiceId: undefined,
+  recentActivitySourceServiceIds: undefined,
+  preferredRecentActivityServiceId: undefined,
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
@@ -218,6 +226,10 @@ export const useSettingsStore = create<SettingsState>()(
         set({ jellyfinPublicAddress: address }),
       setPreferredJellyseerrServiceId: (serviceId: string | undefined) =>
         set({ preferredJellyseerrServiceId: serviceId }),
+      setRecentActivitySourceServiceIds: (ids: string[] | undefined) =>
+        set({ recentActivitySourceServiceIds: ids }),
+      setPreferredRecentActivityServiceId: (serviceId: string | undefined) =>
+        set({ preferredRecentActivityServiceId: serviceId }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -251,10 +263,13 @@ export const useSettingsStore = create<SettingsState>()(
         jellyfinLocalAddress: state.jellyfinLocalAddress,
         jellyfinPublicAddress: state.jellyfinPublicAddress,
         preferredJellyseerrServiceId: state.preferredJellyseerrServiceId,
+        recentActivitySourceServiceIds: state.recentActivitySourceServiceIds,
+        preferredRecentActivityServiceId:
+          state.preferredRecentActivityServiceId,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 9,
+      version: 10,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -394,6 +409,10 @@ export const useSettingsStore = create<SettingsState>()(
             baseDefaults.criticalHealthAlertsBypassQuietHours,
           preferredJellyseerrServiceId:
             partial.preferredJellyseerrServiceId ?? undefined,
+          recentActivitySourceServiceIds:
+            partial.recentActivitySourceServiceIds ?? undefined,
+          preferredRecentActivityServiceId:
+            partial.preferredRecentActivityServiceId ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -446,3 +465,7 @@ export const selectJellyfinPublicAddress = (state: SettingsState) =>
   state.jellyfinPublicAddress;
 export const selectPreferredJellyseerrServiceId = (state: SettingsState) =>
   state.preferredJellyseerrServiceId;
+export const selectRecentActivitySourceServiceIds = (state: SettingsState) =>
+  state.recentActivitySourceServiceIds;
+export const selectPreferredRecentActivityServiceId = (state: SettingsState) =>
+  state.preferredRecentActivityServiceId;

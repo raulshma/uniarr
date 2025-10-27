@@ -11,6 +11,7 @@ import {
 } from "react-native-paper";
 
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { TabHeader } from "@/components/common/TabHeader";
 import { Card } from "@/components/common/Card";
 import {
@@ -99,6 +100,16 @@ const WidgetSettingsScreen = () => {
     onPress();
     setSelectedWidget(widget);
     setSizeDialogVisible(true);
+  };
+
+  const router = useRouter();
+
+  const handleConfigure = async (widget: Widget) => {
+    onPress();
+    // For now we only have a settings page for recent activity widget
+    if (widget.type === "recent-activity") {
+      router.push("/(auth)/settings/recent-activity-sources");
+    }
   };
 
   const handleWidgetSizeChange = async (size: "small" | "medium" | "large") => {
@@ -400,6 +411,16 @@ const WidgetSettingsScreen = () => {
                   </View>
                   {!reorderingEnabled && (
                     <View style={styles.widgetActions}>
+                      {widget.type === "recent-activity" && (
+                        <Button
+                          mode="outlined"
+                          compact
+                          onPress={() => handleConfigure(widget)}
+                          style={{ height: 32 }}
+                        >
+                          Configure
+                        </Button>
+                      )}
                       <Button
                         mode="contained-tonal"
                         compact

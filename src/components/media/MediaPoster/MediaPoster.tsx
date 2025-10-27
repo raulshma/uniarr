@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef } from "react";
 import {
-  Pressable,
   StyleProp,
   StyleSheet,
   View,

@@ -11,21 +11,13 @@ import { useTheme } from "@/hooks/useTheme";
 import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
 import { useWidgetServiceInitialization } from "@/hooks/useWidgetServiceInitialization";
+import type { RecentActivityItem } from "@/models/recentActivity.types";
 
 type StatisticsData = {
   shows: number;
   movies: number;
   episodes: number;
   watched: number;
-};
-
-type RecentActivityItem = {
-  id: string;
-  title: string;
-  episode: string;
-  show: string;
-  date: string;
-  image?: string;
 };
 
 type TrendingTVItem = {
