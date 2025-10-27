@@ -23,7 +23,7 @@ const SettingsGroup = React.forwardRef<View, SettingsGroupProps>(
     const styles = StyleSheet.create({
       container: {
         backgroundColor: theme.colors.surface,
-        borderRadius: 32,
+        borderRadius: theme.custom.spacing.xxl,
         overflow: "hidden" as const,
         elevation: 1, // level1 equivalent
         shadowColor: theme.colors.shadow || "#000",
