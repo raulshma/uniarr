@@ -1,6 +1,6 @@
 import React from "react";
 import type { StyleProp, ViewStyle } from "react-native";
-import { View, ScrollView, Pressable } from "react-native";
+import { View, ScrollView, Pressable, StyleSheet } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -13,6 +13,31 @@ import {
   PERFORMANCE_OPTIMIZATIONS,
   COMPONENT_ANIMATIONS,
 } from "@/utils/animations.utils";
+
+/**
+ * Detects if a style object or StyleProp contains an opacity value (static or via useAnimatedStyle).
+ * Used to determine when to auto-wrap with a layout-safe pattern.
+ * @param style - The style to check
+ * @returns true if opacity is likely present in the style
+ */
+function isStyleOpaque(style: StyleProp<ViewStyle>): boolean {
+  if (!style) return false;
+
+  // Handle array of styles (common in React Native)
+  if (Array.isArray(style)) {
+    return style.some((s) => isStyleOpaque(s as StyleProp<ViewStyle>));
+  }
+
+  // Handle style object
+  if (typeof style === "object") {
+    const flatStyle = StyleSheet.flatten(style as any);
+    if (flatStyle && typeof flatStyle === "object" && "opacity" in flatStyle) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 interface AnimatedViewProps {
   children: React.ReactNode;
@@ -34,6 +59,26 @@ export const AnimatedView: React.FC<AnimatedViewProps> = ({
   const enteringAnimation = animated ? entering : undefined;
   const exitingAnimation = animated ? exiting : undefined;
   const layoutAnimation = animated ? layout : undefined;
+
+  // Detect if style contains opacity (static or animated)
+  const hasOpacity = isStyleOpaque(style);
+
+  // If layout animation is present and style has opacity, use safe wrapper pattern.
+  // Outer view gets layout; inner view gets opacity style.
+  // This prevents Reanimated from warning about opacity being overwritten by layout.
+  if (layoutAnimation && hasOpacity) {
+    return (
+      <Animated.View layout={layoutAnimation} {...PERFORMANCE_OPTIMIZATIONS}>
+        <Animated.View
+          style={style}
+          entering={enteringAnimation}
+          exiting={exitingAnimation}
+        >
+          {children}
+        </Animated.View>
+      </Animated.View>
+    );
+  }
 
   // If both layout and entering/exiting animations are present, use wrapper pattern
   // to prevent layout animation from overwriting opacity properties
@@ -260,7 +305,17 @@ export const AnimatedProgress: React.FC<AnimatedProgressProps> = ({
 }) => {
   const layoutAnimation = animated ? LinearTransition.springify() : undefined;
 
-  // Note: This component only uses layout animations, so no conflict with opacity
+  // Detect if style contains opacity; if so, use safe wrapper pattern
+  const hasOpacity = isStyleOpaque(style);
+
+  if (layoutAnimation && hasOpacity) {
+    return (
+      <Animated.View layout={layoutAnimation} {...PERFORMANCE_OPTIMIZATIONS}>
+        <Animated.View style={style}>{children}</Animated.View>
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View
       style={style}

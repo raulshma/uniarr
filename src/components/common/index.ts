@@ -29,6 +29,13 @@ export { SkeletonPlaceholder, ListRowSkeleton } from "./Skeleton";
 
 export { TabHeader } from "./TabHeader";
 
+export { default as SettingsListItem } from "./SettingsListItem";
+export type { SettingsListItemProps, GroupPosition } from "./SettingsListItem";
+export { getGroupPositions } from "./SettingsListItem";
+
+export { default as SettingsGroup } from "./SettingsGroup";
+export type { SettingsGroupProps } from "./SettingsGroup";
+
 // Animated Components
 export {
   AnimatedView,

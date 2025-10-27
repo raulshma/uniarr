@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { Text, List, Button, useTheme } from "react-native-paper";
+import { Text, Button, useTheme } from "react-native-paper";
 import {
   useConnectorsStore,
   selectGetConnectorsByType,
@@ -10,6 +10,11 @@ import {
   selectPreferredJellyseerrServiceId,
 } from "@/store/settingsStore";
 import type { ServiceType } from "@/models/service.types";
+import {
+  SettingsListItem,
+  SettingsGroup,
+  getGroupPositions,
+} from "@/components/common";
 
 export default function JellyseerrSelectionScreen() {
   const router = useRouter();
@@ -21,6 +26,7 @@ export default function JellyseerrSelectionScreen() {
   );
 
   const jellyseerrConnectors = getConnectorsByType("jellyseerr" as ServiceType);
+  const groupPositions = getGroupPositions(jellyseerrConnectors.length);
 
   const handleSelectService = (serviceId: string) => {
     useSettingsStore.getState().setPreferredJellyseerrServiceId(serviceId);
@@ -53,37 +59,37 @@ export default function JellyseerrSelectionScreen() {
             </Text>
           </View>
         ) : (
-          <View style={styles.listContainer}>
-            {jellyseerrConnectors.map((connector) => {
+          <SettingsGroup>
+            {jellyseerrConnectors.map((connector, index) => {
               const isSelected = connector.config.id === preferredServiceId;
               return (
-                <List.Item
+                <SettingsListItem
                   key={connector.config.id}
                   title={connector.config.id}
-                  description={`URL: ${connector.config.url || "N/A"}`}
+                  subtitle={`URL: ${connector.config.url || "N/A"}`}
+                  left={{ iconName: "server-network" }}
+                  trailing={
+                    isSelected ? (
+                      <View style={styles.selectedBadge}>
+                        <Text
+                          style={{
+                            color: theme.colors.primary,
+                            fontWeight: "600",
+                            fontSize: 12,
+                          }}
+                        >
+                          ✓
+                        </Text>
+                      </View>
+                    ) : undefined
+                  }
+                  selected={isSelected}
                   onPress={() => handleSelectService(connector.config.id)}
-                  right={() => (
-                    <Text
-                      variant="labelMedium"
-                      style={{
-                        color: isSelected
-                          ? theme.colors.primary
-                          : theme.colors.outline,
-                      }}
-                    >
-                      {isSelected ? "✓ Selected" : ""}
-                    </Text>
-                  )}
-                  style={[
-                    styles.listItem,
-                    isSelected && {
-                      backgroundColor: theme.colors.primaryContainer,
-                    },
-                  ]}
+                  groupPosition={groupPositions[index]}
                 />
               );
             })}
-          </View>
+          </SettingsGroup>
         )}
 
         {preferredServiceId && (
@@ -124,13 +130,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 20,
   },
-  listContainer: {
-    gap: 8,
-  },
-  listItem: {
-    marginBottom: 4,
-    borderRadius: 8,
-  },
   emptyStateContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -146,5 +145,12 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginTop: 16,
+  },
+  selectedBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

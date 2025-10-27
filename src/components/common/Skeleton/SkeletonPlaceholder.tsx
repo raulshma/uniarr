@@ -60,35 +60,39 @@ const SkeletonPlaceholder: React.FC<SkeletonPlaceholderProps> = ({
     );
   }, [animated, animationDuration, opacityAnim]);
 
-  // Animated style for pulse
+  // Animated style for pulse (opacity only on inner view)
   const animatedStyle = useAnimatedStyle(() => {
     return {
       opacity: animated ? opacityAnim.value : 1,
-      backgroundColor: baseColor,
     };
-  }, [opacityAnim, baseColor, animated]);
+  }, [opacityAnim, animated]);
+
+  const backgroundStyle = useMemo(
+    () => ({ backgroundColor: baseColor }),
+    [baseColor],
+  );
 
   const dimensionStyle = useMemo(
     () => ({ width, height, borderRadius }),
     [borderRadius, height, width],
   );
 
-  const ContainerComponent = animated ? Animated.View : View;
-  const animationProps = animated ? { entering: FadeIn.duration(200) } : {};
-
+  // Safe wrapper: outer view has dimensions/background, inner view has opacity animation
+  // This prevents layout animations (if parent applies them) from conflicting with opacity
   return (
-    <ContainerComponent
+    <View
       pointerEvents="none"
-      style={[
-        styles.base,
-        dimensionStyle,
-        animated ? animatedStyle : { backgroundColor: baseColor },
-        style,
-      ]}
+      style={[styles.base, dimensionStyle, backgroundStyle, style]}
       accessibilityRole="progressbar"
       testID={testID}
-      {...animationProps}
-    />
+    >
+      {animated ? (
+        <Animated.View
+          style={[animatedStyle, styles.fill]}
+          entering={FadeIn.duration(200)}
+        />
+      ) : null}
+    </View>
   );
 };
 
@@ -97,5 +101,8 @@ export default SkeletonPlaceholder;
 const styles = StyleSheet.create({
   base: {
     backgroundColor: "#ccc",
+  },
+  fill: {
+    ...StyleSheet.absoluteFillObject,
   },
 });

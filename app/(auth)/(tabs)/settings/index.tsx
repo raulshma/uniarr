@@ -14,13 +14,15 @@ import {
   Portal,
   Dialog,
 } from "react-native-paper";
-import { CustomConfirm } from "@/components/common";
 import { Card } from "@/components/common/Card";
 import {
+  CustomConfirm,
   AnimatedListItem,
   AnimatedScrollView,
   AnimatedSection,
-} from "@/components/common/AnimatedComponents";
+  SettingsListItem,
+  SettingsGroup,
+} from "@/components/common";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TabHeader } from "@/components/common/TabHeader";
@@ -474,22 +476,17 @@ const SettingsScreen = () => {
           animated={animationsEnabled}
         >
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <AnimatedListItem
-            index={0}
-            totalItems={appearanceItemsCount}
-            animated={animationsEnabled}
-          >
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="palette"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Theme</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={appearanceItemsCount}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Theme"
+                subtitle="Choose your preferred theme"
+                left={{ iconName: "palette" }}
+                trailing={
                   <View style={styles.themeOptions}>
                     <Chip
                       mode={themePreference === "light" ? "flat" : "outlined"}
@@ -543,71 +540,53 @@ const SettingsScreen = () => {
                       System
                     </Chip>
                   </View>
-                </View>
-              </View>
-            </Card>
-          </AnimatedListItem>
-          {/* OLED Mode Toggle - Only show when dark theme is active */}
-          {isCurrentThemeDark && (
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            {/* OLED Mode Toggle - Only show when dark theme is active */}
+            {isCurrentThemeDark && (
+              <AnimatedListItem
+                index={1}
+                totalItems={appearanceItemsCount}
+                animated={animationsEnabled}
+              >
+                <SettingsListItem
+                  title="OLED Mode"
+                  subtitle="Pure black for OLED displays"
+                  left={{ iconName: "monitor-star" }}
+                  trailing={
+                    <Switch
+                      value={oledEnabled}
+                      onValueChange={setOledEnabled}
+                      color={theme.colors.primary}
+                    />
+                  }
+                  groupPosition="middle"
+                />
+              </AnimatedListItem>
+            )}
             <AnimatedListItem
-              index={1}
+              index={isCurrentThemeDark ? 2 : 1}
               totalItems={appearanceItemsCount}
               animated={animationsEnabled}
             >
-              <Card variant="custom" style={styles.settingCard}>
-                <View style={styles.settingContent}>
-                  <View style={styles.settingIcon}>
-                    <IconButton
-                      icon="monitor-star"
-                      size={20}
-                      iconColor={theme.colors.primary}
-                    />
-                  </View>
-                  <View style={styles.settingInfo}>
-                    <Text style={styles.settingTitle}>OLED Mode</Text>
-                    <Text style={styles.settingValue}>
-                      Pure black for OLED displays
-                    </Text>
-                  </View>
-                  <Switch
-                    value={oledEnabled}
-                    onValueChange={setOledEnabled}
-                    color={theme.colors.primary}
-                  />
-                </View>
-              </Card>
-            </AnimatedListItem>
-          )}
-          <AnimatedListItem
-            index={isCurrentThemeDark ? 2 : 1}
-            totalItems={appearanceItemsCount}
-            animated={animationsEnabled}
-          >
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/theme-editor")}
-            >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Customize Theme"
+                subtitle="Colors, fonts & more"
+                left={{ iconName: "palette-swatch" }}
+                trailing={
                   <IconButton
-                    icon="palette-swatch"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={18}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Customize Theme</Text>
-                  <Text style={styles.settingValue}>Colors, fonts & more</Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={18}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={() => router.push("/(auth)/settings/theme-editor")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Notifications Section */}
@@ -775,70 +754,48 @@ const SettingsScreen = () => {
           animated={animationsEnabled}
         >
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <AnimatedListItem
-            index={0}
-            totalItems={2}
-            animated={animationsEnabled}
-          >
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={handleRefreshIntervalPress}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Refresh Interval"
+                subtitle={`${refreshIntervalMinutes} minutes`}
+                left={{ iconName: "refresh" }}
+                trailing={
                   <IconButton
-                    icon="refresh"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Refresh Interval</Text>
-                  <Text style={styles.settingValue}>
-                    {refreshIntervalMinutes} minutes
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem
-            index={1}
-            totalItems={2}
-            animated={animationsEnabled}
-          >
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/voice-assistant")}
+                }
+                onPress={handleRefreshIntervalPress}
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Voice Assistant"
+                subtitle="Siri & Google Assistant"
+                left={{ iconName: "microphone" }}
+                trailing={
                   <IconButton
-                    icon="microphone"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Voice Assistant</Text>
-                  <Text style={styles.settingValue}>
-                    Siri & Google Assistant
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={() => router.push("/(auth)/settings/voice-assistant")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Storage Section */}
@@ -848,81 +805,64 @@ const SettingsScreen = () => {
           animated={animationsEnabled}
         >
           <Text style={styles.sectionTitle}>Storage</Text>
-          <AnimatedListItem
-            index={0}
-            totalItems={2}
-            animated={animationsEnabled}
-          >
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="folder"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Image Cache</Text>
-                  <Text style={styles.settingValue}>
-                    {isFetchingCacheUsage
-                      ? "Calculating…"
-                      : `${imageCacheUsage.formattedSize}${
-                          imageCacheUsage.fileCount
-                            ? ` • ${imageCacheUsage.fileCount} files`
-                            : ""
-                        }`}
-                  </Text>
-                </View>
-                <Button
-                  mode="contained-tonal"
-                  compact
-                  onPress={handleClearImageCache}
-                  loading={isClearingImageCache}
-                  disabled={
-                    isClearingImageCache ||
-                    isFetchingCacheUsage ||
-                    imageCacheUsage.size === 0
-                  }
-                  style={{ height: 32 }}
-                >
-                  Clear
-                </Button>
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem
-            index={1}
-            totalItems={2}
-            animated={animationsEnabled}
-          >
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={handleCacheLimitPress}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Image Cache"
+                subtitle={
+                  isFetchingCacheUsage
+                    ? "Calculating…"
+                    : `${imageCacheUsage.formattedSize}${
+                        imageCacheUsage.fileCount
+                          ? ` • ${imageCacheUsage.fileCount} files`
+                          : ""
+                      }`
+                }
+                left={{ iconName: "folder" }}
+                trailing={
+                  <Button
+                    mode="contained-tonal"
+                    compact
+                    onPress={handleClearImageCache}
+                    loading={isClearingImageCache}
+                    disabled={
+                      isClearingImageCache ||
+                      isFetchingCacheUsage ||
+                      imageCacheUsage.size === 0
+                    }
+                    style={{ height: 32 }}
+                  >
+                    Clear
+                  </Button>
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Cache Limit"
+                subtitle={formatBytes(maxImageCacheSize)}
+                left={{ iconName: "database-cog" }}
+                trailing={
                   <IconButton
-                    icon="database-cog"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Cache Limit</Text>
-                  <Text style={styles.settingValue}>
-                    {formatBytes(maxImageCacheSize)}
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={handleCacheLimitPress}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Services Section */}
@@ -932,134 +872,92 @@ const SettingsScreen = () => {
           animated={animationsEnabled}
         >
           <Text style={styles.sectionTitle}>Services</Text>
-          <AnimatedListItem
-            index={0}
-            totalItems={4}
-            animated={animationsEnabled}
-          >
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/(tabs)/services")}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={4}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Manage Services"
+                subtitle="Configure connected services"
+                left={{ iconName: "server" }}
+                trailing={
                   <IconButton
-                    icon="server"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Manage Services</Text>
-                  <Text style={styles.settingValue}>
-                    Configure connected services
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem
-            index={1}
-            totalItems={4}
-            animated={animationsEnabled}
-          >
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/tmdb")}
+                }
+                onPress={() => router.push("/(auth)/(tabs)/services")}
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={4}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="TMDB Integration"
+                subtitle={tmdbEnabled ? "Enabled" : "Disabled"}
+                left={{ iconName: "movie-open" }}
+                trailing={
                   <IconButton
-                    icon="movie-open"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>TMDB Integration</Text>
-                  <Text style={styles.settingValue}>
-                    {tmdbEnabled ? "Enabled" : "Disabled"}
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem
-            index={2}
-            totalItems={4}
-            animated={animationsEnabled}
-          >
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/widgets")}
+                }
+                onPress={() => router.push("/(auth)/settings/tmdb")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={4}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Widget Settings"
+                subtitle="Configure dashboard widgets"
+                left={{ iconName: "widgets" }}
+                trailing={
                   <IconButton
-                    icon="widgets"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Widget Settings</Text>
-                  <Text style={styles.settingValue}>
-                    Configure dashboard widgets
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem
-            index={3}
-            totalItems={4}
-            animated={animationsEnabled}
-          >
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="repeat-variant"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Jellyseerr Retries</Text>
-                  <Text style={styles.settingValue}>
-                    {jellyseerrRetryAttempts}{" "}
-                    {jellyseerrRetryAttempts !== 1 ? "retries" : "retry"}
-                  </Text>
-                </View>
-                <Button
-                  mode="contained-tonal"
-                  compact
-                  onPress={() => setJellyseerrRetriesVisible(true)}
-                  style={{ height: 32 }}
-                >
-                  Set
-                </Button>
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={() => router.push("/(auth)/settings/widgets")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={3}
+              totalItems={4}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Jellyseerr Retries"
+                subtitle={`${jellyseerrRetryAttempts} ${
+                  jellyseerrRetryAttempts !== 1 ? "retries" : "retry"
+                }`}
+                left={{ iconName: "repeat-variant" }}
+                trailing={
+                  <Button
+                    mode="contained-tonal"
+                    compact
+                    onPress={() => setJellyseerrRetriesVisible(true)}
+                    style={{ height: 32 }}
+                  >
+                    Set
+                  </Button>
+                }
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* System Section */}
@@ -1069,88 +967,62 @@ const SettingsScreen = () => {
           animated={animationsEnabled}
         >
           <Text style={styles.sectionTitle}>System</Text>
-          <AnimatedListItem
-            index={0}
-            totalItems={3}
-            animated={animationsEnabled}
-          >
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/backup-restore")}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={3}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Backup & Restore"
+                subtitle="Export, import & cloud backups"
+                left={{ iconName: "backup-restore" }}
+                trailing={
                   <IconButton
-                    icon="backup-restore"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Backup & Restore</Text>
-                  <Text style={styles.settingValue}>
-                    Export, import & cloud backups
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem
-            index={1}
-            totalItems={3}
-            animated={animationsEnabled}
-          >
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="information"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>App Version</Text>
-                  <Text style={styles.settingValue}>{appVersionString}</Text>
-                </View>
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem
-            index={2}
-            totalItems={3}
-            animated={animationsEnabled}
-          >
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="console"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Log Level</Text>
-                  <Text style={styles.settingValue}>{logLevel}</Text>
-                </View>
-                <Button
-                  mode="contained-tonal"
-                  compact
-                  onPress={() => setLogLevelVisible(true)}
-                  style={{ height: 32 }}
-                >
-                  Set
-                </Button>
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={() => router.push("/(auth)/settings/backup-restore")}
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="App Version"
+                subtitle={appVersionString}
+                left={{ iconName: "information" }}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Log Level"
+                subtitle={logLevel}
+                left={{ iconName: "console" }}
+                trailing={
+                  <Button
+                    mode="contained-tonal"
+                    compact
+                    onPress={() => setLogLevelVisible(true)}
+                    style={{ height: 32 }}
+                  >
+                    Set
+                  </Button>
+                }
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Thumbnail concurrency dialog removed */}
@@ -1163,38 +1035,28 @@ const SettingsScreen = () => {
             animated={animationsEnabled}
           >
             <Text style={styles.sectionTitle}>Development</Text>
-            <AnimatedListItem
-              index={0}
-              totalItems={1}
-              animated={animationsEnabled}
-            >
-              <Card
-                variant="custom"
-                style={styles.settingCard}
-                onPress={() => router.push("/(auth)/dev")}
+            <SettingsGroup>
+              <AnimatedListItem
+                index={0}
+                totalItems={1}
+                animated={animationsEnabled}
               >
-                <View style={styles.settingContent}>
-                  <View style={styles.settingIcon}>
+                <SettingsListItem
+                  title="Developer Tools"
+                  subtitle="Dev tools & playground"
+                  left={{ iconName: "bug" }}
+                  trailing={
                     <IconButton
-                      icon="bug"
-                      size={20}
-                      iconColor={theme.colors.primary}
+                      icon="chevron-right"
+                      size={16}
+                      iconColor={theme.colors.outline}
                     />
-                  </View>
-                  <View style={styles.settingInfo}>
-                    <Text style={styles.settingTitle}>Developer Tools</Text>
-                    <Text style={styles.settingValue}>
-                      Dev tools & playground
-                    </Text>
-                  </View>
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                </View>
-              </Card>
-            </AnimatedListItem>
+                  }
+                  onPress={() => router.push("/(auth)/dev")}
+                  groupPosition="single"
+                />
+              </AnimatedListItem>
+            </SettingsGroup>
           </AnimatedSection>
         )}
 

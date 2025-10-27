@@ -82,7 +82,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
     );
   }, [shimmer, shimmerDuration, pulseAnim]);
 
-  // Animated style for pulse
+  // Animated style for pulse (opacity only on inner view)
   const pulseStyle = useAnimatedStyle(() => {
     return {
       opacity: pulseAnim.value,
@@ -130,12 +130,21 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
     return <View style={containerStyle} />;
   }
 
-  return <Animated.View style={[containerStyle, pulseStyle]} />;
+  // Safe wrapper: outer view has dimensions/background, inner view has opacity animation.
+  // This prevents layout animations (if parent applies them) from conflicting with opacity.
+  return (
+    <View style={containerStyle}>
+      <Animated.View style={[pulseStyle, styles.fill]} />
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
   container: {
     position: "relative",
+  },
+  fill: {
+    ...StyleSheet.absoluteFillObject,
   },
 });
 
