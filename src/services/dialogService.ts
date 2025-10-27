@@ -23,8 +23,10 @@ type PresentPayload = {
 };
 
 type Presenter = (payload: PresentPayload) => void;
+type CustomDialogPresenter = (type: string, payload: any) => void;
 
 let presenter: Presenter | null = null;
+let customDialogPresenter: CustomDialogPresenter | null = null;
 
 export function registerDialogPresenter(fn: Presenter) {
   presenter = fn;
@@ -32,6 +34,14 @@ export function registerDialogPresenter(fn: Presenter) {
 
 export function unregisterDialogPresenter() {
   presenter = null;
+}
+
+export function registerCustomDialogPresenter(fn: CustomDialogPresenter) {
+  customDialogPresenter = fn;
+}
+
+export function unregisterCustomDialogPresenter() {
+  customDialogPresenter = null;
 }
 
 /**
@@ -69,8 +79,22 @@ export function alert(
   }
 }
 
+/**
+ * Show a custom dialog via the DialogProvider
+ * @param type - The type of custom dialog (e.g., 'updateCheck')
+ * @param payload - The payload to pass to the custom dialog
+ */
+export function showCustomDialog(type: string, payload: any) {
+  if (customDialogPresenter) {
+    customDialogPresenter(type, payload);
+  }
+}
+
 export default {
   alert,
+  showCustomDialog,
   registerDialogPresenter,
   unregisterDialogPresenter,
+  registerCustomDialogPresenter,
+  unregisterCustomDialogPresenter,
 };

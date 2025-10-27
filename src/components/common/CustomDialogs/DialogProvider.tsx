@@ -14,6 +14,8 @@ import CustomAlert from "./CustomAlert";
 import {
   registerDialogPresenter,
   unregisterDialogPresenter,
+  registerCustomDialogPresenter,
+  unregisterCustomDialogPresenter,
 } from "@/services/dialogService";
 
 type DialogPayload = {
@@ -23,8 +25,14 @@ type DialogPayload = {
   options?: { cancelable?: boolean; onDismiss?: () => void };
 };
 
+type CustomDialogPayload = {
+  type: string;
+  payload: any;
+};
+
 const DialogContext = createContext({
   present: (payload: DialogPayload) => {},
+  presentCustomDialog: (type: string, payload: any) => {},
 });
 
 export const useDialog = () => useContext(DialogContext);
@@ -97,16 +105,56 @@ const DialogRenderer = ({
   );
 };
 
+// Separate component to render custom dialogs
+const CustomDialogRenderer = ({
+  current,
+  onDismiss,
+}: {
+  current: CustomDialogPayload | null;
+  onDismiss: () => void;
+}) => {
+  if (!current) return null;
+
+  // Dynamically import and render custom dialogs based on type
+  if (current.type === "updateCheck") {
+    const { UpdateDialog } = require("@/components/common/UpdateDialog");
+    return (
+      <Portal>
+        <UpdateDialog
+          visible
+          updateData={current.payload.updateData}
+          isLoading={current.payload.isLoading}
+          error={current.payload.error}
+          onDismiss={onDismiss}
+        />
+      </Portal>
+    );
+  }
+
+  return null;
+};
+
 export const DialogProvider = ({ children }: { children: ReactNode }) => {
   const [current, setCurrent] = useState<DialogPayload | null>(null);
+  const [customDialog, setCustomDialog] = useState<CustomDialogPayload | null>(
+    null,
+  );
   const presentRef = useRef<(payload: DialogPayload) => void>(() => {});
+  const presentCustomDialogRef = useRef<(type: string, payload: any) => void>(
+    () => {},
+  );
 
   const present = useCallback((payload: DialogPayload) => {
     setCurrent(payload);
   }, []);
 
+  const presentCustomDialog = useCallback((type: string, payload: any) => {
+    setCustomDialog({ type, payload });
+  }, []);
+
   // Store the latest present function in a ref to avoid stale closure issues
   presentRef.current = present;
+  presentCustomDialogRef.current = presentCustomDialog;
 
   useEffect(() => {
     // Register present function so services.dialogService can call into this provider
@@ -114,22 +162,38 @@ export const DialogProvider = ({ children }: { children: ReactNode }) => {
       presentRef.current(payload as any);
     });
 
+    registerCustomDialogPresenter((type, payload) => {
+      presentCustomDialogRef.current(type, payload);
+    });
+
     return () => {
       unregisterDialogPresenter();
+      unregisterCustomDialogPresenter();
     };
   }, []); // Empty dependency array since we use ref
 
   // Memoize the context value to prevent unnecessary re-renders
-  const contextValue = useMemo(() => ({ present }), [present]);
+  const contextValue = useMemo(
+    () => ({ present, presentCustomDialog }),
+    [present, presentCustomDialog],
+  );
 
   const handleDialogDismiss = useCallback(() => {
     setCurrent(null);
+  }, []);
+
+  const handleCustomDialogDismiss = useCallback(() => {
+    setCustomDialog(null);
   }, []);
 
   return (
     <DialogContext.Provider value={contextValue}>
       {children}
       <DialogRenderer current={current} onDismiss={handleDialogDismiss} />
+      <CustomDialogRenderer
+        current={customDialog}
+        onDismiss={handleCustomDialogDismiss}
+      />
     </DialogContext.Provider>
   );
 };

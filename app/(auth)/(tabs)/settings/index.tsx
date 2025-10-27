@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { StyleSheet, View, useColorScheme } from "react-native";
-import { alert } from "@/services/dialogService";
+import { alert, showCustomDialog } from "@/services/dialogService";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Constants from "expo-constants";
 
@@ -36,6 +36,7 @@ import {
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useAppUpdateCheck } from "@/hooks/useAppUpdateCheck";
 import type { NotificationCategory } from "@/models/notification.types";
 import { getCategoryFriendlyName } from "@/utils/quietHours.utils";
 import { borderRadius } from "@/constants/sizes";
@@ -74,6 +75,14 @@ const SettingsScreen = () => {
     Constants.expoConfig?.version || Constants.manifest?.version || "Unknown";
   const appVersionString = `UniArr v${appVersion}`;
 
+  // App update check hook
+  const {
+    data: updateData,
+    isLoading: isCheckingUpdate,
+    error: updateError,
+    refetch: checkForUpdate,
+  } = useAppUpdateCheck({ enabled: false }); // Manual trigger only
+
   // Settings store
   const {
     theme: themePreference,
@@ -100,6 +109,7 @@ const SettingsScreen = () => {
     setMaxImageCacheSize,
     logLevel,
     setLogLevel,
+    setLastReleaseNotesCheckedAt,
     // image thumbnailing controls removed
   } = useSettingsStore();
   const [logLevelVisible, setLogLevelVisible] = useState(false);
@@ -267,6 +277,17 @@ const SettingsScreen = () => {
     void loadImageCacheUsage();
   }, [loadImageCacheUsage]);
 
+  // Update dialog when update check completes
+  useEffect(() => {
+    if (!isCheckingUpdate && (updateData || updateError)) {
+      showCustomDialog("updateCheck", {
+        updateData,
+        isLoading: false,
+        error: updateError ? String(updateError) : null,
+      });
+    }
+  }, [updateData, isCheckingUpdate, updateError]);
+
   const handleClearImageCache = async () => {
     setIsClearingImageCache(true);
     try {
@@ -300,6 +321,18 @@ const SettingsScreen = () => {
       alert("Sign out failed", message);
     }
   };
+
+  const handleCheckForUpdate = useCallback(async () => {
+    setLastReleaseNotesCheckedAt(new Date().toISOString());
+    // Show update dialog with loading state
+    showCustomDialog("updateCheck", {
+      updateData: null,
+      isLoading: true,
+      error: null,
+    });
+    // Trigger the fetch by calling refetch
+    void checkForUpdate();
+  }, [checkForUpdate, setLastReleaseNotesCheckedAt]);
 
   const confirmSignOut = () => setConfirmVisible(true);
 
@@ -916,7 +949,7 @@ const SettingsScreen = () => {
           <SettingsGroup>
             <AnimatedListItem
               index={0}
-              totalItems={3}
+              totalItems={4}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -936,19 +969,31 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={1}
-              totalItems={3}
+              totalItems={4}
               animated={animationsEnabled}
             >
               <SettingsListItem
                 title="App Version"
                 subtitle={appVersionString}
                 left={{ iconName: "information" }}
+                trailing={
+                  <Button
+                    mode="contained-tonal"
+                    compact
+                    onPress={handleCheckForUpdate}
+                    loading={isCheckingUpdate}
+                    disabled={isCheckingUpdate}
+                    style={{ height: 32 }}
+                  >
+                    Check
+                  </Button>
+                }
                 groupPosition="middle"
               />
             </AnimatedListItem>
             <AnimatedListItem
               index={2}
-              totalItems={3}
+              totalItems={4}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -965,6 +1010,26 @@ const SettingsScreen = () => {
                     Set
                   </Button>
                 }
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={3}
+              totalItems={4}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Debugging"
+                subtitle="Logs & diagnostics"
+                left={{ iconName: "bug-outline" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/dev")}
                 groupPosition="bottom"
               />
             </AnimatedListItem>

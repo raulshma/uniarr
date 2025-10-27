@@ -267,7 +267,7 @@ const ServicesScreen = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          backgroundColor: theme.colors.background,
+          backgroundColor: theme.colors.surface,
         },
         content: {
           flex: 1,
@@ -291,7 +291,7 @@ const ServicesScreen = () => {
         },
         summaryCard: {
           width: "48%",
-          backgroundColor: theme.colors.elevation.level2,
+          backgroundColor: theme.colors.surface,
           borderRadius: spacing.lg,
           paddingVertical: spacing.md,
           paddingHorizontal: spacing.md,
@@ -335,7 +335,7 @@ const ServicesScreen = () => {
           marginBottom: spacing.md,
         },
         serviceCard: {
-          backgroundColor: theme.colors.elevation.level1,
+          backgroundColor: theme.colors.surface,
           marginHorizontal: spacing.md,
           marginVertical: spacing.xs,
           borderRadius: borderRadius.xxxl,

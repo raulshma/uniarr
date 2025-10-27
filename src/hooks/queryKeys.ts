@@ -338,6 +338,10 @@ export const queryKeys = {
     jikanDetail: (malId: number): QueryKeyBuilder =>
       ["discover", "jikan", "detail", malId] as const,
   },
+  app: {
+    base: ["app"] as const,
+    updateCheck: ["app", "updateCheck"] as const,
+  },
   tmdb: {
     base: ["tmdb"] as const,
     discover: (

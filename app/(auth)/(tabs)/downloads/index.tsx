@@ -281,7 +281,7 @@ const DownloadsScreen = () => {
           fontWeight: "600",
         },
         torrentItem: {
-          backgroundColor: theme.colors.elevation.level1,
+          backgroundColor: theme.colors.surface,
           borderRadius: spacing.md,
           padding: spacing.lg,
           marginBottom: spacing.sm,

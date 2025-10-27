@@ -57,6 +57,8 @@ type SettingsData = {
   recentActivitySourceServiceIds?: string[];
   // Preferred service to navigate to when recent activity item has multiple origins
   preferredRecentActivityServiceId?: string;
+  // Last time app update was checked (ISO string)
+  lastReleaseNotesCheckedAt?: string;
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -92,6 +94,7 @@ interface SettingsState extends SettingsData {
   setPreferredJellyseerrServiceId: (serviceId: string | undefined) => void;
   setRecentActivitySourceServiceIds: (ids: string[] | undefined) => void;
   setPreferredRecentActivityServiceId: (serviceId: string | undefined) => void;
+  setLastReleaseNotesCheckedAt: (timestamp: string | undefined) => void;
   // (thumbnail setters removed)
 }
 
@@ -168,6 +171,7 @@ const createDefaultSettings = (): SettingsData => ({
   preferredJellyseerrServiceId: undefined,
   recentActivitySourceServiceIds: undefined,
   preferredRecentActivityServiceId: undefined,
+  lastReleaseNotesCheckedAt: undefined,
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
@@ -230,6 +234,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ recentActivitySourceServiceIds: ids }),
       setPreferredRecentActivityServiceId: (serviceId: string | undefined) =>
         set({ preferredRecentActivityServiceId: serviceId }),
+      setLastReleaseNotesCheckedAt: (timestamp: string | undefined) =>
+        set({ lastReleaseNotesCheckedAt: timestamp }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -266,6 +272,7 @@ export const useSettingsStore = create<SettingsState>()(
         recentActivitySourceServiceIds: state.recentActivitySourceServiceIds,
         preferredRecentActivityServiceId:
           state.preferredRecentActivityServiceId,
+        lastReleaseNotesCheckedAt: state.lastReleaseNotesCheckedAt,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
@@ -413,6 +420,8 @@ export const useSettingsStore = create<SettingsState>()(
             partial.recentActivitySourceServiceIds ?? undefined,
           preferredRecentActivityServiceId:
             partial.preferredRecentActivityServiceId ?? undefined,
+          lastReleaseNotesCheckedAt:
+            partial.lastReleaseNotesCheckedAt ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
