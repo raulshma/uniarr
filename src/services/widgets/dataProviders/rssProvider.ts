@@ -12,6 +12,7 @@ export interface RssFeedItem {
   author?: string;
   publishedAt?: string;
   source?: string;
+  image?: string;
 }
 
 const parser = new XMLParser({
@@ -74,6 +75,24 @@ const parseRssChannelItems = (feed: any, feedUrl: string): RssFeedItem[] => {
         return null;
       }
 
+      // Extract image from enclosures or media content
+      let image: string | undefined;
+      const enclosures = normalizeArray(item?.enclosure);
+      const imageEnclosure = enclosures.find(
+        (enc: any) =>
+          typeof enc?.url === "string" && enc?.["@type"]?.startsWith("image/"),
+      );
+      if (imageEnclosure) {
+        image = imageEnclosure.url;
+      } else if (
+        item?.["media:content"]?.url &&
+        item?.["media:content"]?.["@type"]?.startsWith("image/")
+      ) {
+        image = item["media:content"].url;
+      } else if (item?.["media:thumbnail"]?.url) {
+        image = item["media:thumbnail"].url;
+      }
+
       return {
         id: String(item.guid ?? link ?? title),
         title: title.trim(),
@@ -92,6 +111,7 @@ const parseRssChannelItems = (feed: any, feedUrl: string): RssFeedItem[] => {
               : undefined,
         publishedAt: coerceDateString(item.pubDate ?? item.published),
         source: resolveSourceName(feedTitle, feedUrl),
+        image,
       } satisfies RssFeedItem;
     })
     .filter(Boolean) as RssFeedItem[];
@@ -118,6 +138,17 @@ const parseAtomEntries = (root: any, feedUrl: string): RssFeedItem[] => {
             ? entry.content
             : undefined;
 
+      // Extract image from media content
+      let image: string | undefined;
+      if (
+        entry?.["media:content"]?.url &&
+        entry?.["media:content"]?.["@type"]?.startsWith("image/")
+      ) {
+        image = entry["media:content"].url;
+      } else if (entry?.["media:thumbnail"]?.url) {
+        image = entry["media:thumbnail"].url;
+      }
+
       return {
         id: String(entry.id ?? linkHref ?? title),
         title: title.trim(),
@@ -132,6 +163,7 @@ const parseAtomEntries = (root: any, feedUrl: string): RssFeedItem[] => {
         })(),
         publishedAt: coerceDateString(entry.updated ?? entry.published),
         source: resolveSourceName(feedTitle, feedUrl),
+        image,
       } satisfies RssFeedItem;
     })
     .filter(Boolean) as RssFeedItem[];
