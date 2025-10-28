@@ -339,7 +339,7 @@ const ServicesScreen = () => {
           marginHorizontal: spacing.md,
           marginVertical: spacing.xs,
           borderRadius: borderRadius.xxxl,
-          padding: spacing.sm,
+          padding: spacing.xs,
         },
         serviceContent: {
           flexDirection: "row",

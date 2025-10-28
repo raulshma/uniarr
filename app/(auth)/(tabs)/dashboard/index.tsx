@@ -94,6 +94,7 @@ const DashboardScreen = () => {
         },
         scrollView: {
           flex: 1,
+          paddingHorizontal: theme.custom.spacing.none,
         },
         scrollContent: {
           paddingBottom: 100,
@@ -265,7 +266,7 @@ const DashboardScreen = () => {
           <AnimatedSection
             delay={100}
             style={{
-              paddingHorizontal: theme.custom.spacing.lg,
+              paddingHorizontal: theme.custom.spacing.sm,
               marginTop: theme.custom.spacing.sm,
             }}
           >

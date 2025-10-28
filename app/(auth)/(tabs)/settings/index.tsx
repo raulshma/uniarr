@@ -151,7 +151,7 @@ const SettingsScreen = () => {
       backgroundColor: theme.colors.background,
     },
     scrollContainer: {
-      paddingHorizontal: spacing.sm,
+      paddingHorizontal: spacing.xs,
       paddingBottom: spacing.xxxxl,
     },
     // Overview styles removed
