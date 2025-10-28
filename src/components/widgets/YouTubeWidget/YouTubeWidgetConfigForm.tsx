@@ -15,6 +15,11 @@ import { z } from "zod";
 import { useHaptics } from "@/hooks/useHaptics";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { widgetCredentialService } from "@/services/widgets/WidgetCredentialService";
+import { alert as showDialog } from "@/services/dialogService";
+import {
+  testYouTubeApiKey,
+  getYouTubeTroubleshootingHint,
+} from "@/utils/youtube.utils";
 
 const ITEMS_OPTIONS = ["2", "3"] as const;
 
@@ -48,6 +53,7 @@ const YouTubeWidgetConfigForm: React.FC<YouTubeWidgetConfigFormProps> = ({
   const { onPress } = useHaptics();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
 
   const defaultValues = useMemo<FormValues>(() => {
     const channelIds = Array.isArray(widget.config?.channelIds)
@@ -100,6 +106,46 @@ const YouTubeWidgetConfigForm: React.FC<YouTubeWidgetConfigFormProps> = ({
 
     void loadCredentials();
   }, [setValue, widget.id]);
+
+  const handleTestConnection = async () => {
+    const apiKeyValue = watch("apiKey").trim();
+    const channelIdFields = watch("channelIds");
+    const firstChannelId = channelIdFields?.[0]?.value?.trim();
+
+    if (!apiKeyValue) {
+      showDialog("Test Failed", "Please enter an API key first.");
+      return;
+    }
+
+    if (!firstChannelId) {
+      showDialog("Test Failed", "Please enter at least one channel ID.");
+      return;
+    }
+
+    setTestingConnection(true);
+    onPress();
+
+    try {
+      const result = await testYouTubeApiKey(apiKeyValue, firstChannelId);
+
+      if (result.success) {
+        showDialog("✓ Success", result.message);
+      } else {
+        const troubleshootingHint = getYouTubeTroubleshootingHint(
+          result.details?.statusCode,
+        );
+        const errorMessage = `${result.message}\n\nTroubleshooting: ${troubleshootingHint}`;
+        showDialog("Connection Failed", errorMessage);
+      }
+    } catch {
+      showDialog(
+        "Test Error",
+        "An unexpected error occurred while testing the connection.",
+      );
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   const onSubmit = async (values: FormValues) => {
     const sanitizedChannels = values.channelIds
@@ -164,6 +210,16 @@ const YouTubeWidgetConfigForm: React.FC<YouTubeWidgetConfigFormProps> = ({
       {errors.apiKey && (
         <HelperText type="error">{errors.apiKey.message}</HelperText>
       )}
+
+      <Button
+        mode="outlined"
+        icon="lan-check"
+        onPress={handleTestConnection}
+        loading={testingConnection}
+        disabled={testingConnection || saving}
+      >
+        Test Connection
+      </Button>
 
       <Text variant="titleMedium" style={styles.sectionTitle}>
         Channels
