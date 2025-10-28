@@ -1,12 +1,6 @@
 import React, { useMemo, useRef, useCallback, useEffect } from "react";
 import { View, StyleSheet, ViewStyle, Dimensions } from "react-native";
-import {
-  useTheme,
-  IconButton,
-  Text,
-  TouchableRipple,
-  Icon,
-} from "react-native-paper";
+import { useTheme, Text, TouchableRipple, Icon } from "react-native-paper";
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetBackdropProps,
@@ -189,14 +183,6 @@ const BottomDrawer: React.FC<Props> = ({
             ) : (
               <View style={{ flex: 1 }} />
             )}
-            <IconButton
-              icon="close"
-              size={24}
-              onPress={onDismiss}
-              accessibilityLabel="Close drawer"
-              iconColor={theme.colors.onSurfaceVariant}
-              style={styles.closeButton}
-            />
           </View>
         </View>
 

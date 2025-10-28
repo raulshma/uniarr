@@ -2,9 +2,12 @@ import React from "react";
 import { View, StyleSheet, Linking } from "react-native";
 import { Text, Button, useTheme, ActivityIndicator } from "react-native-paper";
 import BottomDrawer from "@/components/common/BottomDrawer";
+import SettingsGroup from "@/components/common/SettingsGroup";
+import SettingsListItem from "@/components/common/SettingsListItem";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useHaptics } from "@/hooks/useHaptics";
+import { borderRadius } from "@/constants/sizes";
 
 export interface ContentMetadata {
   score?: number;
@@ -42,6 +45,11 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
 
   const handleOpenAction = async () => {
     onPress();
+    // Validate that the URL is not empty
+    if (!actionUrl || actionUrl.trim().length === 0) {
+      console.warn("ContentDrawer: Empty action URL");
+      return;
+    }
     try {
       await Linking.openURL(actionUrl);
     } catch (error) {
@@ -58,98 +66,80 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
       closeOnBackdropPress={true}
     >
       <View style={styles.contentContainer}>
-        {/* Metadata Section */}
-        <View
-          style={[
-            styles.metadataSection,
-            { borderBottomColor: theme.colors.outlineVariant },
-          ]}
-        >
-          {metadata.score !== undefined && (
-            <View style={styles.metadataRow}>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                Score
-              </Text>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.primary, fontWeight: "600" }}
-              >
-                {metadata.score.toLocaleString()}
-              </Text>
-            </View>
-          )}
+        {/* Metadata Section - Using SettingsGroup and SettingsListItem */}
+        {(metadata.score !== undefined ||
+          metadata.author ||
+          metadata.comments !== undefined ||
+          metadata.date ||
+          metadata.source) && (
+          <SettingsGroup>
+            {metadata.score !== undefined && (
+              <SettingsListItem
+                title="Score"
+                trailing={
+                  <Text
+                    style={{ color: theme.colors.primary, fontWeight: "600" }}
+                  >
+                    {metadata.score.toLocaleString()}
+                  </Text>
+                }
+                groupPosition={metadata.author ? "top" : "single"}
+              />
+            )}
 
-          {metadata.author && (
-            <View style={styles.metadataRow}>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                Author
-              </Text>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurface }}
-              >
-                {metadata.author}
-              </Text>
-            </View>
-          )}
+            {metadata.author && (
+              <SettingsListItem
+                title="Author"
+                trailing={
+                  <Text style={{ color: theme.colors.onSurface }}>
+                    {metadata.author}
+                  </Text>
+                }
+                groupPosition={metadata.score !== undefined ? "middle" : "top"}
+              />
+            )}
 
-          {metadata.comments !== undefined && (
-            <View style={styles.metadataRow}>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                Comments
-              </Text>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurface }}
-              >
-                {metadata.comments}
-              </Text>
-            </View>
-          )}
+            {metadata.comments !== undefined && (
+              <SettingsListItem
+                title="Comments"
+                trailing={
+                  <Text style={{ color: theme.colors.onSurface }}>
+                    {metadata.comments}
+                  </Text>
+                }
+                groupPosition={metadata.author ? "middle" : "top"}
+              />
+            )}
 
-          {metadata.date && (
-            <View style={styles.metadataRow}>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                Date
-              </Text>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurface }}
-              >
-                {metadata.date}
-              </Text>
-            </View>
-          )}
+            {metadata.date && (
+              <SettingsListItem
+                title="Date"
+                trailing={
+                  <Text style={{ color: theme.colors.onSurface }}>
+                    {metadata.date}
+                  </Text>
+                }
+                groupPosition={
+                  metadata.author || metadata.comments !== undefined
+                    ? "middle"
+                    : "top"
+                }
+              />
+            )}
 
-          {metadata.source && (
-            <View style={styles.metadataRow}>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                Source
-              </Text>
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurface }}
-              >
-                {metadata.source}
-              </Text>
-            </View>
-          )}
-        </View>
+            {metadata.source && (
+              <SettingsListItem
+                title="Source"
+                trailing={
+                  <Text style={{ color: theme.colors.onSurface }}>
+                    {metadata.source}
+                  </Text>
+                }
+                groupPosition="bottom"
+              />
+            )}
+          </SettingsGroup>
+        )}
 
         {/* Content Section */}
         {loading ? (
@@ -166,9 +156,17 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
             </Text>
           </View>
         ) : content ? (
-          <View style={styles.contentSection}>
+          <View
+            style={[
+              styles.contentSection,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.outlineVariant,
+                borderRadius: borderRadius.lg,
+              },
+            ]}
+          >
             <Text
-              variant="bodyMedium"
               style={{
                 color: theme.colors.onSurface,
                 lineHeight: 22,
@@ -177,26 +175,14 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
               {content}
             </Text>
           </View>
-        ) : (
-          <View style={styles.emptyContentContainer}>
-            <Text
-              variant="bodySmall"
-              style={{
-                color: theme.colors.onSurfaceVariant,
-                textAlign: "center",
-              }}
-            >
-              No content available
-            </Text>
-          </View>
-        )}
+        ) : null}
 
         {/* Action Button */}
         <View style={styles.actionButtonContainer}>
           <Button
             mode="contained"
             onPress={handleOpenAction}
-            style={{ borderRadius: 8 }}
+            style={{ borderRadius: borderRadius.md }}
           >
             {actionLabel}
           </Button>
@@ -209,21 +195,12 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
 const styles = StyleSheet.create({
   contentContainer: {
     paddingBottom: spacing.lg,
-  },
-  metadataSection: {
-    paddingBottom: spacing.md,
-    marginBottom: spacing.md,
-    borderBottomWidth: 1,
-    gap: spacing.sm,
-  },
-  metadataRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    gap: spacing.md,
   },
   contentSection: {
-    marginVertical: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
   },
   loadingContainer: {
     minHeight: 100,
@@ -231,14 +208,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing.xl,
   },
-  emptyContentContainer: {
-    minHeight: 60,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: spacing.md,
-  },
   actionButtonContainer: {
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     gap: spacing.sm,
   },
 });

@@ -8,6 +8,7 @@ import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
+import { usePressWithoutLongPress } from "@/hooks/usePressWithoutLongPress";
 import { logger } from "@/services/logger/LoggerService";
 import {
   fetchRssFeeds,
@@ -18,8 +19,8 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
-import ContentDrawer from "@/components/widgets/ContentDrawer";
 import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -54,6 +55,86 @@ const normalizeConfig = (config: Widget["config"]): RssWidgetConfig => {
   } satisfies RssWidgetConfig;
 };
 
+interface RssItemListItemProps {
+  item: RssFeedItem;
+  index: number;
+  itemsLength: number;
+  onPress: () => void;
+  onLongPress: () => void;
+  onLongPressImage: () => void;
+}
+
+const RssItemListItem: React.FC<RssItemListItemProps> = ({
+  item,
+  index,
+  itemsLength,
+  onPress,
+  onLongPress,
+  onLongPressImage,
+}) => {
+  const theme = useTheme<AppTheme>();
+  const { handlePress, handlePressIn, handleLongPress } =
+    usePressWithoutLongPress(onPress);
+
+  return (
+    <HapticPressable
+      onLongPress={() => {
+        handleLongPress();
+        onLongPress();
+      }}
+      onPressIn={handlePressIn}
+      onPress={handlePress}
+      hapticOnLongPress
+    >
+      <SettingsListItem
+        title={item.title}
+        subtitle={
+          item.source && item.publishedAt
+            ? `${item.source} • ${formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true })}`
+            : item.source ||
+              (item.publishedAt
+                ? formatDistanceToNow(new Date(item.publishedAt), {
+                    addSuffix: true,
+                  })
+                : undefined)
+        }
+        left={
+          item.image
+            ? {
+                node: (
+                  <HapticPressable
+                    onLongPress={onLongPressImage}
+                    hapticOnLongPress
+                  >
+                    <Image
+                      source={{ uri: item.image }}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                      }}
+                    />
+                  </HapticPressable>
+                ),
+              }
+            : { iconName: "rss" }
+        }
+        trailing={
+          <IconButton
+            icon="chevron-right"
+            size={16}
+            iconColor={theme.colors.outline}
+            style={{ margin: 0 }}
+          />
+        }
+        groupPosition={
+          index === 0 ? "top" : index === itemsLength - 1 ? "bottom" : "middle"
+        }
+      />
+    </HapticPressable>
+  );
+};
+
 const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
   const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
@@ -66,9 +147,8 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string>("");
 
-  // State for content drawer
-  const [contentDrawerVisible, setContentDrawerVisible] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<RssFeedItem | null>(null);
+  // Get drawer hook for content display
+  const { openDrawer } = useWidgetDrawer();
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
 
@@ -145,14 +225,34 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
 
   const handleLongPressImage = async (imageUri: string) => {
     onLongPress();
+    // Validate that the image URI is a proper HTTP(S) URL
+    if (!imageUri || !imageUri.startsWith("http")) {
+      void logger.warn("RssWidget: Invalid image URI", { imageUri });
+      setError("Invalid image URL");
+      return;
+    }
     setSelectedImageUri(imageUri);
     setImageModalVisible(true);
   };
 
   const handleLongPressItem = (item: RssFeedItem) => {
     onLongPress();
-    setSelectedItem(item);
-    setContentDrawerVisible(true);
+    openDrawer({
+      title: item.title,
+      content: item.summary,
+      metadata: {
+        author: item.author,
+        date: item.publishedAt
+          ? formatDistanceToNow(new Date(item.publishedAt), {
+              addSuffix: true,
+            })
+          : undefined,
+        source: item.source,
+      },
+      actionUrl: item.link || "",
+      actionLabel: "Open Full Article",
+      loading: false,
+    });
   };
 
   if (!feedsConfigured) {
@@ -233,64 +333,15 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
         ) : (
           <View>
             {items.map((item, index) => (
-              <HapticPressable
+              <RssItemListItem
                 key={item.id}
+                item={item}
+                index={index}
+                itemsLength={items.length}
+                onPress={() => openLink(item.link)}
                 onLongPress={() => handleLongPressItem(item)}
-                hapticOnLongPress
-              >
-                <SettingsListItem
-                  title={item.title}
-                  subtitle={
-                    item.source && item.publishedAt
-                      ? `${item.source} • ${formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true })}`
-                      : item.source ||
-                        (item.publishedAt
-                          ? formatDistanceToNow(new Date(item.publishedAt), {
-                              addSuffix: true,
-                            })
-                          : undefined)
-                  }
-                  left={
-                    item.image
-                      ? {
-                          node: (
-                            <HapticPressable
-                              onLongPress={() =>
-                                handleLongPressImage(item.image!)
-                              }
-                              hapticOnLongPress
-                            >
-                              <Image
-                                source={{ uri: item.image }}
-                                style={{
-                                  width: 40,
-                                  height: 40,
-                                  borderRadius: 20,
-                                }}
-                              />
-                            </HapticPressable>
-                          ),
-                        }
-                      : { iconName: "rss" }
-                  }
-                  trailing={
-                    <IconButton
-                      icon="chevron-right"
-                      size={16}
-                      iconColor={theme.colors.outline}
-                      style={{ margin: 0 }}
-                    />
-                  }
-                  onPress={() => openLink(item.link)}
-                  groupPosition={
-                    index === 0
-                      ? "top"
-                      : index === items.length - 1
-                        ? "bottom"
-                        : "middle"
-                  }
-                />
-              </HapticPressable>
+                onLongPressImage={() => handleLongPressImage(item.image!)}
+              />
             ))}
           </View>
         )}
@@ -309,29 +360,6 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
         fileName="Article Thumbnail"
         fileSize="Image"
         onClose={() => setImageModalVisible(false)}
-      />
-
-      {/* Content Drawer */}
-      <ContentDrawer
-        visible={contentDrawerVisible}
-        onDismiss={() => {
-          setContentDrawerVisible(false);
-          setSelectedItem(null);
-        }}
-        title={selectedItem?.title || "Article"}
-        content={selectedItem?.summary}
-        metadata={{
-          author: selectedItem?.author,
-          date: selectedItem?.publishedAt
-            ? formatDistanceToNow(new Date(selectedItem.publishedAt), {
-                addSuffix: true,
-              })
-            : undefined,
-          source: selectedItem?.source,
-        }}
-        actionUrl={selectedItem?.link || ""}
-        actionLabel="Open Full Article"
-        loading={false}
       />
     </>
   );

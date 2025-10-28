@@ -7,6 +7,7 @@ import { Image } from "expo-image";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
+import { usePressWithoutLongPress } from "@/hooks/usePressWithoutLongPress";
 import { useHackerNewsStoryContent } from "@/hooks/useHackerNewsStoryContent";
 import { logger } from "@/services/logger/LoggerService";
 import {
@@ -19,8 +20,8 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
-import ContentDrawer from "@/components/widgets/ContentDrawer";
 import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -60,6 +61,90 @@ const buildStoryUrl = (item: HackerNewsItem): string => {
   return `https://news.ycombinator.com/item?id=${item.id}`;
 };
 
+interface StoryListItemProps {
+  story: HackerNewsItem;
+  index: number;
+  storiesLength: number;
+  onPress: () => void;
+  onLongPress: () => void;
+  onLongPressImage: () => void;
+}
+
+const StoryListItem: React.FC<StoryListItemProps> = ({
+  story,
+  index,
+  storiesLength,
+  onPress,
+  onLongPress,
+  onLongPressImage,
+}) => {
+  const theme = useTheme<AppTheme>();
+  const { handlePress, handlePressIn, handleLongPress } =
+    usePressWithoutLongPress(onPress);
+
+  return (
+    <HapticPressable
+      onLongPress={() => {
+        handleLongPress();
+        onLongPress();
+      }}
+      onPressIn={handlePressIn}
+      onPress={handlePress}
+      hapticOnLongPress
+    >
+      <SettingsListItem
+        title={story.title}
+        subtitle={`${story.score ?? 0} points by ${story.by} • ${formatDistanceToNow(new Date(story.time * 1000), { addSuffix: true })}${story.descendants ? ` • ${story.descendants} comments` : ""}`}
+        left={
+          story.image
+            ? {
+                node: (
+                  <HapticPressable
+                    onLongPress={onLongPressImage}
+                    hapticOnLongPress
+                  >
+                    <Image
+                      source={{ uri: story.image }}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                      }}
+                    />
+                  </HapticPressable>
+                ),
+              }
+            : {
+                node: (
+                  <Text
+                    variant="titleMedium"
+                    style={{ color: theme.colors.primary }}
+                  >
+                    {index + 1}
+                  </Text>
+                ),
+              }
+        }
+        trailing={
+          <IconButton
+            icon="chevron-right"
+            size={16}
+            iconColor={theme.colors.outline}
+            style={{ margin: 0 }}
+          />
+        }
+        groupPosition={
+          index === 0
+            ? "top"
+            : index === storiesLength - 1
+              ? "bottom"
+              : "middle"
+        }
+      />
+    </HapticPressable>
+  );
+};
+
 const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
   widget,
   onEdit,
@@ -77,10 +162,10 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
   const [selectedImageUri, setSelectedImageUri] = useState<string>("");
 
   // State for content drawer
-  const [contentDrawerVisible, setContentDrawerVisible] = useState(false);
   const [selectedStory, setSelectedStory] = useState<HackerNewsItem | null>(
     null,
   );
+  const { openDrawer } = useWidgetDrawer();
 
   // Lazy load content for selected story
   const { content, loading: contentLoading } = useHackerNewsStoryContent(
@@ -153,6 +238,12 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
 
   const handleLongPressImage = async (imageUri: string) => {
     onLongPress();
+    // Validate that the image URI is a proper HTTP(S) URL
+    if (!imageUri || !imageUri.startsWith("http")) {
+      void logger.warn("HackerNewsWidget: Invalid image URI", { imageUri });
+      setError("Invalid image URL");
+      return;
+    }
     setSelectedImageUri(imageUri);
     setImageModalVisible(true);
   };
@@ -160,7 +251,25 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
   const handleLongPressItem = (story: HackerNewsItem) => {
     onLongPress();
     setSelectedStory(story);
-    setContentDrawerVisible(true);
+    openDrawer({
+      title: story.title,
+      content: content,
+      metadata: {
+        score: story.score,
+        author: story.by,
+        date: story.time
+          ? formatDistanceToNow(new Date(story.time * 1000), {
+              addSuffix: true,
+            })
+          : undefined,
+        comments: story.descendants,
+      },
+      actionUrl: story.url
+        ? story.url
+        : `https://news.ycombinator.com/item?id=${story.id || ""}`,
+      actionLabel: "Open on Hacker News",
+      loading: contentLoading,
+    });
   };
 
   return (
@@ -219,64 +328,15 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
         ) : (
           <View>
             {stories.map((story, index) => (
-              <HapticPressable
+              <StoryListItem
                 key={story.id}
+                story={story}
+                index={index}
+                storiesLength={stories.length}
+                onPress={() => openStory(story)}
                 onLongPress={() => handleLongPressItem(story)}
-                hapticOnLongPress
-              >
-                <SettingsListItem
-                  title={story.title}
-                  subtitle={`${story.score ?? 0} points by ${story.by} • ${formatDistanceToNow(new Date(story.time * 1000), { addSuffix: true })}${story.descendants ? ` • ${story.descendants} comments` : ""}`}
-                  left={
-                    story.image
-                      ? {
-                          node: (
-                            <HapticPressable
-                              onLongPress={() =>
-                                handleLongPressImage(story.image!)
-                              }
-                              hapticOnLongPress
-                            >
-                              <Image
-                                source={{ uri: story.image }}
-                                style={{
-                                  width: 40,
-                                  height: 40,
-                                  borderRadius: 20,
-                                }}
-                              />
-                            </HapticPressable>
-                          ),
-                        }
-                      : {
-                          node: (
-                            <Text
-                              variant="titleMedium"
-                              style={{ color: theme.colors.primary }}
-                            >
-                              {index + 1}
-                            </Text>
-                          ),
-                        }
-                  }
-                  trailing={
-                    <IconButton
-                      icon="chevron-right"
-                      size={16}
-                      iconColor={theme.colors.outline}
-                      style={{ margin: 0 }}
-                    />
-                  }
-                  onPress={() => openStory(story)}
-                  groupPosition={
-                    index === 0
-                      ? "top"
-                      : index === stories.length - 1
-                        ? "bottom"
-                        : "middle"
-                  }
-                />
-              </HapticPressable>
+                onLongPressImage={() => handleLongPressImage(story.image!)}
+              />
             ))}
           </View>
         )}
@@ -295,34 +355,6 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
         fileName="Story Favicon"
         fileSize="Image"
         onClose={() => setImageModalVisible(false)}
-      />
-
-      {/* Content Drawer */}
-      <ContentDrawer
-        visible={contentDrawerVisible}
-        onDismiss={() => {
-          setContentDrawerVisible(false);
-          setSelectedStory(null);
-        }}
-        title={selectedStory?.title || "Story"}
-        content={content}
-        metadata={{
-          score: selectedStory?.score,
-          author: selectedStory?.by,
-          date: selectedStory?.time
-            ? formatDistanceToNow(new Date(selectedStory.time * 1000), {
-                addSuffix: true,
-              })
-            : undefined,
-          comments: selectedStory?.descendants,
-        }}
-        actionUrl={
-          selectedStory?.url
-            ? selectedStory.url
-            : `https://news.ycombinator.com/item?id=${selectedStory?.id || ""}`
-        }
-        actionLabel="Open on Hacker News"
-        loading={contentLoading}
       />
     </>
   );

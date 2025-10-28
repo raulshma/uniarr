@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { logger } from "@/services/logger/LoggerService";
+import { stripHtmlTags } from "@/utils/html.utils";
 
 const API_BASE = "https://hacker-news.firebaseio.com/v0";
 
@@ -31,7 +32,8 @@ export const useHackerNewsStoryContent = (itemId: number) => {
 
         const payload = response.data;
         if (payload && typeof payload.text === "string") {
-          setContent(payload.text.substring(0, 500)); // Limit to 500 chars for performance
+          const cleanedText = stripHtmlTags(payload.text);
+          setContent(cleanedText.substring(0, 500)); // Limit to 500 chars for performance
         } else {
           setContent("");
         }

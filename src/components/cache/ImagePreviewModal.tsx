@@ -100,11 +100,11 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             setImageLoading(false);
             setImageError(true);
             setDebugInfo(
-              "All URI variants failed - the image may be inaccessible",
+              `Failed to load image from ${uriVariants.length} variant(s). The image may be inaccessible, expired, or require special authentication.`,
             );
           }
         }
-      }, 5000); // 5 second timeout per variant
+      }, 3000); // Reduced timeout from 5s to 3s per variant
 
       return () => clearTimeout(timeout);
     } else {

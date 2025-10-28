@@ -8,6 +8,7 @@ import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
+import { usePressWithoutLongPress } from "@/hooks/usePressWithoutLongPress";
 import { useRedditPostContent } from "@/hooks/useRedditPostContent";
 import { logger } from "@/services/logger/LoggerService";
 import {
@@ -21,8 +22,8 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
-import ContentDrawer from "@/components/widgets/ContentDrawer";
 import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 
 const CACHE_TTL_MS = 20 * 60 * 1000;
@@ -79,6 +80,77 @@ const normalizeConfig = (config: Widget["config"]): RedditWidgetConfig => {
   } satisfies RedditWidgetConfig;
 };
 
+interface PostListItemProps {
+  post: RedditPostItem;
+  index: number;
+  postsLength: number;
+  onPress: () => void;
+  onLongPress: () => void;
+  onLongPressImage: () => void;
+}
+
+const PostListItem: React.FC<PostListItemProps> = ({
+  post,
+  index,
+  postsLength,
+  onPress,
+  onLongPress,
+  onLongPressImage,
+}) => {
+  const theme = useTheme<AppTheme>();
+  const { handlePress, handlePressIn, handleLongPress } =
+    usePressWithoutLongPress(onPress);
+
+  return (
+    <HapticPressable
+      onLongPress={() => {
+        handleLongPress();
+        onLongPress();
+      }}
+      onPressIn={handlePressIn}
+      onPress={handlePress}
+      hapticOnLongPress
+    >
+      <SettingsListItem
+        title={post.title}
+        subtitle={`r/${post.subreddit} • u/${post.author} • ${formatDistanceToNow(new Date(post.createdUtc * 1000), { addSuffix: true })} • ${post.score} upvotes • ${post.comments} comments`}
+        left={
+          post.thumbnail
+            ? {
+                node: (
+                  <HapticPressable
+                    onLongPress={onLongPressImage}
+                    hapticOnLongPress
+                  >
+                    <Image
+                      source={{ uri: post.thumbnail }}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                      }}
+                    />
+                  </HapticPressable>
+                ),
+              }
+            : { iconName: "reddit" }
+        }
+        trailing={
+          <IconButton
+            icon="chevron-right"
+            size={16}
+            iconColor={theme.colors.outline}
+            style={{ margin: 0 }}
+          />
+        }
+        groupPosition={
+          index === 0 ? "top" : index === postsLength - 1 ? "bottom" : "middle"
+        }
+      />
+    </HapticPressable>
+  );
+};
+
 const RedditWidget: React.FC<RedditWidgetProps> = ({
   widget,
   onEdit,
@@ -96,8 +168,8 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
   const [selectedImageUri, setSelectedImageUri] = useState<string>("");
 
   // State for content drawer
-  const [contentDrawerVisible, setContentDrawerVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<RedditPostItem | null>(null);
+  const { openDrawer } = useWidgetDrawer();
 
   // Lazy load content for selected post
   const { content, loading: contentLoading } = useRedditPostContent(
@@ -165,6 +237,12 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
 
   const handleLongPressImage = async (imageUri: string) => {
     onLongPress();
+    // Validate that the image URI is a proper HTTP(S) URL
+    if (!imageUri || !imageUri.startsWith("http")) {
+      void logger.warn("RedditWidget: Invalid image URI", { imageUri });
+      setError("Invalid image URL");
+      return;
+    }
     setSelectedImageUri(imageUri);
     setImageModalVisible(true);
   };
@@ -172,7 +250,24 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
   const handleLongPressItem = (post: RedditPostItem) => {
     onLongPress();
     setSelectedPost(post);
-    setContentDrawerVisible(true);
+    openDrawer({
+      title: post.title,
+      content: content,
+      metadata: {
+        score: post.score,
+        author: post.author,
+        comments: post.comments,
+        source: post.subreddit ? `r/${post.subreddit}` : undefined,
+      },
+      actionUrl:
+        post.permalink && post.permalink.startsWith("http")
+          ? post.permalink
+          : post.permalink
+            ? `https://www.reddit.com${post.permalink}`
+            : "",
+      actionLabel: "Open on Reddit",
+      loading: contentLoading,
+    });
   };
 
   useEffect(() => {
@@ -275,55 +370,15 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
         ) : (
           <View>
             {posts.map((post, index) => (
-              <HapticPressable
+              <PostListItem
                 key={post.id}
+                post={post}
+                index={index}
+                postsLength={posts.length}
+                onPress={() => openLink(post.permalink || post.url)}
                 onLongPress={() => handleLongPressItem(post)}
-                hapticOnLongPress
-              >
-                <SettingsListItem
-                  title={post.title}
-                  subtitle={`r/${post.subreddit} • u/${post.author} • ${formatDistanceToNow(new Date(post.createdUtc * 1000), { addSuffix: true })} • ${post.score} upvotes • ${post.comments} comments`}
-                  left={
-                    post.thumbnail
-                      ? {
-                          node: (
-                            <HapticPressable
-                              onLongPress={() =>
-                                handleLongPressImage(post.thumbnail!)
-                              }
-                              hapticOnLongPress
-                            >
-                              <Image
-                                source={{ uri: post.thumbnail }}
-                                style={{
-                                  width: 40,
-                                  height: 40,
-                                  borderRadius: 20,
-                                }}
-                              />
-                            </HapticPressable>
-                          ),
-                        }
-                      : { iconName: "reddit" }
-                  }
-                  trailing={
-                    <IconButton
-                      icon="chevron-right"
-                      size={16}
-                      iconColor={theme.colors.outline}
-                      style={{ margin: 0 }}
-                    />
-                  }
-                  onPress={() => openLink(post.permalink || post.url)}
-                  groupPosition={
-                    index === 0
-                      ? "top"
-                      : index === posts.length - 1
-                        ? "bottom"
-                        : "middle"
-                  }
-                />
-              </HapticPressable>
+                onLongPressImage={() => handleLongPressImage(post.thumbnail!)}
+              />
             ))}
           </View>
         )}
@@ -342,28 +397,6 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
         fileName="Post Thumbnail"
         fileSize="Image"
         onClose={() => setImageModalVisible(false)}
-      />
-
-      {/* Content Drawer */}
-      <ContentDrawer
-        visible={contentDrawerVisible}
-        onDismiss={() => {
-          setContentDrawerVisible(false);
-          setSelectedPost(null);
-        }}
-        title={selectedPost?.title || "Post"}
-        content={content}
-        metadata={{
-          score: selectedPost?.score,
-          author: selectedPost?.author,
-          comments: selectedPost?.comments,
-          source: selectedPost?.subreddit
-            ? `r/${selectedPost.subreddit}`
-            : undefined,
-        }}
-        actionUrl={selectedPost?.permalink || ""}
-        actionLabel="Open on Reddit"
-        loading={contentLoading}
       />
     </>
   );

@@ -253,7 +253,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
           backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.xxl,
           paddingHorizontal: spacing.md,
-          paddingBottom: spacing.md,
+          paddingVertical: spacing.md,
         },
         getComponentElevation("widget", theme),
       ])}

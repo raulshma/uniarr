@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { logger } from "@/services/logger/LoggerService";
+import { stripHtmlTags } from "@/utils/html.utils";
 
 /**
  * Lazy fetch full Reddit post content (selftext) when drawer opens
@@ -37,7 +38,9 @@ export const useRedditPostContent = (permalink: string) => {
 
         if (postData) {
           const selftext = postData.selftext || "";
-          setContent(selftext.substring(0, 500)); // Limit to 500 chars for performance
+          // Strip any HTML entities that might be present
+          const cleanedText = stripHtmlTags(selftext);
+          setContent(cleanedText.substring(0, 500)); // Limit to 500 chars for performance
         } else {
           setContent("");
         }
