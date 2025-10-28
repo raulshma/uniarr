@@ -6,9 +6,11 @@ import React, {
   useState,
   useRef,
   useMemo,
+  lazy,
+  Suspense,
 } from "react";
 import type { ReactNode } from "react";
-import { Portal } from "react-native-paper";
+import { Portal, ActivityIndicator } from "react-native-paper";
 import CustomConfirm from "./CustomConfirm";
 import CustomAlert from "./CustomAlert";
 import {
@@ -17,6 +19,12 @@ import {
   registerCustomDialogPresenter,
   unregisterCustomDialogPresenter,
 } from "@/services/dialogService";
+
+const UpdateDialog = lazy(() =>
+  import("@/components/common/UpdateDialog").then((module) => ({
+    default: module.UpdateDialog,
+  })),
+);
 
 type DialogPayload = {
   title: string;
@@ -117,16 +125,17 @@ const CustomDialogRenderer = ({
 
   // Dynamically import and render custom dialogs based on type
   if (current.type === "updateCheck") {
-    const { UpdateDialog } = require("@/components/common/UpdateDialog");
     return (
       <Portal>
-        <UpdateDialog
-          visible
-          updateData={current.payload.updateData}
-          isLoading={current.payload.isLoading}
-          error={current.payload.error}
-          onDismiss={onDismiss}
-        />
+        <Suspense fallback={<ActivityIndicator animating={true} />}>
+          <UpdateDialog
+            visible
+            updateData={current.payload.updateData}
+            isLoading={current.payload.isLoading}
+            error={current.payload.error}
+            onDismiss={onDismiss}
+          />
+        </Suspense>
       </Portal>
     );
   }
