@@ -3,6 +3,7 @@ import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import { FlashList } from "@shopify/flash-list";
+import type { ListRenderItemInfo } from "@shopify/flash-list";
 
 import type { AppTheme } from "@/constants/theme";
 import type { MediaRelease } from "@/models/calendar.types";
@@ -13,6 +14,8 @@ export type CalendarListViewProps = {
   onReleasePress?: (releaseId: string) => void;
   style?: StyleProp<ViewStyle>;
 };
+
+type ReleasesByDate = { date: string; releases: MediaRelease[] };
 
 const CalendarListView: React.FC<CalendarListViewProps> = ({
   releases,
@@ -59,7 +62,7 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
     },
   });
 
-  const releasesByDate = useMemo(() => {
+  const releasesByDate = useMemo<ReleasesByDate[]>(() => {
     const grouped: { [date: string]: MediaRelease[] } = {};
 
     releases.forEach((release) => {
@@ -111,9 +114,8 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
 
   const renderDateSection = ({
     item,
-  }: {
-    item: { date: string; releases: MediaRelease[] };
-  }) => {
+    index,
+  }: ListRenderItemInfo<ReleasesByDate>) => {
     const { relativeDate, fullDate } = formatDate(item.date);
 
     return (
@@ -127,6 +129,7 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
               key={release.id}
               release={release}
               onPress={() => onReleasePress?.(release.id)}
+              animated={false}
             />
           ))}
         </View>
@@ -148,12 +151,14 @@ const CalendarListView: React.FC<CalendarListViewProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      <FlashList
+      <FlashList<ReleasesByDate>
         data={releasesByDate}
         renderItem={renderDateSection}
-        keyExtractor={(item) => item.date}
+        keyExtractor={(item: ReleasesByDate) => item.date}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
       />
     </View>
   );

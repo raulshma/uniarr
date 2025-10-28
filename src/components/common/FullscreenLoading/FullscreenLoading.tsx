@@ -1,6 +1,7 @@
 import React from "react";
-import { StyleSheet, View } from "react-native";
-import { ActivityIndicator, Text, useTheme } from "react-native-paper";
+import { StyleSheet } from "react-native";
+import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
+import { ActivityIndicator, useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
 
@@ -16,27 +17,32 @@ const FullscreenLoading: React.FC<FullscreenLoadingProps> = ({
   const theme = useTheme<AppTheme>();
 
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(200)}
       style={[styles.container, { backgroundColor: "rgba(0,0,0,0.9)" }]}
       accessibilityRole="progressbar"
       accessibilityLabel={message}
       testID={testID}
     >
-      <ActivityIndicator
-        size="large"
-        color={theme.colors.primary}
-        animating
+      <Animated.View
+        entering={ZoomIn.duration(300).delay(100)}
         style={styles.spinner}
-      />
+      >
+        <ActivityIndicator
+          size="large"
+          color={theme.colors.primary}
+          animating
+        />
+      </Animated.View>
       {message ? (
-        <Text
+        <Animated.Text
+          entering={FadeIn.duration(300).delay(200)}
           style={[styles.message, { color: "rgba(255,255,255,0.9)" }]}
-          variant="headlineSmall"
         >
           {message}
-        </Text>
+        </Animated.Text>
       ) : null}
-    </View>
+    </Animated.View>
   );
 };
 

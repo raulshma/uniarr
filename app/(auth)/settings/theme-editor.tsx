@@ -1,11 +1,9 @@
 import React, { useState, useMemo } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
   Button,
-  Card,
   Chip,
-  List,
   Portal,
   SegmentedButtons,
   Switch,
@@ -22,11 +20,20 @@ import { router } from "expo-router";
 
 import { useThemeEditor } from "@/hooks/useThemeEditor";
 import { ColorPicker } from "@/components/common/ColorPicker";
+import {
+  AnimatedListItem,
+  AnimatedScrollView,
+  AnimatedSection,
+  SettingsGroup,
+  SettingsListItem,
+} from "@/components/common";
+import { TabHeader } from "@/components/common/TabHeader";
 import type { AppTheme } from "@/constants/theme";
-import { DensityMode } from "@/theme/spacing";
+import { DensityMode, spacing } from "@/theme/spacing";
 import { FontScale } from "@/theme/typography";
 import { presetThemes } from "@/theme/colors";
 import { borderRadius } from "@/constants/sizes";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const PRESET_NAMES = {
   uniarr: "UniArr",
@@ -72,6 +79,7 @@ export default function ThemeEditorScreen() {
   } = useThemeEditor();
 
   const [showColorPicker, setShowColorPicker] = useState<string | null>(null);
+  const animationsEnabled = shouldAnimateLayout(isLoading, false);
 
   const handlePresetChange = (preset: keyof typeof presetThemes) => {
     updateConfig({ preset, customColors: undefined });
@@ -132,12 +140,11 @@ export default function ThemeEditorScreen() {
       StyleSheet.create({
         container: {
           flex: 1,
+          backgroundColor: theme.colors.background,
         },
-        safeArea: {
-          flex: 1,
-        },
-        scrollContent: {
-          paddingBottom: 16,
+        scrollContainer: {
+          paddingHorizontal: spacing.sm,
+          paddingBottom: spacing.xxxxl,
         },
         centered: {
           justifyContent: "center",
@@ -148,37 +155,54 @@ export default function ThemeEditorScreen() {
           textAlign: "center",
         },
         section: {
-          margin: theme.custom.spacing.md,
-          marginBottom: theme.custom.spacing.xs,
+          marginTop: spacing.md,
+        },
+        sectionTitle: {
+          color: theme.colors.onBackground,
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontFamily: theme.custom.typography.titleMedium.fontFamily,
+          lineHeight: theme.custom.typography.titleMedium.lineHeight,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+          marginBottom: spacing.sm,
+          paddingHorizontal: spacing.xs,
         },
         presetGrid: {
           flexDirection: "row",
           flexWrap: "wrap",
-          gap: 8,
+          gap: spacing.xs,
+          marginTop: spacing.xs,
         },
         presetChip: {
-          margin: theme.custom.spacing.xs,
+          borderRadius: borderRadius.lg,
+          height: 32,
         },
         colorPreview: {
           width: 24,
           height: 24,
-          borderRadius: 12,
+          borderRadius: borderRadius.lg,
           borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
         },
         numberInput: {
           width: 60,
           textAlign: "center",
           borderWidth: 1,
-          borderRadius: 8,
+          borderRadius: borderRadius.sm,
           paddingVertical: 6,
+          backgroundColor: theme.colors.surfaceVariant,
+          color: theme.colors.onSurface,
+          borderColor: theme.colors.outlineVariant,
         },
         previewContainer: {
-          padding: theme.custom.spacing.md,
-          borderRadius: theme.custom.sizes.borderRadius.lg,
+          padding: spacing.md,
+          borderRadius: borderRadius.lg,
           borderWidth: 1,
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.outlineVariant,
         },
         previewCard: {
-          padding: theme.custom.spacing.md,
+          padding: spacing.md,
           shadowColor: "#000",
           shadowOffset: {
             width: 0,
@@ -187,13 +211,17 @@ export default function ThemeEditorScreen() {
           shadowOpacity: 0.25,
           shadowRadius: 3.84,
           elevation: 5,
+          borderRadius: config.posterStyle.borderRadius,
+          backgroundColor: previewTheme.colors.surfaceVariant,
         },
         actions: {
           flexDirection: "row",
           justifyContent: "space-between",
-          padding: theme.custom.spacing.md,
-          paddingTop: theme.custom.spacing.xs,
+          padding: spacing.md,
+          paddingTop: spacing.xs,
           borderTopWidth: 1,
+          borderTopColor: theme.colors.outlineVariant,
+          backgroundColor: theme.colors.surface,
         },
         footer: {
           position: "absolute",
@@ -205,10 +233,14 @@ export default function ThemeEditorScreen() {
         },
         actionButton: {
           flex: 1,
-          marginHorizontal: theme.custom.spacing.xs,
+          marginHorizontal: spacing.xs,
         },
       }),
-    [theme],
+    [
+      theme,
+      config.posterStyle.borderRadius,
+      previewTheme.colors.surfaceVariant,
+    ],
   );
 
   if (isLoading) {
@@ -221,74 +253,117 @@ export default function ThemeEditorScreen() {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
-    >
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 96 + insets.bottom },
-        ]}
+    <SafeAreaView style={styles.container}>
+      <AnimatedScrollView
+        contentContainerStyle={styles.scrollContainer}
+        animated={animationsEnabled}
       >
-        <Card style={styles.section}>
-          <Card.Title title="Theme Presets" />
-          <Card.Content>
-            <View style={styles.presetGrid}>
-              {Object.entries(presetThemes).map(([key, scheme]) => (
-                <Chip
-                  key={key}
-                  selected={config.preset === key}
-                  onPress={() =>
-                    handlePresetChange(key as keyof typeof presetThemes)
-                  }
-                  style={[
-                    styles.presetChip,
-                    {
-                      backgroundColor:
+        {/* Header */}
+        <TabHeader
+          title="Theme Editor"
+          leftAction={{
+            icon: "arrow-left",
+            onPress: () => router.back(),
+            accessibilityLabel: "Go back",
+          }}
+        />
+        {/* Theme Presets Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Theme Presets</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+              style={{
+                padding: spacing.sm,
+                paddingTop: spacing.xxs,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <View style={styles.presetGrid}>
+                {Object.entries(presetThemes).map(([key, scheme]) => (
+                  <Chip
+                    key={key}
+                    selected={config.preset === key}
+                    onPress={() =>
+                      handlePresetChange(key as keyof typeof presetThemes)
+                    }
+                    style={[
+                      styles.presetChip,
+                      {
+                        backgroundColor:
+                          config.preset === key
+                            ? theme.colors.primaryContainer
+                            : theme.colors.surfaceVariant,
+                      },
+                    ]}
+                    textStyle={{
+                      color:
                         config.preset === key
-                          ? theme.colors.primaryContainer
-                          : theme.colors.surfaceVariant,
-                    },
-                  ]}
-                >
-                  {PRESET_NAMES[key as keyof typeof PRESET_NAMES]}
-                </Chip>
-              ))}
-            </View>
-          </Card.Content>
-        </Card>
+                          ? theme.colors.onPrimaryContainer
+                          : theme.colors.onSurfaceVariant,
+                      fontSize: 12,
+                    }}
+                  >
+                    {PRESET_NAMES[key as keyof typeof PRESET_NAMES]}
+                  </Chip>
+                ))}
+              </View>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
 
-        <Card style={styles.section}>
-          <Card.Title title="Custom Colors" />
-          <Card.Content>
-            <List.Section>
-              <List.Item
+        {/* Custom Colors Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={100}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Custom Colors</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
                 title="Primary Color"
-                description={
-                  config.customColors?.primary || "Using preset color"
-                }
-                onPress={() => setShowColorPicker("primary")}
-                right={() => (
+                subtitle={config.customColors?.primary || "Using preset color"}
+                left={{ iconName: "palette" }}
+                trailing={
                   <View
                     style={[
                       styles.colorPreview,
                       {
                         backgroundColor:
                           config.customColors?.primary || theme.colors.primary,
-                        borderColor: theme.colors.outlineVariant,
                       },
                     ]}
                   />
-                )}
+                }
+                onPress={() => setShowColorPicker("primary")}
+                groupPosition="top"
               />
-              <List.Item
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
                 title="Secondary Color"
-                description={
+                subtitle={
                   config.customColors?.secondary || "Using preset color"
                 }
-                onPress={() => setShowColorPicker("secondary")}
-                right={() => (
+                left={{ iconName: "palette" }}
+                trailing={
                   <View
                     style={[
                       styles.colorPreview,
@@ -296,19 +371,26 @@ export default function ThemeEditorScreen() {
                         backgroundColor:
                           config.customColors?.secondary ||
                           theme.colors.secondary,
-                        borderColor: theme.colors.outlineVariant,
                       },
                     ]}
                   />
-                )}
+                }
+                onPress={() => setShowColorPicker("secondary")}
+                groupPosition="middle"
               />
-              <List.Item
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
                 title="Background Color"
-                description={
+                subtitle={
                   config.customColors?.background || "Using preset color"
                 }
-                onPress={() => setShowColorPicker("background")}
-                right={() => (
+                left={{ iconName: "palette" }}
+                trailing={
                   <View
                     style={[
                       styles.colorPreview,
@@ -316,105 +398,181 @@ export default function ThemeEditorScreen() {
                         backgroundColor:
                           config.customColors?.background ||
                           theme.colors.background,
-                        borderColor: theme.colors.outlineVariant,
                       },
                     ]}
                   />
-                )}
+                }
+                onPress={() => setShowColorPicker("background")}
+                groupPosition="bottom"
               />
-            </List.Section>
-          </Card.Content>
-        </Card>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
 
-        <Card style={styles.section}>
-          <Card.Title title="Typography" />
-          <Card.Content>
-            <SegmentedButtons
-              value={config.fontScale}
-              onValueChange={handleFontScaleChange}
-              buttons={[
-                { value: "small", label: "Small" },
-                { value: "medium", label: "Medium" },
-                { value: "large", label: "Large" },
-                { value: "extra-large", label: "Extra Large" },
-              ]}
-            />
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.section}>
-          <Card.Title title="Density" />
-          <Card.Content>
-            <SegmentedButtons
-              value={config.densityMode}
-              onValueChange={handleDensityChange}
-              buttons={[
-                { value: "compact", label: "Compact" },
-                { value: "comfortable", label: "Comfortable" },
-                { value: "spacious", label: "Spacious" },
-              ]}
-            />
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.section}>
-          <Card.Title title="Border Radius" />
-          <Card.Content>
-            <SegmentedButtons
-              value={config.globalBorderRadius || "md"}
-              onValueChange={handleGlobalBorderRadiusChange}
-              buttons={[
-                { value: "none", label: "None" },
-                { value: "xs", label: "XS" },
-                { value: "sm", label: "SM" },
-                { value: "md", label: "MD" },
-                { value: "lg", label: "LG" },
-                { value: "xl", label: "XL" },
-                { value: "xxl", label: "XXL" },
-                { value: "xxxl", label: "XXXL" },
-                { value: "round", label: "Round" },
-              ]}
-              style={{ marginTop: theme.custom.spacing.sm }}
-            />
-            <Text
-              variant="bodySmall"
-              style={{
-                marginTop: theme.custom.spacing.sm,
-                color: theme.colors.onSurfaceVariant,
-              }}
+        {/* Typography Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={150}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Typography</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
             >
-              Current: {borderRadius[config.globalBorderRadius || "md"]}px
-            </Text>
-          </Card.Content>
-        </Card>
+              <SegmentedButtons
+                value={config.fontScale}
+                onValueChange={handleFontScaleChange}
+                buttons={[
+                  { value: "small", label: "Small" },
+                  { value: "medium", label: "Medium" },
+                  { value: "large", label: "Large" },
+                  { value: "extra-large", label: "Extra Large" },
+                ]}
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
 
-        <Card style={styles.section}>
-          <Card.Title title="Display Options" />
-          <Card.Content>
-            <List.Section>
-              <List.Item
+        {/* Density Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={200}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Density</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SegmentedButtons
+                value={config.densityMode}
+                onValueChange={handleDensityChange}
+                buttons={[
+                  { value: "compact", label: "Compact" },
+                  { value: "comfortable", label: "Comfortable" },
+                  { value: "spacious", label: "Spacious" },
+                ]}
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* Border Radius Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Border Radius</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
+              style={{ padding: spacing.sm }}
+            >
+              <SegmentedButtons
+                value={config.globalBorderRadius || "md"}
+                onValueChange={handleGlobalBorderRadiusChange}
+                buttons={[
+                  { value: "none", label: "None" },
+                  { value: "xs", label: "XS" },
+                  { value: "sm", label: "SM" },
+                  { value: "md", label: "MD" },
+                  { value: "lg", label: "LG" },
+                ]}
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
+              style={{ padding: spacing.sm, paddingTop: spacing.none }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <SegmentedButtons
+                  value={config.globalBorderRadius || "md"}
+                  onValueChange={handleGlobalBorderRadiusChange}
+                  buttons={[
+                    { value: "xl", label: "XL" },
+                    { value: "xxl", label: "XXL" },
+                    { value: "xxxl", label: "XXXL" },
+                    { value: "round", label: "Round" },
+                  ]}
+                />
+                <Text
+                  variant="bodySmall"
+                  style={{
+                    marginLeft: spacing.sm,
+                    color: theme.colors.onSurfaceVariant,
+                  }}
+                >
+                  Current: {borderRadius[config.globalBorderRadius || "md"]}px
+                </Text>
+              </View>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* Display Options Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={300}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Display Options</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
                 title="OLED Mode"
-                description="Pure black backgrounds for OLED displays (dark mode only)"
-                right={() => (
+                subtitle="Pure black backgrounds for OLED displays (dark mode only)"
+                left={{ iconName: "monitor-star" }}
+                trailing={
                   <Switch
                     value={config.oledEnabled || false}
                     onValueChange={handleOledToggle}
                     color={theme.colors.primary}
                   />
-                )}
+                }
+                groupPosition="single"
               />
-            </List.Section>
-          </Card.Content>
-        </Card>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
 
-        <Card style={styles.section}>
-          <Card.Title title="Poster Style" />
-          <Card.Content>
-            <List.Section>
-              <List.Item
+        {/* Poster Style Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={350}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Poster Style</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
                 title="Border Radius"
-                description={`${config.posterStyle.borderRadius}px`}
-                right={() => (
+                subtitle={`${config.posterStyle.borderRadius}px`}
+                left={{ iconName: "image-outline" }}
+                trailing={
                   <TextInput
                     value={config.posterStyle.borderRadius.toString()}
                     onChangeText={(text) =>
@@ -423,23 +581,24 @@ export default function ThemeEditorScreen() {
                         parseInt(text) || 0,
                       )
                     }
-                    style={[
-                      styles.numberInput,
-                      {
-                        backgroundColor: theme.colors.surfaceVariant,
-                        color: theme.colors.onSurface,
-                        borderColor: theme.colors.outlineVariant,
-                      },
-                    ]}
+                    style={styles.numberInput}
                     keyboardType="numeric"
                     maxLength={2}
                   />
-                )}
+                }
+                groupPosition="top"
               />
-              <List.Item
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
                 title="Shadow Opacity"
-                description={`${config.posterStyle.shadowOpacity}`}
-                right={() => (
+                subtitle={`${config.posterStyle.shadowOpacity}`}
+                left={{ iconName: "blur" }}
+                trailing={
                   <TextInput
                     value={config.posterStyle.shadowOpacity.toString()}
                     onChangeText={(text) =>
@@ -448,23 +607,24 @@ export default function ThemeEditorScreen() {
                         parseFloat(text) || 0,
                       )
                     }
-                    style={[
-                      styles.numberInput,
-                      {
-                        backgroundColor: theme.colors.surfaceVariant,
-                        color: theme.colors.onSurface,
-                        borderColor: theme.colors.outlineVariant,
-                      },
-                    ]}
+                    style={styles.numberInput}
                     keyboardType="decimal-pad"
                     maxLength={4}
                   />
-                )}
+                }
+                groupPosition="middle"
               />
-              <List.Item
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
                 title="Shadow Radius"
-                description={`${config.posterStyle.shadowRadius}px`}
-                right={() => (
+                subtitle={`${config.posterStyle.shadowRadius}px`}
+                left={{ iconName: "shadow" }}
+                trailing={
                   <TextInput
                     value={config.posterStyle.shadowRadius.toString()}
                     onChangeText={(text) =>
@@ -473,62 +633,51 @@ export default function ThemeEditorScreen() {
                         parseInt(text) || 0,
                       )
                     }
-                    style={[
-                      styles.numberInput,
-                      {
-                        backgroundColor: theme.colors.surfaceVariant,
-                        color: theme.colors.onSurface,
-                        borderColor: theme.colors.outlineVariant,
-                      },
-                    ]}
+                    style={styles.numberInput}
                     keyboardType="numeric"
                     maxLength={2}
                   />
-                )}
+                }
+                groupPosition="bottom"
               />
-            </List.Section>
-          </Card.Content>
-        </Card>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
 
-        <Card style={styles.section}>
-          <Card.Title title="Preview" />
-          <Card.Content>
-            <View
-              style={[
-                styles.previewContainer,
-                {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.outlineVariant,
-                },
-              ]}
+        {/* Preview Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={400}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Preview</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
             >
-              <PaperProvider theme={previewTheme}>
-                <View
-                  style={[
-                    styles.previewCard,
-                    {
-                      borderRadius: config.posterStyle.borderRadius,
-                      backgroundColor: previewTheme.colors.surfaceVariant,
-                    },
-                  ]}
-                >
-                  <Text variant="titleMedium">Sample Title</Text>
-                  <Text
-                    variant="bodyMedium"
-                    style={{ opacity: 0.7, marginBottom: 12 }}
-                  >
-                    Sample subtitle text
-                  </Text>
-                  <Text variant="bodySmall">
-                    This is how your content will look with the current theme
-                    settings.
-                  </Text>
-                </View>
-              </PaperProvider>
-            </View>
-          </Card.Content>
-        </Card>
-      </ScrollView>
+              <View style={styles.previewContainer}>
+                <PaperProvider theme={previewTheme}>
+                  <View style={styles.previewCard}>
+                    <Text variant="titleMedium">Sample Title</Text>
+                    <Text
+                      variant="bodyMedium"
+                      style={{ opacity: 0.7, marginBottom: 12 }}
+                    >
+                      Sample subtitle text
+                    </Text>
+                    <Text variant="bodySmall">
+                      This is how your content will look with the current theme
+                      settings.
+                    </Text>
+                  </View>
+                </PaperProvider>
+              </View>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+      </AnimatedScrollView>
 
       <View
         style={[

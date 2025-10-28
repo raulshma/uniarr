@@ -12,6 +12,7 @@ import type { AppTheme } from "@/constants/theme";
 import type { DiscoverMediaItem } from "@/models/discover.types";
 import { spacing } from "@/theme/spacing";
 import { TmdbListItem } from "@/components/discover/tmdb/TmdbListItem";
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 
 interface Props {
   items: DiscoverMediaItem[];
@@ -33,6 +34,8 @@ export const TmdbResultsGrid: React.FC<Props> = ({
   isFetchingMore,
 }) => {
   const theme = useTheme<AppTheme>();
+  const allowAnimations = !refreshing && !isFetchingMore;
+  const totalItems = items.length;
 
   const styles = useMemo(
     () =>
@@ -53,8 +56,21 @@ export const TmdbResultsGrid: React.FC<Props> = ({
     [],
   );
 
-  const renderItem = ({ item }: { item: DiscoverMediaItem }) => (
-    <TmdbListItem item={item} onAdd={onAdd} onPress={onCardPress} />
+  const renderItem = ({
+    item,
+    index,
+  }: {
+    item: DiscoverMediaItem;
+    index: number;
+  }) => (
+    <AnimatedListItem
+      index={index}
+      totalItems={totalItems}
+      staggerDelay={60}
+      animated={allowAnimations}
+    >
+      <TmdbListItem item={item} onAdd={onAdd} onPress={onCardPress} />
+    </AnimatedListItem>
   );
 
   const renderEmpty = () => (
@@ -83,9 +99,9 @@ export const TmdbResultsGrid: React.FC<Props> = ({
   };
 
   return (
-    <FlashList
+    <FlashList<DiscoverMediaItem>
       data={items}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item: DiscoverMediaItem) => item.id}
       renderItem={renderItem}
       ListEmptyComponent={renderEmpty}
       ListFooterComponent={renderFooter}

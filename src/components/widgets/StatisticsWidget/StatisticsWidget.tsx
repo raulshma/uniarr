@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { StyleSheet, View, TouchableOpacity, Dimensions } from "react-native";
+import Animated from "react-native-reanimated";
 import {
   Text,
   IconButton,
@@ -18,6 +19,7 @@ import { borderRadius, iconSizes } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { secureStorage } from "@/services/storage/SecureStorage";
+import { COMPONENT_ANIMATIONS } from "@/utils/animations.utils";
 
 type StatisticsData = {
   shows: number;
@@ -420,28 +422,39 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
         </View>
       </View>
 
-      <View style={styles.content}>
+      <Animated.View
+        style={styles.content}
+        entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
+      >
         <View style={styles.statsGrid}>
           {statItems.slice(0, 4).map((item, index) => (
-            <TouchableOpacity
+            <Animated.View
               key={item.label}
-              style={styles.statCard}
-              onPress={() => handleStatCardPress(item.label)}
-              activeOpacity={0.7}
+              entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(
+                index,
+                100,
+              ).delay(150)}
+              style={[]}
             >
-              <View style={styles.statIconContainer}>
-                <MaterialCommunityIcons
-                  name={item.icon}
-                  size={24}
-                  color={theme.colors.onPrimaryContainer}
-                />
-              </View>
-              <Text style={styles.statNumber}>{item.number}</Text>
-              <Text style={styles.statLabel}>{item.label}</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.statCard}
+                onPress={() => handleStatCardPress(item.label)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.statIconContainer}>
+                  <MaterialCommunityIcons
+                    name={item.icon}
+                    size={24}
+                    color={theme.colors.onPrimaryContainer}
+                  />
+                </View>
+                <Text style={styles.statNumber}>{item.number}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
+              </TouchableOpacity>
+            </Animated.View>
           ))}
         </View>
-      </View>
+      </Animated.View>
 
       {/* Filter Selection Dialog */}
       <Portal>

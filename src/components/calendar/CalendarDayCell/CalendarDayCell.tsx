@@ -2,10 +2,16 @@ import React, { useMemo } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, View, Pressable } from "react-native";
 import { Text, useTheme } from "react-native-paper";
+import Animated from "react-native-reanimated";
 
 import type { AppTheme } from "@/constants/theme";
 import type { CalendarDay } from "@/models/calendar.types";
 import { MediaReleaseCard } from "../MediaReleaseCard";
+import {
+  AnimatedListItem,
+  AnimatedView,
+} from "@/components/common/AnimatedComponents";
+import { COMPONENT_ANIMATIONS } from "@/utils/animations.utils";
 
 export type CalendarDayCellProps = {
   day: CalendarDay;
@@ -15,6 +21,9 @@ export type CalendarDayCellProps = {
   onLongPress?: () => void;
   onReleasePress?: (releaseId: string) => void;
   style?: StyleProp<ViewStyle>;
+  animationIndex?: number;
+  staggerDelay?: number;
+  animated?: boolean;
 };
 
 const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
@@ -25,6 +34,9 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   onLongPress,
   onReleasePress,
   style,
+  animationIndex = 0,
+  staggerDelay = 40,
+  animated = true,
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -130,63 +142,79 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
     return [
       styles.pressable,
       pressed && {
-        opacity: 0.7,
         transform: [{ scale: 0.95 }],
       },
     ];
   };
 
   return (
-    <View style={[getContainerStyle(), style]}>
-      <Pressable
-        style={getPressableStyle}
-        onPress={onPress}
-        onLongPress={onLongPress}
-        android_ripple={{
-          color: theme.colors.onSurfaceVariant,
-          borderless: false,
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={`${day.date}${hasReleases ? `, ${day.releases.length} releases` : ""}`}
-        accessibilityState={{ selected: isSelected }}
+    <Animated.View style={[getContainerStyle(), style]}>
+      <AnimatedView
+        entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
+          animationIndex * staggerDelay,
+        )}
+        animated={animated}
       >
-        <View style={styles.content}>
-          <View style={styles.dateContainer}>
-            <Text style={[styles.dateText, getDateTextStyle()]}>
-              {dateNumber}
-            </Text>
-            {hasReleases && !isSelected && (
-              <View style={styles.selectedIndicator} />
-            )}
-          </View>
+        <Pressable
+          style={getPressableStyle}
+          onPress={onPress}
+          onLongPress={onLongPress}
+          android_ripple={{
+            color: theme.colors.onSurfaceVariant,
+            borderless: false,
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`${day.date}${hasReleases ? `, ${day.releases.length} releases` : ""}`}
+          accessibilityState={{ selected: isSelected }}
+        >
+          <View style={styles.content}>
+            <View style={styles.dateContainer}>
+              <Text style={[styles.dateText, getDateTextStyle()]}>
+                {dateNumber}
+              </Text>
+              {hasReleases && !isSelected && (
+                <View style={styles.selectedIndicator} />
+              )}
+            </View>
 
-          <View style={styles.releasesContainer}>
-            {visibleReleases.map((release, index) => (
-              <View
-                key={release.id}
-                style={[
-                  styles.releaseItem,
-                  index === visibleReleases.length - 1 &&
-                    styles.releaseItemLast,
-                ]}
-              >
-                <MediaReleaseCard
-                  release={release}
-                  compact
-                  onPress={() => onReleasePress?.(release.id)}
-                />
-              </View>
-            ))}
+            <View style={styles.releasesContainer}>
+              {visibleReleases.map((release, index) => (
+                <AnimatedListItem
+                  key={release.id}
+                  index={index}
+                  staggerDelay={staggerDelay}
+                  style={[
+                    styles.releaseItem,
+                    index === visibleReleases.length - 1 &&
+                      styles.releaseItemLast,
+                  ]}
+                  animated={animated}
+                >
+                  <MediaReleaseCard
+                    release={release}
+                    compact
+                    onPress={() => onReleasePress?.(release.id)}
+                    animated={false}
+                  />
+                </AnimatedListItem>
+              ))}
 
-            {hasMoreReleases && (
-              <View style={styles.moreIndicator}>
-                <Text style={styles.moreText}>+{moreCount} more</Text>
-              </View>
-            )}
+              {hasMoreReleases && (
+                <AnimatedView
+                  style={styles.moreIndicator}
+                  entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(
+                    (visibleReleases.length + 1) * staggerDelay,
+                  )}
+                  animated={animated}
+                >
+                  <Text style={styles.moreText}>+{moreCount} more</Text>
+                </AnimatedView>
+              )}
+            </View>
           </View>
-        </View>
-      </Pressable>
-    </View>
+        </Pressable>
+      </AnimatedView>
+    </Animated.View>
   );
 };
 

@@ -9,6 +9,12 @@ export { default as StatisticsWidget } from "./StatisticsWidget/StatisticsWidget
 export { default as CalendarPreviewWidget } from "./CalendarPreviewWidget/CalendarPreviewWidget";
 export { default as BookmarksWidget } from "./BookmarksWidget/BookmarksWidget";
 export type { BookmarksWidgetProps } from "./BookmarksWidget/BookmarksWidget.types";
+export { default as RssWidget } from "./RssWidget/RssWidget";
+export { default as RedditWidget } from "./RedditWidget/RedditWidget";
+export { default as HackerNewsWidget } from "./HackerNewsWidget/HackerNewsWidget";
+export { default as WeatherWidget } from "./WeatherWidget/WeatherWidget";
+export { default as YouTubeWidget } from "./YouTubeWidget/YouTubeWidget";
+export { default as TwitchWidget } from "./TwitchWidget/TwitchWidget";
 
 // Re-export widget types
 export type {

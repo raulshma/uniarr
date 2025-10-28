@@ -22,6 +22,7 @@ export interface AdGuardDashboardStats {
   dnsQueries: number;
   adsBlocked: number;
   trackersBlocked: number;
+  avgProcessingTimeSeconds?: number;
   blockedPercentage: number;
   topBlockedDomains: AdGuardTopEntry[];
   topQueriedDomains: AdGuardTopEntry[];

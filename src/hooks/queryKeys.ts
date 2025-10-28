@@ -49,14 +49,23 @@ export const queryKeys = {
     base: ["sonarr"] as const,
     service: (serviceId: string): QueryKeyBuilder =>
       ["sonarr", serviceId] as const,
-    seriesList: (serviceId: string): QueryKeyBuilder =>
-      [...queryKeys.sonarr.service(serviceId), "series"] as const,
+    seriesList: (
+      serviceId: string,
+      filters?: Record<string, unknown>,
+    ): QueryKeyBuilder =>
+      [
+        ...queryKeys.sonarr.service(serviceId),
+        "series",
+        filters ?? {},
+      ] as const,
     seriesDetail: (serviceId: string, seriesId: number): QueryKeyBuilder =>
       [...queryKeys.sonarr.service(serviceId), "series", seriesId] as const,
     qualityProfiles: (serviceId: string): QueryKeyBuilder =>
       [...queryKeys.sonarr.service(serviceId), "qualityProfiles"] as const,
     rootFolders: (serviceId: string): QueryKeyBuilder =>
       [...queryKeys.sonarr.service(serviceId), "rootFolders"] as const,
+    tags: (serviceId: string): QueryKeyBuilder =>
+      [...queryKeys.sonarr.service(serviceId), "tags"] as const,
     search: (
       serviceId: string,
       term: string,
@@ -74,14 +83,23 @@ export const queryKeys = {
     base: ["radarr"] as const,
     service: (serviceId: string): QueryKeyBuilder =>
       ["radarr", serviceId] as const,
-    moviesList: (serviceId: string): QueryKeyBuilder =>
-      [...queryKeys.radarr.service(serviceId), "movies"] as const,
+    moviesList: (
+      serviceId: string,
+      filters?: Record<string, unknown>,
+    ): QueryKeyBuilder =>
+      [
+        ...queryKeys.radarr.service(serviceId),
+        "movies",
+        filters ?? {},
+      ] as const,
     movieDetail: (serviceId: string, movieId: number): QueryKeyBuilder =>
       [...queryKeys.radarr.service(serviceId), "movies", movieId] as const,
     qualityProfiles: (serviceId: string): QueryKeyBuilder =>
       [...queryKeys.radarr.service(serviceId), "qualityProfiles"] as const,
     rootFolders: (serviceId: string): QueryKeyBuilder =>
       [...queryKeys.radarr.service(serviceId), "rootFolders"] as const,
+    tags: (serviceId: string): QueryKeyBuilder =>
+      [...queryKeys.radarr.service(serviceId), "tags"] as const,
     search: (
       serviceId: string,
       term: string,
@@ -316,8 +334,13 @@ export const queryKeys = {
   discover: {
     base: ["discover"] as const,
     unified: ["discover", "unified"] as const,
+    releases: ["discover", "releases"] as const,
     jikanDetail: (malId: number): QueryKeyBuilder =>
       ["discover", "jikan", "detail", malId] as const,
+  },
+  app: {
+    base: ["app"] as const,
+    updateCheck: ["app", "updateCheck"] as const,
   },
   tmdb: {
     base: ["tmdb"] as const,

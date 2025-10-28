@@ -24,3 +24,10 @@ declare module "*.webp" {
   const content: ImageSourcePropType;
   export default content;
 }
+
+declare module "@shopify/flash-list" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface FlashListProps<ItemT> {
+    estimatedItemSize?: number;
+  }
+}

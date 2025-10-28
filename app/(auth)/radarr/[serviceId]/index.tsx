@@ -4,23 +4,40 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
-import { Chip, Searchbar, Text, useTheme } from "react-native-paper";
+import {
+  Chip,
+  Icon,
+  Searchbar,
+  Text,
+  TouchableRipple,
+  useTheme,
+} from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Animations disabled on this list page for snappy UX. Detail pages keep animations.
 
+import {
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton/";
+import { LibraryFilterModal } from "@/components/library/LibraryFilterModal";
 import MovieListItem from "@/components/media/MediaCard/MovieListItem";
 import { MovieListItemSkeleton } from "@/components/media/MediaCard";
 import type { MediaDownloadStatus } from "@/components/media/MediaCard";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useRadarrMovies } from "@/hooks/useRadarrMovies";
+import { useRadarrFilterMetadata } from "@/hooks/useLibraryFilterMetadata";
 import type { Movie } from "@/models/movie.types";
 import { logger } from "@/services/logger/LoggerService";
+import {
+  useLibraryFilterStore,
+  type LibraryFilters,
+} from "@/store/libraryFilterStore";
 import { spacing } from "@/theme/spacing";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const FILTER_ALL = "all";
 const FILTER_OWNED = "owned";
@@ -80,9 +97,57 @@ const RadarrMoviesListScreen = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterValue, setFilterValue] = useState<FilterValue>(FILTER_ALL);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+
+  // Advanced filter state from store - ensure fallback stays referentially stable
+  const defaultFilters = useMemo<LibraryFilters>(
+    () => ({
+      tags: [],
+      qualityProfileId: undefined,
+      monitored: undefined,
+    }),
+    [],
+  );
+
+  const filtersFromStore = useLibraryFilterStore(
+    useCallback(
+      (state) => state.serviceFilters[serviceId]?.filters,
+      [serviceId],
+    ),
+  );
+  const filters = filtersFromStore ?? defaultFilters;
+
+  const filterMetadata = useLibraryFilterStore(
+    useCallback(
+      (state) => state.serviceFilters[serviceId]?.metadata,
+      [serviceId],
+    ),
+  );
+
+  const hasActiveFilters = useLibraryFilterStore(
+    useCallback(
+      (state) => {
+        const serviceFilters = state.serviceFilters[serviceId]?.filters;
+        if (!serviceFilters) return false;
+        return (
+          serviceFilters.tags.length > 0 ||
+          serviceFilters.qualityProfileId !== undefined ||
+          serviceFilters.monitored !== undefined
+        );
+      },
+      [serviceId],
+    ),
+  );
+  const setServiceFilters = useLibraryFilterStore((state) => state.setFilters);
+  const clearServiceFilters = useLibraryFilterStore(
+    (state) => state.resetFilters,
+  );
+
+  // Fetch filter metadata
+  useRadarrFilterMetadata({ serviceId });
 
   const { movies, isLoading, isFetching, isError, error, refetch } =
-    useRadarrMovies(serviceId);
+    useRadarrMovies({ serviceId, filters });
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -148,6 +213,56 @@ const RadarrMoviesListScreen = () => {
 
   const isRefreshing = isFetching && !isLoading;
   const isInitialLoad = isBootstrapping || isLoading;
+  const animationsEnabled = shouldAnimateLayout(
+    isLoading || isBootstrapping,
+    isFetching,
+  );
+
+  // Advanced filter handlers
+  const handleOpenFilterModal = useCallback(() => {
+    setIsFilterModalVisible(true);
+  }, []);
+
+  const handleCloseFilterModal = useCallback(() => {
+    setIsFilterModalVisible(false);
+  }, []);
+
+  const handleApplyFilters = useCallback(
+    (newFilters: typeof filters) => {
+      setServiceFilters(serviceId, newFilters);
+      setIsFilterModalVisible(false);
+    },
+    [serviceId, setServiceFilters],
+  );
+
+  const handleResetFilters = useCallback(() => {
+    clearServiceFilters(serviceId);
+    setIsFilterModalVisible(false);
+  }, [serviceId, clearServiceFilters]);
+
+  const handleRemoveTag = useCallback(
+    (tagId: number) => {
+      setServiceFilters(serviceId, {
+        ...filters,
+        tags: filters.tags.filter((id) => id !== tagId),
+      });
+    },
+    [serviceId, filters, setServiceFilters],
+  );
+
+  const handleRemoveQualityProfile = useCallback(() => {
+    setServiceFilters(serviceId, {
+      ...filters,
+      qualityProfileId: undefined,
+    });
+  }, [serviceId, filters, setServiceFilters]);
+
+  const handleRemoveMonitoredFilter = useCallback(() => {
+    setServiceFilters(serviceId, {
+      ...filters,
+      monitored: undefined,
+    });
+  }, [serviceId, filters, setServiceFilters]);
 
   const filteredMovies = useMemo(() => {
     if (!movies) {
@@ -306,27 +421,33 @@ const RadarrMoviesListScreen = () => {
   const renderMovieItem = useCallback(
     ({ item, index }: { item: Movie; index: number }) => {
       return (
-        <View>
-          <MovieListItem
-            id={item.id}
-            title={item.title}
-            year={item.year}
-            runtime={item.runtime}
-            sizeOnDisk={item.statistics?.sizeOnDisk}
-            status={item.status}
-            subtitle={item.studio}
-            monitored={item.monitored}
-            downloadStatus={deriveDownloadStatus(item)}
-            posterUri={item.posterUrl}
-            genres={item.genres}
-            studio={item.studio}
-            statistics={item.statistics}
-            onPress={() => handleMoviePress(item)}
-          />
-        </View>
+        <AnimatedListItem
+          index={index}
+          totalItems={filteredMovies.length}
+          animated={animationsEnabled}
+        >
+          <View>
+            <MovieListItem
+              id={item.id}
+              title={item.title}
+              year={item.year}
+              runtime={item.runtime}
+              sizeOnDisk={item.statistics?.sizeOnDisk}
+              status={item.status}
+              subtitle={item.studio}
+              monitored={item.monitored}
+              downloadStatus={deriveDownloadStatus(item)}
+              posterUri={item.posterUrl}
+              genres={item.genres}
+              studio={item.studio}
+              statistics={item.statistics}
+              onPress={() => handleMoviePress(item)}
+            />
+          </View>
+        </AnimatedListItem>
       );
     },
-    [handleMoviePress],
+    [animationsEnabled, filteredMovies.length, handleMoviePress],
   );
 
   const keyExtractor = useCallback((item: Movie) => item.id.toString(), []);
@@ -334,7 +455,11 @@ const RadarrMoviesListScreen = () => {
   // Header used as the FlashList ListHeaderComponent
   const listHeader = useMemo(
     () => (
-      <View style={styles.listHeader}>
+      <AnimatedSection
+        animated={animationsEnabled}
+        style={styles.listHeader}
+        delay={50}
+      >
         <View style={styles.headerRow}>
           <View>
             <Text variant="headlineSmall" style={styles.headerTitle}>
@@ -392,41 +517,145 @@ const RadarrMoviesListScreen = () => {
             ))}
           </ScrollView>
         </View>
-      </View>
+        {/* Advanced Filters Button */}
+        <View style={{ marginBottom: spacing.md }}>
+          <TouchableRipple
+            borderless={false}
+            style={[
+              styles.filterChip,
+              hasActiveFilters && styles.filterChipSelected,
+            ]}
+            onPress={handleOpenFilterModal}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Icon
+                source="filter-variant"
+                size={16}
+                color={
+                  hasActiveFilters
+                    ? theme.colors.onPrimary
+                    : theme.colors.onSurfaceVariant
+                }
+              />
+              <Text
+                variant="bodyMedium"
+                style={[
+                  styles.filterChipText,
+                  { marginLeft: spacing.xs },
+                  hasActiveFilters && styles.filterChipTextSelected,
+                ]}
+              >
+                Advanced Filters
+                {hasActiveFilters && " (Active)"}
+              </Text>
+            </View>
+          </TouchableRipple>
+        </View>
+        {/* Active Filter Chips */}
+        {hasActiveFilters && (
+          <View style={{ marginBottom: spacing.md }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                gap: spacing.sm,
+              }}
+            >
+              {filters.tags.map((tagId) => {
+                const tag = filterMetadata?.tags.find((t) => t.id === tagId);
+                return tag ? (
+                  <Chip
+                    key={tagId}
+                    mode="flat"
+                    onClose={() => handleRemoveTag(tagId)}
+                    style={{ backgroundColor: theme.colors.primaryContainer }}
+                    textStyle={{ color: theme.colors.onPrimaryContainer }}
+                  >
+                    Tag: {tag.label}
+                  </Chip>
+                ) : null;
+              })}
+              {filters.qualityProfileId && (
+                <Chip
+                  mode="flat"
+                  onClose={handleRemoveQualityProfile}
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                  textStyle={{ color: theme.colors.onPrimaryContainer }}
+                >
+                  Quality:{" "}
+                  {
+                    filterMetadata?.qualityProfiles.find(
+                      (p) => p.id === filters.qualityProfileId,
+                    )?.name
+                  }
+                </Chip>
+              )}
+              {filters.monitored !== undefined && (
+                <Chip
+                  mode="flat"
+                  onClose={handleRemoveMonitoredFilter}
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                  textStyle={{ color: theme.colors.onPrimaryContainer }}
+                >
+                  {filters.monitored ? "Monitored" : "Unmonitored"}
+                </Chip>
+              )}
+            </ScrollView>
+          </View>
+        )}
+      </AnimatedSection>
     ),
     [
+      animationsEnabled,
       filteredMovies.length,
       totalMovies,
       handleAddMovie,
       searchTerm,
       filterValue,
       styles,
+      theme,
+      filters,
+      filterMetadata,
+      hasActiveFilters,
+      handleOpenFilterModal,
+      handleRemoveTag,
+      handleRemoveQualityProfile,
+      handleRemoveMonitoredFilter,
     ],
   );
 
   const listEmptyComponent = useMemo(() => {
     if (filteredMovies.length === 0 && totalMovies > 0) {
       return (
-        <View>
+        <AnimatedSection animated={animationsEnabled} delay={75}>
           <EmptyState
             title="No movies match your filters"
             description="Try a different search query or reset the filters."
             actionLabel="Clear filters"
             onActionPress={handleClearFilters}
           />
-        </View>
+        </AnimatedSection>
       );
     }
 
     return (
-      <EmptyState
-        title="No movies available"
-        description="Add a movie in Radarr or adjust your filters to see it here."
-        actionLabel="Add Movie"
-        onActionPress={handleAddMovie}
-      />
+      <AnimatedSection animated={animationsEnabled} delay={100}>
+        <EmptyState
+          title="No movies available"
+          description="Add a movie in Radarr or adjust your filters to see it here."
+          actionLabel="Add Movie"
+          onActionPress={handleAddMovie}
+        />
+      </AnimatedSection>
     );
-  }, [filteredMovies.length, handleAddMovie, handleClearFilters, totalMovies]);
+  }, [
+    animationsEnabled,
+    filteredMovies.length,
+    handleAddMovie,
+    handleClearFilters,
+    totalMovies,
+  ]);
 
   if (!hasValidServiceId) {
     return (
@@ -549,9 +778,18 @@ const RadarrMoviesListScreen = () => {
           renderItem={renderMovieItem}
           ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
           contentContainerStyle={styles.listContent}
+          estimatedItemSize={180}
+          removeClippedSubviews
+          keyboardShouldPersistTaps="handled"
           ListHeaderComponent={listHeader}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>{listEmptyComponent}</View>
+            <AnimatedSection
+              animated={animationsEnabled}
+              style={styles.emptyContainer}
+              delay={125}
+            >
+              {listEmptyComponent}
+            </AnimatedSection>
           }
           refreshControl={
             <ListRefreshControl
@@ -561,6 +799,14 @@ const RadarrMoviesListScreen = () => {
           }
         />
       </View>
+      <LibraryFilterModal
+        visible={isFilterModalVisible}
+        filters={filters}
+        metadata={filterMetadata}
+        onDismiss={handleCloseFilterModal}
+        onApply={handleApplyFilters}
+        onReset={handleResetFilters}
+      />
     </SafeAreaView>
   );
 };

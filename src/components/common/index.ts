@@ -10,6 +10,8 @@ export type { EmptyStateProps } from "./EmptyState";
 export { default as CustomConfirm } from "./CustomDialogs/CustomConfirm";
 export { default as CustomAlert } from "./CustomDialogs/CustomAlert";
 export { DialogProvider, useDialog } from "./CustomDialogs/DialogProvider";
+export { UpdateDialog } from "./UpdateDialog";
+export type { UpdateDialogProps } from "./UpdateDialog";
 
 export { ErrorBoundary } from "./ErrorBoundary";
 
@@ -28,6 +30,13 @@ export { OfflineIndicator } from "./OfflineIndicator";
 export { SkeletonPlaceholder, ListRowSkeleton } from "./Skeleton";
 
 export { TabHeader } from "./TabHeader";
+
+export { default as SettingsListItem } from "./SettingsListItem";
+export type { SettingsListItemProps, GroupPosition } from "./SettingsListItem";
+export { getGroupPositions } from "./SettingsListItem";
+
+export { default as SettingsGroup } from "./SettingsGroup";
+export type { SettingsGroupProps } from "./SettingsGroup";
 
 // Animated Components
 export {

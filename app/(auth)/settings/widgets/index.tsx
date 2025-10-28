@@ -11,21 +11,25 @@ import {
 } from "react-native-paper";
 
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { TabHeader } from "@/components/common/TabHeader";
-import { Card } from "@/components/common/Card";
 import {
   AnimatedListItem,
   AnimatedScrollView,
   AnimatedSection,
-} from "@/components/common/AnimatedComponents";
+  SettingsListItem,
+  SettingsGroup,
+} from "@/components/common";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const WidgetSettingsScreen = () => {
   const theme = useTheme<AppTheme>();
   const { onPress } = useHaptics();
+  const animationsEnabled = shouldAnimateLayout(false, false);
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [loading, setLoading] = useState(true);
   const [sizeDialogVisible, setSizeDialogVisible] = useState(false);
@@ -100,6 +104,61 @@ const WidgetSettingsScreen = () => {
     setSelectedWidget(widget);
     setSizeDialogVisible(true);
   };
+
+  const router = useRouter();
+
+  const handleConfigure = async (widget: Widget) => {
+    onPress();
+
+    switch (widget.type) {
+      case "service-status":
+        router.push("/(auth)/settings/connections");
+        return;
+      case "bookmarks":
+        router.push({
+          pathname: "/(auth)/settings/bookmarks",
+          params: { widgetId: widget.id },
+        });
+        return;
+      case "recent-activity":
+        router.push("/(auth)/settings/recent-activity-sources");
+        return;
+      case "shortcuts":
+      case "download-progress":
+      case "statistics":
+      case "calendar-preview":
+      case "rss-feed":
+      case "subreddit":
+      case "hacker-news":
+      case "weather":
+      case "youtube":
+      case "twitch":
+        router.push({
+          pathname: "/(auth)/settings/widgets/configure",
+          params: { widgetId: widget.id },
+        });
+        return;
+      default:
+        router.push("/(auth)/settings/widgets");
+    }
+  };
+
+  const isConfigurable = (widget: Widget) =>
+    [
+      "service-status",
+      "shortcuts",
+      "download-progress",
+      "recent-activity",
+      "statistics",
+      "calendar-preview",
+      "bookmarks",
+      "rss-feed",
+      "subreddit",
+      "hacker-news",
+      "weather",
+      "youtube",
+      "twitch",
+    ].includes(widget.type);
 
   const handleWidgetSizeChange = async (size: "small" | "medium" | "large") => {
     if (!selectedWidget) return;
@@ -181,19 +240,18 @@ const WidgetSettingsScreen = () => {
       backgroundColor: theme.colors.background,
     },
     scrollContainer: {
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.sm,
       paddingBottom: spacing.xxxxl,
     },
     section: {
       marginTop: spacing.md,
-      marginBottom: spacing.md,
     },
     sectionHeader: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       paddingHorizontal: spacing.xs,
-      marginBottom: spacing.md,
+      marginBottom: spacing.sm,
     },
     sectionTitle: {
       color: theme.colors.onBackground,
@@ -203,64 +261,9 @@ const WidgetSettingsScreen = () => {
       letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
       fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
     },
-    widgetCard: {
-      backgroundColor: theme.colors.elevation.level1,
-      marginHorizontal: spacing.xs,
-      marginVertical: spacing.xs / 2,
-      borderRadius: 8,
-      padding: spacing.sm,
-    },
-    widgetCardReordering: {
-      backgroundColor: theme.colors.elevation.level2,
-      borderWidth: 2,
-      borderColor: theme.colors.primary,
-    },
-    widgetContent: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
     reorderControls: {
       flexDirection: "row",
       gap: spacing.xxs,
-      marginRight: spacing.xs,
-    },
-    widgetIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: theme.colors.surfaceVariant,
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: spacing.sm,
-    },
-    widgetInfo: {
-      flex: 1,
-    },
-    widgetTitle: {
-      color: theme.colors.onSurface,
-      fontSize: theme.custom.typography.bodyMedium.fontSize,
-      fontFamily: theme.custom.typography.bodyMedium.fontFamily,
-      lineHeight: theme.custom.typography.bodyMedium.lineHeight,
-      letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
-      fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
-      marginBottom: 2,
-    },
-    widgetDescription: {
-      color: theme.colors.onSurfaceVariant,
-      fontSize: theme.custom.typography.bodySmall.fontSize,
-      fontFamily: theme.custom.typography.bodySmall.fontFamily,
-      lineHeight: theme.custom.typography.bodySmall.lineHeight,
-      letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
-      fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
-      marginBottom: 4,
-    },
-    widgetSize: {
-      color: theme.colors.primary,
-      fontSize: theme.custom.typography.labelSmall.fontSize,
-      fontFamily: theme.custom.typography.labelSmall.fontFamily,
-      lineHeight: theme.custom.typography.labelSmall.lineHeight,
-      letterSpacing: theme.custom.typography.labelSmall.letterSpacing,
-      fontWeight: theme.custom.typography.labelSmall.fontWeight as any,
     },
     widgetActions: {
       flexDirection: "row",
@@ -272,9 +275,10 @@ const WidgetSettingsScreen = () => {
       marginVertical: spacing.xs / 2,
     },
     resetButton: {
-      marginHorizontal: 0,
+      marginHorizontal: spacing.xs,
       marginTop: spacing.md,
       marginBottom: spacing.xl,
+      height: 40,
     },
     emptyState: {
       flex: 1,
@@ -312,10 +316,17 @@ const WidgetSettingsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AnimatedScrollView contentContainerStyle={styles.scrollContainer}>
+      <AnimatedScrollView
+        contentContainerStyle={styles.scrollContainer}
+        animated={animationsEnabled}
+      >
         <TabHeader title="Widget Settings" />
 
-        <AnimatedSection style={styles.section} delay={50}>
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Available Widgets</Text>
             {widgets.length > 0 && (
@@ -329,99 +340,107 @@ const WidgetSettingsScreen = () => {
               </Button>
             )}
           </View>
-          {(reorderingEnabled ? localWidgets : widgets).map((widget, index) => (
-            <AnimatedListItem
-              key={widget.id}
-              index={index}
-              totalItems={
-                reorderingEnabled ? localWidgets.length : widgets.length
-              }
-            >
-              <Card
-                variant="custom"
-                style={[
-                  styles.widgetCard,
-                  reorderingEnabled && styles.widgetCardReordering,
-                ]}
-              >
-                <View style={styles.widgetContent}>
-                  {reorderingEnabled && (
-                    <View style={styles.reorderControls}>
-                      <Button
-                        mode="text"
-                        compact
-                        icon="chevron-up"
-                        onPress={() => moveWidget(index, index - 1)}
-                        disabled={index === 0}
-                        style={{ opacity: index === 0 ? 0.5 : 1 }}
-                      >
-                        Up
-                      </Button>
-                      <Button
-                        mode="text"
-                        compact
-                        icon="chevron-down"
-                        onPress={() => moveWidget(index, index + 1)}
-                        disabled={
-                          index ===
-                          (reorderingEnabled
-                            ? localWidgets.length - 1
-                            : widgets.length - 1)
-                        }
-                        style={{
-                          opacity:
-                            index ===
-                            (reorderingEnabled
-                              ? localWidgets.length - 1
-                              : widgets.length - 1)
-                              ? 0.5
-                              : 1,
-                        }}
-                      >
-                        Down
-                      </Button>
-                    </View>
-                  )}
-                  <View style={styles.widgetIcon}>
-                    <MaterialCommunityIcons
-                      name={getWidgetIcon(widget.type)}
-                      size={20}
-                      color={theme.colors.primary}
+          <SettingsGroup>
+            {(reorderingEnabled ? localWidgets : widgets).map(
+              (widget, index) => {
+                const currentWidgets = reorderingEnabled
+                  ? localWidgets
+                  : widgets;
+                const isFirst = index === 0;
+                const isLast = index === currentWidgets.length - 1;
+                let groupPosition: "top" | "middle" | "bottom" | "single";
+                if (currentWidgets.length === 1) {
+                  groupPosition = "single";
+                } else if (isFirst) {
+                  groupPosition = "top";
+                } else if (isLast) {
+                  groupPosition = "bottom";
+                } else {
+                  groupPosition = "middle";
+                }
+
+                return (
+                  <AnimatedListItem
+                    key={widget.id}
+                    index={index}
+                    totalItems={currentWidgets.length}
+                    animated={animationsEnabled}
+                  >
+                    <SettingsListItem
+                      title={widget.title}
+                      subtitle={`${getWidgetDescription(widget.type)} • Size: ${getSizeLabel(widget.size)}`}
+                      left={{ iconName: getWidgetIcon(widget.type) }}
+                      trailing={
+                        reorderingEnabled ? (
+                          <View style={styles.reorderControls}>
+                            <Button
+                              mode="text"
+                              compact
+                              icon="chevron-up"
+                              onPress={() => moveWidget(index, index - 1)}
+                              disabled={index === 0}
+                              style={{ opacity: index === 0 ? 0.5 : 1 }}
+                            >
+                              Up
+                            </Button>
+                            <Button
+                              mode="text"
+                              compact
+                              icon="chevron-down"
+                              onPress={() => moveWidget(index, index + 1)}
+                              disabled={index === currentWidgets.length - 1}
+                              style={{
+                                opacity:
+                                  index === currentWidgets.length - 1 ? 0.5 : 1,
+                              }}
+                            >
+                              Down
+                            </Button>
+                          </View>
+                        ) : (
+                          <View style={styles.widgetActions}>
+                            {isConfigurable(widget) && (
+                              <Button
+                                mode="outlined"
+                                compact
+                                onPress={() => handleConfigure(widget)}
+                                style={{ height: 32 }}
+                              >
+                                Configure
+                              </Button>
+                            )}
+                            <Button
+                              mode="contained-tonal"
+                              compact
+                              onPress={() => handleWidgetSizePress(widget)}
+                              style={{ height: 32 }}
+                            >
+                              Resize
+                            </Button>
+                            <Switch
+                              value={widget.enabled}
+                              onValueChange={() =>
+                                handleToggleWidget(widget.id)
+                              }
+                              color={theme.colors.primary}
+                            />
+                          </View>
+                        )
+                      }
+                      groupPosition={groupPosition}
                     />
-                  </View>
-                  <View style={styles.widgetInfo}>
-                    <Text style={styles.widgetTitle}>{widget.title}</Text>
-                    <Text style={styles.widgetDescription}>
-                      {getWidgetDescription(widget.type)}
-                    </Text>
-                    <Text style={styles.widgetSize}>
-                      Size: {getSizeLabel(widget.size)}
-                    </Text>
-                  </View>
-                  {!reorderingEnabled && (
-                    <View style={styles.widgetActions}>
-                      <Button
-                        mode="contained-tonal"
-                        compact
-                        onPress={() => handleWidgetSizePress(widget)}
-                        style={{ height: 32 }}
-                      >
-                        Resize
-                      </Button>
-                      <Switch
-                        value={widget.enabled}
-                        onValueChange={() => handleToggleWidget(widget.id)}
-                        color={theme.colors.primary}
-                      />
-                    </View>
-                  )}
-                </View>
-              </Card>
-            </AnimatedListItem>
-          ))}
+                  </AnimatedListItem>
+                );
+              },
+            )}
+          </SettingsGroup>
         </AnimatedSection>
 
-        <AnimatedSection style={styles.section} delay={100}>
+        <AnimatedSection
+          style={styles.section}
+          delay={100}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Actions</Text>
           {reorderingEnabled && (
             <View style={{ gap: spacing.xs, marginBottom: spacing.md }}>
@@ -495,7 +514,14 @@ const WidgetSettingsScreen = () => {
             <Dialog.Content>
               <Text
                 style={{
-                  ...styles.widgetDescription,
+                  color: theme.colors.onSurfaceVariant,
+                  fontSize: theme.custom.typography.bodySmall.fontSize,
+                  fontFamily: theme.custom.typography.bodySmall.fontFamily,
+                  lineHeight: theme.custom.typography.bodySmall.lineHeight,
+                  letterSpacing:
+                    theme.custom.typography.bodySmall.letterSpacing,
+                  fontWeight: theme.custom.typography.bodySmall
+                    .fontWeight as any,
                   marginBottom: spacing.md,
                 }}
               >

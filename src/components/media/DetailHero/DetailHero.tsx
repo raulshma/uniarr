@@ -224,15 +224,18 @@ const DetailHero: React.FC<DetailHeroProps> = ({
               cachePolicy="memory-disk"
               priority="high"
             />
-            <Animated.View
-              style={[RNStyleSheet.absoluteFill, blurAnimatedStyle]}
-            >
-              <BlurView
-                intensity={80}
-                tint={theme.dark ? "dark" : "light"}
-                style={RNStyleSheet.absoluteFill}
-              />
-            </Animated.View>
+            {/* Blur opacity wrapped in inner animated view to prevent layout conflicts */}
+            <View style={RNStyleSheet.absoluteFill}>
+              <Animated.View
+                style={[RNStyleSheet.absoluteFill, blurAnimatedStyle]}
+              >
+                <BlurView
+                  intensity={80}
+                  tint={theme.dark ? "dark" : "light"}
+                  style={RNStyleSheet.absoluteFill}
+                />
+              </Animated.View>
+            </View>
             <LinearGradient
               colors={["transparent", theme.colors.background]}
               start={[0, 0.5]}

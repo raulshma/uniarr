@@ -1,6 +1,11 @@
 import React, { forwardRef, useMemo } from "react";
 import type { StyleProp, TextStyle, ViewStyle } from "react-native";
-import { StyleSheet } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import {
   Button as PaperButton,
   type ButtonProps as PaperButtonProps,
@@ -80,25 +85,44 @@ const Button = forwardRef<PaperButtonRef, ButtonProps>(
       }
     };
 
+    const scale = useSharedValue(1);
+
+    const animatedStyle = useAnimatedStyle(() => {
+      return {
+        transform: [{ scale: scale.value }],
+      };
+    });
+
     return (
-      <PaperButton
-        ref={ref}
-        mode={mode}
-        loading={loading}
-        disabled={isDisabled}
-        style={[
-          styles.base,
-          fullWidth ? styles.fullWidth : getAlignmentStyle(),
-          style,
-        ]}
-        contentStyle={combinedContentStyle}
-        labelStyle={combinedLabelStyle}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: isDisabled, busy: loading }}
-        {...rest}
+      <Pressable
+        onPressIn={() => {
+          scale.value = withSpring(0.95);
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1);
+        }}
       >
-        {children}
-      </PaperButton>
+        <Animated.View style={animatedStyle}>
+          <PaperButton
+            ref={ref}
+            mode={mode}
+            loading={loading}
+            disabled={isDisabled}
+            style={[
+              styles.base,
+              fullWidth ? styles.fullWidth : getAlignmentStyle(),
+              style,
+            ]}
+            contentStyle={combinedContentStyle}
+            labelStyle={combinedLabelStyle}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isDisabled, busy: loading }}
+            {...rest}
+          >
+            {children}
+          </PaperButton>
+        </Animated.View>
+      </Pressable>
     );
   },
 );

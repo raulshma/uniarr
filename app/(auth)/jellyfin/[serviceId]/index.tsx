@@ -18,7 +18,8 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Animations removed: using plain Views instead of reanimated Animated.Views
+
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { SeriesListItemSkeleton } from "@/components/media/skeletons";
@@ -69,6 +70,8 @@ const getInternalStringField = (
 };
 
 type CollectionSegmentKey = "movies" | "tv" | "music";
+
+type EnrichedJellyfinItem = JellyfinItem & { __posterSourceId?: string };
 
 const collectionSegments: readonly {
   readonly key: CollectionSegmentKey;
@@ -687,13 +690,15 @@ const JellyfinLibraryScreen = () => {
     return map;
   }, [seriesIds, seriesQueries]);
 
-  const displayItemsEnriched = useMemo(() => {
-    if (libraryState.activeSegment !== "tv") return displayItems;
+  const displayItemsEnriched = useMemo<EnrichedJellyfinItem[]>(() => {
+    if (libraryState.activeSegment !== "tv") {
+      return displayItems as EnrichedJellyfinItem[];
+    }
 
     const enriched = displayItems.map((it) => {
       const navId = getInternalStringField(it, "__navigationId") ?? it.Id;
       const meta = navId ? seriesMetaMap.get(navId) : undefined;
-      if (!meta) return it;
+      if (!meta) return it as EnrichedJellyfinItem;
 
       // Create a stable enriched item to prevent unnecessary re-renders
       const existingPosterSourceId = getInternalStringField(
@@ -736,7 +741,7 @@ const JellyfinLibraryScreen = () => {
               ?.ImageTags
           : (it as unknown as { ImageTags?: Record<string, string> })
               ?.ImageTags,
-      } as JellyfinItem & { __posterSourceId?: string };
+      } as EnrichedJellyfinItem;
     });
 
     return enriched;
@@ -1079,76 +1084,78 @@ const JellyfinLibraryScreen = () => {
       const navigationId = (item as any).__navigationId ?? item.Id;
 
       return (
-        <View>
-          <Pressable
-            style={({ pressed }) => [
-              styles.gridCard,
-              positionStyle,
-              pressed && styles.cardPressed,
-            ]}
-            onPress={() => handleOpenItem(navigationId)}
-          >
-            <View style={styles.posterFrame}>
-              <MediaPoster
-                key={`poster-${item.Id || item.Name || "unknown"}-${index}`}
-                uri={posterUri}
-                size={posterSize}
-                borderRadius={12}
-              />
-              {isPlayable ? (
-                <Pressable
-                  style={styles.gridPlayOverlay}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Play ${item.Name ?? "item"}`}
-                  onPress={(event) => {
-                    event.stopPropagation?.();
-                    handlePlayItem(
-                      item,
-                      item.UserData?.PlaybackPositionTicks ?? null,
-                    );
-                  }}
-                >
-                  <View style={styles.gridPlayButton}>
-                    <Icon
-                      source="play"
-                      size={20}
-                      color={theme.colors.onPrimary}
+        <AnimatedListItem index={index}>
+          <View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.gridCard,
+                positionStyle,
+                pressed && styles.cardPressed,
+              ]}
+              onPress={() => handleOpenItem(navigationId)}
+            >
+              <View style={styles.posterFrame}>
+                <MediaPoster
+                  key={`poster-${item.Id || item.Name || "unknown"}-${index}`}
+                  uri={posterUri}
+                  size={posterSize}
+                  borderRadius={12}
+                />
+                {isPlayable ? (
+                  <Pressable
+                    style={styles.gridPlayOverlay}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Play ${item.Name ?? "item"}`}
+                    onPress={(event) => {
+                      event.stopPropagation?.();
+                      handlePlayItem(
+                        item,
+                        item.UserData?.PlaybackPositionTicks ?? null,
+                      );
+                    }}
+                  >
+                    <View style={styles.gridPlayButton}>
+                      <Icon
+                        source="play"
+                        size={20}
+                        color={theme.colors.onPrimary}
+                      />
+                    </View>
+                  </Pressable>
+                ) : null}
+                {/* Download button overlay on poster */}
+                {connector && serviceId && item.Id && (
+                  <View style={styles.downloadOverlay}>
+                    <DownloadButton
+                      serviceConfig={connector.config}
+                      contentId={item.Id}
+                      size="small"
+                      variant="icon"
+                      onDownloadStart={() => {}}
+                      onDownloadError={() => {}}
                     />
                   </View>
-                </Pressable>
-              ) : null}
-              {/* Download button overlay on poster */}
-              {connector && serviceId && item.Id && (
-                <View style={styles.downloadOverlay}>
-                  <DownloadButton
-                    serviceConfig={connector.config}
-                    contentId={item.Id}
-                    size="small"
-                    variant="icon"
-                    onDownloadStart={() => {}}
-                    onDownloadError={() => {}}
-                  />
-                </View>
-              )}
-            </View>
-            <Text
-              variant="bodyMedium"
-              numberOfLines={2}
-              style={styles.gridTitle}
-            >
-              {item.Name ?? "Untitled"}
-            </Text>
-            {subtitle ? (
+                )}
+              </View>
               <Text
-                variant="bodySmall"
-                numberOfLines={1}
-                style={styles.gridSubtitle}
+                variant="bodyMedium"
+                numberOfLines={2}
+                style={styles.gridTitle}
               >
-                {subtitle}
+                {item.Name ?? "Untitled"}
               </Text>
-            ) : null}
-          </Pressable>
-        </View>
+              {subtitle ? (
+                <Text
+                  variant="bodySmall"
+                  numberOfLines={1}
+                  style={styles.gridSubtitle}
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
+            </Pressable>
+          </View>
+        </AnimatedListItem>
       );
     },
     [
@@ -1246,9 +1253,9 @@ const JellyfinLibraryScreen = () => {
               />
             </View>
 
-            <FlashList
+            <FlashList<JellyfinResumeItem>
               data={continueWatchingItems}
-              keyExtractor={(item, index) => {
+              keyExtractor={(item: JellyfinResumeItem, index: number) => {
                 // Create a unique key using item Id and index to prevent virtualized list recycling issues
                 const baseKey = item.Id || item.Name || "unknown";
                 return `${baseKey}-${index}`;
@@ -1424,9 +1431,9 @@ const JellyfinLibraryScreen = () => {
         ]}
         pointerEvents={libraryState.contentInteractive ? "auto" : "none"}
       >
-        <FlashList
+        <FlashList<EnrichedJellyfinItem>
           data={displayItemsEnriched}
-          keyExtractor={(item, index) => {
+          keyExtractor={(item: EnrichedJellyfinItem, index: number) => {
             // Create a unique key using item Id and index to prevent virtualized list recycling issues
             const baseKey = item.Id || item.Name || "unknown";
             return `${baseKey}-${index}`;

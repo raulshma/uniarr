@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import {
+  Chip,
   Icon,
   IconButton,
   Menu,
@@ -14,8 +15,11 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-// Animations disabled on this list page for snappy UX. Detail pages retain their animations.
 
+import {
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -28,12 +32,19 @@ import {
 } from "@/components/media/MediaSelector";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { SeriesListItemSkeleton } from "@/components/media/skeletons";
+import { LibraryFilterModal } from "@/components/library/LibraryFilterModal";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useSonarrSeries } from "@/hooks/useSonarrSeries";
+import { useSonarrFilterMetadata } from "@/hooks/useLibraryFilterMetadata";
 import type { Series } from "@/models/media.types";
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
+import {
+  useLibraryFilterStore,
+  type LibraryFilters,
+} from "@/store/libraryFilterStore";
 
 const FILTER_ALL = "all";
 const FILTER_MONITORED = "monitored";
@@ -74,9 +85,55 @@ const SonarrSeriesListScreen = () => {
   const [statusMenuVisible, setStatusMenuVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<Series | null>(null);
   const [isEditorVisible, setIsEditorVisible] = useState(false);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+
+  // Keep default filters stable to avoid infinite re-renders when store data is missing
+  const defaultFilters = useMemo<LibraryFilters>(
+    () => ({
+      tags: [],
+      qualityProfileId: undefined,
+      monitored: undefined,
+    }),
+    [],
+  );
+
+  const filtersFromStore = useLibraryFilterStore(
+    useCallback(
+      (state) => state.serviceFilters[serviceId]?.filters,
+      [serviceId],
+    ),
+  );
+  const filters = filtersFromStore ?? defaultFilters;
+
+  const filterMetadata = useLibraryFilterStore(
+    useCallback(
+      (state) => state.serviceFilters[serviceId]?.metadata,
+      [serviceId],
+    ),
+  );
+
+  const hasActiveFilters = useLibraryFilterStore(
+    useCallback(
+      (state) => {
+        const serviceFilters = state.serviceFilters[serviceId]?.filters;
+        if (!serviceFilters) return false;
+        return (
+          serviceFilters.tags.length > 0 ||
+          serviceFilters.qualityProfileId !== undefined ||
+          serviceFilters.monitored !== undefined
+        );
+      },
+      [serviceId],
+    ),
+  );
+  const setFilters = useLibraryFilterStore((state) => state.setFilters);
+  const resetFilters = useLibraryFilterStore((state) => state.resetFilters);
+
+  // Fetch filter metadata
+  useSonarrFilterMetadata({ serviceId });
 
   const { series, isLoading, isFetching, isError, error, refetch } =
-    useSonarrSeries(serviceId);
+    useSonarrSeries({ serviceId, filters });
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -143,6 +200,56 @@ const SonarrSeriesListScreen = () => {
 
   const isRefreshing = isFetching && !isLoading;
   const isInitialLoad = isBootstrapping || isLoading;
+  const animationsEnabled = shouldAnimateLayout(
+    isLoading || isBootstrapping,
+    isFetching,
+  );
+
+  // Advanced filter handlers
+  const handleOpenFilterModal = useCallback(() => {
+    setIsFilterModalVisible(true);
+  }, []);
+
+  const handleCloseFilterModal = useCallback(() => {
+    setIsFilterModalVisible(false);
+  }, []);
+
+  const handleApplyFilters = useCallback(
+    (newFilters: typeof filters) => {
+      setFilters(serviceId, newFilters);
+      setIsFilterModalVisible(false);
+    },
+    [serviceId, setFilters],
+  );
+
+  const handleResetFilters = useCallback(() => {
+    resetFilters(serviceId);
+    setIsFilterModalVisible(false);
+  }, [serviceId, resetFilters]);
+
+  const handleRemoveTag = useCallback(
+    (tagId: number) => {
+      setFilters(serviceId, {
+        ...filters,
+        tags: filters.tags.filter((id) => id !== tagId),
+      });
+    },
+    [serviceId, filters, setFilters],
+  );
+
+  const handleRemoveQualityProfile = useCallback(() => {
+    setFilters(serviceId, {
+      ...filters,
+      qualityProfileId: undefined,
+    });
+  }, [serviceId, filters, setFilters]);
+
+  const handleRemoveMonitoredFilter = useCallback(() => {
+    setFilters(serviceId, {
+      ...filters,
+      monitored: undefined,
+    });
+  }, [serviceId, filters, setFilters]);
 
   const filteredSeries = useMemo(() => {
     if (!series) {
@@ -364,67 +471,83 @@ const SonarrSeriesListScreen = () => {
         totalEpisodes > 0 ? Math.min(availableEpisodes / totalEpisodes, 1) : 0;
 
       return (
-        <View>
-          <MediaSelectableItem
-            item={item}
-            onPress={handleSeriesPress}
-            onLongPress={handleSeriesLongPress}
-            onPressSeries={handleSeriesPress}
-          >
-            <Pressable
-              style={({ pressed }) => [
-                styles.seriesCard,
-                pressed && styles.seriesCardPressed,
-              ]}
+        <AnimatedListItem
+          index={index}
+          totalItems={filteredSeries.length}
+          animated={animationsEnabled}
+        >
+          <View>
+            <MediaSelectableItem
+              item={item}
+              onPress={handleSeriesPress}
+              onLongPress={handleSeriesLongPress}
+              onPressSeries={handleSeriesPress}
             >
-              <MediaPoster
-                uri={item.posterUrl}
-                size={96}
-                borderRadius={16}
-                style={styles.seriesPoster}
-              />
-              <View style={styles.seriesMeta}>
-                <Text
-                  variant="titleMedium"
-                  numberOfLines={1}
-                  style={styles.seriesTitle}
-                >
-                  {item.title}
-                </Text>
-                <Text
-                  variant="bodyMedium"
-                  numberOfLines={1}
-                  style={styles.seriesStatus}
-                >
-                  {item.status ?? "Status unavailable"}
-                </Text>
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.round(progress * 100)}%` },
-                    ]}
-                  />
+              <Pressable
+                style={({ pressed }) => [
+                  styles.seriesCard,
+                  pressed && styles.seriesCardPressed,
+                ]}
+              >
+                <MediaPoster
+                  uri={item.posterUrl}
+                  size={96}
+                  borderRadius={16}
+                  style={styles.seriesPoster}
+                />
+                <View style={styles.seriesMeta}>
+                  <Text
+                    variant="titleMedium"
+                    numberOfLines={1}
+                    style={styles.seriesTitle}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    variant="bodyMedium"
+                    numberOfLines={1}
+                    style={styles.seriesStatus}
+                  >
+                    {item.status ?? "Status unavailable"}
+                  </Text>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${Math.round(progress * 100)}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text variant="bodySmall" style={styles.episodesMeta}>
+                    {totalEpisodes > 0
+                      ? `${availableEpisodes} / ${totalEpisodes} episodes`
+                      : "Episodes unavailable"}
+                  </Text>
                 </View>
-                <Text variant="bodySmall" style={styles.episodesMeta}>
-                  {totalEpisodes > 0
-                    ? `${availableEpisodes} / ${totalEpisodes} episodes`
-                    : "Episodes unavailable"}
-                </Text>
-              </View>
-            </Pressable>
-          </MediaSelectableItem>
-        </View>
+              </Pressable>
+            </MediaSelectableItem>
+          </View>
+        </AnimatedListItem>
       );
     },
-    [handleSeriesPress, handleSeriesLongPress, styles],
+    [
+      animationsEnabled,
+      filteredSeries.length,
+      handleSeriesLongPress,
+      handleSeriesPress,
+      styles,
+    ],
   );
 
   const keyExtractor = useCallback((item: Series) => item.id.toString(), []);
 
   const listHeader = useMemo(
     () => (
-      <View style={styles.listHeader}>
+      <AnimatedSection
+        animated={animationsEnabled}
+        style={styles.listHeader}
+        delay={50}
+      >
         <View style={styles.topBar}>
           <View style={styles.topBarSpacer} />
           <Text variant="headlineSmall" style={styles.topBarTitle}>
@@ -464,7 +587,10 @@ const SonarrSeriesListScreen = () => {
               anchor={
                 <TouchableRipple
                   borderless={false}
-                  style={styles.filterButton}
+                  style={[
+                    styles.filterButton,
+                    { flex: 1, marginRight: spacing.sm },
+                  ]}
                   onPress={() => setStatusMenuVisible(true)}
                 >
                   <View style={styles.filterButtonContent}>
@@ -491,11 +617,101 @@ const SonarrSeriesListScreen = () => {
                 />
               ))}
             </Menu>
+            <TouchableRipple
+              borderless={false}
+              style={[
+                styles.filterButton,
+                { flex: 1, marginLeft: spacing.sm },
+                hasActiveFilters && {
+                  backgroundColor: theme.colors.primaryContainer,
+                },
+              ]}
+              onPress={handleOpenFilterModal}
+            >
+              <View style={styles.filterButtonContent}>
+                <Icon
+                  source="filter-variant"
+                  size={20}
+                  color={
+                    hasActiveFilters
+                      ? theme.colors.onPrimaryContainer
+                      : theme.colors.onSurfaceVariant
+                  }
+                />
+                <Text
+                  variant="bodyMedium"
+                  style={[
+                    styles.filterButtonLabel,
+                    { marginLeft: spacing.sm },
+                    hasActiveFilters && {
+                      color: theme.colors.onPrimaryContainer,
+                    },
+                  ]}
+                >
+                  Advanced Filters
+                  {hasActiveFilters && " (Active)"}
+                </Text>
+              </View>
+            </TouchableRipple>
           </View>
         </View>
-      </View>
+        {/* Active Filter Chips */}
+        {hasActiveFilters && (
+          <View style={{ marginBottom: spacing.md }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                gap: spacing.sm,
+              }}
+            >
+              {filters.tags.map((tagId) => {
+                const tag = filterMetadata?.tags.find((t) => t.id === tagId);
+                return tag ? (
+                  <Chip
+                    key={tagId}
+                    mode="flat"
+                    onClose={() => handleRemoveTag(tagId)}
+                    style={{ backgroundColor: theme.colors.primaryContainer }}
+                    textStyle={{ color: theme.colors.onPrimaryContainer }}
+                  >
+                    Tag: {tag.label}
+                  </Chip>
+                ) : null;
+              })}
+              {filters.qualityProfileId && (
+                <Chip
+                  mode="flat"
+                  onClose={handleRemoveQualityProfile}
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                  textStyle={{ color: theme.colors.onPrimaryContainer }}
+                >
+                  Quality:{" "}
+                  {
+                    filterMetadata?.qualityProfiles.find(
+                      (p) => p.id === filters.qualityProfileId,
+                    )?.name
+                  }
+                </Chip>
+              )}
+              {filters.monitored !== undefined && (
+                <Chip
+                  mode="flat"
+                  onClose={handleRemoveMonitoredFilter}
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                  textStyle={{ color: theme.colors.onPrimaryContainer }}
+                >
+                  {filters.monitored ? "Monitored" : "Unmonitored"}
+                </Chip>
+              )}
+            </ScrollView>
+          </View>
+        )}
+      </AnimatedSection>
     ),
     [
+      animationsEnabled,
       filterValue,
       handleAddSeries,
       handleStatusChange,
@@ -503,30 +719,56 @@ const SonarrSeriesListScreen = () => {
       statusMenuVisible,
       styles,
       theme,
+      filters,
+      filterMetadata,
+      hasActiveFilters,
+      handleOpenFilterModal,
+      handleRemoveTag,
+      handleRemoveQualityProfile,
+      handleRemoveMonitoredFilter,
     ],
   );
 
   const listEmptyComponent = useMemo(() => {
     if (filteredSeries.length === 0 && totalSeries > 0) {
       return (
-        <EmptyState
-          title="No series match your filters"
-          description="Try a different search query or reset the filters."
-          actionLabel="Clear filters"
-          onActionPress={handleClearFilters}
-        />
+        <AnimatedSection
+          animated={animationsEnabled}
+          style={styles.emptyContainer}
+          delay={75}
+        >
+          <EmptyState
+            title="No series match your filters"
+            description="Try a different search query or reset the filters."
+            actionLabel="Clear filters"
+            onActionPress={handleClearFilters}
+          />
+        </AnimatedSection>
       );
     }
 
     return (
-      <EmptyState
-        title="No series available"
-        description="Add a series in Sonarr or adjust your filters to see it here."
-        actionLabel="Add Series"
-        onActionPress={handleAddSeries}
-      />
+      <AnimatedSection
+        animated={animationsEnabled}
+        style={styles.emptyContainer}
+        delay={100}
+      >
+        <EmptyState
+          title="No series available"
+          description="Add a series in Sonarr or adjust your filters to see it here."
+          actionLabel="Add Series"
+          onActionPress={handleAddSeries}
+        />
+      </AnimatedSection>
     );
-  }, [filteredSeries.length, handleAddSeries, handleClearFilters, totalSeries]);
+  }, [
+    animationsEnabled,
+    filteredSeries.length,
+    handleAddSeries,
+    handleClearFilters,
+    styles.emptyContainer,
+    totalSeries,
+  ]);
 
   if (!hasValidServiceId) {
     return (
@@ -617,16 +859,16 @@ const SonarrSeriesListScreen = () => {
     <MediaSelectorProvider>
       <SafeAreaView style={styles.safeArea}>
         <View style={{ flex: 1 }}>
-          <FlashList
+          <FlashList<Series>
             data={filteredSeries}
             keyExtractor={keyExtractor}
             renderItem={renderSeriesItem}
             ItemSeparatorComponent={() => <View style={styles.itemSpacing} />}
             contentContainerStyle={styles.listContent}
+            removeClippedSubviews
+            keyboardShouldPersistTaps="handled"
             ListHeaderComponent={listHeader}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>{listEmptyComponent}</View>
-            }
+            ListEmptyComponent={listEmptyComponent}
             refreshControl={
               <ListRefreshControl
                 refreshing={isRefreshing}
@@ -642,6 +884,14 @@ const SonarrSeriesListScreen = () => {
           onDismiss={handleEditorDismiss}
           onSave={handleEditorSave}
           serviceId={serviceId}
+        />
+        <LibraryFilterModal
+          visible={isFilterModalVisible}
+          filters={filters}
+          metadata={filterMetadata}
+          onDismiss={handleCloseFilterModal}
+          onApply={handleApplyFilters}
+          onReset={handleResetFilters}
         />
       </SafeAreaView>
     </MediaSelectorProvider>

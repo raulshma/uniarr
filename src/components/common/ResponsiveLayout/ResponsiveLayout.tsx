@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet, type ViewStyle } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
@@ -41,6 +42,16 @@ export interface ResponsiveLayoutProps {
    * @default true
    */
   centerContent?: boolean;
+  /**
+   * Whether to animate entrance
+   * @default true
+   */
+  animated?: boolean;
+  /**
+   * Animation duration in milliseconds
+   * @default 300
+   */
+  animationDuration?: number;
 }
 
 export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
@@ -58,6 +69,8 @@ export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
   },
   maxWidth = 1200,
   centerContent = true,
+  animated = true,
+  animationDuration = 300,
 }) => {
   const { isPhone, isTablet, width } = useResponsiveLayout();
 
@@ -126,10 +139,18 @@ export const ResponsiveLayout: React.FC<ResponsiveLayoutProps> = ({
     }
   };
 
+  const ContainerComponent = animated ? Animated.View : View;
+  const animationProps = animated
+    ? { entering: FadeIn.duration(animationDuration) }
+    : {};
+
   return (
-    <View style={[styles.container, getContainerStyle(), currentStyle]}>
+    <ContainerComponent
+      style={[styles.container, getContainerStyle(), currentStyle]}
+      {...animationProps}
+    >
       {children}
-    </View>
+    </ContainerComponent>
   );
 };
 

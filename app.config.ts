@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "uniarr",
   scheme: "uniarr",
   owner: "throwaway0acc",
-  version: "0.1.3",
+  version: "0.1.4",
   orientation: "portrait",
   icon: "./assets/icon.png",
   newArchEnabled: true,
@@ -106,6 +106,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         initialOrientation: "DEFAULT",
       },
     ],
+    ["react-native-localize", { locales: ["en"] }],
   ],
   extra: {
     ...config.extra,

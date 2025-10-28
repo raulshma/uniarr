@@ -1,11 +1,9 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import {
-  IconButton,
   Text,
   useTheme,
   Portal,
@@ -18,15 +16,17 @@ import { FlashList } from "@shopify/flash-list";
 
 import { TabHeader } from "@/components/common/TabHeader";
 
-// Button removed: unused in this file (kept minimal surface area)
-import { Card } from "@/components/common/Card";
+// Card is not needed here because we use the shared ServiceCard component
 import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
-import { AnimatedListItem } from "@/components/common/AnimatedComponents";
-import { ServiceStatus } from "@/components/service/ServiceStatus";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import type { ServiceStatusState } from "@/components/service/ServiceStatus";
 import { ServiceCardSkeleton } from "@/components/service/ServiceCard";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import ServiceCard from "@/components/service/ServiceCard/ServiceCard";
 import type { ConnectionResult } from "@/connectors/base/IConnector";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { queryKeys } from "@/hooks/queryKeys";
@@ -36,6 +36,7 @@ import { logger } from "@/services/logger/LoggerService";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 type ServiceOverviewItem = {
   config: ServiceConfig;
@@ -44,6 +45,25 @@ type ServiceOverviewItem = {
   lastCheckedAt?: Date;
   latency?: number;
   version?: string;
+};
+
+// serviceTypeLabels intentionally omitted here — defined where needed (add-service/edit-service)
+
+const serviceDisplayNames: Record<ServiceType, string> = {
+  sonarr: "TV Shows",
+  radarr: "Movie Library",
+  lidarr: "Music Library",
+  jellyseerr: "Request Service",
+  jellyfin: "Media Server",
+  qbittorrent: "Torrent Client",
+  transmission: "Torrent Client",
+  deluge: "Torrent Client",
+  sabnzbd: "Usenet Client",
+  nzbget: "Usenet Client",
+  rtorrent: "Torrent Client",
+  prowlarr: "Indexer",
+  bazarr: "Subtitle Manager",
+  adguard: "DNS Protection",
 };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
@@ -61,23 +81,6 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
   adguard: "AdGuard Home",
-};
-
-const serviceDisplayNames: Record<ServiceType, string> = {
-  sonarr: "TV Shows",
-  radarr: "Movie Library",
-  lidarr: "Music Library",
-  jellyseerr: "Request Service",
-  jellyfin: "Media Server",
-  qbittorrent: "Torrent Client",
-  transmission: "Torrent Client",
-  deluge: "Torrent Client",
-  sabnzbd: "Usenet Client",
-  nzbget: "Usenet Client",
-  rtorrent: "Torrent Client",
-  prowlarr: "Indexer",
-  bazarr: "Subtitle Manager",
-  adguard: "DNS Protection",
 };
 
 const serviceIcons: Record<ServiceType, string> = {
@@ -202,16 +205,61 @@ const ServicesScreen = () => {
     staleTime: 30000,
   });
 
-  useFocusEffect(
-    useCallback(() => {
-      void refetch();
-    }, [refetch]),
+  const services = useMemo(() => data ?? [], [data]);
+  const showSkeleton = isLoading && services.length === 0;
+  const isRefreshing = isFetching && !isLoading;
+  const animationsEnabled =
+    !showSkeleton &&
+    !(isFetching && data && data.length > 0) &&
+    shouldAnimateLayout(isLoading, isFetching);
+  const refreshControl = useMemo(() => {
+    if (showSkeleton) {
+      return undefined;
+    }
+
+    return (
+      <ListRefreshControl
+        refreshing={isRefreshing}
+        onRefresh={() => refetch()}
+      />
+    );
+  }, [isRefreshing, refetch, showSkeleton]);
+
+  const totalServices = services.length;
+  const overviewMetrics = useMemo(
+    () => [
+      { label: "Configured", value: totalServices },
+      {
+        label: "Online",
+        value: services.filter((service) => service.status === "online").length,
+      },
+      {
+        label: "Degraded",
+        value: services.filter((service) => service.status === "degraded")
+          .length,
+      },
+      {
+        label: "Offline",
+        value: services.filter((service) => service.status === "offline")
+          .length,
+      },
+    ],
+    [services, totalServices],
   );
 
-  const services = data ?? [];
-  const isRefreshing = isFetching && !isLoading;
+  const averageLatency = useMemo(() => {
+    const latencies = services
+      .map((service) => service.latency)
+      .filter((latency): latency is number => typeof latency === "number");
+    if (latencies.length === 0) {
+      return "—";
+    }
+    const sum = latencies.reduce((acc, latency) => acc + latency, 0);
+    return `${Math.round(sum / latencies.length)} ms`;
+  }, [services]);
 
   // We render the tab header outside of the list so it remains fixed.
+
   const listData: ServiceOverviewItem[] = services;
 
   const styles = useMemo(
@@ -219,11 +267,60 @@ const ServicesScreen = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          backgroundColor: theme.colors.background,
+          backgroundColor: theme.colors.surface,
         },
         content: {
           flex: 1,
           paddingHorizontal: spacing.xxs,
+        },
+        summarySection: {
+          paddingHorizontal: spacing.md,
+          marginTop: spacing.md,
+          gap: spacing.sm,
+        },
+        summaryTitle: {
+          color: theme.colors.onSurface,
+          fontSize: 18,
+          fontWeight: "600",
+        },
+        summaryGrid: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          rowGap: spacing.sm,
+        },
+        summaryCard: {
+          width: "48%",
+          backgroundColor: theme.colors.surface,
+          borderRadius: spacing.lg,
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.md,
+        },
+        summaryValue: {
+          color: theme.colors.onSurface,
+          fontSize: 20,
+          fontWeight: "700",
+        },
+        summaryLabel: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 12,
+          marginTop: spacing.xs,
+        },
+        latencyChip: {
+          backgroundColor: theme.colors.elevation.level2,
+          borderRadius: borderRadius.lg,
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.md,
+        },
+        latencyLabel: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 12,
+          marginBottom: spacing.xs,
+        },
+        latencyValue: {
+          color: theme.colors.primary,
+          fontSize: 14,
+          fontWeight: "600",
         },
         section: {
           marginTop: spacing.lg,
@@ -238,7 +335,7 @@ const ServicesScreen = () => {
           marginBottom: spacing.md,
         },
         serviceCard: {
-          backgroundColor: theme.colors.elevation.level1,
+          backgroundColor: theme.colors.surface,
           marginHorizontal: spacing.md,
           marginVertical: spacing.xs,
           borderRadius: borderRadius.xxxl,
@@ -291,6 +388,18 @@ const ServicesScreen = () => {
         emptyContainer: {
           flexGrow: 1,
           paddingTop: spacing.xl,
+        },
+        skeletonContainer: {
+          paddingVertical: spacing.lg,
+          paddingBottom: spacing.xxxxl,
+          gap: spacing.md,
+        },
+        skeletonHeader: {
+          marginHorizontal: spacing.md,
+        },
+        skeletonCard: {
+          marginBottom: spacing.sm,
+          marginHorizontal: spacing.md,
         },
       }),
     [theme],
@@ -363,10 +472,7 @@ const ServicesScreen = () => {
     [router],
   );
 
-  const handleServiceMenuPress = useCallback((service: ServiceOverviewItem) => {
-    setSelectedService(service);
-    setServiceMenuVisible(true);
-  }, []);
+  // service menu is opened via card edit/delete callbacks; keep modal below for confirmation
 
   const handleEditService = useCallback(() => {
     if (!selectedService) return;
@@ -429,65 +535,43 @@ const ServicesScreen = () => {
 
   // Header is rendered outside the scrollable area so it does not scroll with content.
 
-  const ServiceCard = React.memo(
+  const ServiceRow = React.memo(
     ({ item, index }: { item: ServiceOverviewItem; index: number }) => {
       const displayName =
         serviceDisplayNames[item.config.type] || item.config.name;
-      const serviceType = serviceTypeLabels[item.config.type];
       const iconName = serviceIcons[item.config.type];
 
+      const serviceTypeLabel = serviceTypeLabels[item.config.type];
+
       return (
-        <AnimatedListItem index={index} totalItems={services.length}>
-          <Card
-            variant="custom"
-            style={styles.serviceCard}
+        <AnimatedListItem
+          animated={animationsEnabled}
+          index={index}
+          totalItems={services.length}
+        >
+          <ServiceCard
+            key={item.config.id}
+            id={item.config.id}
+            name={displayName}
+            url={item.config.url}
+            description={serviceTypeLabel}
+            status={item.status}
+            statusDescription={item.statusDescription}
+            latency={item.latency}
+            version={item.version}
+            lastCheckedAt={item.lastCheckedAt}
+            icon={iconName}
             onPress={() => handleServicePress(item)}
-          >
-            <View style={styles.serviceContent}>
-              <View style={styles.serviceIcon}>
-                <IconButton
-                  icon={iconName}
-                  size={24}
-                  iconColor={theme.colors.primary}
-                />
-              </View>
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceName}>{displayName}</Text>
-                <Text style={styles.serviceType}>{serviceType}</Text>
-                <View style={styles.serviceStatus}>
-                  <ServiceStatus
-                    status={item.status}
-                    showLabel={false}
-                    size="sm"
-                  />
-                  <Text
-                    style={{
-                      color:
-                        item.status === "online"
-                          ? theme.colors.primary
-                          : item.status === "offline"
-                            ? theme.colors.error
-                            : theme.colors.tertiary,
-                      fontSize: 14,
-                      marginLeft: 4,
-                    }}
-                  >
-                    {item.status === "online"
-                      ? "Connected"
-                      : item.status === "offline"
-                        ? "Offline"
-                        : "Degraded"}
-                  </Text>
-                </View>
-              </View>
-              <IconButton
-                icon="dots-vertical"
-                size={20}
-                iconColor={theme.colors.outline}
-                onPress={() => handleServiceMenuPress(item)}
-              />
-            </View>
-          </Card>
+            onEditPress={() => {
+              setSelectedService(item);
+              handleEditService();
+            }}
+            onDeletePress={() => {
+              setSelectedService(item);
+              handleDeleteService();
+            }}
+            style={styles.serviceCard}
+          />
         </AnimatedListItem>
       );
     },
@@ -495,9 +579,9 @@ const ServicesScreen = () => {
 
   const renderItem = useCallback(
     ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
-      <ServiceCard item={item} index={index} />
+      <ServiceRow item={item} index={index} />
     ),
-    [ServiceCard],
+    [ServiceRow],
   );
 
   const keyExtractor = useCallback(
@@ -532,50 +616,6 @@ const ServicesScreen = () => {
     );
   }, [error, handleAddService, isError, refetch]);
 
-  if (isLoading && services.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <TabHeader
-          showBackButton={true}
-          onBackPress={handleBackPress}
-          rightAction={{
-            icon: "plus",
-            onPress: handleAddService,
-            accessibilityLabel: "Add service",
-          }}
-          style={{ paddingHorizontal: spacing.xxs }}
-        />
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={{
-            paddingVertical: spacing.lg,
-            paddingBottom: spacing.xxxxl,
-          }}
-        >
-          <View style={styles.section}>
-            <SkeletonPlaceholder
-              width="50%"
-              height={28}
-              borderRadius={10}
-              style={{ marginBottom: spacing.md }}
-            />
-            {Array.from({ length: 4 }).map((_, index) => (
-              <View
-                key={index}
-                style={{
-                  marginBottom: spacing.sm,
-                  marginHorizontal: spacing.md,
-                }}
-              >
-                <ServiceCardSkeleton />
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <TabHeader
@@ -587,6 +627,7 @@ const ServicesScreen = () => {
           accessibilityLabel: "Add service",
         }}
         style={{ paddingHorizontal: spacing.md }}
+        animated={!showSkeleton}
       />
       <FlashList
         style={styles.content}
@@ -597,19 +638,68 @@ const ServicesScreen = () => {
           services.length === 0 ? { flex: 1 } : undefined,
           { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
         ]}
+        ListHeaderComponent={
+          !showSkeleton && totalServices > 0 ? (
+            <AnimatedSection
+              animated={animationsEnabled}
+              style={styles.summarySection}
+              delay={50}
+            >
+              <Text style={styles.summaryTitle}>Service overview</Text>
+              <View style={styles.summaryGrid}>
+                {overviewMetrics.map((metric, index) => (
+                  <AnimatedListItem
+                    key={metric.label}
+                    animated={animationsEnabled}
+                    index={index}
+                    totalItems={overviewMetrics.length + 1}
+                    style={styles.summaryCard}
+                  >
+                    <Text style={styles.summaryValue}>{metric.value}</Text>
+                    <Text style={styles.summaryLabel}>{metric.label}</Text>
+                  </AnimatedListItem>
+                ))}
+              </View>
+              <AnimatedListItem
+                animated={animationsEnabled}
+                index={overviewMetrics.length}
+                totalItems={overviewMetrics.length + 1}
+                style={styles.latencyChip}
+              >
+                <Text style={styles.latencyLabel}>Average latency</Text>
+                <Text style={styles.latencyValue}>{averageLatency}</Text>
+              </AnimatedListItem>
+            </AnimatedSection>
+          ) : null
+        }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>{listEmptyComponent}</View>
+          <View style={styles.emptyContainer}>
+            {showSkeleton ? (
+              <View style={styles.skeletonContainer}>
+                <View style={styles.skeletonHeader}>
+                  <SkeletonPlaceholder
+                    width="50%"
+                    height={28}
+                    borderRadius={10}
+                  />
+                </View>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <View key={index} style={styles.skeletonCard}>
+                    <ServiceCardSkeleton />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              listEmptyComponent
+            )}
+          </View>
         }
-        refreshControl={
-          <ListRefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => refetch()}
-          />
-        }
+        refreshControl={refreshControl}
         showsVerticalScrollIndicator={false}
         getItemType={getItemType}
         removeClippedSubviews={true}
         scrollEventThrottle={16}
+        estimatedItemSize={140}
       />
 
       <Portal>

@@ -5,6 +5,11 @@ import {
   type ViewStyle,
   type StyleProp,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
 
 import { useHaptics, type HapticType } from "@/hooks/useHaptics";
 
@@ -42,6 +47,16 @@ export interface HapticPressableProps extends Omit<PressableProps, "style"> {
    * Style callback for custom pressed state styling
    */
   style?: StyleProp<ViewStyle> | ((pressed: boolean) => StyleProp<ViewStyle>);
+  /**
+   * Whether to enable scale animation on press
+   * @default true
+   */
+  enableScaleAnimation?: boolean;
+  /**
+   * Scale factor when pressed
+   * @default 0.95
+   */
+  pressedScale?: number;
 }
 
 const HapticPressable: React.FC<HapticPressableProps> = ({
@@ -52,6 +67,8 @@ const HapticPressable: React.FC<HapticPressableProps> = ({
   pressedStyle,
   opacityFeedback = true,
   pressedOpacity = 0.7,
+  enableScaleAnimation = true,
+  pressedScale = 0.95,
   style,
   onPress,
   onLongPress,
@@ -60,6 +77,37 @@ const HapticPressable: React.FC<HapticPressableProps> = ({
   ...props
 }) => {
   const { trigger, onLongPress: hapticLongPress } = useHaptics();
+
+  // Animation values
+  const scaleAnim = useSharedValue(1);
+
+  // Handle press in animation
+  const handlePressIn = React.useCallback(
+    (event: any) => {
+      if (enableScaleAnimation) {
+        scaleAnim.value = withSpring(pressedScale, {
+          damping: 15,
+          stiffness: 400,
+        });
+      }
+      onPressIn?.(event);
+    },
+    [enableScaleAnimation, pressedScale, scaleAnim, onPressIn],
+  );
+
+  // Handle press out animation
+  const handlePressOut = React.useCallback(
+    (event: any) => {
+      if (enableScaleAnimation) {
+        scaleAnim.value = withSpring(1, {
+          damping: 15,
+          stiffness: 400,
+        });
+      }
+      onPressOut?.(event);
+    },
+    [enableScaleAnimation, scaleAnim, onPressOut],
+  );
 
   const handlePress = React.useCallback(
     async (event: any) => {
@@ -113,15 +161,28 @@ const HapticPressable: React.FC<HapticPressableProps> = ({
     [styleCallback],
   );
 
+  // Animated style for scale animation
+  const animatedStyle = useAnimatedStyle(() => {
+    if (!enableScaleAnimation) return {};
+
+    return {
+      transform: [{ scale: scaleAnim.value }],
+    };
+  }, [scaleAnim, enableScaleAnimation]);
+
   return (
-    <Pressable
-      {...props}
-      style={pressableStyleCallback}
-      onPress={handlePress}
-      onLongPress={handleLongPress}
-    >
-      {children}
-    </Pressable>
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        {...props}
+        style={pressableStyleCallback}
+        onPress={handlePress}
+        onLongPress={handleLongPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
   );
 };
 

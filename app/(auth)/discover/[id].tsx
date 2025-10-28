@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo } from "react";
-import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { View, ScrollView, StyleSheet, Pressable, Linking } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -8,6 +8,7 @@ import {
   Portal,
   Dialog,
   RadioButton,
+  Chip,
 } from "react-native-paper";
 import { Button } from "@/components/common/Button";
 import { alert } from "@/services/dialogService";
@@ -15,13 +16,18 @@ import DetailHero from "@/components/media/DetailHero/DetailHero";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { useJellyseerrMediaCredits } from "@/hooks/useJellyseerrMediaCredits";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
+import { useCheckInLibrary } from "@/hooks/useCheckInLibrary";
+import { useDiscoverReleases } from "@/hooks/useDiscoverReleases";
 import type { AppTheme } from "@/constants/theme";
 import { buildProfileUrl } from "@/utils/tmdb.utils";
-import { useTmdbDetails } from "@/hooks/tmdb/useTmdbDetails";
+import { useTmdbDetails, getDeviceRegion } from "@/hooks/tmdb/useTmdbDetails";
+import { useRelatedItems } from "@/hooks/useRelatedItems";
 import RatingsOverview from "@/components/media/RatingsOverview";
 import { spacing } from "@/theme/spacing";
 import { avatarSizes } from "@/constants/sizes";
 import RelatedItems from "@/components/discover/RelatedItems";
+import { YouTubePlayer } from "@/components/media/VideoPlayer";
+import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
 
 const DiscoverItemDetails = () => {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -58,11 +64,55 @@ const DiscoverItemDetails = () => {
     { enabled: !!item?.tmdbId },
   );
 
+  // Fetch real related items (recommendations and similar) from TMDB
+  const relatedItemsQuery = useRelatedItems(
+    item?.mediaType,
+    item?.tmdbId,
+    !!item?.tmdbId,
+  );
+
+  // Check if item is already in the user's library (lazy check on detail view mount)
+  const inLibraryQuery = useCheckInLibrary({
+    tmdbId: item?.tmdbId,
+    tvdbId: item?.tvdbId,
+    sourceId: item?.sourceId,
+    mediaType: item?.mediaType ?? "movie",
+    enabled: !!item,
+  });
+
   const [dialogVisible, setDialogVisible] = React.useState(false);
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>("");
+  const [showReleases, setShowReleases] = useState(false);
+
+  // Fetch releases on-demand when user expands the releases section
+  const releasesQuery = useDiscoverReleases(
+    item?.mediaType === "series" ? "series" : "movie",
+    showReleases && item?.tmdbId ? item.tmdbId : undefined,
+    {
+      preferQuality: true,
+      minSeeders: 0,
+      tvdbId: showReleases && item?.tvdbId ? item.tvdbId : undefined,
+      imdbId: showReleases && item?.imdbId ? item.imdbId : undefined,
+      title: showReleases && item?.title ? item.title : undefined,
+      year: showReleases && item?.year ? item.year : undefined,
+    },
+  );
 
   const openServicePicker = useCallback(() => {
     if (!item) return;
+
+    // If item is already in library, offer to open it instead
+    if (inLibraryQuery.foundServices.length > 0) {
+      const found = inLibraryQuery.foundServices[0];
+      if (found) {
+        void alert(
+          "Already in Library",
+          `This ${item.mediaType === "series" ? "series" : "movie"} is already in ${found.name}.`,
+        );
+      }
+      return;
+    }
+
     const options =
       item.mediaType === "series" ? services.sonarr : services.radarr;
     if (!options || options.length === 0) {
@@ -96,7 +146,7 @@ const DiscoverItemDetails = () => {
       return options[0]!.id ?? "";
     });
     setDialogVisible(true);
-  }, [item, router, services]);
+  }, [item, router, services, inLibraryQuery.foundServices]);
 
   const handleRelatedPress = useCallback(
     (relatedId: string) => {
@@ -143,74 +193,150 @@ const DiscoverItemDetails = () => {
         backdropUri={item.backdropUrl}
         onBack={() => router.back()}
       >
-        <ScrollView contentContainerStyle={styles.content}>
-          <Text
-            variant="headlineLarge"
-            style={{
-              color: theme.colors.onSurface,
-              fontWeight: "700",
-              marginBottom: spacing.sm,
-            }}
-          >
-            {item.title}
-          </Text>
-
-          {item.overview ? (
-            <View style={styles.synopsis}>
+        {tmdbDetailsQuery.isLoading && !tmdbDetailsQuery.data ? (
+          <ScrollView contentContainerStyle={styles.content}>
+            <DetailPageSkeleton />
+          </ScrollView>
+        ) : (
+          <ScrollView contentContainerStyle={styles.content}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                marginBottom: spacing.sm,
+                justifyContent: "space-between",
+              }}
+            >
               <Text
-                variant="bodyLarge"
-                style={{ color: theme.colors.onSurfaceVariant, lineHeight: 22 }}
-              >
-                {item.overview}
-              </Text>
-            </View>
-          ) : null}
-
-          {tmdbDetailsQuery.data?.details?.genres &&
-          tmdbDetailsQuery.data.details.genres.length > 0 ? (
-            <View style={{ marginBottom: spacing.lg }}>
-              <Text
-                variant="titleMedium"
+                variant="headlineLarge"
                 style={{
                   color: theme.colors.onSurface,
                   fontWeight: "700",
-                  marginBottom: spacing.xs,
+                  flex: 1,
                 }}
               >
-                Genres
+                {item.title}
               </Text>
-              <Text
-                variant="bodyMedium"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                {tmdbDetailsQuery.data.details.genres
-                  .map((g) => g.name)
-                  .filter(Boolean)
-                  .join(", ")}
-              </Text>
+              {inLibraryQuery.foundServices.length > 0 && (
+                <Chip
+                  icon="check-circle"
+                  mode="outlined"
+                  style={{ borderColor: theme.colors.primary }}
+                  textStyle={{ color: theme.colors.primary }}
+                >
+                  In Library
+                </Chip>
+              )}
             </View>
-          ) : null}
 
-          {/* Cast */}
-          <CastRow item={item} tmdbDetailsData={tmdbDetailsQuery.data} />
+            {item.overview ? (
+              <View style={styles.synopsis}>
+                <Text
+                  variant="bodyLarge"
+                  style={{
+                    color: theme.colors.onSurfaceVariant,
+                    lineHeight: 22,
+                  }}
+                >
+                  {item.overview}
+                </Text>
+              </View>
+            ) : null}
 
-          {/* Ratings */}
-          <RatingsOverview rating={item.rating} votes={item.voteCount} />
+            {tmdbDetailsQuery.data?.details?.genres &&
+            tmdbDetailsQuery.data.details.genres.length > 0 ? (
+              <View style={{ marginBottom: spacing.lg }}>
+                <Text
+                  variant="titleMedium"
+                  style={{
+                    color: theme.colors.onSurface,
+                    fontWeight: "700",
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  Genres
+                </Text>
+                <Text
+                  variant="bodyMedium"
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                >
+                  {tmdbDetailsQuery.data.details.genres
+                    .map((g) => g.name)
+                    .filter(Boolean)
+                    .join(", ")}
+                </Text>
+              </View>
+            ) : null}
 
-          <Button
-            mode="contained"
-            onPress={openServicePicker}
-            style={styles.addButton}
-          >
-            Add to Library
-          </Button>
+            {/* Cast */}
+            <CastRow item={item} tmdbDetailsData={tmdbDetailsQuery.data} />
 
-          {/* Related Items */}
-          <RelatedItems
-            currentId={item.id}
-            onPress={(id: string) => handleRelatedPress(id)}
-          />
-        </ScrollView>
+            {/* Ratings */}
+            <RatingsOverview rating={item.rating} votes={item.voteCount} />
+
+            {/* Release Date & Runtime */}
+            <ReleaseMetadata item={item} tmdbDetails={tmdbDetailsQuery.data} />
+
+            {/* Trailer */}
+            {tmdbDetailsQuery.data?.videos?.results &&
+            tmdbDetailsQuery.data.videos.results.length > 0 ? (
+              <View style={{ marginBottom: spacing.lg }}>
+                <YouTubePlayer
+                  videoKey={
+                    tmdbDetailsQuery.data.videos.results.find(
+                      (v: any) =>
+                        v.site?.toLowerCase() === "youtube" &&
+                        v.type?.toLowerCase() === "trailer",
+                    )?.key
+                  }
+                />
+              </View>
+            ) : null}
+
+            {/* Watch Providers */}
+            <WatchProvidersSection
+              watchProvidersData={
+                tmdbDetailsQuery.data?.watchProviders?.results as any
+              }
+            />
+
+            {/* Sources / Releases */}
+            <ReleasesList
+              isLoading={releasesQuery.isLoading}
+              isOpen={showReleases}
+              onToggle={() => setShowReleases(!showReleases)}
+              releases={releasesQuery.data ?? []}
+            />
+
+            <Button
+              mode="contained"
+              onPress={openServicePicker}
+              disabled={inLibraryQuery.isLoading}
+              style={styles.addButton}
+            >
+              {inLibraryQuery.isLoading
+                ? "Checking..."
+                : inLibraryQuery.foundServices.length > 0
+                  ? "Already in Library"
+                  : "Add to Library"}
+            </Button>
+
+            {/* Related Items */}
+            <RelatedItems
+              currentId={item.id}
+              onPress={(id: string) => handleRelatedPress(id)}
+              relatedItems={
+                relatedItemsQuery.recommendations.length > 0
+                  ? relatedItemsQuery.recommendations
+                  : relatedItemsQuery.similar.length > 0
+                    ? relatedItemsQuery.similar
+                    : undefined
+              }
+              isLoadingRelated={relatedItemsQuery.isLoading}
+            />
+          </ScrollView>
+        )}
       </DetailHero>
       <Portal>
         <Dialog
@@ -382,6 +508,19 @@ const CastRow: React.FC<{
   const visibleCast = cast.slice(0, MAX_VISIBLE);
   const extras = Math.max(0, cast.length - MAX_VISIBLE);
 
+  // Helper to get the profile image URL based on the source
+  const getProfileImageUrl = (person: any): string | undefined => {
+    // For Jellyseerr cast: profileUrl is already a full URL
+    if ("profileUrl" in person && person.profileUrl) {
+      return person.profileUrl;
+    }
+    // For TMDB cast: profilePath needs to be converted to full URL
+    if ("profilePath" in person && person.profilePath) {
+      return buildProfileUrl(person.profilePath);
+    }
+    return undefined;
+  };
+
   return (
     <View style={styles.row}>
       <Text
@@ -406,7 +545,7 @@ const CastRow: React.FC<{
             style={{ marginLeft: idx === 0 ? 0 : -OVERLAP, zIndex: idx + 1 }}
           >
             <MediaPoster
-              uri={buildProfileUrl(person.profilePath)}
+              uri={getProfileImageUrl(person)}
               size={AVATAR_SIZE}
               aspectRatio={1}
               borderRadius={AVATAR_SIZE / 2}
@@ -461,6 +600,313 @@ const CastRow: React.FC<{
               </Text>
             </View>
           </Pressable>
+        )}
+      </View>
+    </View>
+  );
+};
+
+const ReleaseMetadata: React.FC<{
+  item: import("@/models/discover.types").DiscoverMediaItem;
+  tmdbDetails: ReturnType<typeof useTmdbDetails>["data"];
+}> = ({ item, tmdbDetails }) => {
+  const theme = useTheme<AppTheme>();
+
+  const runtime = useMemo(() => {
+    if (item.mediaType === "series") {
+      const tvRuntime = (tmdbDetails?.details as any)?.episode_run_time?.[0];
+      return tvRuntime ? `${tvRuntime}m/ep` : undefined;
+    }
+    const movieRuntime = (tmdbDetails?.details as any)?.runtime;
+    return movieRuntime ? `${movieRuntime}m` : undefined;
+  }, [tmdbDetails, item.mediaType]);
+
+  const releaseYear = useMemo(
+    () =>
+      item.releaseDate ? new Date(item.releaseDate).getFullYear() : item.year,
+    [item.releaseDate, item.year],
+  );
+
+  if (!runtime && !releaseYear) return null;
+
+  return (
+    <View
+      style={{
+        marginBottom: spacing.lg,
+        flexDirection: "row",
+        gap: spacing.md,
+      }}
+    >
+      {releaseYear && (
+        <Text
+          variant="bodyMedium"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
+          {releaseYear}
+        </Text>
+      )}
+      {runtime && (
+        <Text
+          variant="bodyMedium"
+          style={{ color: theme.colors.onSurfaceVariant }}
+        >
+          {runtime}
+        </Text>
+      )}
+    </View>
+  );
+};
+
+const WatchProvidersSection: React.FC<{
+  watchProvidersData?: any;
+}> = ({ watchProvidersData }) => {
+  const theme = useTheme<AppTheme>();
+
+  if (!watchProvidersData || typeof watchProvidersData !== "object") {
+    return null;
+  }
+
+  // Get device region and try fallback chain: device region -> US -> any available
+  const region = getDeviceRegion();
+  let regionData = watchProvidersData[region];
+
+  if (!regionData) {
+    // Fallback to US if device region not available
+    regionData = watchProvidersData["US"];
+  }
+
+  if (!regionData) {
+    // Try to find any available region
+    const availableRegion = Object.keys(watchProvidersData).find(
+      (k) => watchProvidersData[k]?.flatrate?.length > 0,
+    );
+    if (availableRegion) {
+      regionData = watchProvidersData[availableRegion];
+    }
+  }
+
+  if (!regionData || !Array.isArray(regionData?.flatrate)) {
+    return null;
+  }
+
+  const providers = regionData.flatrate.slice(0, 5);
+
+  if (providers.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={{ marginBottom: spacing.lg }}>
+      <Text
+        variant="titleMedium"
+        style={{
+          color: theme.colors.onSurface,
+          fontWeight: "700",
+          marginBottom: spacing.xs,
+        }}
+      >
+        Available On
+      </Text>
+      <View style={{ flexDirection: "row", gap: spacing.xs, flexWrap: "wrap" }}>
+        {providers.map((provider: any) => (
+          <Chip key={provider.provider_id} icon="play-circle-outline">
+            {provider.provider_name}
+          </Chip>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const ReleasesList: React.FC<{
+  isLoading: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  releases: import("@/models/discover.types").NormalizedRelease[];
+}> = ({ isLoading, isOpen, onToggle, releases }) => {
+  const theme = useTheme<AppTheme>();
+
+  return (
+    <View style={{ marginBottom: spacing.lg }}>
+      <Pressable
+        onPress={onToggle}
+        style={{
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.md,
+          backgroundColor: theme.colors.surface,
+          borderRadius: 8,
+          marginBottom: isOpen ? spacing.md : 0,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Text
+            variant="titleMedium"
+            style={{
+              color: theme.colors.onSurface,
+              fontWeight: "700",
+            }}
+          >
+            Release Sources
+          </Text>
+          <Text
+            variant="bodyMedium"
+            style={{ color: theme.colors.onSurfaceVariant }}
+          >
+            {isLoading ? "Loading..." : isOpen ? "▼" : "▶"}
+          </Text>
+        </View>
+      </Pressable>
+
+      {isOpen && (
+        <View style={{ marginTop: spacing.md }}>
+          {isLoading ? (
+            <Text
+              variant="bodyMedium"
+              style={{
+                color: theme.colors.onSurfaceVariant,
+                textAlign: "center",
+                paddingVertical: spacing.lg,
+              }}
+            >
+              Searching available sources...
+            </Text>
+          ) : releases.length === 0 ? (
+            <Text
+              variant="bodyMedium"
+              style={{
+                color: theme.colors.onSurfaceVariant,
+                textAlign: "center",
+                paddingVertical: spacing.lg,
+              }}
+            >
+              No releases found
+            </Text>
+          ) : (
+            releases
+              .slice(0, 10)
+              .map((release, idx) => (
+                <ReleaseCard
+                  key={`${release.sourceConnector}-${idx}`}
+                  release={release}
+                />
+              ))
+          )}
+        </View>
+      )}
+    </View>
+  );
+};
+
+const ReleaseCard: React.FC<{
+  release: import("@/models/discover.types").NormalizedRelease;
+}> = ({ release }) => {
+  const theme = useTheme<AppTheme>();
+
+  const sizeInGB = useMemo(
+    () =>
+      release.size
+        ? (release.size / (1024 * 1024 * 1024)).toFixed(2)
+        : undefined,
+    [release.size],
+  );
+
+  const handleOpenMagnet = async () => {
+    if (release.magnetUrl) {
+      try {
+        const canOpen = await Linking.canOpenURL(release.magnetUrl);
+        if (canOpen) {
+          await Linking.openURL(release.magnetUrl);
+        }
+      } catch (error) {
+        console.warn("Failed to open magnet link:", error);
+      }
+    } else if (release.downloadUrl) {
+      try {
+        const canOpen = await Linking.canOpenURL(release.downloadUrl);
+        if (canOpen) {
+          await Linking.openURL(release.downloadUrl);
+        }
+      } catch (error) {
+        console.warn("Failed to open download link:", error);
+      }
+    }
+  };
+
+  return (
+    <View
+      style={{
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        backgroundColor: theme.colors.surfaceVariant,
+        borderRadius: 8,
+        marginBottom: spacing.sm,
+      }}
+    >
+      <View style={{ marginBottom: spacing.xs }}>
+        <Text
+          variant="labelLarge"
+          style={{ color: theme.colors.onSurface, fontWeight: "600" }}
+          numberOfLines={2}
+        >
+          {release.title}
+        </Text>
+      </View>
+
+      <View
+        style={{
+          flexDirection: "row",
+          gap: spacing.xs,
+          flexWrap: "wrap",
+          marginBottom: spacing.xs,
+        }}
+      >
+        {release.quality?.name && (
+          <Chip mode="outlined" compact>
+            {release.quality.name}
+          </Chip>
+        )}
+        {release.indexer && (
+          <Chip mode="outlined" compact>
+            {release.indexer}
+          </Chip>
+        )}
+      </View>
+
+      <View
+        style={{
+          flexDirection: "row",
+          gap: spacing.xs,
+          justifyContent: "space-between",
+        }}
+      >
+        <View style={{ flexDirection: "row", gap: spacing.xs }}>
+          {release.seeders !== null && (
+            <Text
+              variant="labelSmall"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              📤 {release.seeders}
+            </Text>
+          )}
+          {release.size && (
+            <Text
+              variant="labelSmall"
+              style={{ color: theme.colors.onSurfaceVariant }}
+            >
+              {sizeInGB}GB
+            </Text>
+          )}
+        </View>
+        {(release.magnetUrl || release.downloadUrl) && (
+          <Button mode="outlined" compact onPress={handleOpenMagnet}>
+            Open
+          </Button>
         )}
       </View>
     </View>

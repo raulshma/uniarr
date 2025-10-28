@@ -18,11 +18,11 @@ import {
 } from "date-fns";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import BottomDrawer from "@/components/common/BottomDrawer";
-import { TabHeader } from "@/components/common/TabHeader";
 import {
   MediaReleaseCard,
   EnhancedCalendarHeader,
@@ -123,7 +123,8 @@ const CalendarScreen = () => {
         },
         headerContent: {
           paddingHorizontal: theme.custom.spacing.lg,
-          paddingBottom: theme.custom.spacing.lg,
+          // reduce bottom padding so the top section doesn't consume too much vertical space
+          paddingBottom: theme.custom.spacing.sm,
           gap: theme.custom.spacing.lg,
         },
         segmentsRow: {
@@ -652,17 +653,32 @@ const CalendarScreen = () => {
     }
 
     return (
-      <FlashList
+      <FlashList<MediaRelease>
         data={releasesForView}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: MediaRelease) => item.id}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <MediaReleaseCard
-            release={item}
-            onPress={() => handleReleasePress(item.id)}
-          />
+        renderItem={({
+          item,
+          index,
+        }: {
+          item: MediaRelease;
+          index: number;
+        }) => (
+          <AnimatedListItem
+            index={index}
+            totalItems={releasesForView.length}
+            animated={false}
+          >
+            <MediaReleaseCard
+              release={item}
+              onPress={() => handleReleasePress(item.id)}
+              animated={false}
+            />
+          </AnimatedListItem>
         )}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
       />
     );
   };
@@ -699,23 +715,22 @@ const CalendarScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TabHeader
-        title="Release Calendar"
-        showTitle
-        showBackButton={false}
-        rightAction={{
-          icon: "cog",
-          onPress: openFilters,
-          accessibilityLabel: "Open filters",
-        }}
-      />
-
       <EnhancedCalendarHeader
         navigation={navigation}
         view={state.view}
         currentDate={state.currentDate}
         onViewChange={setView}
-        style={{ marginBottom: theme.custom.spacing.sm }}
+        // Make the header visually blend with the page and remove extra elevation so it matches
+        // the surrounding layout. marginBottom still provides a small separation from the
+        // content below but overall height is reduced.
+        style={{
+          marginBottom: theme.custom.spacing.sm,
+          backgroundColor: "transparent",
+          // remove elevation/shadow so the header sits flush on the page
+          elevation: 0,
+          shadowOpacity: 0,
+          shadowRadius: 0,
+        }}
       />
 
       <View style={styles.headerContent}>

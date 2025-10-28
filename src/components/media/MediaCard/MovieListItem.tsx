@@ -256,6 +256,7 @@ const MovieListItem: React.FC<MovieListItemProps> = ({
           size="small"
           borderRadius={8}
           showPlaceholderLabel={false}
+          priority="high"
           style={styles.poster}
         />
         {renderStatusIndicator()}

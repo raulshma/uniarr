@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { Alert } from "react-native";
 import { validateDateString } from "./calendar.utils";
+import { alert } from "@/services/dialogService";
 
 /**
  * Navigation utilities for consistent routing patterns across the app
@@ -51,7 +51,7 @@ export function navigateToRoute<
 
       if (missingParams.length > 0) {
         console.warn("Missing required navigation parameters:", missingParams);
-        Alert.alert(
+        alert(
           "Navigation Error",
           "Missing required information to navigate to this page.",
         );
@@ -82,10 +82,7 @@ export function navigateToRoute<
     }
   } catch (error) {
     console.error("Navigation failed:", error);
-    Alert.alert(
-      "Navigation Error",
-      "Unable to navigate to the requested page.",
-    );
+    alert("Navigation Error", "Unable to navigate to the requested page.");
   }
 }
 
@@ -139,13 +136,13 @@ export const NAVIGATION_ROUTES = {
 
   // Media detail routes
   SONARR_SERIES: (serviceId: string, id: number) =>
-    `/(auth)/sonarr/[serviceId]/series/[id]`,
+    `/(auth)/sonarr/${serviceId}/series/${id}`,
   RADARR_MOVIE: (serviceId: string, id: number) =>
-    `/(auth)/radarr/[serviceId]/movies/[id]`,
+    `/(auth)/radarr/${serviceId}/movies/${id}`,
   JELLYFIN_ITEM: (serviceId: string, itemId: number) =>
-    `/(auth)/jellyfin/[serviceId]/details/[itemId]`,
+    `/(auth)/jellyfin/${serviceId}/details/${itemId}`,
   JELLYSEERR_MEDIA: (serviceId: string, mediaType: string, mediaId: number) =>
-    `/(auth)/jellyseerr/[serviceId]/[mediaType]/[mediaId]`,
+    `/(auth)/jellyseerr/${serviceId}/${mediaType}/${mediaId}`,
 
   // Discovery
   DISCOVER: "/(auth)/discover",
@@ -259,34 +256,13 @@ export const createServiceNavigation = (serviceType: string) => ({
   ) => {
     switch (serviceType) {
       case "sonarr":
-        navigateToRoute(
-          router,
-          NAVIGATION_ROUTES.SONARR_SERIES(serviceId, itemId),
-          {
-            serviceId,
-            id: itemId.toString(),
-          },
-        );
+        router.push(NAVIGATION_ROUTES.SONARR_SERIES(serviceId, itemId));
         break;
       case "radarr":
-        navigateToRoute(
-          router,
-          NAVIGATION_ROUTES.RADARR_MOVIE(serviceId, itemId),
-          {
-            serviceId,
-            id: itemId.toString(),
-          },
-        );
+        router.push(NAVIGATION_ROUTES.RADARR_MOVIE(serviceId, itemId));
         break;
       case "jellyfin":
-        navigateToRoute(
-          router,
-          NAVIGATION_ROUTES.JELLYFIN_ITEM(serviceId, itemId),
-          {
-            serviceId,
-            itemId: itemId.toString(),
-          },
-        );
+        router.push(NAVIGATION_ROUTES.JELLYFIN_ITEM(serviceId, itemId));
         break;
       default:
         console.warn("Unknown service type for navigation:", serviceType);

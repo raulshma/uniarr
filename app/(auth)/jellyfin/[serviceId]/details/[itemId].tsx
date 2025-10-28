@@ -35,6 +35,7 @@ import DownloadButton from "@/components/downloads/DownloadButton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
+import type { JellyfinPerson } from "@/models/jellyfin.types";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { spacing } from "@/theme/spacing";
 import { posterSizes } from "@/constants/sizes";
@@ -660,7 +661,9 @@ const JellyfinItemDetailsScreen = () => {
             {cast.length > 0 ? (
               <FlashList
                 data={cast}
-                keyExtractor={(person) => person.Id ?? person.Name ?? ""}
+                keyExtractor={(person: JellyfinPerson) =>
+                  person.Id ?? person.Name ?? ""
+                }
                 renderItem={renderCastMember}
                 horizontal
                 showsHorizontalScrollIndicator={false}

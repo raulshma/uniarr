@@ -37,7 +37,6 @@ type SettingsData = {
   criticalHealthAlertsBypassQuietHours: boolean;
   // Remember last selected calendar view (week/day/month/list)
   lastCalendarView: CalendarView;
-  useNativeTabs: boolean;
   tmdbEnabled: boolean;
   // Number of retry attempts to perform for Jellyseerr requests when the server
   // returns 5xx errors. This value represents the number of retry attempts
@@ -49,6 +48,17 @@ type SettingsData = {
   logLevel: LogLevel;
   // Haptic feedback setting
   hapticFeedback: boolean;
+  // Jellyfin server addresses for deep linking
+  jellyfinLocalAddress?: string;
+  jellyfinPublicAddress?: string;
+  // Preferred Jellyseerr service for TMDB -> Sonarr mappings
+  preferredJellyseerrServiceId?: string;
+  // Service IDs to include in Recent Activity (if undefined, include all enabled services)
+  recentActivitySourceServiceIds?: string[];
+  // Preferred service to navigate to when recent activity item has multiple origins
+  preferredRecentActivityServiceId?: string;
+  // Last time app update was checked (ISO string)
+  lastReleaseNotesCheckedAt?: string;
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -74,12 +84,17 @@ interface SettingsState extends SettingsData {
   setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
   reset: () => void;
   setLastCalendarView: (view: CalendarView) => void;
-  setUseNativeTabs: (enabled: boolean) => void;
   setTmdbEnabled: (enabled: boolean) => void;
   setJellyseerrRetryAttempts: (attempts: number) => void;
   setMaxImageCacheSize: (size: number) => void;
   setLogLevel: (level: LogLevel) => void;
   setHapticFeedback: (enabled: boolean) => void;
+  setJellyfinLocalAddress: (address: string | undefined) => void;
+  setJellyfinPublicAddress: (address: string | undefined) => void;
+  setPreferredJellyseerrServiceId: (serviceId: string | undefined) => void;
+  setRecentActivitySourceServiceIds: (ids: string[] | undefined) => void;
+  setPreferredRecentActivityServiceId: (serviceId: string | undefined) => void;
+  setLastReleaseNotesCheckedAt: (timestamp: string | undefined) => void;
   // (thumbnail setters removed)
 }
 
@@ -146,12 +161,17 @@ const createDefaultSettings = (): SettingsData => ({
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
   lastCalendarView: "week",
-  useNativeTabs: true,
   tmdbEnabled: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
   maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
   logLevel: LogLevel.DEBUG,
   hapticFeedback: true,
+  jellyfinLocalAddress: undefined,
+  jellyfinPublicAddress: undefined,
+  preferredJellyseerrServiceId: undefined,
+  recentActivitySourceServiceIds: undefined,
+  preferredRecentActivityServiceId: undefined,
+  lastReleaseNotesCheckedAt: undefined,
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
@@ -198,13 +218,24 @@ export const useSettingsStore = create<SettingsState>()(
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
       setLastCalendarView: (view: CalendarView) =>
         set({ lastCalendarView: view }),
-      setUseNativeTabs: (enabled: boolean) => set({ useNativeTabs: enabled }),
       setTmdbEnabled: (enabled: boolean) => set({ tmdbEnabled: enabled }),
       setJellyseerrRetryAttempts: (attempts: number) =>
         set({ jellyseerrRetryAttempts: clampRetryAttempts(attempts) }),
       setMaxImageCacheSize: (size: number) =>
         set({ maxImageCacheSize: clampMaxImageCacheSize(size) }),
       setHapticFeedback: (enabled: boolean) => set({ hapticFeedback: enabled }),
+      setJellyfinLocalAddress: (address: string | undefined) =>
+        set({ jellyfinLocalAddress: address }),
+      setJellyfinPublicAddress: (address: string | undefined) =>
+        set({ jellyfinPublicAddress: address }),
+      setPreferredJellyseerrServiceId: (serviceId: string | undefined) =>
+        set({ preferredJellyseerrServiceId: serviceId }),
+      setRecentActivitySourceServiceIds: (ids: string[] | undefined) =>
+        set({ recentActivitySourceServiceIds: ids }),
+      setPreferredRecentActivityServiceId: (serviceId: string | undefined) =>
+        set({ preferredRecentActivityServiceId: serviceId }),
+      setLastReleaseNotesCheckedAt: (timestamp: string | undefined) =>
+        set({ lastReleaseNotesCheckedAt: timestamp }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -230,16 +261,22 @@ export const useSettingsStore = create<SettingsState>()(
         criticalHealthAlertsBypassQuietHours:
           state.criticalHealthAlertsBypassQuietHours,
         lastCalendarView: state.lastCalendarView,
-        useNativeTabs: state.useNativeTabs,
         tmdbEnabled: state.tmdbEnabled,
         jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
         maxImageCacheSize: state.maxImageCacheSize,
         logLevel: state.logLevel,
         hapticFeedback: state.hapticFeedback,
+        jellyfinLocalAddress: state.jellyfinLocalAddress,
+        jellyfinPublicAddress: state.jellyfinPublicAddress,
+        preferredJellyseerrServiceId: state.preferredJellyseerrServiceId,
+        recentActivitySourceServiceIds: state.recentActivitySourceServiceIds,
+        preferredRecentActivityServiceId:
+          state.preferredRecentActivityServiceId,
+        lastReleaseNotesCheckedAt: state.lastReleaseNotesCheckedAt,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 7,
+      version: 10,
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -377,14 +414,20 @@ export const useSettingsStore = create<SettingsState>()(
           criticalHealthAlertsBypassQuietHours:
             partial.criticalHealthAlertsBypassQuietHours ??
             baseDefaults.criticalHealthAlertsBypassQuietHours,
-          useNativeTabs: partial.useNativeTabs ?? baseDefaults.useNativeTabs,
+          preferredJellyseerrServiceId:
+            partial.preferredJellyseerrServiceId ?? undefined,
+          recentActivitySourceServiceIds:
+            partial.recentActivitySourceServiceIds ?? undefined,
+          preferredRecentActivityServiceId:
+            partial.preferredRecentActivityServiceId ?? undefined,
+          lastReleaseNotesCheckedAt:
+            partial.lastReleaseNotesCheckedAt ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
     },
   ),
 );
-
 export const selectThemePreference = (state: SettingsState): ThemePreference =>
   state.theme;
 export const selectCustomThemeConfig = (
@@ -424,6 +467,14 @@ export const selectCriticalHealthAlertsBypassQuietHours = (
 
 export const selectLastCalendarView = (state: SettingsState) =>
   state.lastCalendarView;
-export const selectUseNativeTabs = (state: SettingsState) =>
-  state.useNativeTabs;
 export const selectHasHydrated = (state: SettingsState) => state._hasHydrated;
+export const selectJellyfinLocalAddress = (state: SettingsState) =>
+  state.jellyfinLocalAddress;
+export const selectJellyfinPublicAddress = (state: SettingsState) =>
+  state.jellyfinPublicAddress;
+export const selectPreferredJellyseerrServiceId = (state: SettingsState) =>
+  state.preferredJellyseerrServiceId;
+export const selectRecentActivitySourceServiceIds = (state: SettingsState) =>
+  state.recentActivitySourceServiceIds;
+export const selectPreferredRecentActivityServiceId = (state: SettingsState) =>
+  state.preferredRecentActivityServiceId;

@@ -121,7 +121,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
       <View style={styles.rightSection}>
         <IconButton
-          icon="today"
+          icon="calendar-today"
           size={24}
           iconColor={theme.colors.primary}
           onPress={navigation.goToToday}

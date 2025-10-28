@@ -9,7 +9,9 @@ const PublicLayout = () => {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: theme.colors.background },
-        animation: "none",
+        // Enable smooth fade transitions between screens
+        animation: "fade",
+        animationDuration: 300,
       }}
     />
   );

@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { StyleSheet, View, useColorScheme } from "react-native";
-import { alert } from "@/services/dialogService";
+import { alert, showCustomDialog } from "@/services/dialogService";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Constants from "expo-constants";
 
@@ -14,13 +14,15 @@ import {
   Portal,
   Dialog,
 } from "react-native-paper";
-import { CustomConfirm } from "@/components/common";
-import { Card } from "@/components/common/Card";
+// Card removed for notifications group — using SettingsGroup instead
 import {
+  CustomConfirm,
   AnimatedListItem,
   AnimatedScrollView,
   AnimatedSection,
-} from "@/components/common/AnimatedComponents";
+  SettingsListItem,
+  SettingsGroup,
+} from "@/components/common";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { TabHeader } from "@/components/common/TabHeader";
@@ -34,9 +36,11 @@ import {
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useAppUpdateCheck } from "@/hooks/useAppUpdateCheck";
 import type { NotificationCategory } from "@/models/notification.types";
 import { getCategoryFriendlyName } from "@/utils/quietHours.utils";
 import { borderRadius } from "@/constants/sizes";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 // Backup & restore moved to its own settings screen
 
 // Helper function to format bytes
@@ -71,6 +75,14 @@ const SettingsScreen = () => {
     Constants.expoConfig?.version || Constants.manifest?.version || "Unknown";
   const appVersionString = `UniArr v${appVersion}`;
 
+  // App update check hook
+  const {
+    data: updateData,
+    isLoading: isCheckingUpdate,
+    error: updateError,
+    refetch: checkForUpdate,
+  } = useAppUpdateCheck({ enabled: false }); // Manual trigger only
+
   // Settings store
   const {
     theme: themePreference,
@@ -90,8 +102,6 @@ const SettingsScreen = () => {
     setRequestNotificationsEnabled,
     setServiceHealthNotificationsEnabled,
     setRefreshIntervalMinutes,
-    useNativeTabs,
-    setUseNativeTabs,
     jellyseerrRetryAttempts,
     setJellyseerrRetryAttempts,
     tmdbEnabled,
@@ -99,6 +109,7 @@ const SettingsScreen = () => {
     setMaxImageCacheSize,
     logLevel,
     setLogLevel,
+    setLastReleaseNotesCheckedAt,
     // image thumbnailing controls removed
   } = useSettingsStore();
   const [logLevelVisible, setLogLevelVisible] = useState(false);
@@ -112,6 +123,28 @@ const SettingsScreen = () => {
   const [isFetchingCacheUsage, setIsFetchingCacheUsage] = useState(false);
   const [isClearingImageCache, setIsClearingImageCache] = useState(false);
 
+  const isBusy = isFetchingCacheUsage || isClearingImageCache;
+  const animationsEnabled = shouldAnimateLayout(isBusy, false);
+
+  const colorScheme = useColorScheme();
+  const isCurrentThemeDark = useMemo(() => {
+    if (themePreference === "dark") return true;
+    if (themePreference === "light") return false;
+    return colorScheme === "dark";
+  }, [themePreference, colorScheme]);
+
+  const appearanceItemsCount = useMemo(
+    () => (isCurrentThemeDark ? 3 : 2),
+    [isCurrentThemeDark],
+  );
+
+  const notificationItemsCount = useMemo(
+    () => (notificationsEnabled ? 6 : 2),
+    [notificationsEnabled],
+  );
+
+  // Overview removed — metrics moved or omitted
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -121,6 +154,7 @@ const SettingsScreen = () => {
       paddingHorizontal: spacing.sm,
       paddingBottom: spacing.xxxxl,
     },
+    // Overview styles removed
     listSpacer: {
       height: spacing.xs,
     },
@@ -243,6 +277,17 @@ const SettingsScreen = () => {
     void loadImageCacheUsage();
   }, [loadImageCacheUsage]);
 
+  // Update dialog when update check completes
+  useEffect(() => {
+    if (!isCheckingUpdate && (updateData || updateError)) {
+      showCustomDialog("updateCheck", {
+        updateData,
+        isLoading: false,
+        error: updateError ? String(updateError) : null,
+      });
+    }
+  }, [updateData, isCheckingUpdate, updateError]);
+
   const handleClearImageCache = async () => {
     setIsClearingImageCache(true);
     try {
@@ -276,6 +321,18 @@ const SettingsScreen = () => {
       alert("Sign out failed", message);
     }
   };
+
+  const handleCheckForUpdate = useCallback(async () => {
+    setLastReleaseNotesCheckedAt(new Date().toISOString());
+    // Show update dialog with loading state
+    showCustomDialog("updateCheck", {
+      updateData: null,
+      isLoading: true,
+      error: null,
+    });
+    // Trigger the fetch by calling refetch
+    void checkForUpdate();
+  }, [checkForUpdate, setLastReleaseNotesCheckedAt]);
 
   const confirmSignOut = () => setConfirmVisible(true);
 
@@ -330,15 +387,6 @@ const SettingsScreen = () => {
     };
   };
 
-  // Check if current theme is dark (either directly or via system setting)
-  const colorScheme = useColorScheme();
-  const isCurrentThemeDark = useMemo(() => {
-    if (themePreference === "dark") return true;
-    if (themePreference === "light") return false;
-    // system theme - check the actual system color scheme
-    return colorScheme === "dark";
-  }, [themePreference, colorScheme]);
-
   const quietHoursValue = useMemo(() => {
     const enabled = Object.entries(quietHours).filter(
       ([, config]) => config.enabled,
@@ -358,7 +406,10 @@ const SettingsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AnimatedScrollView contentContainerStyle={styles.scrollContainer}>
+      <AnimatedScrollView
+        contentContainerStyle={styles.scrollContainer}
+        animated={animationsEnabled}
+      >
         {/* Header */}
         <TabHeader
           rightAction={{
@@ -368,21 +419,26 @@ const SettingsScreen = () => {
           }}
         />
 
+        {/* Overview removed */}
+
         {/* Appearance Section */}
-        <AnimatedSection style={styles.section} delay={50}>
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Appearance</Text>
-          <AnimatedListItem index={0} totalItems={4}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="palette"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Theme</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={appearanceItemsCount}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Theme"
+                subtitle="Choose your preferred theme"
+                left={{ iconName: "palette" }}
+                trailing={
                   <View style={styles.themeOptions}>
                     <Chip
                       mode={themePreference === "light" ? "flat" : "outlined"}
@@ -436,575 +492,582 @@ const SettingsScreen = () => {
                       System
                     </Chip>
                   </View>
-                </View>
-              </View>
-            </Card>
-          </AnimatedListItem>
-          {/* OLED Mode Toggle - Only show when dark theme is active */}
-          {isCurrentThemeDark && (
-            <AnimatedListItem index={1} totalItems={4}>
-              <Card variant="custom" style={styles.settingCard}>
-                <View style={styles.settingContent}>
-                  <View style={styles.settingIcon}>
-                    <IconButton
-                      icon="monitor-star"
-                      size={20}
-                      iconColor={theme.colors.primary}
-                    />
-                  </View>
-                  <View style={styles.settingInfo}>
-                    <Text style={styles.settingTitle}>OLED Mode</Text>
-                    <Text style={styles.settingValue}>
-                      Pure black for OLED displays
-                    </Text>
-                  </View>
-                  <Switch
-                    value={oledEnabled}
-                    onValueChange={setOledEnabled}
-                    color={theme.colors.primary}
-                  />
-                </View>
-              </Card>
+                }
+                groupPosition="top"
+              />
             </AnimatedListItem>
-          )}
-          <AnimatedListItem index={isCurrentThemeDark ? 2 : 1} totalItems={4}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/theme-editor")}
+            {/* OLED Mode Toggle - Only show when dark theme is active */}
+            {isCurrentThemeDark && (
+              <AnimatedListItem
+                index={1}
+                totalItems={appearanceItemsCount}
+                animated={animationsEnabled}
+              >
+                <SettingsListItem
+                  title="OLED Mode"
+                  subtitle="Pure black for OLED displays"
+                  left={{ iconName: "monitor-star" }}
+                  trailing={
+                    <Switch
+                      value={oledEnabled}
+                      onValueChange={setOledEnabled}
+                      color={theme.colors.primary}
+                    />
+                  }
+                  groupPosition="middle"
+                />
+              </AnimatedListItem>
+            )}
+            <AnimatedListItem
+              index={isCurrentThemeDark ? 2 : 1}
+              totalItems={appearanceItemsCount}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Customize Theme"
+                subtitle="Colors, fonts & more"
+                left={{ iconName: "palette-swatch" }}
+                trailing={
                   <IconButton
-                    icon="palette-swatch"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={18}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Customize Theme</Text>
-                  <Text style={styles.settingValue}>Colors, fonts & more</Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={18}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={isCurrentThemeDark ? 3 : 2} totalItems={4}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="tab"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Navigation Style</Text>
-                  <Text style={styles.settingValue}>
-                    {useNativeTabs ? "Native Tabs" : "Curved Bar"}
-                  </Text>
-                </View>
-                <Switch
-                  value={useNativeTabs}
-                  onValueChange={setUseNativeTabs}
-                  color={theme.colors.primary}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={() => router.push("/(auth)/settings/theme-editor")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Notifications Section */}
-        <AnimatedSection style={styles.section} delay={100}>
+        <AnimatedSection
+          style={styles.section}
+          delay={100}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Notifications</Text>
-          <AnimatedListItem index={0} totalItems={1}>
-            <Card variant="custom" style={styles.notificationGroup}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="bell"
-                    size={20}
-                    iconColor={theme.colors.primary}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={notificationItemsCount}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Enable Notifications"
+                left={{ iconName: "bell" }}
+                trailing={
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={setNotificationsEnabled}
+                    color={theme.colors.primary}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Enable Notifications</Text>
-                </View>
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  color={theme.colors.primary}
-                />
-              </View>
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
 
-              {notificationsEnabled && (
-                <>
-                  <View style={styles.notificationItem}>
-                    <View style={styles.notificationIcon}>
-                      <IconButton
-                        icon="check-circle"
-                        size={16}
-                        iconColor={theme.colors.primary}
+            {notificationsEnabled && (
+              <>
+                <AnimatedListItem
+                  index={1}
+                  totalItems={notificationItemsCount}
+                  animated={animationsEnabled}
+                >
+                  <SettingsListItem
+                    title="Completed Downloads"
+                    left={{
+                      node: (
+                        <IconButton
+                          icon="check-circle"
+                          size={16}
+                          iconColor={theme.colors.primary}
+                          style={{ margin: 0, width: 24, height: 24 }}
+                        />
+                      ),
+                    }}
+                    trailing={
+                      <Switch
+                        value={downloadNotificationsEnabled}
+                        onValueChange={setDownloadNotificationsEnabled}
+                        color={theme.colors.primary}
                       />
-                    </View>
-                    <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>
-                        Completed Downloads
-                      </Text>
-                    </View>
-                    <Switch
-                      value={downloadNotificationsEnabled}
-                      onValueChange={setDownloadNotificationsEnabled}
-                      color={theme.colors.primary}
-                    />
-                  </View>
+                    }
+                    groupPosition="middle"
+                  />
+                </AnimatedListItem>
 
-                  <View style={styles.notificationItem}>
-                    <View style={styles.notificationIcon}>
-                      <IconButton
-                        icon="alert-circle"
-                        size={16}
-                        iconColor={theme.colors.primary}
+                <AnimatedListItem
+                  index={2}
+                  totalItems={notificationItemsCount}
+                  animated={animationsEnabled}
+                >
+                  <SettingsListItem
+                    title="Failed Downloads"
+                    left={{
+                      node: (
+                        <IconButton
+                          icon="alert-circle"
+                          size={16}
+                          iconColor={theme.colors.primary}
+                          style={{ margin: 0, width: 24, height: 24 }}
+                        />
+                      ),
+                    }}
+                    trailing={
+                      <Switch
+                        value={failedDownloadNotificationsEnabled}
+                        onValueChange={setFailedDownloadNotificationsEnabled}
+                        color={theme.colors.primary}
                       />
-                    </View>
-                    <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>Failed Downloads</Text>
-                    </View>
-                    <Switch
-                      value={failedDownloadNotificationsEnabled}
-                      onValueChange={setFailedDownloadNotificationsEnabled}
-                      color={theme.colors.primary}
-                    />
-                  </View>
+                    }
+                    groupPosition="middle"
+                  />
+                </AnimatedListItem>
 
-                  <View style={styles.notificationItem}>
-                    <View style={styles.notificationIcon}>
-                      <IconButton
-                        icon="account-plus"
-                        size={16}
-                        iconColor={theme.colors.primary}
+                <AnimatedListItem
+                  index={3}
+                  totalItems={notificationItemsCount}
+                  animated={animationsEnabled}
+                >
+                  <SettingsListItem
+                    title="New Requests"
+                    left={{
+                      node: (
+                        <IconButton
+                          icon="account-plus"
+                          size={16}
+                          iconColor={theme.colors.primary}
+                          style={{ margin: 0, width: 24, height: 24 }}
+                        />
+                      ),
+                    }}
+                    trailing={
+                      <Switch
+                        value={requestNotificationsEnabled}
+                        onValueChange={setRequestNotificationsEnabled}
+                        color={theme.colors.primary}
                       />
-                    </View>
-                    <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>New Requests</Text>
-                    </View>
-                    <Switch
-                      value={requestNotificationsEnabled}
-                      onValueChange={setRequestNotificationsEnabled}
-                      color={theme.colors.primary}
-                    />
-                  </View>
+                    }
+                    groupPosition="middle"
+                  />
+                </AnimatedListItem>
 
-                  <View style={styles.notificationItem}>
-                    <View style={styles.notificationIcon}>
-                      <IconButton
-                        icon="server-network"
-                        size={16}
-                        iconColor={theme.colors.primary}
+                <AnimatedListItem
+                  index={4}
+                  totalItems={notificationItemsCount}
+                  animated={animationsEnabled}
+                >
+                  <SettingsListItem
+                    title="Service Health"
+                    left={{
+                      node: (
+                        <IconButton
+                          icon="server-network"
+                          size={16}
+                          iconColor={theme.colors.primary}
+                          style={{ margin: 0, width: 24, height: 24 }}
+                        />
+                      ),
+                    }}
+                    trailing={
+                      <Switch
+                        value={serviceHealthNotificationsEnabled}
+                        onValueChange={setServiceHealthNotificationsEnabled}
+                        color={theme.colors.primary}
                       />
-                    </View>
-                    <View style={styles.settingInfo}>
-                      <Text style={styles.settingValue}>Service Health</Text>
-                    </View>
-                    <Switch
-                      value={serviceHealthNotificationsEnabled}
-                      onValueChange={setServiceHealthNotificationsEnabled}
-                      color={theme.colors.primary}
-                    />
-                  </View>
-                </>
-              )}
+                    }
+                    groupPosition="middle"
+                  />
+                </AnimatedListItem>
+              </>
+            )}
 
-              <View
-                style={[styles.notificationItem, { marginTop: spacing.xs }]}
-              >
-                <View style={styles.notificationIcon}>
+            <AnimatedListItem
+              index={notificationsEnabled ? 5 : 1}
+              totalItems={notificationItemsCount}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title={`Quiet Hours: ${quietHoursValue}`}
+                left={{
+                  node: (
+                    <IconButton
+                      icon="moon-waning-crescent"
+                      size={16}
+                      iconColor={theme.colors.primary}
+                      style={{ margin: 0, width: 24, height: 24 }}
+                    />
+                  ),
+                }}
+                trailing={
                   <IconButton
-                    icon="moon-waning-crescent"
+                    icon="chevron-right"
                     size={16}
-                    iconColor={theme.colors.primary}
+                    iconColor={theme.colors.outline}
+                    onPress={() => router.push("/(auth)/settings/quiet-hours")}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingValue}>
-                    Quiet Hours: {quietHoursValue}
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                  onPress={() => router.push("/(auth)/settings/quiet-hours")}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Quick Actions Section */}
-        <AnimatedSection style={styles.section} delay={150}>
+        <AnimatedSection
+          style={styles.section}
+          delay={150}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <AnimatedListItem index={0} totalItems={2}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={handleRefreshIntervalPress}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Refresh Interval"
+                subtitle={`${refreshIntervalMinutes} minutes`}
+                left={{ iconName: "refresh" }}
+                trailing={
                   <IconButton
-                    icon="refresh"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Refresh Interval</Text>
-                  <Text style={styles.settingValue}>
-                    {refreshIntervalMinutes} minutes
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/voice-assistant")}
+                }
+                onPress={handleRefreshIntervalPress}
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Voice Assistant"
+                subtitle="Siri & Google Assistant"
+                left={{ iconName: "microphone" }}
+                trailing={
                   <IconButton
-                    icon="microphone"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Voice Assistant</Text>
-                  <Text style={styles.settingValue}>
-                    Siri & Google Assistant
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={() => router.push("/(auth)/settings/voice-assistant")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Storage Section */}
-        <AnimatedSection style={styles.section} delay={200}>
+        <AnimatedSection
+          style={styles.section}
+          delay={200}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Storage</Text>
-          <AnimatedListItem index={0} totalItems={2}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="folder"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Image Cache</Text>
-                  <Text style={styles.settingValue}>
-                    {isFetchingCacheUsage
-                      ? "Calculating…"
-                      : `${imageCacheUsage.formattedSize}${
-                          imageCacheUsage.fileCount
-                            ? ` • ${imageCacheUsage.fileCount} files`
-                            : ""
-                        }`}
-                  </Text>
-                </View>
-                <Button
-                  mode="contained-tonal"
-                  compact
-                  onPress={handleClearImageCache}
-                  loading={isClearingImageCache}
-                  disabled={
-                    isClearingImageCache ||
-                    isFetchingCacheUsage ||
-                    imageCacheUsage.size === 0
-                  }
-                  style={{ height: 32 }}
-                >
-                  Clear
-                </Button>
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={handleCacheLimitPress}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={3}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Image Cache"
+                subtitle={
+                  isFetchingCacheUsage
+                    ? "Calculating…"
+                    : `${imageCacheUsage.formattedSize}${
+                        imageCacheUsage.fileCount
+                          ? ` • ${imageCacheUsage.fileCount} files`
+                          : ""
+                      }`
+                }
+                left={{ iconName: "folder" }}
+                trailing={
+                  <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                    <Button
+                      mode="outlined"
+                      compact
+                      onPress={() => router.push("/(auth)/settings/cache-view")}
+                      disabled={isFetchingCacheUsage}
+                      style={{ height: 32 }}
+                    >
+                      View
+                    </Button>
+                    <Button
+                      mode="contained-tonal"
+                      compact
+                      onPress={handleClearImageCache}
+                      loading={isClearingImageCache}
+                      disabled={
+                        isClearingImageCache ||
+                        isFetchingCacheUsage ||
+                        imageCacheUsage.size === 0
+                      }
+                      style={{ height: 32 }}
+                    >
+                      Clear
+                    </Button>
+                  </View>
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Cache Limit"
+                subtitle={formatBytes(maxImageCacheSize)}
+                left={{ iconName: "database-cog" }}
+                trailing={
                   <IconButton
-                    icon="database-cog"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Cache Limit</Text>
-                  <Text style={styles.settingValue}>
-                    {formatBytes(maxImageCacheSize)}
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={handleCacheLimitPress}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Services Section */}
-        <AnimatedSection style={styles.section} delay={250}>
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>Services</Text>
-          <AnimatedListItem index={0} totalItems={3}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/(tabs)/services")}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={4}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Manage Services"
+                subtitle="Configure connected services"
+                left={{ iconName: "server" }}
+                trailing={
                   <IconButton
-                    icon="server"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Manage Services</Text>
-                  <Text style={styles.settingValue}>
-                    Configure connected services
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={3}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/tmdb")}
+                }
+                onPress={() => router.push("/(auth)/(tabs)/services")}
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={4}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="TMDB Integration"
+                subtitle={tmdbEnabled ? "Enabled" : "Disabled"}
+                left={{ iconName: "movie-open" }}
+                trailing={
                   <IconButton
-                    icon="movie-open"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>TMDB Integration</Text>
-                  <Text style={styles.settingValue}>
-                    {tmdbEnabled ? "Enabled" : "Disabled"}
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={2} totalItems={4}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/widgets")}
+                }
+                onPress={() => router.push("/(auth)/settings/tmdb")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={4}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Widget Settings"
+                subtitle="Configure dashboard widgets"
+                left={{ iconName: "widgets" }}
+                trailing={
                   <IconButton
-                    icon="widgets"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Widget Settings</Text>
-                  <Text style={styles.settingValue}>
-                    Configure dashboard widgets
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={3} totalItems={4}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="repeat-variant"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Jellyseerr Retries</Text>
-                  <Text style={styles.settingValue}>
-                    {jellyseerrRetryAttempts}{" "}
-                    {jellyseerrRetryAttempts !== 1 ? "retries" : "retry"}
-                  </Text>
-                </View>
-                <Button
-                  mode="contained-tonal"
-                  compact
-                  onPress={() => setJellyseerrRetriesVisible(true)}
-                  style={{ height: 32 }}
-                >
-                  Set
-                </Button>
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={() => router.push("/(auth)/settings/widgets")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={3}
+              totalItems={4}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Jellyseerr Retries"
+                subtitle={`${jellyseerrRetryAttempts} ${
+                  jellyseerrRetryAttempts !== 1 ? "retries" : "retry"
+                }`}
+                left={{ iconName: "repeat-variant" }}
+                trailing={
+                  <Button
+                    mode="contained-tonal"
+                    compact
+                    onPress={() => setJellyseerrRetriesVisible(true)}
+                    style={{ height: 32 }}
+                  >
+                    Set
+                  </Button>
+                }
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* System Section */}
-        <AnimatedSection style={styles.section} delay={300}>
+        <AnimatedSection
+          style={styles.section}
+          delay={300}
+          animated={animationsEnabled}
+        >
           <Text style={styles.sectionTitle}>System</Text>
-          <AnimatedListItem index={0} totalItems={2}>
-            <Card
-              variant="custom"
-              style={styles.settingCard}
-              onPress={() => router.push("/(auth)/settings/backup-restore")}
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={4}
+              animated={animationsEnabled}
             >
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+              <SettingsListItem
+                title="Backup & Restore"
+                subtitle="Export, import & cloud backups"
+                left={{ iconName: "backup-restore" }}
+                trailing={
                   <IconButton
-                    icon="backup-restore"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Backup & Restore</Text>
-                  <Text style={styles.settingValue}>
-                    Export, import & cloud backups
-                  </Text>
-                </View>
-                <IconButton
-                  icon="chevron-right"
-                  size={16}
-                  iconColor={theme.colors.outline}
-                />
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={1} totalItems={2}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
+                }
+                onPress={() => router.push("/(auth)/settings/backup-restore")}
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={4}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="App Version"
+                subtitle={appVersionString}
+                left={{ iconName: "information" }}
+                trailing={
+                  <Button
+                    mode="contained-tonal"
+                    compact
+                    onPress={handleCheckForUpdate}
+                    loading={isCheckingUpdate}
+                    disabled={isCheckingUpdate}
+                    style={{ height: 32 }}
+                  >
+                    Check
+                  </Button>
+                }
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={4}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Log Level"
+                subtitle={logLevel}
+                left={{ iconName: "console" }}
+                trailing={
+                  <Button
+                    mode="contained-tonal"
+                    compact
+                    onPress={() => setLogLevelVisible(true)}
+                    style={{ height: 32 }}
+                  >
+                    Set
+                  </Button>
+                }
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={3}
+              totalItems={4}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Debugging"
+                subtitle="Logs & diagnostics"
+                left={{ iconName: "bug-outline" }}
+                trailing={
                   <IconButton
-                    icon="information"
-                    size={20}
-                    iconColor={theme.colors.primary}
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
                   />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>App Version</Text>
-                  <Text style={styles.settingValue}>{appVersionString}</Text>
-                </View>
-              </View>
-            </Card>
-          </AnimatedListItem>
-          <AnimatedListItem index={2} totalItems={2}>
-            <Card variant="custom" style={styles.settingCard}>
-              <View style={styles.settingContent}>
-                <View style={styles.settingIcon}>
-                  <IconButton
-                    icon="console"
-                    size={20}
-                    iconColor={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Log Level</Text>
-                  <Text style={styles.settingValue}>{logLevel}</Text>
-                </View>
-                <Button
-                  mode="contained-tonal"
-                  compact
-                  onPress={() => setLogLevelVisible(true)}
-                  style={{ height: 32 }}
-                >
-                  Set
-                </Button>
-              </View>
-            </Card>
-          </AnimatedListItem>
+                }
+                onPress={() => router.push("/(auth)/dev")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
         </AnimatedSection>
 
         {/* Thumbnail concurrency dialog removed */}
 
         {/* Developer Tools (dev only) */}
         {isDev && (
-          <AnimatedSection style={styles.section} delay={350}>
+          <AnimatedSection
+            style={styles.section}
+            delay={350}
+            animated={animationsEnabled}
+          >
             <Text style={styles.sectionTitle}>Development</Text>
-            <AnimatedListItem index={0} totalItems={1}>
-              <Card
-                variant="custom"
-                style={styles.settingCard}
-                onPress={() => router.push("/(auth)/dev")}
+            <SettingsGroup>
+              <AnimatedListItem
+                index={0}
+                totalItems={1}
+                animated={animationsEnabled}
               >
-                <View style={styles.settingContent}>
-                  <View style={styles.settingIcon}>
+                <SettingsListItem
+                  title="Developer Tools"
+                  subtitle="Dev tools & playground"
+                  left={{ iconName: "bug" }}
+                  trailing={
                     <IconButton
-                      icon="bug"
-                      size={20}
-                      iconColor={theme.colors.primary}
+                      icon="chevron-right"
+                      size={16}
+                      iconColor={theme.colors.outline}
                     />
-                  </View>
-                  <View style={styles.settingInfo}>
-                    <Text style={styles.settingTitle}>Developer Tools</Text>
-                    <Text style={styles.settingValue}>
-                      Dev tools & playground
-                    </Text>
-                  </View>
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                </View>
-              </Card>
-            </AnimatedListItem>
+                  }
+                  onPress={() => router.push("/(auth)/dev")}
+                  groupPosition="single"
+                />
+              </AnimatedListItem>
+            </SettingsGroup>
           </AnimatedSection>
         )}
 
@@ -1013,6 +1076,7 @@ const SettingsScreen = () => {
           index={0}
           totalItems={1}
           style={{ marginTop: spacing.md }}
+          animated={animationsEnabled}
         >
           <Button
             mode="outlined"

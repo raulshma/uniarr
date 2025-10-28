@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -9,25 +9,21 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  ActivityIndicator,
-  Button,
-  Chip,
-  Text,
-  useTheme,
-} from "react-native-paper";
+import { Button, Chip, Text, useTheme } from "react-native-paper";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useJikanAnimeDetails } from "@/hooks/useJikanAnimeDetails";
+import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import type { JikanTrailer, JikanAnimeFull } from "@/models/jikan.types";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import { useConnectorsStore, selectConnectors } from "@/store/connectorsStore";
 import type { components as JellyseerrComponents } from "@/connectors/client-schemas/jellyseerr-openapi";
 import { alert } from "@/services/dialogService";
 import { isApiError } from "@/utils/error.utils";
+import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
 
 type JellyseerrSearchResult =
   | JellyseerrComponents["schemas"]["MovieResult"]
@@ -287,6 +283,18 @@ const AnimeHubDetailScreen: React.FC = () => {
 
   const { anime, isLoading, isError, refetch } =
     useJikanAnimeDetails(validMalId);
+
+  // Initialize skeleton loading hook with 800ms minimum display time for detail pages
+  const skeleton = useSkeletonLoading({ minLoadingTime: 800 });
+
+  // Effect to manage skeleton visibility based on loading state
+  useEffect(() => {
+    if (isLoading && !anime) {
+      skeleton.startLoading();
+    } else {
+      skeleton.stopLoading();
+    }
+  }, [isLoading, anime, skeleton]);
 
   const connectors = useConnectorsStore(selectConnectors);
   const jellyseerrConnectors = useMemo(() => {
@@ -711,12 +719,10 @@ const AnimeHubDetailScreen: React.FC = () => {
     );
   }, [anime, isRequesting, jellyseerrConnectors, requestThroughConnector]);
 
-  if (isLoading && !anime) {
+  if (skeleton.showSkeleton && isLoading && !anime) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loading}>
-          <ActivityIndicator animating color={theme.colors.primary} />
-        </View>
+      <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
+        <DetailPageSkeleton />
       </SafeAreaView>
     );
   }
@@ -724,9 +730,12 @@ const AnimeHubDetailScreen: React.FC = () => {
   if (!validMalId) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loading}>
-          <ActivityIndicator animating color={theme.colors.primary} />
-        </View>
+        <EmptyState
+          title="Invalid anime ID"
+          description="The requested anime could not be found."
+          actionLabel="Go Back"
+          onActionPress={() => router.back()}
+        />
       </SafeAreaView>
     );
   }

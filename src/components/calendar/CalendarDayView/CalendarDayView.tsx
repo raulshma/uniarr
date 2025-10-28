@@ -6,6 +6,11 @@ import { Text, useTheme } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import type { CalendarDay } from "@/models/calendar.types";
 import { MediaReleaseCard } from "../MediaReleaseCard";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+  AnimatedView,
+} from "@/components/common/AnimatedComponents";
 
 export type CalendarDayViewProps = {
   data: CalendarDay;
@@ -105,17 +110,17 @@ const CalendarDayView: React.FC<CalendarDayViewProps> = ({
   if (!hasReleases) {
     return (
       <View style={[styles.container, style]}>
-        <View style={styles.header}>
+        <AnimatedView style={styles.header}>
           <Text style={styles.dateText}>
             {date.weekday}, {date.month} {date.day}, {date.year}
           </Text>
-        </View>
+        </AnimatedView>
         <View style={styles.content}>
-          <View style={styles.emptyState}>
+          <AnimatedView style={styles.emptyState}>
             <Text style={styles.emptyText}>
               No releases scheduled for this day
             </Text>
-          </View>
+          </AnimatedView>
         </View>
       </View>
     );
@@ -123,74 +128,98 @@ const CalendarDayView: React.FC<CalendarDayViewProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.header}>
+      <AnimatedView style={styles.header}>
         <Text style={styles.dateText}>
           {date.weekday}, {date.month} {date.day}, {date.year}
         </Text>
         <Text style={styles.weekdayText}>
           {data.releases.length} release{data.releases.length !== 1 ? "s" : ""}
         </Text>
-      </View>
+      </AnimatedView>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {releasesByStatus.upcoming.length > 0 && (
-          <View style={styles.section}>
+          <AnimatedSection style={styles.section} delay={40}>
             <Text style={styles.sectionTitle}>Upcoming Releases</Text>
             <View style={styles.releasesList}>
-              {releasesByStatus.upcoming.map((release) => (
-                <MediaReleaseCard
+              {releasesByStatus.upcoming.map((release, index) => (
+                <AnimatedListItem
                   key={release.id}
-                  release={release}
-                  onPress={() => onReleasePress?.(release.id)}
-                />
+                  index={index}
+                  staggerDelay={60}
+                >
+                  <MediaReleaseCard
+                    release={release}
+                    onPress={() => onReleasePress?.(release.id)}
+                    animated={false}
+                  />
+                </AnimatedListItem>
               ))}
             </View>
-          </View>
+          </AnimatedSection>
         )}
 
         {releasesByStatus.released.length > 0 && (
-          <View style={styles.section}>
+          <AnimatedSection style={styles.section} delay={80}>
             <Text style={styles.sectionTitle}>Released Today</Text>
             <View style={styles.releasesList}>
-              {releasesByStatus.released.map((release) => (
-                <MediaReleaseCard
+              {releasesByStatus.released.map((release, index) => (
+                <AnimatedListItem
                   key={release.id}
-                  release={release}
-                  onPress={() => onReleasePress?.(release.id)}
-                />
+                  index={index}
+                  staggerDelay={60}
+                >
+                  <MediaReleaseCard
+                    release={release}
+                    onPress={() => onReleasePress?.(release.id)}
+                    animated={false}
+                  />
+                </AnimatedListItem>
               ))}
             </View>
-          </View>
+          </AnimatedSection>
         )}
 
         {releasesByStatus.delayed.length > 0 && (
-          <View style={styles.section}>
+          <AnimatedSection style={styles.section} delay={120}>
             <Text style={styles.sectionTitle}>Delayed Releases</Text>
             <View style={styles.releasesList}>
-              {releasesByStatus.delayed.map((release) => (
-                <MediaReleaseCard
+              {releasesByStatus.delayed.map((release, index) => (
+                <AnimatedListItem
                   key={release.id}
-                  release={release}
-                  onPress={() => onReleasePress?.(release.id)}
-                />
+                  index={index}
+                  staggerDelay={60}
+                >
+                  <MediaReleaseCard
+                    release={release}
+                    onPress={() => onReleasePress?.(release.id)}
+                    animated={false}
+                  />
+                </AnimatedListItem>
               ))}
             </View>
-          </View>
+          </AnimatedSection>
         )}
 
         {releasesByStatus.cancelled.length > 0 && (
-          <View style={styles.section}>
+          <AnimatedSection style={styles.section} delay={160}>
             <Text style={styles.sectionTitle}>Cancelled Releases</Text>
             <View style={styles.releasesList}>
-              {releasesByStatus.cancelled.map((release) => (
-                <MediaReleaseCard
+              {releasesByStatus.cancelled.map((release, index) => (
+                <AnimatedListItem
                   key={release.id}
-                  release={release}
-                  onPress={() => onReleasePress?.(release.id)}
-                />
+                  index={index}
+                  staggerDelay={60}
+                >
+                  <MediaReleaseCard
+                    release={release}
+                    onPress={() => onReleasePress?.(release.id)}
+                    animated={false}
+                  />
+                </AnimatedListItem>
               ))}
             </View>
-          </View>
+          </AnimatedSection>
         )}
       </ScrollView>
     </View>

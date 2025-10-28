@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet, Platform, type ViewStyle } from "react-native";
+import Animated from "react-native-reanimated";
 import {
   BottomNavigation,
   Surface,
@@ -10,6 +11,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import type { AppTheme } from "@/constants/theme";
+import {
+  COMPONENT_ANIMATIONS,
+  PERFORMANCE_OPTIMIZATIONS,
+  FadeOut,
+} from "@/utils/animations.utils";
 
 export interface AdaptiveTabProps {
   /**
@@ -158,29 +164,40 @@ export const AdaptiveTabs: React.FC<AdaptiveTabProps> = ({
 
   if (useSideNavigation) {
     return (
-      <View
+      <Animated.View
+        entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE()}
+        exiting={FadeOut.duration(200)}
         style={[
           styles.sideNavigationContainer,
           { backgroundColor: theme.colors.surface },
         ]}
+        removeClippedSubviews={PERFORMANCE_OPTIMIZATIONS.removeClippedSubviews}
+        collapsable={PERFORMANCE_OPTIMIZATIONS.collapsable}
       >
         <View style={styles.sideNavigationHeader}>
           {/* Could add app logo/title here */}
         </View>
         <BottomNavigation {...getTabBarProps()} />
-      </View>
+      </Animated.View>
     );
   }
 
   return (
-    <Surface
-      style={[
-        styles.bottomNavigationContainer,
-        { backgroundColor: theme.colors.surface },
-      ]}
+    <Animated.View
+      entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE()}
+      exiting={FadeOut.duration(200)}
+      removeClippedSubviews={PERFORMANCE_OPTIMIZATIONS.removeClippedSubviews}
+      collapsable={PERFORMANCE_OPTIMIZATIONS.collapsable}
     >
-      <BottomNavigation {...getTabBarProps()} />
-    </Surface>
+      <Surface
+        style={[
+          styles.bottomNavigationContainer,
+          { backgroundColor: theme.colors.surface },
+        ]}
+      >
+        <BottomNavigation {...getTabBarProps()} />
+      </Surface>
+    </Animated.View>
   );
 };
 

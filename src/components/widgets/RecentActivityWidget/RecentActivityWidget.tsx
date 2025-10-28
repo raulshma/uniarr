@@ -1,31 +1,30 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { StyleSheet, View, TouchableOpacity, FlatList } from "react-native";
-import {
-  Text,
-  IconButton,
-  useTheme,
-  ActivityIndicator,
-} from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { StyleSheet, View, FlatList } from "react-native";
+import { Text, IconButton, useTheme } from "react-native-paper";
+import { useRouter } from "expo-router";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { useHaptics } from "@/hooks/useHaptics";
+import {
+  FadeIn,
+  FadeOut,
+  ANIMATION_DURATIONS,
+  Animated,
+} from "@/utils/animations.utils";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { secureStorage } from "@/services/storage/SecureStorage";
-
-type RecentActivityItem = {
-  id: string;
-  title: string;
-  episode: string;
-  show: string;
-  date: string;
-  timestamp?: number;
-  image?: string;
-};
+import { createCrossServiceKey } from "@/utils/dedupe.utils";
+import { createServiceNavigation } from "@/utils/navigation.utils";
+import { alert } from "@/services/dialogService";
+import { useSettingsStore } from "@/store/settingsStore";
+import type { RecentActivityItem } from "@/models/recentActivity.types";
+import SettingsListItem from "@/components/common/SettingsListItem";
+import { borderRadius } from "@/constants/sizes";
 
 interface RecentActivityWidgetProps {
   widget: Widget;
@@ -38,7 +37,12 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   onRefresh,
   onEdit,
 }) => {
+  const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const recentActivitySourceIds = useSettingsStore(
+    (s) => s.recentActivitySourceServiceIds,
+  );
+
   const { onPress } = useHaptics();
   const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>(
     [],
@@ -78,10 +82,22 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       const configs = await secureStorage.getServiceConfigs();
       const enabledConfigs = configs.filter((config) => config.enabled);
 
-      const recentActivityMap = new Map<string, RecentActivityItem>();
+      // Filter by recent activity sources if set
+      let sourceConfigs = enabledConfigs;
+      if (
+        recentActivitySourceIds !== undefined &&
+        recentActivitySourceIds.length > 0
+      ) {
+        sourceConfigs = enabledConfigs.filter((c) =>
+          recentActivitySourceIds.includes(c.id),
+        );
+      }
+
+      // Map to aggregate items by cross-service key
+      const dedupeMap = new Map<string, RecentActivityItem>();
 
       // Fetch from Sonarr
-      const sonarrConfigs = enabledConfigs.filter(
+      const sonarrConfigs = sourceConfigs.filter(
         (config) => config.type === "sonarr",
       );
       for (const config of sonarrConfigs) {
@@ -97,6 +113,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
               for (const record of history.records.slice(0, 5)) {
                 if ((record as any).series) {
                   const series = (record as any).series;
+                  const episode = (record as any).episode;
                   let imageUrl: string | undefined;
 
                   if (series.images && series.images.length > 0) {
@@ -108,19 +125,75 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
                     }
                   }
 
-                  const itemKey = `sonarr-${series.id}-${(record as any).episode?.episodeNumber}`;
-                  if (!recentActivityMap.has(itemKey)) {
-                    const dateObj = new Date((record as any).date);
-                    recentActivityMap.set(itemKey, {
-                      id: itemKey,
+                  // Create cross-service key for deduplication
+                  const dedupeKey = createCrossServiceKey(
+                    {
+                      serviceId: config.id,
+                      serviceType: "sonarr",
+                      serviceName: config.name,
+                      nativeId: series.id,
+                      seriesId: series.id,
+                      episodeNumber: episode?.episodeNumber,
+                    },
+                    true, // isEpisode
+                  );
+
+                  const dateObj = new Date((record as any).date);
+                  const episodeDisplay = episode
+                    ? `S${episode.seasonNumber?.toString().padStart(2, "0")}E${episode.episodeNumber?.toString().padStart(2, "0")}`
+                    : "";
+
+                  if (dedupeMap.has(dedupeKey)) {
+                    // Merge origins for multi-service items
+                    const existing = dedupeMap.get(dedupeKey)!;
+                    if (!existing.originServiceIds.includes(config.id)) {
+                      existing.originServiceIds.push(config.id);
+                      existing.originServices.push({
+                        serviceId: config.id,
+                        serviceType: "sonarr",
+                        serviceName: config.name,
+                      });
+                      existing.serviceTypes = Array.from(
+                        new Set([...existing.serviceTypes, "sonarr"]),
+                      );
+                      // Update timestamp to most recent
+                      if (dateObj.getTime() > (existing.timestamp ?? 0)) {
+                        existing.timestamp = dateObj.getTime();
+                        existing.date =
+                          formatRelativeTimeLocal(dateObj) || "Unknown";
+                      }
+                      // Update image if we have one
+                      if (imageUrl && !existing.image) {
+                        existing.image = imageUrl;
+                      }
+                    }
+                  } else {
+                    dedupeMap.set(dedupeKey, {
+                      id: dedupeKey,
                       title: series.title || "Unknown",
-                      episode: (record as any).episode
-                        ? `S${(record as any).episode.seasonNumber?.toString().padStart(2, "0")}E${(record as any).episode.episodeNumber?.toString().padStart(2, "0")}`
-                        : "",
+                      episode: episodeDisplay,
                       show: series.title || "",
                       date: formatRelativeTimeLocal(dateObj) || "Unknown",
                       timestamp: dateObj.getTime(),
                       image: imageUrl,
+                      contentId: series.id,
+                      serviceTypes: ["sonarr"],
+                      originServiceIds: [config.id],
+                      originServices: [
+                        {
+                          serviceId: config.id,
+                          serviceType: "sonarr",
+                          serviceName: config.name,
+                        },
+                      ],
+                      isEpisode: !!episode,
+                      episodeInfo: episode
+                        ? {
+                            seriesId: series.id,
+                            seasonNumber: episode.seasonNumber,
+                            episodeNumber: episode.episodeNumber,
+                          }
+                        : undefined,
                     });
                   }
                 }
@@ -133,7 +206,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       }
 
       // Fetch from Radarr
-      const radarrConfigs = enabledConfigs.filter(
+      const radarrConfigs = sourceConfigs.filter(
         (config) => config.type === "radarr",
       );
       for (const config of radarrConfigs) {
@@ -160,17 +233,60 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
                     }
                   }
 
-                  const itemKey = `radarr-${movie.id}`;
-                  if (!recentActivityMap.has(itemKey)) {
-                    const dateObj = new Date((record as any).date);
-                    recentActivityMap.set(itemKey, {
-                      id: itemKey,
+                  // Create cross-service key
+                  const dedupeKey = createCrossServiceKey(
+                    {
+                      serviceId: config.id,
+                      serviceType: "radarr",
+                      serviceName: config.name,
+                      nativeId: movie.id,
+                    },
+                    false,
+                  );
+
+                  const dateObj = new Date((record as any).date);
+
+                  if (dedupeMap.has(dedupeKey)) {
+                    // Merge origins
+                    const existing = dedupeMap.get(dedupeKey)!;
+                    if (!existing.originServiceIds.includes(config.id)) {
+                      existing.originServiceIds.push(config.id);
+                      existing.originServices.push({
+                        serviceId: config.id,
+                        serviceType: "radarr",
+                        serviceName: config.name,
+                      });
+                      existing.serviceTypes = Array.from(
+                        new Set([...existing.serviceTypes, "radarr"]),
+                      );
+                      if (dateObj.getTime() > (existing.timestamp ?? 0)) {
+                        existing.timestamp = dateObj.getTime();
+                        existing.date =
+                          formatRelativeTimeLocal(dateObj) || "Unknown";
+                      }
+                      if (imageUrl && !existing.image) {
+                        existing.image = imageUrl;
+                      }
+                    }
+                  } else {
+                    dedupeMap.set(dedupeKey, {
+                      id: dedupeKey,
                       title: movie.title || "Unknown",
                       episode: "Movie",
                       show: movie.title || "",
                       date: formatRelativeTimeLocal(dateObj) || "Unknown",
                       timestamp: dateObj.getTime(),
                       image: imageUrl,
+                      contentId: movie.id,
+                      serviceTypes: ["radarr"],
+                      originServiceIds: [config.id],
+                      originServices: [
+                        {
+                          serviceId: config.id,
+                          serviceType: "radarr",
+                          serviceName: config.name,
+                        },
+                      ],
                     });
                   }
                 }
@@ -183,7 +299,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       }
 
       // Convert map to array, sort by date (most recent first), and limit
-      return Array.from(recentActivityMap.values())
+      return Array.from(dedupeMap.values())
         .sort((a, b) => {
           // Sort by timestamp in descending order (most recent first)
           const timestampA = a.timestamp ?? 0;
@@ -195,7 +311,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       console.error("Failed to fetch recent activity:", error);
       return [];
     }
-  }, []);
+  }, [recentActivitySourceIds]);
 
   const loadRecentActivity = useCallback(async () => {
     try {
@@ -204,7 +320,17 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         RecentActivityItem[]
       >(widget.id);
       if (cachedData) {
-        setRecentActivity(cachedData);
+        // Filter out cached items missing required navigation fields (backward compatibility)
+        const validatedData = cachedData.filter(
+          (item) =>
+            item.contentId !== undefined &&
+            item.contentId !== null &&
+            item.serviceTypes &&
+            item.serviceTypes.length > 0 &&
+            item.originServices &&
+            item.originServices.length > 0,
+        );
+        setRecentActivity(validatedData);
         setLoading(false);
         setError(null);
         // Don't return, continue to fetch fresh data in background
@@ -235,17 +361,54 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   const handleItemPress = useCallback(
     (item: RecentActivityItem) => {
       onPress();
-      // Navigate to appropriate service based on item ID
-      if (item.id.startsWith("sonarr-")) {
-        // Navigate to Sonarr series list
-        // This would require access to router - for now, just log
-        console.log("Navigate to Sonarr series:", item.id.split("-")[1]);
-      } else if (item.id.startsWith("radarr-")) {
-        // Navigate to Radarr movies list
-        console.log("Navigate to Radarr movies:", item.id.split("-")[1]);
+
+      // Validate required navigation fields
+      if (
+        item.contentId === undefined ||
+        item.contentId === null ||
+        !item.serviceTypes ||
+        item.serviceTypes.length === 0 ||
+        !item.originServices ||
+        item.originServices.length === 0
+      ) {
+        alert(
+          "This should not happen",
+          "Missing service or content information for this item.",
+        );
+        return;
+      }
+
+      // Handle single-origin items
+      if (item.originServices.length === 1) {
+        const origin = item.originServices[0]!;
+        // For Sonarr episodes, navigate to series detail
+        const itemId =
+          item.isEpisode && item.episodeInfo?.seriesId
+            ? item.episodeInfo.seriesId
+            : item.contentId;
+
+        createServiceNavigation(origin.serviceType).navigateToDetail(
+          router,
+          origin.serviceId,
+          itemId,
+        );
+      } else {
+        // Handle multi-origin aggregated items
+        // For now, navigate to the first origin (or preferred if set)
+        const origin = item.originServices[0]!;
+        const itemId =
+          item.isEpisode && item.episodeInfo?.seriesId
+            ? item.episodeInfo.seriesId
+            : item.contentId;
+
+        createServiceNavigation(origin.serviceType).navigateToDetail(
+          router,
+          origin.serviceId,
+          itemId,
+        );
       }
     },
-    [onPress],
+    [onPress, router],
   );
 
   const handleRefresh = useCallback(() => {
@@ -257,7 +420,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
     () =>
       StyleSheet.create({
         container: {
-          flex: 1,
+          overflow: "hidden",
         },
         header: {
           flexDirection: "row",
@@ -337,52 +500,102 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           textAlign: "center",
           paddingVertical: spacing.md,
         },
-        loadingState: {
+        loadingSkeleton: {
+          gap: spacing.md,
+        },
+        skeletonCard: {
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.custom.sizes.borderRadius.xl,
+          padding: spacing.md,
+          flexDirection: "row",
+          ...getComponentElevation("widgetCard", theme),
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
+        },
+        skeletonImage: {
+          width: theme.custom.sizes.additionalCardSizes.portrait.width,
+          height: theme.custom.sizes.additionalCardSizes.portrait.height,
+          borderRadius: theme.custom.sizes.borderRadius.md,
+          marginRight: spacing.md,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        skeletonContent: {
           flex: 1,
-          alignItems: "center",
           justifyContent: "center",
-          paddingVertical: spacing.xl,
+        },
+        skeletonTitle: {
+          width: "80%",
+          height: 16,
+          borderRadius: 4,
+          marginBottom: spacing.xs,
+        },
+        skeletonMeta: {
+          width: "60%",
+          height: 14,
+          borderRadius: 4,
+          marginBottom: spacing.xs,
+        },
+        skeletonDate: {
+          width: "40%",
+          height: 12,
+          borderRadius: 4,
         },
       }),
     [theme],
   );
 
   const renderActivityCard = useCallback(
-    ({ item }: { item: RecentActivityItem }) => (
-      <TouchableOpacity
-        style={styles.activityCard}
-        onPress={() => handleItemPress(item)}
-        activeOpacity={0.7}
-      >
-        {item.image ? (
-          <MediaPoster
-            uri={item.image}
-            size={60}
-            borderRadius={8}
-            style={styles.activityImage}
+    ({ item, index }: { item: RecentActivityItem; index: number }) => (
+      <SettingsListItem
+        title={item.title}
+        subtitle={`${item.show} • ${item.episode} • ${item.date}`}
+        left={{
+          node: item.image ? (
+            <MediaPoster
+              uri={item.image}
+              size={60}
+              borderRadius={8}
+              style={styles.activityImage}
+            />
+          ) : (
+            <View style={styles.activityImage} />
+          ),
+        }}
+        trailing={
+          <IconButton
+            icon="chevron-right"
+            size={16}
+            iconColor={theme.colors.outline}
+            style={{ margin: 0 }}
           />
-        ) : (
-          <View style={styles.activityImage} />
-        )}
-        <View style={styles.activityContent}>
-          <Text style={styles.activityTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text style={styles.activityMeta} numberOfLines={1}>
-            {item.show} • {item.episode}
-          </Text>
-          <Text style={styles.activityDate}>{item.date}</Text>
-        </View>
-      </TouchableOpacity>
+        }
+        onPress={() => handleItemPress(item)}
+        groupPosition={
+          index === 0
+            ? "top"
+            : index === recentActivity.length - 1
+              ? "bottom"
+              : "middle"
+        }
+      />
     ),
-    [handleItemPress, styles],
+    [handleItemPress, styles, recentActivity.length, theme.colors.outline],
   );
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <View
+        style={StyleSheet.flatten([
+          styles.container,
+          {
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
+      >
         <View style={styles.header}>
-          <Text style={styles.title}>Recent Activity</Text>
+          <Text style={styles.title}>{widget.title}</Text>
           <View style={styles.actions}>
             <IconButton
               icon="refresh"
@@ -407,22 +620,49 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <Animated.View
+        style={StyleSheet.flatten([
+          styles.container,
+          {
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
+        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      >
         <View style={styles.header}>
-          <Text style={styles.title}>Recent Activity</Text>
+          <Text style={styles.title}>{widget.title}</Text>
         </View>
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+        <View style={styles.loadingSkeleton}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <SkeletonPlaceholder
+              key={index}
+              height={64}
+              borderRadius={12}
+              style={{ marginBottom: index < 2 ? 12 : 0 }}
+            />
+          ))}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
   if (recentActivity.length === 0) {
     return (
-      <View style={styles.container}>
+      <View
+        style={StyleSheet.flatten([
+          styles.container,
+          {
+            backgroundColor: theme.colors.elevation.level1,
+            borderRadius: borderRadius.xxl,
+            padding: spacing.sm,
+          },
+        ])}
+      >
         <View style={styles.header}>
-          <Text style={styles.title}>Recent Activity</Text>
+          <Text style={styles.title}>{widget.title}</Text>
           <View style={styles.actions}>
             <IconButton
               icon="refresh"
@@ -440,23 +680,24 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
             )}
           </View>
         </View>
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons
-            name="clock-outline"
-            size={48}
-            color={theme.colors.onSurfaceVariant}
-            style={styles.emptyIcon}
-          />
-          <Text style={styles.emptyText}>No recent activity</Text>
-        </View>
+        <SettingsListItem title="No recent activity" groupPosition="single" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={StyleSheet.flatten([
+        styles.container,
+        {
+          backgroundColor: theme.colors.elevation.level1,
+          borderRadius: borderRadius.xxl,
+          padding: spacing.sm,
+        },
+      ])}
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>Recent Activity</Text>
+        <Text style={styles.title}>{widget.title}</Text>
         <View style={styles.actions}>
           <IconButton
             icon="refresh"

@@ -1,12 +1,5 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  useCallback,
-  useRef,
-} from "react";
+import React, { useMemo, useState, useCallback, useRef } from "react";
 import {
-  Pressable,
   StyleProp,
   StyleSheet,
   View,
@@ -14,7 +7,7 @@ import {
   Animated,
 } from "react-native";
 import { Image } from "expo-image";
-import { Text, useTheme } from "react-native-paper";
+import { Text, useTheme, TouchableRipple } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { AppTheme } from "@/constants/theme";
@@ -104,103 +97,47 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     return { width: widthValue, height: heightValue };
   }, [size, aspectRatio]);
 
-  // Debug logging for URI changes
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development" && uri) {
-      console.log("MediaPoster URI changed:", uri);
+  // Removed debug logging - use React DevTools Profiler instead
+
+  // URI resolution: use Image component's native caching
+  // Track when URI changes to reset state
+  const prevUriRef = useRef<string | undefined>(uri);
+  const isUriChanged = prevUriRef.current !== uri;
+
+  if (isUriChanged) {
+    prevUriRef.current = uri;
+    if (!uri) {
+      setImageState({
+        loaded: false,
+        loading: false,
+        error: false,
+        resolvedUri: undefined,
+      });
+      fadeAnim.setValue(0);
+    } else {
+      // Mark as loading to show thumbhash placeholder if available
+      setImageState((prev) => ({
+        ...prev,
+        loading: true,
+        error: false,
+        resolvedUri: uri,
+      }));
     }
-  }, [uri, imageState.loading, imageState.resolvedUri]);
+  }
 
   // Use the thumbhash hook with reduced delay for better UX
+  // Called after URI tracking to ensure state consistency
   const { thumbhash } = useThumbhash(uri, {
     autoGenerate: true,
-    generateDelay: 50, // Reduced delay for faster feedback
+    generateDelay: priority === "high" ? 0 : 50, // No delay for high priority (list items)
   });
 
-  // Optimized preloading with early return
-  useEffect(() => {
-    if (preload && uri && !imageState.resolvedUri) {
-      void imageCacheService.prefetch(uri);
-    }
-  }, [preload, uri, imageState.resolvedUri]);
-
-  // Optimized URI resolution with caching and better error handling
-  useEffect(() => {
-    let isMounted = true;
-    let cancelled = false;
-
-    const resolve = async () => {
-      if (!uri) {
-        if (isMounted && !cancelled) {
-          setImageState({
-            loaded: false,
-            loading: false,
-            error: false,
-            resolvedUri: undefined,
-          });
-          fadeAnim.setValue(0);
-        }
-        return;
-      }
-
-      // Avoid unnecessary re-resolutions if URI hasn't changed or if already loading
-      if (imageState.resolvedUri === uri || imageState.loading) {
-        return;
-      }
-
-      if (isMounted && !cancelled) {
-        setImageState((prev) => ({
-          ...prev,
-          loading: true,
-          error: false,
-          // Keep previous URI during loading to prevent flickering
-          resolvedUri: prev.resolvedUri || uri,
-        }));
-        // Don't reset fade animation to prevent flickering
-      }
-
-      try {
-        // Optimized: cache resolved URIs to avoid repeated processing
-        const localUri = await imageCacheService.resolveForSize(
-          uri,
-          dimensions.width,
-          dimensions.height,
-        );
-        if (isMounted && !cancelled) {
-          setImageState({
-            loaded: false,
-            loading: false,
-            error: false,
-            resolvedUri: localUri,
-          });
-        }
-      } catch {
-        // Silent error handling - fallback to original URI
-        if (isMounted && !cancelled) {
-          setImageState({
-            loaded: false,
-            loading: false,
-            error: true,
-            resolvedUri: uri,
-          });
-        }
-      }
-    };
-
-    void resolve();
-
-    return () => {
-      isMounted = false;
-      cancelled = true;
-    };
-  }, [
-    uri,
-    dimensions.width,
-    dimensions.height,
-    fadeAnim,
-    imageState.loading,
-    imageState.resolvedUri,
-  ]);
+  // Preload image on demand - moved to Image component onLoad
+  const shouldPrefetch = preload && uri && !imageState.resolvedUri;
+  if (shouldPrefetch) {
+    // Fire-and-forget prefetch without blocking render
+    void imageCacheService.prefetch(uri);
+  }
 
   const handleImageLoad = useCallback(() => {
     setImageState((prev) => ({ ...prev, loaded: true, loading: false }));
@@ -332,16 +269,16 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
 
   if (onPress) {
     return (
-      <Pressable
+      <TouchableRipple
         onPress={onPress}
+        borderless={false}
         accessibilityRole="imagebutton"
-        accessibilityLabel={effectiveLabel}
       >
-        <View style={containerStyle} pointerEvents="none">
+        <View style={containerStyle} pointerEvents="box-none">
           {content}
-          {overlay}
+          {overlay && <View pointerEvents="auto">{overlay}</View>}
         </View>
-      </Pressable>
+      </TouchableRipple>
     );
   }
 

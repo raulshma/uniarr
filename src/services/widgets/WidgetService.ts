@@ -9,7 +9,13 @@ export type WidgetType =
   | "statistics"
   | "calendar-preview"
   | "shortcuts"
-  | "bookmarks";
+  | "bookmarks"
+  | "rss-feed"
+  | "subreddit"
+  | "hacker-news"
+  | "weather"
+  | "youtube"
+  | "twitch";
 
 export interface Widget {
   id: string;
@@ -182,6 +188,83 @@ class WidgetService {
           bookmarks: [],
         },
       },
+      {
+        id: "rss-feed",
+        type: "rss-feed",
+        title: "News Headlines",
+        enabled: false,
+        order: 7,
+        size: "large",
+        config: {
+          feeds: [],
+          limit: 10,
+        },
+      },
+      {
+        id: "subreddit",
+        type: "subreddit",
+        title: "Reddit Highlights",
+        enabled: false,
+        order: 8,
+        size: "large",
+        config: {
+          subreddits: [],
+          sort: "hot",
+          topTimeRange: "day",
+          limit: 10,
+        },
+      },
+      {
+        id: "hacker-news",
+        type: "hacker-news",
+        title: "Hacker News",
+        enabled: false,
+        order: 9,
+        size: "large",
+        config: {
+          feedType: "topstories",
+          limit: 10,
+        },
+      },
+      {
+        id: "weather",
+        type: "weather",
+        title: "Local Weather",
+        enabled: false,
+        order: 10,
+        size: "medium",
+        config: {
+          mode: "device",
+          locations: [],
+          units: "metric",
+          forecastDays: 3,
+        },
+      },
+      {
+        id: "youtube",
+        type: "youtube",
+        title: "YouTube Uploads",
+        enabled: false,
+        order: 11,
+        size: "large",
+        config: {
+          channelIds: [],
+          limit: 6,
+          itemsPerChannel: 3,
+        },
+      },
+      {
+        id: "twitch",
+        type: "twitch",
+        title: "Twitch Status",
+        enabled: false,
+        order: 12,
+        size: "medium",
+        config: {
+          channelLogins: [],
+          offlineMessage: "No channels are live right now.",
+        },
+      },
     ];
 
     this.widgets.clear();
@@ -328,6 +411,26 @@ class WidgetService {
   async resetToDefaults(): Promise<void> {
     await this.createDefaultWidgets();
     await this.clearWidgetData();
+  }
+
+  async restoreWidgets(widgets: Widget[]): Promise<void> {
+    await this.ensureInitialized();
+    try {
+      // Replace current widgets with restored ones
+      this.widgets.clear();
+      widgets.forEach((widget) => this.widgets.set(widget.id, widget));
+      await this.saveWidgets();
+
+      // Clear widget cache data for fresh data on restore
+      await this.clearWidgetData();
+
+      logger.debug("[WidgetService] Widgets restored from backup", {
+        widgetCount: widgets.length,
+      });
+    } catch (error) {
+      logger.error("[WidgetService] Failed to restore widgets", { error });
+      throw error;
+    }
   }
 
   private async ensureInitialized(): Promise<void> {

@@ -246,11 +246,11 @@ const AddServiceScreen = () => {
           fontWeight: "600",
         },
         input: {
-          borderRadius: 16,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           backgroundColor: theme.colors.surface,
         },
         outline: {
-          borderRadius: 16,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           borderWidth: 1,
         },
         dropdownAnchor: {
@@ -259,7 +259,7 @@ const AddServiceScreen = () => {
         modalContent: {
           marginHorizontal: spacing.lg,
           backgroundColor: theme.colors.surface,
-          borderRadius: 12,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           paddingVertical: spacing.sm,
         },
         optionItem: {
@@ -295,7 +295,7 @@ const AddServiceScreen = () => {
           marginTop: spacing.sm,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
-          borderRadius: 12,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
         },
         diagnosticsError: {
           backgroundColor: theme.colors.errorContainer,

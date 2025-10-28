@@ -12,6 +12,7 @@ import {
   useTheme,
 } from "react-native-paper";
 
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import { useAdGuardHomeQueryLog } from "@/hooks/useAdGuardHomeQueryLog";
 import type {
   AdGuardQueryLogItem,
@@ -308,33 +309,38 @@ const AdGuardQueryLogScreen = () => {
   }, [clearQueryLog, refetch]);
 
   const renderLogItem = useCallback(
-    ({ item }: { item: AdGuardQueryLogItem }) => {
+    ({ item, index }: { item: AdGuardQueryLogItem; index: number }) => {
       const domain = item.question?.name ?? "Unknown domain";
       const client = item.client ?? "Unknown client";
       const tone = deriveStatusTone(theme, item);
       const reasonLabel = getReasonLabel(item);
 
       return (
-        <View style={styles.logCard}>
-          <View style={styles.logHeader}>
-            <Text style={styles.domainText} numberOfLines={1}>
-              {domain}
-            </Text>
-            <Text style={styles.timestamp}>{formatTimestamp(item.time)}</Text>
+        <AnimatedListItem index={index}>
+          <View style={styles.logCard}>
+            <View style={styles.logHeader}>
+              <Text style={styles.domainText} numberOfLines={1}>
+                {domain}
+              </Text>
+              <Text style={styles.timestamp}>{formatTimestamp(item.time)}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.clientText} numberOfLines={1}>
+                {client}
+              </Text>
+              <Chip
+                compact
+                style={[
+                  styles.statusChip,
+                  { backgroundColor: tone.background },
+                ]}
+                textStyle={{ color: tone.foreground }}
+              >
+                {reasonLabel}
+              </Chip>
+            </View>
           </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.clientText} numberOfLines={1}>
-              {client}
-            </Text>
-            <Chip
-              compact
-              style={[styles.statusChip, { backgroundColor: tone.background }]}
-              textStyle={{ color: tone.foreground }}
-            >
-              {reasonLabel}
-            </Chip>
-          </View>
-        </View>
+        </AnimatedListItem>
       );
     },
     [

@@ -5,14 +5,23 @@ import { Text, useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
 import type { CalendarStats as CalendarStatsType } from "@/models/calendar.types";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import { Card } from "@/components/common/Card";
 
 export type CalendarStatsProps = {
   stats: CalendarStatsType;
   style?: StyleProp<ViewStyle>;
+  shouldAnimateLayout?: boolean; // Allow disabling animations during loading
 };
 
-const CalendarStats: React.FC<CalendarStatsProps> = ({ stats, style }) => {
+const CalendarStats: React.FC<CalendarStatsProps> = ({
+  stats,
+  style,
+  shouldAnimateLayout = true,
+}) => {
   const theme = useTheme<AppTheme>();
 
   const styles = StyleSheet.create({
@@ -89,63 +98,86 @@ const CalendarStats: React.FC<CalendarStatsProps> = ({ stats, style }) => {
     return `${Math.round((value / total) * 100)}%`;
   };
 
+  const statItems = [
+    { value: stats.totalReleases, label: "Total Releases" },
+    { value: stats.upcomingReleases, label: "Upcoming" },
+    { value: stats.releasedThisWeek, label: "This Week" },
+    { value: stats.monitoredReleases, label: "Monitored" },
+  ];
+
+  const breakdownByType = Object.entries(stats.byType);
+  const breakdownByStatus = Object.entries(stats.byStatus);
+
   return (
-    <Card style={[styles.container, style]} contentPadding="md">
-      <View style={styles.grid}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.totalReleases}</Text>
-          <Text style={styles.statLabel}>Total Releases</Text>
+    <AnimatedSection style={[styles.container, style]} delay={0}>
+      <Card contentPadding="md">
+        <View style={styles.grid}>
+          {statItems.map((item, index) => (
+            <AnimatedListItem
+              key={item.label}
+              index={index}
+              totalItems={statItems.length}
+              animated={shouldAnimateLayout}
+              staggerDelay={50}
+            >
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
+              </View>
+            </AnimatedListItem>
+          ))}
         </View>
 
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.upcomingReleases}</Text>
-          <Text style={styles.statLabel}>Upcoming</Text>
-        </View>
+        <AnimatedSection style={styles.breakdownContainer} delay={200}>
+          <Text style={styles.breakdownTitle}>By Type</Text>
+          {breakdownByType.map(([type, count], index) => (
+            <AnimatedListItem
+              key={`type-${type}`}
+              index={index}
+              totalItems={breakdownByType.length}
+              animated={shouldAnimateLayout}
+              staggerDelay={30}
+            >
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>
+                  {type.charAt(0).toUpperCase() + type.slice(1)}s
+                </Text>
+                <Text style={styles.breakdownValue}>
+                  {count} ({formatPercentage(count, stats.totalReleases)})
+                </Text>
+              </View>
+            </AnimatedListItem>
+          ))}
 
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.releasedThisWeek}</Text>
-          <Text style={styles.statLabel}>This Week</Text>
-        </View>
-
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.monitoredReleases}</Text>
-          <Text style={styles.statLabel}>Monitored</Text>
-        </View>
-      </View>
-
-      <View style={styles.breakdownContainer}>
-        <Text style={styles.breakdownTitle}>By Type</Text>
-        {Object.entries(stats.byType).map(([type, count]) => (
-          <View key={type} style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>
-              {type.charAt(0).toUpperCase() + type.slice(1)}s
-            </Text>
-            <Text style={styles.breakdownValue}>
-              {count} ({formatPercentage(count, stats.totalReleases)})
-            </Text>
-          </View>
-        ))}
-
-        <Text
-          style={[
-            styles.breakdownTitle,
-            { marginTop: theme.custom.spacing.sm },
-          ]}
-        >
-          By Status
-        </Text>
-        {Object.entries(stats.byStatus).map(([status, count]) => (
-          <View key={status} style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </Text>
-            <Text style={styles.breakdownValue}>
-              {count} ({formatPercentage(count, stats.totalReleases)})
-            </Text>
-          </View>
-        ))}
-      </View>
-    </Card>
+          <Text
+            style={[
+              styles.breakdownTitle,
+              { marginTop: theme.custom.spacing.sm },
+            ]}
+          >
+            By Status
+          </Text>
+          {breakdownByStatus.map(([status, count], index) => (
+            <AnimatedListItem
+              key={`status-${status}`}
+              index={index + breakdownByType.length}
+              totalItems={breakdownByType.length + breakdownByStatus.length}
+              animated={shouldAnimateLayout}
+              staggerDelay={30}
+            >
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </Text>
+                <Text style={styles.breakdownValue}>
+                  {count} ({formatPercentage(count, stats.totalReleases)})
+                </Text>
+              </View>
+            </AnimatedListItem>
+          ))}
+        </AnimatedSection>
+      </Card>
+    </AnimatedSection>
   );
 };
 

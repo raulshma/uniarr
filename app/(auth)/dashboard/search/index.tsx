@@ -5,6 +5,7 @@ import { useTheme } from "react-native-paper";
 import { useRouter } from "expo-router";
 
 import { TabHeader } from "@/components/common/TabHeader";
+import { PageTransition } from "@/components/common/AnimatedComponents";
 import { UnifiedSearchPanel } from "@/components/search/UnifiedSearchPanel";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -20,6 +21,9 @@ const UnifiedSearchScreen = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
+        page: {
+          flex: 1,
+        },
         content: {
           flex: 1,
           marginTop: spacing.xs,
@@ -31,16 +35,19 @@ const UnifiedSearchScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TabHeader
-        title="Search"
-        showTitle={true}
-        showBackButton={true}
-        onBackPress={() => router.back()}
-      />
+      <PageTransition style={styles.page} transitionType="fade">
+        <TabHeader
+          title="Search"
+          showTitle={true}
+          showBackButton={true}
+          onBackPress={() => router.back()}
+          animationDelay={40}
+        />
 
-      <View style={styles.content}>
-        <UnifiedSearchPanel />
-      </View>
+        <View style={styles.content}>
+          <UnifiedSearchPanel />
+        </View>
+      </PageTransition>
     </SafeAreaView>
   );
 };

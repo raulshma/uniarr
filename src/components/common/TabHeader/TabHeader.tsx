@@ -1,9 +1,11 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { IconButton, Text, useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { AnimatedView } from "@/components/common/AnimatedComponents";
+import { ANIMATION_DURATIONS, FadeIn, FadeOut } from "@/utils/animations.utils";
 
 export type TabHeaderAction = {
   icon: string;
@@ -19,7 +21,9 @@ export type TabHeaderProps = {
   rightAction?: TabHeaderAction;
   showBackButton?: boolean;
   onBackPress?: () => void;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
+  animated?: boolean;
+  animationDelay?: number;
 };
 
 export const TabHeader: React.FC<TabHeaderProps> = ({
@@ -30,6 +34,8 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
   showBackButton = false,
   onBackPress,
   style,
+  animated = true,
+  animationDelay = 0,
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -79,7 +85,14 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <AnimatedView
+      style={[styles.container, style]}
+      entering={FadeIn.duration(ANIMATION_DURATIONS.NORMAL).delay(
+        animationDelay,
+      )}
+      exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
+      animated={animated}
+    >
       <View style={styles.leftSection}>
         {showBackButton ? (
           <IconButton
@@ -134,6 +147,6 @@ export const TabHeader: React.FC<TabHeaderProps> = ({
           <View />
         )}
       </View>
-    </View>
+    </AnimatedView>
   );
 };

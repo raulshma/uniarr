@@ -26,6 +26,8 @@ import { useNotificationRegistration } from "@/hooks/useNotificationRegistration
 import { useNotificationResponseHandler } from "@/hooks/useNotificationResponseHandler";
 import { useQuietHoursManager } from "@/hooks/useQuietHoursManager";
 import { useVoiceCommandHandler } from "@/hooks/useVoiceCommandHandler";
+import { WidgetDrawerProvider } from "@/services/widgetDrawerService";
+import { GlobalWidgetDrawer } from "@/components/widgets/GlobalWidgetDrawer";
 
 const RootLayout = () => {
   const theme = useTheme();
@@ -44,36 +46,38 @@ const RootLayout = () => {
             <AuthProvider>
               <QueryClientProvider client={queryClient}>
                 <PaperProvider theme={theme || defaultTheme}>
-                  <DialogProvider>
-                    <DownloadManagerProvider
-                      managerOptions={{
-                        queueConfig: {
-                          maxConcurrentDownloads: 3,
-                          allowMobileData: false,
-                          allowBackgroundDownloads: true,
-                          maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
-                        },
-                        progressUpdateInterval: 1000,
-                        enablePersistence: true,
-                      }}
-                      indicatorPosition="floating"
-                      onInitialized={(success) => {
-                        console.log("Download manager initialized:", success);
-                      }}
-                      onError={(error) => {
-                        console.error(
-                          "Download manager initialization failed:",
-                          error,
-                        );
-                      }}
-                    >
-                      <StatusBar style={theme.dark ? "light" : "dark"} />
-                      <ErrorBoundary context={{ location: "RootLayout" }}>
-                        <AppContent />
-                      </ErrorBoundary>
-                      <QueryDevtools />
-                    </DownloadManagerProvider>
-                  </DialogProvider>
+                  <WidgetDrawerProvider>
+                    <DialogProvider>
+                      <DownloadManagerProvider
+                        managerOptions={{
+                          queueConfig: {
+                            maxConcurrentDownloads: 3,
+                            allowMobileData: false,
+                            allowBackgroundDownloads: true,
+                            maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
+                          },
+                          progressUpdateInterval: 1000,
+                          enablePersistence: true,
+                        }}
+                        indicatorPosition="floating"
+                        onInitialized={(success) => {
+                          console.log("Download manager initialized:", success);
+                        }}
+                        onError={(error) => {
+                          console.error(
+                            "Download manager initialization failed:",
+                            error,
+                          );
+                        }}
+                      >
+                        <StatusBar style={theme.dark ? "light" : "dark"} />
+                        <ErrorBoundary context={{ location: "RootLayout" }}>
+                          <AppContent />
+                        </ErrorBoundary>
+                        <QueryDevtools />
+                      </DownloadManagerProvider>
+                    </DialogProvider>
+                  </WidgetDrawerProvider>
                 </PaperProvider>
               </QueryClientProvider>
             </AuthProvider>
@@ -139,6 +143,7 @@ const AppContent = () => {
         onRetry={forceSync}
       />
       <RootNavigator />
+      <GlobalWidgetDrawer />
     </View>
   );
 };

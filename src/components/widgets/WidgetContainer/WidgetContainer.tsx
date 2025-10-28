@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { View, StyleSheet, Modal } from "react-native";
+import Animated from "react-native-reanimated";
 import { Text, FAB, useTheme, Button } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -8,7 +9,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { gapSizes } from "@/constants/sizes";
+import { FadeIn, FadeOut, ANIMATION_DURATIONS } from "@/utils/animations.utils";
 import { Card } from "@/components/common/Card";
 import { TabHeader } from "@/components/common/TabHeader";
 import {
@@ -23,6 +26,12 @@ import StatisticsWidget from "../StatisticsWidget/StatisticsWidget";
 import CalendarPreviewWidget from "../CalendarPreviewWidget/CalendarPreviewWidget";
 import ShortcutsWidget from "../ShortcutsWidget/ShortcutsWidget";
 import BookmarksWidget from "../BookmarksWidget/BookmarksWidget";
+import RssWidget from "../RssWidget/RssWidget";
+import RedditWidget from "../RedditWidget/RedditWidget";
+import HackerNewsWidget from "../HackerNewsWidget/HackerNewsWidget";
+import WeatherWidget from "../WeatherWidget/WeatherWidget";
+import YouTubeWidget from "../YouTubeWidget/YouTubeWidget";
+import TwitchWidget from "../TwitchWidget/TwitchWidget";
 
 export interface WidgetContainerProps {
   /**
@@ -85,6 +94,8 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
   };
 
   const renderWidget = (widget: Widget) => {
+    const editHandler = editable ? () => handleEditWidget(widget) : undefined;
+
     switch (widget.type) {
       case "service-status":
         return (
@@ -92,7 +103,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "shortcuts":
@@ -101,7 +112,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "download-progress":
@@ -110,7 +121,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "recent-activity":
@@ -119,7 +130,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "statistics":
@@ -128,7 +139,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "calendar-preview":
@@ -137,7 +148,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
           />
         );
       case "bookmarks":
@@ -146,7 +157,62 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
             key={widget.id}
             widget={widget}
             onRefresh={handleWidgetRefresh}
-            onEdit={editing ? () => handleEditWidget(widget) : undefined}
+            onEdit={editHandler}
+            isEditing={editing}
+          />
+        );
+      case "rss-feed":
+        return (
+          <RssWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "subreddit":
+        return (
+          <RedditWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "hacker-news":
+        return (
+          <HackerNewsWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "weather":
+        return (
+          <WeatherWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "youtube":
+        return (
+          <YouTubeWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
+          />
+        );
+      case "twitch":
+        return (
+          <TwitchWidget
+            key={widget.id}
+            widget={widget}
+            onRefresh={handleWidgetRefresh}
+            onEdit={editHandler}
           />
         );
       default:
@@ -161,29 +227,39 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
   const handleEditWidget = (widget: Widget) => {
     onPress();
-    // Navigate to widget-specific settings if available
+
+    const pushWidgetConfig = () =>
+      router.push({
+        pathname: "/(auth)/settings/widgets/configure",
+        params: { widgetId: widget.id },
+      });
+
     switch (widget.type) {
       case "service-status":
-        // Navigate to service connections settings
         router.push("/(auth)/settings/connections");
         break;
-      case "shortcuts":
-        // Navigate to shortcuts settings
-        router.push("/(auth)/settings/shortcuts");
-        break;
       case "bookmarks":
-        // Navigate to bookmarks settings
         router.push({
           pathname: "/(auth)/settings/bookmarks",
           params: { widgetId: widget.id },
         });
         break;
+      case "recent-activity":
+        router.push("/(auth)/settings/recent-activity-sources");
+        break;
+      case "shortcuts":
       case "download-progress":
-        // Navigate to download settings
-        router.push("/(auth)/settings/downloads");
+      case "statistics":
+      case "calendar-preview":
+      case "rss-feed":
+      case "subreddit":
+      case "hacker-news":
+      case "weather":
+      case "youtube":
+      case "twitch":
+        pushWidgetConfig();
         break;
       default:
-        // For widgets without specific settings, go to general widget settings
         router.push("/(auth)/settings/widgets");
         break;
     }
@@ -209,6 +285,12 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
       statistics: "chart-box",
       "calendar-preview": "calendar",
       bookmarks: "bookmark",
+      "rss-feed": "rss",
+      subreddit: "reddit",
+      "hacker-news": "newspaper-variant",
+      weather: "weather-partly-cloudy",
+      youtube: "youtube",
+      twitch: "twitch",
     };
     return iconMap[type] || "widgets";
   };
@@ -319,24 +401,37 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           justifyContent: "center",
           paddingVertical: theme.custom.spacing.xxl,
         },
+        loadingSkeleton: {
+          gap: theme.custom.spacing.lg,
+          paddingTop: 0,
+        },
+        skeletonWidget: {
+          borderRadius: theme.custom.sizes.borderRadius.xl,
+          overflow: "hidden",
+        },
       }),
     [theme],
   );
 
   if (isLoading) {
     return (
-      <View style={[styles.container, style]}>
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons
-            name="loading"
-            size={theme.custom.sizes.iconSizes.xxxl}
-            color={theme.colors.primary}
-          />
-          <Text variant="bodyMedium" style={styles.emptyText}>
-            Loading widgets...
-          </Text>
+      <Animated.View
+        style={[styles.container, style]}
+        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      >
+        <View style={styles.loadingSkeleton}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <View key={index} style={styles.skeletonWidget}>
+              <SkeletonPlaceholder
+                width="100%"
+                height={120}
+                borderRadius={theme.custom.sizes.borderRadius.xl}
+              />
+            </View>
+          ))}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 

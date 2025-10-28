@@ -4,10 +4,10 @@ import { StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
+import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import { MediaDetails } from "@/components/media/MediaDetails";
 import { MediaDetailsSkeleton } from "@/components/media/skeletons";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
@@ -16,6 +16,7 @@ import type { Series } from "@/models/media.types";
 import { useSonarrSeriesDetails } from "@/hooks/useSonarrSeriesDetails";
 import { spacing } from "@/theme/spacing";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const findEpisodeRuntime = (series?: Series): number | undefined => {
   if (!series?.seasons) {
@@ -70,6 +71,19 @@ const SonarrSeriesDetailsScreen = () => {
     serviceId: serviceKey,
     seriesId: numericSeriesId,
   });
+
+  const isMutating =
+    isTogglingMonitor ||
+    isTogglingSeasonMonitor ||
+    isTriggeringSearch ||
+    isSearchingMissing ||
+    isUnmonitoringAll ||
+    isDeleting;
+  const animationsEnabled = shouldAnimateLayout(
+    isLoading,
+    isFetching,
+    isMutating,
+  );
 
   const styles = useMemo(
     () =>
@@ -175,10 +189,10 @@ const SonarrSeriesDetailsScreen = () => {
     <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <View style={styles.container}>
         {!series ? (
-          <Animated.View
+          <AnimatedSection
+            animated={animationsEnabled}
             style={styles.header}
-            entering={FadeInDown.delay(200).springify()}
-            layout={Layout.springify()}
+            delay={150}
           >
             <Button
               mode="text"
@@ -195,13 +209,17 @@ const SonarrSeriesDetailsScreen = () => {
                 Refreshing…
               </Text>
             ) : null}
-          </Animated.View>
+          </AnimatedSection>
         ) : null}
 
         {isLoading && !series ? (
           <MediaDetailsSkeleton showSeasons={true} />
         ) : isError ? (
-          <View style={{ flex: 1, justifyContent: "center" }}>
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={{ flex: 1, justifyContent: "center" }}
+            delay={100}
+          >
             <EmptyState
               title="Failed to load series"
               description={
@@ -215,47 +233,60 @@ const SonarrSeriesDetailsScreen = () => {
               }}
               icon="alert-circle-outline"
             />
-          </View>
+          </AnimatedSection>
         ) : series ? (
-          <DetailHero
-            posterUri={series.posterUrl}
-            backdropUri={series.backdropUrl}
-            onBack={handleClose}
-            isFetching={isFetching}
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={{ flex: 1 }}
+            delay={150}
           >
-            <MediaDetails
-              title={series.title}
-              year={series.year}
-              status={series.status}
-              overview={series.overview}
-              genres={series.genres}
-              network={series.network}
+            <DetailHero
               posterUri={series.posterUrl}
               backdropUri={series.backdropUrl}
-              monitored={series.monitored}
-              seasons={series.seasons}
-              runtimeMinutes={runtimeMinutes}
-              type="series"
-              onToggleMonitor={handleToggleMonitor}
-              onToggleSeasonMonitor={toggleSeasonMonitor}
-              onSearchPress={handleTriggerSearch}
-              onSearchMissingPress={searchMissingEpisodes}
-              onUnmonitorAllPress={unmonitorAllEpisodes}
-              onDeletePress={handleDeleteSeries}
-              isUpdatingMonitor={isTogglingMonitor}
-              isSearching={isTriggeringSearch}
-              isSearchingMissing={isSearchingMissing}
-              isUnmonitoringAll={isUnmonitoringAll}
-              isTogglingSeasonMonitor={isTogglingSeasonMonitor}
-              isDeleting={isDeleting}
-              showPoster={false}
-              disableScroll={true}
-              serviceConfig={serviceConfig}
-              contentId={numericSeriesId.toString()}
-            />
-          </DetailHero>
+              onBack={handleClose}
+              isFetching={isFetching}
+            >
+              <MediaDetails
+                title={series.title}
+                year={series.year}
+                status={series.status}
+                overview={series.overview}
+                genres={series.genres}
+                network={series.network}
+                posterUri={series.posterUrl}
+                backdropUri={series.backdropUrl}
+                monitored={series.monitored}
+                seasons={series.seasons}
+                runtimeMinutes={runtimeMinutes}
+                type="series"
+                tmdbId={series.tmdbId}
+                tvdbId={series.tvdbId}
+                imdbId={series.imdbId}
+                onToggleMonitor={handleToggleMonitor}
+                onToggleSeasonMonitor={toggleSeasonMonitor}
+                onSearchPress={handleTriggerSearch}
+                onSearchMissingPress={searchMissingEpisodes}
+                onUnmonitorAllPress={unmonitorAllEpisodes}
+                onDeletePress={handleDeleteSeries}
+                isUpdatingMonitor={isTogglingMonitor}
+                isSearching={isTriggeringSearch}
+                isSearchingMissing={isSearchingMissing}
+                isUnmonitoringAll={isUnmonitoringAll}
+                isTogglingSeasonMonitor={isTogglingSeasonMonitor}
+                isDeleting={isDeleting}
+                showPoster={false}
+                disableScroll={true}
+                serviceConfig={serviceConfig}
+                contentId={numericSeriesId.toString()}
+              />
+            </DetailHero>
+          </AnimatedSection>
         ) : (
-          <View style={{ flex: 1, justifyContent: "center" }}>
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={{ flex: 1, justifyContent: "center" }}
+            delay={100}
+          >
             <EmptyState
               title="No series data"
               description="We couldn't load details for this series."
@@ -263,7 +294,7 @@ const SonarrSeriesDetailsScreen = () => {
               onActionPress={handleClose}
               icon="alert-circle-outline"
             />
-          </View>
+          </AnimatedSection>
         )}
       </View>
     </SafeAreaView>

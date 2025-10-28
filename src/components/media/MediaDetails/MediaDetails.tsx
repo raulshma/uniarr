@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Linking, ScrollView, View } from "react-native";
 import {
   Chip,
   Text,
@@ -9,7 +9,7 @@ import {
   Button,
   Switch,
 } from "react-native-paper";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInUp, ZoomIn } from "react-native-reanimated";
 
 import type { AppTheme } from "@/constants/theme";
 import type { Season } from "@/models/media.types";
@@ -17,6 +17,12 @@ import type { ServiceConfig } from "@/models/service.types";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { DownloadButton } from "@/components/downloads";
 import type { MediaKind } from "@/components/media/MediaCard";
+import {
+  useSettingsStore,
+  selectJellyfinLocalAddress,
+  selectJellyfinPublicAddress,
+} from "@/store/settingsStore";
+import { alert } from "@/services/dialogService";
 
 export type MediaDetailsProps = {
   title: string;
@@ -41,6 +47,10 @@ export type MediaDetailsProps = {
   };
   seasons?: Season[];
   type: MediaKind;
+  // External IDs for Jellyfin deep linking
+  tmdbId?: number;
+  tvdbId?: number;
+  imdbId?: string;
   onToggleMonitor?: (nextState: boolean) => void;
   onSearchPress?: () => void;
   onDeletePress?: () => void;
@@ -94,6 +104,9 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   movieFile,
   seasons,
   type,
+  tmdbId,
+  tvdbId,
+  imdbId,
   onToggleMonitor,
   onSearchPress,
   onDeletePress,
@@ -116,6 +129,9 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   const theme = useTheme<AppTheme>();
   // episodesModalVisible removed — seasons use inline selectedSeason state instead
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+
+  const jellyfinLocalAddress = useSettingsStore(selectJellyfinLocalAddress);
+  const jellyfinPublicAddress = useSettingsStore(selectJellyfinPublicAddress);
 
   const handleMonitorPress = useCallback(() => {
     if (!onToggleMonitor) {
@@ -141,6 +157,52 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
     },
     [onToggleSeasonMonitor],
   );
+
+  const handleViewOnJellyfin = useCallback(async () => {
+    // Determine which Jellyfin address to use (prefer public, fallback to local)
+    const jellyfinAddress = jellyfinPublicAddress || jellyfinLocalAddress;
+
+    if (!jellyfinAddress) {
+      alert(
+        "Jellyfin Not Configured",
+        "Please configure your Jellyfin server address in settings to use this feature.",
+      );
+      return;
+    }
+
+    // Construct search URL using external IDs (IMDB preferred for broadest compatibility)
+    let searchUrl: string;
+    if (imdbId) {
+      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=imdb:${imdbId}`;
+    } else if (tmdbId) {
+      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=tmdb:${tmdbId}`;
+    } else if (tvdbId) {
+      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=tvdb:${tvdbId}`;
+    } else {
+      alert(
+        "No External IDs",
+        "This media item doesn't have external IDs (IMDB, TMDB, TVDB) required for Jellyfin linking.",
+      );
+      return;
+    }
+
+    try {
+      const canOpen = await Linking.canOpenURL(searchUrl);
+      if (canOpen) {
+        await Linking.openURL(searchUrl);
+      } else {
+        alert(
+          "Cannot Open Link",
+          "Unable to open Jellyfin link. Please check your Jellyfin server address in settings.",
+        );
+      }
+    } catch (error) {
+      alert(
+        "Error Opening Jellyfin",
+        `Failed to open Jellyfin: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  }, [jellyfinLocalAddress, jellyfinPublicAddress, imdbId, tmdbId, tvdbId]);
 
   const showSeasons = type === "series" && seasons?.length;
   const showEpisodes = showSeasons && (selectedSeason || seasons?.length === 1);
@@ -182,7 +244,10 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
     <>
       {/* Movie Poster */}
       {showPoster ? (
-        <View style={{ alignItems: "center", paddingVertical: 20 }}>
+        <Animated.View
+          entering={ZoomIn.duration(400).springify()}
+          style={{ alignItems: "center", paddingVertical: 20 }}
+        >
           <MediaPoster
             uri={posterUri}
             size={280}
@@ -190,11 +255,14 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             accessibilityLabel={`${title} poster`}
             showPlaceholderLabel
           />
-        </View>
+        </Animated.View>
       ) : null}
 
       {/* Movie Title */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+      <Animated.View
+        entering={FadeInUp.duration(300).delay(100)}
+        style={{ paddingHorizontal: 20, marginBottom: 16 }}
+      >
         <Text
           variant="headlineLarge"
           style={{
@@ -206,11 +274,14 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
         >
           {title}
         </Text>
-      </View>
+      </Animated.View>
 
       {/* Synopsis */}
       {overview ? (
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+        <Animated.View
+          entering={FadeInUp.duration(300).delay(200)}
+          style={{ paddingHorizontal: 20, marginBottom: 24 }}
+        >
           <Text
             variant="bodyLarge"
             style={{
@@ -221,11 +292,14 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
           >
             {overview}
           </Text>
-        </View>
+        </Animated.View>
       ) : null}
 
       {/* Movie Details Card */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+      <Animated.View
+        entering={FadeInUp.duration(300).delay(300)}
+        style={{ paddingHorizontal: 20, marginBottom: 20 }}
+      >
         <Card
           style={{
             backgroundColor: theme.colors.elevation.level1,
@@ -297,10 +371,13 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             </View>
           </Card.Content>
         </Card>
-      </View>
+      </Animated.View>
 
       {/* File Information */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
+      <Animated.View
+        entering={FadeInUp.duration(300).delay(400)}
+        style={{ paddingHorizontal: 20, marginBottom: 32 }}
+      >
         <Text
           variant="titleLarge"
           style={{
@@ -358,11 +435,14 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             </View>
           </Card.Content>
         </Card>
-      </View>
+      </Animated.View>
 
       {/* Action Buttons */}
-      <View style={{ paddingHorizontal: 20 }}>
-        <View style={{ flexDirection: "row", gap: 12 }}>
+      <Animated.View
+        entering={FadeInUp.duration(300).delay(500)}
+        style={{ paddingHorizontal: 20 }}
+      >
+        <View style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}>
           {onSearchPress ? (
             <Button
               mode="contained"
@@ -397,11 +477,31 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             {monitored ? "Unmonitor" : "Monitor"}
           </Button>
         </View>
-      </View>
+
+        {/* View on Jellyfin button - show if we have external IDs */}
+        {(imdbId || tmdbId || tvdbId) && (
+          <Button
+            mode="outlined"
+            onPress={handleViewOnJellyfin}
+            icon="play-circle-outline"
+            textColor={theme.colors.primary}
+            style={{
+              borderRadius: 8,
+              borderColor: theme.colors.primary,
+            }}
+            labelStyle={{ fontWeight: "600" }}
+          >
+            View on Jellyfin
+          </Button>
+        )}
+      </Animated.View>
 
       {/* Seasons - Only show for series */}
       {showSeasons ? (
-        <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
+        <Animated.View
+          entering={FadeInUp.duration(300).delay(600)}
+          style={{ paddingHorizontal: 20, marginTop: 32 }}
+        >
           <Text
             variant="titleLarge"
             style={{
@@ -413,7 +513,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             Seasons
           </Text>
           <View style={{ gap: 12 }}>
-            {seasons?.map((season) => {
+            {seasons?.map((season, seasonIndex) => {
               const totalEpisodes =
                 season.statistics?.episodeCount ?? season.episodes?.length ?? 0;
               const downloadedEpisodes =
@@ -425,7 +525,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
               return (
                 <Animated.View
                   key={season.id ?? season.seasonNumber}
-                  entering={FadeIn.delay(100).duration(300)}
+                  entering={FadeIn.delay(seasonIndex * 50 + 100).duration(300)}
                   style={{
                     borderRadius: 16,
                     overflow: "hidden",
@@ -495,12 +595,15 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       ) : null}
 
       {/* Episodes Section */}
       {showEpisodes ? (
-        <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
+        <Animated.View
+          entering={FadeIn.duration(300).delay(700)}
+          style={{ paddingHorizontal: 20, marginTop: 32 }}
+        >
           <View
             style={{
               flexDirection: "row",
@@ -542,13 +645,14 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
           >
             {(selectedSeason || seasons?.[0])?.episodes?.map(
               (episode, index) => (
-                <View
+                <Animated.View
                   key={
                     episode.id ??
                     `${(selectedSeason || seasons?.[0])?.seasonNumber}-${
                       episode.episodeNumber
                     }`
                   }
+                  entering={FadeIn.delay(index * 30).duration(300)}
                   style={{
                     width: "48%",
                     backgroundColor: theme.colors.elevation.level1,
@@ -642,10 +746,11 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                       style={{ alignSelf: "center" }}
                     />
                   )}
-                </View>
+                </Animated.View>
               ),
             ) || (
-              <View
+              <Animated.View
+                entering={FadeIn.duration(300)}
                 style={{
                   width: "100%",
                   backgroundColor: theme.colors.elevation.level1,
@@ -663,7 +768,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                 >
                   No episodes available for this season
                 </Text>
-              </View>
+              </Animated.View>
             )}
           </View>
 
@@ -697,7 +802,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
               Unmonitor All
             </Button>
           </View>
-        </View>
+        </Animated.View>
       ) : null}
     </>
   );

@@ -6,6 +6,7 @@ import { Text, useTheme } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import type { CalendarWeek } from "@/models/calendar.types";
 import { CalendarDayCell } from "../CalendarDayCell";
+import { AnimatedSection } from "@/components/common/AnimatedComponents";
 
 export type CalendarWeekViewProps = {
   data: CalendarWeek;
@@ -131,12 +132,13 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
           <View style={styles.timeColumn}>{timeSlots}</View>
 
           {data.days.map((day, index) => (
-            <View
+            <AnimatedSection
               key={day.date}
               style={[
                 styles.dayColumn,
                 index === data.days.length - 1 && styles.dayColumnLast,
               ]}
+              delay={index * 50}
             >
               <CalendarDayCell
                 day={day}
@@ -144,8 +146,9 @@ const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                 onPress={() => handleDatePress(day.date)}
                 onReleasePress={onReleasePress}
                 style={{ borderRightWidth: 0, minHeight: 960 }} // 24 hours * 40px per hour
+                animationIndex={index}
               />
-            </View>
+            </AnimatedSection>
           ))}
         </View>
       </ScrollView>

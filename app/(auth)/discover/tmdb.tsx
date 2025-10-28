@@ -14,6 +14,10 @@ import {
   useTheme,
 } from "react-native-paper";
 
+import {
+  AnimatedSection,
+  PageTransition,
+} from "@/components/common/AnimatedComponents";
 import { TabHeader } from "@/components/common/TabHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { TmdbFiltersDrawer } from "@/components/discover/tmdb/TmdbFiltersDrawer";
@@ -47,6 +51,7 @@ import {
   mapTmdbTvToDiscover,
 } from "@/utils/tmdb.utils";
 import { alert } from "@/services/dialogService";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const createInitialFilters = (): TmdbDiscoverFilters => ({
   mediaType: "movie",
@@ -69,6 +74,9 @@ const TmdbDiscoverScreen = () => {
         container: {
           flex: 1,
           backgroundColor: theme.colors.background,
+        },
+        page: {
+          flex: 1,
         },
         content: {
           flex: 1,
@@ -423,6 +431,10 @@ const TmdbDiscoverScreen = () => {
       errorMessage &&
       !errorBannerDismissed,
   );
+  const allowAnimations = shouldAnimateLayout(
+    discoverQuery.isLoading || discoverQuery.isFetching,
+    discoverQuery.isFetching,
+  );
 
   const renderContent = () => {
     let body: React.ReactNode;
@@ -465,7 +477,11 @@ const TmdbDiscoverScreen = () => {
 
     return (
       <View style={styles.content}>
-        <View style={styles.inner}>
+        <AnimatedSection
+          style={styles.inner}
+          delay={50}
+          animated={allowAnimations}
+        >
           <View style={styles.toolbar}>
             <View style={styles.toolbarRow}>
               <Button
@@ -512,7 +528,7 @@ const TmdbDiscoverScreen = () => {
               {errorMessage}
             </Banner>
           ) : null}
-        </View>
+        </AnimatedSection>
         {body}
       </View>
     );
@@ -520,73 +536,77 @@ const TmdbDiscoverScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TabHeader
-        title="TMDB Discover"
-        showTitle
-        showBackButton
-        onBackPress={() => router.back()}
-      />
-
-      {!tmdbEnabled ? (
-        <View style={styles.emptyWrapper}>
-          <EmptyState
-            title="TMDB Discover is disabled"
-            description="Enable TMDB integration in Settings to start browsing TMDB recommendations."
-            actionLabel="Open settings"
-            onActionPress={() => router.push("/(auth)/settings/tmdb")}
+      <PageTransition style={styles.page} transitionType="fade">
+        <AnimatedSection animated={allowAnimations} delay={0}>
+          <TabHeader
+            title="TMDB Discover"
+            showTitle
+            showBackButton
+            onBackPress={() => router.back()}
           />
-        </View>
-      ) : !hasCredentials ? (
-        <View style={styles.emptyWrapper}>
-          <EmptyState
-            title="Add your TMDB credential"
-            description="Store a TMDB API key or V4 token to fetch discover results."
-            actionLabel="Add TMDB key"
-            onActionPress={() => router.push("/(auth)/settings/tmdb")}
-          />
-        </View>
-      ) : (
-        renderContent()
-      )}
+        </AnimatedSection>
 
-      <TmdbFiltersDrawer
-        visible={filtersDrawerVisible}
-        filters={filters}
-        onFiltersChange={handleFiltersChange}
-        onReset={handleResetFilters}
-        onClose={() => setFiltersDrawerVisible(false)}
-        genres={genresQuery.data ?? []}
-        genresLoading={genresQuery.isLoading}
-      />
+        {!tmdbEnabled ? (
+          <View style={styles.emptyWrapper}>
+            <EmptyState
+              title="TMDB Discover is disabled"
+              description="Enable TMDB integration in Settings to start browsing TMDB recommendations."
+              actionLabel="Open settings"
+              onActionPress={() => router.push("/(auth)/settings/tmdb")}
+            />
+          </View>
+        ) : !hasCredentials ? (
+          <View style={styles.emptyWrapper}>
+            <EmptyState
+              title="Add your TMDB credential"
+              description="Store a TMDB API key or V4 token to fetch discover results."
+              actionLabel="Add TMDB key"
+              onActionPress={() => router.push("/(auth)/settings/tmdb")}
+            />
+          </View>
+        ) : (
+          renderContent()
+        )}
 
-      <Portal>
-        <Dialog visible={servicePickerVisible} onDismiss={closeServicePicker}>
-          <Dialog.Title>Select destination</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium" style={{ marginBottom: spacing.sm }}>
-              Choose how you want to handle {pendingItem?.title}
-            </Text>
-            <RadioButton.Group
-              onValueChange={(value) => setSelectedDestinationKey(value)}
-              value={selectedDestinationKey}
-            >
-              {destinationOptions.map((option) => (
-                <RadioButton.Item
-                  key={option.key}
-                  value={option.key}
-                  label={option.label}
-                />
-              ))}
-            </RadioButton.Group>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={closeServicePicker}>Cancel</Button>
-            <Button onPress={confirmAdd} disabled={!selectedDestinationKey}>
-              Continue
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+        <TmdbFiltersDrawer
+          visible={filtersDrawerVisible}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          onReset={handleResetFilters}
+          onClose={() => setFiltersDrawerVisible(false)}
+          genres={genresQuery.data ?? []}
+          genresLoading={genresQuery.isLoading}
+        />
+
+        <Portal>
+          <Dialog visible={servicePickerVisible} onDismiss={closeServicePicker}>
+            <Dialog.Title>Select destination</Dialog.Title>
+            <Dialog.Content>
+              <Text variant="bodyMedium" style={{ marginBottom: spacing.sm }}>
+                Choose how you want to handle {pendingItem?.title}
+              </Text>
+              <RadioButton.Group
+                onValueChange={(value) => setSelectedDestinationKey(value)}
+                value={selectedDestinationKey}
+              >
+                {destinationOptions.map((option) => (
+                  <RadioButton.Item
+                    key={option.key}
+                    value={option.key}
+                    label={option.label}
+                  />
+                ))}
+              </RadioButton.Group>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={closeServicePicker}>Cancel</Button>
+              <Button onPress={confirmAdd} disabled={!selectedDestinationKey}>
+                Continue
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      </PageTransition>
     </SafeAreaView>
   );
 };

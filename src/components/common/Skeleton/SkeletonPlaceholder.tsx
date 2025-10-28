@@ -1,6 +1,14 @@
 import React, { useMemo } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { View, StyleSheet } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  FadeIn,
+} from "react-native-reanimated";
 import { useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
@@ -11,6 +19,16 @@ export type SkeletonPlaceholderProps = {
   borderRadius?: number;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /**
+   * Whether to show pulse animation
+   * @default true
+   */
+  animated?: boolean;
+  /**
+   * Animation duration in milliseconds
+   * @default 1000
+   */
+  animationDuration?: number;
 };
 
 const SkeletonPlaceholder: React.FC<SkeletonPlaceholderProps> = ({
@@ -19,10 +37,37 @@ const SkeletonPlaceholder: React.FC<SkeletonPlaceholderProps> = ({
   borderRadius = 8,
   style,
   testID,
+  animated = true,
+  animationDuration = 1000,
 }) => {
   const theme = useTheme<AppTheme>();
   const baseColor = theme.colors.surfaceVariant;
-  const animatedStyle = useMemo(
+
+  // Animation value for pulse effect
+  const opacityAnim = useSharedValue(1);
+
+  // Start pulse animation
+  React.useEffect(() => {
+    if (!animated) return;
+
+    opacityAnim.value = withRepeat(
+      withSequence(
+        withTiming(0.5, { duration: animationDuration / 2 }),
+        withTiming(1, { duration: animationDuration / 2 }),
+      ),
+      -1,
+      true,
+    );
+  }, [animated, animationDuration, opacityAnim]);
+
+  // Animated style for pulse (opacity only on inner view)
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: animated ? opacityAnim.value : 1,
+    };
+  }, [opacityAnim, animated]);
+
+  const backgroundStyle = useMemo(
     () => ({ backgroundColor: baseColor }),
     [baseColor],
   );
@@ -32,13 +77,22 @@ const SkeletonPlaceholder: React.FC<SkeletonPlaceholderProps> = ({
     [borderRadius, height, width],
   );
 
+  // Safe wrapper: outer view has dimensions/background, inner view has opacity animation
+  // This prevents layout animations (if parent applies them) from conflicting with opacity
   return (
     <View
       pointerEvents="none"
-      style={[styles.base, dimensionStyle, animatedStyle, style]}
+      style={[styles.base, dimensionStyle, backgroundStyle, style]}
       accessibilityRole="progressbar"
       testID={testID}
-    />
+    >
+      {animated ? (
+        <Animated.View
+          style={[animatedStyle, styles.fill]}
+          entering={FadeIn.duration(200)}
+        />
+      ) : null}
+    </View>
   );
 };
 
@@ -47,5 +101,8 @@ export default SkeletonPlaceholder;
 const styles = StyleSheet.create({
   base: {
     backgroundColor: "#ccc",
+  },
+  fill: {
+    ...StyleSheet.absoluteFillObject,
   },
 });

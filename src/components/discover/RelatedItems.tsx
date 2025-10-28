@@ -9,13 +9,25 @@ import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 type Props = {
   currentId: string;
   onPress?: (id: string) => void;
+  relatedItems?: DiscoverMediaItem[];
+  isLoadingRelated?: boolean;
 };
 
-const RelatedItems: React.FC<Props> = ({ currentId, onPress }) => {
+const RelatedItems: React.FC<Props> = ({
+  currentId,
+  onPress,
+  relatedItems,
+  isLoadingRelated = false,
+}) => {
   const theme = useTheme();
   const { sections } = useUnifiedDiscover();
 
   const related = useMemo(() => {
+    // If real related items are provided, use them (take first 8)
+    if (relatedItems && relatedItems.length > 0) {
+      return relatedItems.slice(0, 8);
+    }
+
     // Naive related logic: find items from same section or those with same year/mediaType
     const all = sections.flatMap((s) => s.items || []);
     const current = all.find((i) => i.id === currentId);
@@ -39,7 +51,7 @@ const RelatedItems: React.FC<Props> = ({ currentId, onPress }) => {
       .slice(0, 8);
 
     return scored;
-  }, [sections, currentId]);
+  }, [sections, currentId, relatedItems]);
 
   const styles = useMemo(
     () =>

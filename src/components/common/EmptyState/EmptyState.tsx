@@ -1,5 +1,6 @@
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { Icon, Text, useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
@@ -9,6 +10,7 @@ export type EmptyStateProps = {
   title: string;
   description?: string;
   icon?: React.ComponentProps<typeof Icon>["source"];
+  customIcon?: React.ReactNode;
   actionLabel?: string;
   onActionPress?: () => void;
   children?: React.ReactNode;
@@ -23,16 +25,20 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   onActionPress,
   children,
   testID = "empty-state",
+  customIcon,
 }) => {
   const theme = useTheme<AppTheme>();
 
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(300)}
       style={[styles.container, { paddingHorizontal: theme.custom.spacing.xl }]}
       accessibilityRole="summary"
       testID={testID}
     >
-      <Icon source={icon} size={48} color={theme.colors.onSurfaceVariant} />
+      {customIcon || (
+        <Icon source={icon} size={48} color={theme.colors.onSurfaceVariant} />
+      )}
       <Text
         variant="titleMedium"
         style={[styles.title, { color: theme.colors.onSurface }]}
@@ -53,7 +59,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
         </Button>
       ) : null}
       {children}
-    </View>
+    </Animated.View>
   );
 };
 

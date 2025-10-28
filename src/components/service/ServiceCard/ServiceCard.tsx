@@ -27,6 +27,8 @@ export type ServiceCardProps = {
   lastCheckedAt?: Date | string;
   icon?: React.ComponentProps<typeof Avatar.Icon>["icon"];
   description?: string;
+  latency?: number;
+  version?: string;
   onPress?: () => void;
   onEditPress?: () => void;
   onDeletePress?: () => void;
@@ -85,6 +87,8 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   lastCheckedAt,
   icon = "server",
   description,
+  latency,
+  version,
   onPress,
   onEditPress,
   onDeletePress,
@@ -171,32 +175,109 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
           >
             {url}
           </Text>
-          {description ? (
-            <Text
-              variant="bodySmall"
-              style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
-              numberOfLines={2}
+
+          {/* Badges row: service type, status, latency, version */}
+          <View style={styles.badgesRow}>
+            {description ? (
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: theme.colors.primaryContainer },
+                ]}
+              >
+                <Text
+                  variant="labelSmall"
+                  style={{ color: theme.colors.primary }}
+                >
+                  {description}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Status badge uses the appropriate container token */}
+            <View
+              style={[
+                styles.badge,
+                {
+                  backgroundColor:
+                    status === "online"
+                      ? theme.colors.primaryContainer
+                      : status === "degraded"
+                        ? theme.colors.tertiaryContainer
+                        : theme.colors.errorContainer,
+                },
+              ]}
             >
-              {description}
-            </Text>
-          ) : null}
-          {statusDescription ? (
-            <Text
-              variant="bodySmall"
-              style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
-              numberOfLines={2}
-            >
-              {statusDescription}
-            </Text>
-          ) : null}
-          {relativeTime ? (
-            <Text
-              variant="bodySmall"
-              style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}
-            >
-              Last checked {relativeTime}
-            </Text>
-          ) : null}
+              <Text
+                variant="labelSmall"
+                style={{
+                  color:
+                    status === "online"
+                      ? theme.colors.primary
+                      : status === "degraded"
+                        ? theme.colors.tertiary
+                        : theme.colors.error,
+                }}
+              >
+                {status === "online"
+                  ? "Connected"
+                  : status === "degraded"
+                    ? "Degraded"
+                    : "Offline"}
+              </Text>
+            </View>
+
+            {typeof latency === "number" ? (
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: theme.colors.elevation.level2 },
+                ]}
+              >
+                <Text
+                  variant="labelSmall"
+                  style={{ color: theme.colors.onSurface }}
+                >
+                  {`${latency} ms`}
+                </Text>
+              </View>
+            ) : null}
+
+            {version ? (
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: theme.colors.elevation.level2 },
+                ]}
+              >
+                <Text
+                  variant="labelSmall"
+                  style={{ color: theme.colors.onSurface }}
+                >
+                  {`v${version}`}
+                </Text>
+              </View>
+            ) : null}
+
+            {statusDescription ? (
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant, marginLeft: 8 }}
+                numberOfLines={1}
+              >
+                {statusDescription}
+              </Text>
+            ) : null}
+
+            {relativeTime ? (
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant, marginLeft: 8 }}
+              >
+                Last checked {relativeTime}
+              </Text>
+            ) : null}
+          </View>
         </View>
 
         <View style={styles.actions}>
@@ -246,6 +327,19 @@ const styles = StyleSheet.create({
   },
   statusWrapper: {
     marginLeft: spacing.md,
+  },
+  badgesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.xs,
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  badge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginRight: spacing.xs,
   },
   actions: {
     flexDirection: "row",

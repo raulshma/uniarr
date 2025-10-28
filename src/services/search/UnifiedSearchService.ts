@@ -31,7 +31,11 @@ type JellyseerrSearchResult =
 
 const HISTORY_STORAGE_KEY = "UnifiedSearch_history";
 const HISTORY_LIMIT = 12;
-const SEARCH_TIMEOUT_MS = 2000;
+
+// Mobile networks and VPN tunnels can introduce noticeable latency. Keep
+// per-connector search requests reasonably responsive without failing too fast.
+const DEFAULT_SEARCH_TIMEOUT_MS = 10_000;
+const MAX_SEARCH_TIMEOUT_MS = 20_000;
 
 const normalizeTerm = (term: string): string => term.trim();
 
@@ -122,9 +126,10 @@ export class UnifiedSearchService {
     }
 
     const results = this.deduplicateAndSort(aggregateResults);
+    const filtered = this.applyAdvancedFilters(results, options);
 
     return {
-      results,
+      results: filtered,
       errors: aggErrors,
       durationMs: Date.now() - start,
     };
@@ -326,12 +331,17 @@ export class UnifiedSearchService {
           }),
       };
 
+      const timeoutMs = this.resolveSearchTimeout(connector);
+      const timeoutLabel =
+        connector.config.name ??
+        `${connector.config.type} (${connector.config.id})`;
       const rawResults = await this.withTimeout(
         searchFn(
           term,
           Object.keys(searchOptions).length > 0 ? searchOptions : undefined,
         ),
-        SEARCH_TIMEOUT_MS,
+        timeoutMs,
+        `Search timed out after ${timeoutMs}ms for ${timeoutLabel}.`,
       );
       const mapped = this.mapResults(rawResults, connector, options.mediaTypes);
       const limit = options.limitPerService ?? 25;
@@ -743,6 +753,85 @@ export class UnifiedSearchService {
     });
   }
 
+  private applyAdvancedFilters(
+    results: UnifiedSearchResult[],
+    options: UnifiedSearchOptions,
+  ): UnifiedSearchResult[] {
+    return results.filter((result) => {
+      // Filter by status
+      if (options.status && options.status !== "Any") {
+        const status = options.status.toLowerCase();
+
+        if (status === "owned" || status === "available") {
+          if (!result.isInLibrary) return false;
+        } else if (status === "monitored") {
+          // Monitored items exist in the system (sonarr/radarr metadata)
+          if (!result.isInLibrary) return false;
+        } else if (status === "missing") {
+          // Missing items are in the system but not fully available
+          if (result.isInLibrary !== false) return false;
+        } else if (status === "requested") {
+          // Requested items have isRequested flag set
+          if (!result.isRequested) return false;
+        }
+      }
+
+      // Filter by quality (rating)
+      if (options.quality && options.quality !== "Any") {
+        const qualityThreshold = Number(options.quality);
+        if (!Number.isNaN(qualityThreshold)) {
+          if ((result.rating ?? 0) < qualityThreshold) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by release year range
+      if (
+        options.releaseYearMin !== undefined ||
+        options.releaseYearMax !== undefined
+      ) {
+        const year = result.year;
+        if (year !== undefined) {
+          if (
+            options.releaseYearMin !== undefined &&
+            year < options.releaseYearMin
+          ) {
+            return false;
+          }
+          if (
+            options.releaseYearMax !== undefined &&
+            year > options.releaseYearMax
+          ) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by genres
+      if (options.genres && options.genres.length > 0) {
+        const genresStr = result.extra?.genres as string | undefined;
+        if (genresStr) {
+          const itemGenres = genresStr
+            .split(",")
+            .map((g) => g.trim().toLowerCase());
+          const filterGenres = options.genres.map((g) => g.toLowerCase());
+          const hasMatchingGenre = filterGenres.some((fg) =>
+            itemGenres.some((ig) => ig.includes(fg) || fg.includes(ig)),
+          );
+          if (!hasMatchingGenre) {
+            return false;
+          }
+        } else {
+          // If genres filter is applied but item has no genres, exclude it
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
   private deduplicateAndSort(
     results: UnifiedSearchResult[],
   ): UnifiedSearchResult[] {
@@ -810,10 +899,28 @@ export class UnifiedSearchService {
     return Number.isNaN(timestamp) ? undefined : timestamp;
   }
 
-  private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  private resolveSearchTimeout(connector: IConnector): number {
+    const configuredTimeout = connector.config.timeout;
+
+    if (
+      typeof configuredTimeout === "number" &&
+      Number.isFinite(configuredTimeout) &&
+      configuredTimeout > 0
+    ) {
+      return Math.min(configuredTimeout, MAX_SEARCH_TIMEOUT_MS);
+    }
+
+    return DEFAULT_SEARCH_TIMEOUT_MS;
+  }
+
+  private withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    message?: string,
+  ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
-        reject(new Error("Search timeout"));
+        reject(new Error(message ?? "Search timeout"));
       }, timeoutMs);
 
       promise

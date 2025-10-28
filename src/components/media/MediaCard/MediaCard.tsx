@@ -242,6 +242,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
           size="small"
           borderRadius={borderRadius.lg}
           showPlaceholderLabel={true}
+          priority="high"
           style={{ marginRight: spacing.md }}
         />
         <View

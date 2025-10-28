@@ -8,6 +8,7 @@ import {
 import { FlashList } from "@shopify/flash-list";
 
 import { useResponsiveGrid } from "@/hooks/useResponsiveLayout";
+import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 
 export interface ResponsiveGridProps<T> {
   /**
@@ -74,6 +75,14 @@ export interface ResponsiveGridProps<T> {
    * Distance from end before triggering onEndReached
    */
   onEndReachedThreshold?: number;
+  /**
+   * Whether to animate grid items
+   */
+  animated?: boolean;
+  /**
+   * Animation stagger delay per item (in milliseconds)
+   */
+  staggerDelay?: number;
 }
 
 function ResponsiveGridComponent<T>({
@@ -93,6 +102,8 @@ function ResponsiveGridComponent<T>({
   refreshing = false,
   onEndReached,
   onEndReachedThreshold = 0.5,
+  animated = true,
+  staggerDelay = 50,
 }: ResponsiveGridProps<T>) {
   const {
     calculateGridColumns,
@@ -176,29 +187,44 @@ function ResponsiveGridComponent<T>({
       const { item: row, index } = info;
 
       return (
-        <View style={styles.row}>
-          {row.map((rowData, itemIndex) => {
-            const globalIndex = index * gridConfig.numColumns + itemIndex;
-            return (
-              <View
-                key={keyExtractor(rowData, globalIndex)}
-                style={[
-                  styles.gridItem,
-                  {
-                    width: gridConfig.itemWidth,
-                    marginRight:
-                      itemIndex < row.length - 1 ? gridConfig.spacing : 0,
-                  },
-                ]}
-              >
-                {renderItem(rowData, globalIndex)}
-              </View>
-            );
-          })}
-        </View>
+        <AnimatedListItem
+          index={index}
+          totalItems={groupedData.length}
+          animated={animated && !refreshing}
+          staggerDelay={staggerDelay}
+        >
+          <View style={styles.row}>
+            {row.map((rowData, itemIndex) => {
+              const globalIndex = index * gridConfig.numColumns + itemIndex;
+              return (
+                <View
+                  key={keyExtractor(rowData, globalIndex)}
+                  style={[
+                    styles.gridItem,
+                    {
+                      width: gridConfig.itemWidth,
+                      marginRight:
+                        itemIndex < row.length - 1 ? gridConfig.spacing : 0,
+                    },
+                  ]}
+                >
+                  {renderItem(rowData, globalIndex)}
+                </View>
+              );
+            })}
+          </View>
+        </AnimatedListItem>
       );
     },
-    [gridConfig, keyExtractor, renderItem],
+    [
+      gridConfig,
+      keyExtractor,
+      renderItem,
+      groupedData.length,
+      animated,
+      refreshing,
+      staggerDelay,
+    ],
   );
 
   const getItemType = React.useCallback((item: T[]) => {
@@ -207,11 +233,11 @@ function ResponsiveGridComponent<T>({
 
   return (
     <View style={styles.container} onLayout={handleLayout}>
-      <FlashList
+      <FlashList<T[]>
         data={groupedData}
         renderItem={renderRow}
         getItemType={getItemType}
-        keyExtractor={(item, index) => `row-${index}`}
+        keyExtractor={(item: T[], index: number) => `row-${index}`}
         contentContainerStyle={[
           styles.contentContainer,
           { paddingHorizontal: gridConfig.spacing },

@@ -65,7 +65,7 @@ const NetworkScanScreen = () => {
         },
         sectionSurface: {
           marginHorizontal: spacing.md,
-          borderRadius: 12,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           backgroundColor: theme.colors.elevation.level1,
         },
         sectionPadding: {
@@ -114,7 +114,7 @@ const NetworkScanScreen = () => {
         },
         tabsSurface: {
           marginHorizontal: spacing.md,
-          borderRadius: 12,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           backgroundColor: theme.colors.elevation.level2,
         },
         historyContainer: {

@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Animated } from "react-native";
+import { View, StyleSheet } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  FadeIn,
+  FadeInDown,
+} from "react-native-reanimated";
 import { Text, useTheme, IconButton } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -41,21 +48,13 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const [expanded, setExpanded] = useState(false);
-  const [slideAnim] = useState(new Animated.Value(0));
+  const slideAnim = useSharedValue(0);
 
   useEffect(() => {
     if (isVisible) {
-      Animated.timing(slideAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      slideAnim.value = withTiming(1, { duration: 300 });
     } else {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+      slideAnim.value = withTiming(0, { duration: 200 });
     }
   }, [isVisible, slideAnim]);
 
@@ -76,25 +75,29 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
     return theme.colors.error;
   };
 
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          translateY: slideAnim.value === 0 ? -100 : 0,
+        },
+      ],
+    };
+  }, [slideAnim]);
+
   if (!isVisible) {
     return null;
   }
 
   return (
     <Animated.View
+      entering={FadeInDown.duration(300).springify()}
       style={[
         styles.container,
         {
           backgroundColor: getStatusColor(),
-          transform: [
-            {
-              translateY: slideAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-100, 0],
-              }),
-            },
-          ],
         },
+        animatedStyle,
       ]}
     >
       <View style={styles.content}>
@@ -140,7 +143,8 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
       </View>
 
       {expanded && (
-        <View
+        <Animated.View
+          entering={FadeIn.duration(300)}
           style={[
             styles.expandedContent,
             { borderTopColor: "rgba(255,255,255,0.2)" },
@@ -169,7 +173,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
                 : "Some features may be limited while offline"}
             </Text>
           </View>
-        </View>
+        </Animated.View>
       )}
     </Animated.View>
   );

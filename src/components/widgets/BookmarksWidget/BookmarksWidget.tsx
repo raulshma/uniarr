@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
+import Animated from "react-native-reanimated";
 import { IconButton, Text, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -11,6 +12,13 @@ import { widgetService } from "@/services/widgets/WidgetService";
 import { getComponentElevation } from "@/constants/elevation";
 import { borderRadius } from "@/constants/sizes";
 import { healthCheckService } from "@/services/bookmarks/HealthCheckService";
+import {
+  COMPONENT_ANIMATIONS,
+  FadeIn,
+  FadeOut,
+  ANIMATION_DURATIONS,
+} from "@/utils/animations.utils";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import BookmarkItem from "./BookmarkItem";
 import type {
   Bookmark,
@@ -22,6 +30,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
   widget,
   onRefresh,
   onEdit,
+  isEditing,
 }) => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
@@ -31,7 +40,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
   const [health, setHealth] = useState<Map<string, BookmarkHealth>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const isEditMode = Boolean(onEdit);
+  const isEditMode = Boolean(isEditing);
 
   const handleOpenConfig = useCallback(() => {
     void hapticPress();
@@ -134,7 +143,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
     } finally {
       setRefreshing(false);
     }
-  }, [bookmarks, onRefresh]);
+  }, [bookmarks]);
 
   const getGridLayout = () => {
     const { size } = widget;
@@ -166,13 +175,15 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 
   if (loading) {
     return (
-      <View
+      <Animated.View
         style={[
           styles.container,
           gridLayout.container,
           { backgroundColor: theme.colors.surface },
           containerElevationStyle,
         ]}
+        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
       >
         <View style={styles.header}>
           <Text variant="titleMedium" style={styles.title}>
@@ -185,17 +196,26 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
             iconColor={theme.colors.onSurfaceVariant}
           />
         </View>
-        <View style={styles.loadingContainer}>
-          <MaterialCommunityIcons
-            name="loading"
-            size={theme.custom.sizes.iconSizes.lg}
-            color={theme.colors.primary}
-          />
-          <Text variant="bodySmall" style={styles.loadingText}>
-            Loading bookmarks...
-          </Text>
+        <View style={styles.loadingSkeleton}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <View key={index} style={styles.skeletonBookmark}>
+              <View style={styles.skeletonIcon} />
+              <SkeletonPlaceholder
+                width="80%"
+                height={12}
+                borderRadius={4}
+                style={{ marginTop: spacing.xs }}
+              />
+              <SkeletonPlaceholder
+                width="60%"
+                height={10}
+                borderRadius={4}
+                style={{ marginTop: spacing.xs }}
+              />
+            </View>
+          ))}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
@@ -270,17 +290,27 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
           />
         }
       >
-        <View style={styles.gridContainer}>
-          {enabledBookmarks.map((bookmark) => (
-            <BookmarkItem
+        <Animated.View
+          style={styles.gridContainer}
+          entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
+        >
+          {enabledBookmarks.map((bookmark, index) => (
+            <Animated.View
               key={bookmark.id}
-              bookmark={bookmark}
-              health={health.get(bookmark.id)}
-              onPress={handleBookmarkPress}
-              size={widget.size}
-            />
+              entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, 50).delay(
+                150,
+              )}
+              style={[]}
+            >
+              <BookmarkItem
+                bookmark={bookmark}
+                health={health.get(bookmark.id)}
+                onPress={handleBookmarkPress}
+                size={widget.size}
+              />
+            </Animated.View>
           ))}
-        </View>
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -328,15 +358,26 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: spacing.sm,
   },
-  loadingContainer: {
+  loadingSkeleton: {
     flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  skeletonBookmark: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: spacing.lg,
+    width: "48%",
+    padding: spacing.sm,
   },
-  loadingText: {
-    marginTop: spacing.sm,
-    opacity: 0.7,
+  skeletonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.1)",
   },
   emptyContainer: {
     flex: 1,

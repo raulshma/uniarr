@@ -18,6 +18,8 @@ import { handleApiError } from "@/utils/error.utils";
 import { logger } from "@/services/logger/LoggerService";
 
 import type { components } from "@/connectors/client-schemas/radarr-openapi";
+import type { NormalizedRelease } from "@/models/discover.types";
+import { normalizeRadarrRelease } from "@/services/ReleaseService";
 
 // Aliases for generated OpenAPI types
 type RadarrSystemStatus = components["schemas"]["SystemResource"];
@@ -35,6 +37,7 @@ type RadarrQueueResponse = components["schemas"]["QueueResourcePagingResource"];
 type RadarrTag = components["schemas"]["TagResource"];
 type RadarrMovie = components["schemas"]["MovieResource"];
 type RadarrMovieEditor = components["schemas"]["MovieEditorResource"];
+type RadarrRelease = components["schemas"]["ReleaseResource"];
 
 type RadarrMoveMovieOptions = {
   movieId: number;
@@ -117,10 +120,27 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
     }
   }
 
-  async getMovies(): Promise<Movie[]> {
+  async getMovies(filters?: {
+    tags?: number[];
+    qualityProfileId?: number;
+    monitored?: boolean;
+  }): Promise<Movie[]> {
     try {
+      const params: Record<string, unknown> = {};
+
+      if (filters?.tags && filters.tags.length > 0) {
+        params.tags = filters.tags.join(",");
+      }
+      if (filters?.qualityProfileId !== undefined) {
+        params.qualityProfileId = filters.qualityProfileId;
+      }
+      if (filters?.monitored !== undefined) {
+        params.monitored = filters.monitored;
+      }
+
       const response = await this.client.get<RadarrMovie[]>(
         `${RADARR_API_PREFIX}/movie`,
+        { params },
       );
       return (response.data ?? []).map((item) => this.mapMovie(item));
     } catch (error) {
@@ -156,6 +176,42 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         operation: "search",
         endpoint: `${RADARR_API_PREFIX}/movie/lookup`,
       });
+    }
+  }
+
+  /**
+   * Lookup a movie by TMDB ID.
+   * Uses the dedicated Radarr endpoint /api/v3/movie/lookup/tmdb.
+   * Implementation-only method; not part of the public IConnector interface.
+   * @returns Movie if found, undefined if not found or error occurs.
+   */
+  async lookupByTmdbId(tmdbId: number): Promise<Movie | undefined> {
+    try {
+      const response = await this.client.get<RadarrMovie[]>(
+        `${RADARR_API_PREFIX}/movie/lookup/tmdb`,
+        {
+          params: { tmdbId },
+        },
+      );
+
+      // Radarr /movie/lookup/tmdb returns an array with 0 or 1 item
+      if (response.data && response.data.length > 0) {
+        return this.mapMovie(response.data[0]);
+      }
+
+      logger.debug("[RadarrConnector] TMDB lookup returned no results", {
+        serviceId: this.config.id,
+        tmdbId,
+      });
+      return undefined;
+    } catch (error) {
+      // Log but don't throw; allow caller to handle missing movies gracefully
+      logger.warn("[RadarrConnector] TMDB lookup failed", {
+        serviceId: this.config.id,
+        tmdbId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
     }
   }
 
@@ -327,6 +383,67 @@ export class RadarrConnector extends BaseConnector<Movie, AddMovieRequest> {
         endpoint: `${RADARR_API_PREFIX}/command`,
       });
     }
+  }
+
+  /**
+   * Get available releases/candidates for a movie (from indexers).
+   * Probes multiple candidate endpoints based on Radarr API versions.
+   */
+  async getReleases(
+    movieId: number,
+    options?: { indexerId?: number; minSeeders?: number },
+  ): Promise<NormalizedRelease[]> {
+    const candidateEndpoints = [
+      `${RADARR_API_PREFIX}/release`,
+      `${RADARR_API_PREFIX}/movie/${movieId}/releases`,
+      `${RADARR_API_PREFIX}/releases`,
+    ];
+
+    for (const endpoint of candidateEndpoints) {
+      try {
+        const params: Record<string, unknown> = { movieId };
+        if (options?.indexerId) {
+          params.indexerId = options.indexerId;
+        }
+
+        const response = await this.client.get<RadarrRelease[]>(endpoint, {
+          params,
+        });
+
+        if (Array.isArray(response.data)) {
+          return response.data
+            .filter((r) => {
+              if (options?.minSeeders !== undefined && r.seeders !== null) {
+                return (r.seeders ?? 0) >= options.minSeeders;
+              }
+              return true;
+            })
+            .map((r) => normalizeRadarrRelease(r, this.config.id));
+        }
+      } catch (error) {
+        const axiosError = error as unknown as {
+          response?: { status?: number };
+        };
+        const status = axiosError?.response?.status;
+        if (status !== 404) {
+          logger.warn("[RadarrConnector] Unexpected error fetching releases", {
+            serviceId: this.config.id,
+            endpoint,
+            status,
+            movieId,
+          });
+        }
+        // Try next candidate endpoint
+      }
+    }
+
+    logger.warn("[RadarrConnector] Unable to find working releases endpoint", {
+      serviceId: this.config.id,
+      movieId,
+      tried: candidateEndpoints,
+    });
+
+    return [];
   }
 
   async getTags(): Promise<RadarrTag[]> {

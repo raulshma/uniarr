@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { RefreshControl as NativeRefreshControl } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useTheme } from "react-native-paper";
 
 import type { ComponentProps } from "react";
@@ -43,13 +44,15 @@ export const ListRefreshControl = ({
   }, [onRefresh]);
 
   return (
-    <NativeRefreshControl
-      {...rest}
-      colors={resolvedColors}
-      tintColor={resolvedTintColor}
-      titleColor={resolvedTitleColor}
-      progressBackgroundColor={resolvedProgressBackground}
-      onRefresh={handleRefresh}
-    />
+    <Animated.View entering={FadeIn.duration(300)}>
+      <NativeRefreshControl
+        {...rest}
+        colors={resolvedColors}
+        tintColor={resolvedTintColor}
+        titleColor={resolvedTitleColor}
+        progressBackgroundColor={resolvedProgressBackground}
+        onRefresh={handleRefresh}
+      />
+    </Animated.View>
   );
 };

@@ -6,12 +6,7 @@ import {
   FlatList,
   ImageBackground,
 } from "react-native";
-import {
-  Text,
-  IconButton,
-  useTheme,
-  ActivityIndicator,
-} from "react-native-paper";
+import { Text, IconButton, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
@@ -23,6 +18,13 @@ import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
 import { CalendarService } from "@/services/calendar/CalendarService";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import {
+  FadeIn,
+  FadeOut,
+  ANIMATION_DURATIONS,
+  Animated,
+} from "@/utils/animations.utils";
 
 type UpcomingReleaseItem = {
   id: string;
@@ -335,11 +337,9 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
           textAlign: "center",
           paddingVertical: spacing.md,
         },
-        loadingState: {
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          paddingVertical: spacing.xl,
+        loadingSkeleton: {
+          flexDirection: "row",
+          paddingRight: spacing.md,
         },
       }),
     [theme],
@@ -416,14 +416,40 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <Animated.View
+        style={styles.container}
+        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Upcoming Releases</Text>
         </View>
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+        <View style={styles.loadingSkeleton}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <View
+              key={index}
+              style={[styles.card, { width: cardWidth, height: cardHeight }]}
+            >
+              <View style={styles.posterContainer}>
+                <SkeletonPlaceholder
+                  width="100%"
+                  height={posterHeight}
+                  borderRadius={borderRadius.sm}
+                />
+              </View>
+              <View style={styles.cardContent}>
+                <SkeletonPlaceholder
+                  width="80%"
+                  height={16}
+                  borderRadius={4}
+                  style={{ marginBottom: spacing.xs }}
+                />
+                <SkeletonPlaceholder width="60%" height={12} borderRadius={4} />
+              </View>
+            </View>
+          ))}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 

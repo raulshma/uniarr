@@ -18,15 +18,23 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
-// Card and AnimatedSection intentionally omitted — not used in this file
 import { Button } from "@/components/common/Button";
+import {
+  AnimatedCard,
+  AnimatedListItem,
+  AnimatedSection,
+} from "@/components/common/AnimatedComponents";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { getComponentElevation } from "@/constants/elevation";
 import { borderRadius } from "@/constants/sizes";
 import { useUnifiedSearch } from "@/hooks/useUnifiedSearch";
+import useDebouncedValueHook from "@/hooks/useDebouncedValue";
 import type {
   SearchHistoryEntry,
   UnifiedSearchMediaType,
@@ -37,6 +45,7 @@ import {
   selectGetConnector,
 } from "@/store/connectorsStore";
 import DownloadButton from "@/components/downloads/DownloadButton";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const mediaTypeLabels: Record<UnifiedSearchMediaType, string> = {
   series: "Series",
@@ -61,6 +70,48 @@ const mediaFilterOptions: UnifiedSearchMediaType[] = [
   "series",
   "movie",
   "request",
+];
+
+const allGenres = [
+  "Action",
+  "Adventure",
+  "Animation",
+  "Comedy",
+  "Crime",
+  "Documentary",
+  "Drama",
+  "Family",
+  "Fantasy",
+  "Film-Noir",
+  "Game-Show",
+  "History",
+  "Horror",
+  "Music",
+  "Musical",
+  "Mystery",
+  "News",
+  "Reality-TV",
+  "Romance",
+  "Sci-Fi",
+  "Sport",
+  "Talk-Show",
+  "Thriller",
+  "War",
+  "Western",
+];
+
+const qualityOptions = [
+  "Any",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
 ];
 
 const formatRuntime = (minutes?: number): string => {
@@ -104,7 +155,20 @@ export const UnifiedSearchPanel: React.FC = () => {
   const [qualityFilter, setQualityFilter] = useState<string>("Any");
   const [releaseTypeFilter, setReleaseTypeFilter] = useState<string>("Any");
   const [statusFilter, setStatusFilter] = useState<string>("Any");
+  const [genreFilters, setGenreFilters] = useState<string[]>([]);
+  const [genreSearch, setGenreSearch] = useState<string>("");
+  const [releaseYearMin, setReleaseYearMin] = useState<number>(1990);
+  const [releaseYearMax, setReleaseYearMax] = useState<number>(2025);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [yearPickerTarget, setYearPickerTarget] = useState<
+    "min" | "max" | null
+  >(null);
+
+  // Debounce the user's input to avoid issuing a search request on every keystroke.
+  // This follows best-practice for search inputs on mobile to reduce network
+  // traffic and improve perceived performance. 350ms is a reasonable default.
+  const debouncedTerm = useDebouncedValueHook(searchTerm, 350);
 
   const {
     results,
@@ -118,9 +182,15 @@ export const UnifiedSearchPanel: React.FC = () => {
     recordSearch,
     removeHistoryEntry,
     clearHistory,
-  } = useUnifiedSearch(searchTerm, {
+  } = useUnifiedSearch(debouncedTerm, {
     serviceIds: serviceFilters,
     mediaTypes: mediaFilters,
+    quality: qualityFilter !== "Any" ? qualityFilter : undefined,
+    status: statusFilter !== "Any" ? statusFilter : undefined,
+    genres: genreFilters.length > 0 ? genreFilters : undefined,
+    releaseYearMin: releaseYearMin !== 1990 ? releaseYearMin : undefined,
+    releaseYearMax: releaseYearMax !== 2025 ? releaseYearMax : undefined,
+    releaseType: releaseTypeFilter !== "Any" ? releaseTypeFilter : undefined,
   });
 
   const serviceNameById = useMemo(() => {
@@ -133,6 +203,7 @@ export const UnifiedSearchPanel: React.FC = () => {
 
   const hasActiveQuery = searchTerm.trim().length >= minSearchLength;
   const isBusy = isLoading || isFetching;
+  const allowAnimations = shouldAnimateLayout(isBusy, isFetching);
 
   const styles = useMemo(
     () =>
@@ -176,9 +247,11 @@ export const UnifiedSearchPanel: React.FC = () => {
           borderRadius: 20,
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.sm,
-          minWidth: 80,
+          minWidth: 0,
+          maxWidth: 240,
           alignItems: "center",
           justifyContent: "center",
+          overflow: "hidden",
         },
         mainFilterPillActive: {
           backgroundColor: theme.colors.primary,
@@ -187,6 +260,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           fontSize: 14,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
+          flexShrink: 1,
         },
         mainFilterTextActive: {
           color: theme.colors.onPrimary,
@@ -210,9 +284,11 @@ export const UnifiedSearchPanel: React.FC = () => {
           borderRadius: 20,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
-          minWidth: 70,
+          minWidth: 0,
+          maxWidth: 220,
           alignItems: "center",
           justifyContent: "center",
+          overflow: "hidden",
           flexDirection: "row",
           gap: spacing.xs,
         },
@@ -223,6 +299,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           fontSize: 14,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
+          flexShrink: 1,
         },
         serviceFilterTextActive: {
           color: theme.colors.onPrimary,
@@ -261,17 +338,25 @@ export const UnifiedSearchPanel: React.FC = () => {
         },
         resultCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: borderRadius.xl,
-          marginBottom: spacing.sm,
+          borderRadius: borderRadius.lg,
+          marginBottom: spacing.xs,
+          padding: 0,
+          overflow: "hidden",
+        },
+        resultTouchable: {
+          flex: 1,
         },
         resultContent: {
           flexDirection: "row",
-          padding: spacing.sm,
+          paddingVertical: spacing.xs,
+          paddingRight: spacing.sm,
+          paddingLeft: spacing.xs,
+          alignItems: "center",
         },
         posterContainer: {
-          width: theme.custom.sizes.posterSizes.sm,
-          height: theme.custom.sizes.posterSizes.md,
-          borderRadius: borderRadius.lg,
+          width: theme.custom.sizes.posterSizes.sm - 8,
+          height: theme.custom.sizes.posterSizes.sm * 1.4 - 8,
+          borderRadius: borderRadius.md,
           backgroundColor: theme.colors.surfaceVariant,
           marginRight: spacing.sm,
           overflow: "hidden",
@@ -290,45 +375,46 @@ export const UnifiedSearchPanel: React.FC = () => {
         },
         resultInfo: {
           flex: 1,
-          justifyContent: "space-between",
+          justifyContent: "center",
         },
         resultTitle: {
           color: theme.colors.onSurface,
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: "600",
-          marginBottom: spacing.xs,
-          lineHeight: 22,
+          marginBottom: spacing.xs / 2,
+          lineHeight: 18,
         },
         resultSubtitle: {
           color: theme.colors.onSurfaceVariant,
-          fontSize: 14,
-          marginBottom: spacing.sm,
+          fontSize: 12,
+          marginBottom: 0,
         },
         genreContainer: {
           flexDirection: "row",
           flexWrap: "wrap",
           gap: spacing.xs,
-          marginBottom: spacing.sm,
+          marginBottom: 0,
         },
         genreChip: {
-          height: 28,
-          paddingHorizontal: spacing.sm,
+          height: 22,
+          paddingHorizontal: spacing.xs,
+          marginRight: spacing.xs,
         },
         resultActions: {
           flexDirection: "row",
-          gap: spacing.sm,
+          gap: spacing.xs,
           alignItems: "center",
         },
         actionButton: {
-          width: theme.custom.sizes.touchSizes.md,
-          height: theme.custom.sizes.touchSizes.md,
+          width: theme.custom.sizes.touchSizes.sm,
+          height: theme.custom.sizes.touchSizes.sm,
           borderRadius: borderRadius.round,
           justifyContent: "center",
           alignItems: "center",
         },
         downloadButtonContainer: {
-          width: theme.custom.sizes.touchSizes.md,
-          height: theme.custom.sizes.touchSizes.md,
+          width: theme.custom.sizes.touchSizes.sm,
+          height: theme.custom.sizes.touchSizes.sm,
           borderRadius: borderRadius.round,
           justifyContent: "center",
           alignItems: "center",
@@ -461,6 +547,42 @@ export const UnifiedSearchPanel: React.FC = () => {
           opacity: 0.6,
           marginTop: spacing.sm,
         },
+        /* Compact card helper styles */
+        resultHeaderRow: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        },
+        titleColumn: {
+          flex: 1,
+          paddingRight: spacing.sm,
+        },
+        rightColumn: {
+          alignItems: "flex-end",
+        },
+        serviceBadge: {
+          backgroundColor: theme.colors.surfaceVariant,
+          paddingHorizontal: 8,
+          paddingVertical: 4,
+          borderRadius: 8,
+        },
+        serviceBadgeText: {
+          fontSize: 11,
+          color: theme.colors.onSurfaceVariant,
+        },
+        spacerSmall: {
+          height: spacing.sm,
+        },
+        iconCompact: {
+          margin: 0,
+          padding: 4,
+        },
+        iconWithBg: {
+          margin: 0,
+          padding: 4,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderRadius: borderRadius.round,
+        },
       }),
     [theme],
   );
@@ -489,6 +611,18 @@ export const UnifiedSearchPanel: React.FC = () => {
     });
   }, []);
 
+  const toggleGenre = useCallback((genre: string) => {
+    setGenreFilters((current) => {
+      const next = new Set(current);
+      if (next.has(genre)) {
+        next.delete(genre);
+      } else {
+        next.add(genre);
+      }
+      return Array.from(next);
+    });
+  }, []);
+
   const clearServiceFilters = useCallback(() => {
     setServiceFilters([]);
   }, []);
@@ -501,12 +635,39 @@ export const UnifiedSearchPanel: React.FC = () => {
     setQualityFilter("Any");
     setReleaseTypeFilter("Any");
     setStatusFilter("Any");
+    setGenreFilters([]);
+    setReleaseYearMin(1990);
+    setReleaseYearMax(2025);
   }, []);
+
+  const openYearPicker = useCallback((target: "min" | "max") => {
+    setYearPickerTarget(target);
+    setShowYearPicker(true);
+  }, []);
+
+  const handleYearPickerChange = useCallback(
+    (event: DateTimePickerEvent, date?: Date) => {
+      if (event.type === "set" && date && yearPickerTarget) {
+        const year = date.getFullYear();
+        if (yearPickerTarget === "min") {
+          setReleaseYearMin(year);
+        } else {
+          setReleaseYearMax(year);
+        }
+      }
+      setShowYearPicker(false);
+      setYearPickerTarget(null);
+    },
+    [yearPickerTarget],
+  );
 
   const hasAdvancedFilters =
     qualityFilter !== "Any" ||
     releaseTypeFilter !== "Any" ||
-    statusFilter !== "Any";
+    statusFilter !== "Any" ||
+    genreFilters.length > 0 ||
+    releaseYearMin !== 1990 ||
+    releaseYearMax !== 2025;
 
   // If the route provides search params (e.g. from Discover card), prefill the search
   useEffect(() => {
@@ -599,8 +760,108 @@ export const UnifiedSearchPanel: React.FC = () => {
     [recordSearch, router],
   );
 
-  const renderResult = useCallback(
+  const handleViewAction = useCallback(
     (item: UnifiedSearchResult) => {
+      // Navigate to the appropriate detail screen for each service when possible
+      if (item.serviceType === "jellyseerr") {
+        const mediaType = item.mediaType === "series" ? "series" : "movie";
+        const mediaId =
+          item.externalIds?.tmdbId ?? item.externalIds?.serviceNativeId;
+        if (mediaId) {
+          router.push({
+            pathname: "/(auth)/jellyseerr/[serviceId]/[mediaType]/[mediaId]",
+            params: {
+              serviceId: item.serviceId,
+              mediaType,
+              mediaId: String(mediaId),
+            },
+          });
+          return;
+        }
+        router.push({
+          pathname: "/(auth)/jellyseerr/[serviceId]",
+          params: { serviceId: item.serviceId },
+        });
+        return;
+      }
+
+      if (item.serviceType === "jellyfin") {
+        const itemId = item.externalIds?.serviceNativeId;
+        if (itemId) {
+          router.push({
+            pathname: "/(auth)/jellyfin/[serviceId]/details/[itemId]",
+            params: { serviceId: item.serviceId, itemId: String(itemId) },
+          });
+          return;
+        }
+        router.push({
+          pathname: "/(auth)/jellyfin/[serviceId]",
+          params: { serviceId: item.serviceId },
+        });
+        return;
+      }
+
+      // Sonarr series detail
+      if (item.serviceType === "sonarr") {
+        const nativeId = item.externalIds?.serviceNativeId;
+        const tvdbId = item.externalIds?.tvdbId;
+        // Only navigate to series detail when we have a valid non-zero id
+        if (nativeId && String(nativeId) !== "0") {
+          router.push({
+            pathname: "/(auth)/sonarr/[serviceId]/series/[id]",
+            params: { serviceId: item.serviceId, id: String(nativeId) },
+          });
+          return;
+        }
+        if (tvdbId && String(tvdbId) !== "0") {
+          router.push({
+            pathname: "/(auth)/sonarr/[serviceId]/series/[id]",
+            params: { serviceId: item.serviceId, id: String(tvdbId) },
+          });
+          return;
+        }
+        // Fallback to service index if no usable id
+        router.push({
+          pathname: "/(auth)/sonarr/[serviceId]",
+          params: { serviceId: item.serviceId },
+        });
+        return;
+      }
+
+      // Radarr movie detail
+      if (item.serviceType === "radarr") {
+        const nativeId = item.externalIds?.serviceNativeId;
+        const tmdbId = item.externalIds?.tmdbId;
+        if (nativeId && String(nativeId) !== "0") {
+          router.push({
+            pathname: "/(auth)/radarr/[serviceId]/movies/[id]",
+            params: { serviceId: item.serviceId, id: String(nativeId) },
+          });
+          return;
+        }
+        if (tmdbId && String(tmdbId) !== "0") {
+          router.push({
+            pathname: "/(auth)/radarr/[serviceId]/movies/[id]",
+            params: { serviceId: item.serviceId, id: String(tmdbId) },
+          });
+          return;
+        }
+        // Fallback to service index if no usable id
+        router.push({
+          pathname: "/(auth)/radarr/[serviceId]",
+          params: { serviceId: item.serviceId },
+        });
+        return;
+      }
+
+      // Default: fall back to primary action
+      handlePrimaryAction(item);
+    },
+    [router, handlePrimaryAction],
+  );
+
+  const renderResult = useCallback(
+    (item: UnifiedSearchResult, index: number) => {
       const subtitleInfo = [];
       if (item.year) subtitleInfo.push(String(item.year));
       if (item.runtime) subtitleInfo.push(formatRuntime(item.runtime));
@@ -634,90 +895,115 @@ export const UnifiedSearchPanel: React.FC = () => {
         );
       };
 
+      const serviceLabel =
+        serviceNameById.get(item.serviceId) ??
+        serviceTypeLabels[item.serviceType] ??
+        item.serviceType;
+
       return (
-        <View style={[styles.resultCard, cardElevationStyle]}>
-          <View style={styles.resultContent}>
-            <View style={styles.posterContainer}>{renderPoster()}</View>
+        <AnimatedCard
+          style={[styles.resultCard, cardElevationStyle]}
+          delay={index * 40}
+          animated={allowAnimations}
+        >
+          <TouchableOpacity
+            onPress={() => handlePrimaryAction(item)}
+            activeOpacity={0.8}
+            style={styles.resultTouchable}
+          >
+            <View style={styles.resultContent}>
+              <View style={styles.posterContainer}>{renderPoster()}</View>
 
-            <View style={styles.resultInfo}>
-              <View>
-                <Text style={styles.resultTitle} numberOfLines={2}>
-                  {item.title}
-                </Text>
-                <Text style={styles.resultSubtitle}>
-                  {subtitleInfo.join(" • ")}
-                </Text>
-              </View>
+              <View style={styles.resultInfo}>
+                <View style={styles.resultHeaderRow}>
+                  <View style={styles.titleColumn}>
+                    <Text style={styles.resultTitle} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.resultSubtitle} numberOfLines={1}>
+                      {subtitleInfo.join(" • ")}
+                    </Text>
 
-              <View>
-                {genreInfo.length > 0 && (
-                  <View style={styles.genreContainer}>
-                    {genreInfo.map((genre, index) => (
-                      <Chip
-                        key={index}
-                        compact
-                        mode="outlined"
-                        style={styles.genreChip}
-                        textStyle={{ fontSize: 12 }}
-                      >
-                        {genre}
-                      </Chip>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.resultActions}>
-                  <View
-                    style={[
-                      styles.actionButton,
-                      { backgroundColor: theme.colors.primary },
-                    ]}
-                  >
-                    <IconButton
-                      icon="eye"
-                      size={20}
-                      iconColor={theme.colors.onPrimary}
-                      onPress={() => handlePrimaryAction(item)}
-                    />
+                    {genreInfo.length > 0 && (
+                      <View style={styles.genreContainer}>
+                        {genreInfo.slice(0, 3).map((genre, index) => (
+                          <Chip
+                            key={index}
+                            compact
+                            mode="outlined"
+                            style={styles.genreChip}
+                            textStyle={{ fontSize: 11 }}
+                          >
+                            {genre}
+                          </Chip>
+                        ))}
+                      </View>
+                    )}
                   </View>
 
-                  {item.serviceId && getConnector(item.serviceId)?.config && (
-                    <View style={styles.downloadButtonContainer}>
-                      <DownloadButton
-                        serviceConfig={getConnector(item.serviceId)!.config}
-                        contentId={item.id}
-                        size="small"
-                        variant="icon"
-                        onDownloadStart={(downloadId) => {
-                          console.log(`Download started: ${downloadId}`);
-                        }}
-                        onDownloadError={(error) => {
-                          console.error(`Download failed: ${error}`);
-                        }}
+                  <View style={styles.rightColumn}>
+                    <View style={styles.serviceBadge}>
+                      <Text style={styles.serviceBadgeText}>
+                        {serviceLabel}
+                      </Text>
+                    </View>
+
+                    <View style={styles.spacerSmall} />
+
+                    <View style={styles.resultActions}>
+                      <IconButton
+                        icon="eye"
+                        size={18}
+                        iconColor={theme.colors.primary}
+                        onPress={() => handleViewAction(item)}
+                        style={styles.iconCompact}
+                      />
+
+                      {item.serviceId &&
+                        getConnector(item.serviceId)?.config && (
+                          <View style={styles.downloadButtonContainer}>
+                            <DownloadButton
+                              serviceConfig={
+                                getConnector(item.serviceId)!.config
+                              }
+                              contentId={item.id}
+                              size="small"
+                              variant="icon"
+                              onDownloadStart={(downloadId) => {
+                                console.log(`Download started: ${downloadId}`);
+                              }}
+                              onDownloadError={(error) => {
+                                console.error(`Download failed: ${error}`);
+                              }}
+                            />
+                          </View>
+                        )}
+
+                      <IconButton
+                        icon="dots-vertical"
+                        size={18}
+                        iconColor={theme.colors.onSurfaceVariant}
+                        style={styles.iconWithBg}
                       />
                     </View>
-                  )}
-
-                  <View
-                    style={[
-                      styles.actionButton,
-                      { backgroundColor: theme.colors.surfaceVariant },
-                    ]}
-                  >
-                    <IconButton
-                      icon="dots-vertical"
-                      size={20}
-                      iconColor={theme.colors.onSurfaceVariant}
-                    />
                   </View>
                 </View>
               </View>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </AnimatedCard>
       );
     },
-    [handlePrimaryAction, styles, theme, getConnector, cardElevationStyle],
+    [
+      handlePrimaryAction,
+      styles,
+      theme,
+      getConnector,
+      cardElevationStyle,
+      serviceNameById,
+      handleViewAction,
+      allowAnimations,
+    ],
   );
 
   const renderErrorHelper = useMemo(() => {
@@ -743,7 +1029,11 @@ export const UnifiedSearchPanel: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Search Input */}
-      <View style={styles.searchContainer}>
+      <AnimatedSection
+        style={styles.searchContainer}
+        delay={0}
+        animated={allowAnimations}
+      >
         <TextInput
           mode="flat"
           placeholder="Search"
@@ -765,13 +1055,17 @@ export const UnifiedSearchPanel: React.FC = () => {
             />
           }
         />
-      </View>
+      </AnimatedSection>
 
       {/* Filter Summary */}
       {(mediaFilters.length > 0 ||
         serviceFilters.length > 0 ||
         hasAdvancedFilters) && (
-        <View style={styles.filterSummaryRow}>
+        <AnimatedSection
+          style={styles.filterSummaryRow}
+          delay={60}
+          animated={allowAnimations}
+        >
           <Text style={styles.filterSummaryText}>Active filters:</Text>
           <View style={styles.filterSummaryBadges}>
             {mediaFilters.length > 0 && (
@@ -805,10 +1099,24 @@ export const UnifiedSearchPanel: React.FC = () => {
                     </Text>
                   </View>
                 )}
+                {genreFilters.length > 0 && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>
+                      Genres: {genreFilters.join(", ")}
+                    </Text>
+                  </View>
+                )}
+                {(releaseYearMin !== 1990 || releaseYearMax !== 2025) && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>
+                      Years: {releaseYearMin}-{releaseYearMax}
+                    </Text>
+                  </View>
+                )}
               </>
             )}
           </View>
-        </View>
+        </AnimatedSection>
       )}
 
       {/* Filter Drawer */}
@@ -862,6 +1170,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                         serviceFilters.length === 0 &&
                           styles.mainFilterTextActive,
                       ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
                     >
                       All
                     </Text>
@@ -883,6 +1193,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                           serviceFilters.includes(service.serviceId) &&
                             styles.mainFilterTextActive,
                         ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                       >
                         {service.serviceName}
                       </Text>
@@ -911,8 +1223,40 @@ export const UnifiedSearchPanel: React.FC = () => {
                           mediaFilters.includes(option) &&
                             styles.mainFilterTextActive,
                         ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                       >
                         {mediaTypeLabels[option]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Quality Filters */}
+              <View style={styles.filterDrawerSection}>
+                <Text style={styles.advancedFilterTitle}>Quality (Rating)</Text>
+                <View style={[styles.mainFilterRow, { flexWrap: "wrap" }]}>
+                  {qualityOptions.map((quality) => (
+                    <TouchableOpacity
+                      key={quality}
+                      style={[
+                        styles.mainFilterPill,
+                        qualityFilter === quality &&
+                          styles.mainFilterPillActive,
+                      ]}
+                      onPress={() => setQualityFilter(quality)}
+                    >
+                      <Text
+                        style={[
+                          styles.mainFilterText,
+                          qualityFilter === quality &&
+                            styles.mainFilterTextActive,
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {quality === "Any" ? "Any" : `${quality}+`}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -947,6 +1291,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                           statusFilter === status &&
                             styles.mainFilterTextActive,
                         ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                       >
                         {status}
                       </Text>
@@ -963,6 +1309,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                     mode="flat"
                     placeholder="Search genres..."
                     placeholderTextColor={theme.colors.onSurfaceVariant}
+                    value={genreSearch}
+                    onChangeText={setGenreSearch}
                     style={styles.searchInput}
                     contentStyle={{
                       backgroundColor: "transparent",
@@ -970,7 +1318,6 @@ export const UnifiedSearchPanel: React.FC = () => {
                     }}
                     underlineStyle={{ display: "none" }}
                     left={<TextInput.Icon icon="magnify" size={20} />}
-                    right={<TextInput.Icon icon="chevron-down" size={20} />}
                   />
                 </View>
                 <View
@@ -979,24 +1326,33 @@ export const UnifiedSearchPanel: React.FC = () => {
                     { flexWrap: "wrap", marginTop: spacing.sm },
                   ]}
                 >
-                  {["Action", "Sci-Fi"].map((genre) => (
-                    <View
-                      key={genre}
-                      style={[
-                        styles.mainFilterPill,
-                        styles.mainFilterPillActive,
-                        { flexDirection: "row", gap: spacing.xs },
-                      ]}
-                    >
-                      <Text style={styles.mainFilterTextActive}>{genre}</Text>
-                      <IconButton
-                        icon="close"
-                        size={16}
-                        iconColor={theme.colors.onPrimary}
-                        style={{ margin: 0, padding: 0 }}
-                      />
-                    </View>
-                  ))}
+                  {allGenres
+                    .filter((genre) =>
+                      genre.toLowerCase().includes(genreSearch.toLowerCase()),
+                    )
+                    .map((genre) => (
+                      <TouchableOpacity
+                        key={genre}
+                        style={[
+                          styles.mainFilterPill,
+                          genreFilters.includes(genre) &&
+                            styles.mainFilterPillActive,
+                        ]}
+                        onPress={() => toggleGenre(genre)}
+                      >
+                        <Text
+                          style={[
+                            styles.mainFilterText,
+                            genreFilters.includes(genre) &&
+                              styles.mainFilterTextActive,
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {genre}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                 </View>
               </View>
 
@@ -1015,8 +1371,74 @@ export const UnifiedSearchPanel: React.FC = () => {
                       marginBottom: spacing.sm,
                     }}
                   >
-                    <Text style={styles.mainFilterText}>1990</Text>
-                    <Text style={styles.mainFilterText}>2024</Text>
+                    <Text
+                      style={styles.mainFilterText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {releaseYearMin}
+                    </Text>
+                    <Text
+                      style={styles.mainFilterText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {releaseYearMax}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: spacing.sm,
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <TouchableOpacity
+                        onPress={() => openYearPicker("min")}
+                        style={{
+                          height: 40,
+                          borderWidth: 1,
+                          borderColor: theme.colors.outline,
+                          borderRadius: 4,
+                          justifyContent: "center",
+                          paddingHorizontal: 12,
+                          backgroundColor: theme.colors.surface,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: theme.colors.onSurface,
+                            fontSize: 16,
+                          }}
+                        >
+                          {releaseYearMin}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <TouchableOpacity
+                        onPress={() => openYearPicker("max")}
+                        style={{
+                          height: 40,
+                          borderWidth: 1,
+                          borderColor: theme.colors.outline,
+                          borderRadius: 4,
+                          justifyContent: "center",
+                          paddingHorizontal: 12,
+                          backgroundColor: theme.colors.surface,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: theme.colors.onSurface,
+                            fontSize: 16,
+                          }}
+                        >
+                          {releaseYearMax}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <View
                     style={{
@@ -1034,8 +1456,8 @@ export const UnifiedSearchPanel: React.FC = () => {
                         backgroundColor: theme.colors.primary,
                         borderRadius:
                           theme.custom.sizes.controlSizes.slider.borderRadius,
-                        marginLeft: "30%",
-                        marginRight: "5%",
+                        marginLeft: `${((releaseYearMin - 1900) / (2100 - 1900)) * 100}%`,
+                        marginRight: `${((2100 - releaseYearMax) / (2100 - 1900)) * 100}%`,
                       }}
                     />
                   </View>
@@ -1068,9 +1490,29 @@ export const UnifiedSearchPanel: React.FC = () => {
         </Modal>
       </Portal>
 
+      {/* Year Picker */}
+      {showYearPicker && (
+        <DateTimePicker
+          value={
+            yearPickerTarget === "min"
+              ? new Date(releaseYearMin, 0, 1)
+              : new Date(releaseYearMax, 0, 1)
+          }
+          mode="date"
+          display="spinner"
+          onChange={handleYearPickerChange}
+          minimumDate={new Date(1900, 0, 1)}
+          maximumDate={new Date(2100, 0, 1)}
+        />
+      )}
+
       {/* Results or History */}
       {hasActiveQuery ? (
-        <View style={styles.resultContainer}>
+        <AnimatedSection
+          style={styles.resultContainer}
+          delay={100}
+          animated={allowAnimations}
+        >
           {isBusy && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator animating size="large" />
@@ -1092,7 +1534,16 @@ export const UnifiedSearchPanel: React.FC = () => {
 
           <FlatList
             data={results}
-            renderItem={({ item }) => renderResult(item)}
+            renderItem={({ item, index }) => (
+              <AnimatedListItem
+                index={index}
+                totalItems={results.length}
+                staggerDelay={60}
+                animated={allowAnimations}
+              >
+                {renderResult(item, index)}
+              </AnimatedListItem>
+            )}
             keyExtractor={(item) => item.id}
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
@@ -1109,9 +1560,13 @@ export const UnifiedSearchPanel: React.FC = () => {
               </Text>
             </View>
           )}
-        </View>
+        </AnimatedSection>
       ) : (
-        <View style={styles.historyContainer}>
+        <AnimatedSection
+          style={styles.historyContainer}
+          delay={80}
+          animated={allowAnimations}
+        >
           <View style={styles.historyHeader}>
             <Text
               style={{
@@ -1147,7 +1602,9 @@ export const UnifiedSearchPanel: React.FC = () => {
                   closeIcon="close"
                   textStyle={{ fontSize: 14 }}
                 >
-                  {entry.term}
+                  <Text numberOfLines={1} ellipsizeMode="tail">
+                    {entry.term}
+                  </Text>
                 </Chip>
               ))}
             </View>
@@ -1163,7 +1620,7 @@ export const UnifiedSearchPanel: React.FC = () => {
               </Text>
             </View>
           )}
-        </View>
+        </AnimatedSection>
       )}
 
       {renderErrorHelper}

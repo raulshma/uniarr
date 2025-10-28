@@ -18,7 +18,9 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import {
   AnimatedListItem,
+  AnimatedProgress,
   AnimatedSection,
+  PageTransition,
 } from "@/components/common/AnimatedComponents";
 
 import type { AppTheme } from "@/constants/theme";
@@ -39,10 +41,13 @@ import {
   openFileWithPlayer,
 } from "@/utils/fileOperations.utils";
 import type { VideoPlayerOption } from "@/utils/fileOperations.utils";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 type JellyfinDownloadItem = DownloadItem & {
   isJellyfinDownload: boolean;
 };
+
+type DownloadsListItem = JellyfinDownloadItem | { type: "divider" };
 
 type JellyfinDownloadsOverview = {
   activeDownloads: JellyfinDownloadItem[];
@@ -236,12 +241,17 @@ const JellyfinDownloadsScreen = () => {
 
   const { deleteFile, openFile } = useDownloadedFileActions();
 
+  const allowAnimations = shouldAnimateLayout(refreshing, refreshing);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
         safeArea: {
           flex: 1,
           backgroundColor: theme.colors.background,
+        },
+        page: {
+          flex: 1,
         },
         listContent: {
           paddingHorizontal: spacing.md,
@@ -437,6 +447,8 @@ const JellyfinDownloadsScreen = () => {
           totalItems={
             overview.activeDownloads.length + overview.completedDownloads.length
           }
+          staggerDelay={60}
+          animated={allowAnimations}
         >
           <TouchableOpacity style={styles.downloadItem} activeOpacity={0.7}>
             <View style={styles.downloadHeader}>
@@ -519,9 +531,13 @@ const JellyfinDownloadsScreen = () => {
             {isActive && (
               <View style={styles.progressContainer}>
                 <View style={styles.progressBar}>
-                  <View
+                  <AnimatedProgress
                     style={[styles.progressFill, { width: `${percent}%` }]}
-                  />
+                    animated={allowAnimations}
+                  >
+                    {/* Inner element to satisfy children prop and ensure layout works */}
+                    <View />
+                  </AnimatedProgress>
                 </View>
                 <Text style={styles.progressText}>{percent}% complete</Text>
               </View>
@@ -539,6 +555,7 @@ const JellyfinDownloadsScreen = () => {
       retryDownload,
       deleteFile,
       openFile,
+      allowAnimations,
     ],
   );
 
@@ -563,7 +580,11 @@ const JellyfinDownloadsScreen = () => {
 
   const renderListHeader = useCallback(() => {
     return (
-      <View style={styles.headerContainer}>
+      <AnimatedSection
+        style={styles.headerContainer}
+        delay={40}
+        animated={allowAnimations}
+      >
         <Searchbar
           placeholder="Search downloads..."
           onChangeText={setSearchQuery}
@@ -601,15 +622,17 @@ const JellyfinDownloadsScreen = () => {
             </View>
 
             {overview.activeDownloads.length > 0 && (
-              <Text style={styles.sectionHeader}>Active Downloads</Text>
+              <AnimatedSection delay={80} animated={allowAnimations}>
+                <Text style={styles.sectionHeader}>Active Downloads</Text>
+              </AnimatedSection>
             )}
           </>
         )}
-      </View>
+      </AnimatedSection>
     );
-  }, [styles, searchQuery, hasDownloads, overview]);
+  }, [styles, searchQuery, hasDownloads, overview, allowAnimations]);
 
-  const allDownloads = useMemo(() => {
+  const allDownloads = useMemo<DownloadsListItem[]>(() => {
     return [
       ...overview.activeDownloads,
       ...(overview.activeDownloads.length > 0 &&
@@ -622,61 +645,72 @@ const JellyfinDownloadsScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <TabHeader showBackButton={true} onBackPress={() => router.back()} />
+      <PageTransition
+        style={styles.page}
+        transitionType="fade"
+        animated={allowAnimations}
+      >
+        <AnimatedSection animated={allowAnimations} delay={0}>
+          <TabHeader
+            title="Jellyfin Downloads"
+            showTitle
+            showBackButton
+            onBackPress={() => router.back()}
+          />
+        </AnimatedSection>
 
-      {hasDownloads ? (
-        <FlashList
-          data={allDownloads}
-          keyExtractor={(item, index) => {
-            if (
-              typeof item === "object" &&
-              item !== null &&
-              "type" in item &&
-              item.type === "divider"
-            ) {
-              return `divider-${index}`;
+        {hasDownloads ? (
+          <FlashList<DownloadsListItem>
+            data={allDownloads}
+            keyExtractor={(item: DownloadsListItem, index: number) => {
+              if ("type" in item) {
+                return `divider-${index}`;
+              }
+              return item.id;
+            }}
+            renderItem={({
+              item,
+              index,
+            }: {
+              item: DownloadsListItem;
+              index: number;
+            }) => {
+              if ("type" in item) {
+                return <Divider style={{ marginVertical: spacing.md }} />;
+              }
+              return renderDownloadItem({
+                item,
+                index,
+              });
+            }}
+            ListHeaderComponent={renderListHeader}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <ListRefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+              />
             }
-            const download = item as JellyfinDownloadItem;
-            return download.id;
-          }}
-          renderItem={(props) => {
-            const item = props.item;
-            if (
-              typeof item === "object" &&
-              item !== null &&
-              "type" in item &&
-              item.type === "divider"
-            ) {
-              return <Divider style={{ marginVertical: spacing.md }} />;
+          />
+        ) : (
+          <FlashList<DownloadsListItem>
+            data={[]}
+            renderItem={() => null}
+            keyExtractor={() => "empty"}
+            ListEmptyComponent={
+              <AnimatedSection
+                style={styles.emptyContainer}
+                delay={120}
+                animated={allowAnimations}
+              >
+                {listEmptyComponent}
+              </AnimatedSection>
             }
-            return renderDownloadItem({
-              item: item as JellyfinDownloadItem,
-              index: props.index,
-            });
-          }}
-          ListHeaderComponent={renderListHeader}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <ListRefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-            />
-          }
-        />
-      ) : (
-        <FlashList
-          data={[]}
-          renderItem={() => null}
-          keyExtractor={() => "empty"}
-          ListEmptyComponent={
-            <AnimatedSection style={styles.emptyContainer} delay={100}>
-              {listEmptyComponent}
-            </AnimatedSection>
-          }
-          ListHeaderComponent={renderListHeader}
-          contentContainerStyle={styles.listContent}
-        />
-      )}
+            ListHeaderComponent={renderListHeader}
+            contentContainerStyle={styles.listContent}
+          />
+        )}
+      </PageTransition>
     </SafeAreaView>
   );
 };
