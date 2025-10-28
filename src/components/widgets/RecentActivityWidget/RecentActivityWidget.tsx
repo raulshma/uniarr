@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { StyleSheet, View, FlatList } from "react-native";
-import { Text, IconButton, useTheme } from "react-native-paper";
+import { StyleSheet, View, ScrollView, RefreshControl } from "react-native";
+import { Text, IconButton, useTheme, Card } from "react-native-paper";
 import { useRouter } from "expo-router";
+import Animated from "react-native-reanimated";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { useHaptics } from "@/hooks/useHaptics";
 import {
+  COMPONENT_ANIMATIONS,
   FadeIn,
   FadeOut,
   ANIMATION_DURATIONS,
-  Animated,
 } from "@/utils/animations.utils";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -23,7 +24,6 @@ import { createServiceNavigation } from "@/utils/navigation.utils";
 import { alert } from "@/services/dialogService";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { RecentActivityItem } from "@/models/recentActivity.types";
-import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 
 interface RecentActivityWidgetProps {
@@ -49,6 +49,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchRecentActivity = useCallback(async (): Promise<
     RecentActivityItem[]
@@ -411,51 +412,50 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
     [onPress, router],
   );
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
     onPress();
-    loadRecentActivity();
+    setRefreshing(true);
+    await loadRecentActivity();
+    setRefreshing(false);
   }, [onPress, loadRecentActivity]);
+
+  const containerElevationStyle = getComponentElevation("widget", theme);
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
         container: {
-          overflow: "hidden",
+          borderRadius: borderRadius.xl,
+          padding: spacing.md,
         },
         header: {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: spacing.lg,
+          marginBottom: spacing.md,
         },
         title: {
-          fontSize: 20,
-          fontWeight: "700",
-          color: theme.colors.onBackground,
-          letterSpacing: -0.5,
+          fontWeight: "600",
         },
-        actions: {
-          flexDirection: "row",
-          gap: spacing.xs,
-        },
-        content: {
+        scrollView: {
           flex: 1,
         },
-        activityList: {
-          gap: spacing.md,
+        scrollContent: {
+          paddingBottom: spacing.lg,
         },
         activityCard: {
           backgroundColor: theme.colors.surface,
           borderRadius: theme.custom.sizes.borderRadius.xl,
           padding: spacing.md,
           flexDirection: "row",
+          marginBottom: spacing.sm,
           ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
         },
         activityImage: {
-          width: theme.custom.sizes.additionalCardSizes.portrait.width,
-          height: theme.custom.sizes.additionalCardSizes.portrait.height,
+          width: theme.custom.sizes.additionalCardSizes.portrait.width, // 60 * 1.5 = 90 (50% bigger)
+          height: theme.custom.sizes.additionalCardSizes.portrait.height, // 80 * 1.5 = 120 (50% bigger)
           borderRadius: theme.custom.sizes.borderRadius.md,
           marginRight: spacing.md,
           backgroundColor: theme.colors.surfaceVariant,
@@ -485,20 +485,11 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           justifyContent: "center",
           paddingVertical: spacing.xl,
         },
-        emptyIcon: {
-          marginBottom: spacing.md,
-        },
         emptyText: {
           fontSize: 16,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
-        },
-        errorText: {
-          fontSize: 14,
-          color: theme.colors.error,
-          textAlign: "center",
-          paddingVertical: spacing.md,
         },
         loadingSkeleton: {
           gap: spacing.md,
@@ -508,141 +499,88 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           borderRadius: theme.custom.sizes.borderRadius.xl,
           padding: spacing.md,
           flexDirection: "row",
+          marginBottom: spacing.sm,
           ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
-        },
-        skeletonImage: {
-          width: theme.custom.sizes.additionalCardSizes.portrait.width,
-          height: theme.custom.sizes.additionalCardSizes.portrait.height,
-          borderRadius: theme.custom.sizes.borderRadius.md,
-          marginRight: spacing.md,
-          backgroundColor: theme.colors.surfaceVariant,
-        },
-        skeletonContent: {
-          flex: 1,
-          justifyContent: "center",
-        },
-        skeletonTitle: {
-          width: "80%",
-          height: 16,
-          borderRadius: 4,
-          marginBottom: spacing.xs,
-        },
-        skeletonMeta: {
-          width: "60%",
-          height: 14,
-          borderRadius: 4,
-          marginBottom: spacing.xs,
-        },
-        skeletonDate: {
-          width: "40%",
-          height: 12,
-          borderRadius: 4,
         },
       }),
     [theme],
   );
 
-  const renderActivityCard = useCallback(
-    ({ item, index }: { item: RecentActivityItem; index: number }) => (
-      <SettingsListItem
-        title={item.title}
-        subtitle={`${item.show} • ${item.episode} • ${item.date}`}
-        left={{
-          node: item.image ? (
-            <MediaPoster
-              uri={item.image}
-              size={60}
-              borderRadius={8}
-              style={styles.activityImage}
-            />
-          ) : (
-            <View style={styles.activityImage} />
-          ),
-        }}
-        trailing={
-          <IconButton
-            icon="chevron-right"
-            size={16}
-            iconColor={theme.colors.outline}
-            style={{ margin: 0 }}
-          />
-        }
-        onPress={() => handleItemPress(item)}
-        groupPosition={
-          index === 0
-            ? "top"
-            : index === recentActivity.length - 1
-              ? "bottom"
-              : "middle"
-        }
-      />
-    ),
-    [handleItemPress, styles, recentActivity.length, theme.colors.outline],
-  );
-
   if (error) {
     return (
-      <View
-        style={StyleSheet.flatten([
+      <Card
+        style={[
           styles.container,
-          {
-            backgroundColor: theme.colors.elevation.level1,
-            borderRadius: borderRadius.xxl,
-            padding: spacing.sm,
-          },
-        ])}
+          { backgroundColor: theme.colors.surface },
+          containerElevationStyle,
+        ]}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>{widget.title}</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
+          <Text variant="titleLarge" style={styles.title}>
+            {widget.title}
+          </Text>
+          <View style={{ flexDirection: "row" }}>
+            <IconButton icon="refresh" onPress={handleRefresh} />
+            {onEdit && <IconButton icon="cog" onPress={onEdit} />}
           </View>
         </View>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.emptyState}>
+            <Text variant="bodyMedium" style={styles.emptyText}>
+              {error}
+            </Text>
+          </View>
+        </ScrollView>
+      </Card>
     );
   }
 
   if (loading) {
     return (
       <Animated.View
-        style={StyleSheet.flatten([
+        style={[
           styles.container,
-          {
-            backgroundColor: theme.colors.elevation.level1,
-            borderRadius: borderRadius.xxl,
-            padding: spacing.sm,
-          },
-        ])}
+          { backgroundColor: theme.colors.surface },
+          containerElevationStyle,
+        ]}
         entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
         exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>{widget.title}</Text>
+          <Text variant="titleLarge" style={styles.title}>
+            {widget.title}
+          </Text>
         </View>
         <View style={styles.loadingSkeleton}>
           {Array.from({ length: 3 }).map((_, index) => (
-            <SkeletonPlaceholder
-              key={index}
-              height={64}
-              borderRadius={12}
-              style={{ marginBottom: index < 2 ? 12 : 0 }}
-            />
+            <View key={index} style={styles.skeletonCard}>
+              <View style={styles.activityImage} />
+              <View style={styles.activityContent}>
+                <SkeletonPlaceholder
+                  width="80%"
+                  height={16}
+                  borderRadius={4}
+                  style={{ marginBottom: spacing.xs }}
+                />
+                <SkeletonPlaceholder
+                  width="60%"
+                  height={14}
+                  borderRadius={4}
+                  style={{ marginBottom: spacing.xs }}
+                />
+                <SkeletonPlaceholder width="40%" height={12} borderRadius={4} />
+              </View>
+            </View>
           ))}
         </View>
       </Animated.View>
@@ -651,83 +589,112 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
   if (recentActivity.length === 0) {
     return (
-      <View
-        style={StyleSheet.flatten([
+      <Card
+        style={[
           styles.container,
-          {
-            backgroundColor: theme.colors.elevation.level1,
-            borderRadius: borderRadius.xxl,
-            padding: spacing.sm,
-          },
-        ])}
+          { backgroundColor: theme.colors.surface },
+          containerElevationStyle,
+        ]}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>{widget.title}</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
+          <Text variant="titleLarge" style={styles.title}>
+            {widget.title}
+          </Text>
+          <View style={{ flexDirection: "row" }}>
+            <IconButton icon="refresh" onPress={handleRefresh} />
+            {onEdit && <IconButton icon="cog" onPress={onEdit} />}
           </View>
         </View>
-        <SettingsListItem title="No recent activity" groupPosition="single" />
-      </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.emptyState}>
+            <Text variant="bodyMedium" style={styles.emptyText}>
+              No recent activity
+            </Text>
+            <Text
+              variant="bodySmall"
+              style={{ opacity: 0.7, marginTop: spacing.xs }}
+            >
+              Recent activity will appear here
+            </Text>
+          </View>
+        </ScrollView>
+      </Card>
     );
   }
 
   return (
-    <View
-      style={StyleSheet.flatten([
+    <Card
+      style={[
         styles.container,
-        {
-          backgroundColor: theme.colors.elevation.level1,
-          borderRadius: borderRadius.xxl,
-          padding: spacing.sm,
-        },
-      ])}
+        { backgroundColor: theme.colors.surface },
+        containerElevationStyle,
+      ]}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>{widget.title}</Text>
-        <View style={styles.actions}>
-          <IconButton
-            icon="refresh"
-            size={20}
-            iconColor={theme.colors.primary}
-            onPress={handleRefresh}
-          />
-          {onEdit && (
-            <IconButton
-              icon="cog"
-              size={20}
-              iconColor={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
-            />
-          )}
+        <Text variant="titleLarge" style={styles.title}>
+          {widget.title}
+        </Text>
+        <View style={{ flexDirection: "row" }}>
+          <IconButton icon="refresh" onPress={handleRefresh} />
+          {onEdit && <IconButton icon="cog" onPress={onEdit} />}
         </View>
       </View>
 
-      <View style={styles.content}>
-        <FlatList
-          data={recentActivity}
-          renderItem={renderActivityCard}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.activityList}
-          scrollEnabled={false}
-          nestedScrollEnabled={false}
-        />
-      </View>
-    </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}>
+          {recentActivity.map((item, index) => (
+            <Animated.View
+              key={item.id}
+              entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, 50).delay(
+                150,
+              )}
+            >
+              <View
+                style={styles.activityCard}
+                onTouchEnd={() => handleItemPress(item)}
+              >
+                {item.image ? (
+                  <MediaPoster
+                    uri={item.image}
+                    size={90}
+                    borderRadius={8}
+                    style={styles.activityImage}
+                  />
+                ) : (
+                  <View style={styles.activityImage} />
+                )}
+                <View style={styles.activityContent}>
+                  <Text variant="titleMedium" style={styles.activityTitle}>
+                    {item.title}
+                  </Text>
+                  <Text variant="bodyMedium" style={styles.activityMeta}>
+                    {item.show} • {item.episode}
+                  </Text>
+                  <Text variant="bodySmall" style={styles.activityDate}>
+                    {item.date}
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+          ))}
+        </Animated.View>
+      </ScrollView>
+    </Card>
   );
 };
 

@@ -14,6 +14,7 @@ module.exports = defineConfig([
     "coverage/*",
     "src/connectors/client-schemas/*",
     "src/connectors/openapi-specs/*",
+    "assets/*",
   ]),
   expoConfig,
   eslintPluginPrettierRecommended,

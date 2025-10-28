@@ -69,7 +69,7 @@ const DashboardScreen = () => {
 
   const buttonsTranslateY = scrollY.interpolate({
     inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [headerMaxHeight - 70, -10],
+    outputRange: [headerMaxHeight - 70, -20],
     extrapolate: "clamp",
   });
 
@@ -122,10 +122,10 @@ const DashboardScreen = () => {
           alignItems: "center",
         },
         title: {
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontWeight: "400",
+          fontSize: theme.custom.typography.titleLarge.fontSize,
+          fontWeight: "800",
           color: theme.colors.onBackground,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
         },
         stickyButtonsContainer: {
           position: "absolute",

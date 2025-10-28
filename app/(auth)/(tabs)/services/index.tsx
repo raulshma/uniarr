@@ -267,7 +267,7 @@ const ServicesScreen = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.backdrop,
         },
         content: {
           flex: 1,
@@ -307,7 +307,7 @@ const ServicesScreen = () => {
           marginTop: spacing.xs,
         },
         latencyChip: {
-          backgroundColor: theme.colors.elevation.level2,
+          backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.lg,
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
