@@ -69,13 +69,19 @@ const DashboardScreen = () => {
 
   const buttonsTranslateY = scrollY.interpolate({
     inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [headerMaxHeight - 60, 0],
+    outputRange: [headerMaxHeight - 70, -10],
     extrapolate: "clamp",
   });
 
   const buttonsPosition = scrollY.interpolate({
     inputRange: [0, headerMaxHeight - headerMinHeight],
     outputRange: [1, 1],
+    extrapolate: "clamp",
+  });
+
+  const stickyTitleOpacity = scrollY.interpolate({
+    inputRange: [0, headerMaxHeight - headerMinHeight],
+    outputRange: [0, 1],
     extrapolate: "clamp",
   });
 
@@ -130,9 +136,20 @@ const DashboardScreen = () => {
           paddingHorizontal: theme.custom.spacing.lg,
           paddingTop: insets.top,
         },
+        stickyHeader: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          height: headerMinHeight,
+        },
+        stickyTitle: {
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontWeight: "600",
+          color: theme.colors.onBackground,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+        },
         stickyButtons: {
           flexDirection: "row",
-          justifyContent: "flex-end",
           alignItems: "center",
           gap: theme.custom.spacing.sm,
         },
@@ -183,7 +200,7 @@ const DashboardScreen = () => {
           </Animated.View>
         </Animated.View>
 
-        {/* Sticky Buttons */}
+        {/* Sticky Header */}
         <Animated.View
           style={[
             styles.stickyButtonsContainer,
@@ -192,30 +209,41 @@ const DashboardScreen = () => {
             },
           ]}
         >
-          <Animated.View
-            style={[
-              styles.stickyButtons,
-              {
-                opacity: buttonsPosition,
-                gap: theme.custom.spacing.xxxs,
-              },
-            ]}
-          >
-            <IconButton
-              icon="download"
-              size={22}
-              iconColor={theme.colors.onSurfaceVariant}
-              style={styles.settingsButton}
-              onPress={() => router.push("/(auth)/jellyfin-downloads")}
-            />
-            <IconButton
-              icon="cog"
-              size={22}
-              iconColor={theme.colors.onSurfaceVariant}
-              style={styles.settingsButton}
-              onPress={() => router.push("/(auth)/settings")}
-            />
-          </Animated.View>
+          <View style={styles.stickyHeader}>
+            <Animated.Text
+              style={[
+                styles.stickyTitle,
+                {
+                  opacity: stickyTitleOpacity,
+                },
+              ]}
+            >
+              Dashboard
+            </Animated.Text>
+            <Animated.View
+              style={[
+                styles.stickyButtons,
+                {
+                  opacity: buttonsPosition,
+                },
+              ]}
+            >
+              <IconButton
+                icon="download"
+                size={22}
+                iconColor={theme.colors.onSurfaceVariant}
+                style={styles.settingsButton}
+                onPress={() => router.push("/(auth)/jellyfin-downloads")}
+              />
+              <IconButton
+                icon="cog"
+                size={22}
+                iconColor={theme.colors.onSurfaceVariant}
+                style={styles.settingsButton}
+                onPress={() => router.push("/(auth)/settings")}
+              />
+            </Animated.View>
+          </View>
         </Animated.View>
 
         {/* Content */}
