@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -6,8 +6,14 @@ import {
   FlatList,
   RefreshControl,
   Pressable,
+  useWindowDimensions,
 } from "react-native";
-import { Text, useTheme, IconButton, Searchbar } from "react-native-paper";
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+} from "react-native-reanimated";
+import { BackdropBlur, Canvas, Fill } from "@shopify/react-native-skia";
+import { Text, useTheme, IconButton } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import type { AppTheme } from "@/constants/theme";
@@ -21,6 +27,7 @@ import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { useConnectorsStore } from "@/store/connectorsStore";
 import { AnimeCard, AnimeHubSectionSkeleton } from "@/components/anime";
 import { AnimatedListItem } from "@/components/common/AnimatedComponents";
+import AnimatedSkiaBackground from "@/components/common/AnimatedSkiaBackground";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
 type JellyseerrSearchResult =
@@ -29,10 +36,15 @@ type JellyseerrSearchResult =
 
 const AnimeHubScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
+  const { width: screenWidth } = useWindowDimensions();
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
   const router = useRouter();
   const { getAllConnectors } = useConnectorsStore();
-
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Initialize skeleton loading hook with 500ms minimum display time
   const skeleton = useSkeletonLoading({ minLoadingTime: 500 });
@@ -60,6 +72,40 @@ const AnimeHubScreen: React.FC = () => {
 
   // Jikan (MyAnimeList) Discover data — public API, does not require a configured service
   const jikan = useJikanDiscover();
+
+  // Get a backdrop image from the anime data for the background
+  const backgroundImageUri = useMemo(() => {
+    // Check Jellyseerr data first
+    const allJellyseerrItems = [
+      ...recommendations,
+      ...upcoming,
+      ...trending,
+      ...movies,
+    ];
+
+    for (const item of allJellyseerrItems) {
+      if ("backdropPath" in item && item.backdropPath) {
+        return `https://image.tmdb.org/t/p/original${item.backdropPath}`;
+      }
+    }
+
+    // Check Jikan data
+    const allJikanItems = [
+      ...jikan.top,
+      ...jikan.recommendations,
+      ...jikan.now,
+      ...jikan.upcoming,
+    ];
+
+    for (const item of allJikanItems) {
+      // Jikan doesn't seem to have backdrop URLs, so we'll use poster as fallback
+      if (item.posterUrl) {
+        return item.posterUrl;
+      }
+    }
+
+    return undefined; // Will use default image
+  }, [recommendations, upcoming, trending, movies, jikan]);
 
   // Effect to manage skeleton visibility based on loading state
   useEffect(() => {
@@ -100,13 +146,12 @@ const AnimeHubScreen: React.FC = () => {
   );
 
   const handleSearch = useCallback(() => {
-    if (!searchQuery.trim()) return;
     // Navigate to search with anime filter
     router.push({
-      pathname: "/search",
-      params: { query: searchQuery, filter: "anime" },
+      pathname: "/(auth)/search",
+      params: { filter: "anime" },
     });
-  }, [searchQuery, router]);
+  }, [router]);
 
   const styles = useMemo(
     () =>
@@ -119,7 +164,7 @@ const AnimeHubScreen: React.FC = () => {
           paddingHorizontal: spacing.md,
           paddingTop: spacing.md,
           paddingBottom: spacing.sm,
-          backgroundColor: theme.colors.background,
+          backgroundColor: "transparent",
         },
         headerTop: {
           flexDirection: "row",
@@ -133,10 +178,28 @@ const AnimeHubScreen: React.FC = () => {
           color: theme.colors.onBackground,
         },
         searchBar: {
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 12,
-          elevation: 0,
+          height: 48,
+          borderRadius: 24,
+          overflow: "hidden",
           marginBottom: spacing.md,
+        },
+        searchBarContent: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+        },
+        searchPlaceholder: {
+          flex: 1,
+          marginLeft: spacing.sm,
+          color: theme.colors.onSurfaceVariant,
+          fontSize: theme.custom.typography.bodyLarge.fontSize,
+          fontFamily: theme.custom.typography.bodyLarge.fontFamily,
         },
         scrollContent: {
           paddingBottom: spacing.xl * 2,
@@ -194,7 +257,12 @@ const AnimeHubScreen: React.FC = () => {
   if (skeleton.showSkeleton && combinedLoading) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.header}>
+        <AnimatedSkiaBackground
+          theme={theme}
+          imageUri={backgroundImageUri}
+          scrollY={scrollY}
+        />
+        <View style={[styles.header, { backgroundColor: "transparent" }]}>
           <View style={styles.headerTop}>
             <Text style={styles.title}>Anime Hub</Text>
           </View>
@@ -218,7 +286,12 @@ const AnimeHubScreen: React.FC = () => {
   if (combinedError) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.header}>
+        <AnimatedSkiaBackground
+          theme={theme}
+          imageUri={backgroundImageUri}
+          scrollY={scrollY}
+        />
+        <View style={[styles.header, { backgroundColor: "transparent" }]}>
           <View style={styles.headerTop}>
             <Text style={styles.title}>Anime Hub</Text>
           </View>
@@ -306,8 +379,13 @@ const AnimeHubScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <AnimatedSkiaBackground
+        theme={theme}
+        imageUri={backgroundImageUri}
+        scrollY={scrollY}
+      />
       {/* Fixed Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: "transparent" }]}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Anime Hub</Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -321,23 +399,51 @@ const AnimeHubScreen: React.FC = () => {
         </View>
 
         {/* Search Bar */}
-        <Searchbar
-          placeholder="Search for anime titles"
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          onSubmitEditing={handleSearch}
-          style={styles.searchBar}
-          inputStyle={{ fontSize: 15 }}
-          icon="magnify"
-          iconColor={theme.colors.onSurfaceVariant}
-        />
+        <View style={styles.searchBar}>
+          <Canvas style={StyleSheet.absoluteFill}>
+            <BackdropBlur
+              blur={10}
+              clip={{
+                x: 0,
+                y: 0,
+                width: screenWidth - spacing.md * 2,
+                height: 48,
+              }}
+            >
+              <Fill
+                color={
+                  theme.dark
+                    ? "rgba(30, 41, 59, 0.3)"
+                    : "rgba(248, 250, 252, 0.5)"
+                }
+              />
+            </BackdropBlur>
+          </Canvas>
+          <Pressable
+            style={styles.searchBarContent}
+            onPress={handleSearch}
+            accessibilityRole="button"
+          >
+            <IconButton
+              icon="magnify"
+              size={24}
+              onPress={handleSearch}
+              accessibilityLabel="Search for anime"
+            />
+            <Text style={styles.searchPlaceholder}>
+              Search for anime titles
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Scrollable Content */}
-      <ScrollView
+      <Animated.ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={false}
@@ -530,7 +636,7 @@ const AnimeHubScreen: React.FC = () => {
             />
           </View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 };
