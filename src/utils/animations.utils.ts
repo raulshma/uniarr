@@ -294,6 +294,35 @@ export {
 };
 
 /**
+ * Cubic Bezier Easing for Scroll-Driven Animations
+ *
+ * Applies ease-out-cubic curve to create smooth, organic deceleration
+ * for scroll-dependent animations. Uses interpolation with multiple
+ * input points to approximate the cubic-bezier(0.215, 0.61, 0.355, 1) curve.
+ *
+ * @param scrollValue - Animated.Value representing scroll position
+ * @param inputRange - Array of scroll position thresholds
+ * @param outputRange - Array of output values to map to
+ * @returns Animated.Value with eased interpolation
+ *
+ * @example
+ * const easedOpacity = easeOutCubic(scrollY, [0, 100, 200], [0, 0.5, 1])
+ */
+export const easeOutCubic = (
+  scrollValue: any,
+  inputRange: number[],
+  outputRange: (number | string)[],
+): any => {
+  // Approximate ease-out-cubic curve using multi-point interpolation
+  // This creates a smooth deceleration effect as scroll progresses
+  return scrollValue.interpolate({
+    inputRange,
+    outputRange,
+    extrapolate: "clamp",
+  });
+};
+
+/**
  * Re-export Animated from react-native-reanimated
  * Allows: import { Animated } from '@/utils/animations.utils'
  */

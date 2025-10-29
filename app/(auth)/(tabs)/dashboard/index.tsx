@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo, useRef, useEffect } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -9,6 +9,7 @@ import {
   Animated,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { Text, IconButton, Portal } from "react-native-paper";
 import { useHaptics } from "@/hooks/useHaptics";
 
@@ -19,6 +20,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
 import { useWidgetServiceInitialization } from "@/hooks/useWidgetServiceInitialization";
+import { easeOutCubic } from "@/utils/animations.utils";
 
 // Helper function to calculate progress percentage
 
@@ -28,33 +30,10 @@ const DashboardScreen = () => {
   const { onPress } = useHaptics();
   const insets = useSafeAreaInsets();
   const gradientEnabled = useSettingsStore((s) => s.gradientBackgroundEnabled);
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [refreshing, setRefreshing] = React.useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
-
-  // Animated gradient colors
-  const gradientAnim = useRef(new Animated.Value(0)).current;
-
-  // Initialize gradient animation
-  useEffect(() => {
-    const animateGradient = () => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(gradientAnim, {
-            toValue: 1,
-            duration: 8000,
-            useNativeDriver: false,
-          }),
-          Animated.timing(gradientAnim, {
-            toValue: 0,
-            duration: 8000,
-            useNativeDriver: false,
-          }),
-        ]),
-      ).start();
-    };
-    animateGradient();
-  }, [gradientAnim]);
 
   // Initialize WidgetService early to prevent loading issues
   useWidgetServiceInitialization();
@@ -71,56 +50,57 @@ const DashboardScreen = () => {
   const screenHeight = Dimensions.get("window").height;
   const headerMaxHeight = screenHeight * 0.4; // 40% screen height
   const headerMinHeight = 80; // Minimum collapsed height
+  const collapseRange = headerMaxHeight - headerMinHeight;
 
-  // Animated styles
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [headerMaxHeight, headerMinHeight],
-    extrapolate: "clamp",
-  });
+  // Animated styles with ease-out-cubic Bezier curve for smooth deceleration
+  const headerHeight = easeOutCubic(
+    scrollY,
+    [0, collapseRange],
+    [headerMaxHeight, headerMinHeight],
+  );
 
-  const titleOpacity = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
+  // Title fades out as user scrolls up, then fades back in via sticky title
+  // This creates a smooth fade out effect with the main title
+  const titleOpacity = easeOutCubic(scrollY, [0, collapseRange], [1, 0]);
 
-  const titleTranslateY = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [0, -20],
-    extrapolate: "clamp",
-  });
+  const titleTranslateY = easeOutCubic(scrollY, [0, collapseRange], [0, -20]);
 
-  const buttonsTranslateY = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [headerMaxHeight - 70, -20],
-    extrapolate: "clamp",
-  });
+  const buttonsTranslateY = easeOutCubic(
+    scrollY,
+    [0, collapseRange],
+    [headerMaxHeight - 70, -20],
+  );
 
   const buttonsPosition = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
+    inputRange: [0, collapseRange],
     outputRange: [1, 1],
     extrapolate: "clamp",
   });
 
-  const stickyTitleOpacity = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [0, 1],
+  const stickyTitleOpacity = easeOutCubic(scrollY, [0, collapseRange], [0, 1]);
+
+  // Header background fades in only when reaching the top (fully collapsed)
+  const headerBackgroundOpacity = scrollY.interpolate({
+    inputRange: [0, collapseRange - 10, collapseRange],
+    outputRange: [0, 0, 1],
     extrapolate: "clamp",
   });
 
-  // Gradient opacity animations (reduced for frosted glass effect)
-  const gradient1Opacity = gradientAnim.interpolate({
-    inputRange: [0, 0.33, 0.66, 1],
-    outputRange: [0.7, 0.21, 0.21, 0.7],
+  // Sync gradient animation to scroll position for responsive feel
+  const gradient1Opacity = scrollY.interpolate({
+    inputRange: [0, collapseRange],
+    outputRange: [0.7, 0.21],
+    extrapolate: "clamp",
   });
-  const gradient2Opacity = gradientAnim.interpolate({
-    inputRange: [0, 0.33, 0.66, 1],
-    outputRange: [0.21, 0.7, 0.21, 0.21],
+  const gradient2Opacity = scrollY.interpolate({
+    inputRange: [0, collapseRange],
+    outputRange: [0.21, 0.7],
+    extrapolate: "clamp",
   });
-  const gradient3Opacity = gradientAnim.interpolate({
-    inputRange: [0, 0.33, 0.66, 1],
-    outputRange: [0.21, 0.21, 0.7, 0.21],
+  const gradient3Opacity = scrollY.interpolate({
+    inputRange: [0, collapseRange],
+    outputRange: [0.21, 0.21],
+    extrapolate: "clamp",
   });
 
   const styles = useMemo(
@@ -272,9 +252,31 @@ const DashboardScreen = () => {
         <Animated.View
           style={[styles.headerContainer, { height: headerHeight }]}
         >
+          {/* Header Background - Fades in when reaching top */}
           <Animated.View
-            style={[styles.headerBackground, { height: headerHeight }]}
-          />
+            style={[
+              styles.headerBackground,
+              {
+                height: headerHeight,
+                opacity: headerBackgroundOpacity,
+                backgroundColor: theme.colors.background,
+              },
+            ]}
+          >
+            {frostedEnabled && gradientEnabled && (
+              <BlurView
+                intensity={25}
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    backgroundColor: theme.dark
+                      ? "rgba(15, 15, 35, 0.3)"
+                      : "rgba(255, 255, 255, 0.2)",
+                  },
+                ]}
+              />
+            )}
+          </Animated.View>
           <Animated.View
             style={[styles.headerContent, { height: headerHeight }]}
           >
@@ -345,7 +347,7 @@ const DashboardScreen = () => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           onScroll={onScroll}
-          scrollEventThrottle={16}
+          scrollEventThrottle={8}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }

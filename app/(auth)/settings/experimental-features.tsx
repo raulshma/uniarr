@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native";
 import { Text, useTheme, Switch } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
 import {
   AnimatedListItem,
@@ -17,6 +18,7 @@ import { spacing } from "@/theme/spacing";
 
 const ExperimentalFeaturesScreen = () => {
   const theme = useTheme<AppTheme>();
+  const router = useRouter();
 
   const frostedWidgetsEnabled = useSettingsStore(
     (s) => s.frostedWidgetsEnabled,
@@ -30,6 +32,10 @@ const ExperimentalFeaturesScreen = () => {
   const setGradientBackgroundEnabled = useSettingsStore(
     (s) => s.setGradientBackgroundEnabled,
   );
+
+  const handleBackPress = () => {
+    router.back();
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -54,7 +60,11 @@ const ExperimentalFeaturesScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      <TabHeader title="Experimental Features" showBackButton />
+      <TabHeader
+        title="Experimental Features"
+        showBackButton
+        onBackPress={handleBackPress}
+      />
       <AnimatedScrollView contentContainerStyle={styles.content}>
         <AnimatedSection style={styles.section} delay={0} animated>
           <Text style={styles.sectionTitle}>Appearance</Text>
