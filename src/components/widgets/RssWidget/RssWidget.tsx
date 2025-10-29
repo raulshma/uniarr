@@ -24,6 +24,7 @@ import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
 import WidgetHeader from "../common/WidgetHeader";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -153,6 +154,10 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
   const { openDrawer } = useWidgetDrawer();
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const feedsConfigured = config.feeds && config.feeds.length > 0;
 
@@ -169,6 +174,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<RssFeedItem[]>(
             widget.id,
+            configSignature,
           );
           if (cached && cached.length > 0) {
             setItems(cached);
@@ -188,7 +194,10 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
 
         setItems(fresh);
         setError(null);
-        await widgetService.setWidgetData(widget.id, fresh, CACHE_TTL_MS);
+        await widgetService.setWidgetData(widget.id, fresh, {
+          ttlMs: CACHE_TTL_MS,
+          configSignature,
+        });
       } catch (error) {
         void logger.warn("RssWidget: failed to load feeds", {
           widgetId: widget.id,
@@ -200,7 +209,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
         setIsRefreshing(false);
       }
     },
-    [config.feeds, config.limit, feedsConfigured, widget.id],
+    [config.feeds, configSignature, config.limit, feedsConfigured, widget.id],
   );
 
   useEffect(() => {

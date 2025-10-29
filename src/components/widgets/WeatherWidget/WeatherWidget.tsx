@@ -23,6 +23,7 @@ import { mapConditionToIcon } from "./weatherIcons";
 import { WeatherDetailsDrawerContent } from "./WeatherDetailsDrawerContent";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 45 * 60 * 1000;
 
@@ -103,6 +104,10 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   const units: WeatherUnits = config.units ?? "metric";
   const unitsLabel = units === "imperial" ? "imperial" : "metric";
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const loadCredentials = useCallback(async () => {
     const credentials = await widgetCredentialService.getCredentials(widget.id);
@@ -161,6 +166,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<WeatherCacheEntry>(
             widget.id,
+            configSignature,
           );
           if (
             cached &&
@@ -228,7 +234,10 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
         await widgetService.setWidgetData(
           widget.id,
           { payload: weatherMap, queries: Object.keys(weatherMap) },
-          CACHE_TTL_MS,
+          {
+            ttlMs: CACHE_TTL_MS,
+            configSignature,
+          },
         );
       } catch (error) {
         void logger.warn("WeatherWidget: failed to load forecast", {
@@ -241,7 +250,14 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
         setRefreshing(false);
       }
     },
-    [apiKey, config.forecastDays, resolveQueries, units, widget.id],
+    [
+      apiKey,
+      configSignature,
+      config.forecastDays,
+      resolveQueries,
+      units,
+      widget.id,
+    ],
   );
 
   useEffect(() => {

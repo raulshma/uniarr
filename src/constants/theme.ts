@@ -1,4 +1,5 @@
 import type { ColorSchemeName } from "react-native";
+import { StyleSheet } from "react-native";
 import { MD3DarkTheme, MD3LightTheme, type MD3Theme } from "react-native-paper";
 
 import {
@@ -28,6 +29,9 @@ export type FrostedEffectTokens = {
   surfaceBorderColor: string;
   surfaceBorderWidth: number;
   pillBackgroundColor: string;
+  edgeHighlightColor: string;
+  edgeShadowColor: string;
+  glowColor: string;
 };
 
 export type CustomThemeConfig = {
@@ -146,25 +150,46 @@ const createFrostedTokens = (
   colors: MD3Theme["colors"],
   isDark: boolean,
 ): FrostedEffectTokens => {
-  const surfaceBackgroundAlpha = isDark ? 0.28 : 0.55;
-  const overlayAlpha = isDark ? 0.32 : 0.4;
-  const borderAlpha = isDark ? 0.55 : 0.25;
-  const pillAlpha = isDark ? 0.22 : 0.3;
+  const palette = isDark
+    ? {
+        backgroundBase: "rgba(26, 33, 51, 1)",
+        overlayBase: "rgba(98, 126, 188, 1)",
+        borderBase: "rgba(255, 255, 255, 1)",
+        pillBase: "rgba(76, 100, 148, 1)",
+        edgeHighlight: "rgba(255, 255, 255, 0.55)",
+        edgeShadow: "rgba(14, 19, 30, 0.65)",
+        glow: "rgba(88, 128, 214, 0.24)",
+      }
+    : {
+        backgroundBase: "rgba(255, 255, 255, 1)",
+        overlayBase: "rgba(255, 255, 255, 1)",
+        borderBase: "rgba(255, 255, 255, 1)",
+        pillBase: "rgba(255, 255, 255, 1)",
+        edgeHighlight: "rgba(255, 255, 255, 0.7)",
+        edgeShadow: "rgba(164, 182, 214, 0.45)",
+        glow: "rgba(186, 214, 255, 0.22)",
+      };
 
-  const overlaySource = isDark ? colors.surfaceVariant : "#FFFFFF";
+  const surfaceBackgroundAlpha = isDark ? 0.38 : 0.2;
+  const overlayAlpha = isDark ? 0.26 : 0.12;
+  const borderAlpha = isDark ? 0.16 : 0.12;
+  const pillAlpha = isDark ? 0.28 : 0.24;
 
   return {
-    blurIntensity: isDark ? 68 : 58,
-    blurReductionFactor: isDark ? 16 : 18,
+    blurIntensity: isDark ? 92 : 80,
+    blurReductionFactor: isDark ? 14 : 16,
     blurTint: isDark ? "dark" : "light",
-    surfaceOverlayColor: colorWithAlpha(overlaySource, overlayAlpha),
+    surfaceOverlayColor: colorWithAlpha(palette.overlayBase, overlayAlpha),
     surfaceBackgroundColor: colorWithAlpha(
-      colors.surface,
+      palette.backgroundBase,
       surfaceBackgroundAlpha,
     ),
-    surfaceBorderColor: colorWithAlpha(colors.outlineVariant, borderAlpha),
-    surfaceBorderWidth: 1,
-    pillBackgroundColor: colorWithAlpha(overlaySource, pillAlpha),
+    surfaceBorderColor: colorWithAlpha(palette.borderBase, borderAlpha),
+    surfaceBorderWidth: StyleSheet.hairlineWidth,
+    pillBackgroundColor: colorWithAlpha(palette.pillBase, pillAlpha),
+    edgeHighlightColor: palette.edgeHighlight,
+    edgeShadowColor: palette.edgeShadow,
+    glowColor: palette.glow,
   };
 };
 

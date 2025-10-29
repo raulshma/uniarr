@@ -20,6 +20,7 @@ import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
 import { CalendarService } from "@/services/calendar/CalendarService";
+import type { CalendarServiceType } from "@/models/calendar.types";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import {
   FadeIn,
@@ -28,6 +29,7 @@ import {
   Animated,
 } from "@/utils/animations.utils";
 import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 type UpcomingReleaseItem = {
   id: string;
@@ -63,58 +65,58 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const config = useMemo(() => {
+    const raw = widget.config ?? {};
+    const daysAhead =
+      typeof raw.daysAhead === "number" && raw.daysAhead > 0
+        ? Math.min(raw.daysAhead, 120)
+        : 30;
+    const limit =
+      typeof raw.limit === "number" && raw.limit > 0 && raw.limit <= 24
+        ? raw.limit
+        : 8;
+    const serviceTypes: CalendarServiceType[] = Array.isArray(raw.serviceTypes)
+      ? raw.serviceTypes.filter(
+          (type): type is CalendarServiceType =>
+            type === "sonarr" || type === "radarr",
+        )
+      : ["sonarr", "radarr"];
+
+    return {
+      daysAhead,
+      limit,
+      serviceTypes:
+        serviceTypes.length > 0
+          ? serviceTypes
+          : (["sonarr", "radarr"] as CalendarServiceType[]),
+    };
+  }, [widget.config]);
+
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
+
   const cardWidth = 140;
   const cardHeight = 260;
   const posterHeight = 180;
 
-  const loadUpcomingReleases = useCallback(async () => {
-    try {
-      // Try to get cached data first
-      const cachedData = await widgetService.getWidgetData<
-        UpcomingReleaseItem[]
-      >(widget.id);
-      if (cachedData) {
-        setUpcomingReleases(cachedData);
-        setLoading(false);
-        setError(null);
-        // Don't return, continue to fetch fresh data in background
-      } else {
-        // Only show loading if no cached data
-        setLoading(true);
-      }
-
-      // Fetch fresh data
-      const freshData = await fetchUpcomingReleases();
-      setUpcomingReleases(freshData);
-      setError(null);
-
-      // Cache the data for 15 minutes
-      await widgetService.setWidgetData(widget.id, freshData, 15 * 60 * 1000);
-    } catch (err) {
-      console.error("Failed to load upcoming releases:", err);
-      setError("Failed to load upcoming releases");
-    } finally {
-      setLoading(false);
-    }
-  }, [widget.id]);
-  useEffect(() => {
-    loadUpcomingReleases();
-  }, [loadUpcomingReleases]);
-
-  const fetchUpcomingReleases = async (): Promise<UpcomingReleaseItem[]> => {
+  const fetchUpcomingReleases = useCallback(async (): Promise<
+    UpcomingReleaseItem[]
+  > => {
     try {
       const calendarService = CalendarService.getInstance();
 
-      // Set filters for upcoming releases (next 30 days)
+      // Set filters for upcoming releases (next configured window)
       const today = new Date();
       const endDate = new Date(today);
-      endDate.setDate(today.getDate() + 30);
+      endDate.setDate(today.getDate() + config.daysAhead);
 
       const filters = {
         mediaTypes: ["movie", "episode"] as ["movie", "episode"],
         statuses: ["upcoming"] as ["upcoming"],
         services: [],
-        serviceTypes: ["sonarr", "radarr"] as ["sonarr", "radarr"],
+        serviceTypes: config.serviceTypes,
         monitoredStatus: "monitored" as const,
         dateRange: {
           start: today.toISOString().split("T")[0]!,
@@ -124,9 +126,8 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
 
       const releases = await calendarService.getReleases(filters);
 
-      // Map to our format and limit
       if (releases && releases.length > 0) {
-        return releases.slice(0, 8).map((release) => ({
+        return releases.slice(0, config.limit).map((release) => ({
           id: release.id,
           title:
             release.type === "episode"
@@ -147,7 +148,40 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
       console.error("Failed to fetch upcoming releases:", error);
       return [];
     }
-  };
+  }, [config]);
+
+  const loadUpcomingReleases = useCallback(async () => {
+    try {
+      const cachedData = await widgetService.getWidgetData<
+        UpcomingReleaseItem[]
+      >(widget.id, configSignature);
+      if (cachedData) {
+        setUpcomingReleases(cachedData);
+        setLoading(false);
+        setError(null);
+      } else {
+        setLoading(true);
+      }
+
+      const freshData = await fetchUpcomingReleases();
+      setUpcomingReleases(freshData);
+      setError(null);
+
+      await widgetService.setWidgetData(widget.id, freshData, {
+        ttlMs: 15 * 60 * 1000,
+        configSignature,
+      });
+    } catch (err) {
+      console.error("Failed to load upcoming releases:", err);
+      setError("Failed to load upcoming releases");
+    } finally {
+      setLoading(false);
+    }
+  }, [configSignature, fetchUpcomingReleases, widget.id]);
+
+  useEffect(() => {
+    loadUpcomingReleases();
+  }, [loadUpcomingReleases]);
 
   const handleItemPress = useCallback(
     (item: UpcomingReleaseItem) => {

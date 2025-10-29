@@ -22,6 +22,7 @@ import {
   getGroupPositions,
 } from "@/components/common";
 import WidgetHeader from "../common/WidgetHeader";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const LIVE_CACHE_TTL_MS = 5 * 60 * 1000;
 const OFFLINE_CACHE_TTL_MS = 20 * 60 * 1000;
@@ -90,6 +91,10 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
   const credentialsValid = Boolean(
     credentials?.clientId && credentials?.clientSecret,
   );
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const loadCredentials = useCallback(async () => {
     const stored = await widgetCredentialService.getCredentials(widget.id);
@@ -116,6 +121,7 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<TwitchCacheEntry>(
             widget.id,
+            configSignature,
           );
           if (cached?.channels) {
             setChannels(cached.channels);
@@ -144,7 +150,10 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
         await widgetService.setWidgetData(
           widget.id,
           { channels: fresh, timestamp: Date.now() },
-          ttl,
+          {
+            ttlMs: ttl,
+            configSignature,
+          },
         );
       } catch (error) {
         void logger.warn("TwitchWidget: failed to load channels", {
@@ -159,6 +168,7 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
     },
     [
       config.channelLogins,
+      configSignature,
       credentials,
       credentialsValid,
       hasChannels,

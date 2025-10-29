@@ -27,6 +27,7 @@ import { alert } from "@/services/dialogService";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { RecentActivityItem } from "@/models/recentActivity.types";
 import { borderRadius } from "@/constants/sizes";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 interface RecentActivityWidgetProps {
   widget: Widget;
@@ -53,6 +54,43 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const config = useMemo(() => {
+    const raw = widget.config ?? {};
+    const sourceMode = raw.sourceMode === "custom" ? "custom" : "global";
+    const serviceIds = Array.isArray(raw.serviceIds)
+      ? (raw.serviceIds.filter(
+          (id) => typeof id === "string" && id.length > 0,
+        ) as string[])
+      : [];
+    const limit =
+      typeof raw.limit === "number" && raw.limit >= 4 && raw.limit <= 30
+        ? Math.floor(raw.limit)
+        : 10;
+
+    return {
+      sourceMode,
+      serviceIds,
+      limit,
+    } as const;
+  }, [widget.config]);
+
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
+
+  const effectiveSourceIds = useMemo(() => {
+    if (config.sourceMode === "custom") {
+      return config.serviceIds.length > 0 ? config.serviceIds : undefined;
+    }
+
+    if (recentActivitySourceIds && recentActivitySourceIds.length > 0) {
+      return recentActivitySourceIds;
+    }
+
+    return undefined;
+  }, [config.serviceIds, config.sourceMode, recentActivitySourceIds]);
 
   const fetchRecentActivity = useCallback(async (): Promise<
     RecentActivityItem[]
@@ -88,12 +126,9 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
       // Filter by recent activity sources if set
       let sourceConfigs = enabledConfigs;
-      if (
-        recentActivitySourceIds !== undefined &&
-        recentActivitySourceIds.length > 0
-      ) {
+      if (effectiveSourceIds && effectiveSourceIds.length > 0) {
         sourceConfigs = enabledConfigs.filter((c) =>
-          recentActivitySourceIds.includes(c.id),
+          effectiveSourceIds.includes(c.id),
         );
       }
 
@@ -310,19 +345,19 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           const timestampB = b.timestamp ?? 0;
           return timestampB - timestampA;
         })
-        .slice(0, 10);
+        .slice(0, config.limit);
     } catch (error) {
       console.error("Failed to fetch recent activity:", error);
       return [];
     }
-  }, [recentActivitySourceIds]);
+  }, [config, effectiveSourceIds]);
 
   const loadRecentActivity = useCallback(async () => {
     try {
       // Try to get cached data first
       const cachedData = await widgetService.getWidgetData<
         RecentActivityItem[]
-      >(widget.id);
+      >(widget.id, configSignature);
       if (cachedData) {
         // Filter out cached items missing required navigation fields (backward compatibility)
         const validatedData = cachedData.filter(
@@ -349,14 +384,17 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       setError(null);
 
       // Cache the data for 5 minutes
-      await widgetService.setWidgetData(widget.id, freshData, 5 * 60 * 1000);
+      await widgetService.setWidgetData(widget.id, freshData, {
+        ttlMs: 5 * 60 * 1000,
+        configSignature,
+      });
     } catch (err) {
       console.error("Failed to load recent activity:", err);
       setError("Failed to load recent activity");
     } finally {
       setLoading(false);
     }
-  }, [widget.id, fetchRecentActivity]);
+  }, [configSignature, fetchRecentActivity, widget.id]);
 
   useEffect(() => {
     loadRecentActivity();

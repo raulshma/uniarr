@@ -22,6 +22,7 @@ import { Card } from "@/components/common";
 import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -83,6 +84,10 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const hasChannels = config.channelIds && config.channelIds.length > 0;
   const itemsPerChannel = config.itemsPerChannel ?? 3;
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const loadCredentials = useCallback(async () => {
     const credentials = await widgetCredentialService.getCredentials(widget.id);
@@ -106,6 +111,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<YouTubeCacheEntry>(
             widget.id,
+            configSignature,
           );
           if (cached?.videos?.length) {
             setVideos(cached.videos);
@@ -136,7 +142,10 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
         await widgetService.setWidgetData(
           widget.id,
           { videos: fresh },
-          CACHE_TTL_MS,
+          {
+            ttlMs: CACHE_TTL_MS,
+            configSignature,
+          },
         );
       } catch (error) {
         void logger.warn("YouTubeWidget: failed to load uploads", {
@@ -153,6 +162,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
       apiKey,
       config.channelIds,
       config.limit,
+      configSignature,
       hasChannels,
       itemsPerChannel,
       widget.id,

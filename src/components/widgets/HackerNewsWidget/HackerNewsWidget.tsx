@@ -25,6 +25,7 @@ import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -176,6 +177,10 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
   );
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const loadStories = useCallback(
     async (forceRefresh = false) => {
@@ -183,6 +188,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<HackerNewsItem[]>(
             widget.id,
+            configSignature,
           );
           if (cached && cached.length > 0) {
             setStories(cached);
@@ -202,7 +208,10 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
 
         setStories(fresh);
         setError(null);
-        await widgetService.setWidgetData(widget.id, fresh, CACHE_TTL_MS);
+        await widgetService.setWidgetData(widget.id, fresh, {
+          ttlMs: CACHE_TTL_MS,
+          configSignature,
+        });
       } catch (error) {
         void logger.warn("HackerNewsWidget: failed to load", {
           widgetId: widget.id,
@@ -214,7 +223,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
         setRefreshing(false);
       }
     },
-    [config.feedType, config.limit, widget.id],
+    [config.feedType, configSignature, config.limit, widget.id],
   );
 
   useEffect(() => {

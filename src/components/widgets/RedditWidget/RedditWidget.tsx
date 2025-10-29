@@ -27,6 +27,7 @@ import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
 import WidgetHeader from "../common/WidgetHeader";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 20 * 60 * 1000;
 
@@ -180,6 +181,10 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const hasSources = config.subreddits && config.subreddits.length > 0;
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const loadPosts = useCallback(
     async (forceRefresh = false) => {
@@ -194,6 +199,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<RedditPostItem[]>(
             widget.id,
+            configSignature,
           );
           if (cached && cached.length > 0) {
             setPosts(cached);
@@ -215,7 +221,10 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
 
         setPosts(fresh);
         setError(null);
-        await widgetService.setWidgetData(widget.id, fresh, CACHE_TTL_MS);
+        await widgetService.setWidgetData(widget.id, fresh, {
+          ttlMs: CACHE_TTL_MS,
+          configSignature,
+        });
       } catch (error) {
         void logger.warn("RedditWidget: failed to load posts", {
           widgetId: widget.id,
@@ -229,6 +238,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
     },
     [
       config.limit,
+      configSignature,
       config.sort,
       config.subreddits,
       config.topTimeRange,

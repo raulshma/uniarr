@@ -20,14 +20,17 @@ import {
 import { getComponentElevation } from "@/constants/elevation";
 
 const DEFAULT_FROSTED_TOKENS: FrostedEffectTokens = {
-  blurIntensity: 60,
-  blurReductionFactor: 16,
+  blurIntensity: 90,
+  blurReductionFactor: 14,
   blurTint: "dark",
-  surfaceOverlayColor: "rgba(30, 30, 33, 0.35)",
-  surfaceBackgroundColor: "rgba(17, 17, 20, 0.5)",
-  surfaceBorderColor: "rgba(255, 255, 255, 0.14)",
-  surfaceBorderWidth: 1,
-  pillBackgroundColor: "rgba(255, 255, 255, 0.12)",
+  surfaceOverlayColor: "rgba(104, 134, 198, 0.24)",
+  surfaceBackgroundColor: "rgba(26, 34, 52, 0.36)",
+  surfaceBorderColor: "rgba(255, 255, 255, 0.16)",
+  surfaceBorderWidth: StyleSheet.hairlineWidth,
+  pillBackgroundColor: "rgba(82, 108, 160, 0.28)",
+  edgeHighlightColor: "rgba(255, 255, 255, 0.55)",
+  edgeShadowColor: "rgba(12, 18, 30, 0.58)",
+  glowColor: "rgba(88, 128, 214, 0.24)",
 };
 
 // Keep Pressable interactions consistent; entrance animations apply via wrapper.
@@ -319,6 +322,9 @@ const styles = StyleSheet.create({
     borderRadius: CUSTOM_RADIUS,
     overflow: "hidden",
     position: "relative",
+  },
+  frostedEdge: {
+    borderRadius: CUSTOM_RADIUS,
   },
   inner: {
     width: "100%",

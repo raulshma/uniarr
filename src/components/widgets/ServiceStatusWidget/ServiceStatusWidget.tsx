@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import { Text, IconButton, useTheme, Badge } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -11,8 +11,9 @@ import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { borderRadius, iconSizes, touchSizes } from "@/constants/sizes";
 import { spacing as themeSpacing } from "@/theme/spacing";
-import type { Widget } from "@/services/widgets/WidgetService";
+import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 export interface ServiceStatusWidgetProps {
   widget: Widget;
@@ -35,6 +36,23 @@ interface ServiceStatus {
   };
 }
 
+type ServiceStatusCacheEntry = Omit<ServiceStatus, "lastChecked"> & {
+  lastChecked: string | Date;
+};
+
+const SERVICE_STATUS_CACHE_TTL_MS = 2 * 60 * 1000;
+
+const reviveServiceStatusEntries = (
+  entries: ServiceStatusCacheEntry[],
+): ServiceStatus[] =>
+  entries.map((entry) => ({
+    ...entry,
+    lastChecked:
+      entry.lastChecked instanceof Date
+        ? entry.lastChecked
+        : new Date(entry.lastChecked),
+  }));
+
 const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
   widget,
   onRefresh,
@@ -46,69 +64,166 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [serviceStatuses, setServiceStatuses] = useState<ServiceStatus[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const config = useMemo(() => {
+    const raw = widget.config ?? {};
+    const sourceMode = raw.sourceMode === "custom" ? "custom" : "global";
+    const legacyServiceIds = Array.isArray(raw.includeServiceIds)
+      ? raw.includeServiceIds
+      : [];
+    const configuredServiceIds = Array.isArray(raw.serviceIds)
+      ? raw.serviceIds
+      : [];
+    const serviceIds = Array.from(
+      new Set(
+        [...legacyServiceIds, ...configuredServiceIds].filter(
+          (id) => typeof id === "string" && id.length > 0,
+        ),
+      ),
+    );
+    const showOfflineOnly = raw.showOfflineOnly === true;
 
-  const loadServiceStatuses = useCallback(async () => {
-    try {
-      const connectors = ConnectorManager.getInstance().getAllConnectors();
-      const statuses: ServiceStatus[] = [];
+    return {
+      sourceMode,
+      serviceIds,
+      showOfflineOnly,
+    } as const;
+  }, [widget.config]);
 
-      for (const connector of connectors) {
-        if (!connector.config.enabled) continue;
+  const selectedServiceIds = useMemo(() => {
+    if (config.sourceMode !== "custom") {
+      return undefined;
+    }
 
-        const status = await checkServiceStatus(connector.config.id);
-        statuses.push(status);
+    return new Set(config.serviceIds);
+  }, [config.serviceIds, config.sourceMode]);
+
+  const configSignature = useMemo(
+    () =>
+      createWidgetConfigSignature({
+        sourceMode: config.sourceMode,
+        serviceIds: config.serviceIds,
+        showOfflineOnly: config.showOfflineOnly,
+      }),
+    [config],
+  );
+
+  const checkServiceStatus = useCallback(
+    async (serviceId: string): Promise<ServiceStatus> => {
+      const connector = ConnectorManager.getInstance().getConnector(serviceId);
+      if (!connector) {
+        throw new Error(`Connector not found for service ${serviceId}`);
       }
 
-      setServiceStatuses(statuses);
-    } catch (error) {
-      console.error("Failed to load service statuses:", error);
-    }
-  }, []);
+      try {
+        const startTime = Date.now();
+        await connector.getVersion();
+        const responseTime = Date.now() - startTime;
+
+        return {
+          id: serviceId,
+          name: connector.config.name,
+          type: connector.config.type,
+          status: "online",
+          lastChecked: new Date(),
+          message: `Connected (${responseTime}ms)`,
+        };
+      } catch (error) {
+        console.warn(`Connector ${serviceId} failed status check`, error);
+        return {
+          id: serviceId,
+          name: connector.config.name,
+          type: connector.config.type,
+          status: "offline",
+          lastChecked: new Date(),
+          message: "Connection failed",
+        };
+      }
+    },
+    [],
+  );
+
+  const fetchServiceStatuses = useCallback(async (): Promise<
+    ServiceStatus[]
+  > => {
+    const manager = ConnectorManager.getInstance();
+    await manager.loadSavedServices();
+    const allConnectors = manager.getAllConnectors();
+
+    const connectorsToCheck = allConnectors.filter((connector) => {
+      if (!connector.config.enabled) {
+        return false;
+      }
+
+      if (selectedServiceIds) {
+        if (selectedServiceIds.size === 0) {
+          return false;
+        }
+
+        return selectedServiceIds.has(connector.config.id);
+      }
+
+      return true;
+    });
+
+    const statuses = await Promise.all(
+      connectorsToCheck.map(async (connector) => {
+        try {
+          return await checkServiceStatus(connector.config.id);
+        } catch (error) {
+          console.warn(
+            `Failed to fetch status for ${connector.config.name}`,
+            error,
+          );
+          return null;
+        }
+      }),
+    );
+
+    const filtered = (statuses.filter(Boolean) as ServiceStatus[]).filter(
+      (status) => (config.showOfflineOnly ? status.status !== "online" : true),
+    );
+
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
+  }, [checkServiceStatus, config.showOfflineOnly, selectedServiceIds]);
+
+  const loadServiceStatuses = useCallback(
+    async (useCache = true) => {
+      try {
+        if (useCache) {
+          const cached = await widgetService.getWidgetData<
+            ServiceStatusCacheEntry[]
+          >(widget.id, configSignature);
+          if (cached) {
+            setServiceStatuses(reviveServiceStatusEntries(cached));
+          }
+        }
+
+        const freshStatuses = await fetchServiceStatuses();
+        setServiceStatuses(freshStatuses);
+        await widgetService.setWidgetData(widget.id, freshStatuses, {
+          ttlMs: SERVICE_STATUS_CACHE_TTL_MS,
+          configSignature,
+        });
+      } catch (error) {
+        console.error("Failed to load service statuses:", error);
+      }
+    },
+    [configSignature, fetchServiceStatuses, widget.id],
+  );
 
   useEffect(() => {
     loadServiceStatuses();
   }, [loadServiceStatuses]);
 
-  const checkServiceStatus = async (
-    serviceId: string,
-  ): Promise<ServiceStatus> => {
-    const connector = ConnectorManager.getInstance().getConnector(serviceId);
-    if (!connector) {
-      throw new Error(`Connector not found for service ${serviceId}`);
-    }
-
-    try {
-      // Check if connector is responsive
-      const startTime = Date.now();
-      await connector.getVersion();
-      const responseTime = Date.now() - startTime;
-
-      return {
-        id: serviceId,
-        name: connector.config.name,
-        type: connector.config.type,
-        status: "online",
-        lastChecked: new Date(),
-        message: `Connected (${responseTime}ms)`,
-      };
-    } catch {
-      return {
-        id: serviceId,
-        name: connector.config.name,
-        type: connector.config.type,
-        status: "offline",
-        lastChecked: new Date(),
-        message: "Connection failed",
-      };
-    }
-  };
-
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     onPress();
     setRefreshing(true);
-    await loadServiceStatuses();
+    await loadServiceStatuses(false);
     setRefreshing(false);
-  };
+    if (onRefresh) {
+      onRefresh();
+    }
+  }, [loadServiceStatuses, onPress, onRefresh]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -208,11 +323,25 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
             icon="refresh"
             size={16}
             onPress={() =>
-              checkServiceStatus(service.id).then((updatedStatus) => {
-                setServiceStatuses((prev) =>
-                  prev.map((s) => (s.id === service.id ? updatedStatus : s)),
-                );
-              })
+              checkServiceStatus(service.id)
+                .then((updatedStatus) => {
+                  setServiceStatuses((prev) => {
+                    const next = prev.map((s) =>
+                      s.id === service.id ? updatedStatus : s,
+                    );
+                    void widgetService.setWidgetData(widget.id, next, {
+                      ttlMs: SERVICE_STATUS_CACHE_TTL_MS,
+                      configSignature,
+                    });
+                    return next;
+                  });
+                })
+                .catch((error) => {
+                  console.error(
+                    `Failed to refresh status for ${service.name}`,
+                    error,
+                  );
+                })
             }
           />
         </View>

@@ -16,6 +16,7 @@ import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { COMPONENT_ANIMATIONS } from "@/utils/animations.utils";
 import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 type StatisticsData = {
   shows: number;
@@ -49,6 +50,40 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
   const [filterDialogVisible, setFilterDialogVisible] = useState(false);
   const [filter, setFilter] = useState<"all" | "recent" | "month">("all");
 
+  const selectionConfig = useMemo(() => {
+    const raw = widget.config ?? {};
+    const sourceMode = raw.sourceMode === "custom" ? "custom" : "global";
+    const serviceIds = Array.isArray(raw.serviceIds)
+      ? (raw.serviceIds.filter(
+          (id) => typeof id === "string" && id.length > 0,
+        ) as string[])
+      : [];
+    return {
+      sourceMode,
+      serviceIds,
+    } as const;
+  }, [widget.config]);
+
+  const selectedServiceIds = useMemo(() => {
+    if (selectionConfig.sourceMode !== "custom") {
+      return undefined;
+    }
+    if (selectionConfig.serviceIds.length === 0) {
+      return undefined;
+    }
+    return new Set(selectionConfig.serviceIds);
+  }, [selectionConfig]);
+
+  const configSignature = useMemo(
+    () =>
+      createWidgetConfigSignature({
+        filter,
+        sourceMode: selectionConfig.sourceMode,
+        serviceIds: selectionConfig.serviceIds,
+      }),
+    [filter, selectionConfig],
+  );
+
   // Load filter from widget config
   useEffect(() => {
     if (widget.config?.filter) {
@@ -56,139 +91,147 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
     }
   }, [widget.config]);
 
+  const fetchStatistics = useCallback(
+    async (filterType: "all" | "recent" | "month" = "all") => {
+      try {
+        const manager = ConnectorManager.getInstance();
+        await manager.loadSavedServices();
+        const configs = await secureStorage.getServiceConfigs();
+        const enabledConfigs = configs.filter((config) => {
+          if (!config.enabled) {
+            return false;
+          }
+          if (selectedServiceIds && selectedServiceIds.size > 0) {
+            return selectedServiceIds.has(config.id);
+          }
+          return true;
+        });
+
+        const now = new Date();
+        let cutoffDate: Date | null = null;
+        if (filterType === "recent") {
+          cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+        } else if (filterType === "month") {
+          cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+        }
+
+        let shows = 0;
+        let movies = 0;
+        let episodes = 0;
+        let watched = 0;
+
+        // Fetch statistics from Sonarr
+        const sonarrConfigs = enabledConfigs.filter(
+          (config) => config.type === "sonarr",
+        );
+        for (const config of sonarrConfigs) {
+          try {
+            const connector = manager.getConnector(config.id);
+            if (connector && connector.config.type === "sonarr") {
+              const sonarrConnector = connector as any;
+              const series = await sonarrConnector.getSeries?.();
+              if (series) {
+                let filteredSeries = series;
+                if (cutoffDate) {
+                  filteredSeries = series.filter((s: any) => {
+                    const added = new Date(s.added);
+                    return added >= cutoffDate!;
+                  });
+                }
+                shows += filteredSeries.length;
+                episodes += filteredSeries.reduce(
+                  (sum: number, s: any) => sum + (s.episodeFileCount || 0),
+                  0,
+                );
+                watched += filteredSeries.reduce(
+                  (sum: number, s: any) => sum + (s.episodeCount || 0),
+                  0,
+                );
+              }
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch from Sonarr ${config.name}:`, error);
+          }
+        }
+
+        // Fetch statistics from Radarr
+        const radarrConfigs = enabledConfigs.filter(
+          (config) => config.type === "radarr",
+        );
+        for (const config of radarrConfigs) {
+          try {
+            const connector = manager.getConnector(config.id);
+            if (connector && connector.config.type === "radarr") {
+              const radarrConnector = connector as any;
+              const moviesList = await radarrConnector.getMovies?.();
+              if (moviesList) {
+                let filteredMovies = moviesList;
+                if (cutoffDate) {
+                  filteredMovies = moviesList.filter((m: any) => {
+                    const added = new Date(m.added);
+                    return added >= cutoffDate!;
+                  });
+                }
+                movies += filteredMovies.filter((m: any) => m.hasFile).length;
+              }
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch from Radarr ${config.name}:`, error);
+          }
+        }
+
+        return {
+          shows,
+          movies,
+          episodes,
+          watched,
+        };
+      } catch (error) {
+        console.error("Failed to fetch statistics:", error);
+        return {
+          shows: 0,
+          movies: 0,
+          episodes: 0,
+          watched: 0,
+        };
+      }
+    },
+    [selectedServiceIds],
+  );
+
   const loadStatistics = useCallback(async () => {
     try {
-      // Try to get cached data first
-      const cacheKey = `${widget.id}-${filter}`;
-      const cachedData =
-        await widgetService.getWidgetData<StatisticsData>(cacheKey);
+      const cachedData = await widgetService.getWidgetData<StatisticsData>(
+        widget.id,
+        configSignature,
+      );
       if (cachedData) {
         setStatistics(cachedData);
         setLoading(false);
         setError(null);
-        // Don't return, continue to fetch fresh data in background
       } else {
-        // Only show loading if no cached data
         setLoading(true);
       }
 
-      // Fetch fresh data
       const freshData = await fetchStatistics(filter);
       setStatistics(freshData);
       setError(null);
 
-      // Cache the data for 10 minutes
-      await widgetService.setWidgetData(cacheKey, freshData, 10 * 60 * 1000);
+      await widgetService.setWidgetData(widget.id, freshData, {
+        ttlMs: 10 * 60 * 1000,
+        configSignature,
+      });
     } catch (err) {
       console.error("Failed to load statistics:", err);
       setError("Failed to load statistics");
     } finally {
       setLoading(false);
     }
-  }, [filter, widget.id]);
+  }, [configSignature, fetchStatistics, filter, widget.id]);
 
   useEffect(() => {
     loadStatistics();
   }, [filter, loadStatistics]);
-
-  const fetchStatistics = async (
-    filterType: "all" | "recent" | "month" = "all",
-  ): Promise<StatisticsData> => {
-    try {
-      const manager = ConnectorManager.getInstance();
-      await manager.loadSavedServices();
-      const configs = await secureStorage.getServiceConfigs();
-      const enabledConfigs = configs.filter((config) => config.enabled);
-
-      const now = new Date();
-      let cutoffDate: Date | null = null;
-      if (filterType === "recent") {
-        cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
-      } else if (filterType === "month") {
-        cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
-      }
-
-      let shows = 0;
-      let movies = 0;
-      let episodes = 0;
-      let watched = 0;
-
-      // Fetch statistics from Sonarr
-      const sonarrConfigs = enabledConfigs.filter(
-        (config) => config.type === "sonarr",
-      );
-      for (const config of sonarrConfigs) {
-        try {
-          const connector = manager.getConnector(config.id);
-          if (connector && connector.config.type === "sonarr") {
-            const sonarrConnector = connector as any;
-            const series = await sonarrConnector.getSeries?.();
-            if (series) {
-              let filteredSeries = series;
-              if (cutoffDate) {
-                filteredSeries = series.filter((s: any) => {
-                  const added = new Date(s.added);
-                  return added >= cutoffDate!;
-                });
-              }
-              shows += filteredSeries.length;
-              episodes += filteredSeries.reduce(
-                (sum: number, s: any) => sum + (s.episodeFileCount || 0),
-                0,
-              );
-              watched += filteredSeries.reduce(
-                (sum: number, s: any) => sum + (s.episodeCount || 0),
-                0,
-              );
-            }
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch from Sonarr ${config.name}:`, error);
-        }
-      }
-
-      // Fetch statistics from Radarr
-      const radarrConfigs = enabledConfigs.filter(
-        (config) => config.type === "radarr",
-      );
-      for (const config of radarrConfigs) {
-        try {
-          const connector = manager.getConnector(config.id);
-          if (connector && connector.config.type === "radarr") {
-            const radarrConnector = connector as any;
-            const moviesList = await radarrConnector.getMovies?.();
-            if (moviesList) {
-              let filteredMovies = moviesList;
-              if (cutoffDate) {
-                filteredMovies = moviesList.filter((m: any) => {
-                  const added = new Date(m.added);
-                  return added >= cutoffDate!;
-                });
-              }
-              movies += filteredMovies.filter((m: any) => m.hasFile).length;
-            }
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch from Radarr ${config.name}:`, error);
-        }
-      }
-
-      return {
-        shows,
-        movies,
-        episodes,
-        watched,
-      };
-    } catch (error) {
-      console.error("Failed to fetch statistics:", error);
-      return {
-        shows: 0,
-        movies: 0,
-        episodes: 0,
-        watched: 0,
-      };
-    }
-  };
 
   const handleStatCardPress = (label: string) => {
     onPress();
