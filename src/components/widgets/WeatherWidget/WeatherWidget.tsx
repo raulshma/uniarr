@@ -8,6 +8,19 @@ import React, {
 import { StyleSheet, View, Pressable } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { IconButton, Text, useTheme } from "react-native-paper";
+import {
+  BlurMask,
+  Canvas,
+  Group,
+  Paint,
+  RoundedRect,
+} from "@shopify/react-native-skia";
+import {
+  Easing,
+  runOnJS,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 import { Card } from "@/components/common/Card";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
@@ -28,6 +41,7 @@ import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { mapConditionToIcon } from "./weatherIcons";
 import { WeatherDetailsDrawerContent } from "./WeatherDetailsDrawerContent";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
+import { conditionToColor } from "@/utils/skia.utils";
 
 const CACHE_TTL_MS = 45 * 60 * 1000;
 
@@ -100,12 +114,32 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [permissionIssue, setPermissionIssue] = useState(false);
 
-  // Long press tracking
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const pressStartTimeRef = useRef<number | null>(null);
-  const LONG_PRESS_THRESHOLD = 500;
-
   const { openDrawer } = useWidgetDrawer();
+
+  const glowOpacity = useSharedValue(0);
+  const [layout, setLayout] = useState({ width: 0, height: 0 });
+  const [glowVisible, setGlowVisible] = useState(false);
+  const glowColor = useMemo(() => {
+    const conditionText = weather?.current.condition.text ?? "";
+    const derivedColor = conditionToColor(conditionText);
+    return derivedColor === "transparent" ? theme.colors.primary : derivedColor;
+  }, [theme.colors.primary, weather]);
+  const glowStrokeWidth = 4;
+  const glowBlur = 20;
+  const glowOverscan = glowBlur * 1.25;
+  const glowInset = glowStrokeWidth / 2;
+  const glowWidth = Math.max(0, layout.width - glowInset * 2);
+  const glowHeight = Math.max(0, layout.height - glowInset * 2);
+  const maxGlowRadius = Math.max(0, borderRadius.xxl - glowInset);
+  const glowRadius = Math.max(
+    0,
+    Math.min(maxGlowRadius, glowWidth / 2, glowHeight / 2),
+  );
+  const shouldRenderGlow = glowWidth > 0 && glowHeight > 0 && glowVisible;
+
+  // Manual long press tracking - will be defined after handleOpenDetails
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const LONG_PRESS_THRESHOLD = 1500;
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const units: WeatherUnits = config.units ?? "metric";
@@ -261,9 +295,15 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   }, [apiKey, loadWeather]);
 
   const handleOpenDetails = useCallback(() => {
+    console.log("[WeatherWidget] handleOpenDetails called", {
+      weather: !!weather,
+      resolvedLocations: resolvedLocations.length,
+    });
     if (!weather || resolvedLocations.length === 0) {
+      console.log("[WeatherWidget] Early return - no weather or locations");
       return;
     }
+    console.log("[WeatherWidget] Opening drawer");
     void onWidgetLongPress();
     openDrawer({
       title: `${weather.location.name}${weather.location.region ? ", " + weather.location.region : ""}`,
@@ -291,20 +331,31 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
     onEdit,
   ]);
 
+  // Now define press handlers after handleOpenDetails
   const handlePressIn = useCallback(() => {
-    pressStartTimeRef.current = Date.now();
+    console.log("[WeatherWidget] Pressable onPressIn triggered");
+    setGlowVisible(true);
+    glowOpacity.value = withTiming(1, {
+      duration: LONG_PRESS_THRESHOLD,
+      easing: Easing.out(Easing.quad),
+    });
+    // Start long press timer
     longPressTimerRef.current = setTimeout(() => {
+      console.log("[WeatherWidget] Long press detected");
       handleOpenDetails();
     }, LONG_PRESS_THRESHOLD);
-  }, [handleOpenDetails, LONG_PRESS_THRESHOLD]);
+  }, [glowOpacity, handleOpenDetails, LONG_PRESS_THRESHOLD]);
 
   const handlePressOut = useCallback(() => {
+    console.log("[WeatherWidget] Pressable onPressOut triggered");
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-    pressStartTimeRef.current = null;
-  }, []);
+    glowOpacity.value = withTiming(0, { duration: 120 }, () => {
+      runOnJS(setGlowVisible)(false);
+    });
+  }, [glowOpacity, setGlowVisible]);
 
   const handleRefresh = () => {
     onPress();
@@ -350,201 +401,245 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
 
   return (
     <>
-      <Pressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        delayLongPress={LONG_PRESS_THRESHOLD}
+      <View
+        style={{ position: "relative" }}
+        onLayout={(e) => setLayout(e.nativeEvent.layout)}
       >
-        <Card
-          contentPadding="sm"
-          style={[styles.card, getComponentElevation("widget", theme)]}
-          accessibilityHint="Long press to view detailed weather information"
+        <Pressable
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          delayLongPress={LONG_PRESS_THRESHOLD}
+          style={{ width: "100%" }}
         >
-          <View style={styles.cardContent}>
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <View style={styles.iconWrapper}>
-                  <MaterialCommunityIcons
-                    name={mapConditionToIcon(weather?.current.condition.text)}
-                    size={24}
-                    color={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.titleGroup}>
-                  <Text
-                    variant="titleMedium"
-                    style={{ color: theme.colors.onSurface }}
-                  >
-                    {widget.title}
-                  </Text>
-                  {weather?.location?.name ? (
+          <Card
+            contentPadding="sm"
+            style={[styles.card, getComponentElevation("widget", theme)]}
+            accessibilityHint="Long press to view detailed weather information"
+          >
+            <View style={styles.cardContent}>
+              <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                  <View style={styles.iconWrapper}>
+                    <MaterialCommunityIcons
+                      name={mapConditionToIcon(weather?.current.condition.text)}
+                      size={24}
+                      color={theme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.titleGroup}>
                     <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                      numberOfLines={1}
+                      variant="titleMedium"
+                      style={{ color: theme.colors.onSurface }}
                     >
-                      {weather.location.name}
+                      {widget.title}
                     </Text>
-                  ) : null}
-                </View>
-              </View>
-              <View style={styles.actions}>
-                {onEdit && (
-                  <IconButton
-                    icon="cog"
-                    size={20}
-                    onPress={() => {
-                      onPress();
-                      onEdit();
-                    }}
-                    accessibilityLabel="Edit weather widget"
-                  />
-                )}
-                <IconButton
-                  icon={refreshing ? "progress-clock" : "refresh"}
-                  size={20}
-                  onPress={handleRefresh}
-                  disabled={refreshing}
-                  accessibilityLabel="Refresh weather"
-                />
-              </View>
-            </View>
-
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <SkeletonPlaceholder
-                  height={110}
-                  borderRadius={borderRadius.lg}
-                />
-              </View>
-            ) : !weather ? (
-              <View style={styles.emptyState}>
-                <Text
-                  variant="bodyMedium"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  Weather data is unavailable right now.
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.content}>
-                <View style={styles.currentRow}>
-                  <Text
-                    variant="displaySmall"
-                    style={{ color: theme.colors.onSurface }}
-                  >
-                    {Math.round(weather.current.temperature)}°
-                  </Text>
-                  <View style={styles.currentMeta}>
-                    <Text
-                      variant="titleSmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      {weather.current.condition.text}
-                    </Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                    >
-                      Feels like {Math.round(weather.current.feelsLike)}°
-                    </Text>
-                    <View style={styles.metaRow}>
-                      <MaterialCommunityIcons
-                        name="water-percent"
-                        size={16}
-                        color={theme.colors.onSurfaceVariant}
-                      />
+                    {weather?.location?.name ? (
                       <Text
                         variant="bodySmall"
                         style={{ color: theme.colors.onSurfaceVariant }}
+                        numberOfLines={1}
                       >
-                        {weather.current.humidity}% humidity
+                        {weather.location.name}
                       </Text>
-                    </View>
-                    <View style={styles.metaRow}>
-                      <MaterialCommunityIcons
-                        name="weather-windy"
-                        size={16}
-                        color={theme.colors.onSurfaceVariant}
-                      />
-                      <Text
-                        variant="bodySmall"
-                        style={{ color: theme.colors.onSurfaceVariant }}
-                      >
-                        Wind
-                        {units === "imperial"
-                          ? ` ${Math.round(weather.current.windMph)} mph`
-                          : ` ${Math.round(weather.current.windKph)} kph`}
-                      </Text>
-                    </View>
+                    ) : null}
                   </View>
                 </View>
+                <View style={styles.actions}>
+                  {onEdit && (
+                    <IconButton
+                      icon="cog"
+                      size={20}
+                      onPress={() => {
+                        onPress();
+                        onEdit();
+                      }}
+                      accessibilityLabel="Edit weather widget"
+                    />
+                  )}
+                  <IconButton
+                    icon={refreshing ? "progress-clock" : "refresh"}
+                    size={20}
+                    onPress={handleRefresh}
+                    disabled={refreshing}
+                    accessibilityLabel="Refresh weather"
+                  />
+                </View>
+              </View>
 
-                <View style={styles.forecastRow}>
-                  {weather.forecast.map((day) => {
-                    const forecastDate = new Date(day.date);
-                    return (
-                      <View key={day.date} style={styles.forecastItem}>
-                        <Text
-                          variant="bodySmall"
-                          style={{
-                            color: theme.colors.onSurfaceVariant,
-                          }}
-                        >
-                          {forecastDate.toLocaleDateString(undefined, {
-                            weekday: "short",
-                          })}
-                        </Text>
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <SkeletonPlaceholder
+                    height={110}
+                    borderRadius={borderRadius.lg}
+                  />
+                </View>
+              ) : !weather ? (
+                <View style={styles.emptyState}>
+                  <Text
+                    variant="bodyMedium"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    Weather data is unavailable right now.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.content}>
+                  <View style={styles.currentRow}>
+                    <Text
+                      variant="displaySmall"
+                      style={{ color: theme.colors.onSurface }}
+                    >
+                      {Math.round(weather.current.temperature)}°
+                    </Text>
+                    <View style={styles.currentMeta}>
+                      <Text
+                        variant="titleSmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        {weather.current.condition.text}
+                      </Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        Feels like {Math.round(weather.current.feelsLike)}°
+                      </Text>
+                      <View style={styles.metaRow}>
                         <MaterialCommunityIcons
-                          name={mapConditionToIcon(day.condition.text)}
-                          size={20}
-                          color={theme.colors.primary}
+                          name="water-percent"
+                          size={16}
+                          color={theme.colors.onSurfaceVariant}
                         />
-                        <Text
-                          variant="titleMedium"
-                          style={{ color: theme.colors.onSurface }}
-                        >
-                          {Math.round(day.maxTemp)}° / {Math.round(day.minTemp)}
-                          °
-                        </Text>
                         <Text
                           variant="bodySmall"
                           style={{ color: theme.colors.onSurfaceVariant }}
-                          numberOfLines={2}
                         >
-                          {day.condition.text}
+                          {weather.current.humidity}% humidity
                         </Text>
                       </View>
-                    );
-                  })}
-                </View>
+                      <View style={styles.metaRow}>
+                        <MaterialCommunityIcons
+                          name="weather-windy"
+                          size={16}
+                          color={theme.colors.onSurfaceVariant}
+                        />
+                        <Text
+                          variant="bodySmall"
+                          style={{ color: theme.colors.onSurfaceVariant }}
+                        >
+                          Wind
+                          {units === "imperial"
+                            ? ` ${Math.round(weather.current.windMph)} mph`
+                            : ` ${Math.round(weather.current.windKph)} kph`}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
 
-                <View style={styles.updateRow}>
-                  <MaterialCommunityIcons
-                    name="clock-outline"
-                    size={16}
-                    color={theme.colors.onSurfaceVariant}
-                  />
-                  <Text
-                    variant="bodySmall"
-                    style={{ color: theme.colors.onSurfaceVariant }}
+                  <View style={styles.forecastRow}>
+                    {weather.forecast.map((day) => {
+                      const forecastDate = new Date(day.date);
+                      return (
+                        <View key={day.date} style={styles.forecastItem}>
+                          <Text
+                            variant="bodySmall"
+                            style={{
+                              color: theme.colors.onSurfaceVariant,
+                            }}
+                          >
+                            {forecastDate.toLocaleDateString(undefined, {
+                              weekday: "short",
+                            })}
+                          </Text>
+                          <MaterialCommunityIcons
+                            name={mapConditionToIcon(day.condition.text)}
+                            size={20}
+                            color={theme.colors.primary}
+                          />
+                          <Text
+                            variant="titleMedium"
+                            style={{ color: theme.colors.onSurface }}
+                          >
+                            {Math.round(day.maxTemp)}° /{" "}
+                            {Math.round(day.minTemp)}°
+                          </Text>
+                          <Text
+                            variant="bodySmall"
+                            style={{ color: theme.colors.onSurfaceVariant }}
+                            numberOfLines={2}
+                          >
+                            {day.condition.text}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.updateRow}>
+                    <MaterialCommunityIcons
+                      name="clock-outline"
+                      size={16}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                    <Text
+                      variant="bodySmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      Updated{" "}
+                      {new Date(weather.current.updatedAt).toLocaleTimeString()}{" "}
+                      ({unitsLabel})
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {error && (
+                <Text variant="bodySmall" style={{ color: theme.colors.error }}>
+                  {error}
+                </Text>
+              )}
+            </View>
+          </Card>
+        </Pressable>
+        {shouldRenderGlow && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: -glowOverscan,
+              left: -glowOverscan,
+              width: layout.width + glowOverscan * 2,
+              height: layout.height + glowOverscan * 2,
+            }}
+          >
+            <Canvas
+              style={{
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              <Group opacity={glowOpacity}>
+                <RoundedRect
+                  x={glowOverscan + glowInset}
+                  y={glowOverscan + glowInset}
+                  width={glowWidth}
+                  height={glowHeight}
+                  r={glowRadius}
+                >
+                  <Paint
+                    color={glowColor}
+                    style="stroke"
+                    strokeWidth={glowStrokeWidth}
+                    opacity={0.35}
                   >
-                    Updated{" "}
-                    {new Date(weather.current.updatedAt).toLocaleTimeString()} (
-                    {unitsLabel})
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {error && (
-              <Text variant="bodySmall" style={{ color: theme.colors.error }}>
-                {error}
-              </Text>
-            )}
+                    <BlurMask blur={glowBlur} style="outer" />
+                  </Paint>
+                </RoundedRect>
+              </Group>
+            </Canvas>
           </View>
-        </Card>
-      </Pressable>
+        )}
+      </View>
     </>
   );
 };

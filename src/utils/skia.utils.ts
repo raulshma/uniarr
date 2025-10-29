@@ -140,18 +140,33 @@ export const useDividerAnimation = (duration: number = 3000) => {
 };
 
 /**
- * Calculate animated number transition
- * Useful for smooth temperature/value changes
+ * Map weather condition to color for glow effects
+ * Sunny (yellow) → Rainy (blue) → Cloudy (gray) etc.
  *
- * @param fromValue - Start value
- * @param toValue - End value
- * @param progress - Animation progress (0-1)
- * @returns Interpolated value
+ * @param condition - Weather condition text
+ * @returns RGB color string
  */
-export const interpolateNumber = (
-  fromValue: number,
-  toValue: number,
-  progress: number,
-): number => {
-  return fromValue + (toValue - fromValue) * progress;
+export const conditionToColor = (condition: string): string => {
+  const text = condition.toLowerCase();
+
+  if (text.includes("clear") || text.includes("sunny")) {
+    return "rgb(255, 193, 7)"; // yellow
+  }
+  if (text.includes("rain") || text.includes("drizzle")) {
+    return "rgb(33, 150, 243)"; // blue
+  }
+  if (text.includes("cloud")) {
+    return "rgb(158, 158, 158)"; // gray
+  }
+  if (text.includes("snow") || text.includes("sleet")) {
+    return "rgb(176, 196, 222)"; // light blue
+  }
+  if (text.includes("thunder") || text.includes("storm")) {
+    return "rgb(103, 58, 183)"; // purple
+  }
+  if (text.includes("fog") || text.includes("mist") || text.includes("haze")) {
+    return "rgb(158, 158, 158)"; // gray
+  }
+
+  return "rgb(158, 158, 158)"; // default gray
 };
