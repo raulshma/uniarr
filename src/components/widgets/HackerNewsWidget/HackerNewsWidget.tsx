@@ -20,6 +20,7 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
@@ -152,7 +153,6 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
   onEdit,
   onRefresh,
 }) => {
-  const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [stories, setStories] = useState<HackerNewsItem[]>([]);
@@ -288,29 +288,12 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
           },
         ])}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-            {widget.title}
-          </Text>
-          <View style={styles.actions}>
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                onPress={() => {
-                  onPress();
-                  onEdit();
-                }}
-              />
-            )}
-            <IconButton
-              icon={refreshing ? "progress-clock" : "refresh"}
-              size={20}
-              onPress={handleRefresh}
-              disabled={refreshing}
-            />
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -367,15 +350,6 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
 const styles = StyleSheet.create({
   card: {
     overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   loadingContainer: {
     gap: 12,

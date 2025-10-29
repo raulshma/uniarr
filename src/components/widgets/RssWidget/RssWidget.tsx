@@ -23,6 +23,7 @@ import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
+import WidgetHeader from "../common/WidgetHeader";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -292,29 +293,12 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
           },
         ])}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-            {widget.title}
-          </Text>
-          <View style={styles.actions}>
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                onPress={() => {
-                  onPress();
-                  onEdit();
-                }}
-              />
-            )}
-            <IconButton
-              icon={isRefreshing ? "progress-clock" : "refresh"}
-              size={20}
-              onPress={handleRefresh}
-              disabled={isRefreshing}
-            />
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={isRefreshing}
+        />
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -370,15 +354,6 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
 const styles = StyleSheet.create({
   card: {
     overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   loadingContainer: {
     gap: 12,

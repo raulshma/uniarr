@@ -26,6 +26,7 @@ import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
+import WidgetHeader from "../common/WidgetHeader";
 
 const CACHE_TTL_MS = 20 * 60 * 1000;
 
@@ -329,29 +330,12 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
           },
         ])}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-            {widget.title}
-          </Text>
-          <View style={styles.actions}>
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                onPress={() => {
-                  onPress();
-                  onEdit();
-                }}
-              />
-            )}
-            <IconButton
-              icon={refreshing ? "progress-clock" : "refresh"}
-              size={20}
-              onPress={handleRefresh}
-              disabled={refreshing}
-            />
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
 
         {loading ? (
           <View style={styles.loadingContainer}>

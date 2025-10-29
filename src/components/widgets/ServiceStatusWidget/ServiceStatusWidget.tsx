@@ -7,6 +7,7 @@ import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { borderRadius, iconSizes, touchSizes } from "@/constants/sizes";
 import { spacing as themeSpacing } from "@/theme/spacing";
@@ -221,17 +222,12 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
 
   return (
     <Card style={[styles.container, { padding: spacing.medium }]}>
-      <View style={styles.header}>
-        <Text variant="titleLarge">{widget.title}</Text>
-        <View style={styles.headerActions}>
-          <IconButton
-            icon="refresh"
-            onPress={handleRefresh}
-            loading={refreshing}
-          />
-          {onEdit && <IconButton icon="cog" onPress={onEdit} />}
-        </View>
-      </View>
+      <WidgetHeader
+        title={widget.title}
+        onEdit={onEdit}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -265,15 +261,6 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: themeSpacing.md,
-  },
-  headerActions: {
-    flexDirection: "row",
   },
   scrollView: {
     flex: 1,

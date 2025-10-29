@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { IconButton, Text, useTheme } from "react-native-paper";
+import { Text, useTheme } from "react-native-paper";
 
 import { Card } from "@/components/common/Card";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
 import type { AppTheme } from "@/constants/theme";
@@ -348,51 +349,12 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
       accessibilityHint="Long press to view detailed weather information"
     >
       <View style={styles.cardContent}>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={styles.iconWrapper}>
-              <MaterialCommunityIcons
-                name={mapConditionToIcon(weather?.current.condition.text)}
-                size={24}
-                color={theme.colors.primary}
-              />
-            </View>
-            <View style={styles.titleGroup}>
-              <Text
-                variant="titleMedium"
-                style={{ color: theme.colors.onSurface }}
-              >
-                {widget.title}
-              </Text>
-              {weather?.location?.name ? (
-                <Text
-                  variant="bodySmall"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                  numberOfLines={1}
-                >
-                  {weather.location.name}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.actions}>
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                onPress={onEdit}
-                accessibilityLabel="Edit weather widget"
-              />
-            )}
-            <IconButton
-              icon={refreshing ? "progress-clock" : "refresh"}
-              size={20}
-              onPress={handleRefresh}
-              disabled={refreshing}
-              accessibilityLabel="Refresh weather"
-            />
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -409,6 +371,26 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
           </View>
         ) : (
           <View style={styles.content}>
+            {weather?.location?.name ? (
+              <View style={styles.locationInfo}>
+                <View style={styles.iconWrapper}>
+                  <MaterialCommunityIcons
+                    name={mapConditionToIcon(weather?.current.condition.text)}
+                    size={24}
+                    color={theme.colors.primary}
+                  />
+                </View>
+                <View>
+                  <Text
+                    variant="bodySmall"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                    numberOfLines={1}
+                  >
+                    {weather.location.name}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             <View style={styles.currentRow}>
               <Text
                 variant="displaySmall"
@@ -552,6 +534,12 @@ const createStyles = (theme: AppTheme) =>
     titleGroup: {
       flex: 1,
       gap: theme.custom.spacing.xs,
+    },
+    locationInfo: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.custom.spacing.md,
+      marginBottom: theme.custom.spacing.md,
     },
     iconWrapper: {
       width: 48,

@@ -19,6 +19,7 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
 
@@ -275,29 +276,12 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
         },
       ])}
     >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-          {widget.title}
-        </Text>
-        <View style={styles.actions}>
-          {onEdit && (
-            <IconButton
-              icon="cog"
-              size={20}
-              onPress={() => {
-                onPress();
-                onEdit();
-              }}
-            />
-          )}
-          <IconButton
-            icon={refreshing ? "progress-clock" : "refresh"}
-            size={20}
-            onPress={handleRefresh}
-            disabled={refreshing}
-          />
-        </View>
-      </View>
+      <WidgetHeader
+        title={widget.title}
+        onEdit={onEdit}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -376,15 +360,6 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
 const styles = StyleSheet.create({
   card: {
     overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   loadingContainer: {
     gap: 12,

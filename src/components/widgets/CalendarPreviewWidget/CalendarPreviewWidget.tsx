@@ -6,13 +6,14 @@ import {
   FlatList,
   ImageBackground,
 } from "react-native";
-import { Text, IconButton, useTheme } from "react-native-paper";
+import { Text, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { createCalendarNavigation } from "@/utils/navigation.utils";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -248,22 +249,6 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
         container: {
           flex: 1,
         },
-        header: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: spacing.lg,
-        },
-        headerTitle: {
-          fontSize: 20,
-          fontWeight: "700",
-          color: theme.colors.onBackground,
-          letterSpacing: -0.5,
-        },
-        actions: {
-          flexDirection: "row",
-          gap: spacing.xs,
-        },
         content: {
           flex: 1,
         },
@@ -400,25 +385,11 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
         style={styles.widgetCard}
       >
         <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Upcoming Releases</Text>
-            <View style={styles.actions}>
-              <IconButton
-                icon="refresh"
-                size={20}
-                iconColor={theme.colors.primary}
-                onPress={handleRefresh}
-              />
-              {onEdit && (
-                <IconButton
-                  icon="cog"
-                  size={20}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  onPress={onEdit}
-                />
-              )}
-            </View>
-          </View>
+          <WidgetHeader
+            title={widget.title}
+            onRefresh={handleRefresh}
+            onEdit={onEdit}
+          />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       </Card>
@@ -436,9 +407,11 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
           entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
           exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Upcoming Releases</Text>
-          </View>
+          <WidgetHeader
+            title={widget.title}
+            onRefresh={handleRefresh}
+            onEdit={onEdit}
+          />
           <View style={styles.loadingSkeleton}>
             {Array.from({ length: 4 }).map((_, index) => (
               <View
@@ -480,25 +453,11 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
         style={styles.widgetCard}
       >
         <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Upcoming Releases</Text>
-            <View style={styles.actions}>
-              <IconButton
-                icon="refresh"
-                size={20}
-                iconColor={theme.colors.primary}
-                onPress={handleRefresh}
-              />
-              {onEdit && (
-                <IconButton
-                  icon="cog"
-                  size={20}
-                  iconColor={theme.colors.onSurfaceVariant}
-                  onPress={onEdit}
-                />
-              )}
-            </View>
-          </View>
+          <WidgetHeader
+            title={widget.title}
+            onRefresh={handleRefresh}
+            onEdit={onEdit}
+          />
           <View style={styles.emptyState}>
             <MaterialCommunityIcons
               name="calendar-outline"
@@ -519,25 +478,11 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
       style={styles.widgetCard}
     >
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Upcoming Releases</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onRefresh={handleRefresh}
+          onEdit={onEdit}
+        />
 
         <View style={styles.content}>
           <FlatList

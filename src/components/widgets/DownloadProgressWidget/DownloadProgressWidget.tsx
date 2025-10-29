@@ -1,18 +1,13 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
-import {
-  Text,
-  IconButton,
-  useTheme,
-  ProgressBar,
-  Badge,
-} from "react-native-paper";
+import { Text, useTheme, ProgressBar, Badge } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import type { Widget } from "@/services/widgets/WidgetService";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
@@ -245,17 +240,12 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
       style={[styles.container, { padding: spacing.medium }]}
       variant={frostedEnabled ? "frosted" : "custom"}
     >
-      <View style={styles.header}>
-        <Text variant="titleLarge">{widget.title}</Text>
-        <View style={styles.headerActions}>
-          <IconButton
-            icon="refresh"
-            onPress={handleRefresh}
-            loading={refreshing}
-          />
-          {onEdit && <IconButton icon="cog" onPress={onEdit} />}
-        </View>
-      </View>
+      <WidgetHeader
+        title={widget.title}
+        onRefresh={handleRefresh}
+        onEdit={onEdit}
+        refreshing={refreshing}
+      />
 
       {activeDownloads.length > 0 && (
         <View style={styles.section}>

@@ -54,7 +54,7 @@ const ShortcutItem: React.FC<ShortcutItemProps> = ({
       style={[
         styles.container,
         sizeStyles.container,
-        { backgroundColor: theme.colors.surfaceVariant },
+        { backgroundColor: theme.colors.surfaceVariant, width: "47%" },
         disabled && styles.disabled,
       ]}
       onPress={handlePress}
@@ -94,28 +94,20 @@ const useThemeAwareStyles = (theme: AppTheme) =>
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
       minHeight: touchSizes.lg, // 48 - Shorter for horizontal pill
-      minWidth: touchSizes.xl + 80, // Wider for horizontal pill
-      maxWidth: iconSizes.xxxl + 120, // 184 = 64 + 120 - Much wider for pill shape
       backgroundColor: "rgba(255, 255, 255, 0.05)", // Subtle frosted effect
     },
     smallContainer: {
       minHeight: touchSizes.md, // 44 - Short pill
-      minWidth: touchSizes.lg + 60, // Wider pill
-      maxWidth: touchSizes.xl + 80, // 136 - Wide pill
       paddingVertical: spacing.xs,
       paddingHorizontal: spacing.sm,
     },
     mediumContainer: {
       minHeight: touchSizes.lg, // 48 - Short pill
-      minWidth: touchSizes.xl + 100, // Wider pill
-      maxWidth: iconSizes.xxxl + 120, // 184 = 64 + 120 - Wide pill
       paddingVertical: spacing.xs,
       paddingHorizontal: spacing.md,
     },
     largeContainer: {
       minHeight: touchSizes.lg + 8, // 56 - Short pill
-      minWidth: touchSizes.xl + 96, // Wider pill
-      maxWidth: iconSizes.xxxl + 140, // 204 = 64 + 140 - Wide pill
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.lg,
     },

@@ -1,18 +1,12 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { StyleSheet, View, TouchableOpacity, Dimensions } from "react-native";
 import Animated from "react-native-reanimated";
-import {
-  Text,
-  IconButton,
-  useTheme,
-  Button,
-  Portal,
-  Dialog,
-} from "react-native-paper";
+import { Text, useTheme, Button, Portal, Dialog } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
@@ -245,22 +239,11 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
         container: {
           flex: 1,
         },
-        header: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: theme.custom.spacing.lg,
-        },
         title: {
           fontSize: theme.custom.typography.titleLarge.fontSize,
           fontWeight: "700",
           color: theme.colors.onBackground,
           letterSpacing: -0.5,
-        },
-        actions: {
-          flexDirection: "row",
-          gap: theme.custom.spacing.xs,
-          alignItems: "center",
         },
         filterButton: {
           fontSize: theme.custom.typography.labelMedium.fontSize,
@@ -356,17 +339,11 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
     return (
       <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
         <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Statistics</Text>
-            <View style={styles.actions}>
-              <IconButton
-                icon="refresh"
-                size={20}
-                iconColor={theme.colors.primary}
-                onPress={handleRefresh}
-              />
-            </View>
-          </View>
+          <WidgetHeader
+            title={widget.title}
+            onEdit={onEdit}
+            onRefresh={handleRefresh}
+          />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       </Card>
@@ -377,9 +354,11 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
     return (
       <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
         <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Statistics</Text>
-          </View>
+          <WidgetHeader
+            title={widget.title}
+            onEdit={onEdit}
+            onRefresh={handleRefresh}
+          />
           <View style={styles.loadingSkeleton}>
             {[1, 2, 3, 4].map((key) => (
               <View key={key} style={styles.statSkeleton}>
@@ -410,28 +389,16 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
   return (
     <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Statistics</Text>
-          <View style={styles.actions}>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          additionalActions={
             <TouchableOpacity onPress={() => setFilterDialogVisible(true)}>
               <Text style={styles.filterButton}>{getFilterLabel()}</Text>
             </TouchableOpacity>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
-          </View>
-        </View>
+          }
+        />
 
         <Animated.View
           style={styles.content}

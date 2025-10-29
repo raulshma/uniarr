@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { StyleSheet, View, ScrollView, RefreshControl } from "react-native";
-import { Text, IconButton, useTheme } from "react-native-paper";
+import { Text, useTheme } from "react-native-paper";
 import { useRouter } from "expo-router";
 import Animated from "react-native-reanimated";
 
@@ -8,6 +8,7 @@ import { MediaPoster } from "@/components/media/MediaPoster";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { useHaptics } from "@/hooks/useHaptics";
 import {
   COMPONENT_ANIMATIONS,
@@ -428,38 +429,29 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       StyleSheet.create({
         container: {
           borderRadius: borderRadius.xl,
-          padding: spacing.md,
-        },
-        header: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: spacing.md,
-        },
-        title: {
-          fontWeight: "600",
+          padding: spacing.sm,
         },
         scrollView: {
           flex: 1,
         },
         scrollContent: {
-          paddingBottom: spacing.lg,
+          paddingBottom: spacing.md,
         },
         activityCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: theme.custom.sizes.borderRadius.xl,
-          padding: spacing.md,
+          borderRadius: theme.custom.sizes.borderRadius.md,
+          padding: spacing.xs,
           flexDirection: "row",
-          marginBottom: spacing.sm,
+          marginBottom: spacing.xs,
           ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
         },
         activityImage: {
-          width: theme.custom.sizes.additionalCardSizes.portrait.width, // 60 * 1.5 = 90 (50% bigger)
-          height: theme.custom.sizes.additionalCardSizes.portrait.height, // 80 * 1.5 = 120 (50% bigger)
-          borderRadius: theme.custom.sizes.borderRadius.md,
-          marginRight: spacing.md,
+          width: 50,
+          height: 60,
+          borderRadius: theme.custom.sizes.borderRadius.sm,
+          marginRight: spacing.sm,
           backgroundColor: theme.colors.surfaceVariant,
         },
         activityContent: {
@@ -467,41 +459,41 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           justifyContent: "center",
         },
         activityTitle: {
-          fontSize: 16,
+          fontSize: 13,
           fontWeight: "600",
           color: theme.colors.onSurface,
-          marginBottom: spacing.xs,
+          marginBottom: spacing.xxs,
         },
         activityMeta: {
-          fontSize: 14,
+          fontSize: 12,
           color: theme.colors.onSurfaceVariant,
-          marginBottom: spacing.xs,
+          marginBottom: spacing.xxs,
         },
         activityDate: {
-          fontSize: 12,
+          fontSize: 11,
           color: theme.colors.outline,
         },
         emptyState: {
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          paddingVertical: spacing.xl,
+          paddingVertical: spacing.lg,
         },
         emptyText: {
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
         },
         loadingSkeleton: {
-          gap: spacing.md,
+          gap: spacing.xs,
         },
         skeletonCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: theme.custom.sizes.borderRadius.xl,
-          padding: spacing.md,
+          borderRadius: theme.custom.sizes.borderRadius.md,
+          padding: spacing.xs,
           flexDirection: "row",
-          marginBottom: spacing.sm,
+          marginBottom: spacing.xs,
           ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
@@ -516,15 +508,12 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         variant={frostedEnabled ? "frosted" : "custom"}
         style={[styles.container, containerElevationStyle]}
       >
-        <View style={styles.header}>
-          <Text variant="titleLarge" style={styles.title}>
-            {widget.title}
-          </Text>
-          <View style={{ flexDirection: "row" }}>
-            <IconButton icon="refresh" onPress={handleRefresh} />
-            {onEdit && <IconButton icon="cog" onPress={onEdit} />}
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
 
         <ScrollView
           style={styles.scrollView}
@@ -555,11 +544,12 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
         exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
       >
-        <View style={styles.header}>
-          <Text variant="titleLarge" style={styles.title}>
-            {widget.title}
-          </Text>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
         <View style={styles.loadingSkeleton}>
           {Array.from({ length: 3 }).map((_, index) => (
             <View key={index} style={styles.skeletonCard}>
@@ -592,15 +582,12 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         variant={frostedEnabled ? "frosted" : "custom"}
         style={[styles.container, containerElevationStyle]}
       >
-        <View style={styles.header}>
-          <Text variant="titleLarge" style={styles.title}>
-            {widget.title}
-          </Text>
-          <View style={{ flexDirection: "row" }}>
-            <IconButton icon="refresh" onPress={handleRefresh} />
-            {onEdit && <IconButton icon="cog" onPress={onEdit} />}
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
 
         <ScrollView
           style={styles.scrollView}
@@ -631,15 +618,12 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       variant={frostedEnabled ? "frosted" : "custom"}
       style={[styles.container, containerElevationStyle]}
     >
-      <View style={styles.header}>
-        <Text variant="titleLarge" style={styles.title}>
-          {widget.title}
-        </Text>
-        <View style={{ flexDirection: "row" }}>
-          <IconButton icon="refresh" onPress={handleRefresh} />
-          {onEdit && <IconButton icon="cog" onPress={onEdit} />}
-        </View>
-      </View>
+      <WidgetHeader
+        title={widget.title}
+        onEdit={onEdit}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -664,8 +648,8 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
                 {item.image ? (
                   <MediaPoster
                     uri={item.image}
-                    size={90}
-                    borderRadius={8}
+                    size={50}
+                    borderRadius={6}
                     style={styles.activityImage}
                   />
                 ) : (

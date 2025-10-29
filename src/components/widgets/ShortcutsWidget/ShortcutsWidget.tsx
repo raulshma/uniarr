@@ -18,6 +18,7 @@ import {
   Animated,
 } from "@/utils/animations.utils";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import ShortcutItem from "./ShortcutItem";
 import type { Shortcut } from "./ShortcutsWidget.types";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -144,19 +145,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
           entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
           exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
         >
-          <View style={styles.header}>
-            <Text variant="titleMedium" style={styles.title}>
-              {widget.title}
-            </Text>
-            {onEdit && (
-              <MaterialCommunityIcons
-                name="cog"
-                size={theme.custom.sizes.iconSizes.lg}
-                color={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
-          </View>
+          <WidgetHeader title={widget.title} onEdit={onEdit} />
           <View style={styles.loadingSkeleton}>
             {Array.from({ length: 4 }).map((_, index) => (
               <View key={index} style={styles.skeletonShortcut}>
@@ -181,19 +170,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
     return (
       <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
         <View style={[styles.container, gridLayout.container]}>
-          <View style={styles.header}>
-            <Text variant="titleMedium" style={styles.title}>
-              {widget.title}
-            </Text>
-            {onEdit && (
-              <MaterialCommunityIcons
-                name="cog"
-                size={theme.custom.sizes.iconSizes.lg}
-                color={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
-          </View>
+          <WidgetHeader title={widget.title} onEdit={onEdit} />
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons
               name="gesture-tap"
@@ -212,23 +189,12 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
   return (
     <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
       <View style={[styles.container, gridLayout.container]}>
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.title}>
-            {widget.title}
-          </Text>
-          {onEdit && (
-            <MaterialCommunityIcons
-              name="cog"
-              size={theme.custom.sizes.iconSizes.lg}
-              color={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
-            />
-          )}
-        </View>
+        <WidgetHeader title={widget.title} onEdit={onEdit} />
 
         <ScrollView
           style={gridLayout.scrollContainer}
           contentContainerStyle={styles.scrollContent}
+          scrollEnabled={false}
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
         >
@@ -256,6 +222,7 @@ const useStyles = (theme: AppTheme) =>
     container: {
       borderRadius: borderRadius.xl,
       padding: spacing.md,
+      width: "100%",
     },
     smallContainer: {
       minHeight: 140,
@@ -266,33 +233,30 @@ const useStyles = (theme: AppTheme) =>
     largeContainer: {
       minHeight: 220,
     },
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: spacing.md,
-    },
-    title: {
-      fontWeight: "600",
-    },
     smallScrollContainer: {
       maxHeight: 160,
+      width: "100%",
     },
     mediumScrollContainer: {
       maxHeight: 220,
+      width: "100%",
     },
     largeScrollContainer: {
       maxHeight: 280,
+      width: "100%",
     },
     scrollContent: {
       paddingBottom: spacing.md,
+      width: "100%",
     },
     gridContainer: {
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "space-around",
+      justifyContent: "space-between",
       alignItems: "flex-start",
       gap: spacing.md,
+      width: "100%",
+      flex: 1,
     },
     loadingSkeleton: {
       flex: 1,

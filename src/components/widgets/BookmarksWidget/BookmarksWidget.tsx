@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import Animated from "react-native-reanimated";
-import { IconButton, Text, useTheme } from "react-native-paper";
+import { Text, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
@@ -19,6 +19,7 @@ import {
   ANIMATION_DURATIONS,
 } from "@/utils/animations.utils";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import BookmarkItem from "./BookmarkItem";
 import type {
   Bookmark,
@@ -185,17 +186,10 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
         entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
         exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.title}>
-            {widget.title}
-          </Text>
-          <IconButton
-            icon={isEditMode ? "pencil" : "cog"}
-            size={20}
-            onPress={isEditMode ? onEdit : handleOpenConfig}
-            iconColor={theme.colors.onSurfaceVariant}
-          />
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={isEditMode ? onEdit : handleOpenConfig}
+        />
         <View style={styles.loadingSkeleton}>
           {Array.from({ length: 4 }).map((_, index) => (
             <View key={index} style={styles.skeletonBookmark}>
@@ -231,17 +225,10 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
           containerElevationStyle,
         ]}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.title}>
-            {widget.title}
-          </Text>
-          <IconButton
-            icon={isEditMode ? "pencil" : "cog"}
-            size={20}
-            onPress={isEditMode ? onEdit : handleOpenConfig}
-            iconColor={theme.colors.onSurfaceVariant}
-          />
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={isEditMode ? onEdit : handleOpenConfig}
+        />
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons
             name="link-box"
@@ -265,17 +252,12 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
         containerElevationStyle,
       ]}
     >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={styles.title}>
-          {widget.title}
-        </Text>
-        <IconButton
-          icon={isEditMode ? "pencil" : "cog"}
-          size={20}
-          onPress={isEditMode ? onEdit : handleOpenConfig}
-          iconColor={theme.colors.onSurfaceVariant}
-        />
-      </View>
+      <WidgetHeader
+        title={widget.title}
+        onEdit={isEditMode ? onEdit : handleOpenConfig}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
       <ScrollView
         style={gridLayout.scrollContainer}
@@ -329,15 +311,6 @@ const styles = StyleSheet.create({
   },
   largeContainer: {
     minHeight: 220,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontWeight: "600",
   },
   smallScrollContainer: {
     maxHeight: 120,
