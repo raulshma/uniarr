@@ -1,13 +1,14 @@
 import React, { forwardRef, useMemo, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, View, Pressable } from "react-native";
+import { BlurView } from "expo-blur";
 import {
   Card as PaperCard,
   type CardProps as PaperCardProps,
   useTheme,
 } from "react-native-paper";
 
-import type { AppTheme } from "@/constants/theme";
+import type { AppTheme, FrostedEffectTokens } from "@/constants/theme";
 import { borderRadius } from "@/constants/sizes";
 import {
   ANIMATION_DURATIONS,
@@ -16,6 +17,18 @@ import {
   FadeOut,
   PERFORMANCE_OPTIMIZATIONS,
 } from "@/utils/animations.utils";
+import { getComponentElevation } from "@/constants/elevation";
+
+const DEFAULT_FROSTED_TOKENS: FrostedEffectTokens = {
+  blurIntensity: 60,
+  blurReductionFactor: 16,
+  blurTint: "dark",
+  surfaceOverlayColor: "rgba(30, 30, 33, 0.35)",
+  surfaceBackgroundColor: "rgba(17, 17, 20, 0.5)",
+  surfaceBorderColor: "rgba(255, 255, 255, 0.14)",
+  surfaceBorderWidth: 1,
+  pillBackgroundColor: "rgba(255, 255, 255, 0.12)",
+};
 
 // Keep Pressable interactions consistent; entrance animations apply via wrapper.
 const AnimatedPressable = Pressable;
@@ -83,6 +96,8 @@ const Card = forwardRef<PaperCardRef, CardProps>(
     ref,
   ) => {
     const theme = useTheme<AppTheme>();
+    const frostedTokens =
+      theme.custom.effects?.frosted ?? DEFAULT_FROSTED_TOKENS;
     const [isFocused, setIsFocused] = useState(false);
 
     const paddingValue = useMemo(() => {
@@ -150,6 +165,21 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       ? exitingAnimation
       : FadeOut.duration(ANIMATION_DURATIONS.QUICK);
 
+    const frostedElevationStyle = useMemo(
+      () => getComponentElevation("widgetCard", theme),
+      [theme],
+    );
+
+    const blurViewProps = useMemo(
+      () => ({
+        intensity: frostedTokens.blurIntensity,
+        tint: frostedTokens.blurTint,
+        blurReductionFactor: frostedTokens.blurReductionFactor,
+        reducedTransparencyFallbackColor: frostedTokens.surfaceBackgroundColor,
+      }),
+      [frostedTokens],
+    );
+
     const content =
       variant === "custom" ? (
         <AnimatedPressable
@@ -185,6 +215,10 @@ const Card = forwardRef<PaperCardRef, CardProps>(
         <AnimatedPressable
           style={[
             styles.frostedBase,
+            frostedElevationStyle,
+            {
+              backgroundColor: frostedTokens.surfaceBackgroundColor,
+            },
             style,
             focusable && isFocused ? customFocusRingStyle : undefined,
           ]}
@@ -204,6 +238,18 @@ const Card = forwardRef<PaperCardRef, CardProps>(
           pointerEvents="box-none"
           {...rest}
         >
+          <BlurView
+            {...blurViewProps}
+            pointerEvents="none"
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: frostedTokens.surfaceOverlayColor },
+            ]}
+          />
           {React.Children.count(children) > 0 ? (
             <View style={innerStyle}>{children}</View>
           ) : null}
@@ -272,15 +318,7 @@ const styles = StyleSheet.create({
   frostedBase: {
     borderRadius: CUSTOM_RADIUS,
     overflow: "hidden",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    shadowColor: "rgba(0, 0, 0, 0.1)",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    position: "relative",
   },
   inner: {
     width: "100%",

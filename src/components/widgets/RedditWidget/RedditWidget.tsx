@@ -158,7 +158,6 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
   onEdit,
   onRefresh,
 }) => {
-  const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [posts, setPosts] = useState<RedditPostItem[]>([]);
@@ -297,11 +296,12 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
 
   if (!hasSources) {
     return (
-      <View
+      <Card
+        contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.elevation.level1,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -313,7 +313,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
           actionLabel="Choose subreddits"
           onAction={onEdit}
         />
-      </View>
+      </Card>
     );
   }
 

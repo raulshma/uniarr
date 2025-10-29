@@ -221,7 +221,10 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
   );
 
   return (
-    <Card style={[styles.container, { padding: spacing.medium }]}>
+    <Card
+      style={[styles.container, { padding: spacing.medium }]}
+      variant={frostedEnabled ? "frosted" : "custom"}
+    >
       <WidgetHeader
         title={widget.title}
         onEdit={onEdit}

@@ -138,7 +138,6 @@ const RssItemListItem: React.FC<RssItemListItemProps> = ({
 };
 
 const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
-  const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [items, setItems] = useState<RssFeedItem[]>([]);
@@ -260,11 +259,12 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
 
   if (!feedsConfigured) {
     return (
-      <View
+      <Card
+        contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.elevation.level1,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -276,7 +276,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
           actionLabel="Choose feeds"
           onAction={onEdit}
         />
-      </View>
+      </Card>
     );
   }
 

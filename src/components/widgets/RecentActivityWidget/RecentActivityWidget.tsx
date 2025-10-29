@@ -535,44 +535,50 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
   if (loading) {
     return (
-      <Animated.View
-        style={[
-          styles.container,
-          { backgroundColor: theme.colors.surface },
-          containerElevationStyle,
-        ]}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.container, containerElevationStyle]}
+        contentPadding={0}
       >
-        <WidgetHeader
-          title={widget.title}
-          onEdit={onEdit}
-          onRefresh={handleRefresh}
-          refreshing={refreshing}
-        />
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <View key={index} style={styles.skeletonCard}>
-              <View style={styles.activityImage} />
-              <View style={styles.activityContent}>
-                <SkeletonPlaceholder
-                  width="80%"
-                  height={16}
-                  borderRadius={4}
-                  style={{ marginBottom: spacing.xs }}
-                />
-                <SkeletonPlaceholder
-                  width="60%"
-                  height={14}
-                  borderRadius={4}
-                  style={{ marginBottom: spacing.xs }}
-                />
-                <SkeletonPlaceholder width="40%" height={12} borderRadius={4} />
+        <Animated.View
+          style={styles.container}
+          entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+          exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+        >
+          <WidgetHeader
+            title={widget.title}
+            onEdit={onEdit}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+          />
+          <View style={styles.loadingSkeleton}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <View key={index} style={styles.skeletonCard}>
+                <View style={styles.activityImage} />
+                <View style={styles.activityContent}>
+                  <SkeletonPlaceholder
+                    width="80%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="60%"
+                    height={14}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="40%"
+                    height={12}
+                    borderRadius={4}
+                  />
+                </View>
               </View>
-            </View>
-          ))}
-        </View>
-      </Animated.View>
+            ))}
+          </View>
+        </Animated.View>
+      </Card>
     );
   }
 

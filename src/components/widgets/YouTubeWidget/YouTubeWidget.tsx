@@ -222,11 +222,12 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
 
   if (!apiKey) {
     return (
-      <View
+      <Card
+        contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.elevation.level1,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -238,17 +239,18 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           actionLabel="Add API key"
           onAction={onEdit}
         />
-      </View>
+      </Card>
     );
   }
 
   if (!hasChannels) {
     return (
-      <View
+      <Card
+        contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.elevation.level1,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -260,7 +262,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           actionLabel="Select channels"
           onAction={onEdit}
         />
-      </View>
+      </Card>
     );
   }
 

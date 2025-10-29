@@ -26,6 +26,8 @@ import type {
   BookmarksWidgetProps,
   BookmarkHealth,
 } from "./BookmarksWidget.types";
+import { useSettingsStore } from "@/store/settingsStore";
+import { Card } from "@/components/common";
 
 const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
   widget,
@@ -35,6 +37,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 }) => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const { onPress: hapticPress } = useHaptics();
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -176,40 +179,41 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 
   if (loading) {
     return (
-      <Animated.View
-        style={[
-          styles.container,
-          gridLayout.container,
-          { backgroundColor: theme.colors.surface },
-          containerElevationStyle,
-        ]}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.card, containerElevationStyle]}
+        contentPadding={0}
       >
-        <WidgetHeader
-          title={widget.title}
-          onEdit={isEditMode ? onEdit : handleOpenConfig}
-        />
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <View key={index} style={styles.skeletonBookmark}>
-              <View style={styles.skeletonIcon} />
-              <SkeletonPlaceholder
-                width="80%"
-                height={12}
-                borderRadius={4}
-                style={{ marginTop: spacing.xs }}
-              />
-              <SkeletonPlaceholder
-                width="60%"
-                height={10}
-                borderRadius={4}
-                style={{ marginTop: spacing.xs }}
-              />
-            </View>
-          ))}
-        </View>
-      </Animated.View>
+        <Animated.View
+          style={[styles.container, gridLayout.container]}
+          entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+          exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+        >
+          <WidgetHeader
+            title={widget.title}
+            onEdit={isEditMode ? onEdit : handleOpenConfig}
+          />
+          <View style={styles.loadingSkeleton}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View key={index} style={styles.skeletonBookmark}>
+                <View style={styles.skeletonIcon} />
+                <SkeletonPlaceholder
+                  width="80%"
+                  height={12}
+                  borderRadius={4}
+                  style={{ marginTop: spacing.xs }}
+                />
+                <SkeletonPlaceholder
+                  width="60%"
+                  height={10}
+                  borderRadius={4}
+                  style={{ marginTop: spacing.xs }}
+                />
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+      </Card>
     );
   }
 
@@ -217,90 +221,90 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 
   if (enabledBookmarks.length === 0) {
     return (
-      <View
-        style={[
-          styles.container,
-          gridLayout.container,
-          { backgroundColor: theme.colors.surface },
-          containerElevationStyle,
-        ]}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.card, containerElevationStyle]}
+        contentPadding={0}
       >
-        <WidgetHeader
-          title={widget.title}
-          onEdit={isEditMode ? onEdit : handleOpenConfig}
-        />
-        <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons
-            name="link-box"
-            size={theme.custom.sizes.iconSizes.xxl}
-            color={theme.colors.onSurfaceVariant}
+        <View style={[styles.container, gridLayout.container]}>
+          <WidgetHeader
+            title={widget.title}
+            onEdit={isEditMode ? onEdit : handleOpenConfig}
           />
-          <Text variant="bodySmall" style={styles.emptyText}>
-            No bookmarks configured
-          </Text>
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons
+              name="link-box"
+              size={theme.custom.sizes.iconSizes.xxl}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text variant="bodySmall" style={styles.emptyText}>
+              No bookmarks configured
+            </Text>
+          </View>
         </View>
-      </View>
+      </Card>
     );
   }
 
   return (
-    <View
-      style={[
-        styles.container,
-        gridLayout.container,
-        { backgroundColor: theme.colors.surface },
-        containerElevationStyle,
-      ]}
+    <Card
+      variant={frostedEnabled ? "frosted" : "custom"}
+      style={[styles.card, containerElevationStyle]}
+      contentPadding={0}
     >
-      <WidgetHeader
-        title={widget.title}
-        onEdit={isEditMode ? onEdit : handleOpenConfig}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-      />
+      <View style={[styles.container, gridLayout.container]}>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={isEditMode ? onEdit : handleOpenConfig}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
 
-      <ScrollView
-        style={gridLayout.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
-      >
-        <Animated.View
-          style={styles.gridContainer}
-          entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
+        <ScrollView
+          style={gridLayout.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
         >
-          {enabledBookmarks.map((bookmark, index) => (
-            <Animated.View
-              key={bookmark.id}
-              entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, 50).delay(
-                150,
-              )}
-              style={[]}
-            >
-              <BookmarkItem
-                bookmark={bookmark}
-                health={health.get(bookmark.id)}
-                onPress={handleBookmarkPress}
-                size={widget.size}
-              />
-            </Animated.View>
-          ))}
-        </Animated.View>
-      </ScrollView>
-    </View>
+          <Animated.View
+            style={styles.gridContainer}
+            entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
+          >
+            {enabledBookmarks.map((bookmark, index) => (
+              <Animated.View
+                key={bookmark.id}
+                entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(
+                  index,
+                  50,
+                ).delay(150)}
+              >
+                <BookmarkItem
+                  bookmark={bookmark}
+                  health={health.get(bookmark.id)}
+                  onPress={handleBookmarkPress}
+                  size={widget.size}
+                />
+              </Animated.View>
+            ))}
+          </Animated.View>
+        </ScrollView>
+      </View>
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  card: {
     borderRadius: borderRadius.xl,
+  },
+  container: {
     padding: spacing.md,
   },
   smallContainer: {
