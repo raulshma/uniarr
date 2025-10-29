@@ -41,6 +41,8 @@ export interface SettingsListItemProps {
   testID?: string;
   /** Optional style override */
   style?: ViewStyle;
+  /** Frosted glass background */
+  frosted?: boolean;
 }
 
 const SettingsListItem = React.forwardRef<View, SettingsListItemProps>(
@@ -58,6 +60,7 @@ const SettingsListItem = React.forwardRef<View, SettingsListItemProps>(
       accessibilityLabel: customAccessibilityLabel,
       testID,
       style,
+      frosted = false,
     },
     ref,
   ) => {
@@ -69,9 +72,11 @@ const SettingsListItem = React.forwardRef<View, SettingsListItemProps>(
           container: {
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.sm,
-            backgroundColor: selected
-              ? theme.colors.primaryContainer
-              : theme.colors.surface,
+            backgroundColor: frosted
+              ? "rgba(255, 255, 255, 0.05)"
+              : selected
+                ? theme.colors.primaryContainer
+                : theme.colors.surface,
             flexDirection: "column",
           },
           cornerRadius: getCornerRadius(groupPosition),
@@ -85,9 +90,11 @@ const SettingsListItem = React.forwardRef<View, SettingsListItemProps>(
             width: 40,
             height: 40,
             borderRadius: 20, // Circle
-            backgroundColor: selected
-              ? theme.colors.primary
-              : theme.colors.surfaceVariant,
+            backgroundColor: frosted
+              ? "rgba(255, 255, 255, 0.08)"
+              : selected
+                ? theme.colors.primary
+                : theme.colors.surfaceVariant,
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
@@ -133,7 +140,7 @@ const SettingsListItem = React.forwardRef<View, SettingsListItemProps>(
             opacity: 0.5,
           },
         }),
-      [theme, selected, groupPosition, subtitle],
+      [theme, selected, groupPosition, subtitle, frosted],
     );
 
     // Compute accessible label: custom override or "Title, Subtitle"

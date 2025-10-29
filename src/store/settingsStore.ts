@@ -59,6 +59,10 @@ type SettingsData = {
   preferredRecentActivityServiceId?: string;
   // Last time app update was checked (ISO string)
   lastReleaseNotesCheckedAt?: string;
+  // Use frosted glass effect for widgets on homepage
+  frostedWidgetsEnabled: boolean;
+  // Show animated gradient background on dashboard
+  gradientBackgroundEnabled: boolean;
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -95,6 +99,8 @@ interface SettingsState extends SettingsData {
   setRecentActivitySourceServiceIds: (ids: string[] | undefined) => void;
   setPreferredRecentActivityServiceId: (serviceId: string | undefined) => void;
   setLastReleaseNotesCheckedAt: (timestamp: string | undefined) => void;
+  setFrostedWidgetsEnabled: (enabled: boolean) => void;
+  setGradientBackgroundEnabled: (enabled: boolean) => void;
   // (thumbnail setters removed)
 }
 
@@ -172,6 +178,8 @@ const createDefaultSettings = (): SettingsData => ({
   recentActivitySourceServiceIds: undefined,
   preferredRecentActivityServiceId: undefined,
   lastReleaseNotesCheckedAt: undefined,
+  frostedWidgetsEnabled: false,
+  gradientBackgroundEnabled: false,
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
@@ -236,6 +244,10 @@ export const useSettingsStore = create<SettingsState>()(
         set({ preferredRecentActivityServiceId: serviceId }),
       setLastReleaseNotesCheckedAt: (timestamp: string | undefined) =>
         set({ lastReleaseNotesCheckedAt: timestamp }),
+      setFrostedWidgetsEnabled: (enabled: boolean) =>
+        set({ frostedWidgetsEnabled: enabled }),
+      setGradientBackgroundEnabled: (enabled: boolean) =>
+        set({ gradientBackgroundEnabled: enabled }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -273,6 +285,8 @@ export const useSettingsStore = create<SettingsState>()(
         preferredRecentActivityServiceId:
           state.preferredRecentActivityServiceId,
         lastReleaseNotesCheckedAt: state.lastReleaseNotesCheckedAt,
+        frostedWidgetsEnabled: state.frostedWidgetsEnabled,
+        gradientBackgroundEnabled: state.gradientBackgroundEnabled,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
@@ -365,6 +379,16 @@ export const useSettingsStore = create<SettingsState>()(
           // don't crash on logger wiring
         }
 
+        // Ensure frostedWidgetsEnabled is properly initialized
+        if (typeof state.frostedWidgetsEnabled !== "boolean") {
+          state.frostedWidgetsEnabled = false;
+        }
+
+        // Ensure gradientBackgroundEnabled is properly initialized
+        if (typeof state.gradientBackgroundEnabled !== "boolean") {
+          state.gradientBackgroundEnabled = true;
+        }
+
         // Mark as hydrated
         state._hasHydrated = true;
       },
@@ -422,6 +446,11 @@ export const useSettingsStore = create<SettingsState>()(
             partial.preferredRecentActivityServiceId ?? undefined,
           lastReleaseNotesCheckedAt:
             partial.lastReleaseNotesCheckedAt ?? undefined,
+          frostedWidgetsEnabled:
+            partial.frostedWidgetsEnabled ?? baseDefaults.frostedWidgetsEnabled,
+          gradientBackgroundEnabled:
+            partial.gradientBackgroundEnabled ??
+            baseDefaults.gradientBackgroundEnabled,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -478,3 +507,8 @@ export const selectRecentActivitySourceServiceIds = (state: SettingsState) =>
   state.recentActivitySourceServiceIds;
 export const selectPreferredRecentActivityServiceId = (state: SettingsState) =>
   state.preferredRecentActivityServiceId;
+export const selectFrostedWidgetsEnabled = (state: SettingsState): boolean =>
+  state.frostedWidgetsEnabled;
+export const selectGradientBackgroundEnabled = (
+  state: SettingsState,
+): boolean => state.gradientBackgroundEnabled;

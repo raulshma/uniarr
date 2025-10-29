@@ -3,8 +3,8 @@ import { Linking, StyleSheet, View } from "react-native";
 import { Button, IconButton, Text, useTheme } from "react-native-paper";
 
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { useSettingsStore } from "@/store/settingsStore";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
-import { getComponentElevation } from "@/constants/elevation";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { logger } from "@/services/logger/LoggerService";
@@ -76,6 +76,7 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
 
   const styles = useMemo(
     () =>
@@ -235,10 +236,8 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
     return (
       <Card
         contentPadding="lg"
-        style={StyleSheet.flatten([
-          styles.card,
-          getComponentElevation("widget", theme),
-        ])}
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.card}
       >
         <WidgetConfigPlaceholder
           title="Twitch credentials required"
@@ -254,10 +253,8 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
     return (
       <Card
         contentPadding="lg"
-        style={StyleSheet.flatten([
-          styles.card,
-          getComponentElevation("widget", theme),
-        ])}
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.card}
       >
         <WidgetConfigPlaceholder
           title="Choose Twitch channels"
@@ -272,13 +269,8 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
   return (
     <Card
       contentPadding="sm"
-      style={StyleSheet.flatten([
-        styles.card,
-        {
-          backgroundColor: theme.colors.surface,
-        },
-        getComponentElevation("widget", theme),
-      ])}
+      variant={frostedEnabled ? "frosted" : "custom"}
+      style={styles.card}
     >
       <View style={styles.headerContainer}>
         <View style={styles.header}>

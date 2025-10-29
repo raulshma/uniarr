@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { StyleSheet, View, ScrollView, RefreshControl } from "react-native";
-import { Text, IconButton, useTheme, Card } from "react-native-paper";
+import { Text, IconButton, useTheme } from "react-native-paper";
 import { useRouter } from "expo-router";
 import Animated from "react-native-reanimated";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { Card } from "@/components/common";
 import { useHaptics } from "@/hooks/useHaptics";
 import {
   COMPONENT_ANIMATIONS,
@@ -39,6 +40,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 }) => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const recentActivitySourceIds = useSettingsStore(
     (s) => s.recentActivitySourceServiceIds,
   );
@@ -511,11 +513,8 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   if (error) {
     return (
       <Card
-        style={[
-          styles.container,
-          { backgroundColor: theme.colors.surface },
-          containerElevationStyle,
-        ]}
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.container, containerElevationStyle]}
       >
         <View style={styles.header}>
           <Text variant="titleLarge" style={styles.title}>
@@ -590,11 +589,8 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   if (recentActivity.length === 0) {
     return (
       <Card
-        style={[
-          styles.container,
-          { backgroundColor: theme.colors.surface },
-          containerElevationStyle,
-        ]}
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.container, containerElevationStyle]}
       >
         <View style={styles.header}>
           <Text variant="titleLarge" style={styles.title}>
@@ -632,11 +628,8 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
   return (
     <Card
-      style={[
-        styles.container,
-        { backgroundColor: theme.colors.surface },
-        containerElevationStyle,
-      ]}
+      variant={frostedEnabled ? "frosted" : "custom"}
+      style={[styles.container, containerElevationStyle]}
     >
       <View style={styles.header}>
         <Text variant="titleLarge" style={styles.title}>

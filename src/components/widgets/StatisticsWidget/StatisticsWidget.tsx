@@ -12,6 +12,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { Card } from "@/components/common";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
@@ -20,6 +21,7 @@ import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { COMPONENT_ANIMATIONS } from "@/utils/animations.utils";
+import { useSettingsStore } from "@/store/settingsStore";
 
 type StatisticsData = {
   shows: number;
@@ -41,6 +43,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [statistics, setStatistics] = useState<StatisticsData>({
     shows: 0,
     movies: 0,
@@ -236,6 +239,9 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        card: {
+          borderRadius: borderRadius.xl,
+        },
         container: {
           flex: 1,
         },
@@ -348,39 +354,43 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Statistics</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
+      <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Statistics</Text>
+            <View style={styles.actions}>
+              <IconButton
+                icon="refresh"
+                size={20}
+                iconColor={theme.colors.primary}
+                onPress={handleRefresh}
+              />
+            </View>
           </View>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
+      </Card>
     );
   }
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Statistics</Text>
+      <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Statistics</Text>
+          </View>
+          <View style={styles.loadingSkeleton}>
+            {[1, 2, 3, 4].map((key) => (
+              <View key={key} style={styles.statSkeleton}>
+                <View style={styles.skeletonIconContainer} />
+                <SkeletonPlaceholder style={styles.skeletonNumber} />
+                <SkeletonPlaceholder style={styles.skeletonLabel} />
+              </View>
+            ))}
+          </View>
         </View>
-        <View style={styles.loadingSkeleton}>
-          {[1, 2, 3, 4].map((key) => (
-            <View key={key} style={styles.statSkeleton}>
-              <View style={styles.skeletonIconContainer} />
-              <SkeletonPlaceholder style={styles.skeletonNumber} />
-              <SkeletonPlaceholder style={styles.skeletonLabel} />
-            </View>
-          ))}
-        </View>
-      </View>
+      </Card>
     );
   }
 
@@ -398,114 +408,116 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
   // itemsToShow intentionally omitted; layout uses responsive grid
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Statistics</Text>
-        <View style={styles.actions}>
-          <TouchableOpacity onPress={() => setFilterDialogVisible(true)}>
-            <Text style={styles.filterButton}>{getFilterLabel()}</Text>
-          </TouchableOpacity>
-          <IconButton
-            icon="refresh"
-            size={20}
-            iconColor={theme.colors.primary}
-            onPress={handleRefresh}
-          />
-          {onEdit && (
+    <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Statistics</Text>
+          <View style={styles.actions}>
+            <TouchableOpacity onPress={() => setFilterDialogVisible(true)}>
+              <Text style={styles.filterButton}>{getFilterLabel()}</Text>
+            </TouchableOpacity>
             <IconButton
-              icon="cog"
+              icon="refresh"
               size={20}
-              iconColor={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
+              iconColor={theme.colors.primary}
+              onPress={handleRefresh}
             />
-          )}
+            {onEdit && (
+              <IconButton
+                icon="cog"
+                size={20}
+                iconColor={theme.colors.onSurfaceVariant}
+                onPress={onEdit}
+              />
+            )}
+          </View>
         </View>
-      </View>
 
-      <Animated.View
-        style={styles.content}
-        entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
-      >
-        <View style={styles.statsGrid}>
-          {statItems.slice(0, 4).map((item, index) => (
-            <Animated.View
-              key={item.label}
-              entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(
-                index,
-                100,
-              ).delay(150)}
-              style={[]}
-            >
-              <TouchableOpacity
-                style={styles.statCard}
-                onPress={() => handleStatCardPress(item.label)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.statIconContainer}>
-                  <MaterialCommunityIcons
-                    name={item.icon}
-                    size={24}
-                    color={theme.colors.onPrimaryContainer}
-                  />
-                </View>
-                <Text style={styles.statNumber}>{item.number}</Text>
-                <Text style={styles.statLabel}>{item.label}</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          ))}
-        </View>
-      </Animated.View>
-
-      {/* Filter Selection Dialog */}
-      <Portal>
-        <Dialog
-          visible={filterDialogVisible}
-          onDismiss={() => setFilterDialogVisible(false)}
-          style={{
-            borderRadius: borderRadius.lg,
-            backgroundColor: theme.colors.elevation.level1,
-          }}
+        <Animated.View
+          style={styles.content}
+          entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
         >
-          <Dialog.Title style={{ color: theme.colors.onSurface }}>
-            Filter Statistics
-          </Dialog.Title>
-          <Dialog.Content>
-            <Text
-              style={{
-                color: theme.colors.onSurfaceVariant,
-                marginBottom: theme.custom.spacing.md,
-              }}
-            >
-              Select time range for statistics:
-            </Text>
-            <View style={{ gap: theme.custom.spacing.xs }}>
-              {[
-                { key: "all" as const, label: "All Time" },
-                { key: "recent" as const, label: "Recent (7 days)" },
-                { key: "month" as const, label: "This Month" },
-              ].map((option) => (
-                <Button
-                  key={option.key}
-                  mode={filter === option.key ? "contained" : "outlined"}
-                  onPress={() => handleFilterSelect(option.key)}
-                  style={{ marginVertical: 0 }}
+          <View style={styles.statsGrid}>
+            {statItems.slice(0, 4).map((item, index) => (
+              <Animated.View
+                key={item.label}
+                entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(
+                  index,
+                  100,
+                ).delay(150)}
+                style={[]}
+              >
+                <TouchableOpacity
+                  style={styles.statCard}
+                  onPress={() => handleStatCardPress(item.label)}
+                  activeOpacity={0.7}
                 >
-                  {option.label}
-                </Button>
-              ))}
-            </View>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button
-              mode="outlined"
-              onPress={() => setFilterDialogVisible(false)}
-            >
-              Cancel
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-    </View>
+                  <View style={styles.statIconContainer}>
+                    <MaterialCommunityIcons
+                      name={item.icon}
+                      size={24}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.statNumber}>{item.number}</Text>
+                  <Text style={styles.statLabel}>{item.label}</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+          </View>
+        </Animated.View>
+
+        {/* Filter Selection Dialog */}
+        <Portal>
+          <Dialog
+            visible={filterDialogVisible}
+            onDismiss={() => setFilterDialogVisible(false)}
+            style={{
+              borderRadius: borderRadius.lg,
+              backgroundColor: theme.colors.elevation.level1,
+            }}
+          >
+            <Dialog.Title style={{ color: theme.colors.onSurface }}>
+              Filter Statistics
+            </Dialog.Title>
+            <Dialog.Content>
+              <Text
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  marginBottom: theme.custom.spacing.md,
+                }}
+              >
+                Select time range for statistics:
+              </Text>
+              <View style={{ gap: theme.custom.spacing.xs }}>
+                {[
+                  { key: "all" as const, label: "All Time" },
+                  { key: "recent" as const, label: "Recent (7 days)" },
+                  { key: "month" as const, label: "This Month" },
+                ].map((option) => (
+                  <Button
+                    key={option.key}
+                    mode={filter === option.key ? "contained" : "outlined"}
+                    onPress={() => handleFilterSelect(option.key)}
+                    style={{ marginVertical: 0 }}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </View>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button
+                mode="outlined"
+                onPress={() => setFilterDialogVisible(false)}
+              >
+                Cancel
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+      </View>
+    </Card>
   );
 };
 

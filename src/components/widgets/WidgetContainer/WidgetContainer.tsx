@@ -306,6 +306,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
         widgetsContainer: {
           flex: 1,
           gap: theme.custom.spacing.lg,
+          padding: theme.custom.spacing.sm,
         },
         widgetWrapper: {
           // Each widget handles its own styling

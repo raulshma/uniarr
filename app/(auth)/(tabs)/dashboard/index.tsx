@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -8,15 +8,14 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Text, IconButton, Portal } from "react-native-paper";
 import { useHaptics } from "@/hooks/useHaptics";
 
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useSettingsStore } from "@/store/settingsStore";
 import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
 import { useWidgetServiceInitialization } from "@/hooks/useWidgetServiceInitialization";
@@ -28,9 +27,34 @@ const DashboardScreen = () => {
   const theme = useTheme();
   const { onPress } = useHaptics();
   const insets = useSafeAreaInsets();
+  const gradientEnabled = useSettingsStore((s) => s.gradientBackgroundEnabled);
   const [refreshing, setRefreshing] = React.useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Animated gradient colors
+  const gradientAnim = useRef(new Animated.Value(0)).current;
+
+  // Initialize gradient animation
+  useEffect(() => {
+    const animateGradient = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(gradientAnim, {
+            toValue: 1,
+            duration: 8000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(gradientAnim, {
+            toValue: 0,
+            duration: 8000,
+            useNativeDriver: false,
+          }),
+        ]),
+      ).start();
+    };
+    animateGradient();
+  }, [gradientAnim]);
 
   // Initialize WidgetService early to prevent loading issues
   useWidgetServiceInitialization();
@@ -85,6 +109,20 @@ const DashboardScreen = () => {
     extrapolate: "clamp",
   });
 
+  // Gradient opacity animations (reduced for frosted glass effect)
+  const gradient1Opacity = gradientAnim.interpolate({
+    inputRange: [0, 0.33, 0.66, 1],
+    outputRange: [0.7, 0.21, 0.21, 0.7],
+  });
+  const gradient2Opacity = gradientAnim.interpolate({
+    inputRange: [0, 0.33, 0.66, 1],
+    outputRange: [0.21, 0.7, 0.21, 0.21],
+  });
+  const gradient3Opacity = gradientAnim.interpolate({
+    inputRange: [0, 0.33, 0.66, 1],
+    outputRange: [0.21, 0.21, 0.7, 0.21],
+  });
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -98,6 +136,7 @@ const DashboardScreen = () => {
         },
         scrollContent: {
           paddingBottom: 100,
+          paddingTop: headerMaxHeight + insets.top,
         },
         headerContainer: {
           position: "absolute",
@@ -111,7 +150,7 @@ const DashboardScreen = () => {
           top: 0,
           left: 0,
           right: 0,
-          backgroundColor: theme.colors.background,
+          backgroundColor: "transparent",
         },
         headerContent: {
           flex: 1,
@@ -133,7 +172,7 @@ const DashboardScreen = () => {
           top: 0,
           right: 0,
           left: 0,
-          zIndex: 20,
+          zIndex: 15,
           paddingHorizontal: theme.custom.spacing.lg,
           paddingTop: insets.top,
         },
@@ -163,7 +202,7 @@ const DashboardScreen = () => {
           backgroundColor: theme.colors.surfaceVariant,
         },
       }),
-    [theme, insets.top],
+    [theme, insets.top, headerMaxHeight],
   );
 
   // Summary metrics are currently unused in this component; keep calculation
@@ -176,7 +215,59 @@ const DashboardScreen = () => {
 
   return (
     <Portal.Host>
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
+        {/* Frosted Glass Overlay */}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: "rgba(255, 255, 255, 0.1)",
+            },
+          ]}
+        />
+
+        {gradientEnabled && (
+          <>
+            <Animated.View
+              style={[StyleSheet.absoluteFill, { opacity: gradient1Opacity }]}
+            >
+              <LinearGradient
+                colors={["#0f0f23", "#1a1a2e", "#16213e"]}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+            </Animated.View>
+            <Animated.View
+              style={[StyleSheet.absoluteFill, { opacity: gradient2Opacity }]}
+            >
+              <LinearGradient
+                colors={["#1a1a2e", "#16213e", "#0f0f23"]}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 1, y: 0 }}
+                end={{ x: 0, y: 1 }}
+              />
+            </Animated.View>
+            <Animated.View
+              style={[StyleSheet.absoluteFill, { opacity: gradient3Opacity }]}
+            >
+              <LinearGradient
+                colors={["#16213e", "#0f0f23", "#1a1a2e"]}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+              />
+            </Animated.View>
+          </>
+        )}
+        {!gradientEnabled && (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: theme.colors.background },
+            ]}
+          />
+        )}
         {/* Animated Header */}
         <Animated.View
           style={[styles.headerContainer, { height: headerHeight }]}
@@ -259,9 +350,6 @@ const DashboardScreen = () => {
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-          {/* Spacer to account for header */}
-          <View style={{ height: headerMaxHeight }} />
-
           {/* Widgets Section */}
           <AnimatedSection
             delay={100}
@@ -273,7 +361,7 @@ const DashboardScreen = () => {
             <WidgetContainer editable={true} />
           </AnimatedSection>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Portal.Host>
   );
 };

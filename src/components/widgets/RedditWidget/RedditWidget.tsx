@@ -25,6 +25,7 @@ import { Card } from "@/components/common";
 import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const CACHE_TTL_MS = 20 * 60 * 1000;
 
@@ -158,6 +159,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [posts, setPosts] = useState<RedditPostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -318,10 +320,10 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
     <>
       <Card
         contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.surface,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },

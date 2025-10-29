@@ -8,7 +8,6 @@ import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
-import { getComponentElevation } from "@/constants/elevation";
 import type { Widget } from "@/services/widgets/WidgetService";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { widgetService } from "@/services/widgets/WidgetService";
@@ -18,8 +17,10 @@ import {
   ANIMATION_DURATIONS,
   Animated,
 } from "@/utils/animations.utils";
+import { Card } from "@/components/common";
 import ShortcutItem from "./ShortcutItem";
 import type { Shortcut } from "./ShortcutsWidget.types";
+import { useSettingsStore } from "@/store/settingsStore";
 
 interface ShortcutsWidgetProps {
   widget: Widget;
@@ -35,6 +36,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const { onPress: hapticPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const styles = useStyles(theme);
 
   const [shortcuts, setShortcuts] = React.useState<Shortcut[]>([]);
@@ -136,42 +138,40 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
 
   if (loading) {
     return (
-      <Animated.View
-        style={[
-          styles.container,
-          gridLayout.container,
-          { backgroundColor: theme.colors.surface },
-        ]}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
-      >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.title}>
-            {widget.title}
-          </Text>
-          {onEdit && (
-            <MaterialCommunityIcons
-              name="cog"
-              size={theme.custom.sizes.iconSizes.lg}
-              color={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
-            />
-          )}
-        </View>
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <View key={index} style={styles.skeletonShortcut}>
-              <View style={styles.skeletonIcon} />
-              <SkeletonPlaceholder
-                width={60}
-                height={14}
-                borderRadius={4}
-                style={{ marginLeft: spacing.sm }}
+      <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+        <Animated.View
+          style={[styles.container, gridLayout.container]}
+          entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+          exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+        >
+          <View style={styles.header}>
+            <Text variant="titleMedium" style={styles.title}>
+              {widget.title}
+            </Text>
+            {onEdit && (
+              <MaterialCommunityIcons
+                name="cog"
+                size={theme.custom.sizes.iconSizes.lg}
+                color={theme.colors.onSurfaceVariant}
+                onPress={onEdit}
               />
-            </View>
-          ))}
-        </View>
-      </Animated.View>
+            )}
+          </View>
+          <View style={styles.loadingSkeleton}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View key={index} style={styles.skeletonShortcut}>
+                <View style={styles.skeletonIcon} />
+                <SkeletonPlaceholder
+                  width={60}
+                  height={14}
+                  borderRadius={4}
+                  style={{ marginLeft: spacing.sm }}
+                />
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+      </Card>
     );
   }
 
@@ -179,13 +179,39 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
 
   if (enabledShortcuts.length === 0) {
     return (
-      <View
-        style={[
-          styles.container,
-          gridLayout.container,
-          { backgroundColor: theme.colors.surface },
-        ]}
-      >
+      <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+        <View style={[styles.container, gridLayout.container]}>
+          <View style={styles.header}>
+            <Text variant="titleMedium" style={styles.title}>
+              {widget.title}
+            </Text>
+            {onEdit && (
+              <MaterialCommunityIcons
+                name="cog"
+                size={theme.custom.sizes.iconSizes.lg}
+                color={theme.colors.onSurfaceVariant}
+                onPress={onEdit}
+              />
+            )}
+          </View>
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons
+              name="gesture-tap"
+              size={theme.custom.sizes.iconSizes.xxl}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text variant="bodySmall" style={styles.emptyText}>
+              No shortcuts configured
+            </Text>
+          </View>
+        </View>
+      </Card>
+    );
+  }
+
+  return (
+    <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+      <View style={[styles.container, gridLayout.container]}>
         <View style={styles.header}>
           <Text variant="titleMedium" style={styles.title}>
             {widget.title}
@@ -199,69 +225,37 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
             />
           )}
         </View>
-        <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons
-            name="gesture-tap"
-            size={theme.custom.sizes.iconSizes.xxl}
-            color={theme.colors.onSurfaceVariant}
-          />
-          <Text variant="bodySmall" style={styles.emptyText}>
-            No shortcuts configured
-          </Text>
-        </View>
-      </View>
-    );
-  }
 
-  return (
-    <View
-      style={[
-        styles.container,
-        gridLayout.container,
-        { backgroundColor: theme.colors.surface },
-      ]}
-    >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={styles.title}>
-          {widget.title}
-        </Text>
-        {onEdit && (
-          <MaterialCommunityIcons
-            name="cog"
-            size={theme.custom.sizes.iconSizes.lg}
-            color={theme.colors.onSurfaceVariant}
-            onPress={onEdit}
-          />
-        )}
+        <ScrollView
+          style={gridLayout.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.gridContainer}>
+            {enabledShortcuts.map((shortcut) => (
+              <ShortcutItem
+                key={shortcut.id}
+                shortcut={shortcut}
+                onPress={handleShortcutPress}
+                size={widget.size}
+              />
+            ))}
+          </View>
+        </ScrollView>
       </View>
-
-      <ScrollView
-        style={gridLayout.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.gridContainer}>
-          {enabledShortcuts.map((shortcut) => (
-            <ShortcutItem
-              key={shortcut.id}
-              shortcut={shortcut}
-              onPress={handleShortcutPress}
-              size={widget.size}
-            />
-          ))}
-        </View>
-      </ScrollView>
-    </View>
+    </Card>
   );
 };
 
 const useStyles = (theme: AppTheme) =>
   StyleSheet.create({
+    card: {
+      borderRadius: borderRadius.xl,
+    },
     container: {
       borderRadius: borderRadius.xl,
       padding: spacing.md,
-      ...getComponentElevation("widget", theme),
     },
     smallContainer: {
       minHeight: 140,
@@ -319,7 +313,7 @@ const useStyles = (theme: AppTheme) =>
       minHeight: 48,
       minWidth: 160,
       maxWidth: 184,
-      backgroundColor: theme.colors.surfaceVariant,
+      backgroundColor: "rgba(255, 255, 255, 0.03)", // Subtle frosted skeleton
     },
     skeletonIcon: {
       width: 24,

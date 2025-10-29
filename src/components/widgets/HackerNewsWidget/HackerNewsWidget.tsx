@@ -23,6 +23,7 @@ import { Card } from "@/components/common";
 import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -95,6 +96,7 @@ const StoryListItem: React.FC<StoryListItemProps> = ({
       <SettingsListItem
         title={story.title}
         subtitle={`${story.score ?? 0} points by ${story.by} • ${formatDistanceToNow(new Date(story.time * 1000), { addSuffix: true })}${story.descendants ? ` • ${story.descendants} comments` : ""}`}
+        frosted
         left={
           story.image
             ? {
@@ -152,6 +154,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [stories, setStories] = useState<HackerNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -276,10 +279,10 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
     <>
       <Card
         contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.surface,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -324,6 +327,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
           <SettingsListItem
             title="No stories available at the moment."
             groupPosition="single"
+            frosted
           />
         ) : (
           <View>

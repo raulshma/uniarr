@@ -1,15 +1,17 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
-import { Text, Card, IconButton, useTheme, Badge } from "react-native-paper";
+import { Text, IconButton, useTheme, Badge } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
+import { Card } from "@/components/common";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { borderRadius, iconSizes, touchSizes } from "@/constants/sizes";
 import { spacing as themeSpacing } from "@/theme/spacing";
 import type { Widget } from "@/services/widgets/WidgetService";
+import { useSettingsStore } from "@/store/settingsStore";
 
 export interface ServiceStatusWidgetProps {
   widget: Widget;
@@ -40,6 +42,7 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
   const theme = useTheme<AppTheme>();
   const { spacing } = useResponsiveLayout();
   const { onPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [serviceStatuses, setServiceStatuses] = useState<ServiceStatus[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -149,7 +152,11 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
   };
 
   const renderServiceCard = (service: ServiceStatus) => (
-    <Card key={service.id} style={styles.serviceCard}>
+    <Card
+      key={service.id}
+      style={styles.serviceCard}
+      variant={frostedEnabled ? "frosted" : "custom"}
+    >
       <View style={styles.serviceCardContent}>
         <View style={styles.serviceHeader}>
           <View style={styles.serviceInfo}>

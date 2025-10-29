@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
+import { Card } from "@/components/common";
 import { createCalendarNavigation } from "@/utils/navigation.utils";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -25,6 +26,7 @@ import {
   ANIMATION_DURATIONS,
   Animated,
 } from "@/utils/animations.utils";
+import { useSettingsStore } from "@/store/settingsStore";
 
 type UpcomingReleaseItem = {
   id: string;
@@ -52,6 +54,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   const theme = useTheme<AppTheme>();
   const router = useRouter();
   const { onPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const calendarNavigation = createCalendarNavigation();
   const [upcomingReleases, setUpcomingReleases] = useState<
     UpcomingReleaseItem[]
@@ -239,6 +242,9 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        widgetCard: {
+          borderRadius: borderRadius.xl,
+        },
         container: {
           flex: 1,
         },
@@ -389,72 +395,129 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Upcoming Releases</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
-            {onEdit && (
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.widgetCard}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Upcoming Releases</Text>
+            <View style={styles.actions}>
               <IconButton
-                icon="cog"
+                icon="refresh"
                 size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
+                iconColor={theme.colors.primary}
+                onPress={handleRefresh}
               />
-            )}
+              {onEdit && (
+                <IconButton
+                  icon="cog"
+                  size={20}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={onEdit}
+                />
+              )}
+            </View>
           </View>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
+      </Card>
     );
   }
 
   if (loading) {
     return (
-      <Animated.View
-        style={styles.container}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.widgetCard}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Upcoming Releases</Text>
-        </View>
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <View
-              key={index}
-              style={[styles.card, { width: cardWidth, height: cardHeight }]}
-            >
-              <View style={styles.posterContainer}>
-                <SkeletonPlaceholder
-                  width="100%"
-                  height={posterHeight}
-                  borderRadius={borderRadius.sm}
-                />
+        <Animated.View
+          style={styles.container}
+          entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+          exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>Upcoming Releases</Text>
+          </View>
+          <View style={styles.loadingSkeleton}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View
+                key={index}
+                style={[styles.card, { width: cardWidth, height: cardHeight }]}
+              >
+                <View style={styles.posterContainer}>
+                  <SkeletonPlaceholder
+                    width="100%"
+                    height={posterHeight}
+                    borderRadius={borderRadius.sm}
+                  />
+                </View>
+                <View style={styles.cardContent}>
+                  <SkeletonPlaceholder
+                    width="80%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="60%"
+                    height={12}
+                    borderRadius={4}
+                  />
+                </View>
               </View>
-              <View style={styles.cardContent}>
-                <SkeletonPlaceholder
-                  width="80%"
-                  height={16}
-                  borderRadius={4}
-                  style={{ marginBottom: spacing.xs }}
-                />
-                <SkeletonPlaceholder width="60%" height={12} borderRadius={4} />
-              </View>
-            </View>
-          ))}
-        </View>
-      </Animated.View>
+            ))}
+          </View>
+        </Animated.View>
+      </Card>
     );
   }
 
   if (upcomingReleases.length === 0) {
     return (
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.widgetCard}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Upcoming Releases</Text>
+            <View style={styles.actions}>
+              <IconButton
+                icon="refresh"
+                size={20}
+                iconColor={theme.colors.primary}
+                onPress={handleRefresh}
+              />
+              {onEdit && (
+                <IconButton
+                  icon="cog"
+                  size={20}
+                  iconColor={theme.colors.onSurfaceVariant}
+                  onPress={onEdit}
+                />
+              )}
+            </View>
+          </View>
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons
+              name="calendar-outline"
+              size={48}
+              color={theme.colors.onSurfaceVariant}
+              style={styles.emptyIcon}
+            />
+            <Text style={styles.emptyText}>No upcoming releases</Text>
+          </View>
+        </View>
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      variant={frostedEnabled ? "frosted" : "custom"}
+      style={styles.widgetCard}
+    >
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Upcoming Releases</Text>
@@ -475,55 +538,22 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
             )}
           </View>
         </View>
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons
-            name="calendar-outline"
-            size={48}
-            color={theme.colors.onSurfaceVariant}
-            style={styles.emptyIcon}
+
+        <View style={styles.content}>
+          <FlatList
+            data={upcomingReleases}
+            renderItem={renderReleaseCard}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardList}
+            snapToInterval={cardWidth + spacing.md}
+            decelerationRate="fast"
+            snapToAlignment="start"
           />
-          <Text style={styles.emptyText}>No upcoming releases</Text>
         </View>
       </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Upcoming Releases</Text>
-        <View style={styles.actions}>
-          <IconButton
-            icon="refresh"
-            size={20}
-            iconColor={theme.colors.primary}
-            onPress={handleRefresh}
-          />
-          {onEdit && (
-            <IconButton
-              icon="cog"
-              size={20}
-              iconColor={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
-            />
-          )}
-        </View>
-      </View>
-
-      <View style={styles.content}>
-        <FlatList
-          data={upcomingReleases}
-          renderItem={renderReleaseCard}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.cardList}
-          snapToInterval={cardWidth + spacing.md}
-          decelerationRate="fast"
-          snapToAlignment="start"
-        />
-      </View>
-    </View>
+    </Card>
   );
 };
 

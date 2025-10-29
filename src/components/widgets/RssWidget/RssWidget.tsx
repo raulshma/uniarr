@@ -22,6 +22,7 @@ import { Card } from "@/components/common";
 import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -138,6 +139,7 @@ const RssItemListItem: React.FC<RssItemListItemProps> = ({
 const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
   const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [items, setItems] = useState<RssFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -281,10 +283,10 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
     <>
       <Card
         contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.surface,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },

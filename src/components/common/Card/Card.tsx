@@ -42,12 +42,16 @@ export type CardProps = Omit<
   elevation?: ElevationVariant;
   contentPadding?: keyof AppTheme["custom"]["spacing"] | number;
   contentStyle?: StyleProp<ViewStyle>;
-  variant?: "default" | "outlined" | "custom";
+  variant?: "default" | "outlined" | "custom" | "frosted";
   focusable?: boolean;
   animated?: boolean;
   animationDelay?: number;
   enteringAnimation?: any;
   exitingAnimation?: any;
+  delayLongPress?: number;
+  onLongPress?: () => void;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
 };
 
 const Card = forwardRef<PaperCardRef, CardProps>(
@@ -60,6 +64,10 @@ const Card = forwardRef<PaperCardRef, CardProps>(
       contentPadding = "md",
       variant = "default",
       onPress,
+      onLongPress,
+      onPressIn,
+      onPressOut,
+      delayLongPress,
       disabled,
       accessibilityLabel,
       accessibilityHint,
@@ -147,10 +155,17 @@ const Card = forwardRef<PaperCardRef, CardProps>(
         <AnimatedPressable
           style={[
             styles.customBase,
+            {
+              backgroundColor: theme.colors.surface,
+            },
             style,
             focusable && isFocused ? customFocusRingStyle : undefined,
           ]}
           onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          onLongPress={onLongPress}
+          delayLongPress={delayLongPress}
           onFocus={handleFocus}
           onBlur={handleBlur}
           accessibilityRole={resolvedAccessibilityRole}
@@ -159,6 +174,34 @@ const Card = forwardRef<PaperCardRef, CardProps>(
           accessibilityState={accessibilityState}
           focusable={focusable}
           disabled={isDisabled}
+          pointerEvents="box-none"
+          {...rest}
+        >
+          {React.Children.count(children) > 0 ? (
+            <View style={innerStyle}>{children}</View>
+          ) : null}
+        </AnimatedPressable>
+      ) : variant === "frosted" ? (
+        <AnimatedPressable
+          style={[
+            styles.frostedBase,
+            style,
+            focusable && isFocused ? customFocusRingStyle : undefined,
+          ]}
+          onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          onLongPress={onLongPress}
+          delayLongPress={delayLongPress}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          accessibilityRole={resolvedAccessibilityRole}
+          accessibilityLabel={accessibilityLabel}
+          accessibilityHint={accessibilityHint}
+          accessibilityState={accessibilityState}
+          focusable={focusable}
+          disabled={isDisabled}
+          pointerEvents="box-none"
           {...rest}
         >
           {React.Children.count(children) > 0 ? (
@@ -176,6 +219,10 @@ const Card = forwardRef<PaperCardRef, CardProps>(
             focusable && isFocused ? baseFocusRingStyle : undefined,
           ]}
           onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          onLongPress={onLongPress}
+          delayLongPress={delayLongPress}
           onFocus={handleFocus}
           onBlur={handleBlur}
           accessibilityRole={resolvedAccessibilityRole}
@@ -184,6 +231,7 @@ const Card = forwardRef<PaperCardRef, CardProps>(
           accessibilityState={accessibilityState}
           focusable={focusable}
           disabled={isDisabled}
+          pointerEvents="box-none"
           {...rest}
         >
           {React.Children.count(children) > 0 ? (
@@ -220,6 +268,19 @@ const styles = StyleSheet.create({
   customBase: {
     borderRadius: CUSTOM_RADIUS,
     overflow: "hidden",
+  },
+  frostedBase: {
+    borderRadius: CUSTOM_RADIUS,
+    overflow: "hidden",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    shadowColor: "rgba(0, 0, 0, 0.1)",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   inner: {
     width: "100%",

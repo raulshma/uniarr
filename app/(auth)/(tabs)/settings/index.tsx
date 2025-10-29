@@ -541,6 +541,38 @@ const SettingsScreen = () => {
           </SettingsGroup>
         </AnimatedSection>
 
+        {/* Experimental Features Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Experimental Features"
+                subtitle="Advanced settings and experimental options"
+                left={{ iconName: "beaker" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={18}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() =>
+                  router.push("/(auth)/settings/experimental-features")
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
         {/* Notifications Section */}
         <AnimatedSection
           style={styles.section}

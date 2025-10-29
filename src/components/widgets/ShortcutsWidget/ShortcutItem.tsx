@@ -5,7 +5,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
-import { getComponentElevation } from "@/constants/elevation";
 import { iconSizes, borderRadius, touchSizes } from "@/constants/sizes";
 import type { ShortcutItemProps } from "./ShortcutsWidget.types";
 
@@ -97,7 +96,7 @@ const useThemeAwareStyles = (theme: AppTheme) =>
       minHeight: touchSizes.lg, // 48 - Shorter for horizontal pill
       minWidth: touchSizes.xl + 80, // Wider for horizontal pill
       maxWidth: iconSizes.xxxl + 120, // 184 = 64 + 120 - Much wider for pill shape
-      ...getComponentElevation("widgetCard", theme),
+      backgroundColor: "rgba(255, 255, 255, 0.05)", // Subtle frosted effect
     },
     smallContainer: {
       minHeight: touchSizes.md, // 44 - Short pill

@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import {
   Text,
-  Card,
   IconButton,
   useTheme,
   ProgressBar,
@@ -13,9 +12,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
+import { Card } from "@/components/common";
 import type { Widget } from "@/services/widgets/WidgetService";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
+import { useSettingsStore } from "@/store/settingsStore";
 import { useDownloadStore, selectDownloads } from "@/store/downloadStore";
 import type { DownloadItem } from "@/models/download.types";
 
@@ -81,6 +82,7 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
   const theme = useTheme<AppTheme>();
   const { spacing } = useResponsiveLayout();
   const { onPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [refreshing, setRefreshing] = useState(false);
 
   // Use optimized selector to prevent excessive re-renders
@@ -146,7 +148,11 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
   };
 
   const renderDownloadItem = (download: DisplayDownloadItem) => (
-    <Card key={download.id} style={styles.downloadCard}>
+    <Card
+      key={download.id}
+      style={styles.downloadCard}
+      variant={frostedEnabled ? "frosted" : "custom"}
+    >
       <View style={styles.downloadContent}>
         <View style={styles.downloadHeader}>
           <View style={styles.downloadInfo}>
@@ -235,7 +241,10 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
   );
 
   return (
-    <Card style={[styles.container, { padding: spacing.medium }]}>
+    <Card
+      style={[styles.container, { padding: spacing.medium }]}
+      variant={frostedEnabled ? "frosted" : "custom"}
+    >
       <View style={styles.header}>
         <Text variant="titleLarge">{widget.title}</Text>
         <View style={styles.headerActions}>

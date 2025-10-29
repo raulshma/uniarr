@@ -20,6 +20,7 @@ import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
 import { HapticPressable } from "@/components/common/HapticPressable";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -71,6 +72,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -264,10 +266,10 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
   return (
     <Card
       contentPadding="sm"
+      variant={frostedEnabled ? "frosted" : "custom"}
       style={StyleSheet.flatten([
         styles.card,
         {
-          backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.xxl,
           padding: spacing.sm,
         },
