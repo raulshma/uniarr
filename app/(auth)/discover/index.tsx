@@ -5,7 +5,13 @@ import {
   RefreshControl,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+} from "react-native-reanimated";
+import { BackdropBlur, Canvas, Fill } from "@shopify/react-native-skia";
 import { alert } from "@/services/dialogService";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -27,6 +33,7 @@ import {
   PageTransition,
 } from "@/components/common/AnimatedComponents";
 import { TabHeader } from "@/components/common/TabHeader";
+import AnimatedSkiaBackground from "@/components/common/AnimatedSkiaBackground";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { SectionSkeleton } from "@/components/discover";
 import type { AppTheme } from "@/constants/theme";
@@ -144,6 +151,13 @@ const DiscoverCard = React.memo(
 
 const DiscoverScreen = () => {
   const theme = useTheme<AppTheme>();
+  const { width: screenWidth } = useWindowDimensions();
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
   const router = useRouter();
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const { apiKey: tmdbKey } = useTmdbKey();
@@ -157,6 +171,19 @@ const DiscoverScreen = () => {
   }, [sections]);
 
   const { itemsInLibrary } = useBatchCheckInLibrary(allItems);
+
+  // Get a backdrop image from the discover data for the background
+  const backgroundImageUri = useMemo(() => {
+    // Find the first item with a backdrop URL
+    for (const section of sections) {
+      for (const item of section.items) {
+        if (item.backdropUrl) {
+          return item.backdropUrl;
+        }
+      }
+    }
+    return undefined; // Will use default image
+  }, [sections]);
 
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogItem, setDialogItem] = useState<DiscoverMediaItem | undefined>(
@@ -180,12 +207,20 @@ const DiscoverScreen = () => {
           gap: spacing.lg,
         },
         searchBar: {
+          height: 48,
+          borderRadius: 24,
+          overflow: "hidden",
+        },
+        searchBarContent: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           flexDirection: "row",
           alignItems: "center",
-          backgroundColor: theme.colors.elevation.level2,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
-          borderRadius: 24,
         },
         searchPlaceholder: {
           flex: 1,
@@ -403,9 +438,15 @@ const DiscoverScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <AnimatedSkiaBackground
+        theme={theme}
+        imageUri={backgroundImageUri}
+        scrollY={scrollY}
+      />
       <PageTransition style={styles.page} transitionType="fade">
         <AnimatedSection animated={allowHeaderAnimations} delay={0}>
           <TabHeader
+            style={{ backgroundColor: "transparent" }}
             title="Discover"
             showTitle
             leftAction={
@@ -425,30 +466,55 @@ const DiscoverScreen = () => {
           />
         </AnimatedSection>
 
-        <FlatList
+        <Animated.FlatList
           data={sections}
           keyExtractor={(section) => section.id}
           renderItem={({ item, index }) => renderSection(item, index)}
           contentContainerStyle={[styles.content, styles.sectionsContainer]}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
           ListHeaderComponent={
             <AnimatedSection
               style={styles.searchBarWrapper}
               delay={50}
               animated={allowAnimations}
             >
-              <Pressable
-                style={styles.searchBar}
-                onPress={openUnifiedSearch}
-                accessibilityRole="button"
-              >
-                <IconButton
-                  icon="magnify"
-                  size={24}
+              <View style={styles.searchBar}>
+                <Canvas style={StyleSheet.absoluteFill}>
+                  <BackdropBlur
+                    blur={10}
+                    clip={{
+                      x: 0,
+                      y: 0,
+                      width: screenWidth - spacing.md * 2,
+                      height: 48,
+                    }}
+                  >
+                    <Fill
+                      color={
+                        theme.dark
+                          ? "rgba(30, 41, 59, 0.3)"
+                          : "rgba(248, 250, 252, 0.5)"
+                      }
+                    />
+                  </BackdropBlur>
+                </Canvas>
+                <Pressable
+                  style={styles.searchBarContent}
                   onPress={openUnifiedSearch}
-                  accessibilityLabel="Open search"
-                />
-                <Text style={styles.searchPlaceholder}>{placeholderText}</Text>
-              </Pressable>
+                  accessibilityRole="button"
+                >
+                  <IconButton
+                    icon="magnify"
+                    size={24}
+                    onPress={openUnifiedSearch}
+                    accessibilityLabel="Open search"
+                  />
+                  <Text style={styles.searchPlaceholder}>
+                    {placeholderText}
+                  </Text>
+                </Pressable>
+              </View>
             </AnimatedSection>
           }
           ListEmptyComponent={
