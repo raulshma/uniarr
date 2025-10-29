@@ -22,7 +22,7 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
-import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -393,7 +393,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
       </Card>
 
       {/* Image Preview Modal */}
-      <ImagePreviewModal
+      <ImageViewer
         visible={imageModalVisible}
         imageUri={selectedImageUri}
         fileName="Post Thumbnail"

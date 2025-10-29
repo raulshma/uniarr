@@ -18,7 +18,7 @@ import {
   SettingsListItem,
   AnimatedScrollView,
 } from "@/components/common";
-import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import ImageViewer from "@/components/cache/ImageViewer";
 import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
 import {
@@ -677,7 +677,7 @@ const CacheViewerScreen = () => {
       {renderContent}
 
       {previewImage && (
-        <ImagePreviewModal
+        <ImageViewer
           visible={!!previewImage}
           imageUri={previewImage.uri}
           fileName={previewImage.fileName}

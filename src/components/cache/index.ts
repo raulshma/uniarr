@@ -1,1 +1,1 @@
-export { default as ImagePreviewModal } from "./ImagePreviewModal";
+export { default as ImageViewer } from "./ImageViewer";
