@@ -1,5 +1,6 @@
 import { widgetService } from "@/services/widgets/WidgetService";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
+import { StorageBackendManager } from "@/services/storage/MMKVStorage";
 
 /**
  * Integration test to verify widget reorder/cache persistence fix.
@@ -12,8 +13,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 describe("WidgetService Reorder and Cache Persistence", () => {
   beforeEach(async () => {
-    // Clear AsyncStorage before each test
-    await AsyncStorage.clear();
+    // Initialize storage backend for tests
+    const manager = StorageBackendManager.getInstance();
+    if (!manager.isInitialized()) {
+      await manager.initialize();
+    }
+
+    // Clear storage before each test
+    await storageAdapter.clear();
     // Reset WidgetService singleton
     (widgetService as any).isInitialized = false;
     (widgetService as any).widgets.clear();
@@ -57,7 +64,9 @@ describe("WidgetService Reorder and Cache Persistence", () => {
 
     // Cache some test data
     const testData = [{ id: "test-1", value: "data" }];
-    await widgetService.setWidgetData(testWidgetId!, testData, 60000);
+    await widgetService.setWidgetData(testWidgetId!, testData, {
+      ttlMs: 60000,
+    });
 
     // Verify data is cached
     let cachedData = await widgetService.getWidgetData(testWidgetId!);
@@ -80,7 +89,9 @@ describe("WidgetService Reorder and Cache Persistence", () => {
     const testWidgetId = widgets[0]?.id;
 
     const testData = { status: "active" };
-    await widgetService.setWidgetData(testWidgetId!, testData, 60000);
+    await widgetService.setWidgetData(testWidgetId!, testData, {
+      ttlMs: 60000,
+    });
 
     // Verify initial state
     let cachedData = await widgetService.getWidgetData(testWidgetId!);
@@ -104,8 +115,8 @@ describe("WidgetService Reorder and Cache Persistence", () => {
   it("should throw error on saveWidgets failure", async () => {
     await widgetService.initialize();
 
-    // Mock AsyncStorage.setItem to reject
-    const setItemSpy = jest.spyOn(AsyncStorage, "setItem");
+    // Mock storageAdapter.setItem to reject
+    const setItemSpy = jest.spyOn(storageAdapter, "setItem");
     setItemSpy.mockRejectedValueOnce(new Error("Storage quota exceeded"));
 
     // Attempt to reorder should throw
@@ -147,7 +158,9 @@ describe("WidgetService Reorder and Cache Persistence", () => {
       expect(testWidgetId).toBeDefined();
 
       const cachedPayload = { items: ["item1", "item2"] };
-      await widgetService.setWidgetData(testWidgetId!, cachedPayload, 300000);
+      await widgetService.setWidgetData(testWidgetId!, cachedPayload, {
+        ttlMs: 300000,
+      });
 
       // Verify cache is available (dashboard displaying data)
       let cached = await widgetService.getWidgetData(testWidgetId!);
