@@ -327,7 +327,6 @@ const useStyles = (theme: AppTheme) =>
       justifyContent: "flex-start",
       borderRadius: borderRadius.xxl,
       paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
       minHeight: 48,
       backgroundColor: "rgba(255, 255, 255, 0.03)", // Subtle frosted skeleton
       width: "47%",
