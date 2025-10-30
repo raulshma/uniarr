@@ -412,25 +412,34 @@ const DiscoverScreen = () => {
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item, index }) => (
-            <AnimatedListItem
-              index={index}
-              totalItems={items.length}
-              staggerDelay={50}
-              animated={allowAnimations}
-            >
-              <DiscoverCard
-                item={item}
-                isInLibrary={
-                  itemsInLibrary.has(item.id) &&
-                  (itemsInLibrary.get(item.id)?.services.length ?? 0) > 0
-                }
-                onPress={handleCardPress}
-                onAdd={openServicePicker}
-                theme={theme}
-              />
-            </AnimatedListItem>
-          )}
+          renderItem={({ item, index }) => {
+            const itemsInLibraryHas =
+              !!itemsInLibrary &&
+              typeof (itemsInLibrary as any).has === "function";
+
+            const isInLibrary =
+              itemsInLibraryHas &&
+              (itemsInLibrary as Map<string, any>).has(item.id) &&
+              ((itemsInLibrary as Map<string, any>).get(item.id)?.services
+                ?.length ?? 0) > 0;
+
+            return (
+              <AnimatedListItem
+                index={index}
+                totalItems={items.length}
+                staggerDelay={50}
+                animated={allowAnimations}
+              >
+                <DiscoverCard
+                  item={item}
+                  isInLibrary={isInLibrary}
+                  onPress={handleCardPress}
+                  onAdd={openServicePicker}
+                  theme={theme}
+                />
+              </AnimatedListItem>
+            );
+          }}
         />
       </AnimatedSection>
     );
