@@ -30,8 +30,8 @@ import { useQuietHoursManager } from "@/hooks/useQuietHoursManager";
 import { useVoiceCommandHandler } from "@/hooks/useVoiceCommandHandler";
 import { WidgetDrawerProvider } from "@/services/widgetDrawerService";
 import { GlobalWidgetDrawer } from "@/components/widgets/GlobalWidgetDrawer";
-import { StorageBackendManager } from "@/services/storage/MMKVStorage";
-import { createQueryClientPersister } from "@/services/storage/queryClientPersister";
+import { storageInitPromise } from "@/services/storage/MMKVStorage";
+import { getPersister } from "@/services/storage/queryClientPersister";
 import { performStorageMigration } from "@/utils/storage.migration";
 
 const RootLayout = () => {
@@ -43,10 +43,11 @@ const RootLayout = () => {
 
   // Initialize storage at startup (eager detection)
   useEffect(() => {
+    // Use the module-level storage init promise so initialization begins on import.
+    let mounted = true;
     const initializeStorage = async () => {
       try {
-        const manager = StorageBackendManager.getInstance();
-        await manager.initialize();
+        await storageInitPromise;
 
         // Perform silent migration if needed
         const migrationResult = await performStorageMigration();
@@ -57,11 +58,11 @@ const RootLayout = () => {
           );
         }
 
-        setStorageReady(true);
+        if (mounted) setStorageReady(true);
       } catch (error) {
         console.error("[RootLayout] Storage initialization failed", error);
         // Mark as ready anyway to allow app to continue
-        setStorageReady(true);
+        if (mounted) setStorageReady(true);
       }
     };
 
@@ -76,7 +77,9 @@ const RootLayout = () => {
 
     const setupPersister = async () => {
       try {
-        const p = await createQueryClientPersister();
+        // Use the cached persister factory so creation begins lazily and is shared
+        // across the app instead of being recreated in component effects.
+        const p = await getPersister();
         if (!mounted) return;
         setPersister(p);
 

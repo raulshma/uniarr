@@ -2,6 +2,8 @@ import { useAuth } from "@clerk/clerk-expo";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { OAuthCallbackLoader } from "@/components/auth/OAuthCallbackLoader";
+import { initApp } from "@/services/bootstrap/appInit";
+import { logger } from "@/services/logger/LoggerService";
 
 const IndexScreen = () => {
   const { isLoaded, isSignedIn } = useAuth();
@@ -12,6 +14,7 @@ const IndexScreen = () => {
   >("loading");
   const params = useLocalSearchParams();
   const router = useRouter();
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
     // Check if this is an OAuth callback by looking for typical OAuth parameters
@@ -32,6 +35,28 @@ const IndexScreen = () => {
       setLoaderStatus("success");
     }
   }, [isLoaded, isSignedIn, isOAuthCallback]);
+
+  // Initialize core services (storage, persister) once on mount.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await initApp();
+      } catch (err) {
+        logger.error("[App Index]: Failed to initApp", {
+          error: err,
+          location: "AppIndexScreen",
+        });
+        // initApp logs errors; keep UI alive
+      } finally {
+        if (mounted) setAppReady(true);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Handle loader completion and redirect
   const handleLoaderComplete = () => {
@@ -85,6 +110,17 @@ const IndexScreen = () => {
         message="Loading..."
         minShowTimeMs={1000}
         status={loaderStatus}
+      />
+    );
+  }
+
+  // Wait for app init (storage/persister) to be ready before proceeding
+  if (!appReady) {
+    return (
+      <OAuthCallbackLoader
+        message="Initializing app..."
+        minShowTimeMs={800}
+        status="loading"
       />
     );
   }

@@ -116,3 +116,27 @@ export async function createQueryClientPersister(): Promise<Persister> {
 }
 
 export default createQueryClientPersister;
+
+// Singleton wrapper: cache a single persister instance so callers can await
+// the same persister without recreating it repeatedly. This is useful for
+// performing app-wide initialization before mounting providers.
+let _persisterPromise: Promise<Persister> | null = null;
+
+export function getPersister(): Promise<Persister> {
+  if (!_persisterPromise) {
+    _persisterPromise = (async () => {
+      try {
+        const p = await createQueryClientPersister();
+        return p;
+      } catch (err) {
+        logger.error("[QueryPersister] Failed to create persister singleton", {
+          error: err,
+        });
+        // Re-throw so callers can handle as needed
+        throw err;
+      }
+    })();
+  }
+
+  return _persisterPromise;
+}

@@ -275,3 +275,16 @@ class StorageBackendManager {
 
 export { StorageBackendManager, IStorage, StorageBackend };
 export default StorageBackendManager;
+
+// Eager initialization helper: promise that begins initialization when the
+// module is imported. Consumers can await this to ensure storage is ready
+// without having to call initialize() repeatedly from components.
+export const storageInitPromise: Promise<void> = (async () => {
+  try {
+    const manager = StorageBackendManager.getInstance();
+    await manager.initialize();
+  } catch (err) {
+    // Initialization errors are logged inside the manager; swallow here so
+    // callers can still await without throwing unexpectedly.
+  }
+})();
