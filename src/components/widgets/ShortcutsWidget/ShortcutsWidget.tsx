@@ -137,6 +137,50 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
 
   const gridLayout = getGridLayout();
 
+  const getSkeletonSizeStyles = (size: string) => {
+    switch (size) {
+      case "small":
+        return styles.smallSkeletonShortcut;
+      case "large":
+        return styles.largeSkeletonShortcut;
+      default: // medium
+        return styles.mediumSkeletonShortcut;
+    }
+  };
+
+  const getSkeletonIconSize = (size: string) => {
+    switch (size) {
+      case "small":
+        return styles.smallSkeletonIcon;
+      case "large":
+        return styles.largeSkeletonIcon;
+      default: // medium
+        return styles.mediumSkeletonIcon;
+    }
+  };
+
+  const getSkeletonTextWidth = (size: string): number => {
+    switch (size) {
+      case "small":
+        return 45;
+      case "large":
+        return 80;
+      default: // medium
+        return 60;
+    }
+  };
+
+  const getSkeletonTextHeight = (size: string): number => {
+    switch (size) {
+      case "small":
+        return 12;
+      case "large":
+        return 18;
+      default: // medium
+        return 14;
+    }
+  };
+
   if (loading) {
     return (
       <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
@@ -147,12 +191,23 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
         >
           <WidgetHeader title={widget.title} onEdit={onEdit} />
           <View style={styles.loadingSkeleton}>
-            {Array.from({ length: 4 }).map((_, index) => (
-              <View key={index} style={styles.skeletonShortcut}>
-                <View style={styles.skeletonIcon} />
+            {Array.from({ length: gridLayout.columns * 2 }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.skeletonShortcut,
+                  getSkeletonSizeStyles(widget.size),
+                ]}
+              >
+                <View
+                  style={[
+                    styles.skeletonIcon,
+                    getSkeletonIconSize(widget.size),
+                  ]}
+                />
                 <SkeletonPlaceholder
-                  width={60}
-                  height={14}
+                  width={getSkeletonTextWidth(widget.size)}
+                  height={getSkeletonTextHeight(widget.size)}
                   borderRadius={4}
                   style={{ marginLeft: spacing.sm }}
                 />
@@ -275,9 +330,23 @@ const useStyles = (theme: AppTheme) =>
       paddingVertical: spacing.xs,
       paddingHorizontal: spacing.md,
       minHeight: 48,
-      minWidth: 160,
-      maxWidth: 184,
       backgroundColor: "rgba(255, 255, 255, 0.03)", // Subtle frosted skeleton
+      width: "47%",
+    },
+    smallSkeletonShortcut: {
+      minHeight: 44,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+    },
+    mediumSkeletonShortcut: {
+      minHeight: 48,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+    },
+    largeSkeletonShortcut: {
+      minHeight: 56,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
     },
     skeletonIcon: {
       width: 24,
@@ -285,6 +354,21 @@ const useStyles = (theme: AppTheme) =>
       borderRadius: 12,
       backgroundColor: theme.colors.onSurfaceVariant,
       opacity: 0.3,
+    },
+    smallSkeletonIcon: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+    },
+    mediumSkeletonIcon: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+    },
+    largeSkeletonIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
     },
     emptyContainer: {
       flex: 1,
