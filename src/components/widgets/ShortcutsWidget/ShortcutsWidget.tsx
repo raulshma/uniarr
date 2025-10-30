@@ -276,7 +276,6 @@ const useStyles = (theme: AppTheme) =>
     },
     container: {
       borderRadius: borderRadius.xl,
-      padding: spacing.md,
       width: "100%",
     },
     smallContainer: {
