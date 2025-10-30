@@ -187,7 +187,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               >
                 <Text
                   variant="labelSmall"
-                  style={{ color: theme.colors.primary }}
+                  style={{ color: theme.colors.onPrimaryContainer }}
                 >
                   {description}
                 </Text>
@@ -213,10 +213,10 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
                 style={{
                   color:
                     status === "online"
-                      ? theme.colors.primary
+                      ? theme.colors.onPrimaryContainer
                       : status === "degraded"
-                        ? theme.colors.tertiary
-                        : theme.colors.error,
+                        ? theme.colors.onTertiaryContainer
+                        : theme.colors.onErrorContainer,
                 }}
               >
                 {status === "online"
@@ -231,12 +231,12 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               <View
                 style={[
                   styles.badge,
-                  { backgroundColor: theme.colors.elevation.level2 },
+                  { backgroundColor: theme.colors.surfaceVariant },
                 ]}
               >
                 <Text
                   variant="labelSmall"
-                  style={{ color: theme.colors.onSurface }}
+                  style={{ color: theme.colors.onSurfaceVariant }}
                 >
                   {`${latency} ms`}
                 </Text>
@@ -247,12 +247,12 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               <View
                 style={[
                   styles.badge,
-                  { backgroundColor: theme.colors.elevation.level2 },
+                  { backgroundColor: theme.colors.surfaceVariant },
                 ]}
               >
                 <Text
                   variant="labelSmall"
-                  style={{ color: theme.colors.onSurface }}
+                  style={{ color: theme.colors.onSurfaceVariant }}
                 >
                   {`v${version}`}
                 </Text>
