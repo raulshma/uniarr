@@ -16,7 +16,6 @@
  */
 
 import { StorageBackendManager, AsyncStorageAdapter } from "./MMKVStorage";
-import { logger } from "@/services/logger/LoggerService";
 import type { IStorage } from "./MMKVStorage";
 
 /**
@@ -39,7 +38,7 @@ class StorageAdapter implements IStorage {
       // Log a single warning so developers know MMKV/native NitroModules
       // are not available and AsyncStorage is being used instead.
       if (!this.fallbackWarned) {
-        logger.warn(
+        console.warn(
           "[StorageAdapter] MMKV backend not yet initialized — using AsyncStorage fallback. This may be expected in Expo Go.",
         );
         this.fallbackWarned = true;

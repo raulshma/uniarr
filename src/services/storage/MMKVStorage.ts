@@ -10,7 +10,8 @@
  * await mmkvStorage.initialize(); // Call during app startup
  */
 
-import { logger } from "@/services/logger/LoggerService";
+// Use console for internal storage-layer logging to avoid importing the
+// application logger (which would create a circular dependency).
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createMMKV } from "react-native-mmkv";
 import Constants from "expo-constants";
@@ -41,7 +42,7 @@ class MMKVStorageAdapter implements IStorage {
       const value = this.storage.getString(key);
       return value ?? null;
     } catch (error) {
-      logger.error("[MMKVStorage] Failed to get item", { key, error });
+      console.error("[MMKVStorage] Failed to get item", { key, error });
       return null;
     }
   }
@@ -50,7 +51,7 @@ class MMKVStorageAdapter implements IStorage {
     try {
       this.storage.set(key, value);
     } catch (error) {
-      logger.error("[MMKVStorage] Failed to set item", { key, error });
+      console.error("[MMKVStorage] Failed to set item", { key, error });
       throw error;
     }
   }
@@ -59,7 +60,7 @@ class MMKVStorageAdapter implements IStorage {
     try {
       this.storage.remove(key);
     } catch (error) {
-      logger.error("[MMKVStorage] Failed to remove item", {
+      console.error("[MMKVStorage] Failed to remove item", {
         key,
         error,
       });
@@ -71,7 +72,7 @@ class MMKVStorageAdapter implements IStorage {
     try {
       return this.storage.getAllKeys();
     } catch (error) {
-      logger.error("[MMKVStorage] Failed to get all keys", { error });
+      console.error("[MMKVStorage] Failed to get all keys", { error });
       return [];
     }
   }
@@ -80,7 +81,7 @@ class MMKVStorageAdapter implements IStorage {
     try {
       this.storage.clearAll();
     } catch (error) {
-      logger.error("[MMKVStorage] Failed to clear storage", { error });
+      console.error("[MMKVStorage] Failed to clear storage", { error });
       throw error;
     }
   }
@@ -95,7 +96,7 @@ export class AsyncStorageAdapter implements IStorage {
     try {
       return await AsyncStorage.getItem(key);
     } catch (error) {
-      logger.error("[AsyncStorageAdapter] Failed to get item", {
+      console.error("[AsyncStorageAdapter] Failed to get item", {
         key,
         error,
       });
@@ -107,7 +108,7 @@ export class AsyncStorageAdapter implements IStorage {
     try {
       await AsyncStorage.setItem(key, value);
     } catch (error) {
-      logger.error("[AsyncStorageAdapter] Failed to set item", {
+      console.error("[AsyncStorageAdapter] Failed to set item", {
         key,
         error,
       });
@@ -119,7 +120,7 @@ export class AsyncStorageAdapter implements IStorage {
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      logger.error("[AsyncStorageAdapter] Failed to remove item", {
+      console.error("[AsyncStorageAdapter] Failed to remove item", {
         key,
         error,
       });
@@ -131,7 +132,7 @@ export class AsyncStorageAdapter implements IStorage {
     try {
       return Array.from(await AsyncStorage.getAllKeys());
     } catch (error) {
-      logger.error("[AsyncStorageAdapter] Failed to get all keys", {
+      console.error("[AsyncStorageAdapter] Failed to get all keys", {
         error,
       });
       return [];
@@ -142,7 +143,7 @@ export class AsyncStorageAdapter implements IStorage {
     try {
       await AsyncStorage.clear();
     } catch (error) {
-      logger.error("[AsyncStorageAdapter] Failed to clear storage", {
+      console.error("[AsyncStorageAdapter] Failed to clear storage", {
         error,
       });
       throw error;
@@ -176,7 +177,7 @@ class StorageBackendManager {
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
-      logger.debug("[StorageBackendManager] Storage already initialized", {
+      console.debug("[StorageBackendManager] Storage already initialized", {
         backend: this.backend,
       });
       return;
@@ -186,7 +187,7 @@ class StorageBackendManager {
     // fall back to AsyncStorage to avoid throwing at startup.
     try {
       if (Constants && Constants.appOwnership === "expo") {
-        logger.info(
+        console.info(
           "[StorageBackendManager] Detected Expo Go (appOwnership=expo). Skipping MMKV and using AsyncStorage fallback",
         );
         this.adapter = new AsyncStorageAdapter();
@@ -196,7 +197,7 @@ class StorageBackendManager {
       }
     } catch (err) {
       // If anything goes wrong accessing Constants, continue to attempt MMKV initialization.
-      logger.debug(
+      console.debug(
         "[StorageBackendManager] Error checking Constants.appOwnership, proceeding to attempt MMKV",
         { error: err instanceof Error ? err.message : String(err) },
       );
@@ -214,9 +215,9 @@ class StorageBackendManager {
       this.mmkvInstance = mmkvInstance;
       this.backend = "mmkv";
 
-      logger.info("[StorageBackendManager] Using MMKV storage backend");
+      console.info("[StorageBackendManager] Using MMKV storage backend");
     } catch (error) {
-      logger.warn(
+      console.warn(
         "[StorageBackendManager] MMKV not available, falling back to AsyncStorage",
         {
           error: error instanceof Error ? error.message : String(error),
@@ -284,6 +285,9 @@ export const storageInitPromise: Promise<void> = (async () => {
     const manager = StorageBackendManager.getInstance();
     await manager.initialize();
   } catch (err) {
+    console.error("[StorageInit] Error during storage initialization", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     // Initialization errors are logged inside the manager; swallow here so
     // callers can still await without throwing unexpectedly.
   }
