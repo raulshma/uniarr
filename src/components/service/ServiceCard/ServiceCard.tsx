@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
+import type { StyleProp, ViewStyle, ImageSource } from "react-native";
 import { StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
@@ -26,7 +26,7 @@ export type ServiceCardProps = {
   status: ServiceStatusState;
   statusDescription?: string;
   lastCheckedAt?: Date | string;
-  icon?: React.ComponentProps<typeof Avatar.Icon>["icon"];
+  icon?: React.ComponentProps<typeof Avatar.Icon>["icon"] | ImageSource;
   description?: string;
   latency?: number;
   version?: string;
@@ -78,6 +78,61 @@ const formatRelativeTime = (input?: Date | string): string | undefined => {
 
   const months = Math.round(days / 30);
   return `${months}mo ago`;
+};
+
+const arePropsEqual = (
+  prevProps: ServiceCardProps,
+  nextProps: ServiceCardProps,
+) => {
+  // Only re-render if these essential props changed
+  const propsToCompare: (keyof ServiceCardProps)[] = [
+    "id",
+    "name",
+    "url",
+    "status",
+    "statusDescription",
+    "latency",
+    "version",
+    "lastCheckedAt",
+    "icon",
+    "description",
+    "isDeleting",
+  ];
+
+  for (const prop of propsToCompare) {
+    const prevValue = prevProps[prop];
+    const nextValue = nextProps[prop];
+
+    if (prevValue !== nextValue) {
+      // Special handling for objects that might be the same reference
+      if (
+        prop === "icon" &&
+        typeof prevValue === "object" &&
+        typeof nextValue === "object" &&
+        prevValue &&
+        nextValue &&
+        "uri" in prevValue &&
+        "uri" in nextValue
+      ) {
+        if (prevValue.uri !== nextValue.uri) {
+          return false; // Re-render needed
+        }
+      } else {
+        return false; // Re-render needed for other changed props
+      }
+    }
+  }
+
+  // Function props rarely change, but check them anyway
+  if (
+    prevProps.onPress !== nextProps.onPress ||
+    prevProps.onEditPress !== nextProps.onEditPress ||
+    prevProps.onDeletePress !== nextProps.onDeletePress
+  ) {
+    return false;
+  }
+
+  return true; // No re-render needed
 };
 
 const ServiceCard: React.FC<ServiceCardProps> = ({
@@ -152,12 +207,20 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
         {/* Top Section: icon + name + status */}
         <View style={styles.topSection}>
           <View style={styles.topRow}>
-            <Avatar.Icon
-              size={avatarSizes.lg}
-              icon={icon}
-              style={{ backgroundColor: theme.colors.primaryContainer }}
-              color={theme.colors.onPrimaryContainer}
-            />
+            {typeof icon === "object" && "uri" in icon ? (
+              <Avatar.Image
+                size={avatarSizes.lg}
+                source={icon}
+                style={{ backgroundColor: theme.colors.primaryContainer }}
+              />
+            ) : (
+              <Avatar.Icon
+                size={avatarSizes.lg}
+                icon={icon as React.ComponentProps<typeof Avatar.Icon>["icon"]}
+                style={{ backgroundColor: theme.colors.primaryContainer }}
+                color={theme.colors.onPrimaryContainer}
+              />
+            )}
 
             <View
               style={[styles.meta, { marginLeft: theme.custom.spacing.md }]}
@@ -335,7 +398,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   );
 };
 
-export default ServiceCard;
+export default React.memo(ServiceCard, arePropsEqual);
 
 const styles = StyleSheet.create({
   root: {
