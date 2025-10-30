@@ -40,7 +40,7 @@ type ServiceStatusCacheEntry = Omit<ServiceStatus, "lastChecked"> & {
   lastChecked: string | Date;
 };
 
-const SERVICE_STATUS_CACHE_TTL_MS = 2 * 60 * 1000;
+const SERVICE_STATUS_CACHE_TTL_MS = 5 * 60 * 1000; // Increased to 5 minutes for better performance
 
 const reviveServiceStatusEntries = (
   entries: ServiceStatusCacheEntry[],
@@ -187,17 +187,19 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
   }, [checkServiceStatus, config.showOfflineOnly, selectedServiceIds]);
 
   const loadServiceStatuses = useCallback(
-    async (useCache = true) => {
+    async (forceRefresh = false) => {
       try {
-        if (useCache) {
+        // Always try to show cached data first for better UX
+        if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<
             ServiceStatusCacheEntry[]
           >(widget.id, configSignature);
-          if (cached) {
+          if (cached && cached.length > 0) {
             setServiceStatuses(reviveServiceStatusEntries(cached));
           }
         }
 
+        // Fetch fresh data in background if cache is stale or missing
         const freshStatuses = await fetchServiceStatuses();
         setServiceStatuses(freshStatuses);
         await widgetService.setWidgetData(widget.id, freshStatuses, {
@@ -206,9 +208,13 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
         });
       } catch (error) {
         console.error("Failed to load service statuses:", error);
+        // If we failed and have no cached data, show empty state
+        if (serviceStatuses.length === 0) {
+          setServiceStatuses([]);
+        }
       }
     },
-    [configSignature, fetchServiceStatuses, widget.id],
+    [configSignature, fetchServiceStatuses, widget.id, serviceStatuses.length],
   );
 
   useEffect(() => {
@@ -218,7 +224,7 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
   const handleRefresh = useCallback(async () => {
     onPress();
     setRefreshing(true);
-    await loadServiceStatuses(false);
+    await loadServiceStatuses(true);
     setRefreshing(false);
     if (onRefresh) {
       onRefresh();
