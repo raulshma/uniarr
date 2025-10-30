@@ -6,6 +6,7 @@ import {
   useTheme,
   Switch,
   Button,
+  IconButton,
   Portal,
   Dialog,
 } from "react-native-paper";
@@ -19,6 +20,7 @@ import {
   AnimatedSection,
   SettingsListItem,
   SettingsGroup,
+  SkiaLoader,
 } from "@/components/common";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -42,12 +44,21 @@ const WidgetSettingsScreen = () => {
   }, []);
 
   const loadWidgets = async () => {
+    const startTime = Date.now();
     try {
       setLoading(true);
       await widgetService.initialize();
       const availableWidgets = await widgetService.getWidgets();
       setWidgets(availableWidgets);
       setLocalWidgets(availableWidgets);
+
+      // Ensure minimum loading time for better UX (at least 300ms to show loader)
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, 300 - elapsedTime);
+
+      if (remainingTime > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remainingTime));
+      }
     } catch (error) {
       console.error("Failed to load widgets:", error);
     } finally {
@@ -308,7 +319,7 @@ const WidgetSettingsScreen = () => {
       <SafeAreaView style={styles.container}>
         <TabHeader title="Widget Settings" />
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Loading widgets...</Text>
+          <SkiaLoader size={64} />
         </View>
       </SafeAreaView>
     );
@@ -400,23 +411,17 @@ const WidgetSettingsScreen = () => {
                         ) : (
                           <View style={styles.widgetActions}>
                             {isConfigurable(widget) && (
-                              <Button
+                              <IconButton
+                                icon="tune"
                                 mode="outlined"
-                                compact
                                 onPress={() => handleConfigure(widget)}
-                                style={{ height: 32 }}
-                              >
-                                Configure
-                              </Button>
+                              />
                             )}
-                            <Button
+                            <IconButton
+                              icon="aspect-ratio"
                               mode="contained-tonal"
-                              compact
                               onPress={() => handleWidgetSizePress(widget)}
-                              style={{ height: 32 }}
-                            >
-                              Resize
-                            </Button>
+                            />
                             <Switch
                               value={widget.enabled}
                               onValueChange={() =>

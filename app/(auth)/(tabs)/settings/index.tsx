@@ -539,7 +539,7 @@ const SettingsScreen = () => {
           <SettingsGroup>
             <AnimatedListItem
               index={0}
-              totalItems={1}
+              totalItems={2}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -557,6 +557,26 @@ const SettingsScreen = () => {
                   router.push("/(auth)/settings/experimental-features")
                 }
                 groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Elements Configuration"
+                subtitle="Configure UI elements and animations"
+                left={{ iconName: "palette-swatch-variant" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/settings/elements")}
+                groupPosition="bottom"
               />
             </AnimatedListItem>
           </SettingsGroup>
@@ -843,8 +863,8 @@ const SettingsScreen = () => {
               />
             </AnimatedListItem>
             <AnimatedListItem
-              index={1}
-              totalItems={3}
+              index={0}
+              totalItems={1}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -859,7 +879,7 @@ const SettingsScreen = () => {
                   />
                 }
                 onPress={handleCacheLimitPress}
-                groupPosition="bottom"
+                groupPosition="single"
               />
             </AnimatedListItem>
           </SettingsGroup>
@@ -947,9 +967,8 @@ const SettingsScreen = () => {
                 trailing={
                   <Button
                     mode="contained-tonal"
-                    compact
                     onPress={() => setJellyseerrRetriesVisible(true)}
-                    style={{ height: 32 }}
+                    style={{ height: 36 }}
                   >
                     Set
                   </Button>
@@ -1000,11 +1019,10 @@ const SettingsScreen = () => {
                 trailing={
                   <Button
                     mode="contained-tonal"
-                    compact
                     onPress={handleCheckForUpdate}
                     loading={isCheckingUpdate}
                     disabled={isCheckingUpdate}
-                    style={{ height: 32 }}
+                    style={{ height: 36 }}
                   >
                     Check
                   </Button>
@@ -1024,9 +1042,8 @@ const SettingsScreen = () => {
                 trailing={
                   <Button
                     mode="contained-tonal"
-                    compact
                     onPress={() => setLogLevelVisible(true)}
-                    style={{ height: 32 }}
+                    style={{ height: 36 }}
                   >
                     Set
                   </Button>

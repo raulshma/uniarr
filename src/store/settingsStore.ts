@@ -63,6 +63,14 @@ type SettingsData = {
   frostedWidgetsEnabled: boolean;
   // Show animated gradient background on dashboard
   gradientBackgroundEnabled: boolean;
+  // SkiaLoader configuration
+  skiaLoaderConfig?: {
+    size: number;
+    strokeWidth: number;
+    duration: number;
+    blur: number;
+    colors: string[];
+  };
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -101,6 +109,13 @@ interface SettingsState extends SettingsData {
   setLastReleaseNotesCheckedAt: (timestamp: string | undefined) => void;
   setFrostedWidgetsEnabled: (enabled: boolean) => void;
   setGradientBackgroundEnabled: (enabled: boolean) => void;
+  setSkiaLoaderConfig: (config: {
+    size: number;
+    strokeWidth: number;
+    duration: number;
+    blur: number;
+    colors: string[];
+  }) => void;
   // (thumbnail setters removed)
 }
 
@@ -248,6 +263,7 @@ export const useSettingsStore = create<SettingsState>()(
         set({ frostedWidgetsEnabled: enabled }),
       setGradientBackgroundEnabled: (enabled: boolean) =>
         set({ gradientBackgroundEnabled: enabled }),
+      setSkiaLoaderConfig: (config) => set({ skiaLoaderConfig: config }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -287,6 +303,7 @@ export const useSettingsStore = create<SettingsState>()(
         lastReleaseNotesCheckedAt: state.lastReleaseNotesCheckedAt,
         frostedWidgetsEnabled: state.frostedWidgetsEnabled,
         gradientBackgroundEnabled: state.gradientBackgroundEnabled,
+        skiaLoaderConfig: state.skiaLoaderConfig,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
@@ -451,6 +468,8 @@ export const useSettingsStore = create<SettingsState>()(
           gradientBackgroundEnabled:
             partial.gradientBackgroundEnabled ??
             baseDefaults.gradientBackgroundEnabled,
+          skiaLoaderConfig:
+            partial.skiaLoaderConfig ?? baseDefaults.skiaLoaderConfig,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
