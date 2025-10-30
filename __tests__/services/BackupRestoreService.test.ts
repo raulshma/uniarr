@@ -192,6 +192,11 @@ describe("BackupRestoreService - Backup Options", () => {
       includeRecentIPs: false,
       includeDownloadConfig: true,
       includeServicesViewState: false,
+      includeWidgetsConfig: false,
+      includeWidgetConfigCredentials: false,
+      includeWidgetSecureCredentials: false,
+      includeWidgetProfiles: false,
+      includeWidgetProfileCredentials: false,
       encryptSensitive: false,
     };
 
@@ -211,6 +216,11 @@ describe("BackupRestoreService - Backup Options", () => {
       includeRecentIPs: false,
       includeDownloadConfig: false,
       includeServicesViewState: false,
+      includeWidgetsConfig: false,
+      includeWidgetConfigCredentials: false,
+      includeWidgetSecureCredentials: false,
+      includeWidgetProfiles: false,
+      includeWidgetProfileCredentials: false,
       encryptSensitive: true,
       password: "test", // Too short
     };

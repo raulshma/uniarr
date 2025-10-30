@@ -13,6 +13,7 @@
 import { logger } from "@/services/logger/LoggerService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createMMKV } from "react-native-mmkv";
+import Constants from "expo-constants";
 
 type StorageBackend = "mmkv" | "asyncstorage";
 
@@ -89,7 +90,7 @@ class MMKVStorageAdapter implements IStorage {
  * AsyncStorage Adapter
  * Provides compatibility layer for AsyncStorage (used as fallback)
  */
-class AsyncStorageAdapter implements IStorage {
+export class AsyncStorageAdapter implements IStorage {
   async getItem(key: string): Promise<string | null> {
     try {
       return await AsyncStorage.getItem(key);
@@ -156,6 +157,7 @@ class AsyncStorageAdapter implements IStorage {
 class StorageBackendManager {
   private static instance: StorageBackendManager;
   private adapter: IStorage | null = null;
+  private mmkvInstance: any | undefined;
   private backend: StorageBackend = "asyncstorage";
   private initialized = false;
 
@@ -179,6 +181,26 @@ class StorageBackendManager {
       });
       return;
     }
+    // If running in Expo Go (Constants.appOwnership === 'expo'), the native
+    // MMKV / NitroModules will not be available. Detect Expo Go and immediately
+    // fall back to AsyncStorage to avoid throwing at startup.
+    try {
+      if (Constants && Constants.appOwnership === "expo") {
+        logger.info(
+          "[StorageBackendManager] Detected Expo Go (appOwnership=expo). Skipping MMKV and using AsyncStorage fallback",
+        );
+        this.adapter = new AsyncStorageAdapter();
+        this.backend = "asyncstorage";
+        this.initialized = true;
+        return;
+      }
+    } catch (err) {
+      // If anything goes wrong accessing Constants, continue to attempt MMKV initialization.
+      logger.debug(
+        "[StorageBackendManager] Error checking Constants.appOwnership, proceeding to attempt MMKV",
+        { error: err instanceof Error ? err.message : String(err) },
+      );
+    }
 
     try {
       const mmkvInstance = createMMKV({ id: "uniarr-storage" });
@@ -188,6 +210,8 @@ class StorageBackendManager {
       mmkvInstance.remove("__test__");
 
       this.adapter = new MMKVStorageAdapter(mmkvInstance);
+      // keep raw MMKV instance available for sync persisters
+      this.mmkvInstance = mmkvInstance;
       this.backend = "mmkv";
 
       logger.info("[StorageBackendManager] Using MMKV storage backend");
@@ -231,6 +255,14 @@ class StorageBackendManager {
    */
   isMMKV(): boolean {
     return this.backend === "mmkv";
+  }
+
+  /**
+   * Return the raw MMKV JS instance if available.
+   * Useful for sync persisters that require the synchronous MMKV API.
+   */
+  getMMKVInstance(): any | undefined {
+    return this.mmkvInstance;
   }
 
   /**

@@ -10,21 +10,21 @@ jest.mock("@/utils/network.utils", () => ({
   testNetworkConnectivity: jest.fn().mockResolvedValue({
     success: true,
     latency: 50,
-  }),
-  diagnoseVpnIssues: jest.fn().mockReturnValue([]),
+  } as any),
+  diagnoseVpnIssues: jest.fn().mockReturnValue([] as any),
 }));
 
 // Mock API test utilities
 jest.mock("@/utils/api-test.utils", () => ({
   testSonarrApi: jest.fn().mockResolvedValue({
     success: true,
-  }),
+  } as any),
   testRadarrApi: jest.fn().mockResolvedValue({
     success: true,
-  }),
+  } as any),
   testQBittorrentApi: jest.fn().mockResolvedValue({
     success: true,
-  }),
+  } as any),
 }));
 
 type MockAxiosInstance = {

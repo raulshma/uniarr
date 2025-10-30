@@ -15,7 +15,8 @@
  * await storageAdapter.clear();
  */
 
-import { StorageBackendManager } from "./MMKVStorage";
+import { StorageBackendManager, AsyncStorageAdapter } from "./MMKVStorage";
+import { logger } from "@/services/logger/LoggerService";
 import type { IStorage } from "./MMKVStorage";
 
 /**
@@ -23,13 +24,27 @@ import type { IStorage } from "./MMKVStorage";
  * Initialized by StorageBackendManager during app startup
  */
 class StorageAdapter implements IStorage {
+  private fallbackAdapter: IStorage | null = null;
+  private fallbackWarned = false;
+
   private getActiveAdapter(): IStorage {
     const manager = StorageBackendManager.getInstance();
 
+    // If storage manager hasn't finished initialization yet, use AsyncStorage
+    // as a safe fallback so rehydration and early reads don't throw.
     if (!manager.isInitialized()) {
-      throw new Error(
-        "Storage adapter not initialized. Ensure StorageBackendManager.getInstance().initialize() is called in app/_layout.tsx",
-      );
+      if (!this.fallbackAdapter) {
+        this.fallbackAdapter = new AsyncStorageAdapter();
+      }
+      // Log a single warning so developers know MMKV/native NitroModules
+      // are not available and AsyncStorage is being used instead.
+      if (!this.fallbackWarned) {
+        logger.warn(
+          "[StorageAdapter] MMKV backend not yet initialized — using AsyncStorage fallback. This may be expected in Expo Go.",
+        );
+        this.fallbackWarned = true;
+      }
+      return this.fallbackAdapter;
     }
 
     return manager.getAdapter();

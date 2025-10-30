@@ -1,5 +1,7 @@
 import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, hydrate } from "@tanstack/react-query";
+import type { Persister } from "@tanstack/react-query-persist-client";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { StatusBar } from "expo-status-bar";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useMemo, type ComponentType, useEffect, useState } from "react";
@@ -29,12 +31,15 @@ import { useVoiceCommandHandler } from "@/hooks/useVoiceCommandHandler";
 import { WidgetDrawerProvider } from "@/services/widgetDrawerService";
 import { GlobalWidgetDrawer } from "@/components/widgets/GlobalWidgetDrawer";
 import { StorageBackendManager } from "@/services/storage/MMKVStorage";
+import { createQueryClientPersister } from "@/services/storage/queryClientPersister";
 import { performStorageMigration } from "@/utils/storage.migration";
 
 const RootLayout = () => {
   const theme = useTheme();
   const clerkPublishableKey = useMemo(() => getClerkPublishableKey(), []);
   const [storageReady, setStorageReady] = useState(false);
+  const [persisterReady, setPersisterReady] = useState(false);
+  const [persister, setPersister] = useState<Persister | null>(null);
 
   // Initialize storage at startup (eager detection)
   useEffect(() => {
@@ -63,15 +68,56 @@ const RootLayout = () => {
     initializeStorage();
   }, []);
 
+  // Create and hydrate persister once storage is ready
+  useEffect(() => {
+    if (!storageReady) return;
+
+    let mounted = true;
+
+    const setupPersister = async () => {
+      try {
+        const p = await createQueryClientPersister();
+        if (!mounted) return;
+        setPersister(p);
+
+        // Attempt to restore and hydrate queryClient so UI can use cached data immediately
+        if (p && typeof p.restoreClient === "function") {
+          const restored = await p.restoreClient();
+          if (restored) {
+            // restored may contain { clientState } or be the raw dehydrated state
+            const maybeClientState = (restored as any).clientState ?? restored;
+            try {
+              hydrate(queryClient, maybeClientState);
+            } catch (err) {
+              console.warn(
+                "[RootLayout] Failed to hydrate queryClient from persister",
+                err,
+              );
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[RootLayout] Failed to create query persister", error);
+      } finally {
+        if (mounted) setPersisterReady(true);
+      }
+    };
+
+    setupPersister();
+
+    return () => {
+      mounted = false;
+    };
+  }, [storageReady]);
+
   // Don't render until storage is ready
-  if (!storageReady) {
+  if (!storageReady || !persisterReady) {
     return (
       <View style={{ flex: 1, backgroundColor: theme?.colors?.background }}>
         {/* Storage initialization screen */}
       </View>
     );
   }
-
   return (
     <GestureHandlerRootView
       style={{ flex: 1, backgroundColor: theme.colors.background }}
@@ -83,42 +129,90 @@ const RootLayout = () => {
         >
           <ClerkLoaded>
             <AuthProvider>
-              <QueryClientProvider client={queryClient}>
-                <PaperProvider theme={theme || defaultTheme}>
-                  <WidgetDrawerProvider>
-                    <DialogProvider>
-                      <DownloadManagerProvider
-                        managerOptions={{
-                          queueConfig: {
-                            maxConcurrentDownloads: 3,
-                            allowMobileData: false,
-                            allowBackgroundDownloads: true,
-                            maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
-                          },
-                          progressUpdateInterval: 1500,
-                          enablePersistence: true,
-                        }}
-                        indicatorPosition="floating"
-                        onInitialized={(success) => {
-                          console.log("Download manager initialized:", success);
-                        }}
-                        onError={(error) => {
-                          console.error(
-                            "Download manager initialization failed:",
-                            error,
-                          );
-                        }}
-                      >
-                        <StatusBar style={theme.dark ? "light" : "dark"} />
-                        <ErrorBoundary context={{ location: "RootLayout" }}>
-                          <AppContent />
-                        </ErrorBoundary>
-                        <QueryDevtools />
-                      </DownloadManagerProvider>
-                    </DialogProvider>
-                  </WidgetDrawerProvider>
-                </PaperProvider>
-              </QueryClientProvider>
+              {persister ? (
+                <PersistQueryClientProvider
+                  client={queryClient}
+                  persistOptions={{ persister }}
+                >
+                  <PaperProvider theme={theme || defaultTheme}>
+                    <WidgetDrawerProvider>
+                      <DialogProvider>
+                        <DownloadManagerProvider
+                          managerOptions={{
+                            queueConfig: {
+                              maxConcurrentDownloads: 3,
+                              allowMobileData: false,
+                              allowBackgroundDownloads: true,
+                              maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
+                            },
+                            progressUpdateInterval: 1500,
+                            enablePersistence: true,
+                          }}
+                          indicatorPosition="floating"
+                          onInitialized={(success) => {
+                            console.log(
+                              "Download manager initialized:",
+                              success,
+                            );
+                          }}
+                          onError={(error) => {
+                            console.error(
+                              "Download manager initialization failed:",
+                              error,
+                            );
+                          }}
+                        >
+                          <StatusBar style={theme.dark ? "light" : "dark"} />
+                          <ErrorBoundary context={{ location: "RootLayout" }}>
+                            <AppContent />
+                          </ErrorBoundary>
+                          <QueryDevtools />
+                        </DownloadManagerProvider>
+                      </DialogProvider>
+                    </WidgetDrawerProvider>
+                  </PaperProvider>
+                </PersistQueryClientProvider>
+              ) : (
+                <QueryClientProvider client={queryClient}>
+                  <PaperProvider theme={theme || defaultTheme}>
+                    <WidgetDrawerProvider>
+                      <DialogProvider>
+                        <DownloadManagerProvider
+                          managerOptions={{
+                            queueConfig: {
+                              maxConcurrentDownloads: 3,
+                              allowMobileData: false,
+                              allowBackgroundDownloads: true,
+                              maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
+                            },
+                            progressUpdateInterval: 1500,
+                            enablePersistence: true,
+                          }}
+                          indicatorPosition="floating"
+                          onInitialized={(success) => {
+                            console.log(
+                              "Download manager initialized:",
+                              success,
+                            );
+                          }}
+                          onError={(error) => {
+                            console.error(
+                              "Download manager initialization failed:",
+                              error,
+                            );
+                          }}
+                        >
+                          <StatusBar style={theme.dark ? "light" : "dark"} />
+                          <ErrorBoundary context={{ location: "RootLayout" }}>
+                            <AppContent />
+                          </ErrorBoundary>
+                          <QueryDevtools />
+                        </DownloadManagerProvider>
+                      </DialogProvider>
+                    </WidgetDrawerProvider>
+                  </PaperProvider>
+                </QueryClientProvider>
+              )}
             </AuthProvider>
           </ClerkLoaded>
         </ClerkProvider>

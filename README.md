@@ -19,24 +19,33 @@ UniArr provides a comprehensive, unified interface for managing all your media a
   - **Media Managers**: Sonarr (TV), Radarr (Movies), Lidarr (Music), Jellyseerr (Requests)
   - **Download Clients**: qBittorrent, Transmission, Deluge, rTorrent, SABnzbd, NZBGet
   - **Supporting Services**: Prowlarr (Indexer), Bazarr (Subtitles), Jellyfin (Media Server), AdGuard Home (DNS/Ad-blocking)
+  - **External APIs**: The Movie Database (TMDb) integration for movie/TV discovery and metadata
 - **Unified Search**: Cross-service search with intelligent deduplication and filtering
 - **Release Calendar**: Comprehensive calendar merging releases from all Sonarr/Radarr instances with multiple view modes (Month, Week, Day, List)
 - **Anime Integration**: MyAnimeList (Jikan) integration with detailed anime information and tracking
 - **Download Management**: Centralized download queue management with progress tracking and remote control capabilities
+- **Media Editor**: Advanced media metadata editing with multi-source ratings
+- **Content Ranking**: Intelligent release quality scoring and ranking system
 
 ### 🎨 Advanced User Interface
 
-- **Dynamic Widget System**: 12+ customizable widgets including:
-  - Bookmarks (custom navigation shortcuts)
-  - Weather (animated gradients with real-time updates)
-  - Service Status monitoring
-  - Download Progress tracking
-  - Calendar Preview with statistics
-  - RSS Feeds and social media (Reddit, Twitch, YouTube, Hacker News)
+- **Dynamic Widget System**: 15+ customizable widgets including:
+  - **Bookmarks Widget**: Custom navigation shortcuts with health monitoring and icon picker
+  - **Weather Widget**: Animated weather gradients with real-time updates and location services
+  - **Service Status Widget**: Real-time service monitoring with health checks
+  - **Download Progress Widget**: Active download tracking with queue management
+  - **Calendar Preview Widget**: Upcoming releases preview with statistics
+  - **Statistics Widget**: Overview metrics aggregation and analytics
+  - **Social Media Widgets**: Reddit, Twitch, YouTube, Hacker News integration
+  - **RSS Feed Widget**: RSS feed reader with custom sources
+  - **Recent Activity Widget**: Activity feed across all services
+  - **Shortcuts Widget**: Quick access to common actions and navigation
 - **Sophisticated Theming**: Custom MD3 themes with multiple presets (UniArr, Netflix, Disney+, Max, etc.)
 - **Dark/Light Modes**: Full theme support with OLED optimization for power efficiency
 - **Frosted Glass Effects**: Animated UI elements with native blur and transparency effects
 - **Responsive Design**: Adaptive layouts for phones, tablets, and web platforms
+- **Custom Navigation**: Curved tab bar with advanced navigation patterns
+- **Modal System**: Advanced modal management with contextual interactions
 
 ### 🌐 Network & Connectivity
 
@@ -45,6 +54,8 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Offline-First Architecture**: Full offline functionality with intelligent synchronization and mutation queuing
 - **Connection Health**: Real-time service status monitoring with automatic recovery
 - **Network-Aware Updates**: Battery-conscious refresh intervals (5-120 minutes) based on data type
+- **AdGuard Home Integration**: Advanced DNS blocking with query log management, protection status monitoring, and filter refresh capabilities
+- **Network History**: Recent IP addresses and connection history tracking
 
 ### 🔧 Technical Excellence
 
@@ -53,6 +64,19 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Multi-Layer Caching**: Sophisticated image caching with memory/disk optimization and authenticated requests
 - **Error Boundaries**: Comprehensive error handling and recovery mechanisms
 - **State Management**: TanStack Query for server state + Zustand for client state with offline support
+- **MMKV Storage**: High-performance storage backend with ~30x faster operations than AsyncStorage and automatic fallback
+- **Image Cache Intelligence**: Smart prefetching with concurrent background processing and automatic cleanup
+- **Mutation Queue Service**: Offline mutation queuing with intelligent synchronization and retry mechanisms
+- **Thumbhash Integration**: Blur hash placeholders for better user experience during image loading
+
+### 🔐 Authentication & Security
+
+- **Clerk Authentication**: Complete end-user authentication with social providers and secure token management
+- **Multi-Provider Service Auth**: Support for API keys, basic authentication, session-based authentication, and OAuth
+- **Secure Storage**: Hardware-backed encrypted credential storage using Expo SecureStore
+- **ServiceAuthHelper**: Unified authentication abstraction with automatic token refresh
+- **Permission Management**: Fine-grained permission control for app features and services
+- **Authentication Providers**: Specialized providers for different service types (Jellyfin, API Key, Basic Auth, Session-based)
 
 ### 🎤 Voice Assistant & AI Integration
 
@@ -86,6 +110,23 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Performance Metrics**: Battery usage monitoring, network performance tracking, and cache optimization statistics
 - **Activity Timeline**: Chronological activity tracking with service-specific event logging
 - **Usage Analytics**: User behavior analysis with feature usage statistics and optimization suggestions
+- **Quality Profile Distribution**: Content quality analysis across different media types
+- **Library Growth Tracking**: Historical data for media library expansion and trends
+- **Download Statistics**: Comprehensive download performance analysis with success rates and speeds
+- **Request Analytics**: Jellyseerr request tracking and approval rate analysis
+- **Indexer Performance**: Prowlarr indexer effectiveness and performance metrics
+- **Activity Time Analysis**: Usage pattern analysis with peak activity time tracking
+
+### 🛠️ App Management & Utilities
+
+- **App Update Service**: Automatic update checking with GitHub integration and version tracking
+- **Widget Drawer System**: Global widget management with profile-based configurations
+- **Haptic Feedback System**: 9+ different haptic feedback types for enhanced user interaction
+- **File Sharing Integration**: Native file system integration with document picker and sharing capabilities
+- **Location Services**: Device location tracking with caching for weather and location-based features
+- **Dialog System**: Theme-aware dialog system with programmatic API for alerts and confirmations
+- **Homarr Icons Integration**: Icon management with CDN caching and extensive icon library
+- **Video Player**: Native video playback support for media content
 
 ### 🧪 Experimental Features & Debug Tools
 
@@ -225,6 +266,10 @@ npx eas submit       # Submit to app stores
 - **React Native Testing Library** - Component testing utilities
 - **Detox** - End-to-end testing for critical user flows
 - **Connector Mocks** - Comprehensive service mocking patterns
+- **Integration Testing** - Multi-service flow testing with real-world scenarios
+- **Storage Testing** - MMKV and AsyncStorage testing with migration scenarios
+- **Widget Testing** - Component testing for all widget types and configurations
+- **Service Testing** - End-to-end testing for all 15+ service connectors
 
 #### **Development Features**
 
@@ -343,7 +388,19 @@ uniarr/
 │   └── _layout.tsx              # Root layout with providers
 ├── src/
 │   ├── components/              # Reusable UI components
-│   │   ├── widgets/            # Dynamic widget system
+│   │   ├── widgets/            # Dynamic widget system (15+ widget types)
+│   │   │   ├── BookmarksWidget/
+│   │   │   ├── WeatherWidget/
+│   │   │   ├── ServiceStatusWidget/
+│   │   │   ├── DownloadProgressWidget/
+│   │   │   ├── CalendarPreviewWidget/
+│   │   │   ├── StatisticsWidget/
+│   │   │   ├── RedditWidget/
+│   │   │   ├── TwitchWidget/
+│   │   │   ├── YouTubeWidget/
+│   │   │   ├── HackerNewsWidget/
+│   │   │   ├── RssWidget/
+│   │   │   └── ...
 │   │   ├── calendar/           # Multi-service calendar
 │   │   ├── search/             # Unified search components
 │   │   └── common/             # Shared UI components
@@ -355,19 +412,35 @@ uniarr/
 │   │   ├── queryKeys.ts        # Hierarchical query key factory
 │   │   └── queryConfig.ts      # Query configuration presets
 │   ├── services/               # Business logic services
-│   │   ├── image/ImageCacheService.ts  # Multi-layer image caching
-│   │   ├── storage/            # Secure storage abstraction
-│   │   └── network/            # Network diagnostics & VPN
+│   │   ├── analytics/          # Analytics and metrics
+│   │   ├── auth/               # Authentication management
+│   │   ├── backup/             # Backup/restore functionality
+│   │   ├── calendar/           # Calendar aggregation service
+│   │   ├── dialogService.ts    # Theme-aware dialog system
+│   │   ├── download/           # Download management
+│   │   ├── haptic/             # Haptic feedback system
+│   │   ├── image/              # Image caching and processing
+│   │   ├── location/           # Location services
+│   │   ├── network/            # Network diagnostics & VPN
+│   │   ├── notifications/      # Push notification system
+│   │   ├── search/             # Unified search service
+│   │   ├── storage/            # Storage abstraction (MMKV/AsyncStorage)
+│   │   ├── voice/              # Voice assistant integration
+│   │   ├── webhooks/           # Webhook processing
+│   │   ├── widgets/            # Widget data providers
+│   │   └── ...
 │   ├── store/                   # Zustand state management
 │   │   ├── connectorsStore.ts  # Service connector management
 │   │   ├── settingsStore.ts    # User preferences
-│   │   └── downloadStore.ts    # Download queue state
+│   │   ├── downloadStore.ts    # Download queue state
+│   │   └── ...
 │   ├── models/                  # TypeScript type definitions
 │   ├── utils/                   # Utility functions & helpers
 │   └── constants/               # App constants and theme config
 ├── __tests__/                    # Test suites
 │   ├── connectors/              # Connector unit tests
-│   └── integration/             # Multi-service integration tests
+│   ├── integration/             # Multi-service integration tests
+│   └── mocks/                   # Service and component mocks
 └── scripts/                     # Build and generation scripts
 ```
 
@@ -408,6 +481,15 @@ uniarr/
 - **Husky + lint-staged** - Pre-commit quality gates
 - **Jest + React Native Testing Library** - Comprehensive testing
 - **Detox** - End-to-end testing for critical user flows
+
+#### **OpenAPI Integration & Schema Generation**
+
+- **Local API Specifications**: OpenAPI specs stored in `src/connectors/openapi-specs/` for each external service
+- **Automatic Schema Generation**: TypeScript types generated via `npm run generate:client-schemas` command
+- **Client Stub Generation**: Automatic client stubs using `openapi-typescript` and `openapi-fetch`
+- **Multi-Spec Support**: Handles both YAML and JSON OpenAPI specifications
+- **Schema Validation**: Ensures compatibility with service APIs through generated types
+- **OperationId Deduplication**: Automatic handling of duplicate operation identifiers across services
 
 ### Service Connector Architecture
 
