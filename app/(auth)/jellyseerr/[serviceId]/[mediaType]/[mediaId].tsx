@@ -1,14 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo } from "react";
 import { ScrollView, View, StyleSheet, Linking } from "react-native";
-import {
-  Button,
-  Card,
-  Chip,
-  Text,
-  useTheme,
-  ActivityIndicator,
-} from "react-native-paper";
+import { Button, Card, Chip, Text, useTheme } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -264,7 +258,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={[styles.container, { justifyContent: "center" }]}>
-          <ActivityIndicator animating />
+          <SkiaLoader size={60} />
         </View>
       </SafeAreaView>
     );

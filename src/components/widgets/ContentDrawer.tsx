@@ -1,6 +1,7 @@
 import React from "react";
 import { View, StyleSheet, Linking } from "react-native";
-import { Text, Button, useTheme, ActivityIndicator } from "react-native-paper";
+import { Text, Button, useTheme } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import BottomDrawer from "@/components/common/BottomDrawer";
 import SettingsGroup from "@/components/common/SettingsGroup";
 import SettingsListItem from "@/components/common/SettingsListItem";
@@ -155,7 +156,7 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
           customContent
         ) : loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <SkiaLoader size={80} />
             <Text
               variant="bodySmall"
               style={{

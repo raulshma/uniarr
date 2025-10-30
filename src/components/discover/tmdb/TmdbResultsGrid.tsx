@@ -1,10 +1,6 @@
 import React, { useMemo } from "react";
-import {
-  ActivityIndicator,
-  RefreshControl,
-  StyleSheet,
-  View,
-} from "react-native";
+import { RefreshControl, StyleSheet, View } from "react-native";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { FlashList } from "@shopify/flash-list";
 import { Text, useTheme } from "react-native-paper";
 
@@ -91,7 +87,7 @@ export const TmdbResultsGrid: React.FC<Props> = ({
     if (onEndReached && isFetchingMore) {
       return (
         <View style={styles.footer}>
-          <ActivityIndicator />
+          <SkiaLoader size={40} />
         </View>
       );
     }

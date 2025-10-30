@@ -2,13 +2,13 @@ import React, { useMemo } from "react";
 import type { StyleProp, ViewStyle, ImageSource } from "react-native";
 import { StyleSheet, View } from "react-native";
 import {
-  ActivityIndicator,
   Avatar,
   IconButton,
   Text,
   Tooltip,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
@@ -378,7 +378,9 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               ) : null}
               {onDeletePress ? (
                 isDeleting ? (
-                  <ActivityIndicator size={20} style={styles.deleteSpinner} />
+                  <View style={styles.deleteSpinner}>
+                    <SkiaLoader size={20} centered />
+                  </View>
                 ) : (
                   <IconButton
                     icon="delete"

@@ -1,9 +1,7 @@
 import React from "react";
 import { StyleSheet } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
-import { ActivityIndicator, useTheme } from "react-native-paper";
-
-import type { AppTheme } from "@/constants/theme";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 
 export type FullscreenLoadingProps = {
   message?: string;
@@ -14,8 +12,6 @@ const FullscreenLoading: React.FC<FullscreenLoadingProps> = ({
   message = "Loading...",
   testID = "fullscreen-loading",
 }) => {
-  const theme = useTheme<AppTheme>();
-
   return (
     <Animated.View
       entering={FadeIn.duration(200)}
@@ -28,11 +24,7 @@ const FullscreenLoading: React.FC<FullscreenLoadingProps> = ({
         entering={ZoomIn.duration(300).delay(100)}
         style={styles.spinner}
       >
-        <ActivityIndicator
-          size="large"
-          color={theme.colors.primary}
-          animating
-        />
+        <SkiaLoader size={80} />
       </Animated.View>
       {message ? (
         <Animated.Text

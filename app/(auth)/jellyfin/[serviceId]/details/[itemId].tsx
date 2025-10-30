@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Share, ScrollView, StyleSheet, View, Dimensions } from "react-native";
 import {
-  ActivityIndicator,
   Button,
   Chip,
   IconButton,
@@ -11,6 +10,7 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -508,7 +508,7 @@ const JellyfinItemDetailsScreen = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator animating size="large" />
+          <SkiaLoader size={80} />
         </View>
       </SafeAreaView>
     );

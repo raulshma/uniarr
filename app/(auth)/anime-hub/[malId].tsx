@@ -9,13 +9,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  Chip,
-  Text,
-  useTheme,
-  IconButton,
-  ActivityIndicator,
-} from "react-native-paper";
+import { Chip, Text, useTheme, IconButton } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -863,11 +858,7 @@ const AnimeHubDetailScreen: React.FC = () => {
 
               <View style={styles.primaryActions}>
                 {isRequesting ? (
-                  <ActivityIndicator
-                    animating
-                    size={20}
-                    color={theme.colors.primary}
-                  />
+                  <SkiaLoader size={20} centered />
                 ) : (
                   <IconButton
                     icon="playlist-plus"

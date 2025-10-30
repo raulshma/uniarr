@@ -20,6 +20,9 @@ import {
 import { spacing } from "@/theme/spacing";
 import { generateSizeTokens, borderRadius } from "@/constants/sizes";
 
+// Default preset key used across the app. Change here to change the default preset.
+export const DEFAULT_PRESET_KEY = "royal";
+
 export type FrostedEffectTokens = {
   blurIntensity: number;
   blurReductionFactor: number;
@@ -221,7 +224,7 @@ export const createCustomTheme = (
   isDark: boolean = false,
 ): AppTheme => {
   // Determine color scheme
-  const requestedPreset = config.preset ?? "uniarr";
+  const requestedPreset = config.preset ?? DEFAULT_PRESET_KEY;
   // Support legacy brand-based keys by mapping them to neutral keys
   const resolvedPresetKey =
     (presetKeyAliases[
@@ -229,7 +232,10 @@ export const createCustomTheme = (
     ] as keyof typeof presetThemes) ?? requestedPreset;
   const basePreset = (presetThemes[
     resolvedPresetKey as keyof typeof presetThemes
-  ] ?? presetThemes.uniarr) as ThemePreset;
+  ] ??
+    presetThemes[
+      DEFAULT_PRESET_KEY as keyof typeof presetThemes
+    ]) as ThemePreset;
   const colorScheme: CustomColorScheme = {
     ...basePreset.common,
     ...config.customColors,
@@ -280,7 +286,7 @@ export const getAppTheme = (scheme: ColorSchemeName): AppTheme =>
 
 // Default custom theme configuration
 export const defaultCustomThemeConfig: CustomThemeConfig = {
-  preset: "uniarr",
+  preset: DEFAULT_PRESET_KEY,
   oledEnabled: false,
   fontScale: "medium",
   densityMode: "comfortable",

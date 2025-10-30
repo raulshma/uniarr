@@ -10,7 +10,8 @@ import React, {
   Suspense,
 } from "react";
 import type { ReactNode } from "react";
-import { Portal, ActivityIndicator } from "react-native-paper";
+import { Portal } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import CustomConfirm from "./CustomConfirm";
 import CustomAlert from "./CustomAlert";
 import {
@@ -127,7 +128,7 @@ const CustomDialogRenderer = ({
   if (current.type === "updateCheck") {
     return (
       <Portal>
-        <Suspense fallback={<ActivityIndicator animating={true} />}>
+        <Suspense fallback={<SkiaLoader size={40} />}>
           <UpdateDialog
             visible
             updateData={current.payload.updateData}

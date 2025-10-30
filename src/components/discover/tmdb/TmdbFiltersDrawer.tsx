@@ -1,7 +1,6 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import {
-  ActivityIndicator,
   Button,
   Chip,
   SegmentedButtons,
@@ -10,6 +9,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 
 import BottomDrawer from "@/components/common/BottomDrawer";
 import type { AppTheme } from "@/constants/theme";
@@ -134,7 +134,7 @@ export const TmdbFiltersDrawer: React.FC<Props> = ({
       <View style={styles.section}>
         <View style={styles.row}>
           <Text variant="titleMedium">Genre</Text>
-          {genresLoading ? <ActivityIndicator size="small" /> : null}
+          {genresLoading ? <SkiaLoader size={20} centered /> : null}
         </View>
         <View style={styles.chipRow}>
           <Chip

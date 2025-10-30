@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import {
-  ActivityIndicator,
   HelperText,
   List,
   RadioButton,
@@ -12,6 +11,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -549,9 +549,7 @@ const RadarrAddMovieScreen = () => {
           </View>
 
           <View style={styles.resultsContainer}>
-            {searchQuery.isLoading ? (
-              <ActivityIndicator animating color={theme.colors.primary} />
-            ) : null}
+            {searchQuery.isLoading ? <SkiaLoader size={60} centered /> : null}
             {!searchQuery.isLoading &&
             !searchQuery.isFetching &&
             debouncedTerm.length >= 2 &&
@@ -604,7 +602,7 @@ const RadarrAddMovieScreen = () => {
               Quality Profile
             </Text>
             {qualityProfilesQuery.isLoading ? (
-              <ActivityIndicator animating color={theme.colors.primary} />
+              <SkiaLoader size={60} centered />
             ) : qualityProfilesQuery.isError ? (
               <HelperText
                 type="error"
@@ -672,7 +670,7 @@ const RadarrAddMovieScreen = () => {
               Root Folder
             </Text>
             {rootFoldersQuery.isLoading ? (
-              <ActivityIndicator animating color={theme.colors.primary} />
+              <SkiaLoader size={60} centered />
             ) : rootFolders.length ? (
               <Controller<AddMovieFormValues, "rootFolderPath">
                 control={control}

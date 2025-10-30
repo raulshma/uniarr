@@ -7,6 +7,7 @@ import {
   vec,
 } from "@shopify/react-native-skia";
 import { useEffect, useMemo } from "react";
+import { StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
   interpolate,
@@ -25,6 +26,9 @@ export interface SkiaLoaderProps {
   blur?: number;
   blurStyle?: "inner" | "outer" | "solid" | "normal";
   colors?: string[];
+  // Positioning props
+  centered?: boolean;
+  containerStyle?: any;
 }
 
 export const SkiaLoader = (props: SkiaLoaderProps) => {
@@ -38,6 +42,8 @@ export const SkiaLoader = (props: SkiaLoaderProps) => {
     blur = config.blur,
     blurStyle = config.blurStyle,
     colors = config.colors,
+    centered = false,
+    containerStyle,
   } = props;
   const radius = (size - strokeWidth) / 2;
   const canvasSize = size + 30;
@@ -68,7 +74,7 @@ export const SkiaLoader = (props: SkiaLoaderProps) => {
     return interpolate(progress.value, [0, 0.5, 1], [0.6, 0.3, 0.6]);
   }, []);
 
-  return (
+  const loaderElement = (
     <Animated.View style={rContainerStyle}>
       <Canvas
         style={{
@@ -93,4 +99,22 @@ export const SkiaLoader = (props: SkiaLoaderProps) => {
       </Canvas>
     </Animated.View>
   );
+
+  // If centered or containerStyle is provided, wrap in a container
+  if (centered || containerStyle) {
+    return (
+      <View style={[centered && styles.centeredContainer, containerStyle]}>
+        {loaderElement}
+      </View>
+    );
+  }
+
+  return loaderElement;
 };
+
+const styles = StyleSheet.create({
+  centeredContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

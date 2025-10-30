@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
-  ActivityIndicator,
   Button,
   Chip,
   Dialog,
@@ -12,6 +11,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { alert } from "@/services/dialogService";
 
 import { MediaPoster } from "./MediaPoster";
@@ -235,7 +235,7 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
           <ScrollView style={styles.scrollContent}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" />
+                <SkiaLoader size={80} />
                 <Text variant="bodyMedium" style={{ marginTop: spacing.md }}>
                   Loading metadata...
                 </Text>
