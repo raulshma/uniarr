@@ -267,7 +267,6 @@ const ServicesScreen = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          backgroundColor: theme.colors.backdrop,
         },
         content: {
           flex: 1,

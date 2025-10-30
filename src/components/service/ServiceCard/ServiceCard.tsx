@@ -6,6 +6,7 @@ import {
   Avatar,
   IconButton,
   Text,
+  Tooltip,
   useTheme,
 } from "react-native-paper";
 
@@ -148,162 +149,186 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
       focusable={Boolean(onPress)}
     >
       <View style={styles.root}>
-        <Avatar.Icon
-          size={avatarSizes.lg}
-          icon={icon}
-          style={{ backgroundColor: theme.colors.primaryContainer }}
-          color={theme.colors.onPrimaryContainer}
-        />
+        {/* Top Section: icon + name + status */}
+        <View style={styles.topSection}>
+          <View style={styles.topRow}>
+            <Avatar.Icon
+              size={avatarSizes.lg}
+              icon={icon}
+              style={{ backgroundColor: theme.colors.primaryContainer }}
+              color={theme.colors.onPrimaryContainer}
+            />
 
-        <View style={[styles.meta, { marginLeft: theme.custom.spacing.md }]}>
-          <View style={styles.titleRow}>
-            <Text
-              variant="titleMedium"
-              style={{ color: theme.colors.onSurface }}
-              numberOfLines={1}
-            >
-              {name}
-            </Text>
-            <View style={styles.statusWrapper}>
-              <ServiceStatus status={status} />
-            </View>
-          </View>
-          <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onSurfaceVariant }}
-            numberOfLines={2}
-          >
-            {url}
-          </Text>
-
-          {/* Badges row: service type, status, latency, version */}
-          <View style={styles.badgesRow}>
-            {description ? (
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: theme.colors.primaryContainer },
-                ]}
-              >
-                <Text
-                  variant="labelSmall"
-                  style={{ color: theme.colors.onPrimaryContainer }}
-                >
-                  {description}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Status badge uses the appropriate container token */}
             <View
-              style={[
-                styles.badge,
-                {
-                  backgroundColor:
-                    status === "online"
-                      ? theme.colors.primaryContainer
-                      : status === "degraded"
-                        ? theme.colors.tertiaryContainer
-                        : theme.colors.errorContainer,
-                },
-              ]}
+              style={[styles.meta, { marginLeft: theme.custom.spacing.md }]}
             >
-              <Text
-                variant="labelSmall"
-                style={{
-                  color:
-                    status === "online"
-                      ? theme.colors.onPrimaryContainer
-                      : status === "degraded"
-                        ? theme.colors.onTertiaryContainer
-                        : theme.colors.onErrorContainer,
-                }}
-              >
-                {status === "online"
-                  ? "Connected"
-                  : status === "degraded"
-                    ? "Degraded"
-                    : "Offline"}
-              </Text>
+              <View style={styles.titleRow}>
+                <Tooltip title={name}>
+                  <Text
+                    variant="titleMedium"
+                    style={{ color: theme.colors.onSurface }}
+                    numberOfLines={1}
+                  >
+                    {name}
+                  </Text>
+                </Tooltip>
+                <View style={styles.statusWrapper}>
+                  <ServiceStatus status={status} />
+                </View>
+              </View>
+              <Tooltip title={url}>
+                <Text
+                  variant="bodyMedium"
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                  numberOfLines={2}
+                >
+                  {url}
+                </Text>
+              </Tooltip>
             </View>
-
-            {typeof latency === "number" ? (
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: theme.colors.surfaceVariant },
-                ]}
-              >
-                <Text
-                  variant="labelSmall"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {`${latency} ms`}
-                </Text>
-              </View>
-            ) : null}
-
-            {version ? (
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: theme.colors.surfaceVariant },
-                ]}
-              >
-                <Text
-                  variant="labelSmall"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  {`v${version}`}
-                </Text>
-              </View>
-            ) : null}
-
-            {statusDescription ? (
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant, marginLeft: 8 }}
-                numberOfLines={1}
-              >
-                {statusDescription}
-              </Text>
-            ) : null}
-
-            {relativeTime ? (
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant, marginLeft: 8 }}
-              >
-                Last checked {relativeTime}
-              </Text>
-            ) : null}
           </View>
         </View>
 
-        <View style={styles.actions}>
-          {onEditPress ? (
-            <IconButton
-              icon="pencil"
-              size={20}
-              onPress={onEditPress}
-              accessibilityLabel={`Edit ${name}`}
-              accessibilityHint="Opens the edit service form"
-            />
-          ) : null}
-          {onDeletePress ? (
-            isDeleting ? (
-              <ActivityIndicator size={20} style={styles.deleteSpinner} />
-            ) : (
-              <IconButton
-                icon="delete"
-                size={20}
-                onPress={onDeletePress}
-                disabled={isDeleting}
-                accessibilityLabel={`Delete ${name}`}
-                accessibilityHint="Removes this service"
-              />
-            )
-          ) : null}
+        {/* Bottom Section: badges + actions */}
+        <View style={styles.bottomSection}>
+          <View style={styles.bottomRow}>
+            {/* Badges row: service type, status, latency, version */}
+            <View style={styles.badgesRow}>
+              {description ? (
+                <View
+                  style={[
+                    styles.badge,
+                    { backgroundColor: theme.colors.primaryContainer },
+                  ]}
+                >
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: theme.colors.onPrimaryContainer }}
+                  >
+                    {description}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Status badge uses the appropriate container token */}
+              <View
+                style={[
+                  styles.badge,
+                  {
+                    backgroundColor:
+                      status === "online"
+                        ? theme.colors.primaryContainer
+                        : status === "degraded"
+                          ? theme.colors.tertiaryContainer
+                          : theme.colors.errorContainer,
+                  },
+                ]}
+              >
+                <Text
+                  variant="labelSmall"
+                  style={{
+                    color:
+                      status === "online"
+                        ? theme.colors.onPrimaryContainer
+                        : status === "degraded"
+                          ? theme.colors.onTertiaryContainer
+                          : theme.colors.onErrorContainer,
+                  }}
+                >
+                  {status === "online"
+                    ? "Connected"
+                    : status === "degraded"
+                      ? "Degraded"
+                      : "Offline"}
+                </Text>
+              </View>
+
+              {typeof latency === "number" ? (
+                <View
+                  style={[
+                    styles.badge,
+                    { backgroundColor: theme.colors.surfaceVariant },
+                  ]}
+                >
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    {`${latency} ms`}
+                  </Text>
+                </View>
+              ) : null}
+
+              {version ? (
+                <View
+                  style={[
+                    styles.badge,
+                    { backgroundColor: theme.colors.surfaceVariant },
+                  ]}
+                >
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    {`v${version}`}
+                  </Text>
+                </View>
+              ) : null}
+
+              {statusDescription ? (
+                <Tooltip title={statusDescription}>
+                  <Text
+                    variant="bodySmall"
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      marginLeft: 8,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {statusDescription}
+                  </Text>
+                </Tooltip>
+              ) : null}
+
+              {relativeTime ? (
+                <Text
+                  variant="bodySmall"
+                  style={{
+                    color: theme.colors.onSurfaceVariant,
+                    marginLeft: 8,
+                  }}
+                >
+                  Last checked {relativeTime}
+                </Text>
+              ) : null}
+            </View>
+
+            <View style={styles.actions}>
+              {onEditPress ? (
+                <IconButton
+                  icon="pencil"
+                  size={20}
+                  onPress={onEditPress}
+                  accessibilityLabel={`Edit ${name}`}
+                  accessibilityHint="Opens the edit service form"
+                />
+              ) : null}
+              {onDeletePress ? (
+                isDeleting ? (
+                  <ActivityIndicator size={20} style={styles.deleteSpinner} />
+                ) : (
+                  <IconButton
+                    icon="delete"
+                    size={20}
+                    onPress={onDeletePress}
+                    disabled={isDeleting}
+                    accessibilityLabel={`Delete ${name}`}
+                    accessibilityHint="Removes this service"
+                  />
+                )
+              ) : null}
+            </View>
+          </View>
         </View>
       </View>
     </Card>
@@ -314,6 +339,12 @@ export default ServiceCard;
 
 const styles = StyleSheet.create({
   root: {
+    flexDirection: "column",
+  },
+  topSection: {
+    marginBottom: spacing.sm,
+  },
+  topRow: {
     flexDirection: "row",
     alignItems: "flex-start",
   },
@@ -328,23 +359,27 @@ const styles = StyleSheet.create({
   statusWrapper: {
     marginLeft: spacing.md,
   },
+  bottomSection: {},
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   badgesRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: spacing.xs,
     flexWrap: "wrap",
     gap: spacing.xs,
+    flex: 1,
   },
   badge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 999,
-    marginRight: spacing.xs,
   },
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: spacing.sm,
   },
   deleteSpinner: {
     marginHorizontal: spacing.xxxs,
