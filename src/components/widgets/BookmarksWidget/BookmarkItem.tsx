@@ -165,21 +165,17 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
     minHeight: 100,
+    overflow: "hidden",
+    width: "100%",
   },
   smallContainer: {
-    flex: 1,
     minHeight: 80,
-    maxWidth: "48%",
   },
   mediumContainer: {
-    flex: 1,
     minHeight: 100,
-    maxWidth: "48%",
   },
   largeContainer: {
-    flex: 1,
     minHeight: 120,
   },
   disabled: {
@@ -191,11 +187,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: spacing.sm,
   },
   content: {
     width: "100%",
     alignItems: "center",
-    gap: spacing.xs,
+    // spacing between label and health badge is provided by margins
   },
   label: {
     fontWeight: "600",

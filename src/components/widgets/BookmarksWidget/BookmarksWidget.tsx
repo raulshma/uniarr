@@ -284,6 +284,11 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
                   index,
                   50,
                 ).delay(150)}
+                style={
+                  widget.size === "large"
+                    ? styles.gridItemLarge
+                    : styles.gridItemMedium
+                }
               >
                 <BookmarkItem
                   bookmark={bookmark}
@@ -314,7 +319,7 @@ const styles = StyleSheet.create({
     minHeight: 180,
   },
   largeContainer: {
-    minHeight: 220,
+    padding: spacing.md,
   },
   smallScrollContainer: {
     maxHeight: 120,
@@ -331,9 +336,9 @@ const styles = StyleSheet.create({
   gridContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   loadingSkeleton: {
     flex: 1,
@@ -341,14 +346,25 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "flex-start",
     alignItems: "flex-start",
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    // skeleton spacing handled by individual skeleton items
+    paddingHorizontal: spacing.xs,
   },
   skeletonBookmark: {
     alignItems: "center",
     justifyContent: "center",
     width: "48%",
     padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  gridItemMedium: {
+    flexBasis: "48%",
+    maxWidth: "48%",
+    marginBottom: spacing.sm,
+  },
+  gridItemLarge: {
+    flexBasis: "32%",
+    maxWidth: "32%",
+    marginBottom: spacing.sm,
   },
   skeletonIcon: {
     width: 40,

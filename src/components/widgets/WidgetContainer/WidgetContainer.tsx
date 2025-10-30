@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { View, StyleSheet, Modal } from "react-native";
-import Animated from "react-native-reanimated";
 import { Text, FAB, useTheme, Button } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -9,9 +8,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useHaptics } from "@/hooks/useHaptics";
 import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
-import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+
 import { gapSizes } from "@/constants/sizes";
-import { FadeIn, FadeOut, ANIMATION_DURATIONS } from "@/utils/animations.utils";
 import { Card } from "@/components/common/Card";
 import { TabHeader } from "@/components/common/TabHeader";
 import {
@@ -54,11 +52,10 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const { onPress } = useHaptics();
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [editing, setEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const loadWidgets = async () => {
     try {
-      setIsLoading(true);
       await widgetService.initialize();
       const availableWidgets = await widgetService.getWidgets();
       const enabledWidgets = availableWidgets.filter((w) => w.enabled);
@@ -66,7 +63,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
     } catch (error) {
       console.error("Failed to load widgets:", error);
     } finally {
-      setIsLoading(false);
+      setHasLoaded(true);
     }
   };
 
@@ -402,38 +399,13 @@ const WidgetContainer: React.FC<WidgetContainerProps> = ({
           justifyContent: "center",
           paddingVertical: theme.custom.spacing.xxl,
         },
-        loadingSkeleton: {
-          gap: theme.custom.spacing.lg,
-          paddingTop: 0,
-        },
-        skeletonWidget: {
-          borderRadius: theme.custom.sizes.borderRadius.xl,
-          overflow: "hidden",
-        },
       }),
     [theme],
   );
 
-  if (isLoading) {
-    return (
-      <Animated.View
-        style={[styles.container, style]}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
-      >
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <View key={index} style={styles.skeletonWidget}>
-              <SkeletonPlaceholder
-                width="100%"
-                height={120}
-                borderRadius={theme.custom.sizes.borderRadius.xl}
-              />
-            </View>
-          ))}
-        </View>
-      </Animated.View>
-    );
+  // Show nothing while loading for seamless experience
+  if (!hasLoaded) {
+    return <View style={[styles.container, style]} />;
   }
 
   if (widgets.length === 0) {

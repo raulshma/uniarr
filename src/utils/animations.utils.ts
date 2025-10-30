@@ -8,6 +8,7 @@
  */
 
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   SlideInUp,
@@ -106,13 +107,13 @@ export const SCREEN_TRANSITIONS = {
  */
 export const COMPONENT_ANIMATIONS = {
   /**
-   * LIST_ITEM_STAGGER: Progressive fade-in with per-item delay
+   * LIST_ITEM_STAGGER: Progressive fade-in with per-item delay and cubic bezier easing
    * Usage: Apply to list items with index-based delay (e.g., 50ms per item)
    */
   LIST_ITEM_STAGGER: (index: number, delay = 50) =>
     FadeIn.duration(ANIMATION_DURATIONS.NORMAL)
       .delay(index * delay)
-      .springify(),
+      .easing(Easing.bezier(0.25, 0.46, 0.45, 0.94)),
 
   /**
    * CARD_ENTRANCE: Zoom-in with fade for card components
@@ -272,6 +273,7 @@ export const shouldAnimateLayout = (
  * Allows: import { FadeIn, SlideInUp } from '@/utils/animations.utils'
  */
 export {
+  Easing,
   FadeIn,
   FadeOut,
   SlideInUp,
