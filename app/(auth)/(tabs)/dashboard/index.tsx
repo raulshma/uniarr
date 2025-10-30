@@ -61,7 +61,7 @@ const DashboardScreen = () => {
 
   // Title fades out as user scrolls up, then fades back in via sticky title
   // This creates a smooth fade out effect with the main title
-  const titleOpacity = easeOutCubic(scrollY, [0, collapseRange], [1, 0]);
+  const titleOpacity = easeOutCubic(scrollY, [0, collapseRange * 0.6], [1, 0]);
 
   const titleTranslateY = easeOutCubic(scrollY, [0, collapseRange], [0, -20]);
 
@@ -77,7 +77,11 @@ const DashboardScreen = () => {
     extrapolate: "clamp",
   });
 
-  const stickyTitleOpacity = easeOutCubic(scrollY, [0, collapseRange], [0, 1]);
+  const stickyTitleOpacity = easeOutCubic(
+    scrollY,
+    [collapseRange * 0.6, collapseRange],
+    [0, 1],
+  );
 
   // Header background fades in only when reaching the top (fully collapsed)
   const headerBackgroundOpacity = scrollY.interpolate({
@@ -324,14 +328,14 @@ const DashboardScreen = () => {
             >
               <IconButton
                 icon="download"
-                size={22}
+                size={20}
                 iconColor={theme.colors.onSurfaceVariant}
                 style={styles.settingsButton}
                 onPress={() => router.push("/(auth)/jellyfin-downloads")}
               />
               <IconButton
                 icon="cog"
-                size={22}
+                size={20}
                 iconColor={theme.colors.onSurfaceVariant}
                 style={styles.settingsButton}
                 onPress={() => router.push("/(auth)/settings")}

@@ -25,8 +25,6 @@ import {
 } from "@/components/common";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { TabHeader } from "@/components/common/TabHeader";
-
 import type { AppTheme } from "@/constants/theme";
 import { useAuth } from "@/services/auth/AuthProvider";
 import {
@@ -410,15 +408,6 @@ const SettingsScreen = () => {
         contentContainerStyle={styles.scrollContainer}
         animated={animationsEnabled}
       >
-        {/* Header */}
-        <TabHeader
-          rightAction={{
-            icon: "cog",
-            onPress: () => {},
-            accessibilityLabel: "Settings",
-          }}
-        />
-
         {/* Overview removed */}
 
         {/* Appearance Section */}

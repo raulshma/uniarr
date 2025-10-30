@@ -56,7 +56,7 @@ const RootLayout = () => {
                             allowBackgroundDownloads: true,
                             maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
                           },
-                          progressUpdateInterval: 1000,
+                          progressUpdateInterval: 1500,
                           enablePersistence: true,
                         }}
                         indicatorPosition="floating"

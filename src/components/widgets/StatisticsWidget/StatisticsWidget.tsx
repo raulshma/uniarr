@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { StyleSheet, View, TouchableOpacity, Dimensions } from "react-native";
+import { StyleSheet, View, TouchableOpacity } from "react-native";
 import Animated from "react-native-reanimated";
 import { Text, useTheme, Button, Portal, Dialog } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -268,11 +268,6 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
     }
   };
 
-  const screenWidth = Dimensions.get("window").width;
-  const cardSize =
-    (screenWidth - theme.custom.spacing.lg * 2 - theme.custom.spacing.md) / 2 -
-    theme.custom.spacing.sm;
-
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -300,6 +295,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           flexDirection: "row",
           flexWrap: "wrap",
           justifyContent: "space-between",
+          paddingHorizontal: theme.custom.spacing.xs,
           gap: theme.custom.spacing.sm,
         },
         statCard: {
@@ -307,7 +303,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           borderRadius: borderRadius.xl,
           padding: theme.custom.spacing.lg,
           alignItems: "flex-start",
-          width: cardSize,
+          flex: 1,
           minHeight: 120,
           ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
@@ -343,14 +339,14 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           flexDirection: "row",
           flexWrap: "wrap",
           justifyContent: "space-between",
-          gap: theme.custom.spacing.sm,
+          paddingHorizontal: theme.custom.spacing.sm,
         },
         statSkeleton: {
           backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.xl,
           padding: theme.custom.spacing.lg,
           alignItems: "flex-start",
-          width: cardSize,
+          flex: 1,
           minHeight: 120,
           ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
@@ -375,7 +371,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
           borderRadius: borderRadius.sm,
         },
       }),
-    [theme, cardSize],
+    [theme],
   );
 
   if (error) {
