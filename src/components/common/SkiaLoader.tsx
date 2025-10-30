@@ -23,6 +23,7 @@ export interface SkiaLoaderProps {
   strokeWidth?: number;
   duration?: number;
   blur?: number;
+  blurStyle?: "inner" | "outer" | "solid" | "normal";
   colors?: string[];
 }
 
@@ -35,6 +36,7 @@ export const SkiaLoader = (props: SkiaLoaderProps) => {
     strokeWidth = config.strokeWidth,
     duration = config.duration,
     blur = config.blur,
+    blurStyle = config.blurStyle,
     colors = config.colors,
   } = props;
   const radius = (size - strokeWidth) / 2;
@@ -86,7 +88,7 @@ export const SkiaLoader = (props: SkiaLoaderProps) => {
             c={vec(canvasSize / 2, canvasSize / 2)}
             colors={colors}
           />
-          <BlurMask blur={blur} style="outer" />
+          <BlurMask blur={blur} style={blurStyle} />
         </Path>
       </Canvas>
     </Animated.View>

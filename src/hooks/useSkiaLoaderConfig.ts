@@ -5,6 +5,7 @@ const DEFAULT_SKIA_LOADER_CONFIG = {
   strokeWidth: 10,
   duration: 1000,
   blur: 5,
+  blurStyle: "outer" as const,
   colors: [
     "#FF0080", // Hot Pink
     "#FF1493", // Deep Pink

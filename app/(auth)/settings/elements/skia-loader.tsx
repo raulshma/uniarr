@@ -2,7 +2,7 @@ import { StyleSheet, View } from "react-native";
 import { Text, useTheme, Button, Chip } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 import {
   AnimatedListItem,
@@ -24,8 +24,16 @@ interface SkiaLoaderConfig {
   strokeWidth: number;
   duration: number;
   blur: number;
+  blurStyle: "inner" | "outer" | "solid" | "normal";
   colors: string[];
 }
+
+// Static arrays moved outside component for better performance
+const sizeOptions = [40, 60, 80, 100, 120];
+const strokeOptions = [6, 8, 10, 12, 14];
+const durationOptions = [500, 750, 1000, 1250, 1500];
+const blurOptions = [2, 3, 5, 7, 10];
+const blurStyleOptions = ["inner", "outer", "solid", "normal"] as const;
 
 const SkiaLoaderConfigScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -59,14 +67,91 @@ const SkiaLoaderConfigScreen = () => {
     setSkiaLoaderConfig(defaultConfig);
   }, [defaultConfig, setSkiaLoaderConfig]);
 
+  // Memoize chip rendering functions for performance
+  const renderSizeChips = useMemo(
+    () =>
+      sizeOptions.map((size) => (
+        <Chip
+          key={size}
+          mode={tempConfig.size === size ? "flat" : "outlined"}
+          onPress={() => updateConfig({ size })}
+        >
+          {size}
+        </Chip>
+      )),
+    [tempConfig.size, updateConfig],
+  );
+
+  const renderStrokeChips = useMemo(
+    () =>
+      strokeOptions.map((width) => (
+        <Chip
+          key={width}
+          mode={tempConfig.strokeWidth === width ? "flat" : "outlined"}
+          onPress={() => updateConfig({ strokeWidth: width })}
+        >
+          {width}
+        </Chip>
+      )),
+    [tempConfig.strokeWidth, updateConfig],
+  );
+
+  const renderDurationChips = useMemo(
+    () =>
+      durationOptions.map((duration) => (
+        <Chip
+          key={duration}
+          mode={tempConfig.duration === duration ? "flat" : "outlined"}
+          onPress={() => updateConfig({ duration })}
+        >
+          {duration}
+        </Chip>
+      )),
+    [tempConfig.duration, updateConfig],
+  );
+
+  const renderBlurChips = useMemo(
+    () =>
+      blurOptions.map((blur) => (
+        <Chip
+          key={blur}
+          mode={tempConfig.blur === blur ? "flat" : "outlined"}
+          onPress={() => updateConfig({ blur })}
+        >
+          {blur}
+        </Chip>
+      )),
+    [tempConfig.blur, updateConfig],
+  );
+
+  const renderBlurStyleChips = useMemo(
+    () =>
+      blurStyleOptions.map((blurStyle) => (
+        <Chip
+          key={blurStyle}
+          mode={tempConfig.blurStyle === blurStyle ? "flat" : "outlined"}
+          onPress={() => updateConfig({ blurStyle })}
+        >
+          {blurStyle}
+        </Chip>
+      )),
+    [tempConfig.blurStyle, updateConfig],
+  );
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    content: {
+    stickyPreviewContainer: {
+      backgroundColor: theme.colors.background,
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.md,
+    },
+    scrollContent: {
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.lg,
     },
     section: {
       marginVertical: spacing.md,
@@ -83,7 +168,6 @@ const SkiaLoaderConfigScreen = () => {
       paddingVertical: spacing.lg,
       backgroundColor: theme.colors.surfaceVariant,
       borderRadius: 12,
-      marginBottom: spacing.md,
     },
     previewTitle: {
       fontSize: 16,
@@ -96,30 +180,42 @@ const SkiaLoaderConfigScreen = () => {
       flexWrap: "wrap",
       gap: spacing.xs,
       marginTop: spacing.xs,
+      maxWidth: 240,
     },
     strokeOptions: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: spacing.xs,
       marginTop: spacing.xs,
+      maxWidth: 240,
     },
     durationOptions: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: spacing.xs,
       marginTop: spacing.xs,
+      maxWidth: 240,
     },
     blurOptions: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: spacing.xs,
       marginTop: spacing.xs,
+      maxWidth: 240,
+    },
+    blurStyleOptions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+      marginTop: spacing.xs,
+      maxWidth: 240,
     },
     colorPresets: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: spacing.xs,
       marginTop: spacing.xs,
+      maxWidth: 240,
     },
     actionButtons: {
       flexDirection: "row",
@@ -127,11 +223,6 @@ const SkiaLoaderConfigScreen = () => {
       marginTop: spacing.lg,
     },
   });
-
-  const sizeOptions = [40, 60, 80, 100, 120];
-  const strokeOptions = [6, 8, 10, 12, 14];
-  const durationOptions = [500, 750, 1000, 1250, 1500];
-  const blurOptions = [2, 3, 5, 7, 10];
 
   const colorPresets = [
     {
@@ -178,21 +269,22 @@ const SkiaLoaderConfigScreen = () => {
         showBackButton
         onBackPress={handleBackPress}
       />
-      <AnimatedScrollView contentContainerStyle={styles.content}>
-        {/* Preview Section */}
-        <AnimatedSection style={styles.section} delay={0} animated>
-          <View style={styles.previewSection}>
-            <Text style={styles.previewTitle}>Live Preview</Text>
-            <SkiaLoader
-              size={tempConfig.size}
-              strokeWidth={tempConfig.strokeWidth}
-              duration={tempConfig.duration}
-              blur={tempConfig.blur}
-              colors={tempConfig.colors}
-            />
-          </View>
-        </AnimatedSection>
 
+      {/* Sticky Preview Section */}
+      <View style={styles.stickyPreviewContainer}>
+        <View style={styles.previewSection}>
+          <SkiaLoader
+            size={tempConfig.size}
+            strokeWidth={tempConfig.strokeWidth}
+            duration={tempConfig.duration}
+            blur={tempConfig.blur}
+            blurStyle={tempConfig.blurStyle}
+            colors={tempConfig.colors}
+          />
+        </View>
+      </View>
+
+      <AnimatedScrollView contentContainerStyle={styles.scrollContent}>
         {/* Size Configuration */}
         <AnimatedSection style={styles.section} delay={50} animated>
           <Text style={styles.sectionTitle}>Size</Text>
@@ -203,17 +295,7 @@ const SkiaLoaderConfigScreen = () => {
                 subtitle={`Current: ${tempConfig.size}px`}
                 left={{ iconName: "resize" }}
                 trailing={
-                  <View style={styles.sizeOptions}>
-                    {sizeOptions.map((size) => (
-                      <Chip
-                        key={size}
-                        mode={tempConfig.size === size ? "flat" : "outlined"}
-                        onPress={() => updateConfig({ size })}
-                      >
-                        {size}
-                      </Chip>
-                    ))}
-                  </View>
+                  <View style={styles.sizeOptions}>{renderSizeChips}</View>
                 }
                 groupPosition="single"
               />
@@ -231,19 +313,7 @@ const SkiaLoaderConfigScreen = () => {
                 subtitle={`Current: ${tempConfig.strokeWidth}px`}
                 left={{ iconName: "vector-circle" }}
                 trailing={
-                  <View style={styles.strokeOptions}>
-                    {strokeOptions.map((width) => (
-                      <Chip
-                        key={width}
-                        mode={
-                          tempConfig.strokeWidth === width ? "flat" : "outlined"
-                        }
-                        onPress={() => updateConfig({ strokeWidth: width })}
-                      >
-                        {width}
-                      </Chip>
-                    ))}
-                  </View>
+                  <View style={styles.strokeOptions}>{renderStrokeChips}</View>
                 }
                 groupPosition="single"
               />
@@ -262,17 +332,7 @@ const SkiaLoaderConfigScreen = () => {
                 left={{ iconName: "speedometer" }}
                 trailing={
                   <View style={styles.durationOptions}>
-                    {durationOptions.map((duration) => (
-                      <Chip
-                        key={duration}
-                        mode={
-                          tempConfig.duration === duration ? "flat" : "outlined"
-                        }
-                        onPress={() => updateConfig({ duration })}
-                      >
-                        {duration}
-                      </Chip>
-                    ))}
+                    {renderDurationChips}
                   </View>
                 }
                 groupPosition="single"
@@ -291,16 +351,26 @@ const SkiaLoaderConfigScreen = () => {
                 subtitle={`Current: ${tempConfig.blur}px`}
                 left={{ iconName: "blur" }}
                 trailing={
-                  <View style={styles.blurOptions}>
-                    {blurOptions.map((blur) => (
-                      <Chip
-                        key={blur}
-                        mode={tempConfig.blur === blur ? "flat" : "outlined"}
-                        onPress={() => updateConfig({ blur })}
-                      >
-                        {blur}
-                      </Chip>
-                    ))}
+                  <View style={styles.blurOptions}>{renderBlurChips}</View>
+                }
+                groupPosition="single"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* Blur Style */}
+        <AnimatedSection style={styles.section} delay={225} animated>
+          <Text style={styles.sectionTitle}>Blur Style</Text>
+          <SettingsGroup>
+            <AnimatedListItem index={0} totalItems={1} animated>
+              <SettingsListItem
+                title="Blur Style"
+                subtitle={`Current: ${tempConfig.blurStyle}`}
+                left={{ iconName: "blur-linear" }}
+                trailing={
+                  <View style={styles.blurStyleOptions}>
+                    {renderBlurStyleChips}
                   </View>
                 }
                 groupPosition="single"
@@ -310,7 +380,7 @@ const SkiaLoaderConfigScreen = () => {
         </AnimatedSection>
 
         {/* Color Presets */}
-        <AnimatedSection style={styles.section} delay={250} animated>
+        <AnimatedSection style={styles.section} delay={275} animated>
           <Text style={styles.sectionTitle}>Color Themes</Text>
           <SettingsGroup>
             {colorPresets.map((preset, index) => (
@@ -339,7 +409,7 @@ const SkiaLoaderConfigScreen = () => {
         </AnimatedSection>
 
         {/* Action Buttons */}
-        <AnimatedSection style={styles.section} delay={300} animated>
+        <AnimatedSection style={styles.section} delay={325} animated>
           <View style={styles.actionButtons}>
             <Button mode="outlined" onPress={handleReset} style={{ flex: 1 }}>
               Reset to Default

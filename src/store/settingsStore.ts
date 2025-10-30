@@ -69,6 +69,7 @@ type SettingsData = {
     strokeWidth: number;
     duration: number;
     blur: number;
+    blurStyle: "inner" | "outer" | "solid" | "normal";
     colors: string[];
   };
   // Hydration tracking
@@ -114,6 +115,7 @@ interface SettingsState extends SettingsData {
     strokeWidth: number;
     duration: number;
     blur: number;
+    blurStyle: "inner" | "outer" | "solid" | "normal";
     colors: string[];
   }) => void;
   // (thumbnail setters removed)
@@ -195,6 +197,28 @@ const createDefaultSettings = (): SettingsData => ({
   lastReleaseNotesCheckedAt: undefined,
   frostedWidgetsEnabled: false,
   gradientBackgroundEnabled: false,
+  skiaLoaderConfig: {
+    size: 80,
+    strokeWidth: 10,
+    duration: 1000,
+    blur: 5,
+    blurStyle: "outer" as const,
+    colors: [
+      "#FF0080", // Hot Pink
+      "#FF1493", // Deep Pink
+      "#FF69B4", // Hot Pink (lighter)
+      "#00FFFF", // Electric Blue
+      "#00BFFF", // Deep Sky Blue
+      "#1E90FF", // Dodger Blue
+      "#FF4500", // Neon Red
+      "#FF6347", // Tomato
+      "#FFA500", // Orange
+      "#00FF7F", // Spring Green
+      "#32CD32", // Lime Green
+      "#00FA9A", // Medium Spring Green
+      "#FF0080", // Hot Pink (repeat for smooth transition)
+    ],
+  },
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
