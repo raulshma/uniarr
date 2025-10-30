@@ -37,6 +37,8 @@ export type DetailHeroProps = {
   posterSize?: number;
   heroHeight?: number;
   actionBarHeight?: number;
+  /** Optional override for the gradient end color (falls back to theme.colors.background) */
+  overlayEndColor?: string;
   onBack?: () => void;
   onShare?: () => void;
   onMal?: () => void;
@@ -54,6 +56,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   posterSize = posterSizes.xl, // 160 -> centralized
   heroHeight = spacing.xxxxl * 4, // 320 -> centralized (80 * 4)
   actionBarHeight = controlSizes.switch.height, // 48 -> centralized
+  overlayEndColor,
   onBack,
   onShare,
   onMal,
@@ -74,8 +77,8 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   const initialLeft = spacing.lg;
   const finalLeft = (windowWidth - posterSize) / 2;
   const deltaX = finalLeft - initialLeft;
-  // Start with 75% of the poster inside the hero area (25% projecting into content)
-  const initialTop = heroHeight - posterSize * 0.75;
+  // Start with 70% of the poster inside the hero area (30% projecting into content)
+  const initialTop = heroHeight - posterSize * 0.7;
   // Pin directly under the action bar
   const finalTop = insets.top + actionBarHeight;
   const finalTopWithoutHeader = insets.top;
@@ -237,7 +240,10 @@ const DetailHero: React.FC<DetailHeroProps> = ({
               </Animated.View>
             </View>
             <LinearGradient
-              colors={["transparent", theme.colors.background]}
+              colors={[
+                "transparent",
+                overlayEndColor ?? theme.colors.background,
+              ]}
               start={[0, 0.5]}
               end={[0, 1]}
               style={[RNStyleSheet.absoluteFill, styles.heroGradient]}
@@ -246,7 +252,10 @@ const DetailHero: React.FC<DetailHeroProps> = ({
         ) : (
           // Fallback when no backdrop: gentle gradient so UI doesn't feel empty.
           <LinearGradient
-            colors={[theme.colors.surfaceVariant, theme.colors.background]}
+            colors={[
+              theme.colors.surfaceVariant,
+              overlayEndColor ?? theme.colors.background,
+            ]}
             start={[0, 0]}
             end={[0, 1]}
             style={RNStyleSheet.absoluteFill}
@@ -287,24 +296,24 @@ const DetailHero: React.FC<DetailHeroProps> = ({
         </Animated.View>
       </Animated.View>
 
-      {/* Pinned poster overlay */}
-      <Animated.View
-        pointerEvents="box-none"
-        style={[styles.heroPoster, posterAnimatedStyle]}
-      >
-        <MediaPoster uri={posterUri} size={posterSize} />
-      </Animated.View>
-
       <AnimatedScrollView
         contentContainerStyle={{
           paddingBottom: spacing.xl, // 32 -> xl
-          paddingTop: heroHeight * 0.5,
+          paddingTop: heroHeight * 0.4,
         }}
         onScroll={onScroll}
         scrollEventThrottle={16}
       >
         {children}
       </AnimatedScrollView>
+
+      {/* Pinned poster overlay (render after scroll so it visually overlays content) */}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.heroPoster, posterAnimatedStyle]}
+      >
+        <MediaPoster uri={posterUri} size={posterSize} />
+      </Animated.View>
     </View>
   );
 };
@@ -349,9 +358,9 @@ const createStyles = (
     },
     heroPoster: {
       position: "absolute",
-      top: heroHeight - posterSize * 0.75,
+      top: heroHeight - posterSize * 0.7,
       left: spacing.lg,
-      zIndex: 20,
+      zIndex: 60,
       ...getComponentElevation("poster", theme),
     },
   });

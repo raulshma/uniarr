@@ -158,8 +158,15 @@ export const useOfflineSync = (options: OfflineSyncOptions = {}) => {
     });
   };
 
+  // Only consider offline when we explicitly know the connection state
+  // null means "unknown/loading", so don't show offline indicator
+  const isOnline =
+    isConnected === null
+      ? null
+      : isConnected === true && isInternetReachable === true;
+
   return {
-    isOnline: isConnected === true && isInternetReachable === true,
+    isOnline,
     queueMutationForOffline,
     processQueuedMutations,
   };
