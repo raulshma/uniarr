@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import type { IConnector, SearchOptions } from "@/connectors/base/IConnector";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
@@ -243,7 +242,7 @@ export class UnifiedSearchService {
     this.history = [];
 
     try {
-      await AsyncStorage.removeItem(HISTORY_STORAGE_KEY);
+      await storageAdapter.removeItem(HISTORY_STORAGE_KEY);
     } catch (error) {
       await logger.error("Failed to clear unified search history.", {
         location: "UnifiedSearchService.clearHistory",
@@ -258,7 +257,7 @@ export class UnifiedSearchService {
     }
 
     try {
-      const raw = await AsyncStorage.getItem(HISTORY_STORAGE_KEY);
+      const raw = await storageAdapter.getItem(HISTORY_STORAGE_KEY);
       if (!raw) {
         this.history = [];
       } else {
@@ -292,7 +291,7 @@ export class UnifiedSearchService {
 
   private async persistHistory(): Promise<void> {
     try {
-      await AsyncStorage.setItem(
+      await storageAdapter.setItem(
         HISTORY_STORAGE_KEY,
         JSON.stringify(this.history),
       );

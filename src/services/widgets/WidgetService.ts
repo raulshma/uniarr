@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { logger } from "@/services/logger/LoggerService";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 
 export type WidgetType =
   | "service-status"
@@ -69,7 +68,7 @@ class WidgetService {
 
   private async loadWidgets(): Promise<void> {
     try {
-      const serialized = await AsyncStorage.getItem(this.STORAGE_KEY);
+      const serialized = await storageAdapter.getItem(this.STORAGE_KEY);
       if (serialized) {
         const widgets = JSON.parse(serialized) as Widget[];
         this.widgets.clear();
@@ -86,7 +85,7 @@ class WidgetService {
 
   private async loadWidgetData(): Promise<void> {
     try {
-      const serialized = await AsyncStorage.getItem(this.DATA_KEY);
+      const serialized = await storageAdapter.getItem(this.DATA_KEY);
       if (serialized) {
         this.widgetData = JSON.parse(serialized) as WidgetData;
         // Clean up expired data
@@ -303,7 +302,7 @@ class WidgetService {
   private async saveWidgets(): Promise<void> {
     try {
       const widgets = Array.from(this.widgets.values());
-      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(widgets));
+      await storageAdapter.setItem(this.STORAGE_KEY, JSON.stringify(widgets));
     } catch (error) {
       logger.error("[WidgetService] Failed to save widgets", { error });
     }
@@ -311,7 +310,7 @@ class WidgetService {
 
   private async saveWidgetData(): Promise<void> {
     try {
-      await AsyncStorage.setItem(
+      await storageAdapter.setItem(
         this.DATA_KEY,
         JSON.stringify(this.widgetData),
       );

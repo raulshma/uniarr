@@ -2,7 +2,7 @@ import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { Slot, useRouter, useSegments } from "expo-router";
-import { useMemo, type ComponentType, useEffect } from "react";
+import { useMemo, type ComponentType, useEffect, useState } from "react";
 import { Platform, View } from "react-native";
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -28,10 +28,49 @@ import { useQuietHoursManager } from "@/hooks/useQuietHoursManager";
 import { useVoiceCommandHandler } from "@/hooks/useVoiceCommandHandler";
 import { WidgetDrawerProvider } from "@/services/widgetDrawerService";
 import { GlobalWidgetDrawer } from "@/components/widgets/GlobalWidgetDrawer";
+import { StorageBackendManager } from "@/services/storage/MMKVStorage";
+import { performStorageMigration } from "@/utils/storage.migration";
 
 const RootLayout = () => {
   const theme = useTheme();
   const clerkPublishableKey = useMemo(() => getClerkPublishableKey(), []);
+  const [storageReady, setStorageReady] = useState(false);
+
+  // Initialize storage at startup (eager detection)
+  useEffect(() => {
+    const initializeStorage = async () => {
+      try {
+        const manager = StorageBackendManager.getInstance();
+        await manager.initialize();
+
+        // Perform silent migration if needed
+        const migrationResult = await performStorageMigration();
+        if (migrationResult.itemsFailed > 0) {
+          console.warn(
+            `[RootLayout] Storage migration had ${migrationResult.itemsFailed} failures`,
+            migrationResult.errors,
+          );
+        }
+
+        setStorageReady(true);
+      } catch (error) {
+        console.error("[RootLayout] Storage initialization failed", error);
+        // Mark as ready anyway to allow app to continue
+        setStorageReady(true);
+      }
+    };
+
+    initializeStorage();
+  }, []);
+
+  // Don't render until storage is ready
+  if (!storageReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme?.colors?.background }}>
+        {/* Storage initialization screen */}
+      </View>
+    );
+  }
 
   return (
     <GestureHandlerRootView

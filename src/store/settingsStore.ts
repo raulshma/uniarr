@@ -1,8 +1,8 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { logger, LogLevel } from "@/services/logger/LoggerService";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 import type {
   NotificationCategory,
   QuietHoursConfig,
@@ -291,7 +291,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       // Bump version since we're adding new persisted fields
       version: 10,
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           void logger.error("Failed to rehydrate settings store.", {

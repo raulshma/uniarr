@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 import type { ServiceType } from "@/models/service.types";
 
 /**
@@ -54,7 +54,7 @@ async function fetchIconsTree(): Promise<Record<string, string[]> | null> {
     const now = Date.now();
 
     // Try to get cached data from AsyncStorage
-    const cachedJson = await AsyncStorage.getItem(ICONS_CACHE_STORAGE_KEY);
+    const cachedJson = await storageAdapter.getItem(ICONS_CACHE_STORAGE_KEY);
     if (cachedJson) {
       const cache: IconsCache = JSON.parse(cachedJson);
       // Return cached data if still valid
@@ -76,7 +76,7 @@ async function fetchIconsTree(): Promise<Record<string, string[]> | null> {
       data,
       timestamp: now,
     };
-    await AsyncStorage.setItem(
+    await storageAdapter.setItem(
       ICONS_CACHE_STORAGE_KEY,
       JSON.stringify(cacheToStore),
     );
@@ -87,7 +87,7 @@ async function fetchIconsTree(): Promise<Record<string, string[]> | null> {
 
     // Try to return stale cached data if available
     try {
-      const cachedJson = await AsyncStorage.getItem(ICONS_CACHE_STORAGE_KEY);
+      const cachedJson = await storageAdapter.getItem(ICONS_CACHE_STORAGE_KEY);
       if (cachedJson) {
         const cache: IconsCache = JSON.parse(cachedJson);
         return cache.data;

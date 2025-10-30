@@ -1,6 +1,7 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 // Export shallow equality helper for components to use when selecting parts of the store
 export { shallow } from "zustand/shallow";
 
@@ -78,7 +79,7 @@ export const useServicesStore = create<ServicesState>()(
         sortKey: state.sortKey,
         sortDirection: state.sortDirection,
       }),
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.error("Failed to rehydrate services store:", error);

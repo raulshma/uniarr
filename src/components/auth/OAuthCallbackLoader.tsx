@@ -74,7 +74,7 @@ const SkiaLoader = ({ size = 80, theme }: { size: number; theme: any }) => {
     }
 
     return paths;
-  }, [size, center, radius]);
+  }, [center, radius]);
 
   return (
     <Canvas style={{ width: size, height: size }}>

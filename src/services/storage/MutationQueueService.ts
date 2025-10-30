@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { logger } from "@/services/logger/LoggerService";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 
 const MUTATION_QUEUE_KEY = "MutationQueue_pending";
 const MUTATION_QUEUE_INDEX_KEY = "MutationQueue_index";
@@ -34,7 +33,7 @@ class MutationQueueService {
     }
 
     try {
-      const stored = await AsyncStorage.getItem(MUTATION_QUEUE_INDEX_KEY);
+      const stored = await storageAdapter.getItem(MUTATION_QUEUE_INDEX_KEY);
       if (stored) {
         const ids = JSON.parse(stored) as string[];
         const mutations = await Promise.all(
@@ -128,7 +127,7 @@ class MutationQueueService {
 
     const ids = this.queue.map((m) => m.id);
     await Promise.all(ids.map((id) => this.removeStoredMutation(id)));
-    await AsyncStorage.removeItem(MUTATION_QUEUE_INDEX_KEY);
+    await storageAdapter.removeItem(MUTATION_QUEUE_INDEX_KEY);
 
     this.queue = [];
 
@@ -145,7 +144,7 @@ class MutationQueueService {
 
   private async persistMutation(mutation: QueuedMutation): Promise<void> {
     try {
-      await AsyncStorage.setItem(
+      await storageAdapter.setItem(
         this.getMutationKey(mutation.id),
         JSON.stringify(mutation),
       );
@@ -161,7 +160,10 @@ class MutationQueueService {
   private async persistIndex(): Promise<void> {
     try {
       const ids = this.queue.map((m) => m.id);
-      await AsyncStorage.setItem(MUTATION_QUEUE_INDEX_KEY, JSON.stringify(ids));
+      await storageAdapter.setItem(
+        MUTATION_QUEUE_INDEX_KEY,
+        JSON.stringify(ids),
+      );
     } catch (error) {
       await logger.error("Failed to persist mutation queue index", {
         location: "MutationQueueService.persistIndex",
@@ -172,7 +174,7 @@ class MutationQueueService {
 
   private async getStoredMutation(id: string): Promise<QueuedMutation | null> {
     try {
-      const stored = await AsyncStorage.getItem(this.getMutationKey(id));
+      const stored = await storageAdapter.getItem(this.getMutationKey(id));
       if (!stored) {
         return null;
       }
@@ -200,7 +202,7 @@ class MutationQueueService {
 
   private async removeStoredMutation(id: string): Promise<void> {
     try {
-      await AsyncStorage.removeItem(this.getMutationKey(id));
+      await storageAdapter.removeItem(this.getMutationKey(id));
     } catch (error) {
       await logger.error("Failed to remove stored mutation", {
         location: "MutationQueueService.removeStoredMutation",

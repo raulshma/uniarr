@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { logger } from "@/services/logger/LoggerService";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 
 export type WebhookEvent = {
   id: string;
@@ -79,7 +78,7 @@ class WebhookService {
 
   private async loadConfig(): Promise<void> {
     try {
-      const stored = await AsyncStorage.getItem(this.STORAGE_KEY);
+      const stored = await storageAdapter.getItem(this.STORAGE_KEY);
       if (stored) {
         this.config = { ...this.config, ...JSON.parse(stored) };
       }
@@ -90,7 +89,7 @@ class WebhookService {
 
   private async loadEvents(): Promise<void> {
     try {
-      const stored = await AsyncStorage.getItem(this.EVENTS_KEY);
+      const stored = await storageAdapter.getItem(this.EVENTS_KEY);
       if (stored) {
         this.eventQueue = JSON.parse(stored).map((e: any) => ({
           ...e,
@@ -104,7 +103,7 @@ class WebhookService {
 
   private async loadNotifications(): Promise<void> {
     try {
-      const stored = await AsyncStorage.getItem(this.NOTIFICATIONS_KEY);
+      const stored = await storageAdapter.getItem(this.NOTIFICATIONS_KEY);
       if (stored) {
         this.notifications = JSON.parse(stored);
       }
@@ -115,7 +114,10 @@ class WebhookService {
 
   private async saveConfig(): Promise<void> {
     try {
-      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.config));
+      await storageAdapter.setItem(
+        this.STORAGE_KEY,
+        JSON.stringify(this.config),
+      );
     } catch (error) {
       logger.error("[WebhookService] Failed to save config", { error });
     }
@@ -123,7 +125,7 @@ class WebhookService {
 
   private async saveEvents(): Promise<void> {
     try {
-      await AsyncStorage.setItem(
+      await storageAdapter.setItem(
         this.EVENTS_KEY,
         JSON.stringify(this.eventQueue),
       );
@@ -134,7 +136,7 @@ class WebhookService {
 
   private async saveNotifications(): Promise<void> {
     try {
-      await AsyncStorage.setItem(
+      await storageAdapter.setItem(
         this.NOTIFICATIONS_KEY,
         JSON.stringify(this.notifications),
       );
