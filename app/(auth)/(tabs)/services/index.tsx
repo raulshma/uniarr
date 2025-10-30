@@ -39,6 +39,31 @@ import { getHomarrIconUrl, getHomarrIconUrls } from "@/utils/homarrIcons.utils";
 import { imageCacheService } from "@/services/image/ImageCacheService";
 import { useServiceHealth } from "@/hooks/useServiceHealth";
 
+// Custom hook for async icon loading
+const useServiceIcon = (serviceType: ServiceType, isDarkTheme: boolean) => {
+  const [icon, setIcon] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadIcon = async () => {
+      try {
+        setLoading(true);
+        const url = await getHomarrIconUrl(serviceType, isDarkTheme);
+        setIcon(url);
+      } catch (error) {
+        console.warn(`Failed to load icon for ${serviceType}:`, error);
+        setIcon(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadIcon();
+  }, [serviceType, isDarkTheme]);
+
+  return { icon, loading };
+};
+
 type ServiceOverviewItem = {
   config: ServiceConfig;
   status: ServiceStatusState;
@@ -106,40 +131,128 @@ const fetchServiceConfigs = async (): Promise<ServiceConfig[]> => {
   return configs;
 };
 
-// Simplified approach: We'll let the individual service rows handle their own queries
-// and remove the metrics aggregation for now to avoid hooks violations
+// Component that collects health data from all services for overview metrics
+// Handles up to 10 services with individual queries (covers most realistic use cases)
+const ServiceOverviewMetrics = React.memo(
+  ({
+    serviceConfigs,
+    children,
+  }: {
+    serviceConfigs: ServiceConfig[];
+    children: (metrics: {
+      overviewMetrics: { label: string; value: number }[];
+      averageLatency: string;
+      isAnyServiceLoading: boolean;
+    }) => React.ReactNode;
+  }) => {
+    // Support up to 10 services with individual queries
+    const [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10] = serviceConfigs;
+    const h1 = useServiceHealth(s1?.id ?? "");
+    const h2 = useServiceHealth(s2?.id ?? "");
+    const h3 = useServiceHealth(s3?.id ?? "");
+    const h4 = useServiceHealth(s4?.id ?? "");
+    const h5 = useServiceHealth(s5?.id ?? "");
+    const h6 = useServiceHealth(s6?.id ?? "");
+    const h7 = useServiceHealth(s7?.id ?? "");
+    const h8 = useServiceHealth(s8?.id ?? "");
+    const h9 = useServiceHealth(s9?.id ?? "");
+    const h10 = useServiceHealth(s10?.id ?? "");
+
+    const healthQueries = [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10].filter(
+      (_, index) => serviceConfigs[index] !== undefined,
+    );
+
+    const metrics = useMemo(() => {
+      const overviewMetrics = [
+        { label: "Configured", value: serviceConfigs.length },
+        {
+          label: "Online",
+          value: healthQueries.filter(
+            (query) => query.data?.status === "online",
+          ).length,
+        },
+        {
+          label: "Degraded",
+          value: healthQueries.filter(
+            (query) => query.data?.status === "degraded",
+          ).length,
+        },
+        {
+          label: "Offline",
+          value: healthQueries.filter(
+            (query) => query.data?.status === "offline",
+          ).length,
+        },
+      ];
+
+      const latencies = healthQueries
+        .map((query) => query.data?.latency)
+        .filter((latency): latency is number => typeof latency === "number");
+
+      const averageLatency =
+        latencies.length === 0
+          ? "—"
+          : `${Math.round(
+              latencies.reduce((acc, latency) => acc + latency, 0) /
+                latencies.length,
+            )} ms`;
+
+      const isAnyServiceLoading = healthQueries.some(
+        (query) => query.isLoading,
+      );
+
+      return { overviewMetrics, averageLatency, isAnyServiceLoading };
+    }, [serviceConfigs.length, healthQueries]);
+
+    return <>{children(metrics)}</>;
+  },
+);
+
 const ServiceOverviewHeader = React.memo(
   ({
     serviceConfigs,
     animationsEnabled,
-    isDarkTheme,
     styles,
   }: {
     serviceConfigs: ServiceConfig[];
     animationsEnabled: boolean;
-    isDarkTheme: boolean;
     styles: ReturnType<typeof StyleSheet.create>;
   }) => {
     return (
-      <AnimatedSection
-        animated={animationsEnabled}
-        style={styles.summarySection}
-        delay={50}
-      >
-        <Text style={styles.summaryTitle}>Service overview</Text>
-        <View style={styles.summaryGrid}>
-          <AnimatedListItem
-            key="configured"
-            animated={animationsEnabled}
-            index={0}
-            totalItems={1}
-            style={styles.summaryCard}
+      <ServiceOverviewMetrics serviceConfigs={serviceConfigs}>
+        {({ overviewMetrics, averageLatency, isAnyServiceLoading }) => (
+          <AnimatedSection
+            animated={animationsEnabled && !isAnyServiceLoading}
+            style={styles.summarySection}
+            delay={50}
           >
-            <Text style={styles.summaryValue}>{serviceConfigs.length}</Text>
-            <Text style={styles.summaryLabel}>Configured</Text>
-          </AnimatedListItem>
-        </View>
-      </AnimatedSection>
+            <Text style={styles.summaryTitle}>Service overview</Text>
+            <View style={styles.summaryGrid}>
+              {overviewMetrics.map((metric, index) => (
+                <AnimatedListItem
+                  key={metric.label}
+                  animated={animationsEnabled && !isAnyServiceLoading}
+                  index={index}
+                  totalItems={overviewMetrics.length + 1}
+                  style={styles.summaryCard}
+                >
+                  <Text style={styles.summaryValue}>{metric.value}</Text>
+                  <Text style={styles.summaryLabel}>{metric.label}</Text>
+                </AnimatedListItem>
+              ))}
+            </View>
+            <AnimatedListItem
+              animated={animationsEnabled && !isAnyServiceLoading}
+              index={overviewMetrics.length}
+              totalItems={overviewMetrics.length + 1}
+              style={styles.latencyChip}
+            >
+              <Text style={styles.latencyLabel}>Average latency</Text>
+              <Text style={styles.latencyValue}>{averageLatency}</Text>
+            </AnimatedListItem>
+          </AnimatedSection>
+        )}
+      </ServiceOverviewMetrics>
     );
   },
 );
@@ -176,6 +289,7 @@ const ServiceRowWithHealth = React.memo(
     handleDeleteService: () => void;
   }) => {
     const { data: healthData } = useServiceHealth(config.id);
+    const { icon: homarrUrl } = useServiceIcon(config.type, isDarkTheme);
 
     const serviceItem: ServiceOverviewItem = useMemo(
       () => ({
@@ -190,7 +304,6 @@ const ServiceRowWithHealth = React.memo(
     );
 
     const displayName = serviceDisplayNames[config.type] || config.name;
-    const homarrUrl = getHomarrIconUrl(config.type, isDarkTheme);
     const icon = homarrUrl ? { uri: homarrUrl } : serviceIcons[config.type];
     const serviceTypeLabel = serviceTypeLabels[config.type];
 
@@ -246,7 +359,7 @@ const ServicesScreen = () => {
         const configs = await secureStorage.getServiceConfigs();
         if (configs.length > 0) {
           const serviceTypes = [...new Set(configs.map((c) => c.type))];
-          const iconUrls = getHomarrIconUrls(serviceTypes, isDarkTheme);
+          const iconUrls = await getHomarrIconUrls(serviceTypes, isDarkTheme);
           await imageCacheService.prefetch(iconUrls);
         }
       } catch (error) {
@@ -663,7 +776,6 @@ const ServicesScreen = () => {
             <ServiceOverviewHeader
               serviceConfigs={configs}
               animationsEnabled={animationsEnabled}
-              isDarkTheme={isDarkTheme}
               styles={styles}
             />
           ) : null
