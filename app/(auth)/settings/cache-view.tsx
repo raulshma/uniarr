@@ -520,7 +520,7 @@ const CacheViewerScreen = () => {
                     onPress={handleClearAll}
                     loading={loading}
                     disabled={loading || !analysis || analysis.fileCount === 0}
-                    style={{ height: 32 }}
+                    style={{ height: 36 }}
                   >
                     Clear
                   </Button>

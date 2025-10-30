@@ -836,16 +836,14 @@ const SettingsScreen = () => {
                   <View style={{ flexDirection: "row", gap: spacing.xs }}>
                     <Button
                       mode="outlined"
-                      compact
                       onPress={() => router.push("/(auth)/settings/cache-view")}
                       disabled={isFetchingCacheUsage}
-                      style={{ height: 32 }}
+                      style={{ height: 38 }}
                     >
                       View
                     </Button>
                     <Button
                       mode="contained-tonal"
-                      compact
                       onPress={handleClearImageCache}
                       loading={isClearingImageCache}
                       disabled={
@@ -853,7 +851,7 @@ const SettingsScreen = () => {
                         isFetchingCacheUsage ||
                         imageCacheUsage.size === 0
                       }
-                      style={{ height: 32 }}
+                      style={{ height: 36 }}
                     >
                       Clear
                     </Button>
