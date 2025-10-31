@@ -32,6 +32,7 @@ import {
   type ImageCacheUsage,
 } from "@/services/image/ImageCacheService";
 import { logger } from "@/services/logger/LoggerService";
+import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
 import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useAppUpdateCheck } from "@/hooks/useAppUpdateCheck";
@@ -65,6 +66,7 @@ const SettingsScreen = () => {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
+  const [errorLogCount, setErrorLogCount] = useState(0);
   const theme = useTheme<AppTheme>();
   const isDev = typeof __DEV__ !== "undefined" && __DEV__;
 
@@ -285,6 +287,19 @@ const SettingsScreen = () => {
       });
     }
   }, [updateData, isCheckingUpdate, updateError]);
+
+  // Load error log count on mount
+  useEffect(() => {
+    const loadErrorCount = async () => {
+      try {
+        const errors = await apiErrorLogger.getErrors({});
+        setErrorLogCount(errors.length);
+      } catch {
+        // Silently fail - not critical
+      }
+    };
+    void loadErrorCount();
+  }, []);
 
   const handleClearImageCache = async () => {
     setIsClearingImageCache(true);
@@ -1106,6 +1121,45 @@ const SettingsScreen = () => {
             </SettingsGroup>
           </AnimatedSection>
         )}
+
+        {/* Logging & Diagnostics Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Logging & Diagnostics</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="API Error Logs"
+                subtitle={
+                  errorLogCount > 0
+                    ? `${errorLogCount} errors logged`
+                    : "No errors logged"
+                }
+                left={{ iconName: "file-document-outline" }}
+                trailing={
+                  errorLogCount > 0 ? (
+                    <Chip>{errorLogCount}</Chip>
+                  ) : (
+                    <IconButton
+                      icon="chevron-right"
+                      size={16}
+                      iconColor={theme.colors.outline}
+                    />
+                  )
+                }
+                onPress={() => router.push("/(auth)/settings/api-error-logs")}
+                groupPosition="single"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
 
         {/* Sign Out Button */}
         <AnimatedListItem

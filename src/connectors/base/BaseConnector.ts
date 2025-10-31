@@ -9,6 +9,7 @@ import type {
 import type { ServiceConfig } from "@/models/service.types";
 import { handleApiError } from "@/utils/error.utils";
 import { logger } from "@/services/logger/LoggerService";
+import { httpErrorInterceptor } from "@/services/http/HttpErrorInterceptor";
 import {
   testNetworkConnectivity,
   diagnoseVpnIssues,
@@ -223,6 +224,23 @@ export abstract class BaseConnector<
       headers: this.getDefaultHeaders(),
       ...this.getAuthConfig(),
     });
+
+    // Setup HTTP error interceptor for automatic error logging
+    // This ensures ALL API calls through this connector are captured
+    httpErrorInterceptor.setup(
+      instance,
+      {
+        enableErrorLogging: true,
+        captureRequestBody: false, // Don't capture for privacy
+        captureResponseBody: false, // Don't capture for privacy
+        captureRequestHeaders: false, // Don't capture headers
+        excludeStatusCodes: [401, 403, 404], // Skip common expected errors
+      },
+      {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+      },
+    );
 
     instance.interceptors.request.use(
       (requestConfig) => {

@@ -72,6 +72,11 @@ type SettingsData = {
     blurStyle: "inner" | "outer" | "solid" | "normal";
     colors: string[];
   };
+  // API Error Logger configuration
+  apiErrorLoggerEnabled: boolean;
+  apiErrorLoggerActivePreset: string; // "CRITICAL", "SERVER", "RATE_LIMIT", "CLIENT_ERRORS", "STRICT", "CUSTOM"
+  apiErrorLoggerCustomCodes: (number | string)[]; // Used when preset is CUSTOM
+  apiErrorLoggerRetentionDays: number; // How many days to keep error logs (default: 7)
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -118,6 +123,10 @@ interface SettingsState extends SettingsData {
     blurStyle: "inner" | "outer" | "solid" | "normal";
     colors: string[];
   }) => void;
+  setApiErrorLoggerEnabled: (enabled: boolean) => void;
+  setApiErrorLoggerActivePreset: (preset: string) => void;
+  setApiErrorLoggerCustomCodes: (codes: (number | string)[]) => void;
+  setApiErrorLoggerRetentionDays: (days: number) => void;
   // (thumbnail setters removed)
 }
 
@@ -219,6 +228,10 @@ const createDefaultSettings = (): SettingsData => ({
       "#FF0080", // Hot Pink (repeat for smooth transition)
     ],
   },
+  apiErrorLoggerEnabled: false,
+  apiErrorLoggerActivePreset: "CRITICAL",
+  apiErrorLoggerCustomCodes: [],
+  apiErrorLoggerRetentionDays: 7,
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
@@ -288,6 +301,14 @@ export const useSettingsStore = create<SettingsState>()(
       setGradientBackgroundEnabled: (enabled: boolean) =>
         set({ gradientBackgroundEnabled: enabled }),
       setSkiaLoaderConfig: (config) => set({ skiaLoaderConfig: config }),
+      setApiErrorLoggerEnabled: (enabled: boolean) =>
+        set({ apiErrorLoggerEnabled: enabled }),
+      setApiErrorLoggerActivePreset: (preset: string) =>
+        set({ apiErrorLoggerActivePreset: preset }),
+      setApiErrorLoggerCustomCodes: (codes: (number | string)[]) =>
+        set({ apiErrorLoggerCustomCodes: codes }),
+      setApiErrorLoggerRetentionDays: (days: number) =>
+        set({ apiErrorLoggerRetentionDays: Math.max(1, Math.min(365, days)) }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -328,6 +349,10 @@ export const useSettingsStore = create<SettingsState>()(
         frostedWidgetsEnabled: state.frostedWidgetsEnabled,
         gradientBackgroundEnabled: state.gradientBackgroundEnabled,
         skiaLoaderConfig: state.skiaLoaderConfig,
+        apiErrorLoggerEnabled: state.apiErrorLoggerEnabled,
+        apiErrorLoggerActivePreset: state.apiErrorLoggerActivePreset,
+        apiErrorLoggerCustomCodes: state.apiErrorLoggerCustomCodes,
+        apiErrorLoggerRetentionDays: state.apiErrorLoggerRetentionDays,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
