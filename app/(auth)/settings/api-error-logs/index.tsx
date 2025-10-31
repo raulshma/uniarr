@@ -713,7 +713,7 @@ const ApiErrorLogsScreen = () => {
             <Button
               mode="outlined"
               onPress={() => setShowGroupDialog(true)}
-              icon="folder-group"
+              icon="folder-multiple"
             >
               {groupBy === "none"
                 ? "None"

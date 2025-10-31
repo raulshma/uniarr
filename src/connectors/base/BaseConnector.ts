@@ -217,7 +217,17 @@ export abstract class BaseConnector<
     }
   }
 
-  /** Create a configured Axios instance with logging and error handling. */
+  /**
+   * Create a configured Axios instance with logging and error handling.
+   *
+   * @note API Error Logger Capture Settings
+   * The capture settings (requestBody, responseBody, requestHeaders) are read at
+   * HTTP client initialization time. If users change these settings at runtime,
+   * the changes will NOT automatically apply to already-initialized connectors.
+   * Users must restart the app for capture setting changes to take effect.
+   * This is a design choice to avoid the overhead of monitoring settings changes
+   * for every HTTP request. Consider documenting this limitation in the UI.
+   */
   protected createHttpClient(): AxiosInstance {
     const instance = axios.create({
       baseURL: this.config.url,

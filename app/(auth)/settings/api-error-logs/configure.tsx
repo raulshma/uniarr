@@ -8,6 +8,8 @@ import {
   Switch,
   Dialog,
   Portal,
+  TextInput,
+  Chip,
 } from "react-native-paper";
 import { useState, useMemo } from "react";
 
@@ -78,6 +80,10 @@ const ApiErrorLoggerConfigureScreen = () => {
 
   const [presetDialogVisible, setPresetDialogVisible] = useState(false);
   const [retentionDialogVisible, setRetentionDialogVisible] = useState(false);
+  const [customCodeDialogVisible, setCustomCodeDialogVisible] = useState(false);
+  const [customCodeInput, setCustomCodeInput] = useState("");
+  const { apiErrorLoggerCustomCodes, setApiErrorLoggerCustomCodes } =
+    useSettingsStore();
 
   const styles = StyleSheet.create({
     container: {
@@ -211,6 +217,69 @@ const ApiErrorLoggerConfigureScreen = () => {
                   />
                 </AnimatedListItem>
               </SettingsGroup>
+
+              {/* Custom Codes Section - show only when CUSTOM preset is selected */}
+              {apiErrorLoggerActivePreset === "CUSTOM" && (
+                <View style={{ marginTop: spacing.md }}>
+                  <Text
+                    style={{
+                      ...styles.sectionTitle,
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    Custom Error Codes
+                  </Text>
+                  <View style={{ gap: spacing.xs, marginBottom: spacing.md }}>
+                    {apiErrorLoggerCustomCodes.length > 0 ? (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          flexWrap: "wrap",
+                          gap: spacing.xs,
+                        }}
+                      >
+                        {apiErrorLoggerCustomCodes.map((code) => (
+                          <Chip
+                            key={code}
+                            onClose={() => {
+                              setApiErrorLoggerCustomCodes(
+                                apiErrorLoggerCustomCodes.filter(
+                                  (c) => c !== code,
+                                ),
+                              );
+                            }}
+                            style={{
+                              backgroundColor: theme.colors.primaryContainer,
+                            }}
+                          >
+                            {String(code)}
+                          </Chip>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text
+                        style={{
+                          ...styles.settingValue,
+                          color: theme.colors.onSurfaceVariant,
+                          fontStyle: "italic",
+                        }}
+                      >
+                        No custom codes added yet
+                      </Text>
+                    )}
+                  </View>
+                  <Button
+                    mode="contained-tonal"
+                    onPress={() => {
+                      setCustomCodeInput("");
+                      setCustomCodeDialogVisible(true);
+                    }}
+                    icon="plus"
+                  >
+                    Add Error Code
+                  </Button>
+                </View>
+              )}
             </AnimatedSection>
 
             {/* Capture Options Section */}
@@ -452,6 +521,79 @@ const ApiErrorLoggerConfigureScreen = () => {
               onPress={() => setRetentionDialogVisible(false)}
             >
               Cancel
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      {/* Custom Error Code Dialog */}
+      <Portal>
+        <Dialog
+          visible={customCodeDialogVisible}
+          onDismiss={() => setCustomCodeDialogVisible(false)}
+          style={{
+            borderRadius: 12,
+            backgroundColor: theme.colors.elevation.level1,
+          }}
+        >
+          <Dialog.Title style={styles.sectionTitle}>
+            Add Custom Error Code
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ ...styles.settingValue, marginBottom: spacing.md }}>
+              Enter an HTTP status code (number) or network error code (text).
+              Examples: 429, ECONNREFUSED
+            </Text>
+            <TextInput
+              label="Error Code"
+              value={customCodeInput}
+              onChangeText={setCustomCodeInput}
+              placeholder="e.g., 429 or ECONNREFUSED"
+              mode="outlined"
+              keyboardType="default"
+              style={{ marginBottom: spacing.md }}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              mode="outlined"
+              onPress={() => setCustomCodeDialogVisible(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
+              onPress={() => {
+                if (customCodeInput.trim()) {
+                  // Try to parse as number, otherwise use as string
+                  const code = /^\d+$/.test(customCodeInput)
+                    ? parseInt(customCodeInput, 10)
+                    : customCodeInput.trim();
+
+                  if (
+                    !apiErrorLoggerCustomCodes.includes(code) &&
+                    typeof code === "number" &&
+                    code > 0
+                  ) {
+                    setApiErrorLoggerCustomCodes([
+                      ...apiErrorLoggerCustomCodes,
+                      code,
+                    ]);
+                  } else if (
+                    !apiErrorLoggerCustomCodes.includes(code) &&
+                    typeof code === "string"
+                  ) {
+                    setApiErrorLoggerCustomCodes([
+                      ...apiErrorLoggerCustomCodes,
+                      code,
+                    ]);
+                  }
+                  setCustomCodeDialogVisible(false);
+                  setCustomCodeInput("");
+                }
+              }}
+            >
+              Add
             </Button>
           </Dialog.Actions>
         </Dialog>

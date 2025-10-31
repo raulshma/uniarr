@@ -1,3 +1,9 @@
+export interface SensitiveDataDetection {
+  patterns: string[]; // Which patterns were detected (e.g., ["authorization", "x-api-key"])
+  location: "headers" | "body" | "both"; // Where sensitive data was found
+  timestamp: string; // ISO string of when detection occurred
+}
+
 export interface ApiErrorLogEntry {
   id: string;
   timestamp: string; // ISO string
@@ -12,6 +18,8 @@ export interface ApiErrorLogEntry {
   isNetworkError: boolean; // true if network connectivity issue
   retryCount: number; // Number of times this error was retried
   context?: Record<string, unknown>; // Additional context
+  deletedAt?: string; // ISO string - set when soft-deleted; null if active. Used for audit trail preservation.
+  sensitiveDataDetected?: SensitiveDataDetection; // Track if/when sensitive patterns were detected during capture
 }
 
 export interface ApiErrorLogFilter {
@@ -24,6 +32,7 @@ export interface ApiErrorLogFilter {
   operation?: string;
   endpoint?: string;
   search?: string; // Search in message or endpoint
+  includeDeleted?: boolean; // Include soft-deleted entries (audit trail); default: false
 }
 
 export interface GroupedErrorStats {

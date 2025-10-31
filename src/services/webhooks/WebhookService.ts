@@ -40,6 +40,9 @@ class WebhookService {
   private readonly STORAGE_KEY = "WebhookService:config";
   private readonly EVENTS_KEY = "WebhookService:events";
   private readonly NOTIFICATIONS_KEY = "WebhookService:notifications";
+  private readonly MAX_EVENT_QUEUE_SIZE = 1000; // Prevent unbounded event queue growth
+  private readonly LISTENER_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour: auto-clean stale listeners
+  private readonly MAX_LISTENERS_PER_HOOK = 10; // Warn if excessive listeners from same hook
 
   private config: WebhookConfig = {
     enabled: false,
@@ -52,7 +55,11 @@ class WebhookService {
   private eventQueue: WebhookEvent[] = [];
   private notifications: WebhookNotification[] = [];
   private isProcessing = false;
-  private listeners: Map<string, (event: WebhookEvent) => void> = new Map();
+  private listeners: Map<
+    string,
+    { callback: (event: WebhookEvent) => void; createdAt: number }
+  > = new Map();
+  private listenerCleanupTimer: NodeJS.Timeout | null = null;
 
   static getInstance(): WebhookService {
     if (!WebhookService.instance) {
@@ -67,6 +74,9 @@ class WebhookService {
       await this.loadEvents();
       await this.loadNotifications();
 
+      // Start listener cleanup timer to prevent stale listener accumulation
+      this.startListenerCleanup();
+
       if (this.config.enabled) {
         logger.info("[WebhookService] Initialized with webhooks enabled");
         this.startProcessing();
@@ -74,6 +84,15 @@ class WebhookService {
     } catch (error) {
       logger.error("[WebhookService] Failed to initialize", { error });
     }
+  }
+
+  /**
+   * Stop the webhook service and clean up resources
+   */
+  destroy(): void {
+    this.stopListenerCleanup();
+    this.listeners.clear();
+    this.stopProcessing();
   }
 
   private async loadConfig(): Promise<void> {
@@ -145,6 +164,48 @@ class WebhookService {
     }
   }
 
+  /**
+   * Start periodic cleanup of stale listeners (1 hour inactive = removed)
+   * @private
+   */
+  private startListenerCleanup(): void {
+    if (this.listenerCleanupTimer) {
+      return;
+    }
+
+    this.listenerCleanupTimer = setInterval(
+      () => {
+        const now = Date.now();
+        const staleListenerIds: string[] = [];
+
+        this.listeners.forEach((listenerData, id) => {
+          if (now - listenerData.createdAt > this.LISTENER_TIMEOUT_MS) {
+            staleListenerIds.push(id);
+          }
+        });
+
+        if (staleListenerIds.length > 0) {
+          staleListenerIds.forEach((id) => this.listeners.delete(id));
+          logger.debug(
+            `[WebhookService] Cleaned up ${staleListenerIds.length} stale listeners`,
+          );
+        }
+      },
+      30 * 60 * 1000,
+    ); // Check every 30 minutes
+  }
+
+  /**
+   * Stop listener cleanup timer
+   * @private
+   */
+  private stopListenerCleanup(): void {
+    if (this.listenerCleanupTimer) {
+      clearInterval(this.listenerCleanupTimer);
+      this.listenerCleanupTimer = null;
+    }
+  }
+
   // Public API methods
 
   async updateConfig(updates: Partial<WebhookConfig>): Promise<void> {
@@ -188,8 +249,12 @@ class WebhookService {
         createdAt: new Date(),
       };
 
-      // Add to queue
+      // Add to queue with size limit to prevent unbounded growth
       this.eventQueue.push(event);
+      if (this.eventQueue.length > this.MAX_EVENT_QUEUE_SIZE) {
+        // Remove oldest events when queue exceeds limit
+        this.eventQueue = this.eventQueue.slice(-this.MAX_EVENT_QUEUE_SIZE);
+      }
       await this.saveEvents();
 
       // Trigger notification
@@ -246,7 +311,18 @@ class WebhookService {
     callback: (event: WebhookEvent) => void,
   ): string {
     const listenerId = this.generateId();
-    this.listeners.set(listenerId, callback);
+    this.listeners.set(listenerId, {
+      callback,
+      createdAt: Date.now(),
+    });
+
+    // Warn if too many listeners from same hook (potential leak indicator)
+    if (this.listeners.size > this.MAX_LISTENERS_PER_HOOK) {
+      logger.warn(
+        `[WebhookService] High listener count: ${this.listeners.size}. Possible listener leak.`,
+      );
+    }
+
     return listenerId;
   }
 
@@ -352,11 +428,13 @@ class WebhookService {
   }
 
   private notifyListeners(event: WebhookEvent): void {
-    this.listeners.forEach((callback, listenerId) => {
+    this.listeners.forEach((listenerData, listenerId) => {
       try {
-        callback(event);
+        listenerData.callback(event);
       } catch (error) {
         logger.error("[WebhookService] Listener error", { listenerId, error });
+        // Remove listener on error to prevent repeated failures
+        this.listeners.delete(listenerId);
       }
     });
   }

@@ -272,6 +272,26 @@ class StorageBackendManager {
   isInitialized(): boolean {
     return this.initialized;
   }
+
+  /**
+   * Destroy the storage backend and clean up resources
+   * Call this during app shutdown or when storage is no longer needed
+   */
+  destroy(): void {
+    if (this.mmkvInstance) {
+      try {
+        // MMKV doesn't have an explicit destroy method in the JS API,
+        // but clearing reference allows garbage collection
+        this.mmkvInstance = undefined;
+      } catch (error) {
+        console.error("[StorageBackendManager] Error during cleanup", {
+          error,
+        });
+      }
+    }
+    this.adapter = null;
+    this.initialized = false;
+  }
 }
 
 export { StorageBackendManager, IStorage, StorageBackend };

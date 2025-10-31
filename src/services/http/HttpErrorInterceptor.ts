@@ -22,6 +22,18 @@ import { handleApiError, type ErrorContext } from "@/utils/error.utils";
 import { logger } from "@/services/logger/LoggerService";
 
 /**
+ * Sanitize sensitive data location to valid enum value
+ */
+function sanitizeDataLocation(
+  location: "headers" | "body" | "both" | null,
+): "headers" | "body" | "both" {
+  if (location === "headers" || location === "body" || location === "both") {
+    return location;
+  }
+  return "body"; // Default fallback
+}
+
+/**
  * Configuration for HTTP error interception
  */
 export interface HttpErrorInterceptorConfig {
@@ -102,6 +114,12 @@ class HttpErrorInterceptor {
 
   /**
    * Setup error interceptor on an Axios instance
+   *
+   * @note Settings are captured at setup time
+   * The enableErrorLogging and capture* flags are captured at the moment this method
+   * is called. Runtime changes to settings will NOT affect already-setup instances.
+   * This is intentional for performance reasons. If capture settings change, the app
+   * must be restarted to apply the new settings to HTTP clients.
    *
    * @param axiosInstance The Axios instance to setup
    * @param config Configuration for error interception
@@ -240,7 +258,7 @@ class HttpErrorInterceptor {
   }
 
   /**
-   * Capture error with optional body/header data
+   * Capture error with optional body/header data and sensitive data detection
    */
   private async captureError(
     error: AxiosError,
@@ -258,11 +276,23 @@ class HttpErrorInterceptor {
         requestHeaders?: string;
       } = {};
 
+      const detectedSensitivePatterns: string[] = [];
+      let sensitiveDataLocation: "headers" | "body" | "both" | null = null;
+
       if (config.captureRequestBody && error.config?.data) {
         details.requestBody =
           typeof error.config.data === "string"
             ? error.config.data
             : JSON.stringify(error.config.data);
+
+        // Check for sensitive patterns in body
+        const bodySensitivePatterns = this.detectSensitivePatterns(
+          details.requestBody,
+        );
+        if (bodySensitivePatterns.length > 0) {
+          detectedSensitivePatterns.push(...bodySensitivePatterns);
+          sensitiveDataLocation = "body";
+        }
       }
 
       if (config.captureResponseBody && error.response?.data) {
@@ -270,18 +300,59 @@ class HttpErrorInterceptor {
           typeof error.response.data === "string"
             ? error.response.data
             : JSON.stringify(error.response.data);
+
+        // Check for sensitive patterns in response body
+        const bodySensitivePatterns = this.detectSensitivePatterns(
+          details.responseBody,
+        );
+        if (bodySensitivePatterns.length > 0) {
+          detectedSensitivePatterns.push(...bodySensitivePatterns);
+          sensitiveDataLocation =
+            sensitiveDataLocation === "body" ? "both" : "body";
+        }
       }
 
       if (config.captureRequestHeaders && error.config?.headers) {
-        // Filter out sensitive headers
+        // Detect sensitive headers BEFORE filtering
+        const headerSensitivePatterns = this.detectSensitiveHeaderPatterns(
+          error.config.headers as Record<string, unknown>,
+        );
+
+        if (headerSensitivePatterns.length > 0) {
+          detectedSensitivePatterns.push(...headerSensitivePatterns);
+          if (sensitiveDataLocation === "body") {
+            sensitiveDataLocation = "both";
+          } else {
+            sensitiveDataLocation = "headers";
+          }
+        }
+
+        // Filter out sensitive headers from stored data
         const safeHeaders = this.filterSensitiveHeaders(
           error.config.headers as Record<string, unknown>,
         );
         details.requestHeaders = JSON.stringify(safeHeaders);
       }
 
-      // Log error with details (the service will handle capture based on settings)
-      await apiErrorLogger.addError(apiError, context, 0, details);
+      // Build sensitive data detection object if patterns were found
+      const sensitiveDataDetection =
+        detectedSensitivePatterns.length > 0
+          ? {
+              patterns: Array.from(new Set(detectedSensitivePatterns)), // Deduplicate
+              location: sanitizeDataLocation(sensitiveDataLocation),
+              timestamp: new Date().toISOString(),
+            }
+          : undefined;
+
+      // Log error with details and sensitive data detection
+      // The ApiErrorLoggerService will attach sensitiveDataDetection to the entry
+      await apiErrorLogger.addError(
+        apiError,
+        context,
+        0,
+        details,
+        sensitiveDataDetection,
+      );
     } catch (captureError) {
       void logger.error("Failed to capture HTTP error.", {
         originalError: error.message,
@@ -291,12 +362,51 @@ class HttpErrorInterceptor {
   }
 
   /**
-   * Filter out sensitive headers that should not be logged
+   * Detect sensitive patterns in text data (bodies)
+   * Returns list of detected pattern names
    */
-  private filterSensitiveHeaders(
+  private detectSensitivePatterns(data: string): string[] {
+    const patterns = [
+      {
+        name: "api-key",
+        regex: /[\'"]\s*(?:api[_-]?key|apikey)\s*[\'"]\s*:\s*[\'"]/i,
+      },
+      {
+        name: "password",
+        regex: /[\'"]\s*(?:password|passwd|pwd)\s*[\'"]\s*:\s*[\'"]/i,
+      },
+      {
+        name: "secret",
+        regex: /[\'"]\s*(?:secret|secret[_-]?key)\s*[\'"]\s*:\s*[\'"]/i,
+      },
+      {
+        name: "token",
+        regex: /[\'"]\s*(?:token|access[_-]?token|bearer)\s*[\'"]\s*:\s*[\'"]/i,
+      },
+      {
+        name: "credentials",
+        regex: /[\'"]\s*(?:credential|credentials|auth)\s*[\'"]\s*:\s*[\'"]/i,
+      },
+    ];
+
+    const detected: string[] = [];
+    for (const { name, regex } of patterns) {
+      if (regex.test(data)) {
+        detected.push(name);
+      }
+    }
+    return detected;
+  }
+
+  /**
+   * Detect sensitive header patterns
+   * Returns list of detected header names
+   */
+  private detectSensitiveHeaderPatterns(
     headers: Record<string, unknown>,
-  ): Record<string, unknown> {
+  ): string[] {
     const sensitivePatterns = [
+      /authorization/i,
       /auth/i,
       /token/i,
       /key/i,
@@ -305,6 +415,38 @@ class HttpErrorInterceptor {
       /credential/i,
       /bearer/i,
       /x-api-key/i,
+      /x-secret/i,
+    ];
+
+    const detected: string[] = [];
+    for (const [headerName] of Object.entries(headers)) {
+      for (const pattern of sensitivePatterns) {
+        if (pattern.test(headerName)) {
+          detected.push(headerName);
+          break; // Only add header name once
+        }
+      }
+    }
+    return detected;
+  }
+
+  /**
+   * Filter out sensitive headers that should not be logged
+   */
+  private filterSensitiveHeaders(
+    headers: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const sensitivePatterns = [
+      /authorization/i,
+      /auth/i,
+      /token/i,
+      /key/i,
+      /secret/i,
+      /password/i,
+      /credential/i,
+      /bearer/i,
+      /x-api-key/i,
+      /x-secret/i,
     ];
 
     const filtered: Record<string, unknown> = {};

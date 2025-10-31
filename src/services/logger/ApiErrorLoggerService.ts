@@ -12,7 +12,10 @@ import type { ApiError, ErrorContext } from "@/utils/error.utils";
 
 const STORAGE_PREFIX = "ApiErrorLog";
 const INDEX_KEY = `${STORAGE_PREFIX}_index`;
+const CLEANUP_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_ENTRIES = 10_000; // Higher limit for error logs
+const AUDIT_TRAIL_RETENTION_DAYS = 30; // Keep deleted entries for 30 days for audit trail
+const SIZE_BASED_EVICTION_THRESHOLD = 0.95; // Evict when at 95% of max entries (9,500 entries)
 
 const isDevelopment = typeof __DEV__ !== "undefined" && __DEV__;
 
@@ -30,12 +33,65 @@ class ApiErrorLoggerService {
 
   private pendingPersist: Promise<void> | null = null;
 
+  private cleanupTimer: NodeJS.Timeout | null = null;
+
+  private isRunning = false;
+
   static getInstance(): ApiErrorLoggerService {
     if (!ApiErrorLoggerService.instance) {
       ApiErrorLoggerService.instance = new ApiErrorLoggerService();
     }
 
     return ApiErrorLoggerService.instance;
+  }
+
+  /**
+   * Start the error logger service (enables periodic cleanup)
+   * Called when app comes to foreground via AppState listener
+   */
+  async start(): Promise<void> {
+    if (this.isRunning) {
+      return;
+    }
+
+    await this.ensureInitialized();
+
+    this.isRunning = true;
+
+    // Perform cleanup immediately on start
+    await this.performPeriodicCleanup();
+
+    // Schedule periodic cleanup
+    this.cleanupTimer = setInterval(() => {
+      void this.performPeriodicCleanup();
+    }, CLEANUP_INTERVAL_MS);
+
+    if (isDevelopment) {
+      console.log(
+        "[ApiErrorLoggerService] Started with periodic cleanup every 15 minutes.",
+      );
+    }
+  }
+
+  /**
+   * Stop the error logger service (cancels periodic cleanup)
+   * Called when app goes to background via AppState listener
+   */
+  stop(): void {
+    if (!this.isRunning) {
+      return;
+    }
+
+    this.isRunning = false;
+
+    if (this.cleanupTimer !== null) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+
+    if (isDevelopment) {
+      console.log("[ApiErrorLoggerService] Stopped periodic cleanup.");
+    }
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -97,6 +153,11 @@ class ApiErrorLoggerService {
       responseBody?: string;
       requestHeaders?: string;
     },
+    sensitiveDataDetection?: {
+      patterns: string[];
+      location: "headers" | "body" | "both";
+      timestamp: string;
+    },
   ): Promise<void> {
     await this.ensureInitialized();
 
@@ -122,6 +183,7 @@ class ApiErrorLoggerService {
       isNetworkError: error.isNetworkError,
       retryCount,
       context: error.details,
+      sensitiveDataDetected: sensitiveDataDetection,
     };
 
     // Store detailed information (body/headers) if capture is enabled and details provided
@@ -152,6 +214,10 @@ class ApiErrorLoggerService {
     }
 
     this.entries = [...this.entries, entry].slice(-MAX_ENTRIES);
+
+    // Perform size-based eviction if approaching limit
+    await this.evictIfNeeded();
+
     await this.persistEntries();
   }
 
@@ -159,6 +225,11 @@ class ApiErrorLoggerService {
     await this.ensureInitialized();
 
     let filtered = [...this.entries];
+
+    // Exclude soft-deleted entries by default (unless explicitly requested for audit)
+    if (!filter?.includeDeleted) {
+      filtered = filtered.filter((e) => !e.deletedAt);
+    }
 
     if (filter) {
       if (filter.serviceId) {
@@ -228,57 +299,38 @@ class ApiErrorLoggerService {
     await this.ensureInitialized();
 
     const idSet = new Set(ids);
-    this.entries = this.entries.filter((e) => !idSet.has(e.id));
+    const now = new Date().toISOString();
 
-    // Remove from individual storage and error details
-    for (const id of ids) {
-      try {
-        await storageAdapter.removeItem(getStorageKey(id));
-        await errorDetailsStorage.deleteErrorDetails(id);
-      } catch (error) {
-        if (isDevelopment) {
-          console.warn(
-            `[ApiErrorLoggerService] Failed to delete entry ${id}.`,
-            error,
-          );
-        }
-      }
-    }
+    // Soft-delete: mark with deletedAt timestamp instead of removing
+    this.entries = this.entries.map((e) =>
+      idSet.has(e.id) ? { ...e, deletedAt: now } : e,
+    );
 
+    // Persist the soft-delete markers
     await this.persistEntries();
+
+    if (isDevelopment) {
+      console.log(
+        `[ApiErrorLoggerService] Soft-deleted ${ids.length} entries. Will be permanently removed after ${AUDIT_TRAIL_RETENTION_DAYS} days.`,
+      );
+    }
   }
 
   async clearAll(): Promise<void> {
     await this.ensureInitialized();
 
     const allIds = this.entries.map((e) => e.id);
-    this.entries = [];
+    const now = new Date().toISOString();
 
-    // Remove all individual entries and error details
-    for (const id of allIds) {
-      try {
-        await storageAdapter.removeItem(getStorageKey(id));
-        await errorDetailsStorage.deleteErrorDetails(id);
-      } catch (error) {
-        if (isDevelopment) {
-          console.warn(
-            `[ApiErrorLoggerService] Failed to delete entry ${id}.`,
-            error,
-          );
-        }
-      }
-    }
+    // Soft-delete all entries instead of hard-deleting
+    this.entries = this.entries.map((e) => ({ ...e, deletedAt: now }));
 
-    // Clear all error details
-    await errorDetailsStorage.clearAllErrorDetails();
+    await this.persistEntries();
 
-    // Clear index
-    try {
-      await storageAdapter.removeItem(INDEX_KEY);
-    } catch (error) {
-      if (isDevelopment) {
-        console.error("[ApiErrorLoggerService] Failed to clear index.", error);
-      }
+    if (isDevelopment) {
+      console.log(
+        `[ApiErrorLoggerService] Soft-deleted all ${allIds.length} entries. Will be permanently removed after ${AUDIT_TRAIL_RETENTION_DAYS} days.`,
+      );
     }
   }
 
@@ -300,8 +352,144 @@ class ApiErrorLoggerService {
     // Also clear old entries from ErrorDetailsStorage
     await errorDetailsStorage.deleteOldErrorDetails(retentionDays);
 
-    await this.deleteErrors(oldIds);
+    // Hard-delete entries after retention window
+    this.entries = this.entries.filter((e) => !oldIds.includes(e.id));
+
+    for (const id of oldIds) {
+      try {
+        await storageAdapter.removeItem(getStorageKey(id));
+        await errorDetailsStorage.deleteErrorDetails(id);
+      } catch (error) {
+        if (isDevelopment) {
+          console.warn(
+            `[ApiErrorLoggerService] Failed to hard-delete old entry ${id}.`,
+            error,
+          );
+        }
+      }
+    }
+
+    await this.persistEntries();
     return oldIds.length;
+  }
+
+  /**
+   * Performs periodic cleanup:
+   * 1. Soft-deleted entries older than AUDIT_TRAIL_RETENTION_DAYS are permanently removed
+   * 2. Active entries older than apiErrorLoggerRetentionDays are deleted
+   *
+   * Called automatically every 15 minutes when app is in foreground.
+   * @private
+   */
+  private async performPeriodicCleanup(): Promise<void> {
+    try {
+      const settings = useSettingsStore.getState();
+
+      if (!settings.apiErrorLoggerEnabled) {
+        return; // Skip cleanup if disabled
+      }
+
+      // Remove permanently soft-deleted entries that are past audit trail retention
+      const auditCutoffTime = new Date();
+      auditCutoffTime.setDate(
+        auditCutoffTime.getDate() - AUDIT_TRAIL_RETENTION_DAYS,
+      );
+
+      const entriesForHardDelete = this.entries.filter(
+        (e) => e.deletedAt && new Date(e.deletedAt) < auditCutoffTime,
+      );
+
+      if (entriesForHardDelete.length > 0) {
+        const hardDeleteIds = entriesForHardDelete.map((e) => e.id);
+        this.entries = this.entries.filter(
+          (e) => !hardDeleteIds.includes(e.id),
+        );
+
+        for (const id of hardDeleteIds) {
+          try {
+            await storageAdapter.removeItem(getStorageKey(id));
+            await errorDetailsStorage.deleteErrorDetails(id);
+          } catch (error) {
+            if (isDevelopment) {
+              console.warn(
+                `[ApiErrorLoggerService] Failed to hard-delete audit-expired entry ${id}.`,
+                error,
+              );
+            }
+          }
+        }
+
+        await this.persistEntries();
+
+        if (isDevelopment) {
+          console.log(
+            `[ApiErrorLoggerService] Permanently removed ${hardDeleteIds.length} audit-expired entries.`,
+          );
+        }
+      }
+
+      // Remove active entries past retention window
+      const removed = await this.clearOldEntries(
+        settings.apiErrorLoggerRetentionDays,
+      );
+
+      if (isDevelopment && removed > 0) {
+        console.log(
+          `[ApiErrorLoggerService] Cleaned up ${removed} expired active entries.`,
+        );
+      }
+    } catch (error) {
+      if (isDevelopment) {
+        console.error(
+          "[ApiErrorLoggerService] Periodic cleanup failed.",
+          error,
+        );
+      }
+    }
+  }
+
+  /**
+   * Size-based eviction using LRU strategy
+   * Triggered when entries reach 95% of MAX_ENTRIES
+   * Removes oldest 10% of entries to reduce memory pressure
+   * @private
+   */
+  private async evictIfNeeded(): Promise<void> {
+    const evictionThreshold = Math.floor(
+      MAX_ENTRIES * SIZE_BASED_EVICTION_THRESHOLD,
+    );
+
+    if (this.entries.length >= evictionThreshold) {
+      // Calculate how many entries to remove (10% of max)
+      const entriesToRemove = Math.floor(MAX_ENTRIES * 0.1);
+      const idsToRemove = this.entries
+        .slice(0, entriesToRemove)
+        .map((e) => e.id);
+
+      this.entries = this.entries.slice(entriesToRemove);
+
+      // Clean up details storage for removed entries
+      for (const id of idsToRemove) {
+        try {
+          await errorDetailsStorage.deleteErrorDetails(id);
+        } catch (error) {
+          if (isDevelopment) {
+            console.warn(
+              `[ApiErrorLoggerService] Failed to clean up details for evicted entry ${id}.`,
+              error,
+            );
+          }
+        }
+      }
+
+      if (isDevelopment) {
+        console.log(
+          `[ApiErrorLoggerService] LRU eviction: removed ${entriesToRemove} entries to reduce memory pressure. Current count: ${this.entries.length}`,
+        );
+      }
+
+      await this.persistEntries();
+    }
   }
 
   async getGroupedStats(): Promise<GroupedErrorStats> {

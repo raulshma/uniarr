@@ -27,12 +27,17 @@ import { useOfflineAwareActions } from "@/hooks/useOfflineAwareActions";
 import { useNotificationRegistration } from "@/hooks/useNotificationRegistration";
 import { useNotificationResponseHandler } from "@/hooks/useNotificationResponseHandler";
 import { useQuietHoursManager } from "@/hooks/useQuietHoursManager";
+import { useApiErrorLoggerLifecycle } from "@/hooks/useApiErrorLoggerLifecycle";
 import { useVoiceCommandHandler } from "@/hooks/useVoiceCommandHandler";
+import { useServiceLifecycleCoordination } from "@/hooks/useServiceLifecycleCoordination";
 import { WidgetDrawerProvider } from "@/services/widgetDrawerService";
 import { GlobalWidgetDrawer } from "@/components/widgets/GlobalWidgetDrawer";
 import { storageInitPromise } from "@/services/storage/MMKVStorage";
 import { getPersister } from "@/services/storage/queryClientPersister";
-import { performStorageMigration } from "@/utils/storage.migration";
+import {
+  performStorageMigration,
+  cleanupAsyncStorage,
+} from "@/utils/storage.migration";
 
 const RootLayout = () => {
   const theme = useTheme();
@@ -57,6 +62,9 @@ const RootLayout = () => {
             migrationResult.errors,
           );
         }
+
+        // Clean up old AsyncStorage data after successful migration
+        await cleanupAsyncStorage();
 
         if (mounted) setStorageReady(true);
       } catch (error) {
@@ -260,7 +268,9 @@ const AppContent = () => {
   useNotificationRegistration();
   useNotificationResponseHandler();
   useQuietHoursManager();
+  useApiErrorLoggerLifecycle();
   useVoiceCommandHandler();
+  useServiceLifecycleCoordination();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
