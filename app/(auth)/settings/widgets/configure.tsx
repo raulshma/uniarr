@@ -15,6 +15,7 @@ import WeatherWidgetConfigForm from "@/components/widgets/WeatherWidget/WeatherW
 import YouTubeWidgetConfigForm from "@/components/widgets/YouTubeWidget/YouTubeWidgetConfigForm";
 import TwitchWidgetConfigForm from "@/components/widgets/TwitchWidget/TwitchWidgetConfigForm";
 import ShortcutsWidgetConfigForm from "@/components/widgets/ShortcutsWidget/ShortcutsWidgetConfigForm";
+import ServiceStatusWidgetConfigForm from "@/components/widgets/ServiceStatusWidget/ServiceStatusWidgetConfigForm";
 import StatisticsWidgetConfigForm from "@/components/widgets/StatisticsWidget/StatisticsWidgetConfigForm";
 import CalendarPreviewWidgetConfigForm from "@/components/widgets/CalendarPreviewWidget/CalendarPreviewWidgetConfigForm";
 import DownloadProgressWidgetConfigForm from "@/components/widgets/DownloadProgressWidget/DownloadProgressWidgetConfigForm";
@@ -93,6 +94,13 @@ const WidgetConfigureScreen: React.FC = () => {
       case "shortcuts":
         return (
           <ShortcutsWidgetConfigForm widget={widget} onSaved={handleSaved} />
+        );
+      case "service-status":
+        return (
+          <ServiceStatusWidgetConfigForm
+            widget={widget}
+            onSaved={handleSaved}
+          />
         );
       case "statistics":
         return (

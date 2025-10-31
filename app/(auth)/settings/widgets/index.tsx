@@ -122,9 +122,6 @@ const WidgetSettingsScreen = () => {
     onPress();
 
     switch (widget.type) {
-      case "service-status":
-        router.push("/(auth)/settings/connections");
-        return;
       case "bookmarks":
         router.push({
           pathname: "/(auth)/settings/bookmarks",
@@ -134,6 +131,7 @@ const WidgetSettingsScreen = () => {
       case "recent-activity":
         router.push("/(auth)/settings/recent-activity-sources");
         return;
+      case "service-status":
       case "shortcuts":
       case "download-progress":
       case "statistics":

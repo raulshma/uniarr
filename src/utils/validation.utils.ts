@@ -213,3 +213,51 @@ export const widgetProfileSchema = z.object({
 });
 
 export type WidgetProfileInput = z.infer<typeof widgetProfileSchema>;
+
+/**
+ * Widget configuration schemas
+ */
+
+// Service Status Widget Config
+export const serviceStatusWidgetConfigSchema = z.object({
+  sourceMode: z.enum(["global", "custom"]),
+  serviceIds: z.array(z.string()),
+  showOfflineOnly: z.boolean(),
+});
+
+export type ServiceStatusWidgetConfig = z.infer<
+  typeof serviceStatusWidgetConfigSchema
+>;
+
+// Download Progress Widget Config
+export const downloadProgressWidgetConfigSchema = z.object({
+  includeServiceIds: z.array(z.string()),
+  includeCompleted: z.boolean(),
+  maxItems: z.number().int().min(1).max(20),
+});
+
+export type DownloadProgressWidgetConfig = z.infer<
+  typeof downloadProgressWidgetConfigSchema
+>;
+
+// Statistics Widget Config
+export const statisticsWidgetConfigSchema = z.object({
+  filter: z.enum(["all", "recent", "month"]),
+  sourceMode: z.enum(["global", "custom"]),
+  serviceIds: z.array(z.string()),
+});
+
+export type StatisticsWidgetConfig = z.infer<
+  typeof statisticsWidgetConfigSchema
+>;
+
+// Calendar Preview Widget Config
+export const calendarPreviewWidgetConfigSchema = z.object({
+  daysAhead: z.number().int().min(1).max(365),
+  limit: z.number().int().min(1).max(50),
+  serviceTypes: z.array(z.enum(["sonarr", "radarr"])),
+});
+
+export type CalendarPreviewWidgetConfig = z.infer<
+  typeof calendarPreviewWidgetConfigSchema
+>;

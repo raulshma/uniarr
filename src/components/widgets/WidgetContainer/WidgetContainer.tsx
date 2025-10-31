@@ -102,7 +102,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = React.memo(
 
         switch (widget.type) {
           case "service-status":
-            router.push("/(auth)/settings/connections");
+            pushWidgetConfig();
             break;
           case "bookmarks":
             router.push({
