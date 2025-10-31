@@ -6,6 +6,7 @@ import {
   Image as RNImage,
   Pressable,
   Modal,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,6 +20,7 @@ import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useJikanAnimeDetails } from "@/hooks/useJikanAnimeDetails";
 import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
+import { skeletonTiming } from "@/constants/skeletonTiming";
 import type { JikanTrailer, JikanAnimeFull } from "@/models/jikan.types";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import { useConnectorsStore, selectConnectors } from "@/store/connectorsStore";
@@ -289,8 +291,8 @@ const AnimeHubDetailScreen: React.FC = () => {
   const { anime, isLoading, isError, refetch } =
     useJikanAnimeDetails(validMalId);
 
-  // Initialize skeleton loading hook with 800ms minimum display time for detail pages
-  const skeleton = useSkeletonLoading({ minLoadingTime: 800 });
+  // Initialize skeleton loading hook with high complexity timing (900ms) for external API data
+  const skeleton = useSkeletonLoading(skeletonTiming.highComplexity);
 
   // Effect to manage skeleton visibility based on loading state
   useEffect(() => {
@@ -768,7 +770,23 @@ const AnimeHubDetailScreen: React.FC = () => {
   if (skeleton.showSkeleton && isLoading && !anime) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
-        <DetailPageSkeleton />
+        <DetailHero
+          posterUri={posterUri}
+          backdropUri={selectedBackdropUri}
+          heroHeight={spacing.xxxxl * 3}
+          overlayEndColor={theme.colors.background}
+          onBack={() => router.back()}
+          onMal={openOnMal}
+        >
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: spacing.lg,
+              paddingBottom: spacing.xxxxl,
+            }}
+          >
+            <DetailPageSkeleton />
+          </ScrollView>
+        </DetailHero>
       </SafeAreaView>
     );
   }
