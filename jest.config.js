@@ -19,6 +19,7 @@ module.exports = {
     "expo-document-picker": "<rootDir>/__tests__/mocks/expo-document-picker.js",
     "expo-crypto": "<rootDir>/__tests__/mocks/expo-crypto.js",
     "expo-secure-store": "<rootDir>/__tests__/mocks/expo-secure-store.js",
+    "expo-constants": "<rootDir>/__tests__/mocks/expo-constants.js",
     "@react-native-community/netinfo":
       "<rootDir>/__tests__/mocks/react-native-community-netinfo.js",
     "@react-native-async-storage/async-storage":

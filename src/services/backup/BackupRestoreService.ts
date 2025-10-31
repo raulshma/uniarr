@@ -13,6 +13,18 @@ import {
   getStoredTmdbKey,
   setStoredTmdbKey,
 } from "@/services/tmdb/TmdbCredentialService";
+import type {
+  FilterMetadata,
+  LibraryFilters,
+} from "@/store/libraryFilterStore";
+
+type LibraryFiltersBackupPayload = Record<
+  string,
+  {
+    filters: LibraryFilters;
+    metadata?: FilterMetadata;
+  }
+>;
 
 export interface BackupExportOptions {
   includeSettings: boolean;
@@ -23,11 +35,14 @@ export interface BackupExportOptions {
   includeRecentIPs: boolean;
   includeDownloadConfig: boolean;
   includeServicesViewState: boolean;
+  includeLibraryFilters: boolean;
   includeWidgetsConfig: boolean;
   includeWidgetConfigCredentials: boolean;
   includeWidgetSecureCredentials: boolean;
   includeWidgetProfiles: boolean;
   includeWidgetProfileCredentials: boolean;
+  includeVoiceAssistantConfig: boolean;
+  includeBookmarkHealthChecks: boolean;
   encryptSensitive: boolean;
   password?: string;
 }
@@ -59,6 +74,18 @@ export interface BackupSelectionConfig {
     sensitive: boolean;
   };
   servicesViewState: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  libraryFilters: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  voiceAssistantConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  bookmarkHealthChecks: {
     enabled: boolean;
     sensitive: boolean;
   };
@@ -138,6 +165,9 @@ export interface EncryptedBackupData {
       sortKey: "name" | "status" | "type";
       sortDirection: "asc" | "desc";
     };
+    libraryFilters?: LibraryFiltersBackupPayload;
+    voiceAssistantConfig?: any;
+    bookmarkHealthChecks?: Record<string, any>[];
     widgetsConfig?: any[];
     widgetsCredentials?: Record<string, any>;
     widgetSecureCredentials?: Record<string, any>;
@@ -209,6 +239,9 @@ export interface BackupData {
       sortKey: "name" | "status" | "type";
       sortDirection: "asc" | "desc";
     };
+    libraryFilters?: LibraryFiltersBackupPayload;
+    voiceAssistantConfig?: any;
+    bookmarkHealthChecks?: Record<string, any>[];
     widgetsConfig?: any[];
     widgetsCredentials?: Record<string, any>;
     widgetSecureCredentials?: Record<string, any>;
@@ -479,6 +512,9 @@ class BackupRestoreService {
           includeRecentIPs: options.includeRecentIPs,
           includeDownloadConfig: options.includeDownloadConfig,
           includeServicesViewState: options.includeServicesViewState,
+          includeLibraryFilters: options.includeLibraryFilters,
+          includeVoiceAssistantConfig: options.includeVoiceAssistantConfig,
+          includeBookmarkHealthChecks: options.includeBookmarkHealthChecks,
           encryptSensitive: options.encryptSensitive,
         },
       });
@@ -631,6 +667,76 @@ class BackupRestoreService {
                   : String(parseError),
             });
           }
+        }
+      }
+
+      // Collect library filters
+      if (options.includeLibraryFilters) {
+        const libraryFiltersKey = "LibraryFilterStore:v1";
+        const libraryFiltersData =
+          await AsyncStorage.getItem(libraryFiltersKey);
+        if (libraryFiltersData) {
+          try {
+            const parsedData = JSON.parse(libraryFiltersData);
+            const state = parsedData.state || parsedData;
+            if (state.serviceFilters) {
+              backupData.appData.libraryFilters =
+                state.serviceFilters as LibraryFiltersBackupPayload;
+            }
+          } catch (parseError) {
+            await logger.warn("Failed to parse library filter store data", {
+              location: "BackupRestoreService.createSelectiveBackup",
+              error:
+                parseError instanceof Error
+                  ? parseError.message
+                  : String(parseError),
+            });
+          }
+        }
+      }
+
+      // Collect voice assistant configuration
+      if (options.includeVoiceAssistantConfig) {
+        try {
+          const voiceConfig = await AsyncStorage.getItem(
+            "voice_assistant_config",
+          );
+          const voiceShortcuts = await AsyncStorage.getItem("voice_shortcuts");
+          if (voiceConfig) {
+            backupData.appData.voiceAssistantConfig = {
+              config: JSON.parse(voiceConfig),
+              shortcuts: voiceShortcuts ? JSON.parse(voiceShortcuts) : [],
+            };
+          }
+        } catch (parseError) {
+          await logger.warn("Failed to collect voice assistant config", {
+            location: "BackupRestoreService.createSelectiveBackup",
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          });
+        }
+      }
+
+      // Collect bookmark health checks
+      if (options.includeBookmarkHealthChecks) {
+        try {
+          const healthCheckData = await AsyncStorage.getItem(
+            "BookmarkHealthCheck:health",
+          );
+          if (healthCheckData) {
+            backupData.appData.bookmarkHealthChecks =
+              JSON.parse(healthCheckData);
+          }
+        } catch (parseError) {
+          await logger.warn("Failed to collect bookmark health checks", {
+            location: "BackupRestoreService.createSelectiveBackup",
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          });
         }
       }
 
@@ -905,6 +1011,72 @@ class BackupRestoreService {
         }
       }
 
+      // Fetch library filter state
+      let libraryFilters: LibraryFiltersBackupPayload | undefined;
+
+      const libraryFiltersKey = "LibraryFilterStore:v1";
+      const libraryFiltersData = await AsyncStorage.getItem(libraryFiltersKey);
+      if (libraryFiltersData) {
+        try {
+          const parsedData = JSON.parse(libraryFiltersData);
+          const state = parsedData.state || parsedData;
+          if (state.serviceFilters) {
+            libraryFilters =
+              state.serviceFilters as LibraryFiltersBackupPayload;
+          }
+        } catch (parseError) {
+          await logger.warn("Failed to parse library filter store data", {
+            location: "BackupRestoreService.createBackup",
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+          });
+        }
+      }
+
+      // Fetch voice assistant configuration
+      let voiceAssistantConfig: any = undefined;
+      try {
+        const voiceConfig = await AsyncStorage.getItem(
+          "voice_assistant_config",
+        );
+        const voiceShortcuts = await AsyncStorage.getItem("voice_shortcuts");
+        if (voiceConfig) {
+          voiceAssistantConfig = {
+            config: JSON.parse(voiceConfig),
+            shortcuts: voiceShortcuts ? JSON.parse(voiceShortcuts) : [],
+          };
+        }
+      } catch (parseError) {
+        await logger.warn("Failed to fetch voice assistant config", {
+          location: "BackupRestoreService.createBackup",
+          error:
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError),
+        });
+      }
+
+      // Fetch bookmark health checks
+      let bookmarkHealthChecks: Record<string, any>[] | undefined;
+      try {
+        const healthCheckData = await AsyncStorage.getItem(
+          "BookmarkHealthCheck:health",
+        );
+        if (healthCheckData) {
+          bookmarkHealthChecks = JSON.parse(healthCheckData);
+        }
+      } catch (parseError) {
+        await logger.warn("Failed to fetch bookmark health checks", {
+          location: "BackupRestoreService.createBackup",
+          error:
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError),
+        });
+      }
+
       // Fetch widgets configuration
       let widgetsConfig = undefined;
       const widgetsStorageKey = "WidgetService:widgets";
@@ -956,6 +1128,9 @@ class BackupRestoreService {
           },
           ...(downloadConfig && { downloadConfig }),
           ...(servicesViewState && { servicesViewState }),
+          ...(libraryFilters && { libraryFilters }),
+          ...(voiceAssistantConfig && { voiceAssistantConfig }),
+          ...(bookmarkHealthChecks && { bookmarkHealthChecks }),
           ...(widgetsConfig && { widgetsConfig }),
         },
       };
@@ -978,6 +1153,9 @@ class BackupRestoreService {
         hasTmdbCredentials: !!tmdbApiKey,
         hasDownloadConfig: !!downloadConfig,
         hasServicesViewState: !!servicesViewState,
+        hasLibraryFilters: !!libraryFilters,
+        hasVoiceAssistantConfig: !!voiceAssistantConfig,
+        hasBookmarkHealthChecks: !!bookmarkHealthChecks,
         hasWidgetsConfig: !!widgetsConfig,
       });
 
@@ -1280,6 +1458,90 @@ class BackupRestoreService {
         });
       }
 
+      // Restore library filters if available
+      if (backupData.appData.libraryFilters) {
+        const libraryFiltersKey = "LibraryFilterStore:v1";
+        const stateToStore = {
+          state: {
+            serviceFilters: backupData.appData
+              .libraryFilters as LibraryFiltersBackupPayload,
+          },
+          version: 1,
+        };
+        await AsyncStorage.setItem(
+          libraryFiltersKey,
+          JSON.stringify(stateToStore),
+        );
+
+        await logger.info("Library filters restored", {
+          location: "BackupRestoreService.restoreBackup",
+          serviceCount: Object.keys(backupData.appData.libraryFilters).length,
+        });
+      }
+
+      // Restore voice assistant configuration if available
+      if (backupData.appData.voiceAssistantConfig) {
+        try {
+          const voiceConfig = backupData.appData.voiceAssistantConfig.config;
+          const voiceShortcuts =
+            backupData.appData.voiceAssistantConfig.shortcuts;
+
+          if (voiceConfig) {
+            await AsyncStorage.setItem(
+              "voice_assistant_config",
+              JSON.stringify(voiceConfig),
+            );
+          }
+
+          if (voiceShortcuts && Array.isArray(voiceShortcuts)) {
+            await AsyncStorage.setItem(
+              "voice_shortcuts",
+              JSON.stringify(voiceShortcuts),
+            );
+          }
+
+          await logger.info("Voice assistant configuration restored", {
+            location: "BackupRestoreService.restoreBackup",
+            hasConfig: !!voiceConfig,
+            shortcutCount: voiceShortcuts?.length || 0,
+          });
+        } catch (voiceError) {
+          await logger.warn("Failed to restore voice assistant config", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              voiceError instanceof Error
+                ? voiceError.message
+                : String(voiceError),
+          });
+        }
+      }
+
+      // Restore bookmark health checks if available
+      if (
+        backupData.appData.bookmarkHealthChecks &&
+        Array.isArray(backupData.appData.bookmarkHealthChecks)
+      ) {
+        try {
+          await AsyncStorage.setItem(
+            "BookmarkHealthCheck:health",
+            JSON.stringify(backupData.appData.bookmarkHealthChecks),
+          );
+
+          await logger.info("Bookmark health checks restored", {
+            location: "BackupRestoreService.restoreBackup",
+            healthCheckCount: backupData.appData.bookmarkHealthChecks.length,
+          });
+        } catch (healthError) {
+          await logger.warn("Failed to restore bookmark health checks", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              healthError instanceof Error
+                ? healthError.message
+                : String(healthError),
+          });
+        }
+      }
+
       // Restore widgets configuration if available
       if (
         backupData.appData.widgetsConfig &&
@@ -1505,11 +1767,14 @@ class BackupRestoreService {
       includeRecentIPs: true,
       includeDownloadConfig: true,
       includeServicesViewState: true,
+      includeLibraryFilters: true,
       includeWidgetsConfig: true,
       includeWidgetConfigCredentials: true,
       includeWidgetSecureCredentials: false,
       includeWidgetProfiles: true,
       includeWidgetProfileCredentials: true,
+      includeVoiceAssistantConfig: true,
+      includeBookmarkHealthChecks: true,
       encryptSensitive: false,
     };
   }
@@ -1547,6 +1812,18 @@ class BackupRestoreService {
       servicesViewState: {
         enabled: true,
         sensitive: false, // View state is not sensitive (UI preferences)
+      },
+      libraryFilters: {
+        enabled: true,
+        sensitive: false, // Library filters are user preferences only
+      },
+      voiceAssistantConfig: {
+        enabled: true,
+        sensitive: false, // Voice assistant configuration
+      },
+      bookmarkHealthChecks: {
+        enabled: true,
+        sensitive: false, // Bookmark health check status
       },
       widgetsConfig: {
         enabled: true,

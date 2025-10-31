@@ -68,7 +68,6 @@ const SettingsScreen = () => {
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const [errorLogCount, setErrorLogCount] = useState(0);
   const theme = useTheme<AppTheme>();
-  const isDev = typeof __DEV__ !== "undefined" && __DEV__;
 
   // Get dynamic app version from Expo Constants
   const appVersion =
@@ -1086,42 +1085,6 @@ const SettingsScreen = () => {
             </AnimatedListItem>
           </SettingsGroup>
         </AnimatedSection>
-
-        {/* Thumbnail concurrency dialog removed */}
-
-        {/* Developer Tools (dev only) */}
-        {isDev && (
-          <AnimatedSection
-            style={styles.section}
-            delay={350}
-            animated={animationsEnabled}
-          >
-            <Text style={styles.sectionTitle}>Development</Text>
-            <SettingsGroup>
-              <AnimatedListItem
-                index={0}
-                totalItems={1}
-                animated={animationsEnabled}
-              >
-                <SettingsListItem
-                  title="Developer Tools"
-                  subtitle="Dev tools & playground"
-                  left={{ iconName: "bug" }}
-                  trailing={
-                    <IconButton
-                      icon="chevron-right"
-                      size={16}
-                      iconColor={theme.colors.outline}
-                    />
-                  }
-                  onPress={() => router.push("/(auth)/dev")}
-                  groupPosition="single"
-                />
-              </AnimatedListItem>
-            </SettingsGroup>
-          </AnimatedSection>
-        )}
-
         {/* Logging & Diagnostics Section */}
         <AnimatedSection
           style={styles.section}
