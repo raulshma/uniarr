@@ -226,6 +226,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
               placeholder={{ thumbhash: heroThumbhash }}
               cachePolicy="memory-disk"
               priority="high"
+              transition={{ effect: "cross-dissolve", duration: 500 }}
             />
             {/* Blur opacity wrapped in inner animated view to prevent layout conflicts */}
             <View style={RNStyleSheet.absoluteFill}>

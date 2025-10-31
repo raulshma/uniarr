@@ -508,7 +508,7 @@ const JellyfinItemDetailsScreen = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <SkiaLoader size={80} />
+          <SkiaLoader size={80} centered />
         </View>
       </SafeAreaView>
     );

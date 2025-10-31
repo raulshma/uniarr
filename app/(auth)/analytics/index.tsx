@@ -209,7 +209,7 @@ const AnalyticsScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <SkiaLoader size={80} />
+          <SkiaLoader size={80} centered />
           <Text
             variant="bodyLarge"
             style={{ color: theme.colors.onSurface, marginTop: 16 }}

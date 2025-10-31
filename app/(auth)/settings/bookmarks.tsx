@@ -59,7 +59,7 @@ const BookmarksSettingsScreen: React.FC = () => {
           { backgroundColor: theme.colors.background },
         ]}
       >
-        <SkiaLoader size={80} />
+        <SkiaLoader size={80} centered />
         <Text style={styles.statusText}>Loading bookmarks settings...</Text>
       </SafeAreaView>
     );

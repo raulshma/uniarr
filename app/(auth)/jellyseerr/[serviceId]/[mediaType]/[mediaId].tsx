@@ -258,7 +258,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={[styles.container, { justifyContent: "center" }]}>
-          <SkiaLoader size={60} />
+          <SkiaLoader size={60} centered />
         </View>
       </SafeAreaView>
     );

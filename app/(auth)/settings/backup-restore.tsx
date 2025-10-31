@@ -441,7 +441,7 @@ const BackupRestoreScreen = () => {
 
           {isLoadingBackups ? (
             <View style={styles.loadingContainer}>
-              <SkiaLoader size={80} />
+              <SkiaLoader size={80} centered />
             </View>
           ) : recentBackups.length === 0 ? (
             <View style={styles.emptyState}>
