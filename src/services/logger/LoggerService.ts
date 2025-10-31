@@ -166,6 +166,20 @@ class LoggerService {
     await storageAdapter.removeItem(STORAGE_KEY);
   }
 
+  async clearByFilter(filterFn: (entry: LogEntry) => boolean): Promise<number> {
+    await this.ensureInitialized();
+
+    const initialCount = this.entries.length;
+    this.entries = this.entries.filter((entry) => !filterFn(entry));
+    const removedCount = initialCount - this.entries.length;
+
+    if (removedCount > 0) {
+      await this.persistEntries();
+    }
+
+    return removedCount;
+  }
+
   async log(
     level: LogLevel,
     message: string,

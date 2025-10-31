@@ -16,6 +16,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StorageBackendManager } from "../services/storage/MMKVStorage";
 
 const MIGRATION_FLAG_KEY = "__storage_migration_complete__";
+const MIGRATED_KEYS_KEY = "__storage_migrated_keys__";
 const MIGRATION_BATCH_SIZE = 100;
 
 interface MigrationResult {
@@ -69,6 +70,7 @@ export async function performStorageMigration(): Promise<MigrationResult> {
     let itemsMigrated = 0;
     let itemsFailed = 0;
     const errors: { key: string; error: string }[] = [];
+    const migratedKeys: string[] = [];
 
     // Migrate in batches to avoid memory issues
     for (let i = 0; i < asyncStorageKeys.length; i += MIGRATION_BATCH_SIZE) {
@@ -77,12 +79,13 @@ export async function performStorageMigration(): Promise<MigrationResult> {
       // Fetch all values for batch
       const batchValues = await AsyncStorage.multiGet(batchKeys);
 
-      // Migrate to MMKV
+      // Migrate to MMKV; collect successfully migrated keys
       for (const [key, value] of batchValues) {
         if (value !== null) {
           try {
             await adapter.setItem(key, value);
             itemsMigrated++;
+            migratedKeys.push(key);
           } catch (error) {
             itemsFailed++;
             errors.push({
@@ -108,6 +111,18 @@ export async function performStorageMigration(): Promise<MigrationResult> {
 
     // Set migration flag to mark completion
     await adapter.setItem(MIGRATION_FLAG_KEY, "true");
+
+    // Persist the list of migrated keys so cleanup can be targeted. Only
+    // persist when there were no failures to avoid partial cleanup.
+    if (itemsFailed === 0 && migratedKeys.length > 0) {
+      try {
+        await adapter.setItem(MIGRATED_KEYS_KEY, JSON.stringify(migratedKeys));
+      } catch (err) {
+        logger.warn("[StorageMigration] Failed to persist migrated keys list", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
 
     logger.info(
       `[StorageMigration] Migration completed: ${itemsMigrated} items migrated, ${itemsFailed} failed`,
@@ -145,20 +160,108 @@ export async function performStorageMigration(): Promise<MigrationResult> {
  */
 export async function cleanupAsyncStorage(): Promise<void> {
   try {
-    const keys = await AsyncStorage.getAllKeys();
+    const manager = StorageBackendManager.getInstance();
 
-    if (keys.length === 0) {
-      logger.debug("[StorageCleanup] No AsyncStorage data to clean up");
+    // Only perform cleanup when MMKV is active. If MMKV is not available
+    // we must not delete AsyncStorage contents as they may hold user
+    // configured settings that are still in use.
+    if (!manager.isMMKV()) {
+      logger.debug(
+        "[StorageCleanup] MMKV not available — skipping AsyncStorage cleanup",
+      );
+      return;
+    }
+
+    const adapter = manager.getAdapter();
+
+    // Ensure migration actually completed and we have a record of migrated keys
+    const migrationFlag = await adapter.getItem(MIGRATION_FLAG_KEY);
+    if (migrationFlag !== "true") {
+      logger.debug(
+        "[StorageCleanup] Migration flag missing or false — skipping AsyncStorage cleanup",
+      );
+      return;
+    }
+
+    const migratedKeysJson = await adapter.getItem(MIGRATED_KEYS_KEY);
+    if (!migratedKeysJson) {
+      logger.debug(
+        "[StorageCleanup] No migrated-keys metadata found — skipping AsyncStorage cleanup",
+      );
+      return;
+    }
+
+    let migratedKeys: string[];
+    try {
+      migratedKeys = JSON.parse(migratedKeysJson) as string[];
+    } catch (err) {
+      logger.warn(
+        "[StorageCleanup] Failed to parse migrated keys metadata — skipping cleanup",
+        { error: err instanceof Error ? err.message : String(err) },
+      );
+      return;
+    }
+
+    if (!Array.isArray(migratedKeys) || migratedKeys.length === 0) {
+      logger.debug(
+        "[StorageCleanup] Migrated keys list empty — nothing to remove",
+      );
+      return;
+    }
+
+    // Intersect migrated keys with current AsyncStorage keys to avoid attempting
+    // to remove non-existent keys and to provide accurate logging.
+    const existingKeys = await AsyncStorage.getAllKeys();
+    const candidateKeys = migratedKeys.filter((k) => existingKeys.includes(k));
+
+    if (candidateKeys.length === 0) {
+      logger.debug(
+        `[StorageCleanup] No migrated AsyncStorage entries found to remove (checked ${migratedKeys.length} migrated keys)`,
+      );
+      return;
+    }
+
+    // Confirm values still present before removing
+    const keyValues = await AsyncStorage.multiGet(candidateKeys);
+    const keysToRemove = keyValues
+      .filter(([, value]) => value !== null && value !== undefined)
+      .map(([key]) => key);
+
+    if (keysToRemove.length === 0) {
+      logger.debug(
+        `[StorageCleanup] No AsyncStorage entries with values found to remove (checked ${candidateKeys.length} candidate keys)`,
+      );
       return;
     }
 
     logger.info(
-      `[StorageCleanup] Cleaning up ${keys.length} AsyncStorage items`,
+      `[StorageCleanup] Cleaning up ${keysToRemove.length} migrated AsyncStorage items`,
     );
 
-    await AsyncStorage.multiRemove(keys);
-
-    logger.info("[StorageCleanup] AsyncStorage cleanup completed");
+    try {
+      await AsyncStorage.multiRemove(keysToRemove);
+      logger.info(
+        `[StorageCleanup] AsyncStorage cleanup completed (${keysToRemove.length} items removed)`,
+      );
+      // Optionally remove the migrated-keys metadata since cleanup finished
+      try {
+        await adapter.removeItem(MIGRATED_KEYS_KEY);
+      } catch (rmErr) {
+        // Non-fatal: keep metadata for auditing if removal fails
+        logger.debug(
+          "[StorageCleanup] Failed to remove migrated-keys metadata after cleanup",
+          { error: rmErr instanceof Error ? rmErr.message : String(rmErr) },
+        );
+      }
+    } catch (removeError) {
+      logger.warn("[StorageCleanup] Failed to remove some AsyncStorage keys", {
+        error:
+          removeError instanceof Error
+            ? removeError.message
+            : String(removeError),
+        keysAttempted: keysToRemove,
+      });
+    }
   } catch (error) {
     logger.warn("[StorageCleanup] Failed to clean up AsyncStorage", {
       error: error instanceof Error ? error.message : String(error),

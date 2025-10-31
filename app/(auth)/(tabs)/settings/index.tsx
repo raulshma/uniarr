@@ -67,6 +67,7 @@ const SettingsScreen = () => {
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const [errorLogCount, setErrorLogCount] = useState(0);
+  const [cleanupLogCount, setCleanupLogCount] = useState(0);
   const theme = useTheme<AppTheme>();
 
   // Get dynamic app version from Expo Constants
@@ -298,6 +299,24 @@ const SettingsScreen = () => {
       }
     };
     void loadErrorCount();
+  }, []);
+
+  // Load cleanup log count on mount
+  useEffect(() => {
+    const loadCleanupCount = async () => {
+      try {
+        const allLogs = await logger.getLogs();
+        const cleanupLogs = allLogs.filter(
+          (log) =>
+            log.message.includes("[StorageCleanup]") ||
+            log.message.includes("[StorageMigration]"),
+        );
+        setCleanupLogCount(cleanupLogs.length);
+      } catch {
+        // Silently fail - not critical
+      }
+    };
+    void loadCleanupCount();
   }, []);
 
   const handleClearImageCache = async () => {
@@ -927,7 +946,27 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={1}
-              totalItems={4}
+              totalItems={5}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Service Health & Configuration"
+                subtitle="Monitor and manage service health"
+                left={{ iconName: "server-network" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/settings/services-health")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -946,8 +985,8 @@ const SettingsScreen = () => {
               />
             </AnimatedListItem>
             <AnimatedListItem
-              index={2}
-              totalItems={4}
+              index={3}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -966,8 +1005,8 @@ const SettingsScreen = () => {
               />
             </AnimatedListItem>
             <AnimatedListItem
-              index={3}
-              totalItems={4}
+              index={4}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1095,7 +1134,7 @@ const SettingsScreen = () => {
           <SettingsGroup>
             <AnimatedListItem
               index={0}
-              totalItems={2}
+              totalItems={3}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1117,7 +1156,7 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={1}
-              totalItems={2}
+              totalItems={3}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1140,6 +1179,34 @@ const SettingsScreen = () => {
                   )
                 }
                 onPress={() => router.push("/(auth)/settings/api-error-logs")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Cleanup History Logs"
+                subtitle={
+                  cleanupLogCount > 0
+                    ? `${cleanupLogCount} cleanup operations logged`
+                    : "No cleanup operations logged"
+                }
+                left={{ iconName: "broom" }}
+                trailing={
+                  cleanupLogCount > 0 ? (
+                    <Chip>{cleanupLogCount}</Chip>
+                  ) : (
+                    <IconButton
+                      icon="chevron-right"
+                      size={16}
+                      iconColor={theme.colors.outline}
+                    />
+                  )
+                }
+                onPress={() => router.push("/(auth)/settings/cleanup-history")}
                 groupPosition="bottom"
               />
             </AnimatedListItem>

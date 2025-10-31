@@ -19,7 +19,9 @@ type ConnectorConstructor<TConnector extends IConnector = IConnector> = new (
   config: ServiceConfig,
 ) => TConnector;
 
-const connectorRegistry: Partial<Record<ServiceType, ConnectorConstructor>> = {
+export const connectorRegistry: Partial<
+  Record<ServiceType, ConnectorConstructor>
+> = {
   // SonarrConnector uses specialized generics for its request payload, so we cast to the
   // generic constructor type expected by the registry.
   sonarr: SonarrConnector as ConnectorConstructor,

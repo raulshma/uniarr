@@ -1,5 +1,5 @@
 import React, { forwardRef, useMemo, useState } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
+import type { StyleProp, ViewStyle, GestureResponderEvent } from "react-native";
 import { StyleSheet, View, Pressable } from "react-native";
 import { BlurView } from "expo-blur";
 import {
@@ -66,8 +66,8 @@ export type CardProps = Omit<
   exitingAnimation?: any;
   delayLongPress?: number;
   onLongPress?: () => void;
-  onPressIn?: () => void;
-  onPressOut?: () => void;
+  onPressIn?: (e?: GestureResponderEvent) => void;
+  onPressOut?: (e?: GestureResponderEvent) => void;
 };
 
 const Card = forwardRef<PaperCardRef, CardProps>(
