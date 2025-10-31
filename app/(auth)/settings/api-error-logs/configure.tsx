@@ -151,8 +151,15 @@ const ApiErrorLoggerConfigureScreen = () => {
   ]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
-      <TabHeader title="API Error Logger" showBackButton />
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "bottom", "left", "right"]}
+    >
+      <TabHeader
+        title="API Error Logger"
+        showBackButton
+        onBackPress={router.back}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Enable/Disable Section */}

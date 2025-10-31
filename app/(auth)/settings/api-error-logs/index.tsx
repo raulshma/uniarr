@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   StyleSheet,
@@ -39,6 +40,7 @@ import { BarChart, PieChart } from "react-native-chart-kit";
 
 const ApiErrorLogsScreen = () => {
   const theme = useTheme<AppTheme>();
+  const router = useRouter();
   shouldAnimateLayout(false, false);
 
   // State
@@ -544,7 +546,11 @@ const ApiErrorLogsScreen = () => {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <TabHeader title="API Error Logs" showBackButton />
+        <TabHeader
+          title="API Error Logs"
+          showBackButton
+          onBackPress={router.back}
+        />
         <View style={styles.content}>
           <Text>Loading error logs...</Text>
         </View>
@@ -557,7 +563,11 @@ const ApiErrorLogsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <TabHeader title="API Error Logs" showBackButton />
+      <TabHeader
+        title="API Error Logs"
+        showBackButton
+        onBackPress={router.back}
+      />
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Summary Stats */}
         {stats && (
