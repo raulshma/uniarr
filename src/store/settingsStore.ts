@@ -37,6 +37,11 @@ type SettingsData = {
   criticalHealthAlertsBypassQuietHours: boolean;
   // Remember last selected calendar view (week/day/month/list)
   lastCalendarView: CalendarView;
+  // Persist the last custom calendar range for the hybrid calendar
+  lastCalendarRange?: {
+    start: string;
+    end: string;
+  };
   tmdbEnabled: boolean;
   // Number of retry attempts to perform for Jellyseerr requests when the server
   // returns 5xx errors. This value represents the number of retry attempts
@@ -105,6 +110,9 @@ interface SettingsState extends SettingsData {
   setCriticalHealthAlertsBypassQuietHours: (enabled: boolean) => void;
   reset: () => void;
   setLastCalendarView: (view: CalendarView) => void;
+  setLastCalendarRange: (
+    range: { start: string; end: string } | undefined,
+  ) => void;
   setTmdbEnabled: (enabled: boolean) => void;
   setJellyseerrRetryAttempts: (attempts: number) => void;
   setMaxImageCacheSize: (size: number) => void;
@@ -199,6 +207,7 @@ const createDefaultSettings = (): SettingsData => ({
   quietHours: createDefaultQuietHoursState(),
   criticalHealthAlertsBypassQuietHours: true,
   lastCalendarView: "week",
+  lastCalendarRange: undefined,
   tmdbEnabled: false,
   jellyseerrRetryAttempts: DEFAULT_JELLYSEERR_RETRY_ATTEMPTS,
   maxImageCacheSize: DEFAULT_MAX_IMAGE_CACHE_SIZE,
@@ -287,6 +296,7 @@ export const useSettingsStore = create<SettingsState>()(
         set({ criticalHealthAlertsBypassQuietHours: enabled }),
       setLastCalendarView: (view: CalendarView) =>
         set({ lastCalendarView: view }),
+      setLastCalendarRange: (range) => set({ lastCalendarRange: range }),
       setTmdbEnabled: (enabled: boolean) => set({ tmdbEnabled: enabled }),
       setJellyseerrRetryAttempts: (attempts: number) =>
         set({ jellyseerrRetryAttempts: clampRetryAttempts(attempts) }),
@@ -349,6 +359,7 @@ export const useSettingsStore = create<SettingsState>()(
         criticalHealthAlertsBypassQuietHours:
           state.criticalHealthAlertsBypassQuietHours,
         lastCalendarView: state.lastCalendarView,
+        lastCalendarRange: state.lastCalendarRange,
         tmdbEnabled: state.tmdbEnabled,
         jellyseerrRetryAttempts: state.jellyseerrRetryAttempts,
         maxImageCacheSize: state.maxImageCacheSize,
@@ -377,7 +388,7 @@ export const useSettingsStore = create<SettingsState>()(
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields
-      version: 10,
+      version: 11,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -476,6 +487,24 @@ export const useSettingsStore = create<SettingsState>()(
           state.gradientBackgroundEnabled = true;
         }
 
+        if (state.lastCalendarRange) {
+          const { start, end } = state.lastCalendarRange;
+          const startDate = start ? new Date(start) : undefined;
+          const endDate = end ? new Date(end) : undefined;
+
+          const isValidDate = (date?: Date) =>
+            Boolean(date) && !Number.isNaN(date!.getTime());
+
+          if (!isValidDate(startDate) || !isValidDate(endDate)) {
+            state.lastCalendarRange = undefined;
+          } else if (startDate!.getTime() > endDate!.getTime()) {
+            state.lastCalendarRange = {
+              start: end,
+              end: start,
+            };
+          }
+        }
+
         // Mark as hydrated
         state._hasHydrated = true;
       },
@@ -533,6 +562,8 @@ export const useSettingsStore = create<SettingsState>()(
             partial.preferredRecentActivityServiceId ?? undefined,
           lastReleaseNotesCheckedAt:
             partial.lastReleaseNotesCheckedAt ?? undefined,
+          lastCalendarRange:
+            partial.lastCalendarRange ?? baseDefaults.lastCalendarRange,
           frostedWidgetsEnabled:
             partial.frostedWidgetsEnabled ?? baseDefaults.frostedWidgetsEnabled,
           gradientBackgroundEnabled:
@@ -585,6 +616,8 @@ export const selectCriticalHealthAlertsBypassQuietHours = (
 
 export const selectLastCalendarView = (state: SettingsState) =>
   state.lastCalendarView;
+export const selectLastCalendarRange = (state: SettingsState) =>
+  state.lastCalendarRange;
 export const selectHasHydrated = (state: SettingsState) => state._hasHydrated;
 export const selectJellyfinLocalAddress = (state: SettingsState) =>
   state.jellyfinLocalAddress;
