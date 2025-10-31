@@ -1132,7 +1132,29 @@ const SettingsScreen = () => {
           <SettingsGroup>
             <AnimatedListItem
               index={0}
-              totalItems={1}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="API Error Logger"
+                subtitle="Configure error capture settings"
+                left={{ iconName: "cog" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() =>
+                  router.push("/(auth)/settings/api-error-logs/configure")
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1155,7 +1177,7 @@ const SettingsScreen = () => {
                   )
                 }
                 onPress={() => router.push("/(auth)/settings/api-error-logs")}
-                groupPosition="single"
+                groupPosition="bottom"
               />
             </AnimatedListItem>
           </SettingsGroup>

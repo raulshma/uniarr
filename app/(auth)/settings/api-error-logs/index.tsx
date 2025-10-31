@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Modal,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import {
@@ -21,8 +22,10 @@ import {
 
 import { TabHeader } from "@/components/common/TabHeader";
 import { AnimatedListItem, AnimatedSection } from "@/components/common";
+import { ErrorDetailModal } from "@/components/common/ErrorDetailModal";
 import { alert } from "@/services/dialogService";
 import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
+import { logger } from "@/services/logger/LoggerService";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
@@ -45,9 +48,9 @@ const ApiErrorLogsScreen = () => {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "statusCode">(
     "newest",
   );
-  const [groupBy, setGroupBy] = useState<"none" | "service" | "endpoint">(
-    "none",
-  );
+  const [groupBy, setGroupBy] = useState<
+    "none" | "service" | "serviceType" | "endpoint"
+  >("none");
   const [isSelectingMultiple, setIsSelectingMultiple] = useState(false);
   const [selectedErrorIds, setSelectedErrorIds] = useState<Set<string>>(
     new Set(),
@@ -58,6 +61,10 @@ const ApiErrorLogsScreen = () => {
   const [stats, setStats] = useState<GroupedErrorStats | null>(null);
   const [serviceHistogram, setServiceHistogram] = useState<HistogramData[]>([]);
   const [showInsights, setShowInsights] = useState(false);
+  const [selectedErrorForDetail, setSelectedErrorForDetail] =
+    useState<ApiErrorLogEntry | null>(null);
+  const [errorDetails, setErrorDetails] = useState<any>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   // Load errors on mount
   useEffect(() => {
@@ -124,7 +131,16 @@ const ApiErrorLogsScreen = () => {
     const groups = new Map<string, ApiErrorLogEntry[]>();
 
     for (const error of filteredErrors) {
-      const key = groupBy === "service" ? error.serviceId : error.endpoint;
+      let key: string;
+
+      if (groupBy === "service") {
+        key = error.serviceId;
+      } else if (groupBy === "serviceType") {
+        key = error.serviceType || "Unknown";
+      } else {
+        // endpoint
+        key = error.endpoint;
+      }
 
       if (!groups.has(key)) {
         groups.set(key, []);
@@ -245,6 +261,23 @@ const ApiErrorLogsScreen = () => {
       ],
     );
   }, []);
+
+  const handleViewErrorDetail = useCallback(
+    async (error: ApiErrorLogEntry) => {
+      if (isSelectingMultiple) return;
+      setSelectedErrorForDetail(error);
+      setIsLoadingDetails(true);
+      try {
+        const details = await apiErrorLogger.getErrorDetails(error.id);
+        setErrorDetails(details);
+      } catch (err) {
+        await logger.error("Failed to load error details", { error: err });
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    },
+    [isSelectingMultiple],
+  );
 
   const styles = StyleSheet.create({
     container: {
@@ -465,6 +498,8 @@ const ApiErrorLogsScreen = () => {
           onPress={() => {
             if (isSelectingMultiple) {
               handleToggleErrorSelection(item.id);
+            } else {
+              void handleViewErrorDetail(item);
             }
           }}
           onLongPress={() => {
@@ -684,7 +719,9 @@ const ApiErrorLogsScreen = () => {
                 ? "None"
                 : groupBy === "service"
                   ? "Service"
-                  : "Endpoint"}
+                  : groupBy === "serviceType"
+                    ? "Type"
+                    : "Endpoint"}
             </Button>
           </View>
         </View>
@@ -853,6 +890,15 @@ const ApiErrorLogsScreen = () => {
                 By Service
               </Chip>
               <Chip
+                selected={groupBy === "serviceType"}
+                onPress={() => {
+                  setGroupBy("serviceType");
+                  setShowGroupDialog(false);
+                }}
+              >
+                By Service Type
+              </Chip>
+              <Chip
                 selected={groupBy === "endpoint"}
                 onPress={() => {
                   setGroupBy("endpoint");
@@ -891,6 +937,29 @@ const ApiErrorLogsScreen = () => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      {/* Error Detail Modal */}
+      {selectedErrorForDetail && (
+        <Modal
+          visible={!!selectedErrorForDetail}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => {
+            setSelectedErrorForDetail(null);
+            setErrorDetails(null);
+          }}
+        >
+          <ErrorDetailModal
+            error={selectedErrorForDetail}
+            details={errorDetails}
+            isLoading={isLoadingDetails}
+            onClose={() => {
+              setSelectedErrorForDetail(null);
+              setErrorDetails(null);
+            }}
+          />
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };

@@ -251,28 +251,37 @@ class HttpErrorInterceptor {
       // Convert Axios error to ApiError (handles all error normalization)
       const apiError = handleApiError(error, context);
 
-      // Enrich context with optional request/response data
-      if (apiError.details) {
-        if (config.captureRequestBody && error.config) {
-          apiError.details.requestBody = error.config.data;
-        }
+      // Prepare detailed data for optional capture
+      const details: {
+        requestBody?: string;
+        responseBody?: string;
+        requestHeaders?: string;
+      } = {};
 
-        if (config.captureResponseBody && error.response) {
-          apiError.details.responseBody = error.response.data;
-        }
-
-        if (config.captureRequestHeaders && error.config?.headers) {
-          // Filter out sensitive headers
-          const safeHeaders = this.filterSensitiveHeaders(
-            error.config.headers as Record<string, unknown>,
-          );
-          apiError.details.requestHeaders = safeHeaders;
-        }
+      if (config.captureRequestBody && error.config?.data) {
+        details.requestBody =
+          typeof error.config.data === "string"
+            ? error.config.data
+            : JSON.stringify(error.config.data);
       }
 
-      // Log directly to API error logger (bypass settings check since
-      // we've already decided to log via shouldExcludeError)
-      await apiErrorLogger.addError(apiError, context);
+      if (config.captureResponseBody && error.response?.data) {
+        details.responseBody =
+          typeof error.response.data === "string"
+            ? error.response.data
+            : JSON.stringify(error.response.data);
+      }
+
+      if (config.captureRequestHeaders && error.config?.headers) {
+        // Filter out sensitive headers
+        const safeHeaders = this.filterSensitiveHeaders(
+          error.config.headers as Record<string, unknown>,
+        );
+        details.requestHeaders = JSON.stringify(safeHeaders);
+      }
+
+      // Log error with details (the service will handle capture based on settings)
+      await apiErrorLogger.addError(apiError, context, 0, details);
     } catch (captureError) {
       void logger.error("Failed to capture HTTP error.", {
         originalError: error.message,

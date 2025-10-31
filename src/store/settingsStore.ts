@@ -77,6 +77,9 @@ type SettingsData = {
   apiErrorLoggerActivePreset: string; // "CRITICAL", "SERVER", "RATE_LIMIT", "CLIENT_ERRORS", "STRICT", "CUSTOM"
   apiErrorLoggerCustomCodes: (number | string)[]; // Used when preset is CUSTOM
   apiErrorLoggerRetentionDays: number; // How many days to keep error logs (default: 7)
+  apiErrorLoggerCaptureRequestBody: boolean; // Capture request body in error logs (default: false)
+  apiErrorLoggerCaptureResponseBody: boolean; // Capture response body in error logs (default: false)
+  apiErrorLoggerCaptureRequestHeaders: boolean; // Capture request headers in error logs (default: false)
   // Hydration tracking
   _hasHydrated: boolean;
   // (thumbnail generation removed)
@@ -127,6 +130,9 @@ interface SettingsState extends SettingsData {
   setApiErrorLoggerActivePreset: (preset: string) => void;
   setApiErrorLoggerCustomCodes: (codes: (number | string)[]) => void;
   setApiErrorLoggerRetentionDays: (days: number) => void;
+  setApiErrorLoggerCaptureRequestBody: (capture: boolean) => void;
+  setApiErrorLoggerCaptureResponseBody: (capture: boolean) => void;
+  setApiErrorLoggerCaptureRequestHeaders: (capture: boolean) => void;
   // (thumbnail setters removed)
 }
 
@@ -232,6 +238,9 @@ const createDefaultSettings = (): SettingsData => ({
   apiErrorLoggerActivePreset: "CRITICAL",
   apiErrorLoggerCustomCodes: [],
   apiErrorLoggerRetentionDays: 7,
+  apiErrorLoggerCaptureRequestBody: false,
+  apiErrorLoggerCaptureResponseBody: false,
+  apiErrorLoggerCaptureRequestHeaders: false,
   _hasHydrated: false,
   // (thumbnail defaults removed)
 });
@@ -309,6 +318,12 @@ export const useSettingsStore = create<SettingsState>()(
         set({ apiErrorLoggerCustomCodes: codes }),
       setApiErrorLoggerRetentionDays: (days: number) =>
         set({ apiErrorLoggerRetentionDays: Math.max(1, Math.min(365, days)) }),
+      setApiErrorLoggerCaptureRequestBody: (capture: boolean) =>
+        set({ apiErrorLoggerCaptureRequestBody: capture }),
+      setApiErrorLoggerCaptureResponseBody: (capture: boolean) =>
+        set({ apiErrorLoggerCaptureResponseBody: capture }),
+      setApiErrorLoggerCaptureRequestHeaders: (capture: boolean) =>
+        set({ apiErrorLoggerCaptureRequestHeaders: capture }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -353,6 +368,12 @@ export const useSettingsStore = create<SettingsState>()(
         apiErrorLoggerActivePreset: state.apiErrorLoggerActivePreset,
         apiErrorLoggerCustomCodes: state.apiErrorLoggerCustomCodes,
         apiErrorLoggerRetentionDays: state.apiErrorLoggerRetentionDays,
+        apiErrorLoggerCaptureRequestBody:
+          state.apiErrorLoggerCaptureRequestBody,
+        apiErrorLoggerCaptureResponseBody:
+          state.apiErrorLoggerCaptureResponseBody,
+        apiErrorLoggerCaptureRequestHeaders:
+          state.apiErrorLoggerCaptureRequestHeaders,
         // thumbnail fields removed
       }),
       // Bump version since we're adding new persisted fields

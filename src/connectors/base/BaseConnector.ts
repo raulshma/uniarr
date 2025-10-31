@@ -10,6 +10,7 @@ import type { ServiceConfig } from "@/models/service.types";
 import { handleApiError } from "@/utils/error.utils";
 import { logger } from "@/services/logger/LoggerService";
 import { httpErrorInterceptor } from "@/services/http/HttpErrorInterceptor";
+import { useSettingsStore } from "@/store/settingsStore";
 import {
   testNetworkConnectivity,
   diagnoseVpnIssues,
@@ -225,15 +226,18 @@ export abstract class BaseConnector<
       ...this.getAuthConfig(),
     });
 
+    // Get capture settings from user preferences
+    const settings = useSettingsStore.getState();
+
     // Setup HTTP error interceptor for automatic error logging
     // This ensures ALL API calls through this connector are captured
     httpErrorInterceptor.setup(
       instance,
       {
         enableErrorLogging: true,
-        captureRequestBody: false, // Don't capture for privacy
-        captureResponseBody: false, // Don't capture for privacy
-        captureRequestHeaders: false, // Don't capture headers
+        captureRequestBody: settings.apiErrorLoggerCaptureRequestBody,
+        captureResponseBody: settings.apiErrorLoggerCaptureResponseBody,
+        captureRequestHeaders: settings.apiErrorLoggerCaptureRequestHeaders,
         excludeStatusCodes: [401, 403, 404], // Skip common expected errors
       },
       {

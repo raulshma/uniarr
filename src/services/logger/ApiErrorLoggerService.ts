@@ -1,5 +1,7 @@
 import { storageAdapter } from "@/services/storage/StorageAdapter";
 import { storageInitPromise } from "@/services/storage/MMKVStorage";
+import { errorDetailsStorage } from "@/services/storage/ErrorDetailsStorage";
+import { useSettingsStore } from "@/store/settingsStore";
 import type {
   ApiErrorLogEntry,
   ApiErrorLogFilter,
@@ -90,6 +92,11 @@ class ApiErrorLoggerService {
     error: ApiError,
     context?: ErrorContext,
     retryCount = 0,
+    details?: {
+      requestBody?: string;
+      responseBody?: string;
+      requestHeaders?: string;
+    },
   ): Promise<void> {
     await this.ensureInitialized();
 
@@ -116,6 +123,33 @@ class ApiErrorLoggerService {
       retryCount,
       context: error.details,
     };
+
+    // Store detailed information (body/headers) if capture is enabled and details provided
+    if (details) {
+      const settings = useSettingsStore.getState();
+      const hasContent =
+        (settings.apiErrorLoggerCaptureRequestBody && details.requestBody) ||
+        (settings.apiErrorLoggerCaptureResponseBody && details.responseBody) ||
+        (settings.apiErrorLoggerCaptureRequestHeaders &&
+          details.requestHeaders);
+
+      if (hasContent) {
+        const capturedDetails = {
+          requestBody: settings.apiErrorLoggerCaptureRequestBody
+            ? details.requestBody
+            : undefined,
+          responseBody: settings.apiErrorLoggerCaptureResponseBody
+            ? details.responseBody
+            : undefined,
+          requestHeaders: settings.apiErrorLoggerCaptureRequestHeaders
+            ? details.requestHeaders
+            : undefined,
+        };
+
+        // Non-blocking store of details - don't await to avoid slowing down error logging
+        void errorDetailsStorage.storeErrorDetails(id, capturedDetails);
+      }
+    }
 
     this.entries = [...this.entries, entry].slice(-MAX_ENTRIES);
     await this.persistEntries();
@@ -183,16 +217,24 @@ class ApiErrorLoggerService {
     return filtered;
   }
 
+  /**
+   * Get detailed information (body/headers) for an error by ID
+   */
+  async getErrorDetails(errorId: string) {
+    return errorDetailsStorage.getErrorDetails(errorId);
+  }
+
   async deleteErrors(ids: string[]): Promise<void> {
     await this.ensureInitialized();
 
     const idSet = new Set(ids);
     this.entries = this.entries.filter((e) => !idSet.has(e.id));
 
-    // Remove from individual storage
+    // Remove from individual storage and error details
     for (const id of ids) {
       try {
         await storageAdapter.removeItem(getStorageKey(id));
+        await errorDetailsStorage.deleteErrorDetails(id);
       } catch (error) {
         if (isDevelopment) {
           console.warn(
@@ -212,10 +254,11 @@ class ApiErrorLoggerService {
     const allIds = this.entries.map((e) => e.id);
     this.entries = [];
 
-    // Remove all individual entries
+    // Remove all individual entries and error details
     for (const id of allIds) {
       try {
         await storageAdapter.removeItem(getStorageKey(id));
+        await errorDetailsStorage.deleteErrorDetails(id);
       } catch (error) {
         if (isDevelopment) {
           console.warn(
@@ -225,6 +268,9 @@ class ApiErrorLoggerService {
         }
       }
     }
+
+    // Clear all error details
+    await errorDetailsStorage.clearAllErrorDetails();
 
     // Clear index
     try {
@@ -250,6 +296,9 @@ class ApiErrorLoggerService {
     if (oldIds.length === 0) {
       return 0;
     }
+
+    // Also clear old entries from ErrorDetailsStorage
+    await errorDetailsStorage.deleteOldErrorDetails(retentionDays);
 
     await this.deleteErrors(oldIds);
     return oldIds.length;
