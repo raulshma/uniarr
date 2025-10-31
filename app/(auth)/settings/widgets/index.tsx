@@ -319,7 +319,7 @@ const WidgetSettingsScreen = () => {
       <SafeAreaView style={styles.container}>
         <TabHeader title="Widget Settings" />
         <View style={styles.emptyState}>
-          <SkiaLoader size={64} />
+          <SkiaLoader size={64} centered />
         </View>
       </SafeAreaView>
     );

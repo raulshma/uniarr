@@ -21,7 +21,7 @@ import { spacing } from "@/theme/spacing";
 import { generateSizeTokens, borderRadius } from "@/constants/sizes";
 
 // Default preset key used across the app. Change here to change the default preset.
-export const DEFAULT_PRESET_KEY = "royal";
+export const DEFAULT_PRESET_KEY = "uniarr";
 
 export type FrostedEffectTokens = {
   blurIntensity: number;

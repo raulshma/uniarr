@@ -24,7 +24,7 @@ const FullscreenLoading: React.FC<FullscreenLoadingProps> = ({
         entering={ZoomIn.duration(300).delay(100)}
         style={styles.spinner}
       >
-        <SkiaLoader size={80} />
+        <SkiaLoader size={80} centered />
       </Animated.View>
       {message ? (
         <Animated.Text

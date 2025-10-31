@@ -10,6 +10,7 @@ import React, {
   Suspense,
 } from "react";
 import type { ReactNode } from "react";
+import { View } from "react-native";
 import { Portal } from "react-native-paper";
 import { SkiaLoader } from "@/components/common/SkiaLoader";
 import CustomConfirm from "./CustomConfirm";
@@ -128,7 +129,19 @@ const CustomDialogRenderer = ({
   if (current.type === "updateCheck") {
     return (
       <Portal>
-        <Suspense fallback={<SkiaLoader size={40} />}>
+        <Suspense
+          fallback={
+            <View
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <SkiaLoader size={40} />
+            </View>
+          }
+        >
           <UpdateDialog
             visible
             updateData={current.payload.updateData}
