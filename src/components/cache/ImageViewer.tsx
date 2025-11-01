@@ -93,7 +93,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       };
 
       logger.error("ImageViewer: Failed to load image", errorDetail);
-      setErrorMessage(`Failed to load image: ${fileName} (${imageUri})`);
+      setErrorMessage(`Failed to load image: ${fileName}`);
     },
     [imageUri, resolvedUri, fileName],
   );
@@ -193,6 +193,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       fontSize: 16,
       textAlign: "center",
       marginTop: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    errorUrlText: {
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 14,
+      textAlign: "center",
+      marginTop: spacing.xs,
     },
     bottomActions: {
       position: "absolute",
@@ -240,6 +247,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
             iconColor={theme.colors.error}
           />
           <Text style={styles.errorText}>{errorMessage}</Text>
+          <Text style={styles.errorUrlText}>{imageUri}</Text>
         </View>
       );
     }
