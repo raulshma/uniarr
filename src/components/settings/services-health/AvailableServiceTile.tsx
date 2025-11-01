@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { View, StyleSheet } from "react-native";
 import { Text, useTheme, Card, IconButton, Button } from "react-native-paper";
 
@@ -15,7 +16,7 @@ interface AvailableServiceTileProps {
   onAddService: () => void;
 }
 
-export const AvailableServiceTile: React.FC<AvailableServiceTileProps> = ({
+const AvailableServiceTile: React.FC<AvailableServiceTileProps> = ({
   service,
   index,
   totalItems,
@@ -189,3 +190,5 @@ export const AvailableServiceTile: React.FC<AvailableServiceTileProps> = ({
     </AnimatedListItem>
   );
 };
+
+export default memo(AvailableServiceTile);

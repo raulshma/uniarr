@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { View, StyleSheet } from "react-native";
 import { Text, useTheme, Card, Chip, IconButton } from "react-native-paper";
 import { format } from "date-fns";
@@ -15,7 +15,7 @@ interface HealthOverviewSectionProps {
   onRefresh: () => void;
 }
 
-export const HealthOverviewSection: React.FC<HealthOverviewSectionProps> = ({
+const HealthOverviewSection: React.FC<HealthOverviewSectionProps> = ({
   overview,
   isLoading,
   isError,
@@ -170,3 +170,5 @@ export const HealthOverviewSection: React.FC<HealthOverviewSectionProps> = ({
     </View>
   );
 };
+
+export default memo(HealthOverviewSection);

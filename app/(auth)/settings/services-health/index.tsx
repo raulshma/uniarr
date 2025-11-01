@@ -1,6 +1,7 @@
 import { useRef, useCallback, useMemo, useState, useEffect } from "react";
 import { useRouter } from "expo-router";
-import { StyleSheet, View, RefreshControl, FlatList } from "react-native";
+import { StyleSheet, View, RefreshControl } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { Text, useTheme, Button, FAB } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -20,9 +21,9 @@ import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
 
 // Components
-import { ServiceHealthCard } from "@/components/settings/services-health/ServiceHealthCard";
-import { HealthOverviewSection } from "@/components/settings/services-health/HealthOverviewSection";
-import { AvailableServiceTile } from "@/components/settings/services-health/AvailableServiceTile";
+import ServiceHealthCard from "@/components/settings/services-health/ServiceHealthCard";
+import HealthOverviewSection from "@/components/settings/services-health/HealthOverviewSection";
+import AvailableServiceTile from "@/components/settings/services-health/AvailableServiceTile";
 
 interface ListItemData {
   type: "header" | "overview" | "service" | "available";
@@ -33,7 +34,7 @@ interface ListItemData {
 const ServicesHealthScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
-  const scrollViewRef = useRef<FlatList>(null);
+  const scrollViewRef = useRef<any>(null);
 
   const { overview, services, isLoading, isError, refetch, isRefreshing } =
     useServicesHealth();
@@ -333,7 +334,7 @@ const ServicesHealthScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList
+      <FlashList
         ref={scrollViewRef}
         data={listData}
         renderItem={renderItem}
@@ -364,6 +365,7 @@ const ServicesHealthScreen = () => {
             </Button>
           </View>
         }
+        estimatedItemSize={150}
       />
 
       {/* Floating Action Button */}
