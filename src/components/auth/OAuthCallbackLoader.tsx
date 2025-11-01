@@ -1,23 +1,13 @@
 import { StyleSheet, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withRepeat,
   Easing,
-  useDerivedValue,
 } from "react-native-reanimated";
-import {
-  Canvas,
-  Circle,
-  Group,
-  Path,
-  Skia,
-  useClock,
-} from "@shopify/react-native-skia";
 import {
   Animated,
   ANIMATION_DURATIONS,
@@ -32,116 +22,69 @@ interface OAuthCallbackLoaderProps {
   status?: "loading" | "success" | "failure";
 }
 
-// Enhanced Skia Animated Loader Component with sophisticated animations
-const SkiaLoader = ({ size = 80, theme }: { size: number; theme: any }) => {
-  const clock = useClock();
-  const center = size / 2;
-  const radius = size / 2 - 8;
-
-  // Use clock for time-based animation (more performant)
-  const rotation = useDerivedValue(() => {
-    // 360 degrees per 1200ms = 0.3 degrees per ms
-    return (clock.value / 1200) * 360;
-  });
-
-  // Create multiple arcs for a more sophisticated loader effect
-  const arcPaths = useMemo(() => {
-    const paths: (ReturnType<typeof Skia.Path.Make> | null)[] = [];
-    const arcCount = 3;
-
-    for (let i = 0; i < arcCount; i++) {
-      const path = Skia.Path.Make();
-      if (!path) {
-        paths.push(null);
-        continue;
-      }
-
-      const startAngle = i * (360 / arcCount) * (Math.PI / 180);
-
-      // Create arc using addArc method
-      path.addArc(
-        {
-          x: center - radius,
-          y: center - radius,
-          width: radius * 2,
-          height: radius * 2,
-        },
-        (startAngle * 180) / Math.PI,
-        120, // 120-degree arc
-      );
-
-      paths.push(path);
-    }
-
-    return paths;
-  }, [center, radius]);
-
-  return (
-    <Canvas style={{ width: size, height: size }}>
-      {/* Static background circle */}
-      <Circle
-        cx={center}
-        cy={center}
-        r={radius}
-        color={theme.colors.surfaceVariant}
-        style="stroke"
-        strokeWidth={3}
-        opacity={0.12}
-      />
-
-      {/* Animated rotating arc group */}
-      <Group
-        transform={[{ rotate: rotation.value }]}
-        origin={{ x: center, y: center }}
-      >
-        {/* Primary rotating arc */}
-        {arcPaths[0] && (
-          <Path
-            path={arcPaths[0]}
-            color={theme.colors.primary}
-            style="stroke"
-            strokeWidth={4}
-            strokeCap="round"
-            opacity={0.95}
-          />
-        )}
-
-        {/* Secondary arc for depth effect */}
-        {arcPaths[1] && (
-          <Path
-            path={arcPaths[1]}
-            color={theme.colors.primary}
-            style="stroke"
-            strokeWidth={3}
-            strokeCap="round"
-            opacity={0.5}
-          />
-        )}
-
-        {/* Tertiary arc for trailing effect */}
-        {arcPaths[2] && (
-          <Path
-            path={arcPaths[2]}
-            color={theme.colors.primary}
-            style="stroke"
-            strokeWidth={2}
-            strokeCap="round"
-            opacity={0.25}
-          />
-        )}
-      </Group>
-
-      {/* Center dot with subtle breathing animation */}
-      <Circle
-        cx={center}
-        cy={center}
-        r={3}
-        color={theme.colors.primary}
-        opacity={0.7}
-      />
-    </Canvas>
-  );
-};
+// Developer quotes about UniArr and development wisdom
+const DEVELOPER_QUOTES = [
+  "Loading your unified media dashboard... because managing Sonarr, Radarr, and qBittorrent separately is so 2023.",
+  "While you wait, remember: the best error message is the one that never appears.",
+  "Connecting to your media empire... because one dashboard to rule them all is the way to go!",
+  "Loading... because good things come to those who wait, and great code comes to those who debug.",
+  "Please hold while we turn your scattered services into one beautiful dashboard. Poof! ✨",
+  "Debugging is like being the detective in a crime movie where you are also the murderer.",
+  "Loading your release calendar... because knowing when your favorite shows/movies drop is half the battle.",
+  "While waiting, ponder this: 'There are only two hard things in Computer Science: cache invalidation and naming things.' - Phil Karlton",
+  "Connecting to VPN diagnostics... because who doesn't love a good network health check?",
+  "Loading... because even developers need coffee breaks sometimes ☕",
+  "Patience is a virtue, but so is a good loading animation.",
+  "Loading Jellyseerr integration... because requesting media should be as easy as liking a post.",
+  "While you wait, here's a fun fact: the first computer bug was an actual bug - a moth stuck in a relay.",
+  "Loading... because great apps are worth the wait, and mediocre ones load instantly.",
+  "Remember: 'First, solve the problem. Then, write the code.' - John Johnson",
+  "Connecting all your services... because why manage four apps when you can manage one?",
+  "Loading... because we're connecting the dots, not just drawing them.",
+  "While waiting, reflect: 'Code is poetry written in logic.' - Unknown",
+  "Loading VPN diagnostics... because network issues are like ninjas - they strike when you least expect them.",
+  "Loading... because authentication is like dating - it takes time to find the right match.",
+  "Syncing your media libraries... because nothing says 'organized' like seeing all your content in one place.",
+  "Loading release calendar... because anticipation is the best part of any media binge.",
+  "Connecting to qBittorrent... because downloading should be as smooth as streaming.",
+  "Loading... because building a unified dashboard is like herding cats, but way more rewarding.",
+  "While you wait, think about this: your media collection just got a whole lot smarter.",
+  "Loading Jellyseerr requests... because democracy in media selection is beautiful.",
+  "Connecting services... because one API call to rule them all, one API call to find them...",
+  "Loading... because patience is a virtue, and so is a well-integrated media experience.",
+  "While waiting, remember: great software is invisible - it just works, and you love it.",
+  "Loading VPN diagnostics... because a secure connection is the foundation of good streaming.",
+  "Initializing Sonarr connection... because TV shows deserve their own kingdom.",
+  "Loading Radarr integration... because movies are like fine wine - they need proper curation.",
+  "Connecting to Jellyfin/Plex... because your media should play, not buffer.",
+  "Loading unified search... because finding 'that one episode' shouldn't require four different apps.",
+  "Syncing download progress... because watching a progress bar fill up is oddly satisfying.",
+  "Loading media health checks... because corrupted files are the enemy of good streaming.",
+  "Connecting service diagnostics... because knowing what's broken is the first step to fixing it.",
+  "Loading offline sync... because airplane mode shouldn't mean media blackout.",
+  "Initializing theme system... because dark mode isn't just cool, it's essential.",
+  "Loading widget dashboard... because customizable is just a fancy word for 'exactly how you want it'.",
+  "Connecting API bridges... because REST APIs are like bridges - they connect everything.",
+  "Loading backup services... because losing your media configuration would be tragic.",
+  "Syncing notification system... because you deserve to know when your downloads finish.",
+  "Loading queue management... because download priorities shouldn't be a free-for-all.",
+  "Connecting metadata fetchers... because movie posters make everything look better.",
+  "Loading quality profiles... because 4K is great, but sometimes 1080p is just fine.",
+  "Initializing user preferences... because one size doesn't fit all media servers.",
+  "Loading activity feeds... because seeing what everyone's watching is social media for media geeks.",
+  "Connecting external services... because your media library shouldn't live in isolation.",
+  "Loading performance metrics... because fast loading screens are the ultimate flex.",
+  "Syncing watch history... because 'what episode was I on?' is the eternal question.",
+  "Loading recommendation engine... because discovering new content shouldn't be a chore.",
+  "Connecting to Trakt/TMDb... because ratings and reviews help you choose wisely.",
+  "Loading subtitle management... because foreign films are better with subtitles.",
+  "Initializing file organization... because a messy library is a sad library.",
+  "Loading duplicate detection... because nobody needs the same movie twice.",
+  "Connecting to media analysis... because knowing your library stats is nerdy fun.",
+  "Loading smart scheduling... because downloads at 3 AM are perfectly reasonable.",
+  "Syncing cross-platform sync... because your media should follow you everywhere.",
+  "Loading bandwidth controls... because roommates also download stuff.",
+];
 
 export const OAuthCallbackLoader = ({
   message = "Processing authentication...",
@@ -153,36 +96,44 @@ export const OAuthCallbackLoader = ({
   const theme = useTheme();
   const mountTimeRef = useRef(Date.now());
   const hasTriggeredExitRef = useRef(false);
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
 
-  // Animated shared values
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
+  // Animated shared values for quote transitions
+  const quoteOpacity = useSharedValue(1);
 
-  // Breathing loop animation (subtle scale oscillation)
+  // Cycle through quotes every 3 seconds during loading
   useEffect(() => {
-    if (!shouldAnimateLayout(false)) return;
+    if (status !== "loading") return;
 
-    // Start breathing loop: 1.0 -> 1.08 -> 1.0 over 1.4s (700ms up, 700ms down)
-    // Also add slight opacity pulse for more dramatic effect
-    scale.value = withRepeat(
-      withTiming(1.08, {
-        duration: 700,
-        easing: Easing.inOut(Easing.ease),
-      }),
-      -1,
-      true,
-    );
+    const interval = setInterval(() => {
+      if (shouldAnimateLayout(false)) {
+        // Fade out current quote
+        quoteOpacity.value = withTiming(
+          0,
+          {
+            duration: 500,
+            easing: Easing.inOut(Easing.ease),
+          },
+          () => {
+            // Change quote after fade out
+            setCurrentQuoteIndex(
+              (prev) => (prev + 1) % DEVELOPER_QUOTES.length,
+            );
+            // Fade in new quote
+            quoteOpacity.value = withTiming(1, {
+              duration: 500,
+              easing: Easing.inOut(Easing.ease),
+            });
+          },
+        );
+      } else {
+        // No animation, just change quote
+        setCurrentQuoteIndex((prev) => (prev + 1) % DEVELOPER_QUOTES.length);
+      }
+    }, 3000);
 
-    // Slight opacity pulse alongside scale
-    opacity.value = withRepeat(
-      withTiming(0.9, {
-        duration: 700,
-        easing: Easing.inOut(Easing.ease),
-      }),
-      -1,
-      true,
-    );
-  }, [scale, opacity]);
+    return () => clearInterval(interval);
+  }, [status, quoteOpacity]);
 
   // Monitor status and trigger exit animation when success
   useEffect(() => {
@@ -195,12 +146,8 @@ export const OAuthCallbackLoader = ({
       hasTriggeredExitRef.current = true;
 
       if (shouldAnimateLayout(false)) {
-        // Exit animation: fade out + scale down
-        scale.value = withTiming(0.8, {
-          duration: ANIMATION_DURATIONS.NORMAL,
-          easing: Easing.out(Easing.ease),
-        });
-        opacity.value = withTiming(0, {
+        // Exit animation: fade out
+        quoteOpacity.value = withTiming(0, {
           duration: ANIMATION_DURATIONS.NORMAL,
           easing: Easing.out(Easing.ease),
         });
@@ -213,12 +160,11 @@ export const OAuthCallbackLoader = ({
     }, remainingMs);
 
     return () => clearTimeout(exitTimer);
-  }, [status, minShowTimeMs, scale, opacity, onComplete]);
+  }, [status, minShowTimeMs, quoteOpacity, onComplete]);
 
-  // Animated style for logo
-  const animatedLogoStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+  // Animated style for quote
+  const animatedQuoteStyle = useAnimatedStyle(() => ({
+    opacity: quoteOpacity.value,
   }));
 
   const styles = StyleSheet.create({
@@ -227,33 +173,51 @@ export const OAuthCallbackLoader = ({
       backgroundColor: theme.colors.background,
       justifyContent: "center",
       alignItems: "center",
-      padding: 20,
+      padding: 40,
     },
     content: {
       alignItems: "center",
+      maxWidth: 380,
     },
-    logoContainer: {
-      marginBottom: 32,
-      width: 120,
-      height: 120,
+    quoteContainer: {
+      marginBottom: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 30,
       justifyContent: "center",
       alignItems: "center",
-      borderRadius: 60,
-      backgroundColor: theme.colors.surfaceVariant,
     },
-    title: {
-      fontSize: 24,
-      fontWeight: "bold",
-      color: theme.colors.primary,
-      marginBottom: 16,
+    quoteRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      width: "100%",
+    },
+    quote: {
+      fontSize: 18,
+      fontStyle: "italic",
+      color: theme.colors.onSurface,
       textAlign: "center",
+      lineHeight: 28,
+      fontWeight: "400",
+      flex: 1,
     },
-    message: {
-      fontSize: 16,
+    quoteMark: {
+      fontSize: 48,
+      color: theme.colors.primary,
+      opacity: 0.6,
+      fontFamily: "serif",
+    },
+    quoteMarkEnd: {
+      fontSize: 48,
+      color: theme.colors.primary,
+      opacity: 0.6,
+      fontFamily: "serif",
+    },
+    subtitle: {
+      fontSize: 14,
       color: theme.colors.onSurfaceVariant,
       textAlign: "center",
-      marginBottom: 32,
-      maxWidth: 300,
+      opacity: 0.8,
+      marginTop: 16,
     },
   });
 
@@ -261,20 +225,28 @@ export const OAuthCallbackLoader = ({
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         {shouldAnimateLayout(false) ? (
-          <Animated.View style={[styles.logoContainer, animatedLogoStyle]}>
-            <SkiaLoader size={80} theme={theme} />
+          <Animated.View style={[styles.quoteContainer, animatedQuoteStyle]}>
+            <View style={styles.quoteRow}>
+              <Text style={styles.quoteMark}>"</Text>
+              <Text style={styles.quote}>
+                {DEVELOPER_QUOTES[currentQuoteIndex]}
+              </Text>
+              <Text style={styles.quoteMarkEnd}>"</Text>
+            </View>
+            <Text style={styles.subtitle}>Developer Wisdom</Text>
           </Animated.View>
         ) : (
-          <View style={styles.logoContainer}>
-            <SkiaLoader size={80} theme={theme} />
+          <View style={styles.quoteContainer}>
+            <View style={styles.quoteRow}>
+              <Text style={styles.quoteMark}>"</Text>
+              <Text style={styles.quote}>
+                {DEVELOPER_QUOTES[currentQuoteIndex]}
+              </Text>
+              <Text style={styles.quoteMarkEnd}>"</Text>
+            </View>
+            <Text style={styles.subtitle}>Developer Wisdom</Text>
           </View>
         )}
-        <Text variant="titleLarge" style={styles.title}>
-          {title}
-        </Text>
-        <Text variant="bodyMedium" style={styles.message}>
-          {message}
-        </Text>
       </View>
     </SafeAreaView>
   );
