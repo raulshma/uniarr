@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 import type { DownloadManager } from "@/services/download/DownloadManager";
 import type {
   DownloadItem,
@@ -345,7 +346,7 @@ export const useDownloadStore = create<DownloadStoreState>()(
     }),
     {
       name: "download-store",
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => storageAdapter),
       // Only persist specific parts of the state
       partialize: (state) => ({
         config: state.config,

@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -8,18 +8,18 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { Text, IconButton, Portal } from "react-native-paper";
 import { useHaptics } from "@/hooks/useHaptics";
 
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useSettingsStore } from "@/store/settingsStore";
 import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
-import { useWidgetServiceInitialization } from "@/hooks/useWidgetServiceInitialization";
+import { easeOutCubic } from "@/utils/animations.utils";
 
 // Helper function to calculate progress percentage
 
@@ -28,12 +28,24 @@ const DashboardScreen = () => {
   const theme = useTheme();
   const { onPress } = useHaptics();
   const insets = useSafeAreaInsets();
+  const gradientEnabled = useSettingsStore((s) => s.gradientBackgroundEnabled);
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [refreshing, setRefreshing] = React.useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Initialize WidgetService early to prevent loading issues
-  useWidgetServiceInitialization();
+  // Performance monitoring
+  useEffect(() => {
+    const mountTime = Date.now();
+    console.log("[Dashboard] Component mounted");
+
+    return () => {
+      const unmountTime = Date.now();
+      console.log(
+        `[Dashboard] Component unmounted after ${unmountTime - mountTime}ms`,
+      );
+    };
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     onPress();
@@ -47,43 +59,117 @@ const DashboardScreen = () => {
   const screenHeight = Dimensions.get("window").height;
   const headerMaxHeight = screenHeight * 0.4; // 40% screen height
   const headerMinHeight = 80; // Minimum collapsed height
+  const collapseRange = headerMaxHeight - headerMinHeight;
 
-  // Animated styles
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [headerMaxHeight, headerMinHeight],
-    extrapolate: "clamp",
-  });
+  // Memoize animated styles to prevent recalculation on every render
+  const animatedValues = useMemo(
+    () => ({
+      // Animated styles with ease-out-cubic Bezier curve for smooth deceleration
+      headerHeight: easeOutCubic(
+        scrollY,
+        [0, collapseRange],
+        [headerMaxHeight, headerMinHeight],
+      ),
 
-  const titleOpacity = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
+      // Title fades out as user scrolls up, then fades back in via sticky title
+      // This creates a smooth fade out effect with the main title
+      titleOpacity: easeOutCubic(scrollY, [0, collapseRange * 0.6], [1, 0]),
 
-  const titleTranslateY = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [0, -20],
-    extrapolate: "clamp",
-  });
+      titleTranslateY: easeOutCubic(scrollY, [0, collapseRange], [0, -20]),
 
-  const buttonsTranslateY = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [headerMaxHeight - 70, -10],
-    extrapolate: "clamp",
-  });
+      buttonsTranslateY: easeOutCubic(
+        scrollY,
+        [0, collapseRange],
+        [headerMaxHeight - 70, -20],
+      ),
 
-  const buttonsPosition = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [1, 1],
-    extrapolate: "clamp",
-  });
+      buttonsPosition: scrollY.interpolate({
+        inputRange: [0, collapseRange],
+        outputRange: [1, 1],
+        extrapolate: "clamp",
+      }),
 
-  const stickyTitleOpacity = scrollY.interpolate({
-    inputRange: [0, headerMaxHeight - headerMinHeight],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
+      stickyTitleOpacity: easeOutCubic(
+        scrollY,
+        [collapseRange * 0.6, collapseRange],
+        [0, 1],
+      ),
+
+      // Header background fades in only when reaching the top (fully collapsed)
+      headerBackgroundOpacity: scrollY.interpolate({
+        inputRange: [0, collapseRange - 10, collapseRange],
+        outputRange: [0, 0, 1],
+        extrapolate: "clamp",
+      }),
+
+      // Sync gradient animation to scroll position for responsive feel
+      gradient1Opacity: scrollY.interpolate({
+        inputRange: [0, collapseRange],
+        outputRange: [0.7, 0.21],
+        extrapolate: "clamp",
+      }),
+      gradient2Opacity: scrollY.interpolate({
+        inputRange: [0, collapseRange],
+        outputRange: [0.21, 0.7],
+        extrapolate: "clamp",
+      }),
+      gradient3Opacity: scrollY.interpolate({
+        inputRange: [0, collapseRange],
+        outputRange: [0.21, 0.21],
+        extrapolate: "clamp",
+      }),
+    }),
+    [scrollY, headerMaxHeight, headerMinHeight, collapseRange],
+  );
+
+  // Memoize gradient background to prevent unnecessary re-renders
+  const gradientBackground = useMemo(() => {
+    if (!gradientEnabled) return null;
+
+    return (
+      <>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { opacity: animatedValues.gradient1Opacity },
+          ]}
+        >
+          <LinearGradient
+            colors={["#0f0f23", "#1a1a2e", "#16213e"]}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+        </Animated.View>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { opacity: animatedValues.gradient2Opacity },
+          ]}
+        >
+          <LinearGradient
+            colors={["#1a1a2e", "#16213e", "#0f0f23"]}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
+        </Animated.View>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { opacity: animatedValues.gradient3Opacity },
+          ]}
+        >
+          <LinearGradient
+            colors={["#16213e", "#0f0f23", "#1a1a2e"]}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+          />
+        </Animated.View>
+      </>
+    );
+  }, [gradientEnabled, animatedValues]);
 
   const styles = useMemo(
     () =>
@@ -94,9 +180,11 @@ const DashboardScreen = () => {
         },
         scrollView: {
           flex: 1,
+          paddingHorizontal: theme.custom.spacing.none,
         },
         scrollContent: {
           paddingBottom: 100,
+          paddingTop: headerMaxHeight + insets.top,
         },
         headerContainer: {
           position: "absolute",
@@ -110,7 +198,7 @@ const DashboardScreen = () => {
           top: 0,
           left: 0,
           right: 0,
-          backgroundColor: theme.colors.background,
+          backgroundColor: "transparent",
         },
         headerContent: {
           flex: 1,
@@ -122,17 +210,17 @@ const DashboardScreen = () => {
           alignItems: "center",
         },
         title: {
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontWeight: "400",
+          fontSize: theme.custom.typography.titleLarge.fontSize,
+          fontWeight: "800",
           color: theme.colors.onBackground,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
         },
         stickyButtonsContainer: {
           position: "absolute",
           top: 0,
           right: 0,
           left: 0,
-          zIndex: 20,
+          zIndex: 15,
           paddingHorizontal: theme.custom.spacing.lg,
           paddingTop: insets.top,
         },
@@ -162,7 +250,7 @@ const DashboardScreen = () => {
           backgroundColor: theme.colors.surfaceVariant,
         },
       }),
-    [theme, insets.top],
+    [theme, insets.top, headerMaxHeight],
   );
 
   // Summary metrics are currently unused in this component; keep calculation
@@ -175,23 +263,70 @@ const DashboardScreen = () => {
 
   return (
     <Portal.Host>
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
+        {/* Frosted Glass Overlay */}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: "rgba(255, 255, 255, 0.1)",
+            },
+          ]}
+        />
+
+        {gradientBackground}
+        {!gradientEnabled && (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: theme.colors.background },
+            ]}
+          />
+        )}
         {/* Animated Header */}
         <Animated.View
-          style={[styles.headerContainer, { height: headerHeight }]}
+          style={[
+            styles.headerContainer,
+            { height: animatedValues.headerHeight },
+          ]}
         >
+          {/* Header Background - Fades in when reaching top */}
           <Animated.View
-            style={[styles.headerBackground, { height: headerHeight }]}
-          />
+            style={[
+              styles.headerBackground,
+              {
+                height: animatedValues.headerHeight,
+                opacity: animatedValues.headerBackgroundOpacity,
+                backgroundColor: theme.colors.background,
+              },
+            ]}
+          >
+            {frostedEnabled && gradientEnabled && (
+              <BlurView
+                intensity={25}
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    backgroundColor: theme.dark
+                      ? "rgba(15, 15, 35, 0.3)"
+                      : "rgba(255, 255, 255, 0.2)",
+                  },
+                ]}
+              />
+            )}
+          </Animated.View>
           <Animated.View
-            style={[styles.headerContent, { height: headerHeight }]}
+            style={[
+              styles.headerContent,
+              { height: animatedValues.headerHeight },
+            ]}
           >
             <Animated.View
               style={[
                 styles.titleContainer,
                 {
-                  opacity: titleOpacity,
-                  transform: [{ translateY: titleTranslateY }],
+                  opacity: animatedValues.titleOpacity,
+                  transform: [{ translateY: animatedValues.titleTranslateY }],
                 },
               ]}
             >
@@ -205,7 +340,7 @@ const DashboardScreen = () => {
           style={[
             styles.stickyButtonsContainer,
             {
-              transform: [{ translateY: buttonsTranslateY }],
+              transform: [{ translateY: animatedValues.buttonsTranslateY }],
             },
           ]}
         >
@@ -214,7 +349,7 @@ const DashboardScreen = () => {
               style={[
                 styles.stickyTitle,
                 {
-                  opacity: stickyTitleOpacity,
+                  opacity: animatedValues.stickyTitleOpacity,
                 },
               ]}
             >
@@ -224,20 +359,20 @@ const DashboardScreen = () => {
               style={[
                 styles.stickyButtons,
                 {
-                  opacity: buttonsPosition,
+                  opacity: animatedValues.buttonsPosition,
                 },
               ]}
             >
               <IconButton
                 icon="download"
-                size={22}
+                size={20}
                 iconColor={theme.colors.onSurfaceVariant}
                 style={styles.settingsButton}
                 onPress={() => router.push("/(auth)/jellyfin-downloads")}
               />
               <IconButton
                 icon="cog"
-                size={22}
+                size={20}
                 iconColor={theme.colors.onSurfaceVariant}
                 style={styles.settingsButton}
                 onPress={() => router.push("/(auth)/settings")}
@@ -258,21 +393,18 @@ const DashboardScreen = () => {
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-          {/* Spacer to account for header */}
-          <View style={{ height: headerMaxHeight }} />
-
           {/* Widgets Section */}
           <AnimatedSection
             delay={100}
             style={{
-              paddingHorizontal: theme.custom.spacing.lg,
+              paddingHorizontal: theme.custom.spacing.sm,
               marginTop: theme.custom.spacing.sm,
             }}
           >
             <WidgetContainer editable={true} />
           </AnimatedSection>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Portal.Host>
   );
 };

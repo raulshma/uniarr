@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,12 +12,13 @@ import { MediaDetails } from "@/components/media/MediaDetails";
 import { MediaDetailsSkeleton } from "@/components/media/skeletons";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import type { AppTheme } from "@/constants/theme";
+import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
+import { skeletonTiming } from "@/constants/skeletonTiming";
 import type { Series } from "@/models/media.types";
 import { useSonarrSeriesDetails } from "@/hooks/useSonarrSeriesDetails";
 import { spacing } from "@/theme/spacing";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
-
 const findEpisodeRuntime = (series?: Series): number | undefined => {
   if (!series?.seasons) {
     return undefined;
@@ -71,6 +72,18 @@ const SonarrSeriesDetailsScreen = () => {
     serviceId: serviceKey,
     seriesId: numericSeriesId,
   });
+
+  // Initialize skeleton loading hook with low complexity timing (500ms) for local service queries
+  const skeleton = useSkeletonLoading(skeletonTiming.lowComplexity);
+
+  // Effect to manage skeleton visibility based on loading state
+  useEffect(() => {
+    if (isLoading && !series) {
+      skeleton.startLoading();
+    } else {
+      skeleton.stopLoading();
+    }
+  }, [isLoading, series, skeleton]);
 
   const isMutating =
     isTogglingMonitor ||
@@ -188,7 +201,7 @@ const SonarrSeriesDetailsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <View style={styles.container}>
-        {!series ? (
+        {!series && !(skeleton.showSkeleton && isLoading && !series) ? (
           <AnimatedSection
             animated={animationsEnabled}
             style={styles.header}
@@ -212,8 +225,27 @@ const SonarrSeriesDetailsScreen = () => {
           </AnimatedSection>
         ) : null}
 
-        {isLoading && !series ? (
-          <MediaDetailsSkeleton showSeasons={true} />
+        {skeleton.showSkeleton && isLoading && !series ? (
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={{ flex: 1 }}
+            delay={150}
+          >
+            <DetailHero
+              posterUri={undefined}
+              backdropUri={undefined}
+              onBack={handleClose}
+            >
+              <ScrollView
+                contentContainerStyle={{
+                  paddingHorizontal: spacing.lg,
+                  paddingBottom: spacing.xxxxl,
+                }}
+              >
+                <MediaDetailsSkeleton showSeasons={true} />
+              </ScrollView>
+            </DetailHero>
+          </AnimatedSection>
         ) : isError ? (
           <AnimatedSection
             animated={animationsEnabled}

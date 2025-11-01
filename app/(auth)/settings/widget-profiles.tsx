@@ -9,9 +9,9 @@ import {
   TextInput,
   Portal,
   Dialog,
-  ActivityIndicator,
   Divider,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { TabHeader } from "@/components/common/TabHeader";
@@ -329,7 +329,7 @@ const WidgetProfilesScreen = () => {
             { justifyContent: "center", alignItems: "center" },
           ]}
         >
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <SkiaLoader size={80} />
         </View>
       ) : (
         <ScrollView

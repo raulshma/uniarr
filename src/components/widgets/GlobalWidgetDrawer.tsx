@@ -16,6 +16,9 @@ export const GlobalWidgetDrawer = () => {
       actionLabel={drawerState.actionLabel}
       loading={drawerState.loading}
       maxHeight={drawerState.maxHeight}
+      customContent={drawerState.customContent}
+      showMetadata={drawerState.showMetadata}
+      showActionButton={drawerState.showActionButton}
     />
   );
 };

@@ -6,6 +6,7 @@ import {
   defaultTheme,
   createCustomTheme,
   defaultCustomThemeConfig,
+  DEFAULT_PRESET_KEY,
   type AppTheme,
   type CustomThemeConfig,
 } from "@/constants/theme";
@@ -38,7 +39,7 @@ const hasCustomThemeOverrides = (
     return false;
   }
 
-  if (config.preset && config.preset !== "uniarr") {
+  if (config.preset && config.preset !== DEFAULT_PRESET_KEY) {
     return true;
   }
 

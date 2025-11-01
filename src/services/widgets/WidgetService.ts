@@ -1,6 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { logger } from "@/services/logger/LoggerService";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 
 export type WidgetType =
   | "service-status"
@@ -28,12 +27,15 @@ export interface Widget {
   lastUpdated?: string;
 }
 
+export interface WidgetDataEntry<T = any> {
+  data: T;
+  timestamp: number;
+  expiresAt?: number;
+  configSignature?: string;
+}
+
 export interface WidgetData {
-  [widgetId: string]: {
-    data: any;
-    timestamp: number;
-    expiresAt?: number;
-  };
+  [widgetId: string]: WidgetDataEntry;
 }
 
 class WidgetService {
@@ -66,7 +68,7 @@ class WidgetService {
 
   private async loadWidgets(): Promise<void> {
     try {
-      const serialized = await AsyncStorage.getItem(this.STORAGE_KEY);
+      const serialized = await storageAdapter.getItem(this.STORAGE_KEY);
       if (serialized) {
         const widgets = JSON.parse(serialized) as Widget[];
         this.widgets.clear();
@@ -83,7 +85,7 @@ class WidgetService {
 
   private async loadWidgetData(): Promise<void> {
     try {
-      const serialized = await AsyncStorage.getItem(this.DATA_KEY);
+      const serialized = await storageAdapter.getItem(this.DATA_KEY);
       if (serialized) {
         this.widgetData = JSON.parse(serialized) as WidgetData;
         // Clean up expired data
@@ -104,6 +106,11 @@ class WidgetService {
         enabled: false,
         order: 0,
         size: "medium",
+        config: {
+          sourceMode: "global",
+          serviceIds: [],
+          showOfflineOnly: false,
+        },
       },
       {
         id: "shortcuts",
@@ -152,6 +159,11 @@ class WidgetService {
         enabled: false,
         order: 2,
         size: "medium",
+        config: {
+          includeServiceIds: [],
+          includeCompleted: false,
+          maxItems: 6,
+        },
       },
       {
         id: "recent-activity",
@@ -160,6 +172,11 @@ class WidgetService {
         enabled: false,
         order: 3,
         size: "large",
+        config: {
+          sourceMode: "global",
+          serviceIds: [],
+          limit: 10,
+        },
       },
       {
         id: "statistics",
@@ -168,6 +185,11 @@ class WidgetService {
         enabled: false,
         order: 4,
         size: "large",
+        config: {
+          filter: "all",
+          sourceMode: "global",
+          serviceIds: [],
+        },
       },
       {
         id: "calendar-preview",
@@ -176,6 +198,11 @@ class WidgetService {
         enabled: false,
         order: 5,
         size: "large",
+        config: {
+          daysAhead: 30,
+          limit: 8,
+          serviceTypes: ["sonarr", "radarr"],
+        },
       },
       {
         id: "bookmarks",
@@ -275,7 +302,7 @@ class WidgetService {
   private async saveWidgets(): Promise<void> {
     try {
       const widgets = Array.from(this.widgets.values());
-      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(widgets));
+      await storageAdapter.setItem(this.STORAGE_KEY, JSON.stringify(widgets));
     } catch (error) {
       logger.error("[WidgetService] Failed to save widgets", { error });
     }
@@ -283,7 +310,7 @@ class WidgetService {
 
   private async saveWidgetData(): Promise<void> {
     try {
-      await AsyncStorage.setItem(
+      await storageAdapter.setItem(
         this.DATA_KEY,
         JSON.stringify(this.widgetData),
       );
@@ -358,22 +385,29 @@ class WidgetService {
   async setWidgetData<T>(
     widgetId: string,
     data: T,
-    ttlMs?: number,
+    options?: {
+      ttlMs?: number;
+      configSignature?: string;
+    },
   ): Promise<void> {
     await this.ensureInitialized();
     const timestamp = Date.now();
-    const expiresAt = ttlMs ? timestamp + ttlMs : undefined;
+    const expiresAt = options?.ttlMs ? timestamp + options.ttlMs : undefined;
 
     this.widgetData[widgetId] = {
       data,
       timestamp,
       expiresAt,
+      configSignature: options?.configSignature,
     };
 
     await this.saveWidgetData();
   }
 
-  async getWidgetData<T>(widgetId: string): Promise<T | null> {
+  async getWidgetData<T>(
+    widgetId: string,
+    configSignature?: string,
+  ): Promise<T | null> {
     await this.ensureInitialized();
     const cached = this.widgetData[widgetId];
 
@@ -383,6 +417,22 @@ class WidgetService {
 
     // Check if data has expired
     if (cached.expiresAt && cached.expiresAt < Date.now()) {
+      delete this.widgetData[widgetId];
+      await this.saveWidgetData();
+      return null;
+    }
+
+    if (
+      configSignature &&
+      cached.configSignature &&
+      cached.configSignature !== configSignature
+    ) {
+      delete this.widgetData[widgetId];
+      await this.saveWidgetData();
+      return null;
+    }
+
+    if (configSignature && !cached.configSignature) {
       delete this.widgetData[widgetId];
       await this.saveWidgetData();
       return null;

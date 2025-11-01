@@ -8,7 +8,6 @@ import {
   View,
 } from "react-native";
 import {
-  ActivityIndicator,
   Chip,
   HelperText,
   IconButton,
@@ -18,6 +17,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -1515,7 +1515,7 @@ export const UnifiedSearchPanel: React.FC = () => {
         >
           {isBusy && (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator animating size="large" />
+              <SkiaLoader size={80} centered />
             </View>
           )}
 
@@ -1590,7 +1590,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           </View>
 
           {isHistoryLoading ? (
-            <ActivityIndicator animating />
+            <SkiaLoader size={40} centered />
           ) : history.length ? (
             <View style={styles.historyChips}>
               {history.map((entry) => (

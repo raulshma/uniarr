@@ -18,6 +18,7 @@ import { queryKeys } from "@/hooks/queryKeys";
 import {
   useSettingsStore,
   selectLastCalendarView,
+  selectLastCalendarRange,
 } from "@/store/settingsStore";
 import { validateDateString } from "@/utils/calendar.utils";
 import { CalendarService } from "@/services/calendar/CalendarService";
@@ -59,12 +60,31 @@ const DEFAULT_STATE: CalendarState = {
  */
 export const useCalendar = (): UseCalendarReturn => {
   const lastCalendarView = useSettingsStore(selectLastCalendarView);
+  const lastCalendarRange = useSettingsStore(selectLastCalendarRange);
   const setLastCalendarView = useSettingsStore((s) => s.setLastCalendarView);
+  const setLastCalendarRange = useSettingsStore((s) => s.setLastCalendarRange);
 
-  const [state, setState] = useState<CalendarState>(() => ({
-    ...DEFAULT_STATE,
-    view: lastCalendarView ?? DEFAULT_STATE.view,
-  }));
+  const [state, setState] = useState<CalendarState>(() => {
+    const baseFilters: CalendarFilters = { ...DEFAULT_FILTERS };
+
+    if (lastCalendarRange?.start && lastCalendarRange?.end) {
+      return {
+        ...DEFAULT_STATE,
+        currentDate: lastCalendarRange.start,
+        view: "custom",
+        filters: {
+          ...baseFilters,
+          dateRange: { ...lastCalendarRange },
+        },
+      };
+    }
+
+    return {
+      ...DEFAULT_STATE,
+      view: lastCalendarView ?? DEFAULT_STATE.view,
+      filters: baseFilters,
+    };
+  });
 
   // Fetch releases from calendar service
   const {
@@ -129,16 +149,30 @@ export const useCalendar = (): UseCalendarReturn => {
 
   const setFilters = useCallback(
     (filters: Partial<CalendarFilters>) => {
-      updateState({
-        filters: { ...state.filters, ...filters },
+      setState((prev) => {
+        const nextFilters = { ...prev.filters, ...filters };
+        return { ...prev, filters: nextFilters };
       });
+
+      if (Object.prototype.hasOwnProperty.call(filters, "dateRange")) {
+        const range = filters.dateRange;
+        if (range && range.start && range.end) {
+          setLastCalendarRange({
+            start: range.start,
+            end: range.end,
+          });
+        } else {
+          setLastCalendarRange(undefined);
+        }
+      }
     },
-    [state.filters, updateState],
+    [setLastCalendarRange],
   );
 
   const clearFilters = useCallback(() => {
     updateState({ filters: { ...DEFAULT_FILTERS } });
-  }, [updateState]);
+    setLastCalendarRange(undefined);
+  }, [updateState, setLastCalendarRange]);
 
   const goToToday = useCallback(() => {
     const today = new Date().toISOString().split("T")[0]!;

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
@@ -27,7 +27,6 @@ import type { ServiceStatusState } from "@/components/service/ServiceStatus";
 import { ServiceCardSkeleton } from "@/components/service/ServiceCard";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import ServiceCard from "@/components/service/ServiceCard/ServiceCard";
-import type { ConnectionResult } from "@/connectors/base/IConnector";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { queryKeys } from "@/hooks/queryKeys";
 import type { AppTheme } from "@/constants/theme";
@@ -36,7 +35,34 @@ import { logger } from "@/services/logger/LoggerService";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
-import { shouldAnimateLayout } from "@/utils/animations.utils";
+import { getHomarrIconUrl, getHomarrIconUrls } from "@/utils/homarrIcons.utils";
+import { imageCacheService } from "@/services/image/ImageCacheService";
+import { useServiceHealth } from "@/hooks/useServiceHealth";
+
+// Custom hook for async icon loading
+const useServiceIcon = (serviceType: ServiceType, isDarkTheme: boolean) => {
+  const [icon, setIcon] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadIcon = async () => {
+      try {
+        setLoading(true);
+        const url = await getHomarrIconUrl(serviceType, isDarkTheme);
+        setIcon(url);
+      } catch (error) {
+        console.warn(`Failed to load icon for ${serviceType}:`, error);
+        setIcon(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadIcon();
+  }, [serviceType, isDarkTheme]);
+
+  return { icon, loading };
+};
 
 type ServiceOverviewItem = {
   config: ServiceConfig;
@@ -100,94 +126,220 @@ const serviceIcons: Record<ServiceType, string> = {
   adguard: "shield-check",
 };
 
-const deriveStatus = (
-  config: ServiceConfig,
-  result: ConnectionResult | undefined,
-  checkedAt: Date,
-): Pick<
-  ServiceOverviewItem,
-  "status" | "statusDescription" | "lastCheckedAt" | "latency" | "version"
-> => {
-  if (!config.enabled) {
-    return {
-      status: "offline",
-      statusDescription: "Service disabled",
-    };
-  }
-
-  if (!result) {
-    return {
-      status: "offline",
-      statusDescription: "Status unavailable",
-      lastCheckedAt: checkedAt,
-    };
-  }
-
-  const latency = result.latency ?? undefined;
-  const version = result.version ?? undefined;
-  const isHighLatency = typeof latency === "number" && latency > 2000;
-
-  const status: ServiceStatusState = result.success
-    ? isHighLatency
-      ? "degraded"
-      : "online"
-    : "offline";
-
-  const descriptionParts: string[] = [];
-  if (result.message) {
-    descriptionParts.push(result.message);
-  }
-  if (typeof latency === "number") {
-    descriptionParts.push(`Latency ${latency}ms`);
-  }
-  if (version) {
-    descriptionParts.push(`Version ${version}`);
-  }
-
-  const statusDescription =
-    descriptionParts.length > 0 ? descriptionParts.join(" • ") : undefined;
-
-  return {
-    status,
-    statusDescription,
-    lastCheckedAt: checkedAt,
-    latency,
-    version,
-  };
-};
-
-const fetchServicesOverview = async (): Promise<ServiceOverviewItem[]> => {
-  const manager = ConnectorManager.getInstance();
-  await manager.loadSavedServices();
-
+const fetchServiceConfigs = async (): Promise<ServiceConfig[]> => {
   const configs = await secureStorage.getServiceConfigs();
-  if (configs.length === 0) {
-    return [];
-  }
-
-  const checkedAt = new Date();
-
-  // Test connections with a timeout and staggered approach to avoid blocking UI
-  const connectionResults = await Promise.race([
-    manager.testAllConnections(),
-    new Promise<Map<string, ConnectionResult>>((resolve) => {
-      // Timeout after 8 seconds to show partial results
-      setTimeout(() => {
-        resolve(new Map());
-      }, 8000);
-    }),
-  ]);
-
-  return configs.map((config) => {
-    const connectionResult = connectionResults.get(config.id);
-    const statusFields = deriveStatus(config, connectionResult, checkedAt);
-
-    return {
-      config,
-      ...statusFields,
-    };
-  });
+  return configs;
 };
+
+// Component that collects health data from all services for overview metrics
+// Handles up to 10 services with individual queries (covers most realistic use cases)
+const ServiceOverviewMetrics = React.memo(
+  ({
+    serviceConfigs,
+    children,
+  }: {
+    serviceConfigs: ServiceConfig[];
+    children: (metrics: {
+      overviewMetrics: { label: string; value: number }[];
+      averageLatency: string;
+      isAnyServiceLoading: boolean;
+    }) => React.ReactNode;
+  }) => {
+    // Support up to 10 services with individual queries
+    const [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10] = serviceConfigs;
+    const h1 = useServiceHealth(s1?.id ?? "");
+    const h2 = useServiceHealth(s2?.id ?? "");
+    const h3 = useServiceHealth(s3?.id ?? "");
+    const h4 = useServiceHealth(s4?.id ?? "");
+    const h5 = useServiceHealth(s5?.id ?? "");
+    const h6 = useServiceHealth(s6?.id ?? "");
+    const h7 = useServiceHealth(s7?.id ?? "");
+    const h8 = useServiceHealth(s8?.id ?? "");
+    const h9 = useServiceHealth(s9?.id ?? "");
+    const h10 = useServiceHealth(s10?.id ?? "");
+
+    const healthQueries = [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10].filter(
+      (_, index) => serviceConfigs[index] !== undefined,
+    );
+
+    const metrics = useMemo(() => {
+      const overviewMetrics = [
+        { label: "Configured", value: serviceConfigs.length },
+        {
+          label: "Online",
+          value: healthQueries.filter(
+            (query) => query.data?.status === "online",
+          ).length,
+        },
+        {
+          label: "Degraded",
+          value: healthQueries.filter(
+            (query) => query.data?.status === "degraded",
+          ).length,
+        },
+        {
+          label: "Offline",
+          value: healthQueries.filter(
+            (query) => query.data?.status === "offline",
+          ).length,
+        },
+      ];
+
+      const latencies = healthQueries
+        .map((query) => query.data?.latency)
+        .filter((latency): latency is number => typeof latency === "number");
+
+      const averageLatency =
+        latencies.length === 0
+          ? "—"
+          : `${Math.round(
+              latencies.reduce((acc, latency) => acc + latency, 0) /
+                latencies.length,
+            )} ms`;
+
+      const isAnyServiceLoading = healthQueries.some(
+        (query) => query.isLoading,
+      );
+
+      return { overviewMetrics, averageLatency, isAnyServiceLoading };
+    }, [serviceConfigs.length, healthQueries]);
+
+    return <>{children(metrics)}</>;
+  },
+);
+
+const ServiceOverviewHeader = React.memo(
+  ({
+    serviceConfigs,
+    animationsEnabled,
+    styles,
+  }: {
+    serviceConfigs: ServiceConfig[];
+    animationsEnabled: boolean;
+    styles: ReturnType<typeof StyleSheet.create>;
+  }) => {
+    return (
+      <ServiceOverviewMetrics serviceConfigs={serviceConfigs}>
+        {({ overviewMetrics, averageLatency, isAnyServiceLoading }) => (
+          <AnimatedSection
+            animated={animationsEnabled && !isAnyServiceLoading}
+            style={styles.summarySection}
+            delay={50}
+          >
+            <Text style={styles.summaryTitle}>Service overview</Text>
+            <View style={styles.summaryGrid}>
+              {overviewMetrics.map((metric, index) => (
+                <AnimatedListItem
+                  key={metric.label}
+                  animated={animationsEnabled && !isAnyServiceLoading}
+                  index={index}
+                  totalItems={overviewMetrics.length + 1}
+                  style={styles.summaryCard}
+                >
+                  <Text style={styles.summaryValue}>{metric.value}</Text>
+                  <Text style={styles.summaryLabel}>{metric.label}</Text>
+                </AnimatedListItem>
+              ))}
+            </View>
+            <AnimatedListItem
+              animated={animationsEnabled && !isAnyServiceLoading}
+              index={overviewMetrics.length}
+              totalItems={overviewMetrics.length + 1}
+              style={styles.latencyChip}
+            >
+              <Text style={styles.latencyLabel}>Average latency</Text>
+              <Text style={styles.latencyValue}>{averageLatency}</Text>
+            </AnimatedListItem>
+          </AnimatedSection>
+        )}
+      </ServiceOverviewMetrics>
+    );
+  },
+);
+
+// Individual service row component that uses its own health query
+const ServiceRowWithHealth = React.memo(
+  ({
+    config,
+    index,
+    animationsEnabled,
+    totalServices,
+    isDarkTheme,
+    serviceDisplayNames,
+    serviceTypeLabels,
+    serviceIcons,
+    styles,
+    handleServicePress,
+    setSelectedService,
+    handleEditService,
+    handleDeleteService,
+  }: {
+    config: ServiceConfig;
+    index: number;
+    animationsEnabled: boolean;
+    totalServices: number;
+    isDarkTheme: boolean;
+    serviceDisplayNames: Record<ServiceType, string>;
+    serviceTypeLabels: Record<ServiceType, string>;
+    serviceIcons: Record<ServiceType, string>;
+    styles: ReturnType<typeof StyleSheet.create>;
+    handleServicePress: (service: ServiceOverviewItem) => void;
+    setSelectedService: (service: ServiceOverviewItem | null) => void;
+    handleEditService: () => void;
+    handleDeleteService: () => void;
+  }) => {
+    const { data: healthData } = useServiceHealth(config.id);
+    const { icon: homarrUrl } = useServiceIcon(config.type, isDarkTheme);
+
+    const serviceItem: ServiceOverviewItem = useMemo(
+      () => ({
+        config,
+        status: healthData?.status || "offline",
+        statusDescription: healthData?.statusDescription,
+        lastCheckedAt: healthData?.lastCheckedAt,
+        latency: healthData?.latency,
+        version: healthData?.version,
+      }),
+      [config, healthData],
+    );
+
+    const displayName = serviceDisplayNames[config.type] || config.name;
+    const icon = homarrUrl ? { uri: homarrUrl } : serviceIcons[config.type];
+    const serviceTypeLabel = serviceTypeLabels[config.type];
+
+    return (
+      <AnimatedListItem
+        animated={animationsEnabled}
+        index={index}
+        totalItems={totalServices}
+      >
+        <ServiceCard
+          key={config.id}
+          id={config.id}
+          name={displayName}
+          url={config.url}
+          description={serviceTypeLabel}
+          status={serviceItem.status}
+          statusDescription={serviceItem.statusDescription}
+          latency={serviceItem.latency}
+          version={serviceItem.version}
+          lastCheckedAt={serviceItem.lastCheckedAt}
+          icon={icon}
+          onPress={() => handleServicePress(serviceItem)}
+          onEditPress={() => {
+            setSelectedService(serviceItem);
+            handleEditService();
+          }}
+          onDeletePress={() => {
+            setSelectedService(serviceItem);
+            handleDeleteService();
+          }}
+          style={styles.serviceCard}
+        />
+      </AnimatedListItem>
+    );
+  },
+);
 
 const ServicesScreen = () => {
   const router = useRouter();
@@ -198,20 +350,45 @@ const ServicesScreen = () => {
   const [selectedService, setSelectedService] =
     useState<ServiceOverviewItem | null>(null);
 
-  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: queryKeys.services.overview,
-    queryFn: fetchServicesOverview,
-    refetchInterval: 60000,
-    staleTime: 30000,
+  const isDarkTheme = theme.dark;
+
+  // Prefetch Homarr icons once on component mount, not on every refresh
+  useEffect(() => {
+    const prefetchIcons = async () => {
+      try {
+        const configs = await secureStorage.getServiceConfigs();
+        if (configs.length > 0) {
+          const serviceTypes = [...new Set(configs.map((c) => c.type))];
+          const iconUrls = await getHomarrIconUrls(serviceTypes, isDarkTheme);
+          await imageCacheService.prefetch(iconUrls);
+        }
+      } catch (error) {
+        logger.error("Failed to prefetch service icons", {
+          location: "ServicesScreen.prefetchIcons",
+          error,
+        });
+      }
+    };
+
+    void prefetchIcons();
+  }, [isDarkTheme]);
+
+  // Get service configs (static data, only changes when services are added/removed)
+  const {
+    data: configs = [],
+    isLoading: isLoadingConfigs,
+    error: configsError,
+  } = useQuery({
+    queryKey: queryKeys.services.base,
+    queryFn: fetchServiceConfigs,
+    staleTime: 5 * 60 * 1000, // 5 minutes - configs don't change often
   });
 
-  const services = useMemo(() => data ?? [], [data]);
-  const showSkeleton = isLoading && services.length === 0;
-  const isRefreshing = isFetching && !isLoading;
-  const animationsEnabled =
-    !showSkeleton &&
-    !(isFetching && data && data.length > 0) &&
-    shouldAnimateLayout(isLoading, isFetching);
+  const showSkeleton = isLoadingConfigs && configs.length === 0;
+  const isError = configsError;
+  const hasAnyServices = configs.length > 0;
+  const animationsEnabled = !showSkeleton;
+
   const refreshControl = useMemo(() => {
     if (showSkeleton) {
       return undefined;
@@ -219,55 +396,26 @@ const ServicesScreen = () => {
 
     return (
       <ListRefreshControl
-        refreshing={isRefreshing}
-        onRefresh={() => refetch()}
+        refreshing={false} // Will be handled by individual components
+        onRefresh={() => {
+          // Refresh all service health queries
+          configs.forEach((config) => {
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.services.health(config.id),
+            });
+          });
+        }}
       />
     );
-  }, [isRefreshing, refetch, showSkeleton]);
-
-  const totalServices = services.length;
-  const overviewMetrics = useMemo(
-    () => [
-      { label: "Configured", value: totalServices },
-      {
-        label: "Online",
-        value: services.filter((service) => service.status === "online").length,
-      },
-      {
-        label: "Degraded",
-        value: services.filter((service) => service.status === "degraded")
-          .length,
-      },
-      {
-        label: "Offline",
-        value: services.filter((service) => service.status === "offline")
-          .length,
-      },
-    ],
-    [services, totalServices],
-  );
-
-  const averageLatency = useMemo(() => {
-    const latencies = services
-      .map((service) => service.latency)
-      .filter((latency): latency is number => typeof latency === "number");
-    if (latencies.length === 0) {
-      return "—";
-    }
-    const sum = latencies.reduce((acc, latency) => acc + latency, 0);
-    return `${Math.round(sum / latencies.length)} ms`;
-  }, [services]);
+  }, [showSkeleton, configs, queryClient]);
 
   // We render the tab header outside of the list so it remains fixed.
-
-  const listData: ServiceOverviewItem[] = services;
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
         container: {
           flex: 1,
-          backgroundColor: theme.colors.surface,
         },
         content: {
           flex: 1,
@@ -307,7 +455,7 @@ const ServicesScreen = () => {
           marginTop: spacing.xs,
         },
         latencyChip: {
-          backgroundColor: theme.colors.elevation.level2,
+          backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.lg,
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
@@ -339,7 +487,7 @@ const ServicesScreen = () => {
           marginHorizontal: spacing.md,
           marginVertical: spacing.xs,
           borderRadius: borderRadius.xxxl,
-          padding: spacing.sm,
+          padding: spacing.xs,
         },
         serviceContent: {
           flexDirection: "row",
@@ -506,7 +654,7 @@ const ServicesScreen = () => {
               await manager.removeConnector(selectedService.config.id);
 
               await queryClient.invalidateQueries({
-                queryKey: queryKeys.services.overview,
+                queryKey: queryKeys.services.base,
               });
 
               alert(
@@ -533,59 +681,38 @@ const ServicesScreen = () => {
     );
   }, [selectedService, queryClient]);
 
-  // Header is rendered outside the scrollable area so it does not scroll with content.
-
-  const ServiceRow = React.memo(
-    ({ item, index }: { item: ServiceOverviewItem; index: number }) => {
-      const displayName =
-        serviceDisplayNames[item.config.type] || item.config.name;
-      const iconName = serviceIcons[item.config.type];
-
-      const serviceTypeLabel = serviceTypeLabels[item.config.type];
-
-      return (
-        <AnimatedListItem
-          animated={animationsEnabled}
-          index={index}
-          totalItems={services.length}
-        >
-          <ServiceCard
-            key={item.config.id}
-            id={item.config.id}
-            name={displayName}
-            url={item.config.url}
-            description={serviceTypeLabel}
-            status={item.status}
-            statusDescription={item.statusDescription}
-            latency={item.latency}
-            version={item.version}
-            lastCheckedAt={item.lastCheckedAt}
-            icon={iconName}
-            onPress={() => handleServicePress(item)}
-            onEditPress={() => {
-              setSelectedService(item);
-              handleEditService();
-            }}
-            onDeletePress={() => {
-              setSelectedService(item);
-              handleDeleteService();
-            }}
-            style={styles.serviceCard}
-          />
-        </AnimatedListItem>
-      );
-    },
-  );
-
   const renderItem = useCallback(
-    ({ item, index }: { item: ServiceOverviewItem; index: number }) => (
-      <ServiceRow item={item} index={index} />
+    ({ item, index }: { item: ServiceConfig; index: number }) => (
+      <ServiceRowWithHealth
+        config={item}
+        index={index}
+        animationsEnabled={animationsEnabled}
+        totalServices={configs.length}
+        isDarkTheme={isDarkTheme}
+        serviceDisplayNames={serviceDisplayNames}
+        serviceTypeLabels={serviceTypeLabels}
+        serviceIcons={serviceIcons}
+        styles={styles}
+        handleServicePress={handleServicePress}
+        setSelectedService={setSelectedService}
+        handleEditService={handleEditService}
+        handleDeleteService={handleDeleteService}
+      />
     ),
-    [ServiceRow],
+    [
+      animationsEnabled,
+      configs.length,
+      isDarkTheme,
+      styles,
+      handleServicePress,
+      setSelectedService,
+      handleEditService,
+      handleDeleteService,
+    ],
   );
 
   const keyExtractor = useCallback(
-    (item: ServiceOverviewItem) => `service-${item.config.id}`,
+    (item: ServiceConfig) => `service-${item.id}`,
     [],
   );
 
@@ -594,14 +721,20 @@ const ServicesScreen = () => {
   const listEmptyComponent = useMemo(() => {
     if (isError) {
       const message =
-        error instanceof Error ? error.message : "Unable to load services.";
+        configsError instanceof Error
+          ? configsError.message
+          : "Unable to load services.";
 
       return (
         <EmptyState
           title="Unable to load services"
           description={message}
           actionLabel="Retry"
-          onActionPress={() => void refetch()}
+          onActionPress={() => {
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.services.base,
+            });
+          }}
         />
       );
     }
@@ -614,7 +747,7 @@ const ServicesScreen = () => {
         onActionPress={handleAddService}
       />
     );
-  }, [error, handleAddService, isError, refetch]);
+  }, [configsError, handleAddService, isError, queryClient]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -631,45 +764,20 @@ const ServicesScreen = () => {
       />
       <FlashList
         style={styles.content}
-        data={listData}
+        data={configs}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         contentContainerStyle={[
-          services.length === 0 ? { flex: 1 } : undefined,
+          configs.length === 0 ? { flex: 1 } : undefined,
           { paddingTop: spacing.xs, paddingBottom: spacing.xxxxl },
         ]}
         ListHeaderComponent={
-          !showSkeleton && totalServices > 0 ? (
-            <AnimatedSection
-              animated={animationsEnabled}
-              style={styles.summarySection}
-              delay={50}
-            >
-              <Text style={styles.summaryTitle}>Service overview</Text>
-              <View style={styles.summaryGrid}>
-                {overviewMetrics.map((metric, index) => (
-                  <AnimatedListItem
-                    key={metric.label}
-                    animated={animationsEnabled}
-                    index={index}
-                    totalItems={overviewMetrics.length + 1}
-                    style={styles.summaryCard}
-                  >
-                    <Text style={styles.summaryValue}>{metric.value}</Text>
-                    <Text style={styles.summaryLabel}>{metric.label}</Text>
-                  </AnimatedListItem>
-                ))}
-              </View>
-              <AnimatedListItem
-                animated={animationsEnabled}
-                index={overviewMetrics.length}
-                totalItems={overviewMetrics.length + 1}
-                style={styles.latencyChip}
-              >
-                <Text style={styles.latencyLabel}>Average latency</Text>
-                <Text style={styles.latencyValue}>{averageLatency}</Text>
-              </AnimatedListItem>
-            </AnimatedSection>
+          !showSkeleton && hasAnyServices ? (
+            <ServiceOverviewHeader
+              serviceConfigs={configs}
+              animationsEnabled={animationsEnabled}
+              styles={styles}
+            />
           ) : null
         }
         ListEmptyComponent={

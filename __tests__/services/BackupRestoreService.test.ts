@@ -168,6 +168,9 @@ describe("BackupRestoreService - Backup Options", () => {
     expect(defaults.includeServiceConfigs).toBe(true);
     expect(defaults.includeNetworkHistory).toBe(true);
     expect(defaults.includeRecentIPs).toBe(true);
+    expect(defaults.includeLibraryFilters).toBe(true);
+    expect(defaults.includeVoiceAssistantConfig).toBe(true);
+    expect(defaults.includeBookmarkHealthChecks).toBe(true);
   });
 
   it("should include new backup options in selection config", () => {
@@ -180,6 +183,18 @@ describe("BackupRestoreService - Backup Options", () => {
     expect(config.servicesViewState).toBeDefined();
     expect(config.servicesViewState.enabled).toBe(true);
     expect(config.servicesViewState.sensitive).toBe(false);
+
+    expect(config.libraryFilters).toBeDefined();
+    expect(config.libraryFilters.enabled).toBe(true);
+    expect(config.libraryFilters.sensitive).toBe(false);
+
+    expect(config.voiceAssistantConfig).toBeDefined();
+    expect(config.voiceAssistantConfig.enabled).toBe(true);
+    expect(config.voiceAssistantConfig.sensitive).toBe(false);
+
+    expect(config.bookmarkHealthChecks).toBeDefined();
+    expect(config.bookmarkHealthChecks.enabled).toBe(true);
+    expect(config.bookmarkHealthChecks.sensitive).toBe(false);
   });
 
   it("should validate export options correctly", () => {
@@ -192,6 +207,14 @@ describe("BackupRestoreService - Backup Options", () => {
       includeRecentIPs: false,
       includeDownloadConfig: true,
       includeServicesViewState: false,
+      includeLibraryFilters: true,
+      includeVoiceAssistantConfig: true,
+      includeBookmarkHealthChecks: false,
+      includeWidgetsConfig: false,
+      includeWidgetConfigCredentials: false,
+      includeWidgetSecureCredentials: false,
+      includeWidgetProfiles: false,
+      includeWidgetProfileCredentials: false,
       encryptSensitive: false,
     };
 
@@ -211,6 +234,14 @@ describe("BackupRestoreService - Backup Options", () => {
       includeRecentIPs: false,
       includeDownloadConfig: false,
       includeServicesViewState: false,
+      includeLibraryFilters: false,
+      includeVoiceAssistantConfig: false,
+      includeBookmarkHealthChecks: false,
+      includeWidgetsConfig: false,
+      includeWidgetConfigCredentials: false,
+      includeWidgetSecureCredentials: false,
+      includeWidgetProfiles: false,
+      includeWidgetProfileCredentials: false,
       encryptSensitive: true,
       password: "test", // Too short
     };

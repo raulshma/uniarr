@@ -46,18 +46,18 @@ const RecentlyAddedScreen = () => {
           flex: 1,
         },
         listContentContainer: {
-          paddingHorizontal: spacing.md,
+          paddingHorizontal: spacing.xs,
           paddingBottom: 80,
         },
         mediaItem: {
-          backgroundColor: theme.colors.elevation.level1,
+          backgroundColor: theme.colors.surface,
           marginVertical: spacing.xs,
           borderRadius: borderRadius.xxxl,
         },
         mediaContent: {
           flexDirection: "row",
           alignItems: "center",
-          padding: spacing.md,
+          padding: spacing.xs,
         },
         mediaIcon: {
           width: 48,

@@ -25,8 +25,6 @@ import {
 } from "@/components/common";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { TabHeader } from "@/components/common/TabHeader";
-
 import type { AppTheme } from "@/constants/theme";
 import { useAuth } from "@/services/auth/AuthProvider";
 import {
@@ -34,6 +32,7 @@ import {
   type ImageCacheUsage,
 } from "@/services/image/ImageCacheService";
 import { logger } from "@/services/logger/LoggerService";
+import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
 import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useAppUpdateCheck } from "@/hooks/useAppUpdateCheck";
@@ -67,8 +66,9 @@ const SettingsScreen = () => {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
+  const [errorLogCount, setErrorLogCount] = useState(0);
+  const [cleanupLogCount, setCleanupLogCount] = useState(0);
   const theme = useTheme<AppTheme>();
-  const isDev = typeof __DEV__ !== "undefined" && __DEV__;
 
   // Get dynamic app version from Expo Constants
   const appVersion =
@@ -151,7 +151,7 @@ const SettingsScreen = () => {
       backgroundColor: theme.colors.background,
     },
     scrollContainer: {
-      paddingHorizontal: spacing.sm,
+      paddingHorizontal: spacing.xs,
       paddingBottom: spacing.xxxxl,
     },
     // Overview styles removed
@@ -288,6 +288,37 @@ const SettingsScreen = () => {
     }
   }, [updateData, isCheckingUpdate, updateError]);
 
+  // Load error log count on mount
+  useEffect(() => {
+    const loadErrorCount = async () => {
+      try {
+        const errors = await apiErrorLogger.getErrors({});
+        setErrorLogCount(errors.length);
+      } catch {
+        // Silently fail - not critical
+      }
+    };
+    void loadErrorCount();
+  }, []);
+
+  // Load cleanup log count on mount
+  useEffect(() => {
+    const loadCleanupCount = async () => {
+      try {
+        const allLogs = await logger.getLogs();
+        const cleanupLogs = allLogs.filter(
+          (log) =>
+            log.message.includes("[StorageCleanup]") ||
+            log.message.includes("[StorageMigration]"),
+        );
+        setCleanupLogCount(cleanupLogs.length);
+      } catch {
+        // Silently fail - not critical
+      }
+    };
+    void loadCleanupCount();
+  }, []);
+
   const handleClearImageCache = async () => {
     setIsClearingImageCache(true);
     try {
@@ -410,15 +441,6 @@ const SettingsScreen = () => {
         contentContainerStyle={styles.scrollContainer}
         animated={animationsEnabled}
       >
-        {/* Header */}
-        <TabHeader
-          rightAction={{
-            icon: "cog",
-            onPress: () => {},
-            accessibilityLabel: "Settings",
-          }}
-        />
-
         {/* Overview removed */}
 
         {/* Appearance Section */}
@@ -535,6 +557,58 @@ const SettingsScreen = () => {
                   />
                 }
                 onPress={() => router.push("/(auth)/settings/theme-editor")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* Experimental Features Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Experimental Features"
+                subtitle="Advanced settings and experimental options"
+                left={{ iconName: "beaker" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={18}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() =>
+                  router.push("/(auth)/settings/experimental-features")
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Elements Configuration"
+                subtitle="Configure UI elements and animations"
+                left={{ iconName: "palette-swatch-variant" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/settings/elements")}
                 groupPosition="bottom"
               />
             </AnimatedListItem>
@@ -795,16 +869,14 @@ const SettingsScreen = () => {
                   <View style={{ flexDirection: "row", gap: spacing.xs }}>
                     <Button
                       mode="outlined"
-                      compact
                       onPress={() => router.push("/(auth)/settings/cache-view")}
                       disabled={isFetchingCacheUsage}
-                      style={{ height: 32 }}
+                      style={{ height: 38 }}
                     >
                       View
                     </Button>
                     <Button
                       mode="contained-tonal"
-                      compact
                       onPress={handleClearImageCache}
                       loading={isClearingImageCache}
                       disabled={
@@ -812,7 +884,7 @@ const SettingsScreen = () => {
                         isFetchingCacheUsage ||
                         imageCacheUsage.size === 0
                       }
-                      style={{ height: 32 }}
+                      style={{ height: 36 }}
                     >
                       Clear
                     </Button>
@@ -822,8 +894,8 @@ const SettingsScreen = () => {
               />
             </AnimatedListItem>
             <AnimatedListItem
-              index={1}
-              totalItems={3}
+              index={0}
+              totalItems={1}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -838,7 +910,7 @@ const SettingsScreen = () => {
                   />
                 }
                 onPress={handleCacheLimitPress}
-                groupPosition="bottom"
+                groupPosition="single"
               />
             </AnimatedListItem>
           </SettingsGroup>
@@ -874,7 +946,27 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={1}
-              totalItems={4}
+              totalItems={5}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Service Health & Configuration"
+                subtitle="Monitor and manage service health"
+                left={{ iconName: "server-network" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/settings/services-health")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -893,8 +985,8 @@ const SettingsScreen = () => {
               />
             </AnimatedListItem>
             <AnimatedListItem
-              index={2}
-              totalItems={4}
+              index={3}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -913,8 +1005,8 @@ const SettingsScreen = () => {
               />
             </AnimatedListItem>
             <AnimatedListItem
-              index={3}
-              totalItems={4}
+              index={4}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -926,9 +1018,8 @@ const SettingsScreen = () => {
                 trailing={
                   <Button
                     mode="contained-tonal"
-                    compact
                     onPress={() => setJellyseerrRetriesVisible(true)}
-                    style={{ height: 32 }}
+                    style={{ height: 36 }}
                   >
                     Set
                   </Button>
@@ -979,11 +1070,10 @@ const SettingsScreen = () => {
                 trailing={
                   <Button
                     mode="contained-tonal"
-                    compact
                     onPress={handleCheckForUpdate}
                     loading={isCheckingUpdate}
                     disabled={isCheckingUpdate}
-                    style={{ height: 32 }}
+                    style={{ height: 36 }}
                   >
                     Check
                   </Button>
@@ -1003,9 +1093,8 @@ const SettingsScreen = () => {
                 trailing={
                   <Button
                     mode="contained-tonal"
-                    compact
                     onPress={() => setLogLevelVisible(true)}
-                    style={{ height: 32 }}
+                    style={{ height: 36 }}
                   >
                     Set
                   </Button>
@@ -1035,41 +1124,94 @@ const SettingsScreen = () => {
             </AnimatedListItem>
           </SettingsGroup>
         </AnimatedSection>
-
-        {/* Thumbnail concurrency dialog removed */}
-
-        {/* Developer Tools (dev only) */}
-        {isDev && (
-          <AnimatedSection
-            style={styles.section}
-            delay={350}
-            animated={animationsEnabled}
-          >
-            <Text style={styles.sectionTitle}>Development</Text>
-            <SettingsGroup>
-              <AnimatedListItem
-                index={0}
-                totalItems={1}
-                animated={animationsEnabled}
-              >
-                <SettingsListItem
-                  title="Developer Tools"
-                  subtitle="Dev tools & playground"
-                  left={{ iconName: "bug" }}
-                  trailing={
+        {/* Logging & Diagnostics Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Logging & Diagnostics</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="API Error Logger"
+                subtitle="Configure error capture settings"
+                left={{ iconName: "cog" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() =>
+                  router.push("/(auth)/settings/api-error-logs/configure")
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="API Error Logs"
+                subtitle={
+                  errorLogCount > 0
+                    ? `${errorLogCount} errors logged`
+                    : "No errors logged"
+                }
+                left={{ iconName: "file-document-outline" }}
+                trailing={
+                  errorLogCount > 0 ? (
+                    <Chip>{errorLogCount}</Chip>
+                  ) : (
                     <IconButton
                       icon="chevron-right"
                       size={16}
                       iconColor={theme.colors.outline}
                     />
-                  }
-                  onPress={() => router.push("/(auth)/dev")}
-                  groupPosition="single"
-                />
-              </AnimatedListItem>
-            </SettingsGroup>
-          </AnimatedSection>
-        )}
+                  )
+                }
+                onPress={() => router.push("/(auth)/settings/api-error-logs")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Cleanup History Logs"
+                subtitle={
+                  cleanupLogCount > 0
+                    ? `${cleanupLogCount} cleanup operations logged`
+                    : "No cleanup operations logged"
+                }
+                left={{ iconName: "broom" }}
+                trailing={
+                  cleanupLogCount > 0 ? (
+                    <Chip>{cleanupLogCount}</Chip>
+                  ) : (
+                    <IconButton
+                      icon="chevron-right"
+                      size={16}
+                      iconColor={theme.colors.outline}
+                    />
+                  )
+                }
+                onPress={() => router.push("/(auth)/settings/cleanup-history")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
 
         {/* Sign Out Button */}
         <AnimatedListItem

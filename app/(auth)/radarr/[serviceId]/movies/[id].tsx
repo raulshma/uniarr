@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo } from "react";
+import { StyleSheet, View, ScrollView } from "react-native";
 import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,6 +12,8 @@ import { MediaDetails } from "@/components/media/MediaDetails";
 import { MovieDetailsSkeleton } from "@/components/media/skeletons";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import type { AppTheme } from "@/constants/theme";
+import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
+import { skeletonTiming } from "@/constants/skeletonTiming";
 import { useRadarrMovieDetails } from "@/hooks/useRadarrMovieDetails";
 import { spacing } from "@/theme/spacing";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
@@ -44,6 +46,18 @@ const RadarrMovieDetailsScreen = () => {
     serviceId: serviceKey,
     movieId: numericMovieId,
   });
+
+  // Initialize skeleton loading hook with low complexity timing (500ms) for local service queries
+  const skeleton = useSkeletonLoading(skeletonTiming.lowComplexity);
+
+  // Effect to manage skeleton visibility based on loading state
+  useEffect(() => {
+    if (isLoading && !movie) {
+      skeleton.startLoading();
+    } else {
+      skeleton.stopLoading();
+    }
+  }, [isLoading, movie, skeleton]);
 
   const isMutating = isTogglingMonitor || isTriggeringSearch || isDeleting;
   const animationsEnabled = shouldAnimateLayout(
@@ -138,7 +152,7 @@ const RadarrMovieDetailsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <View style={styles.container}>
-        {!movie ? (
+        {!movie && !(skeleton.showSkeleton && isLoading && !movie) ? (
           <AnimatedSection
             animated={animationsEnabled}
             style={styles.header}
@@ -162,8 +176,27 @@ const RadarrMovieDetailsScreen = () => {
           </AnimatedSection>
         ) : null}
 
-        {isLoading && !movie ? (
-          <MovieDetailsSkeleton />
+        {skeleton.showSkeleton && isLoading && !movie ? (
+          <AnimatedSection
+            animated={animationsEnabled}
+            style={{ flex: 1 }}
+            delay={150}
+          >
+            <DetailHero
+              posterUri={undefined}
+              backdropUri={undefined}
+              onBack={handleClose}
+            >
+              <ScrollView
+                contentContainerStyle={{
+                  paddingHorizontal: spacing.lg,
+                  paddingBottom: spacing.xxxxl,
+                }}
+              >
+                <MovieDetailsSkeleton />
+              </ScrollView>
+            </DetailHero>
+          </AnimatedSection>
         ) : isError ? (
           <AnimatedSection
             animated={animationsEnabled}

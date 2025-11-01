@@ -6,6 +6,7 @@ const eslintPluginPrettierRecommended = require("eslint-plugin-prettier/recommen
 
 module.exports = defineConfig([
   globalIgnores([
+    "__tests__/*",
     "dist/*",
     "android/*",
     "ios/*",
@@ -14,6 +15,7 @@ module.exports = defineConfig([
     "coverage/*",
     "src/connectors/client-schemas/*",
     "src/connectors/openapi-specs/*",
+    "assets/*",
   ]),
   expoConfig,
   eslintPluginPrettierRecommended,

@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import {
-  ActivityIndicator,
   Button,
   Chip,
   Portal,
@@ -12,6 +11,7 @@ import {
   useTheme,
   PaperProvider,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -65,6 +65,13 @@ const PRESET_NAMES = {
   warmPaper: "Warm Paper",
   terminal: "Terminal",
   pastel: "Pastel",
+  // Newly added palettes
+  royal: "Royal",
+  subzero: "Sub-Zero",
+  emerald: "Emerald",
+  slate: "Slate",
+  sunset: "Sunset",
+  legacy: "UA Legacy",
 };
 
 export default function ThemeEditorScreen() {
@@ -246,7 +253,7 @@ export default function ThemeEditorScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" />
+        <SkiaLoader size={80} />
         <Text style={styles.loadingText}>Loading theme editor...</Text>
       </View>
     );

@@ -213,7 +213,7 @@ export const useOfflineAwareActions = () => {
   const canPerformAction = useCallback(
     (requireInternet = false): boolean => {
       if (requireInternet) {
-        return isOnline;
+        return isOnline === true; // Only allow when we explicitly know we're online
       }
       return Boolean(isConnected); // Allow local actions if device is connected to any network
     },

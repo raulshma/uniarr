@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 
 import type {
   NotificationCategory,
@@ -145,7 +145,7 @@ class QuietHoursService {
 
   private async loadState(): Promise<void> {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const raw = await storageAdapter.getItem(STORAGE_KEY);
       if (!raw) {
         this.queues = createEmptyQueueState();
         return;
@@ -185,7 +185,7 @@ class QuietHoursService {
 
   private async saveState(): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.queues));
+      await storageAdapter.setItem(STORAGE_KEY, JSON.stringify(this.queues));
     } catch (error) {
       await logger.warn("Quiet hours queue failed to persist.", {
         location: "QuietHoursService.saveState",

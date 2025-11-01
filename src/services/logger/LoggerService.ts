@@ -1,4 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
+import { storageInitPromise } from "@/services/storage/MMKVStorage";
 
 import { LogEntry, LogFilterOptions, LogLevel } from "@/models/logger.types";
 
@@ -84,6 +85,9 @@ class LoggerService {
 
   private levelInitialized = false;
 
+  // Protect overlapping writes to persistent storage
+  private pendingPersist: Promise<void> | null = null;
+
   static getInstance(): LoggerService {
     if (!LoggerService.instance) {
       LoggerService.instance = new LoggerService();
@@ -96,9 +100,19 @@ class LoggerService {
     if (this.isInitialized) {
       return;
     }
-
+    // Await the global storage initialization so we prefer MMKV when available.
+    // This uses the central storage init promise but does not require the
+    // storage adapter to be fully synchronous here — the adapter will still
+    // fallback to AsyncStorage if initialization hasn't completed.
     try {
-      const serializedEntries = await AsyncStorage.getItem(STORAGE_KEY);
+      await storageInitPromise;
+    } catch {
+      // storageInitPromise swallows errors; ignore here.
+    }
+
+    // Load persisted entries via the central storage adapter
+    try {
+      const serializedEntries = await storageAdapter.getItem(STORAGE_KEY);
       this.entries = deserializeEntries(serializedEntries);
     } catch (error) {
       if (isDevelopment) {
@@ -113,7 +127,7 @@ class LoggerService {
     // Try to load a small persisted minimum level to apply earlier than
     // any external rehydration of the settings store.
     try {
-      const storedLevel = await AsyncStorage.getItem(LEVEL_STORAGE_KEY);
+      const storedLevel = await storageAdapter.getItem(LEVEL_STORAGE_KEY);
       if (
         storedLevel &&
         Object.values(LogLevel).includes(storedLevel as LogLevel)
@@ -135,19 +149,35 @@ class LoggerService {
   setMinimumLevel(level: LogLevel): void {
     this.minimumLevel = level;
     // Persist small key for faster startup next time
-    void AsyncStorage.setItem(LEVEL_STORAGE_KEY, level).catch((error) => {
-      if (isDevelopment) {
-        console.warn(
-          "[LoggerService] Failed to persist minimum log level.",
-          error,
-        );
-      }
-    });
+    void storageAdapter
+      .setItem(LEVEL_STORAGE_KEY, level)
+      .catch((error: unknown) => {
+        if (isDevelopment) {
+          console.warn(
+            "[LoggerService] Failed to persist minimum log level.",
+            error,
+          );
+        }
+      });
   }
 
   async clear(): Promise<void> {
     this.entries = [];
-    await AsyncStorage.removeItem(STORAGE_KEY);
+    await storageAdapter.removeItem(STORAGE_KEY);
+  }
+
+  async clearByFilter(filterFn: (entry: LogEntry) => boolean): Promise<number> {
+    await this.ensureInitialized();
+
+    const initialCount = this.entries.length;
+    this.entries = this.entries.filter((entry) => !filterFn(entry));
+    const removedCount = initialCount - this.entries.length;
+
+    if (removedCount > 0) {
+      await this.persistEntries();
+    }
+
+    return removedCount;
   }
 
   async log(
@@ -245,12 +275,36 @@ class LoggerService {
   }
 
   private async persistEntries(): Promise<void> {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, serializeEntries(this.entries));
-    } catch (error) {
-      if (isDevelopment) {
-        console.error("[LoggerService] Failed to persist log entries.", error);
+    // Use a simple pending promise chain to avoid overlapping writes.
+    const write = async (): Promise<void> => {
+      try {
+        await storageAdapter.setItem(
+          STORAGE_KEY,
+          serializeEntries(this.entries),
+        );
+      } catch (err: unknown) {
+        if (isDevelopment) {
+          console.error("[LoggerService] Failed to persist log entries.", err);
+        }
       }
+    };
+
+    if (!this.pendingPersist) {
+      this.pendingPersist = write();
+      try {
+        await this.pendingPersist;
+      } finally {
+        this.pendingPersist = null;
+      }
+      return;
+    }
+
+    // Chain onto the existing pending write
+    this.pendingPersist = this.pendingPersist.then(() => write());
+    try {
+      await this.pendingPersist;
+    } finally {
+      this.pendingPersist = null;
     }
   }
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { Text, useTheme } from "react-native-paper";
 import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -58,7 +59,7 @@ const BookmarksSettingsScreen: React.FC = () => {
           { backgroundColor: theme.colors.background },
         ]}
       >
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <SkiaLoader size={80} centered />
         <Text style={styles.statusText}>Loading bookmarks settings...</Text>
       </SafeAreaView>
     );

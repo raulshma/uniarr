@@ -8,7 +8,6 @@ import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
-import { getComponentElevation } from "@/constants/elevation";
 import type { Widget } from "@/services/widgets/WidgetService";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { widgetService } from "@/services/widgets/WidgetService";
@@ -18,8 +17,11 @@ import {
   ANIMATION_DURATIONS,
   Animated,
 } from "@/utils/animations.utils";
+import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import ShortcutItem from "./ShortcutItem";
 import type { Shortcut } from "./ShortcutsWidget.types";
+import { useSettingsStore } from "@/store/settingsStore";
 
 interface ShortcutsWidgetProps {
   widget: Widget;
@@ -35,6 +37,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const { onPress: hapticPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const styles = useStyles(theme);
 
   const [shortcuts, setShortcuts] = React.useState<Shortcut[]>([]);
@@ -134,44 +137,85 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
 
   const gridLayout = getGridLayout();
 
+  const getSkeletonSizeStyles = (size: string) => {
+    switch (size) {
+      case "small":
+        return styles.smallSkeletonShortcut;
+      case "large":
+        return styles.largeSkeletonShortcut;
+      default: // medium
+        return styles.mediumSkeletonShortcut;
+    }
+  };
+
+  const getSkeletonIconSize = (size: string) => {
+    switch (size) {
+      case "small":
+        return styles.smallSkeletonIcon;
+      case "large":
+        return styles.largeSkeletonIcon;
+      default: // medium
+        return styles.mediumSkeletonIcon;
+    }
+  };
+
+  const getSkeletonTextWidth = (size: string): number => {
+    switch (size) {
+      case "small":
+        return 45;
+      case "large":
+        return 80;
+      default: // medium
+        return 60;
+    }
+  };
+
+  const getSkeletonTextHeight = (size: string): number => {
+    switch (size) {
+      case "small":
+        return 12;
+      case "large":
+        return 18;
+      default: // medium
+        return 14;
+    }
+  };
+
   if (loading) {
     return (
-      <Animated.View
-        style={[
-          styles.container,
-          gridLayout.container,
-          { backgroundColor: theme.colors.surface },
-        ]}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
-      >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.title}>
-            {widget.title}
-          </Text>
-          {onEdit && (
-            <MaterialCommunityIcons
-              name="cog"
-              size={theme.custom.sizes.iconSizes.lg}
-              color={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
-            />
-          )}
-        </View>
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <View key={index} style={styles.skeletonShortcut}>
-              <View style={styles.skeletonIcon} />
-              <SkeletonPlaceholder
-                width={60}
-                height={14}
-                borderRadius={4}
-                style={{ marginLeft: spacing.sm }}
-              />
-            </View>
-          ))}
-        </View>
-      </Animated.View>
+      <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+        <Animated.View
+          style={[styles.container, gridLayout.container]}
+          entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+          exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+        >
+          <WidgetHeader title={widget.title} onEdit={onEdit} />
+          <View style={styles.loadingSkeleton}>
+            {Array.from({ length: gridLayout.columns * 2 }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.skeletonShortcut,
+                  getSkeletonSizeStyles(widget.size),
+                ]}
+              >
+                <View
+                  style={[
+                    styles.skeletonIcon,
+                    getSkeletonIconSize(widget.size),
+                  ]}
+                />
+                <SkeletonPlaceholder
+                  width={getSkeletonTextWidth(widget.size)}
+                  height={getSkeletonTextHeight(widget.size)}
+                  borderRadius={4}
+                  style={{ marginLeft: spacing.sm }}
+                />
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+      </Card>
     );
   }
 
@@ -179,89 +223,60 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
 
   if (enabledShortcuts.length === 0) {
     return (
-      <View
-        style={[
-          styles.container,
-          gridLayout.container,
-          { backgroundColor: theme.colors.surface },
-        ]}
-      >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.title}>
-            {widget.title}
-          </Text>
-          {onEdit && (
+      <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+        <View style={[styles.container, gridLayout.container]}>
+          <WidgetHeader title={widget.title} onEdit={onEdit} />
+          <View style={styles.emptyContainer}>
             <MaterialCommunityIcons
-              name="cog"
-              size={theme.custom.sizes.iconSizes.lg}
+              name="gesture-tap"
+              size={theme.custom.sizes.iconSizes.xxl}
               color={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
             />
-          )}
+            <Text variant="bodySmall" style={styles.emptyText}>
+              No shortcuts configured
+            </Text>
+          </View>
         </View>
-        <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons
-            name="gesture-tap"
-            size={theme.custom.sizes.iconSizes.xxl}
-            color={theme.colors.onSurfaceVariant}
-          />
-          <Text variant="bodySmall" style={styles.emptyText}>
-            No shortcuts configured
-          </Text>
-        </View>
-      </View>
+      </Card>
     );
   }
 
   return (
-    <View
-      style={[
-        styles.container,
-        gridLayout.container,
-        { backgroundColor: theme.colors.surface },
-      ]}
-    >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={styles.title}>
-          {widget.title}
-        </Text>
-        {onEdit && (
-          <MaterialCommunityIcons
-            name="cog"
-            size={theme.custom.sizes.iconSizes.lg}
-            color={theme.colors.onSurfaceVariant}
-            onPress={onEdit}
-          />
-        )}
-      </View>
+    <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
+      <View style={[styles.container, gridLayout.container]}>
+        <WidgetHeader title={widget.title} onEdit={onEdit} />
 
-      <ScrollView
-        style={gridLayout.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.gridContainer}>
-          {enabledShortcuts.map((shortcut) => (
-            <ShortcutItem
-              key={shortcut.id}
-              shortcut={shortcut}
-              onPress={handleShortcutPress}
-              size={widget.size}
-            />
-          ))}
-        </View>
-      </ScrollView>
-    </View>
+        <ScrollView
+          style={gridLayout.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          scrollEnabled={false}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.gridContainer}>
+            {enabledShortcuts.map((shortcut) => (
+              <ShortcutItem
+                key={shortcut.id}
+                shortcut={shortcut}
+                onPress={handleShortcutPress}
+                size={widget.size}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+    </Card>
   );
 };
 
 const useStyles = (theme: AppTheme) =>
   StyleSheet.create({
+    card: {
+      borderRadius: borderRadius.xl,
+    },
     container: {
       borderRadius: borderRadius.xl,
-      padding: spacing.md,
-      ...getComponentElevation("widget", theme),
+      width: "100%",
     },
     smallContainer: {
       minHeight: 140,
@@ -272,33 +287,30 @@ const useStyles = (theme: AppTheme) =>
     largeContainer: {
       minHeight: 220,
     },
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: spacing.md,
-    },
-    title: {
-      fontWeight: "600",
-    },
     smallScrollContainer: {
       maxHeight: 160,
+      width: "100%",
     },
     mediumScrollContainer: {
       maxHeight: 220,
+      width: "100%",
     },
     largeScrollContainer: {
       maxHeight: 280,
+      width: "100%",
     },
     scrollContent: {
       paddingBottom: spacing.md,
+      width: "100%",
     },
     gridContainer: {
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "space-around",
+      justifyContent: "space-between",
       alignItems: "flex-start",
       gap: spacing.md,
+      width: "100%",
+      flex: 1,
     },
     loadingSkeleton: {
       flex: 1,
@@ -315,11 +327,24 @@ const useStyles = (theme: AppTheme) =>
       justifyContent: "flex-start",
       borderRadius: borderRadius.xxl,
       paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
       minHeight: 48,
-      minWidth: 160,
-      maxWidth: 184,
-      backgroundColor: theme.colors.surfaceVariant,
+      backgroundColor: "rgba(255, 255, 255, 0.03)", // Subtle frosted skeleton
+      width: "47%",
+    },
+    smallSkeletonShortcut: {
+      minHeight: 44,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+    },
+    mediumSkeletonShortcut: {
+      minHeight: 48,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+    },
+    largeSkeletonShortcut: {
+      minHeight: 56,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
     },
     skeletonIcon: {
       width: 24,
@@ -327,6 +352,21 @@ const useStyles = (theme: AppTheme) =>
       borderRadius: 12,
       backgroundColor: theme.colors.onSurfaceVariant,
       opacity: 0.3,
+    },
+    smallSkeletonIcon: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+    },
+    mediumSkeletonIcon: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+    },
+    largeSkeletonIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
     },
     emptyContainer: {
       flex: 1,

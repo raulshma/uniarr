@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Share, ScrollView, StyleSheet, View, Dimensions } from "react-native";
 import {
-  ActivityIndicator,
   Button,
   Chip,
   IconButton,
@@ -11,6 +10,7 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -107,7 +107,7 @@ const JellyfinItemDetailsScreen = () => {
     const initialLeft = spacing.lg;
     const finalLeft = (windowWidth - POSTER_SIZE) / 2;
     const deltaX = finalLeft - initialLeft;
-    const initialTop = HERO_HEIGHT - POSTER_SIZE * 0.75;
+    const initialTop = HERO_HEIGHT - POSTER_SIZE * 0.7;
     const finalTop = insets.top + ACTION_BAR_HEIGHT;
     const finalTopWithoutHeader = insets.top;
     const deltaYHidden = finalTopWithoutHeader - initialTop;
@@ -508,7 +508,7 @@ const JellyfinItemDetailsScreen = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator animating size="large" />
+          <SkiaLoader size={80} centered />
         </View>
       </SafeAreaView>
     );
@@ -795,22 +795,22 @@ const createStyles = (theme: AppTheme) =>
     heroPoster: {
       position: "absolute",
       // start visually overlapping the bottom of the hero area
-      top: HERO_HEIGHT - POSTER_SIZE * 0.75,
+      top: HERO_HEIGHT - POSTER_SIZE * 0.7,
       left: spacing.lg,
       shadowColor: theme.colors.shadow,
       shadowOpacity: 0.45,
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 10 },
       elevation: 12,
-      zIndex: 20,
+      zIndex: 60,
     },
     scrollContent: {
       paddingBottom: spacing.xxl,
     },
     detailsContent: {
       // Add extra top padding so content does not overlap the floating poster
-      // only 25% of the poster projects into the content card
-      paddingTop: spacing.xxxl + POSTER_SIZE * 0.5,
+      // only ~30% of the poster projects into the content card
+      paddingTop: spacing.xxxl + POSTER_SIZE * 0.4,
       paddingHorizontal: spacing.lg,
       gap: spacing.lg,
     },

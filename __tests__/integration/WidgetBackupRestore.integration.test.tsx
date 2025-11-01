@@ -1,7 +1,8 @@
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { widgetProfileService } from "@/services/widgets/WidgetProfileService";
 import { backupRestoreService } from "@/services/backup/BackupRestoreService";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
+import StorageBackendManager from "@/services/storage/MMKVStorage";
 import * as FileSystemLegacy from "expo-file-system/legacy";
 
 /**
@@ -16,8 +17,14 @@ import * as FileSystemLegacy from "expo-file-system/legacy";
 
 describe("Widget Backup and Restore Integration", () => {
   beforeEach(async () => {
-    // Clear AsyncStorage before each test
-    await AsyncStorage.clear();
+    // Initialize storage backend for tests
+    const manager = StorageBackendManager.getInstance();
+    if (!manager.isInitialized()) {
+      await manager.initialize();
+    }
+
+    // Clear storage before each test
+    await storageAdapter.clear();
 
     // Reset WidgetService singleton
     (widgetService as any).isInitialized = false;
@@ -543,7 +550,7 @@ describe("Widget Backup and Restore Integration", () => {
           await backupRestoreService.createSelectiveBackup(backupOptions);
 
         // Clear widgets data
-        await AsyncStorage.removeItem("WidgetService:widgets");
+        await storageAdapter.removeItem("WidgetService:widgets");
         (widgetService as any).widgets.clear();
 
         // Restore from backup
@@ -553,7 +560,7 @@ describe("Widget Backup and Restore Integration", () => {
         await backupRestoreService.restoreBackup(backupData);
 
         // Verify credentials are restored
-        const restoredWidgetsData = await AsyncStorage.getItem(
+        const restoredWidgetsData = await storageAdapter.getItem(
           "WidgetService:widgets",
         );
         expect(restoredWidgetsData).toBeDefined();

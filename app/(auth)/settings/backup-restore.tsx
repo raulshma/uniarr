@@ -2,13 +2,8 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, View } from "react-native";
-import {
-  Text,
-  useTheme,
-  Button,
-  ActivityIndicator,
-  Icon,
-} from "react-native-paper";
+import { Text, useTheme, Button, Icon } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import * as Sharing from "expo-sharing";
 
 import { TabHeader } from "@/components/common/TabHeader";
@@ -446,11 +441,7 @@ const BackupRestoreScreen = () => {
 
           {isLoadingBackups ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator
-                animating
-                size="large"
-                color={theme.colors.primary}
-              />
+              <SkiaLoader size={80} centered />
             </View>
           ) : recentBackups.length === 0 ? (
             <View style={styles.emptyState}>

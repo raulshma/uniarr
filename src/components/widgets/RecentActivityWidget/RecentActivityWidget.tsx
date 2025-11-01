@@ -1,17 +1,20 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { StyleSheet, View, FlatList } from "react-native";
-import { Text, IconButton, useTheme } from "react-native-paper";
+import { StyleSheet, View, ScrollView, RefreshControl } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 import { useRouter } from "expo-router";
+import Animated from "react-native-reanimated";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { useHaptics } from "@/hooks/useHaptics";
 import {
+  COMPONENT_ANIMATIONS,
   FadeIn,
   FadeOut,
   ANIMATION_DURATIONS,
-  Animated,
 } from "@/utils/animations.utils";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -23,8 +26,8 @@ import { createServiceNavigation } from "@/utils/navigation.utils";
 import { alert } from "@/services/dialogService";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { RecentActivityItem } from "@/models/recentActivity.types";
-import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 interface RecentActivityWidgetProps {
   widget: Widget;
@@ -39,6 +42,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 }) => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const recentActivitySourceIds = useSettingsStore(
     (s) => s.recentActivitySourceServiceIds,
   );
@@ -49,6 +53,44 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const config = useMemo(() => {
+    const raw = widget.config ?? {};
+    const sourceMode = raw.sourceMode === "custom" ? "custom" : "global";
+    const serviceIds = Array.isArray(raw.serviceIds)
+      ? (raw.serviceIds.filter(
+          (id) => typeof id === "string" && id.length > 0,
+        ) as string[])
+      : [];
+    const limit =
+      typeof raw.limit === "number" && raw.limit >= 4 && raw.limit <= 30
+        ? Math.floor(raw.limit)
+        : 10;
+
+    return {
+      sourceMode,
+      serviceIds,
+      limit,
+    } as const;
+  }, [widget.config]);
+
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
+
+  const effectiveSourceIds = useMemo(() => {
+    if (config.sourceMode === "custom") {
+      return config.serviceIds.length > 0 ? config.serviceIds : undefined;
+    }
+
+    if (recentActivitySourceIds && recentActivitySourceIds.length > 0) {
+      return recentActivitySourceIds;
+    }
+
+    return undefined;
+  }, [config.serviceIds, config.sourceMode, recentActivitySourceIds]);
 
   const fetchRecentActivity = useCallback(async (): Promise<
     RecentActivityItem[]
@@ -84,12 +126,9 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
 
       // Filter by recent activity sources if set
       let sourceConfigs = enabledConfigs;
-      if (
-        recentActivitySourceIds !== undefined &&
-        recentActivitySourceIds.length > 0
-      ) {
+      if (effectiveSourceIds && effectiveSourceIds.length > 0) {
         sourceConfigs = enabledConfigs.filter((c) =>
-          recentActivitySourceIds.includes(c.id),
+          effectiveSourceIds.includes(c.id),
         );
       }
 
@@ -306,19 +345,19 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           const timestampB = b.timestamp ?? 0;
           return timestampB - timestampA;
         })
-        .slice(0, 10);
+        .slice(0, config.limit);
     } catch (error) {
       console.error("Failed to fetch recent activity:", error);
       return [];
     }
-  }, [recentActivitySourceIds]);
+  }, [config, effectiveSourceIds]);
 
   const loadRecentActivity = useCallback(async () => {
     try {
       // Try to get cached data first
       const cachedData = await widgetService.getWidgetData<
         RecentActivityItem[]
-      >(widget.id);
+      >(widget.id, configSignature);
       if (cachedData) {
         // Filter out cached items missing required navigation fields (backward compatibility)
         const validatedData = cachedData.filter(
@@ -345,14 +384,17 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       setError(null);
 
       // Cache the data for 5 minutes
-      await widgetService.setWidgetData(widget.id, freshData, 5 * 60 * 1000);
+      await widgetService.setWidgetData(widget.id, freshData, {
+        ttlMs: 5 * 60 * 1000,
+        configSignature,
+      });
     } catch (err) {
       console.error("Failed to load recent activity:", err);
       setError("Failed to load recent activity");
     } finally {
       setLoading(false);
     }
-  }, [widget.id, fetchRecentActivity]);
+  }, [configSignature, fetchRecentActivity, widget.id]);
 
   useEffect(() => {
     loadRecentActivity();
@@ -411,53 +453,43 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
     [onPress, router],
   );
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
     onPress();
-    loadRecentActivity();
+    setRefreshing(true);
+    await loadRecentActivity();
+    setRefreshing(false);
   }, [onPress, loadRecentActivity]);
+
+  const containerElevationStyle = getComponentElevation("widget", theme);
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
         container: {
-          overflow: "hidden",
+          borderRadius: borderRadius.xl,
+          padding: spacing.sm,
         },
-        header: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: spacing.lg,
-        },
-        title: {
-          fontSize: 20,
-          fontWeight: "700",
-          color: theme.colors.onBackground,
-          letterSpacing: -0.5,
-        },
-        actions: {
-          flexDirection: "row",
-          gap: spacing.xs,
-        },
-        content: {
+        scrollView: {
           flex: 1,
         },
-        activityList: {
-          gap: spacing.md,
+        scrollContent: {
+          paddingBottom: spacing.md,
         },
         activityCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: theme.custom.sizes.borderRadius.xl,
-          padding: spacing.md,
+          borderRadius: theme.custom.sizes.borderRadius.md,
+          padding: spacing.xs,
           flexDirection: "row",
+          marginBottom: spacing.xs,
           ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
         },
         activityImage: {
-          width: theme.custom.sizes.additionalCardSizes.portrait.width,
-          height: theme.custom.sizes.additionalCardSizes.portrait.height,
-          borderRadius: theme.custom.sizes.borderRadius.md,
-          marginRight: spacing.md,
+          width: 50,
+          height: 60,
+          borderRadius: theme.custom.sizes.borderRadius.sm,
+          marginRight: spacing.sm,
           backgroundColor: theme.colors.surfaceVariant,
         },
         activityContent: {
@@ -465,269 +497,225 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
           justifyContent: "center",
         },
         activityTitle: {
-          fontSize: 16,
+          fontSize: 13,
           fontWeight: "600",
           color: theme.colors.onSurface,
-          marginBottom: spacing.xs,
+          marginBottom: spacing.xxs,
         },
         activityMeta: {
-          fontSize: 14,
+          fontSize: 12,
           color: theme.colors.onSurfaceVariant,
-          marginBottom: spacing.xs,
+          marginBottom: spacing.xxs,
         },
         activityDate: {
-          fontSize: 12,
+          fontSize: 11,
           color: theme.colors.outline,
         },
         emptyState: {
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          paddingVertical: spacing.xl,
-        },
-        emptyIcon: {
-          marginBottom: spacing.md,
+          paddingVertical: spacing.lg,
         },
         emptyText: {
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: "500",
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
         },
-        errorText: {
-          fontSize: 14,
-          color: theme.colors.error,
-          textAlign: "center",
-          paddingVertical: spacing.md,
-        },
         loadingSkeleton: {
-          gap: spacing.md,
+          gap: spacing.xs,
         },
         skeletonCard: {
           backgroundColor: theme.colors.surface,
-          borderRadius: theme.custom.sizes.borderRadius.xl,
-          padding: spacing.md,
+          borderRadius: theme.custom.sizes.borderRadius.md,
+          padding: spacing.xs,
           flexDirection: "row",
+          marginBottom: spacing.xs,
           ...getComponentElevation("widgetCard", theme),
           borderWidth: 1,
           borderColor: theme.colors.outlineVariant,
-        },
-        skeletonImage: {
-          width: theme.custom.sizes.additionalCardSizes.portrait.width,
-          height: theme.custom.sizes.additionalCardSizes.portrait.height,
-          borderRadius: theme.custom.sizes.borderRadius.md,
-          marginRight: spacing.md,
-          backgroundColor: theme.colors.surfaceVariant,
-        },
-        skeletonContent: {
-          flex: 1,
-          justifyContent: "center",
-        },
-        skeletonTitle: {
-          width: "80%",
-          height: 16,
-          borderRadius: 4,
-          marginBottom: spacing.xs,
-        },
-        skeletonMeta: {
-          width: "60%",
-          height: 14,
-          borderRadius: 4,
-          marginBottom: spacing.xs,
-        },
-        skeletonDate: {
-          width: "40%",
-          height: 12,
-          borderRadius: 4,
         },
       }),
     [theme],
   );
 
-  const renderActivityCard = useCallback(
-    ({ item, index }: { item: RecentActivityItem; index: number }) => (
-      <SettingsListItem
-        title={item.title}
-        subtitle={`${item.show} • ${item.episode} • ${item.date}`}
-        left={{
-          node: item.image ? (
-            <MediaPoster
-              uri={item.image}
-              size={60}
-              borderRadius={8}
-              style={styles.activityImage}
-            />
-          ) : (
-            <View style={styles.activityImage} />
-          ),
-        }}
-        trailing={
-          <IconButton
-            icon="chevron-right"
-            size={16}
-            iconColor={theme.colors.outline}
-            style={{ margin: 0 }}
-          />
-        }
-        onPress={() => handleItemPress(item)}
-        groupPosition={
-          index === 0
-            ? "top"
-            : index === recentActivity.length - 1
-              ? "bottom"
-              : "middle"
-        }
-      />
-    ),
-    [handleItemPress, styles, recentActivity.length, theme.colors.outline],
-  );
-
   if (error) {
     return (
-      <View
-        style={StyleSheet.flatten([
-          styles.container,
-          {
-            backgroundColor: theme.colors.elevation.level1,
-            borderRadius: borderRadius.xxl,
-            padding: spacing.sm,
-          },
-        ])}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.container, containerElevationStyle]}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>{widget.title}</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.emptyState}>
+            <Text variant="bodyMedium" style={styles.emptyText}>
+              {error}
+            </Text>
           </View>
-        </View>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
+        </ScrollView>
+      </Card>
     );
   }
 
   if (loading) {
     return (
-      <Animated.View
-        style={StyleSheet.flatten([
-          styles.container,
-          {
-            backgroundColor: theme.colors.elevation.level1,
-            borderRadius: borderRadius.xxl,
-            padding: spacing.sm,
-          },
-        ])}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.container, containerElevationStyle]}
+        contentPadding={0}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>{widget.title}</Text>
-        </View>
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <SkeletonPlaceholder
-              key={index}
-              height={64}
-              borderRadius={12}
-              style={{ marginBottom: index < 2 ? 12 : 0 }}
-            />
-          ))}
-        </View>
-      </Animated.View>
+        <Animated.View
+          style={styles.container}
+          entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+          exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+        >
+          <WidgetHeader
+            title={widget.title}
+            onEdit={onEdit}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+          />
+          <View style={styles.loadingSkeleton}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <View key={index} style={styles.skeletonCard}>
+                <View style={styles.activityImage} />
+                <View style={styles.activityContent}>
+                  <SkeletonPlaceholder
+                    width="80%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="60%"
+                    height={14}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="40%"
+                    height={12}
+                    borderRadius={4}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+      </Card>
     );
   }
 
   if (recentActivity.length === 0) {
     return (
-      <View
-        style={StyleSheet.flatten([
-          styles.container,
-          {
-            backgroundColor: theme.colors.elevation.level1,
-            borderRadius: borderRadius.xxl,
-            padding: spacing.sm,
-          },
-        ])}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.container, containerElevationStyle]}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>{widget.title}</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.emptyState}>
+            <Text variant="bodyMedium" style={styles.emptyText}>
+              No recent activity
+            </Text>
+            <Text
+              variant="bodySmall"
+              style={{ opacity: 0.7, marginTop: spacing.xs }}
+            >
+              Recent activity will appear here
+            </Text>
           </View>
-        </View>
-        <SettingsListItem title="No recent activity" groupPosition="single" />
-      </View>
+        </ScrollView>
+      </Card>
     );
   }
 
   return (
-    <View
-      style={StyleSheet.flatten([
-        styles.container,
-        {
-          backgroundColor: theme.colors.elevation.level1,
-          borderRadius: borderRadius.xxl,
-          padding: spacing.sm,
-        },
-      ])}
+    <Card
+      variant={frostedEnabled ? "frosted" : "custom"}
+      style={[styles.container, containerElevationStyle]}
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>{widget.title}</Text>
-        <View style={styles.actions}>
-          <IconButton
-            icon="refresh"
-            size={20}
-            iconColor={theme.colors.primary}
-            onPress={handleRefresh}
-          />
-          {onEdit && (
-            <IconButton
-              icon="cog"
-              size={20}
-              iconColor={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
-            />
-          )}
-        </View>
-      </View>
+      <WidgetHeader
+        title={widget.title}
+        onEdit={onEdit}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
-      <View style={styles.content}>
-        <FlatList
-          data={recentActivity}
-          renderItem={renderActivityCard}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.activityList}
-          scrollEnabled={false}
-          nestedScrollEnabled={false}
-        />
-      </View>
-    </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}>
+          {recentActivity.map((item, index) => (
+            <Animated.View
+              key={item.id}
+              entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, 50).delay(
+                150,
+              )}
+            >
+              <View
+                style={styles.activityCard}
+                onTouchEnd={() => handleItemPress(item)}
+              >
+                {item.image ? (
+                  <MediaPoster
+                    uri={item.image}
+                    size={50}
+                    borderRadius={6}
+                    style={styles.activityImage}
+                  />
+                ) : (
+                  <View style={styles.activityImage} />
+                )}
+                <View style={styles.activityContent}>
+                  <Text variant="titleMedium" style={styles.activityTitle}>
+                    {item.title}
+                  </Text>
+                  <Text variant="bodyMedium" style={styles.activityMeta}>
+                    {item.show} • {item.episode}
+                  </Text>
+                  <Text variant="bodySmall" style={styles.activityDate}>
+                    {item.date}
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+          ))}
+        </Animated.View>
+      </ScrollView>
+    </Card>
   );
 };
 

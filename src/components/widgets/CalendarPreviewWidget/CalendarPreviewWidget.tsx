@@ -6,18 +6,21 @@ import {
   FlatList,
   ImageBackground,
 } from "react-native";
-import { Text, IconButton, useTheme } from "react-native-paper";
+import { Text, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
+import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { createCalendarNavigation } from "@/utils/navigation.utils";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
 import { CalendarService } from "@/services/calendar/CalendarService";
+import type { CalendarServiceType } from "@/models/calendar.types";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import {
   FadeIn,
@@ -25,6 +28,8 @@ import {
   ANIMATION_DURATIONS,
   Animated,
 } from "@/utils/animations.utils";
+import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 type UpcomingReleaseItem = {
   id: string;
@@ -52,6 +57,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   const theme = useTheme<AppTheme>();
   const router = useRouter();
   const { onPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const calendarNavigation = createCalendarNavigation();
   const [upcomingReleases, setUpcomingReleases] = useState<
     UpcomingReleaseItem[]
@@ -59,58 +65,58 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const config = useMemo(() => {
+    const raw = widget.config ?? {};
+    const daysAhead =
+      typeof raw.daysAhead === "number" && raw.daysAhead > 0
+        ? Math.min(raw.daysAhead, 120)
+        : 30;
+    const limit =
+      typeof raw.limit === "number" && raw.limit > 0 && raw.limit <= 24
+        ? raw.limit
+        : 8;
+    const serviceTypes: CalendarServiceType[] = Array.isArray(raw.serviceTypes)
+      ? raw.serviceTypes.filter(
+          (type): type is CalendarServiceType =>
+            type === "sonarr" || type === "radarr",
+        )
+      : ["sonarr", "radarr"];
+
+    return {
+      daysAhead,
+      limit,
+      serviceTypes:
+        serviceTypes.length > 0
+          ? serviceTypes
+          : (["sonarr", "radarr"] as CalendarServiceType[]),
+    };
+  }, [widget.config]);
+
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
+
   const cardWidth = 140;
   const cardHeight = 260;
   const posterHeight = 180;
 
-  const loadUpcomingReleases = useCallback(async () => {
-    try {
-      // Try to get cached data first
-      const cachedData = await widgetService.getWidgetData<
-        UpcomingReleaseItem[]
-      >(widget.id);
-      if (cachedData) {
-        setUpcomingReleases(cachedData);
-        setLoading(false);
-        setError(null);
-        // Don't return, continue to fetch fresh data in background
-      } else {
-        // Only show loading if no cached data
-        setLoading(true);
-      }
-
-      // Fetch fresh data
-      const freshData = await fetchUpcomingReleases();
-      setUpcomingReleases(freshData);
-      setError(null);
-
-      // Cache the data for 15 minutes
-      await widgetService.setWidgetData(widget.id, freshData, 15 * 60 * 1000);
-    } catch (err) {
-      console.error("Failed to load upcoming releases:", err);
-      setError("Failed to load upcoming releases");
-    } finally {
-      setLoading(false);
-    }
-  }, [widget.id]);
-  useEffect(() => {
-    loadUpcomingReleases();
-  }, [loadUpcomingReleases]);
-
-  const fetchUpcomingReleases = async (): Promise<UpcomingReleaseItem[]> => {
+  const fetchUpcomingReleases = useCallback(async (): Promise<
+    UpcomingReleaseItem[]
+  > => {
     try {
       const calendarService = CalendarService.getInstance();
 
-      // Set filters for upcoming releases (next 30 days)
+      // Set filters for upcoming releases (next configured window)
       const today = new Date();
       const endDate = new Date(today);
-      endDate.setDate(today.getDate() + 30);
+      endDate.setDate(today.getDate() + config.daysAhead);
 
       const filters = {
         mediaTypes: ["movie", "episode"] as ["movie", "episode"],
         statuses: ["upcoming"] as ["upcoming"],
         services: [],
-        serviceTypes: ["sonarr", "radarr"] as ["sonarr", "radarr"],
+        serviceTypes: config.serviceTypes,
         monitoredStatus: "monitored" as const,
         dateRange: {
           start: today.toISOString().split("T")[0]!,
@@ -120,9 +126,8 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
 
       const releases = await calendarService.getReleases(filters);
 
-      // Map to our format and limit
       if (releases && releases.length > 0) {
-        return releases.slice(0, 8).map((release) => ({
+        return releases.slice(0, config.limit).map((release) => ({
           id: release.id,
           title:
             release.type === "episode"
@@ -143,7 +148,40 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
       console.error("Failed to fetch upcoming releases:", error);
       return [];
     }
-  };
+  }, [config]);
+
+  const loadUpcomingReleases = useCallback(async () => {
+    try {
+      const cachedData = await widgetService.getWidgetData<
+        UpcomingReleaseItem[]
+      >(widget.id, configSignature);
+      if (cachedData) {
+        setUpcomingReleases(cachedData);
+        setLoading(false);
+        setError(null);
+      } else {
+        setLoading(true);
+      }
+
+      const freshData = await fetchUpcomingReleases();
+      setUpcomingReleases(freshData);
+      setError(null);
+
+      await widgetService.setWidgetData(widget.id, freshData, {
+        ttlMs: 15 * 60 * 1000,
+        configSignature,
+      });
+    } catch (err) {
+      console.error("Failed to load upcoming releases:", err);
+      setError("Failed to load upcoming releases");
+    } finally {
+      setLoading(false);
+    }
+  }, [configSignature, fetchUpcomingReleases, widget.id]);
+
+  useEffect(() => {
+    loadUpcomingReleases();
+  }, [loadUpcomingReleases]);
 
   const handleItemPress = useCallback(
     (item: UpcomingReleaseItem) => {
@@ -239,24 +277,11 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        widgetCard: {
+          borderRadius: borderRadius.xl,
+        },
         container: {
           flex: 1,
-        },
-        header: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: spacing.lg,
-        },
-        headerTitle: {
-          fontSize: 20,
-          fontWeight: "700",
-          color: theme.colors.onBackground,
-          letterSpacing: -0.5,
-        },
-        actions: {
-          flexDirection: "row",
-          gap: spacing.xs,
         },
         content: {
           flex: 1,
@@ -389,141 +414,125 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Upcoming Releases</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
-            />
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
-          </View>
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.widgetCard}
+      >
+        <View style={styles.container}>
+          <WidgetHeader
+            title={widget.title}
+            onRefresh={handleRefresh}
+            onEdit={onEdit}
+          />
+          <Text style={styles.errorText}>{error}</Text>
         </View>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
+      </Card>
     );
   }
 
   if (loading) {
     return (
-      <Animated.View
-        style={styles.container}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.widgetCard}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Upcoming Releases</Text>
-        </View>
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <View
-              key={index}
-              style={[styles.card, { width: cardWidth, height: cardHeight }]}
-            >
-              <View style={styles.posterContainer}>
-                <SkeletonPlaceholder
-                  width="100%"
-                  height={posterHeight}
-                  borderRadius={borderRadius.sm}
-                />
+        <Animated.View
+          style={styles.container}
+          entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+          exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+        >
+          <WidgetHeader
+            title={widget.title}
+            onRefresh={handleRefresh}
+            onEdit={onEdit}
+          />
+          <View style={styles.loadingSkeleton}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View
+                key={index}
+                style={[styles.card, { width: cardWidth, height: cardHeight }]}
+              >
+                <View style={styles.posterContainer}>
+                  <SkeletonPlaceholder
+                    width="100%"
+                    height={posterHeight}
+                    borderRadius={borderRadius.sm}
+                  />
+                </View>
+                <View style={styles.cardContent}>
+                  <SkeletonPlaceholder
+                    width="80%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="60%"
+                    height={12}
+                    borderRadius={4}
+                  />
+                </View>
               </View>
-              <View style={styles.cardContent}>
-                <SkeletonPlaceholder
-                  width="80%"
-                  height={16}
-                  borderRadius={4}
-                  style={{ marginBottom: spacing.xs }}
-                />
-                <SkeletonPlaceholder width="60%" height={12} borderRadius={4} />
-              </View>
-            </View>
-          ))}
-        </View>
-      </Animated.View>
+            ))}
+          </View>
+        </Animated.View>
+      </Card>
     );
   }
 
   if (upcomingReleases.length === 0) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Upcoming Releases</Text>
-          <View style={styles.actions}>
-            <IconButton
-              icon="refresh"
-              size={20}
-              iconColor={theme.colors.primary}
-              onPress={handleRefresh}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.widgetCard}
+      >
+        <View style={styles.container}>
+          <WidgetHeader
+            title={widget.title}
+            onRefresh={handleRefresh}
+            onEdit={onEdit}
+          />
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons
+              name="calendar-outline"
+              size={48}
+              color={theme.colors.onSurfaceVariant}
+              style={styles.emptyIcon}
             />
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                onPress={onEdit}
-              />
-            )}
+            <Text style={styles.emptyText}>No upcoming releases</Text>
           </View>
         </View>
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons
-            name="calendar-outline"
-            size={48}
-            color={theme.colors.onSurfaceVariant}
-            style={styles.emptyIcon}
-          />
-          <Text style={styles.emptyText}>No upcoming releases</Text>
-        </View>
-      </View>
+      </Card>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Upcoming Releases</Text>
-        <View style={styles.actions}>
-          <IconButton
-            icon="refresh"
-            size={20}
-            iconColor={theme.colors.primary}
-            onPress={handleRefresh}
+    <Card
+      variant={frostedEnabled ? "frosted" : "custom"}
+      style={styles.widgetCard}
+    >
+      <View style={styles.container}>
+        <WidgetHeader
+          title={widget.title}
+          onRefresh={handleRefresh}
+          onEdit={onEdit}
+        />
+
+        <View style={styles.content}>
+          <FlatList
+            data={upcomingReleases}
+            renderItem={renderReleaseCard}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardList}
+            snapToInterval={cardWidth + spacing.md}
+            decelerationRate="fast"
+            snapToAlignment="start"
           />
-          {onEdit && (
-            <IconButton
-              icon="cog"
-              size={20}
-              iconColor={theme.colors.onSurfaceVariant}
-              onPress={onEdit}
-            />
-          )}
         </View>
       </View>
-
-      <View style={styles.content}>
-        <FlatList
-          data={upcomingReleases}
-          renderItem={renderReleaseCard}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.cardList}
-          snapToInterval={cardWidth + spacing.md}
-          decelerationRate="fast"
-          snapToAlignment="start"
-        />
-      </View>
-    </View>
+    </Card>
   );
 };
 

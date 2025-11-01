@@ -6,17 +6,21 @@ import {
   Image as RNImage,
   Pressable,
   Modal,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, Chip, Text, useTheme } from "react-native-paper";
+import { Chip, Text, useTheme, IconButton } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import { EmptyState } from "@/components/common/EmptyState";
+import { AnimatedSection, SettingsGroup } from "@/components/common";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useJikanAnimeDetails } from "@/hooks/useJikanAnimeDetails";
 import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
+import { skeletonTiming } from "@/constants/skeletonTiming";
 import type { JikanTrailer, JikanAnimeFull } from "@/models/jikan.types";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import { useConnectorsStore, selectConnectors } from "@/store/connectorsStore";
@@ -24,6 +28,9 @@ import type { components as JellyseerrComponents } from "@/connectors/client-sch
 import { alert } from "@/services/dialogService";
 import { isApiError } from "@/utils/error.utils";
 import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
+import { useUnifiedSearch } from "@/hooks/useUnifiedSearch";
+import { shouldAnimateLayout } from "@/utils/animations.utils";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type JellyseerrSearchResult =
   | JellyseerrComponents["schemas"]["MovieResult"]
@@ -284,8 +291,8 @@ const AnimeHubDetailScreen: React.FC = () => {
   const { anime, isLoading, isError, refetch } =
     useJikanAnimeDetails(validMalId);
 
-  // Initialize skeleton loading hook with 800ms minimum display time for detail pages
-  const skeleton = useSkeletonLoading({ minLoadingTime: 800 });
+  // Initialize skeleton loading hook with high complexity timing (900ms) for external API data
+  const skeleton = useSkeletonLoading(skeletonTiming.highComplexity);
 
   // Effect to manage skeleton visibility based on loading state
   useEffect(() => {
@@ -304,6 +311,8 @@ const AnimeHubDetailScreen: React.FC = () => {
     );
   }, [connectors]);
 
+  const { searchableServices } = useUnifiedSearch("", { enabled: false });
+
   const [isRequesting, setIsRequesting] = useState(false);
 
   const styles = useMemo(
@@ -313,13 +322,20 @@ const AnimeHubDetailScreen: React.FC = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
-        content: {
-          paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.xl,
-          gap: spacing.lg,
+        scrollContainer: {
+          paddingHorizontal: spacing.xs,
+          paddingBottom: spacing.xxxxl,
         },
         section: {
-          gap: spacing.sm,
+          marginTop: spacing.md,
+          marginHorizontal: spacing.xs,
+        },
+        sectionTitle: {
+          color: theme.colors.onBackground,
+          fontSize: 16,
+          fontWeight: "500",
+          marginBottom: spacing.sm,
+          paddingHorizontal: spacing.xs,
         },
         metaRow: {
           flexDirection: "row",
@@ -343,24 +359,15 @@ const AnimeHubDetailScreen: React.FC = () => {
         metaText: {
           color: theme.colors.onSurface,
         },
-        loading: {
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: theme.colors.background,
-        },
-        statsContainer: {
+        primaryActions: {
+          marginTop: spacing.md,
+          gap: spacing.sm,
           flexDirection: "row",
-          flexWrap: "wrap",
-          gap: spacing.md,
-        },
-        statItem: {
-          flex: 1,
-          minWidth: 120,
           alignItems: "center",
-          padding: spacing.sm,
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 8,
+        },
+        helperText: {
+          color: theme.colors.onSurfaceVariant,
+          marginTop: spacing.sm,
         },
         statLabel: {
           color: theme.colors.onSurfaceVariant,
@@ -378,19 +385,6 @@ const AnimeHubDetailScreen: React.FC = () => {
           color: theme.colors.primary,
           marginBottom: spacing.xs,
           textTransform: "capitalize",
-        },
-        loadingAdditional: {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: spacing.md,
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 8,
-          marginBottom: spacing.md,
-        },
-        loadingText: {
-          color: theme.colors.onSurfaceVariant,
-          marginLeft: spacing.sm,
         },
         relationGroup: {
           marginBottom: spacing.md,
@@ -456,36 +450,6 @@ const AnimeHubDetailScreen: React.FC = () => {
           backgroundColor: theme.colors.surfaceVariant,
           borderRadius: 8,
         },
-        primaryCard: {
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 12,
-          padding: spacing.md,
-          marginBottom: spacing.md,
-        },
-        primaryActions: {
-          marginTop: spacing.md,
-          gap: spacing.sm,
-        },
-        infoCard: {
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 12,
-          padding: spacing.md,
-          marginBottom: spacing.md,
-        },
-        cardTitle: {
-          color: theme.colors.onSurface,
-          marginBottom: spacing.sm,
-          fontWeight: "600",
-        },
-        helperText: {
-          color: theme.colors.onSurfaceVariant,
-        },
-        statsOverview: {
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 12,
-          padding: spacing.md,
-          marginBottom: spacing.md,
-        },
         detailedStats: {
           gap: spacing.md,
         },
@@ -493,6 +457,14 @@ const AnimeHubDetailScreen: React.FC = () => {
           flexDirection: "row",
           justifyContent: "space-between",
           gap: spacing.md,
+        },
+        statItem: {
+          flex: 1,
+          minWidth: 120,
+          alignItems: "center",
+          padding: spacing.sm,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderRadius: 8,
         },
         episodesList: {
           gap: spacing.sm,
@@ -522,7 +494,83 @@ const AnimeHubDetailScreen: React.FC = () => {
     undefined,
   );
 
-  // modal state for fullscreen image (no pan/zoom)
+  const animationsEnabled = shouldAnimateLayout(false, false);
+  const [selectedBackdropUri, setSelectedBackdropUri] = useState<
+    string | undefined
+  >(undefined);
+  const posterUri =
+    anime?.images?.jpg?.large_image_url ??
+    anime?.images?.jpg?.image_url ??
+    undefined;
+  const trailerBackdropUri = (() => {
+    const trailer = anime?.trailer as JikanTrailer | undefined;
+    if (!trailer) return undefined;
+    const images = trailer.images;
+    if (images && typeof images === "object") {
+      return images.maximum_image_url ?? images.large_image_url ?? undefined;
+    }
+    return undefined;
+  })();
+  useEffect(() => {
+    let mounted = true;
+
+    const chooseBackdrop = async () => {
+      try {
+        // 1) If trailer provides a backdrop, use it immediately.
+        if (trailerBackdropUri) {
+          if (mounted) setSelectedBackdropUri(trailerBackdropUri);
+          return;
+        }
+
+        // 2) Otherwise, try to pick a persisted gallery image index for this anime.
+        const pics = Array.isArray(anime?.pictures) ? anime!.pictures : [];
+        const animeId = anime?.mal_id ?? undefined;
+
+        if (animeId && pics.length > 0) {
+          const key = `animeBackdropChoice:${animeId}`;
+          const stored = await AsyncStorage.getItem(key);
+          let index: number | undefined = undefined;
+          if (stored !== null) {
+            const parsed = Number.parseInt(stored, 10);
+            if (
+              Number.isFinite(parsed) &&
+              parsed >= 0 &&
+              parsed < pics.length
+            ) {
+              index = parsed;
+            }
+          }
+
+          if (index === undefined) {
+            index = Math.floor(Math.random() * pics.length);
+            try {
+              await AsyncStorage.setItem(key, String(index));
+            } catch {
+              // ignore storage errors — fallback still works
+            }
+          }
+
+          const picture = pics[index];
+          const uri =
+            picture?.jpg?.large_image_url ??
+            picture?.jpg?.image_url ??
+            undefined;
+          if (mounted) setSelectedBackdropUri(uri ?? posterUri);
+          return;
+        }
+
+        // 3) Fallback to posterUri (may be undefined)
+        if (mounted) setSelectedBackdropUri(posterUri);
+      } catch {
+        if (mounted) setSelectedBackdropUri(posterUri);
+      }
+    };
+
+    void chooseBackdrop();
+    return () => {
+      mounted = false;
+    };
+  }, [anime, posterUri, trailerBackdropUri]);
 
   const openOnMal = async () => {
     if (validMalId) {
@@ -722,7 +770,23 @@ const AnimeHubDetailScreen: React.FC = () => {
   if (skeleton.showSkeleton && isLoading && !anime) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
-        <DetailPageSkeleton />
+        <DetailHero
+          posterUri={posterUri}
+          backdropUri={selectedBackdropUri}
+          heroHeight={spacing.xxxxl * 3}
+          overlayEndColor={theme.colors.background}
+          onBack={() => router.back()}
+          onMal={openOnMal}
+        >
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: spacing.lg,
+              paddingBottom: spacing.xxxxl,
+            }}
+          >
+            <DetailPageSkeleton />
+          </ScrollView>
+        </DetailHero>
       </SafeAreaView>
     );
   }
@@ -753,19 +817,6 @@ const AnimeHubDetailScreen: React.FC = () => {
     );
   }
 
-  const posterUri =
-    anime?.images?.jpg?.large_image_url ??
-    anime?.images?.jpg?.image_url ??
-    undefined;
-  const backdropUri = (() => {
-    const trailer = anime?.trailer as JikanTrailer | undefined;
-    if (!trailer) return undefined;
-    const images = trailer.images;
-    if (images && typeof images === "object") {
-      return images.maximum_image_url ?? images.large_image_url ?? undefined;
-    }
-    return undefined;
-  })();
   const genres = (anime?.genres ?? [])
     .map((genre) => genre.name)
     .filter(Boolean);
@@ -790,22 +841,31 @@ const AnimeHubDetailScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
       <DetailHero
         posterUri={posterUri}
-        backdropUri={backdropUri}
+        backdropUri={selectedBackdropUri}
+        heroHeight={spacing.xxxxl * 3}
+        overlayEndColor={theme.colors.background}
         onBack={() => router.back()}
         onMal={openOnMal}
       >
-        <View style={styles.content}>
-          {/* Primary Information Card */}
-          <View style={styles.primaryCard}>
-            <View style={styles.section}>
-              <Text variant="headlineLarge" style={styles.headline}>
-                {anime?.title ?? "Untitled"}
-              </Text>
-              {anime?.title_english && anime.title_english !== anime.title ? (
-                <Text variant="titleMedium" style={styles.body}>
-                  {anime.title_english}
+        {/* Primary Information Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={50}
+          animated={animationsEnabled}
+        >
+          <SettingsGroup>
+            <View style={{ padding: spacing.md, gap: spacing.md }}>
+              <View>
+                <Text variant="headlineLarge" style={styles.headline}>
+                  {anime?.title ?? "Untitled"}
                 </Text>
-              ) : null}
+                {anime?.title_english && anime.title_english !== anime.title ? (
+                  <Text variant="titleMedium" style={styles.body}>
+                    {anime.title_english}
+                  </Text>
+                ) : null}
+              </View>
+
               <View style={styles.metaRow}>
                 {metaItems.map((item) => (
                   <Chip key={item} compact mode="outlined">
@@ -813,19 +873,38 @@ const AnimeHubDetailScreen: React.FC = () => {
                   </Chip>
                 ))}
               </View>
-            </View>
 
-            <View style={styles.primaryActions}>
-              <Button
-                mode="contained"
-                onPress={handleRequestPress}
-                loading={isRequesting}
-                disabled={isRequesting}
-              >
-                {isRequesting
-                  ? "Submitting request..."
-                  : "Request via Jellyseerr"}
-              </Button>
+              <View style={styles.primaryActions}>
+                {isRequesting ? (
+                  <SkiaLoader size={20} centered />
+                ) : (
+                  <IconButton
+                    icon="playlist-plus"
+                    size={28}
+                    iconColor={theme.colors.primary}
+                    onPress={handleRequestPress}
+                    accessibilityLabel="Request via Jellyseerr"
+                  />
+                )}
+
+                <IconButton
+                  icon="movie-search"
+                  size={28}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(auth)/search",
+                      params: { query: anime?.title, mediaType: "series" },
+                    })
+                  }
+                  disabled={!searchableServices.length}
+                  iconColor={
+                    searchableServices.length
+                      ? theme.colors.primary
+                      : theme.colors.onSurfaceVariant
+                  }
+                  accessibilityLabel="Unified Search"
+                />
+              </View>
               {jellyseerrConnectors.length === 0 ? (
                 <Text variant="bodySmall" style={styles.helperText}>
                   Connect a Jellyseerr service to forward anime requests to
@@ -833,451 +912,524 @@ const AnimeHubDetailScreen: React.FC = () => {
                 </Text>
               ) : null}
             </View>
-          </View>
+          </SettingsGroup>
+        </AnimatedSection>
 
-          {/* Synopsis Section */}
-          {anime?.synopsis ? (
-            <View style={styles.infoCard}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Synopsis
-              </Text>
-              <Text variant="bodyLarge" style={styles.body}>
-                {anime.synopsis}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Quick Stats Overview */}
-          {anime?.statistics && (
-            <View style={styles.statsOverview}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Quick Stats
-              </Text>
-              <View style={styles.statsGrid}>
-                <View style={styles.statCard}>
-                  <Text variant="headlineSmall" style={styles.statNumber}>
-                    {anime && typeof anime.score === "number"
-                      ? anime.score.toFixed(1)
-                      : "N/A"}
-                  </Text>
-                  <Text variant="labelMedium" style={styles.statLabel}>
-                    Score
-                  </Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text variant="headlineSmall" style={styles.statNumber}>
-                    {anime && typeof anime.rank === "number"
-                      ? `#${anime.rank}`
-                      : "N/A"}
-                  </Text>
-                  <Text variant="labelMedium" style={styles.statLabel}>
-                    Rank
-                  </Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text variant="headlineSmall" style={styles.statNumber}>
-                    {anime && typeof anime.popularity === "number"
-                      ? `#${anime.popularity}`
-                      : "N/A"}
-                  </Text>
-                  <Text variant="labelMedium" style={styles.statLabel}>
-                    Popularity
-                  </Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text variant="headlineSmall" style={styles.statNumber}>
-                    {anime && typeof anime.members === "number"
-                      ? anime.members.toLocaleString()
-                      : "N/A"}
-                  </Text>
-                  <Text variant="labelMedium" style={styles.statLabel}>
-                    Members
-                  </Text>
-                </View>
+        {/* Synopsis Section */}
+        {anime?.synopsis ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={100}
+            animated={animationsEnabled}
+          >
+            <Text style={styles.sectionTitle}>Synopsis</Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md }}>
+                <Text variant="bodyLarge" style={styles.body}>
+                  {anime.synopsis}
+                </Text>
               </View>
-            </View>
-          )}
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
 
-          {/* Tags and Categories */}
-          {(tags.length || (anime?.studios?.length ?? 0) > 0) && (
-            <View style={styles.infoCard}>
-              {tags.length ? (
-                <View style={styles.section}>
-                  <Text variant="titleMedium" style={styles.cardTitle}>
-                    Tags
-                  </Text>
-                  <View style={styles.metaRow}>
-                    {tags.map((tag) => (
-                      <Chip
-                        key={tag}
-                        style={styles.chip}
-                        textStyle={styles.chipText}
-                      >
-                        {tag}
-                      </Chip>
-                    ))}
+        {/* Quick Stats Overview */}
+        {anime?.statistics ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={150}
+            animated={animationsEnabled}
+          >
+            <Text style={styles.sectionTitle}>Quick Stats</Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md }}>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statCard}>
+                    <Text variant="headlineSmall" style={styles.statNumber}>
+                      {anime && typeof anime.score === "number"
+                        ? anime.score.toFixed(1)
+                        : "N/A"}
+                    </Text>
+                    <Text variant="labelMedium" style={styles.statLabel}>
+                      Score
+                    </Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text variant="headlineSmall" style={styles.statNumber}>
+                      {anime && typeof anime.rank === "number"
+                        ? `#${anime.rank}`
+                        : "N/A"}
+                    </Text>
+                    <Text variant="labelMedium" style={styles.statLabel}>
+                      Rank
+                    </Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text variant="headlineSmall" style={styles.statNumber}>
+                      {anime && typeof anime.popularity === "number"
+                        ? `#${anime.popularity}`
+                        : "N/A"}
+                    </Text>
+                    <Text variant="labelMedium" style={styles.statLabel}>
+                      Popularity
+                    </Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text variant="headlineSmall" style={styles.statNumber}>
+                      {anime && typeof anime.members === "number"
+                        ? anime.members.toLocaleString()
+                        : "N/A"}
+                    </Text>
+                    <Text variant="labelMedium" style={styles.statLabel}>
+                      Members
+                    </Text>
                   </View>
                 </View>
-              ) : null}
+              </View>
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
 
-              {anime?.studios?.length ? (
-                <View style={styles.section}>
-                  <Text variant="titleMedium" style={styles.cardTitle}>
-                    Studios
-                  </Text>
-                  <View style={styles.metaRow}>
-                    {anime.studios
-                      .map((studio) => studio.name)
-                      .filter(Boolean)
-                      .map((name) => (
-                        <Chip key={name} mode="outlined">
-                          <Text style={styles.metaText}>{name}</Text>
+        {/* Tags and Categories */}
+        {tags.length || (anime?.studios?.length ?? 0) > 0 ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={200}
+            animated={animationsEnabled}
+          >
+            {tags.length ? (
+              <>
+                <Text style={styles.sectionTitle}>Tags</Text>
+                <SettingsGroup>
+                  <View style={{ padding: spacing.md }}>
+                    <View style={styles.metaRow}>
+                      {tags.map((tag) => (
+                        <Chip
+                          key={tag}
+                          style={styles.chip}
+                          textStyle={styles.chipText}
+                        >
+                          {tag}
                         </Chip>
                       ))}
+                    </View>
                   </View>
-                </View>
-              ) : null}
-            </View>
-          )}
+                </SettingsGroup>
+              </>
+            ) : null}
 
-          {/* Detailed Statistics */}
-          {anime?.statistics && (
-            <View style={styles.infoCard}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Community Stats
-              </Text>
-              <View style={styles.detailedStats}>
-                <View style={styles.statRow}>
-                  <View style={styles.statItem}>
-                    <Text variant="headlineSmall" style={styles.statValue}>
-                      {anime &&
-                      anime.statistics &&
-                      typeof anime.statistics.watching === "number"
-                        ? anime.statistics.watching.toLocaleString()
-                        : "0"}
-                    </Text>
-                    <Text variant="labelMedium" style={styles.statLabel}>
-                      Currently Watching
-                    </Text>
+            {anime?.studios?.length ? (
+              <>
+                <Text style={[styles.sectionTitle, { marginTop: spacing.md }]}>
+                  Studios
+                </Text>
+                <SettingsGroup>
+                  <View style={{ padding: spacing.md }}>
+                    <View style={styles.metaRow}>
+                      {anime.studios
+                        .map((studio) => studio.name)
+                        .filter(Boolean)
+                        .map((name) => (
+                          <Chip key={name} mode="outlined">
+                            <Text style={styles.metaText}>{name}</Text>
+                          </Chip>
+                        ))}
+                    </View>
                   </View>
-                  <View style={styles.statItem}>
-                    <Text variant="headlineSmall" style={styles.statValue}>
-                      {anime &&
-                      anime.statistics &&
-                      typeof anime.statistics.completed === "number"
-                        ? anime.statistics.completed.toLocaleString()
-                        : "0"}
-                    </Text>
-                    <Text variant="labelMedium" style={styles.statLabel}>
-                      Completed
-                    </Text>
+                </SettingsGroup>
+              </>
+            ) : null}
+          </AnimatedSection>
+        ) : null}
+
+        {/* Detailed Statistics */}
+        {anime?.statistics ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={250}
+            animated={animationsEnabled}
+          >
+            <Text style={styles.sectionTitle}>Community Stats</Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md }}>
+                <View style={styles.detailedStats}>
+                  <View style={styles.statRow}>
+                    <View style={styles.statItem}>
+                      <Text variant="headlineSmall" style={styles.statValue}>
+                        {anime &&
+                        anime.statistics &&
+                        typeof anime.statistics.watching === "number"
+                          ? anime.statistics.watching.toLocaleString()
+                          : "0"}
+                      </Text>
+                      <Text variant="labelMedium" style={styles.statLabel}>
+                        Currently Watching
+                      </Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text variant="headlineSmall" style={styles.statValue}>
+                        {anime &&
+                        anime.statistics &&
+                        typeof anime.statistics.completed === "number"
+                          ? anime.statistics.completed.toLocaleString()
+                          : "0"}
+                      </Text>
+                      <Text variant="labelMedium" style={styles.statLabel}>
+                        Completed
+                      </Text>
+                    </View>
                   </View>
+                  <View style={styles.statRow}>
+                    <View style={styles.statItem}>
+                      <Text variant="headlineSmall" style={styles.statValue}>
+                        {anime &&
+                        anime.statistics &&
+                        typeof anime.statistics.on_hold === "number"
+                          ? anime.statistics.on_hold.toLocaleString()
+                          : "0"}
+                      </Text>
+                      <Text variant="labelMedium" style={styles.statLabel}>
+                        On Hold
+                      </Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text variant="headlineSmall" style={styles.statValue}>
+                        {anime &&
+                        anime.statistics &&
+                        typeof anime.statistics.dropped === "number"
+                          ? anime.statistics.dropped.toLocaleString()
+                          : "0"}
+                      </Text>
+                      <Text variant="labelMedium" style={styles.statLabel}>
+                        Dropped
+                      </Text>
+                    </View>
+                  </View>
+                  {anime &&
+                    anime.statistics &&
+                    typeof (anime.statistics as Record<string, unknown>)[
+                      "favorites"
+                    ] === "number" && (
+                      <View style={styles.statRow}>
+                        <View style={styles.statItem}>
+                          <Text
+                            variant="headlineSmall"
+                            style={styles.statValue}
+                          >
+                            {typeof (
+                              anime.statistics as Record<string, unknown>
+                            )["favorites"] === "number"
+                              ? (
+                                  (anime.statistics as Record<string, unknown>)[
+                                    "favorites"
+                                  ] as number
+                                ).toLocaleString()
+                              : "0"}
+                          </Text>
+                          <Text variant="labelMedium" style={styles.statLabel}>
+                            Favorited
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                 </View>
-                <View style={styles.statRow}>
-                  <View style={styles.statItem}>
-                    <Text variant="headlineSmall" style={styles.statValue}>
-                      {anime &&
-                      anime.statistics &&
-                      typeof anime.statistics.on_hold === "number"
-                        ? anime.statistics.on_hold.toLocaleString()
-                        : "0"}
-                    </Text>
-                    <Text variant="labelMedium" style={styles.statLabel}>
-                      On Hold
-                    </Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text variant="headlineSmall" style={styles.statValue}>
-                      {anime &&
-                      anime.statistics &&
-                      typeof anime.statistics.dropped === "number"
-                        ? anime.statistics.dropped.toLocaleString()
-                        : "0"}
-                    </Text>
-                    <Text variant="labelMedium" style={styles.statLabel}>
-                      Dropped
-                    </Text>
-                  </View>
-                </View>
-                {anime &&
-                  anime.statistics &&
-                  typeof (anime.statistics as Record<string, unknown>)[
-                    "favorites"
-                  ] === "number" && (
-                    <View style={styles.statRow}>
-                      <View style={styles.statItem}>
-                        <Text variant="headlineSmall" style={styles.statValue}>
-                          {typeof (anime.statistics as Record<string, unknown>)[
-                            "favorites"
-                          ] === "number"
-                            ? (
-                                (anime.statistics as Record<string, unknown>)[
-                                  "favorites"
-                                ] as number
-                              ).toLocaleString()
-                            : "0"}
+              </View>
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
+
+        {/* Episodes Section */}
+        {anime?.episodes && anime.episodes.length > 0 ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={300}
+            animated={animationsEnabled}
+          >
+            <Text style={styles.sectionTitle}>
+              Episodes ({anime && anime.episodes ? anime.episodes.length : 0})
+            </Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md }}>
+                <View style={styles.episodesList}>
+                  {anime.episodes.slice(0, 8).map((episode) => (
+                    <View key={episode.mal_id} style={styles.episodeItem}>
+                      <View style={styles.episodeHeader}>
+                        <Text variant="bodyMedium" style={styles.episodeTitle}>
+                          {episode.title}
                         </Text>
-                        <Text variant="labelMedium" style={styles.statLabel}>
-                          Favorited
+                        <Text variant="labelSmall" style={styles.episodeMeta}>
+                          #{episode.episode_id}
                         </Text>
                       </View>
+                      {episode.duration && (
+                        <Text variant="labelSmall" style={styles.episodeMeta}>
+                          {episode.duration}
+                        </Text>
+                      )}
                     </View>
+                  ))}
+                  {anime && anime.episodes && anime.episodes.length > 8 && (
+                    <Text variant="labelMedium" style={styles.showMore}>
+                      +{" "}
+                      {anime && anime.episodes ? anime.episodes.length - 8 : 0}{" "}
+                      more episodes
+                    </Text>
                   )}
+                </View>
               </View>
-            </View>
-          )}
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
 
-          {/* Episodes Section */}
-          {anime?.episodes && anime.episodes.length > 0 ? (
-            <View style={styles.infoCard}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Episodes ({anime && anime.episodes ? anime.episodes.length : 0})
-              </Text>
-              <View style={styles.episodesList}>
-                {anime.episodes.slice(0, 8).map((episode) => (
-                  <View key={episode.mal_id} style={styles.episodeItem}>
-                    <View style={styles.episodeHeader}>
-                      <Text variant="bodyMedium" style={styles.episodeTitle}>
-                        {episode.title}
-                      </Text>
-                      <Text variant="labelSmall" style={styles.episodeMeta}>
-                        #{episode.episode_id}
-                      </Text>
-                    </View>
-                    {episode.duration && (
-                      <Text variant="labelSmall" style={styles.episodeMeta}>
-                        {episode.duration}
-                      </Text>
-                    )}
-                  </View>
-                ))}
-                {anime && anime.episodes && anime.episodes.length > 8 && (
-                  <Text variant="labelMedium" style={styles.showMore}>
-                    + {anime && anime.episodes ? anime.episodes.length - 8 : 0}{" "}
-                    more episodes
-                  </Text>
-                )}
+        {/* Pictures Gallery */}
+        {anime && anime.pictures && anime.pictures.length > 0 ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={350}
+            animated={animationsEnabled}
+          >
+            <Text style={styles.sectionTitle}>Gallery</Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md }}>
+                <View style={styles.picturesContainer}>
+                  {anime && anime.pictures
+                    ? anime.pictures.slice(0, 6).map((picture, index) => {
+                        const uri =
+                          picture.jpg?.large_image_url ??
+                          picture.jpg?.image_url ??
+                          undefined;
+                        return (
+                          <Pressable
+                            key={index}
+                            style={styles.pictureItem}
+                            onPress={() => {
+                              if (uri) {
+                                setSelectedImage(uri);
+                                setModalVisible(true);
+                              }
+                            }}
+                          >
+                            <RNImage
+                              source={{ uri }}
+                              style={styles.pictureImage}
+                              resizeMode="cover"
+                            />
+                          </Pressable>
+                        );
+                      })
+                    : null}
+                </View>
               </View>
-            </View>
-          ) : null}
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
 
-          {/* Pictures Gallery */}
-          {anime && anime.pictures && anime.pictures.length > 0 ? (
-            <View style={styles.infoCard}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Gallery
-              </Text>
-              <View style={styles.picturesContainer}>
-                {anime && anime.pictures
-                  ? anime.pictures.slice(0, 6).map((picture, index) => {
-                      const uri =
-                        picture.jpg?.large_image_url ??
-                        picture.jpg?.image_url ??
-                        undefined;
-                      return (
-                        <Pressable
-                          key={index}
-                          style={styles.pictureItem}
+        {/* Related Content */}
+        {anime && anime.relations && anime.relations.length > 0 ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={400}
+            animated={animationsEnabled}
+          >
+            <Text style={styles.sectionTitle}>Related Content</Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md, gap: spacing.md }}>
+                {anime.relations.map((relation) => (
+                  <View key={relation.relation} style={styles.relationGroup}>
+                    <Text variant="labelMedium" style={styles.relationType}>
+                      {relation.relation}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      {relation.entry?.map((entry) => (
+                        <Chip
+                          key={`${entry.mal_id}-${entry.name}`}
+                          mode="outlined"
                           onPress={() => {
-                            if (uri) {
-                              setSelectedImage(uri);
-                              setModalVisible(true);
+                            if (entry.mal_id && entry.type === "anime") {
+                              router.push(`/anime-hub/${entry.mal_id}`);
                             }
                           }}
                         >
-                          <RNImage
-                            source={{ uri }}
-                            style={styles.pictureImage}
-                            resizeMode="cover"
-                          />
-                        </Pressable>
-                      );
-                    })
-                  : null}
+                          <Text style={styles.metaText}>{entry.name}</Text>
+                        </Chip>
+                      )) || []}
+                    </View>
+                  </View>
+                ))}
               </View>
-            </View>
-          ) : null}
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
 
-          {/* Fullscreen image modal */}
-          <Modal
-            visible={modalVisible}
-            transparent
-            onRequestClose={() => setModalVisible(false)}
+        {/* Recommendations */}
+        {anime?.recommendations && anime.recommendations.length > 0 ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={450}
+            animated={animationsEnabled}
           >
-            <Modal
-              visible={modalVisible}
-              transparent
-              onRequestClose={() => setModalVisible(false)}
-            >
-              <Pressable
-                style={styles.modalOverlay}
-                onPress={() => setModalVisible(false)}
-              >
-                {selectedImage ? (
-                  <RNImage
-                    source={{ uri: selectedImage }}
-                    style={styles.modalImage}
-                    resizeMode="contain"
-                  />
-                ) : null}
-              </Pressable>
-            </Modal>
-          </Modal>
-
-          {/* Related Content */}
-          {anime && anime.relations && anime.relations.length > 0 ? (
-            <View style={styles.infoCard}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Related Content
-              </Text>
-              {anime.relations.map((relation) => (
-                <View key={relation.relation} style={styles.relationGroup}>
-                  <Text variant="labelMedium" style={styles.relationType}>
-                    {relation.relation}
-                  </Text>
-                  <View style={styles.metaRow}>
-                    {relation.entry?.map((entry) => (
+            <Text style={styles.sectionTitle}>Recommended For You</Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md }}>
+                <View style={styles.metaRow}>
+                  {anime.recommendations.slice(0, 8).map((rec, idx) => {
+                    const entry = Array.isArray(rec.entry)
+                      ? (rec.entry[1] ?? rec.entry[0])
+                      : rec.entry;
+                    const malId = entry?.mal_id ?? entry?.malId ?? undefined;
+                    const name =
+                      entry?.name ??
+                      entry?.title ??
+                      entry?.title_english ??
+                      "Untitled";
+                    return (
                       <Chip
-                        key={`${entry.mal_id}-${entry.name}`}
+                        key={`${malId ?? idx}-${name}`}
                         mode="outlined"
                         onPress={() => {
-                          if (entry.mal_id && entry.type === "anime") {
-                            router.push(`/anime-hub/${entry.mal_id}`);
+                          if (malId && entry?.type === "anime") {
+                            router.push(`/anime-hub/${malId}`);
                           }
                         }}
                       >
-                        <Text style={styles.metaText}>{entry.name}</Text>
+                        <Text style={styles.metaText}>{name}</Text>
                       </Chip>
-                    )) || []}
-                  </View>
+                    );
+                  })}
                 </View>
-              ))}
-            </View>
-          ) : null}
+              </View>
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
 
-          {/* Recommendations */}
-          {anime?.recommendations && anime.recommendations.length > 0 ? (
-            <View style={styles.infoCard}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Recommended For You
-              </Text>
-              <View style={styles.metaRow}>
-                {anime.recommendations.slice(0, 8).map((rec, idx) => {
-                  // `entry` may be an array of two entries or a single object depending on the API shape
-                  const entry = Array.isArray(rec.entry)
-                    ? (rec.entry[1] ?? rec.entry[0])
-                    : rec.entry;
-                  const malId = entry?.mal_id ?? entry?.malId ?? undefined;
-                  const name =
-                    entry?.name ??
-                    entry?.title ??
-                    entry?.title_english ??
-                    "Untitled";
-                  return (
+        {/* Streaming Platforms */}
+        {anime?.streaming && anime.streaming.length > 0 ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={500}
+            animated={animationsEnabled}
+          >
+            <Text style={styles.sectionTitle}>Available On</Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md }}>
+                <View style={styles.metaRow}>
+                  {anime.streaming.map((stream) => (
                     <Chip
-                      key={`${malId ?? idx}-${name}`}
+                      key={`${stream.name}-${stream.url}`}
                       mode="outlined"
                       onPress={() => {
-                        if (malId && entry?.type === "anime") {
-                          router.push(`/anime-hub/${malId}`);
+                        if (stream.url) {
+                          Linking.openURL(stream.url);
                         }
                       }}
                     >
-                      <Text style={styles.metaText}>{name}</Text>
+                      <Text style={styles.metaText}>{stream.name}</Text>
                     </Chip>
-                  );
-                })}
+                  ))}
+                </View>
               </View>
-            </View>
-          ) : null}
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
 
-          {/* Streaming Platforms */}
-          {anime?.streaming && anime.streaming.length > 0 ? (
-            <View style={styles.infoCard}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Available On
-              </Text>
-              <View style={styles.metaRow}>
-                {anime.streaming.map((stream) => (
-                  <Chip
-                    key={`${stream.name}-${stream.url}`}
-                    mode="outlined"
-                    onPress={() => {
-                      if (stream.url) {
-                        Linking.openURL(stream.url);
-                      }
-                    }}
-                  >
-                    <Text style={styles.metaText}>{stream.name}</Text>
-                  </Chip>
+        {/* Additional Information */}
+        {(anime?.background ||
+          (anime?.external && anime.external.length > 0)) && (
+          <AnimatedSection
+            style={styles.section}
+            delay={550}
+            animated={animationsEnabled}
+          >
+            {anime?.background ? (
+              <>
+                <Text style={styles.sectionTitle}>Background</Text>
+                <SettingsGroup>
+                  <View style={{ padding: spacing.md }}>
+                    <Text variant="bodyLarge" style={styles.body}>
+                      {anime.background}
+                    </Text>
+                  </View>
+                </SettingsGroup>
+              </>
+            ) : null}
+
+            {anime?.external && anime.external.length > 0 ? (
+              <>
+                <Text style={[styles.sectionTitle, { marginTop: spacing.md }]}>
+                  External Links
+                </Text>
+                <SettingsGroup>
+                  <View style={{ padding: spacing.md }}>
+                    <View style={styles.metaRow}>
+                      {anime.external.map((link) => (
+                        <Chip
+                          key={`${link.name}-${link.url}`}
+                          mode="outlined"
+                          onPress={() => {
+                            if (link.url) {
+                              Linking.openURL(link.url);
+                            }
+                          }}
+                        >
+                          <Text style={styles.metaText}>{link.name}</Text>
+                        </Chip>
+                      ))}
+                    </View>
+                  </View>
+                </SettingsGroup>
+              </>
+            ) : null}
+          </AnimatedSection>
+        )}
+
+        {/* Reviews Section */}
+        {anime?.reviews && anime.reviews.length > 0 ? (
+          <AnimatedSection
+            style={styles.section}
+            delay={600}
+            animated={animationsEnabled}
+          >
+            <Text style={styles.sectionTitle}>Community Reviews</Text>
+            <SettingsGroup>
+              <View style={{ padding: spacing.md, gap: spacing.md }}>
+                {anime.reviews.slice(0, 3).map((review) => (
+                  <View key={review.mal_id} style={styles.reviewItem}>
+                    <Text variant="bodyMedium" style={styles.reviewContent}>
+                      {review.content
+                        ? `${review.content.substring(0, 200)}...`
+                        : (review as any)?.review
+                          ? `${(review as any).review.substring(0, 200)}...`
+                          : ""}
+                    </Text>
+                    <Text variant="labelSmall" style={styles.reviewAuthor}>
+                      - {review.user?.username || "Anonymous"}
+                    </Text>
+                  </View>
                 ))}
               </View>
-            </View>
-          ) : null}
+            </SettingsGroup>
+          </AnimatedSection>
+        ) : null}
 
-          {/* Additional Information */}
-          {(anime?.background ||
-            (anime?.external && anime.external.length > 0)) && (
-            <View style={styles.infoCard}>
-              {anime?.background ? (
-                <View style={styles.section}>
-                  <Text variant="titleMedium" style={styles.cardTitle}>
-                    Background
-                  </Text>
-                  <Text variant="bodyLarge" style={styles.body}>
-                    {anime.background}
-                  </Text>
-                </View>
-              ) : null}
-
-              {anime?.external && anime.external.length > 0 ? (
-                <View style={styles.section}>
-                  <Text variant="titleMedium" style={styles.cardTitle}>
-                    External Links
-                  </Text>
-                  <View style={styles.metaRow}>
-                    {anime.external.map((link) => (
-                      <Chip
-                        key={`${link.name}-${link.url}`}
-                        mode="outlined"
-                        onPress={() => {
-                          if (link.url) {
-                            Linking.openURL(link.url);
-                          }
-                        }}
-                      >
-                        <Text style={styles.metaText}>{link.name}</Text>
-                      </Chip>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          )}
-
-          {/* Reviews Section */}
-          {anime?.reviews && anime.reviews.length > 0 ? (
-            <View style={styles.infoCard}>
-              <Text variant="titleMedium" style={styles.cardTitle}>
-                Community Reviews
-              </Text>
-              {anime.reviews.slice(0, 3).map((review) => (
-                <View key={review.mal_id} style={styles.reviewItem}>
-                  <Text variant="bodyMedium" style={styles.reviewContent}>
-                    {review.content
-                      ? `${review.content.substring(0, 200)}...`
-                      : (review as any)?.review
-                        ? `${(review as any).review.substring(0, 200)}...`
-                        : ""}
-                  </Text>
-                  <Text variant="labelSmall" style={styles.reviewAuthor}>
-                    - {review.user?.username || "Anonymous"}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
+        {/* Fullscreen image modal */}
+        <Modal
+          visible={modalVisible}
+          transparent
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setModalVisible(false)}
+          >
+            {selectedImage ? (
+              <RNImage
+                source={{ uri: selectedImage }}
+                style={styles.modalImage}
+                resizeMode="contain"
+              />
+            ) : null}
+          </Pressable>
+        </Modal>
       </DetailHero>
     </SafeAreaView>
   );

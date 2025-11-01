@@ -1,6 +1,7 @@
 import React from "react";
 import { View, StyleSheet, Linking } from "react-native";
-import { Text, Button, useTheme, ActivityIndicator } from "react-native-paper";
+import { Text, Button, useTheme } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import BottomDrawer from "@/components/common/BottomDrawer";
 import SettingsGroup from "@/components/common/SettingsGroup";
 import SettingsListItem from "@/components/common/SettingsListItem";
@@ -22,11 +23,14 @@ interface ContentDrawerProps {
   onDismiss: () => void;
   title: string;
   content?: string;
-  metadata: ContentMetadata;
-  actionUrl: string;
+  metadata?: ContentMetadata;
+  actionUrl?: string;
   actionLabel?: string;
   loading?: boolean;
   maxHeight?: string | number;
+  customContent?: React.ReactNode;
+  showMetadata?: boolean;
+  showActionButton?: boolean;
 }
 
 const ContentDrawer: React.FC<ContentDrawerProps> = ({
@@ -34,11 +38,14 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
   onDismiss,
   title,
   content,
-  metadata,
+  metadata = {},
   actionUrl,
   actionLabel = "Open in Browser",
   loading = false,
   maxHeight = "80%",
+  customContent,
+  showMetadata = true,
+  showActionButton = true,
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress } = useHaptics();
@@ -67,84 +74,89 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
     >
       <View style={styles.contentContainer}>
         {/* Metadata Section - Using SettingsGroup and SettingsListItem */}
-        {(metadata.score !== undefined ||
-          metadata.author ||
-          metadata.comments !== undefined ||
-          metadata.date ||
-          metadata.source) && (
-          <SettingsGroup>
-            {metadata.score !== undefined && (
-              <SettingsListItem
-                title="Score"
-                trailing={
-                  <Text
-                    style={{ color: theme.colors.primary, fontWeight: "600" }}
-                  >
-                    {metadata.score.toLocaleString()}
-                  </Text>
-                }
-                groupPosition={metadata.author ? "top" : "single"}
-              />
-            )}
+        {showMetadata &&
+          (metadata.score !== undefined ||
+            metadata.author ||
+            metadata.comments !== undefined ||
+            metadata.date ||
+            metadata.source) && (
+            <SettingsGroup>
+              {metadata.score !== undefined && (
+                <SettingsListItem
+                  title="Score"
+                  trailing={
+                    <Text
+                      style={{ color: theme.colors.primary, fontWeight: "600" }}
+                    >
+                      {metadata.score.toLocaleString()}
+                    </Text>
+                  }
+                  groupPosition={metadata.author ? "top" : "single"}
+                />
+              )}
 
-            {metadata.author && (
-              <SettingsListItem
-                title="Author"
-                trailing={
-                  <Text style={{ color: theme.colors.onSurface }}>
-                    {metadata.author}
-                  </Text>
-                }
-                groupPosition={metadata.score !== undefined ? "middle" : "top"}
-              />
-            )}
+              {metadata.author && (
+                <SettingsListItem
+                  title="Author"
+                  trailing={
+                    <Text style={{ color: theme.colors.onSurface }}>
+                      {metadata.author}
+                    </Text>
+                  }
+                  groupPosition={
+                    metadata.score !== undefined ? "middle" : "top"
+                  }
+                />
+              )}
 
-            {metadata.comments !== undefined && (
-              <SettingsListItem
-                title="Comments"
-                trailing={
-                  <Text style={{ color: theme.colors.onSurface }}>
-                    {metadata.comments}
-                  </Text>
-                }
-                groupPosition={metadata.author ? "middle" : "top"}
-              />
-            )}
+              {metadata.comments !== undefined && (
+                <SettingsListItem
+                  title="Comments"
+                  trailing={
+                    <Text style={{ color: theme.colors.onSurface }}>
+                      {metadata.comments}
+                    </Text>
+                  }
+                  groupPosition={metadata.author ? "middle" : "top"}
+                />
+              )}
 
-            {metadata.date && (
-              <SettingsListItem
-                title="Date"
-                trailing={
-                  <Text style={{ color: theme.colors.onSurface }}>
-                    {metadata.date}
-                  </Text>
-                }
-                groupPosition={
-                  metadata.author || metadata.comments !== undefined
-                    ? "middle"
-                    : "top"
-                }
-              />
-            )}
+              {metadata.date && (
+                <SettingsListItem
+                  title="Date"
+                  trailing={
+                    <Text style={{ color: theme.colors.onSurface }}>
+                      {metadata.date}
+                    </Text>
+                  }
+                  groupPosition={
+                    metadata.author || metadata.comments !== undefined
+                      ? "middle"
+                      : "top"
+                  }
+                />
+              )}
 
-            {metadata.source && (
-              <SettingsListItem
-                title="Source"
-                trailing={
-                  <Text style={{ color: theme.colors.onSurface }}>
-                    {metadata.source}
-                  </Text>
-                }
-                groupPosition="bottom"
-              />
-            )}
-          </SettingsGroup>
-        )}
+              {metadata.source && (
+                <SettingsListItem
+                  title="Source"
+                  trailing={
+                    <Text style={{ color: theme.colors.onSurface }}>
+                      {metadata.source}
+                    </Text>
+                  }
+                  groupPosition="bottom"
+                />
+              )}
+            </SettingsGroup>
+          )}
 
         {/* Content Section */}
-        {loading ? (
+        {customContent ? (
+          customContent
+        ) : loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <SkiaLoader size={80} />
             <Text
               variant="bodySmall"
               style={{
@@ -178,15 +190,17 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
         ) : null}
 
         {/* Action Button */}
-        <View style={styles.actionButtonContainer}>
-          <Button
-            mode="contained"
-            onPress={handleOpenAction}
-            style={{ borderRadius: borderRadius.md }}
-          >
-            {actionLabel}
-          </Button>
-        </View>
+        {showActionButton && actionUrl ? (
+          <View style={styles.actionButtonContainer}>
+            <Button
+              mode="contained"
+              onPress={handleOpenAction}
+              style={{ borderRadius: borderRadius.md }}
+            >
+              {actionLabel}
+            </Button>
+          </View>
+        ) : null}
       </View>
     </BottomDrawer>
   );

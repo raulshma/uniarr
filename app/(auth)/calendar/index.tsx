@@ -1,13 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
-import { Button, Icon, Text, useTheme } from "react-native-paper";
+import { Platform, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 import {
+  Button,
+  Chip,
+  Searchbar,
+  SegmentedButtons,
+  Text,
+  useTheme,
+} from "react-native-paper";
+import {
+  differenceInCalendarDays,
   format,
+  formatRelative,
   isAfter,
   isSameMonth,
   isSameWeek,
@@ -16,20 +31,26 @@ import {
   isYesterday,
   parseISO,
 } from "date-fns";
-import { useRouter, useLocalSearchParams } from "expo-router";
 
-import { AnimatedListItem } from "@/components/common/AnimatedComponents";
-import { EmptyState } from "@/components/common/EmptyState";
-import { LoadingState } from "@/components/common/LoadingState";
-import { ErrorBoundary } from "@/components/common/ErrorBoundary";
-import BottomDrawer from "@/components/common/BottomDrawer";
 import {
-  MediaReleaseCard,
+  CalendarDayView,
+  CalendarMonthView,
+  CalendarStats,
+  CalendarWeekView,
   EnhancedCalendarHeader,
+  MediaReleaseCard,
 } from "@/components/calendar";
-import { useCalendar } from "@/hooks/useCalendar";
-import { validateDateString } from "@/utils/calendar.utils";
+import {
+  AnimatedSection,
+  AnimatedView,
+} from "@/components/common/AnimatedComponents";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { LoadingState } from "@/components/common/LoadingState";
+import BottomDrawer from "@/components/common/BottomDrawer";
+import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
+import { useCalendar } from "@/hooks/useCalendar";
 import type {
   CalendarDay,
   CalendarFilters,
@@ -41,21 +62,78 @@ import type {
   MediaType,
   ReleaseStatus,
 } from "@/models/calendar.types";
-
-const ALL_MEDIA_TYPES: MediaType[] = ["movie", "series", "episode"];
-const DEFAULT_STATUSES: ReleaseStatus[] = ["upcoming", "released"];
-const SERVICE_TYPES: CalendarServiceType[] = ["sonarr", "radarr"];
+import { logger } from "@/services/logger/LoggerService";
+import { secureStorage } from "@/services/storage/SecureStorage";
+import { validateDateString } from "@/utils/calendar.utils";
 
 type DateField = "start" | "end";
+type ServiceOption = {
+  id: string;
+  name: string;
+  type: CalendarServiceType;
+};
+type AgendaSection = {
+  date: string;
+  releases: MediaRelease[];
+};
+
+type QuickRangeOption = {
+  label: string;
+  days: number;
+};
+
+const ALL_MEDIA_TYPES: MediaType[] = ["movie", "series", "episode"];
+const ALL_STATUSES: ReleaseStatus[] = [
+  "upcoming",
+  "released",
+  "delayed",
+  "cancelled",
+];
+const DEFAULT_STATUSES: ReleaseStatus[] = ["upcoming", "released"];
+const SERVICE_TYPES: CalendarServiceType[] = ["sonarr", "radarr", "jellyseerr"];
+
+const QUICK_RANGES: QuickRangeOption[] = [
+  { label: "7d", days: 7 },
+  { label: "14d", days: 14 },
+  { label: "30d", days: 30 },
+  { label: "90d", days: 90 },
+];
+
+const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
+  movie: "Movies",
+  series: "Series",
+  episode: "Episodes",
+};
+
+const STATUS_LABELS: Record<ReleaseStatus, string> = {
+  upcoming: "Upcoming",
+  released: "Released",
+  delayed: "Delayed",
+  cancelled: "Cancelled",
+};
+
+const SERVICE_TYPE_LABELS: Record<CalendarServiceType, string> = {
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+  jellyseerr: "Jellyseerr",
+};
 
 const cloneFilters = (filters: CalendarFilters): CalendarFilters => ({
   ...filters,
   mediaTypes: [...filters.mediaTypes],
   statuses: [...filters.statuses],
   services: [...filters.services],
-  serviceTypes: [...(filters.serviceTypes ?? [])],
+  serviceTypes: [...filters.serviceTypes],
   dateRange: filters.dateRange ? { ...filters.dateRange } : undefined,
+  searchQuery: filters.searchQuery,
 });
+
+const VIEW_SEGMENTS: { label: string; value: CalendarView }[] = [
+  { label: "Day", value: "day" },
+  { label: "Week", value: "week" },
+  { label: "Month", value: "month" },
+  { label: "Hybrid", value: "custom" },
+];
 
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -64,41 +142,17 @@ const CalendarScreen = () => {
   const {
     state,
     calendarData,
+    stats,
     navigation,
     releases,
     setView,
     setCurrentDate,
+    setSelectedDate,
     setFilters,
     clearFilters,
     goToToday,
     goToDate,
   } = useCalendar();
-
-  // Handle date parameter from URL (e.g., from widget navigation)
-  useEffect(() => {
-    if (localSearchParams.date) {
-      const urlDate = localSearchParams.date;
-      // Validate the date format
-      if (validateDateString(urlDate)) {
-        goToDate(urlDate);
-      }
-    }
-  }, [localSearchParams.date, goToDate]);
-
-  const VIEW_SEGMENTS: {
-    label: string;
-    value: Extract<CalendarView, "day" | "week" | "month" | "custom">;
-  }[] = useMemo(
-    () => [
-      { label: "Day", value: "day" },
-      { label: "Week", value: "week" },
-      { label: "Month", value: "month" },
-      ...(state.filters.dateRange
-        ? [{ label: "Custom", value: "custom" as const }]
-        : []),
-    ],
-    [state.filters.dateRange],
-  );
 
   const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
   const [pendingFilters, setPendingFilters] = useState<CalendarFilters>(() =>
@@ -107,12 +161,69 @@ const CalendarScreen = () => {
   const [activeDateField, setActiveDateField] = useState<DateField | null>(
     null,
   );
+  const [serviceOptions, setServiceOptions] = useState<ServiceOption[]>([]);
+  const [searchText, setSearchText] = useState(state.filters.searchQuery ?? "");
+  const [activeQuickRange, setActiveQuickRange] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void (async () => {
+      try {
+        const configs = await secureStorage.getServiceConfigs();
+        if (!isMounted) return;
+        const enabled = configs.filter((config) => config.enabled);
+        setServiceOptions(
+          enabled.map((config) => ({
+            id: config.id,
+            name: config.name,
+            type: config.type as CalendarServiceType,
+          })),
+        );
+      } catch (error) {
+        void logger.warn("calendar.loadServiceOptions.failed", {
+          location: "CalendarScreen",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (localSearchParams.date && validateDateString(localSearchParams.date)) {
+      goToDate(localSearchParams.date);
+    }
+  }, [localSearchParams.date, goToDate]);
 
   useEffect(() => {
     if (isFilterDrawerVisible) {
       setPendingFilters(cloneFilters(state.filters));
     }
   }, [isFilterDrawerVisible, state.filters]);
+
+  useEffect(() => {
+    setSearchText(state.filters.searchQuery ?? "");
+  }, [state.filters.searchQuery]);
+
+  useEffect(() => {
+    const range = state.filters.dateRange;
+    if (!range) {
+      setActiveQuickRange(null);
+      return;
+    }
+    const start = parseISO(range.start);
+    const end = parseISO(range.end);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      setActiveQuickRange(null);
+      return;
+    }
+    const diff = differenceInCalendarDays(end, start) + 1;
+    setActiveQuickRange(diff > 0 ? diff : null);
+  }, [state.filters.dateRange]);
 
   const styles = useMemo(
     () =>
@@ -121,96 +232,104 @@ const CalendarScreen = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
-        headerContent: {
-          paddingHorizontal: theme.custom.spacing.lg,
-          // reduce bottom padding so the top section doesn't consume too much vertical space
-          paddingBottom: theme.custom.spacing.sm,
-          gap: theme.custom.spacing.lg,
+        listContent: {
+          paddingBottom: theme.custom.spacing.xl,
+          paddingHorizontal: theme.custom.spacing.xs,
+          gap: theme.custom.spacing.sm,
         },
-        segmentsRow: {
-          flexDirection: "row",
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: 28,
-          padding: 4,
-          gap: 4,
-          alignSelf: "center",
-          width: "90%",
+        headerContainer: {
+          gap: theme.custom.spacing.md,
+          paddingTop: theme.custom.spacing.md,
         },
-        segmentButton: {
-          flex: 1,
-          borderRadius: 24,
-          paddingVertical: theme.custom.spacing.sm,
-          alignItems: "center",
-          justifyContent: "center",
-        },
-        segmentActive: {
-          backgroundColor: theme.colors.primary,
-        },
-        segmentLabel: {
-          fontSize: theme.custom.typography.labelLarge.fontSize,
-          fontFamily: theme.custom.typography.labelLarge.fontFamily,
-          fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
-          color: theme.colors.onSurfaceVariant,
-          letterSpacing: theme.custom.typography.labelLarge.letterSpacing,
-        },
-        segmentLabelActive: {
-          color: theme.colors.onPrimary,
-        },
-        sectionHeader: {
-          paddingHorizontal: theme.custom.spacing.lg,
+        headerTextGroup: {
+          gap: theme.custom.spacing.xs,
         },
         headingText: {
           fontSize: theme.custom.typography.headlineSmall.fontSize,
           fontFamily: theme.custom.typography.headlineSmall.fontFamily,
           fontWeight: theme.custom.typography.headlineSmall.fontWeight as any,
-          color: theme.colors.onBackground,
           letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
+          color: theme.colors.onBackground,
         },
         subheadingText: {
-          marginTop: theme.custom.spacing.xs,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
+          fontFamily: theme.custom.typography.bodySmall.fontFamily,
+          fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
+          letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
+          color: theme.colors.onSurfaceVariant,
+        },
+        segmentedContainer: {
+          borderRadius: 24,
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        segmentedWrapper: {
+          alignSelf: "stretch",
+        },
+        quickFiltersRow: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: theme.custom.spacing.sm,
+          alignItems: "center",
+        },
+        filterSummaryRow: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: theme.custom.spacing.sm,
+          alignItems: "center",
+        },
+        summaryChip: {
+          backgroundColor: theme.colors.surfaceVariant,
+        },
+        summaryChipSpacing: {
+          marginRight: theme.custom.spacing.sm,
+        },
+        summaryScrollContent: {
+          paddingVertical: theme.custom.spacing.xs,
+          paddingRight: theme.custom.spacing.sm,
+          alignItems: "center",
+        },
+        calendarCardWrapper: {
+          borderRadius: 20,
+          overflow: "hidden",
+        },
+        agendaSection: {
+          gap: theme.custom.spacing.sm,
+        },
+        agendaHeader: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        },
+        agendaDate: {
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontFamily: theme.custom.typography.titleMedium.fontFamily,
+          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
+          color: theme.colors.onSurface,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+        },
+        agendaMeta: {
           fontSize: theme.custom.typography.bodySmall.fontSize,
           fontFamily: theme.custom.typography.bodySmall.fontFamily,
           fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
           color: theme.colors.onSurfaceVariant,
-          letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
         },
-        filtersRow: {
-          paddingHorizontal: theme.custom.spacing.lg,
-          marginTop: theme.custom.spacing.sm,
-        },
-        filtersButton: {
-          flexDirection: "row",
-          alignItems: "center",
-          alignSelf: "flex-start",
+        agendaReleases: {
           gap: theme.custom.spacing.xs,
-          paddingHorizontal: theme.custom.spacing.lg,
-          paddingVertical: theme.custom.spacing.sm,
-          borderRadius: 999,
-          backgroundColor: theme.colors.surfaceVariant,
         },
-        filtersButtonActive: {
-          backgroundColor: theme.colors.primary,
-        },
-        filtersButtonLabel: {
-          fontSize: theme.custom.typography.labelLarge.fontSize,
-          fontFamily: theme.custom.typography.labelLarge.fontFamily,
-          fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
-          color: theme.colors.onSurfaceVariant,
-        },
-        filtersButtonLabelActive: {
-          color: theme.colors.onPrimary,
-        },
-        listContent: {
-          padding: theme.custom.spacing.lg,
-          paddingBottom: theme.custom.spacing.xl * 2,
-          gap: theme.custom.spacing.sm,
+        agendaCard: {
+          borderRadius: 14,
         },
         emptyWrapper: {
+          paddingVertical: theme.custom.spacing.xl,
+        },
+        advancedFiltersChip: {
+          alignSelf: "flex-start",
+        },
+        drawerContainer: {
           paddingHorizontal: theme.custom.spacing.lg,
-          paddingTop: theme.custom.spacing.lg,
+          gap: theme.custom.spacing.lg,
         },
         drawerSection: {
-          marginBottom: theme.custom.spacing.lg,
           gap: theme.custom.spacing.sm,
         },
         drawerSectionTitle: {
@@ -218,41 +337,21 @@ const CalendarScreen = () => {
           fontFamily: theme.custom.typography.titleMedium.fontFamily,
           fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
           color: theme.colors.onSurface,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
         },
-        pillGrid: {
+        drawerChips: {
           flexDirection: "row",
           flexWrap: "wrap",
           gap: theme.custom.spacing.sm,
         },
-        pill: {
-          paddingHorizontal: theme.custom.spacing.lg,
-          paddingVertical: theme.custom.spacing.sm,
-          borderRadius: 999,
-          backgroundColor: theme.colors.surfaceVariant,
-        },
-        pillActive: {
-          backgroundColor: theme.colors.primary,
-        },
-        pillLabel: {
-          fontSize: theme.custom.typography.labelLarge.fontSize,
-          fontFamily: theme.custom.typography.labelLarge.fontFamily,
-          fontWeight: theme.custom.typography.labelLarge.fontWeight as any,
-          color: theme.colors.onSurfaceVariant,
-        },
-        pillLabelActive: {
-          color: theme.colors.onPrimary,
-        },
         dateRow: {
           flexDirection: "row",
-          alignItems: "center",
           gap: theme.custom.spacing.sm,
         },
         dateField: {
           flex: 1,
-          borderRadius: 14,
-          paddingHorizontal: theme.custom.spacing.lg,
-          paddingVertical: theme.custom.spacing.lg,
+          borderRadius: 16,
+          paddingVertical: theme.custom.spacing.md,
+          paddingHorizontal: theme.custom.spacing.md,
           backgroundColor: theme.colors.surfaceVariant,
           borderWidth: 1,
           borderColor: "transparent",
@@ -267,17 +366,8 @@ const CalendarScreen = () => {
           color: theme.colors.onSurfaceVariant,
           marginBottom: theme.custom.spacing.xs,
         },
-        dateFieldValue: {
-          fontSize: theme.custom.typography.bodyLarge.fontSize,
-          fontFamily: theme.custom.typography.bodyLarge.fontFamily,
-          fontWeight: theme.custom.typography.bodyLarge.fontWeight as any,
-          color: theme.colors.onSurface,
-        },
         drawerActions: {
           gap: theme.custom.spacing.sm,
-        },
-        clearButton: {
-          alignSelf: "center",
         },
       }),
     [theme],
@@ -285,52 +375,36 @@ const CalendarScreen = () => {
 
   const handleReleasePress = useCallback(
     (releaseId: string) => {
-      // Find the release by ID from the current releases list
       const release = releases.find((r) => r.id === releaseId);
       if (!release) {
-        console.warn("Release not found:", releaseId);
+        void logger.warn("calendar.releaseNotFound", { releaseId });
         return;
       }
 
-      // Navigate based on media type
       switch (release.type) {
         case "episode":
-          // For episodes, navigate to the series detail page
           if (release.serviceId && release.seriesId) {
             router.push(
               `/sonarr/${release.serviceId}/series/${release.seriesId}`,
             );
-          } else {
-            console.warn(
-              "Missing serviceId or seriesId for episode navigation",
-            );
           }
           break;
-
         case "movie":
-          // For movies, navigate to the movie detail page using tmdbId
           if (release.serviceId && release.tmdbId) {
             router.push(
               `/radarr/${release.serviceId}/movies/${release.tmdbId}`,
             );
-          } else {
-            console.warn("Missing serviceId or tmdbId for movie navigation");
           }
           break;
-
         case "series":
-          // For series, navigate to the series detail page
           if (release.serviceId && release.seriesId) {
             router.push(
               `/sonarr/${release.serviceId}/series/${release.seriesId}`,
             );
-          } else {
-            console.warn("Missing serviceId or seriesId for series navigation");
           }
           break;
-
         default:
-          console.warn("Unknown media type for navigation:", release.type);
+          break;
       }
     },
     [releases, router],
@@ -340,17 +414,59 @@ const CalendarScreen = () => {
     goToToday();
   }, [goToToday]);
 
-  const sortByDateThenTitle = useCallback(
-    (a: MediaRelease, b: MediaRelease) => {
-      const aDate = parseISO(a.releaseDate);
-      const bDate = parseISO(b.releaseDate);
-      if (aDate.getTime() !== bDate.getTime()) {
-        return bDate.getTime() - aDate.getTime();
-      }
-      return a.title.localeCompare(b.title);
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      setSearchText(text);
+      const trimmed = text.trim();
+      setFilters({ searchQuery: trimmed.length > 0 ? trimmed : undefined });
     },
-    [],
+    [setFilters],
   );
+
+  const handleSelectSegment = useCallback(
+    (value: string) => {
+      const segment = value as CalendarView;
+      if (segment === state.view) return;
+      setView(segment);
+      if (segment !== "day") {
+        setSelectedDate(undefined);
+      }
+    },
+    [setView, state.view, setSelectedDate],
+  );
+
+  const handleDateSelect = useCallback(
+    (date: string) => {
+      setSelectedDate(date);
+      setCurrentDate(date);
+      setView("day");
+    },
+    [setCurrentDate, setSelectedDate, setView],
+  );
+
+  const handleQuickRangeSelect = useCallback(
+    (days: number) => {
+      const today = new Date();
+      const start = format(today, "yyyy-MM-dd");
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() + (days - 1));
+      const end = format(endDate, "yyyy-MM-dd");
+      setFilters({
+        dateRange: {
+          start,
+          end,
+        },
+      });
+      setCurrentDate(start);
+      setSelectedDate(start);
+      setView("custom");
+    },
+    [setFilters, setCurrentDate, setSelectedDate, setView],
+  );
+
+  const openFilters = useCallback(() => {
+    setIsFilterDrawerVisible(true);
+  }, []);
 
   const releasesForView = useMemo(() => {
     if (!calendarData) {
@@ -358,43 +474,39 @@ const CalendarScreen = () => {
     }
 
     if (state.view === "day" && "date" in calendarData) {
-      const dayData = calendarData as CalendarDay;
-      return [...dayData.releases].sort(sortByDateThenTitle);
+      return [...(calendarData as CalendarDay).releases];
     }
 
     if (state.view === "week" && "days" in calendarData) {
-      const weekData = calendarData as CalendarWeek;
-      return [...weekData.days.flatMap((day) => day.releases)].sort(
-        sortByDateThenTitle,
-      );
+      return [
+        ...(calendarData as CalendarWeek).days.flatMap((day) => day.releases),
+      ];
     }
 
     if (state.view === "month" && "weeks" in calendarData) {
       const monthData = calendarData as CalendarMonth;
-      const flattened = monthData.weeks
+      return monthData.weeks
         .flatMap((week) => week.days)
         .filter((day) => day.isCurrentMonth)
         .flatMap((day) => day.releases);
-      return [...flattened].sort(sortByDateThenTitle);
     }
 
     if (state.view === "custom") {
-      // For custom view, show all releases in the dateRange, which are already filtered
-      return [...releases].sort(sortByDateThenTitle);
+      return [...releases];
     }
 
     if ("releases" in calendarData && calendarData.releases) {
-      return [...calendarData.releases].sort(sortByDateThenTitle);
+      return [...calendarData.releases];
     }
 
     return [] as MediaRelease[];
-  }, [calendarData, sortByDateThenTitle, state.view, releases]);
+  }, [calendarData, releases, state.view]);
 
   const headingLabel = useMemo(() => {
     if (!calendarData) return "";
 
     if (state.view === "day" && "date" in calendarData) {
-      const date = parseISO(calendarData.date);
+      const date = parseISO((calendarData as CalendarDay).date);
       if (isToday(date)) return "Today";
       if (isTomorrow(date)) return "Tomorrow";
       if (isYesterday(date)) return "Yesterday";
@@ -402,10 +514,10 @@ const CalendarScreen = () => {
     }
 
     if (state.view === "week" && "days" in calendarData) {
-      const weekData = calendarData as CalendarWeek;
-      const first = parseISO(weekData.days[0]?.date ?? state.currentDate);
+      const week = calendarData as CalendarWeek;
+      const first = parseISO(week.days[0]?.date ?? state.currentDate);
       const last = parseISO(
-        weekData.days[weekData.days.length - 1]?.date ?? state.currentDate,
+        week.days[week.days.length - 1]?.date ?? state.currentDate,
       );
       if (isSameWeek(first, new Date())) {
         return "This Week";
@@ -414,8 +526,8 @@ const CalendarScreen = () => {
     }
 
     if (state.view === "month" && "weeks" in calendarData) {
-      const monthData = calendarData as CalendarMonth;
-      const monthDate = new Date(monthData.year, monthData.month - 1, 1);
+      const month = calendarData as CalendarMonth;
+      const monthDate = new Date(month.year, month.month - 1, 1);
       if (isSameMonth(monthDate, new Date())) {
         return "This Month";
       }
@@ -423,12 +535,8 @@ const CalendarScreen = () => {
     }
 
     if (state.view === "custom" && state.filters.dateRange) {
-      const start = format(
-        parseISO(state.filters.dateRange.start),
-        "MMM d, yyyy",
-      );
-      const end = format(parseISO(state.filters.dateRange.end), "MMM d, yyyy");
-      return `Custom: ${start} - ${end}`;
+      const { start, end } = state.filters.dateRange;
+      return `Range • ${format(parseISO(start), "MMM d, yyyy")} → ${format(parseISO(end), "MMM d, yyyy")}`;
     }
 
     return navigation.currentPeriod;
@@ -436,8 +544,8 @@ const CalendarScreen = () => {
     calendarData,
     navigation.currentPeriod,
     state.currentDate,
-    state.view,
     state.filters.dateRange,
+    state.view,
   ]);
 
   const subheadingLabel = useMemo(() => {
@@ -446,95 +554,419 @@ const CalendarScreen = () => {
     }
     return `${releasesForView.length} release${
       releasesForView.length === 1 ? "" : "s"
-    }`;
+    } in view`;
   }, [releasesForView.length]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (state.filters.mediaTypes.length !== ALL_MEDIA_TYPES.length) count++;
-    if (state.filters.serviceTypes?.length) count++;
+
+    const defaultStatuses = new Set(DEFAULT_STATUSES);
+    const sameAsDefault =
+      state.filters.statuses.length === DEFAULT_STATUSES.length &&
+      state.filters.statuses.every((status) => defaultStatuses.has(status));
+    if (!sameAsDefault) count++;
+
+    if (state.filters.serviceTypes.length) count++;
+    if (state.filters.services.length) count++;
     if (state.filters.monitoredStatus !== "all") count++;
     if (state.filters.dateRange) count++;
-    if (state.filters.services.length) count++;
     if (state.filters.searchQuery) count++;
-    if (state.filters.statuses.length !== DEFAULT_STATUSES.length) count++;
     return count;
   }, [state.filters]);
 
-  const formatDateFieldValue = useCallback((value?: string) => {
-    if (!value) return "Select date";
-    return format(parseISO(value), "MM/dd/yyyy");
-  }, []);
+  const filterSummaryItems = useMemo(() => {
+    const items: {
+      key: string;
+      label: string;
+      icon: string;
+      selected: boolean;
+    }[] = [];
 
-  const handleSelectSegment = useCallback(
-    (view: CalendarView) => {
-      if (view === state.view) return;
-      setView(view);
+    const statusesActive =
+      state.filters.statuses.length !== ALL_STATUSES.length;
+    const statusLabel = statusesActive
+      ? `Status • ${state.filters.statuses
+          .map((status) => STATUS_LABELS[status])
+          .join(", ")}`
+      : "Status • All";
+    items.push({
+      key: "statuses",
+      label: statusLabel,
+      icon: "flag-variant",
+      selected: statusesActive,
+    });
+
+    const mediaActive =
+      state.filters.mediaTypes.length !== ALL_MEDIA_TYPES.length;
+    const mediaLabel = mediaActive
+      ? `Media • ${state.filters.mediaTypes
+          .map((type) => MEDIA_TYPE_LABELS[type])
+          .join(", ")}`
+      : "Media • All";
+    items.push({
+      key: "media",
+      label: mediaLabel,
+      icon: "movie-open",
+      selected: mediaActive,
+    });
+
+    const serviceTypeActive = state.filters.serviceTypes.length > 0;
+    const serviceTypeLabel = serviceTypeActive
+      ? `Sources • ${state.filters.serviceTypes
+          .map((type) => SERVICE_TYPE_LABELS[type])
+          .join(", ")}`
+      : "Sources • Any";
+    items.push({
+      key: "serviceTypes",
+      label: serviceTypeLabel,
+      icon: "database",
+      selected: serviceTypeActive,
+    });
+
+    const servicesActive = state.filters.services.length > 0;
+    const selectedServices = state.filters.services
+      .map((id) => serviceOptions.find((service) => service.id === id)?.name)
+      .filter(Boolean) as string[];
+    let servicesLabel = "Services • All";
+    if (servicesActive) {
+      const preview = selectedServices.slice(0, 2).join(", ");
+      const remainder = selectedServices.length - 2;
+      servicesLabel =
+        remainder > 0
+          ? `Services • ${preview} +${remainder}`
+          : `Services • ${preview}`;
+    }
+    items.push({
+      key: "services",
+      label: servicesLabel,
+      icon: "server",
+      selected: servicesActive,
+    });
+
+    const monitoredActive = state.filters.monitoredStatus !== "all";
+    const monitoredLabel = monitoredActive
+      ? state.filters.monitoredStatus === "monitored"
+        ? "Monitoring • Monitored"
+        : "Monitoring • Unmonitored"
+      : "Monitoring • Any";
+    items.push({
+      key: "monitored",
+      label: monitoredLabel,
+      icon: "eye",
+      selected: monitoredActive,
+    });
+
+    const rangeActive = Boolean(state.filters.dateRange);
+    const rangeLabel =
+      rangeActive && state.filters.dateRange
+        ? (() => {
+            const { start, end } = state.filters.dateRange;
+            const formattedStart = format(parseISO(start), "MMM d");
+            const formattedEnd = format(parseISO(end), "MMM d");
+            return `Range • ${formattedStart} → ${formattedEnd}`;
+          })()
+        : "Range • Any";
+    items.push({
+      key: "range",
+      label: rangeLabel,
+      icon: "calendar-range",
+      selected: rangeActive,
+    });
+
+    if (state.filters.searchQuery) {
+      items.push({
+        key: "search",
+        label: `Search • “${state.filters.searchQuery}”`,
+        icon: "magnify",
+        selected: true,
+      });
+    }
+
+    return items;
+  }, [serviceOptions, state.filters]);
+
+  const agendaSections = useMemo<AgendaSection[]>(() => {
+    const map = new Map<string, MediaRelease[]>();
+    releasesForView.forEach((release) => {
+      const existing = map.get(release.releaseDate) ?? [];
+      existing.push(release);
+      map.set(release.releaseDate, existing);
+    });
+
+    const sortedDates = Array.from(map.keys()).sort(
+      (a, b) => new Date(a).getTime() - new Date(b).getTime(),
+    );
+
+    return sortedDates.map((date) => ({
+      date,
+      releases: (map.get(date) ?? [])
+        .slice()
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    }));
+  }, [releasesForView]);
+
+  const renderCalendarSurface = useMemo(() => {
+    if (!calendarData) return null;
+
+    if (state.view === "day" && "date" in calendarData) {
+      return (
+        <CalendarDayView
+          data={calendarData as CalendarDay}
+          onReleasePress={handleReleasePress}
+        />
+      );
+    }
+
+    if (state.view === "week" && "days" in calendarData) {
+      return (
+        <CalendarWeekView
+          data={calendarData as CalendarWeek}
+          selectedDate={state.selectedDate}
+          onDateSelect={handleDateSelect}
+          onReleasePress={handleReleasePress}
+        />
+      );
+    }
+
+    if ("weeks" in calendarData) {
+      return (
+        <CalendarMonthView
+          data={calendarData as CalendarMonth}
+          selectedDate={state.selectedDate}
+          onDateSelect={handleDateSelect}
+          onReleasePress={handleReleasePress}
+        />
+      );
+    }
+
+    return null;
+  }, [
+    calendarData,
+    state.view,
+    state.selectedDate,
+    handleDateSelect,
+    handleReleasePress,
+  ]);
+
+  const renderAgendaSection = useCallback(
+    ({ item, index }: ListRenderItemInfo<AgendaSection>) => {
+      const dateObj = parseISO(item.date);
+      const formattedDate = format(dateObj, "EEEE, MMM d");
+      const relative = formatRelative(dateObj, new Date());
+      const countLabel = `${item.releases.length} release${
+        item.releases.length === 1 ? "" : "s"
+      }`;
+
+      return (
+        <AnimatedSection style={styles.agendaSection} delay={index * 30}>
+          <View style={styles.agendaHeader}>
+            <Text style={styles.agendaDate}>{formattedDate}</Text>
+            <Text style={styles.agendaMeta}>
+              {relative} • {countLabel}
+            </Text>
+          </View>
+
+          <View style={styles.agendaReleases}>
+            {item.releases.map((release, releaseIndex) => (
+              <Animated.View
+                key={release.id}
+                entering={FadeIn.duration(220)
+                  .withInitialValues({
+                    opacity: 0,
+                    transform: [{ scale: 0.94 }],
+                  })
+                  .delay(releaseIndex * 30)}
+                exiting={FadeOut.duration(160)}
+                layout={LinearTransition.springify().stiffness(320).damping(28)}
+                style={styles.agendaCard}
+              >
+                <MediaReleaseCard
+                  release={release}
+                  onPress={() => handleReleasePress(release.id)}
+                  compact
+                  animated={false}
+                />
+              </Animated.View>
+            ))}
+          </View>
+        </AnimatedSection>
+      );
     },
-    [setView, state.view],
+    [handleReleasePress, styles],
   );
 
-  const openFilters = useCallback(() => {
-    setIsFilterDrawerVisible(true);
-  }, []);
+  const listHeader = useMemo(
+    () => (
+      <AnimatedView
+        entering={FadeIn.duration(220)}
+        style={styles.headerContainer}
+      >
+        <EnhancedCalendarHeader
+          navigation={navigation}
+          view={state.view}
+          currentDate={state.currentDate}
+          onViewChange={setView}
+          style={{
+            backgroundColor: "transparent",
+            elevation: 0,
+            shadowOpacity: 0,
+            marginBottom: 0,
+            paddingHorizontal: theme.custom.spacing.none,
+            paddingVertical: theme.custom.spacing.none,
+          }}
+        />
+
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.headingText}>{headingLabel}</Text>
+          <Text style={styles.subheadingText}>{subheadingLabel}</Text>
+        </View>
+
+        <View style={styles.segmentedWrapper}>
+          <SegmentedButtons
+            value={state.view}
+            onValueChange={handleSelectSegment}
+            buttons={VIEW_SEGMENTS}
+            style={styles.segmentedContainer}
+            density="small"
+          />
+        </View>
+
+        <Searchbar
+          value={searchText}
+          onChangeText={handleSearchChange}
+          placeholder="Search releases"
+          inputStyle={{ fontSize: theme.custom.typography.bodyMedium.fontSize }}
+          iconColor={theme.colors.onSurfaceVariant}
+        />
+
+        <View style={styles.quickFiltersRow}>
+          {QUICK_RANGES.map((option) => (
+            <Chip
+              key={option.days}
+              compact
+              selected={activeQuickRange === option.days}
+              onPress={() => handleQuickRangeSelect(option.days)}
+            >
+              {option.label}
+            </Chip>
+          ))}
+          <Chip
+            compact
+            icon="tune-variant"
+            onPress={openFilters}
+            style={styles.advancedFiltersChip}
+          >
+            {activeFilterCount > 0
+              ? `Advanced • ${activeFilterCount}`
+              : "Advanced filters"}
+          </Chip>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.summaryScrollContent}
+        >
+          {filterSummaryItems.map((item) => (
+            <Chip
+              key={item.key}
+              compact
+              icon={item.icon}
+              selected={item.selected}
+              onPress={openFilters}
+              style={[styles.summaryChip, styles.summaryChipSpacing]}
+            >
+              {item.label}
+            </Chip>
+          ))}
+        </ScrollView>
+
+        <CalendarStats stats={stats} shouldAnimateLayout={!state.isLoading} />
+
+        <Animated.View
+          layout={LinearTransition.springify().stiffness(340).damping(30)}
+          style={styles.calendarCardWrapper}
+        >
+          <Card contentPadding={0} animated={false}>
+            {renderCalendarSurface}
+          </Card>
+        </Animated.View>
+      </AnimatedView>
+    ),
+    [
+      activeFilterCount,
+      activeQuickRange,
+      filterSummaryItems,
+      handleQuickRangeSelect,
+      handleSelectSegment,
+      handleSearchChange,
+      headingLabel,
+      navigation,
+      openFilters,
+      renderCalendarSurface,
+      searchText,
+      setView,
+      state.currentDate,
+      state.view,
+      stats,
+      styles,
+      subheadingLabel,
+      theme.colors.onSurfaceVariant,
+      theme.custom.typography.bodyMedium.fontSize,
+      theme.custom.spacing.none,
+      state.isLoading,
+    ],
+  );
+
+  const listEmptyComponent = useMemo(() => {
+    if (state.isLoading) {
+      return (
+        <View style={styles.emptyWrapper}>
+          <LoadingState message="Loading calendar..." />
+        </View>
+      );
+    }
+
+    if (state.error) {
+      return (
+        <View style={styles.emptyWrapper}>
+          <EmptyState
+            title="Unable to load calendar"
+            description={state.error}
+            actionLabel="Retry"
+            onActionPress={handleRetry}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyWrapper}>
+        <EmptyState
+          title="No releases found"
+          description="Try adjusting your filters or check back later."
+          actionLabel="Reset filters"
+          onActionPress={() => {
+            clearFilters();
+            setSelectedDate(undefined);
+          }}
+        />
+      </View>
+    );
+  }, [
+    state.isLoading,
+    state.error,
+    styles.emptyWrapper,
+    handleRetry,
+    clearFilters,
+    setSelectedDate,
+  ]);
 
   const closeFilters = useCallback(() => {
     setIsFilterDrawerVisible(false);
     setActiveDateField(null);
   }, []);
-
-  const handleServiceTypeSelect = useCallback(
-    (serviceType: CalendarServiceType | "all") => {
-      if (serviceType === "all") {
-        setPendingFilters((prev) => ({
-          ...prev,
-          serviceTypes: [],
-        }));
-        return;
-      }
-      setPendingFilters((prev) => ({
-        ...prev,
-        serviceTypes: [serviceType],
-      }));
-    },
-    [],
-  );
-
-  const handleMediaTypeSelect = useCallback(
-    (option: "all" | "tv" | "movies") => {
-      switch (option) {
-        case "all":
-          setPendingFilters((prev) => ({
-            ...prev,
-            mediaTypes: [...ALL_MEDIA_TYPES],
-          }));
-          break;
-        case "tv":
-          setPendingFilters((prev) => ({
-            ...prev,
-            mediaTypes: ["series", "episode"],
-          }));
-          break;
-        case "movies":
-          setPendingFilters((prev) => ({
-            ...prev,
-            mediaTypes: ["movie"],
-          }));
-          break;
-      }
-    },
-    [],
-  );
-
-  const handleMonitoredSelect = useCallback(
-    (option: CalendarFilters["monitoredStatus"]) => {
-      setPendingFilters((prev) => ({
-        ...prev,
-        monitoredStatus: option,
-      }));
-    },
-    [],
-  );
 
   const handleDateFieldPress = useCallback((field: DateField) => {
     setActiveDateField(field);
@@ -550,22 +982,15 @@ const CalendarScreen = () => {
       if (selectedDate && activeDateField) {
         const iso = format(selectedDate, "yyyy-MM-dd");
         setPendingFilters((prev) => {
-          const nextRange = {
-            start: prev.dateRange?.start ?? iso,
-            end: prev.dateRange?.end ?? iso,
+          const currentRange = prev.dateRange ?? {
+            start: iso,
+            end: iso,
           };
 
-          if (activeDateField === "start") {
-            nextRange.start = iso;
-            if (!prev.dateRange?.end) {
-              nextRange.end = iso;
-            }
-          } else {
-            nextRange.end = iso;
-            if (!prev.dateRange?.start) {
-              nextRange.start = iso;
-            }
-          }
+          const nextRange =
+            activeDateField === "start"
+              ? { start: iso, end: currentRange.end ?? iso }
+              : { start: currentRange.start ?? iso, end: iso };
 
           return {
             ...prev,
@@ -578,6 +1003,11 @@ const CalendarScreen = () => {
     },
     [activeDateField],
   );
+
+  const formatDateFieldValue = useCallback((value?: string) => {
+    if (!value) return "Select date";
+    return format(parseISO(value), "MM/dd/yyyy");
+  }, []);
 
   const applyFilters = useCallback(() => {
     const normalized: CalendarFilters = {
@@ -596,13 +1026,22 @@ const CalendarScreen = () => {
           })()
         : undefined,
     };
+
     setFilters(normalized);
     if (normalized.dateRange?.start) {
       setCurrentDate(normalized.dateRange.start);
+      setSelectedDate(normalized.dateRange.start);
       setView("custom");
     }
     closeFilters();
-  }, [pendingFilters, setFilters, setCurrentDate, setView, closeFilters]);
+  }, [
+    pendingFilters,
+    setFilters,
+    setCurrentDate,
+    setSelectedDate,
+    setView,
+    closeFilters,
+  ]);
 
   const resetFilters = useCallback(() => {
     clearFilters();
@@ -616,186 +1055,25 @@ const CalendarScreen = () => {
       dateRange: undefined,
       searchQuery: undefined,
     }));
-    if (state.view === "custom") {
-      setView("month");
-    }
-  }, [clearFilters, state.view, setView]);
-
-  const renderContent = () => {
-    if (state.isLoading) {
-      return <LoadingState message="Loading calendar..." />;
-    }
-
-    if (state.error) {
-      return (
-        <View style={styles.emptyWrapper}>
-          <EmptyState
-            title="Unable to load calendar"
-            description={state.error}
-            actionLabel="Retry"
-            onActionPress={handleRetry}
-          />
-        </View>
-      );
-    }
-
-    if (releasesForView.length === 0) {
-      return (
-        <View style={styles.emptyWrapper}>
-          <EmptyState
-            title="No releases found"
-            description="Try adjusting your filters or check back later for new releases."
-            actionLabel="Clear Filters"
-            onActionPress={resetFilters}
-          />
-        </View>
-      );
-    }
-
-    return (
-      <FlashList<MediaRelease>
-        data={releasesForView}
-        keyExtractor={(item: MediaRelease) => item.id}
-        contentContainerStyle={styles.listContent}
-        renderItem={({
-          item,
-          index,
-        }: {
-          item: MediaRelease;
-          index: number;
-        }) => (
-          <AnimatedListItem
-            index={index}
-            totalItems={releasesForView.length}
-            animated={false}
-          >
-            <MediaReleaseCard
-              release={item}
-              onPress={() => handleReleasePress(item.id)}
-              animated={false}
-            />
-          </AnimatedListItem>
-        )}
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews={false}
-        scrollEventThrottle={16}
-      />
-    );
-  };
-
-  const renderPill = (
-    label: string,
-    isActive: boolean,
-    onPress: () => void,
-    testID?: string,
-  ) => (
-    <Pressable
-      key={label}
-      onPress={onPress}
-      style={[styles.pill, isActive && styles.pillActive]}
-      accessibilityRole="button"
-      accessibilityState={{ selected: isActive }}
-      testID={testID}
-    >
-      <Text
-        style={[
-          styles.pillLabel,
-          isActive && styles.pillLabelActive,
-          {
-            color: isActive
-              ? theme.colors.onPrimary
-              : theme.colors.onSurfaceVariant,
-          },
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
+    setSelectedDate(undefined);
+    setView("month");
+    closeFilters();
+  }, [clearFilters, closeFilters, setSelectedDate, setView]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <EnhancedCalendarHeader
-        navigation={navigation}
-        view={state.view}
-        currentDate={state.currentDate}
-        onViewChange={setView}
-        // Make the header visually blend with the page and remove extra elevation so it matches
-        // the surrounding layout. marginBottom still provides a small separation from the
-        // content below but overall height is reduced.
-        style={{
-          marginBottom: theme.custom.spacing.sm,
-          backgroundColor: "transparent",
-          // remove elevation/shadow so the header sits flush on the page
-          elevation: 0,
-          shadowOpacity: 0,
-          shadowRadius: 0,
-        }}
-      />
-
-      <View style={styles.headerContent}>
-        <View style={styles.segmentsRow}>
-          {VIEW_SEGMENTS.map((segment) => {
-            const isActive = state.view === segment.value;
-            return (
-              <Pressable
-                key={segment.value}
-                onPress={() => handleSelectSegment(segment.value)}
-                style={[styles.segmentButton, isActive && styles.segmentActive]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isActive }}
-              >
-                <Text
-                  style={[
-                    styles.segmentLabel,
-                    isActive && styles.segmentLabelActive,
-                  ]}
-                >
-                  {segment.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.headingText}>{headingLabel}</Text>
-          <Text style={styles.subheadingText}>{subheadingLabel}</Text>
-        </View>
-
-        <View style={styles.filtersRow}>
-          <Pressable
-            onPress={openFilters}
-            style={[
-              styles.filtersButton,
-              activeFilterCount > 0 && styles.filtersButtonActive,
-            ]}
-            accessibilityRole="button"
-          >
-            <Icon
-              source="tune-variant"
-              size={18}
-              color={
-                activeFilterCount > 0
-                  ? theme.colors.onPrimary
-                  : theme.colors.onSurfaceVariant
-              }
-            />
-            <Text
-              style={[
-                styles.filtersButtonLabel,
-                activeFilterCount > 0 && styles.filtersButtonLabelActive,
-              ]}
-            >
-              {activeFilterCount > 0
-                ? `Filters • ${activeFilterCount}`
-                : "Filters"}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <ErrorBoundary>{renderContent()}</ErrorBoundary>
+      <ErrorBoundary>
+        <FlashList<AgendaSection>
+          data={agendaSections}
+          renderItem={renderAgendaSection}
+          keyExtractor={(item: AgendaSection) => item.date}
+          estimatedItemSize={200}
+          ListHeaderComponent={listHeader}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={listEmptyComponent}
+          showsVerticalScrollIndicator={false}
+        />
+      </ErrorBoundary>
 
       <BottomDrawer
         visible={isFilterDrawerVisible}
@@ -803,175 +1081,172 @@ const CalendarScreen = () => {
         title="Filter & Sort"
         maxHeight="80%"
       >
-        <View
-          style={{
-            paddingHorizontal: theme.custom.spacing.lg,
-            backgroundColor: theme.colors.surface,
-          }}
-        >
+        <View style={styles.drawerContainer}>
           <View style={styles.drawerSection}>
-            <Text
-              style={[
-                styles.drawerSectionTitle,
-                { color: theme.colors.onSurface },
-              ]}
-            >
-              Service Type
-            </Text>
-            <View style={styles.pillGrid}>
-              {renderPill(
-                "All",
-                pendingFilters.serviceTypes.length === 0,
-                () => handleServiceTypeSelect("all"),
-                "filter-service-all",
-              )}
-              {SERVICE_TYPES.map((service) =>
-                renderPill(
-                  service === "sonarr" ? "Sonarr" : "Radarr",
-                  pendingFilters.serviceTypes.includes(service),
-                  () => handleServiceTypeSelect(service),
-                  `filter-service-${service}`,
-                ),
-              )}
+            <Text style={styles.drawerSectionTitle}>Service Type</Text>
+            <View style={styles.drawerChips}>
+              {SERVICE_TYPES.map((type) => (
+                <Chip
+                  key={type}
+                  compact
+                  selected={pendingFilters.serviceTypes.includes(type)}
+                  onPress={() =>
+                    setPendingFilters((prev) => {
+                      const existing = new Set(prev.serviceTypes);
+                      if (existing.has(type)) {
+                        existing.delete(type);
+                      } else {
+                        existing.add(type);
+                      }
+                      return {
+                        ...prev,
+                        serviceTypes: Array.from(existing),
+                      };
+                    })
+                  }
+                >
+                  {SERVICE_TYPE_LABELS[type]}
+                </Chip>
+              ))}
             </View>
           </View>
 
           <View style={styles.drawerSection}>
-            <Text
-              style={[
-                styles.drawerSectionTitle,
-                { color: theme.colors.onSurface },
-              ]}
-            >
-              Media Type
-            </Text>
-            <View style={styles.pillGrid}>
-              {renderPill(
-                "All",
-                pendingFilters.mediaTypes.length === ALL_MEDIA_TYPES.length,
-                () => handleMediaTypeSelect("all"),
-                "filter-media-all",
-              )}
-              {renderPill(
-                "TV Shows",
-                pendingFilters.mediaTypes.length === 2 &&
-                  pendingFilters.mediaTypes.includes("series") &&
-                  pendingFilters.mediaTypes.includes("episode"),
-                () => handleMediaTypeSelect("tv"),
-                "filter-media-tv",
-              )}
-              {renderPill(
-                "Movies",
-                pendingFilters.mediaTypes.length === 1 &&
-                  pendingFilters.mediaTypes.includes("movie"),
-                () => handleMediaTypeSelect("movies"),
-                "filter-media-movies",
-              )}
+            <Text style={styles.drawerSectionTitle}>Media Type</Text>
+            <View style={styles.drawerChips}>
+              {ALL_MEDIA_TYPES.map((type) => (
+                <Chip
+                  key={type}
+                  compact
+                  selected={pendingFilters.mediaTypes.includes(type)}
+                  onPress={() =>
+                    setPendingFilters((prev) => ({
+                      ...prev,
+                      mediaTypes: prev.mediaTypes.includes(type)
+                        ? prev.mediaTypes.filter((t) => t !== type)
+                        : [...prev.mediaTypes, type],
+                    }))
+                  }
+                >
+                  {MEDIA_TYPE_LABELS[type]}
+                </Chip>
+              ))}
             </View>
           </View>
 
           <View style={styles.drawerSection}>
-            <Text
-              style={[
-                styles.drawerSectionTitle,
-                { color: theme.colors.onSurface },
-              ]}
-            >
-              Monitored Status
-            </Text>
-            <View style={styles.pillGrid}>
-              {renderPill(
-                "All",
-                pendingFilters.monitoredStatus === "all",
-                () => handleMonitoredSelect("all"),
-                "filter-monitored-all",
-              )}
-              {renderPill(
-                "Monitored",
-                pendingFilters.monitoredStatus === "monitored",
-                () => handleMonitoredSelect("monitored"),
-                "filter-monitored-monitored",
-              )}
-              {renderPill(
-                "Unmonitored",
-                pendingFilters.monitoredStatus === "unmonitored",
-                () => handleMonitoredSelect("unmonitored"),
-                "filter-monitored-unmonitored",
-              )}
+            <Text style={styles.drawerSectionTitle}>Release Status</Text>
+            <View style={styles.drawerChips}>
+              {ALL_STATUSES.map((status) => (
+                <Chip
+                  key={status}
+                  compact
+                  selected={pendingFilters.statuses.includes(status)}
+                  onPress={() =>
+                    setPendingFilters((prev) => ({
+                      ...prev,
+                      statuses: prev.statuses.includes(status)
+                        ? prev.statuses.filter((s) => s !== status)
+                        : [...prev.statuses, status],
+                    }))
+                  }
+                >
+                  {STATUS_LABELS[status]}
+                </Chip>
+              ))}
             </View>
           </View>
 
           <View style={styles.drawerSection}>
-            <Text
-              style={[
-                styles.drawerSectionTitle,
-                { color: theme.colors.onSurface },
-              ]}
-            >
-              Date Range
-            </Text>
+            <Text style={styles.drawerSectionTitle}>Services</Text>
+            <View style={styles.drawerChips}>
+              {serviceOptions.map((service) => (
+                <Chip
+                  key={service.id}
+                  compact
+                  selected={pendingFilters.services.includes(service.id)}
+                  onPress={() =>
+                    setPendingFilters((prev) => ({
+                      ...prev,
+                      services: prev.services.includes(service.id)
+                        ? prev.services.filter((id) => id !== service.id)
+                        : [...prev.services, service.id],
+                    }))
+                  }
+                >
+                  {service.name}
+                </Chip>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.drawerSection}>
+            <Text style={styles.drawerSectionTitle}>Monitored</Text>
+            <View style={styles.drawerChips}>
+              {(["all", "monitored", "unmonitored"] as const).map((value) => (
+                <Chip
+                  key={value}
+                  compact
+                  selected={pendingFilters.monitoredStatus === value}
+                  onPress={() =>
+                    setPendingFilters((prev) => ({
+                      ...prev,
+                      monitoredStatus: value,
+                    }))
+                  }
+                >
+                  {value === "all"
+                    ? "Any"
+                    : value === "monitored"
+                      ? "Monitored"
+                      : "Unmonitored"}
+                </Chip>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.drawerSection}>
+            <Text style={styles.drawerSectionTitle}>Date Range</Text>
             <View style={styles.dateRow}>
-              <Pressable
-                onPress={() => handleDateFieldPress("start")}
+              <View
                 style={[
                   styles.dateField,
                   activeDateField === "start" && styles.dateFieldActive,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.dateFieldLabel,
-                    { color: theme.colors.onSurfaceVariant },
-                  ]}
-                >
-                  Start Date
-                </Text>
-                <Text
-                  style={[
-                    styles.dateFieldValue,
-                    { color: theme.colors.onSurface },
-                  ]}
+                <Text style={styles.dateFieldLabel}>Start</Text>
+                <Chip
+                  compact
+                  onPress={() => handleDateFieldPress("start")}
+                  icon="calendar"
                 >
                   {formatDateFieldValue(pendingFilters.dateRange?.start)}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleDateFieldPress("end")}
+                </Chip>
+              </View>
+              <View
                 style={[
                   styles.dateField,
                   activeDateField === "end" && styles.dateFieldActive,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.dateFieldLabel,
-                    { color: theme.colors.onSurfaceVariant },
-                  ]}
-                >
-                  End Date
-                </Text>
-                <Text
-                  style={[
-                    styles.dateFieldValue,
-                    { color: theme.colors.onSurface },
-                  ]}
+                <Text style={styles.dateFieldLabel}>End</Text>
+                <Chip
+                  compact
+                  onPress={() => handleDateFieldPress("end")}
+                  icon="calendar"
                 >
                   {formatDateFieldValue(pendingFilters.dateRange?.end)}
-                </Text>
-              </Pressable>
+                </Chip>
+              </View>
             </View>
           </View>
 
           <View style={styles.drawerActions}>
             <Button mode="contained" onPress={applyFilters}>
-              Apply Filters
+              Apply filters
             </Button>
-            <Button
-              mode="text"
-              onPress={resetFilters}
-              style={styles.clearButton}
-            >
-              Clear Filters
+            <Button mode="text" onPress={resetFilters}>
+              Clear all
             </Button>
           </View>
         </View>
@@ -980,9 +1255,12 @@ const CalendarScreen = () => {
       {activeDateField ? (
         <DateTimePicker
           value={(() => {
-            if (!activeDateField) return new Date();
             const current = pendingFilters.dateRange?.[activeDateField];
-            return current ? parseISO(current) : new Date();
+            if (!current) {
+              return new Date();
+            }
+            const parsed = parseISO(current);
+            return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
           })()}
           mode="date"
           display={Platform.OS === "ios" ? "spinner" : "default"}

@@ -9,6 +9,8 @@ import type {
 import type { ServiceConfig } from "@/models/service.types";
 import { handleApiError } from "@/utils/error.utils";
 import { logger } from "@/services/logger/LoggerService";
+import { httpErrorInterceptor } from "@/services/http/HttpErrorInterceptor";
+import { useSettingsStore } from "@/store/settingsStore";
 import {
   testNetworkConnectivity,
   diagnoseVpnIssues,
@@ -215,7 +217,17 @@ export abstract class BaseConnector<
     }
   }
 
-  /** Create a configured Axios instance with logging and error handling. */
+  /**
+   * Create a configured Axios instance with logging and error handling.
+   *
+   * @note API Error Logger Capture Settings
+   * The capture settings (requestBody, responseBody, requestHeaders) are read at
+   * HTTP client initialization time. If users change these settings at runtime,
+   * the changes will NOT automatically apply to already-initialized connectors.
+   * Users must restart the app for capture setting changes to take effect.
+   * This is a design choice to avoid the overhead of monitoring settings changes
+   * for every HTTP request. Consider documenting this limitation in the UI.
+   */
   protected createHttpClient(): AxiosInstance {
     const instance = axios.create({
       baseURL: this.config.url,
@@ -223,6 +235,26 @@ export abstract class BaseConnector<
       headers: this.getDefaultHeaders(),
       ...this.getAuthConfig(),
     });
+
+    // Get capture settings from user preferences
+    const settings = useSettingsStore.getState();
+
+    // Setup HTTP error interceptor for automatic error logging
+    // This ensures ALL API calls through this connector are captured
+    httpErrorInterceptor.setup(
+      instance,
+      {
+        enableErrorLogging: true,
+        captureRequestBody: settings.apiErrorLoggerCaptureRequestBody,
+        captureResponseBody: settings.apiErrorLoggerCaptureResponseBody,
+        captureRequestHeaders: settings.apiErrorLoggerCaptureRequestHeaders,
+        excludeStatusCodes: [401, 403, 404], // Skip common expected errors
+      },
+      {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+      },
+    );
 
     instance.interceptors.request.use(
       (requestConfig) => {

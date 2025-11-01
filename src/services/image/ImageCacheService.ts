@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 // Use legacy FileSystem API to avoid deprecation warnings for getInfoAsync.
 // TODO: migrate to the new File/Directory API from `expo-file-system` to remove
 // the legacy dependency and use the modern APIs for file info and operations.
@@ -1395,7 +1395,7 @@ class ImageCacheService {
     }
 
     try {
-      const serialized = await AsyncStorage.getItem(STORAGE_KEY);
+      const serialized = await storageAdapter.getItem(STORAGE_KEY);
       if (serialized) {
         const parsed = JSON.parse(serialized) as string[];
         if (Array.isArray(parsed)) {
@@ -1433,7 +1433,7 @@ class ImageCacheService {
       const sanitized = Array.from(this.trackedUris).map((u) =>
         this.sanitizeUriForStorage(u),
       );
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      await storageAdapter.setItem(STORAGE_KEY, JSON.stringify(sanitized));
     } catch (error) {
       void logger.warn("ImageCacheService: failed to persist tracked URIs.", {
         error: this.stringifyError(error),

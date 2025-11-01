@@ -2,6 +2,9 @@ import { isAxiosError, type AxiosError } from "axios";
 
 import { type ServiceType } from "@/models/service.types";
 import { logger } from "@/services/logger/LoggerService";
+import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
+import { useSettingsStore } from "@/store/settingsStore";
+import { ERROR_CODE_PRESETS } from "@/models/apiErrorLog.types";
 
 export interface ErrorContext {
   serviceId?: string;
@@ -136,6 +139,53 @@ const mergeContext = (
   };
 };
 
+const shouldLogErrorCode = (
+  statusCode: number | string | undefined,
+  isNetwork: boolean,
+): boolean => {
+  try {
+    const settings = useSettingsStore.getState();
+    if (!settings.apiErrorLoggerEnabled) {
+      return false;
+    }
+
+    const preset = ERROR_CODE_PRESETS[settings.apiErrorLoggerActivePreset];
+    if (!preset) {
+      return false;
+    }
+
+    let codesToLog = preset.codes;
+    if (settings.apiErrorLoggerActivePreset === "CUSTOM") {
+      codesToLog = settings.apiErrorLoggerCustomCodes;
+    }
+
+    // Check if error code matches
+    if (statusCode !== undefined) {
+      return codesToLog.includes(statusCode);
+    }
+
+    // For network errors
+    if (isNetwork) {
+      return codesToLog.some(
+        (code) =>
+          typeof code === "string" &&
+          [
+            "ECONNABORTED",
+            "ECONNREFUSED",
+            "ENOTFOUND",
+            "ETIMEDOUT",
+            "ERR_NETWORK",
+          ].includes(code),
+      );
+    }
+
+    return false;
+  } catch {
+    // If settings access fails, don't log to prevent errors
+    return false;
+  }
+};
+
 export const handleApiError = (
   error: unknown,
   context?: ErrorContext,
@@ -182,6 +232,11 @@ export const handleApiError = (
       void logger.error("API error captured.", logContext);
     } else {
       void logger.warn("API error captured.", logContext);
+    }
+
+    // Log to API error logger if enabled and code matches config
+    if (shouldLogErrorCode(statusCode, isNetwork)) {
+      void apiErrorLogger.addError(apiError, context);
     }
 
     return apiError;

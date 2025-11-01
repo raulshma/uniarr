@@ -41,6 +41,8 @@ export interface SettingsListItemProps {
   testID?: string;
   /** Optional style override */
   style?: ViewStyle;
+  /** Frosted glass background */
+  frosted?: boolean;
 }
 
 const SettingsListItem = React.forwardRef<View, SettingsListItemProps>(
@@ -58,83 +60,124 @@ const SettingsListItem = React.forwardRef<View, SettingsListItemProps>(
       accessibilityLabel: customAccessibilityLabel,
       testID,
       style,
+      frosted = false,
     },
     ref,
   ) => {
     const theme = useTheme<AppTheme>();
 
-    const styles = useMemo(
-      () =>
-        StyleSheet.create({
-          container: {
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.sm,
-            backgroundColor: selected
-              ? theme.colors.primaryContainer
-              : theme.colors.surface,
-            flexDirection: "column",
-          },
-          cornerRadius: getCornerRadius(groupPosition),
-          innerContainer: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing.md,
-            minHeight: 48,
-          },
-          leftIconContainer: {
-            width: 40,
-            height: 40,
-            borderRadius: 20, // Circle
-            backgroundColor: selected
-              ? theme.colors.primary
-              : theme.colors.surfaceVariant,
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          },
-          contentContainer: {
-            flex: 1,
-            justifyContent: "center",
-          },
-          title: {
-            color: theme.colors.onSurface,
-            fontSize: theme.custom.typography.bodyMedium.fontSize,
-            fontFamily: theme.custom.typography.bodyMedium.fontFamily,
-            lineHeight: theme.custom.typography.bodyMedium.lineHeight,
-            letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
-            fontWeight: "600" as const,
-            marginBottom: subtitle ? 2 : 0,
-          },
-          subtitle: {
-            color: theme.colors.onSurfaceVariant,
-            fontSize: theme.custom.typography.bodySmall.fontSize,
-            fontFamily: theme.custom.typography.bodySmall.fontFamily,
-            lineHeight: theme.custom.typography.bodySmall.lineHeight,
-            letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
-            fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
-          },
-          trailingContainer: {
-            flexShrink: 0,
-            alignItems: "center",
-            justifyContent: "center",
-          },
-          // Divider rendered as a separate view so it can be inset to align with text
-          divider: {
-            height: StyleSheet.hairlineWidth || 1,
-            backgroundColor: theme.colors.outline,
-            // inset the divider so it aligns with the content (icon width + gap + padding)
-            marginLeft: spacing.md + 40 + spacing.md,
-            marginRight: spacing.md,
-          },
-          pressedStyle: {
-            opacity: 0.8,
-          },
-          disabledStyle: {
-            opacity: 0.5,
-          },
-        }),
-      [theme, selected, groupPosition, subtitle],
-    );
+    const styles = useMemo(() => {
+      const frostedPalette = theme.custom.effects?.frosted;
+
+      const frostedSurface = (() => {
+        if (frostedPalette) {
+          return frostedPalette.pillBackgroundColor;
+        }
+
+        return theme.dark
+          ? "rgba(24, 24, 32, 0.42)"
+          : "rgba(255, 255, 255, 0.65)";
+      })();
+
+      const frostedIconSurface = (() => {
+        if (frostedPalette) {
+          return frostedPalette.pillBackgroundColor;
+        }
+
+        return theme.dark
+          ? "rgba(255, 255, 255, 0.18)"
+          : "rgba(255, 255, 255, 0.78)";
+      })();
+
+      const containerBackground = (() => {
+        if (frosted) {
+          return frostedSurface;
+        }
+
+        if (selected) {
+          return theme.colors.primaryContainer;
+        }
+
+        return theme.colors.surface;
+      })();
+
+      const iconBackground = (() => {
+        if (frosted) {
+          return frostedIconSurface;
+        }
+
+        if (selected) {
+          return theme.colors.primary;
+        }
+
+        return theme.colors.surfaceVariant;
+      })();
+
+      return StyleSheet.create({
+        container: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          backgroundColor: containerBackground,
+          flexDirection: "column",
+        },
+        cornerRadius: getCornerRadius(groupPosition),
+        innerContainer: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.md,
+          minHeight: 48,
+        },
+        leftIconContainer: {
+          width: 40,
+          height: 40,
+          borderRadius: 20, // Circle
+          backgroundColor: iconBackground,
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        },
+        contentContainer: {
+          flex: 1,
+          justifyContent: "center",
+        },
+        title: {
+          color: theme.colors.onSurface,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
+          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
+          lineHeight: theme.custom.typography.bodyMedium.lineHeight,
+          letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
+          fontWeight: "600" as const,
+          marginBottom: subtitle ? 2 : 0,
+        },
+        subtitle: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
+          fontFamily: theme.custom.typography.bodySmall.fontFamily,
+          lineHeight: theme.custom.typography.bodySmall.lineHeight,
+          letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
+          fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
+        },
+        trailingContainer: {
+          flexShrink: 0,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        // Divider rendered as a separate view so it can be inset to align with text
+        divider: {
+          height: StyleSheet.hairlineWidth || 1,
+          backgroundColor: theme.colors.outline,
+          // inset the divider so it aligns with the content (icon width + gap + padding)
+          marginLeft: spacing.md + 40 + spacing.md,
+          marginRight: spacing.md,
+        },
+        pressedStyle: {
+          opacity: 0.8,
+        },
+        disabledStyle: {
+          opacity: 0.5,
+        },
+      });
+    }, [theme, selected, groupPosition, subtitle, frosted]);
 
     // Compute accessible label: custom override or "Title, Subtitle"
     const computedAccessibilityLabel =

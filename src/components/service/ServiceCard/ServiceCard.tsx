@@ -1,13 +1,15 @@
 import React, { useMemo } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
-import { StyleSheet, View } from "react-native";
+import type { StyleProp, ViewStyle, ImageSource } from "react-native";
+import { StyleSheet, View, Pressable } from "react-native";
 import {
-  ActivityIndicator,
   Avatar,
   IconButton,
   Text,
+  Tooltip,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
+import type { CardProps } from "@/components/common/Card/Card";
 
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
@@ -25,7 +27,7 @@ export type ServiceCardProps = {
   status: ServiceStatusState;
   statusDescription?: string;
   lastCheckedAt?: Date | string;
-  icon?: React.ComponentProps<typeof Avatar.Icon>["icon"];
+  icon?: React.ComponentProps<typeof Avatar.Icon>["icon"] | ImageSource;
   description?: string;
   latency?: number;
   version?: string;
@@ -77,6 +79,61 @@ const formatRelativeTime = (input?: Date | string): string | undefined => {
 
   const months = Math.round(days / 30);
   return `${months}mo ago`;
+};
+
+const arePropsEqual = (
+  prevProps: ServiceCardProps,
+  nextProps: ServiceCardProps,
+) => {
+  // Only re-render if these essential props changed
+  const propsToCompare: (keyof ServiceCardProps)[] = [
+    "id",
+    "name",
+    "url",
+    "status",
+    "statusDescription",
+    "latency",
+    "version",
+    "lastCheckedAt",
+    "icon",
+    "description",
+    "isDeleting",
+  ];
+
+  for (const prop of propsToCompare) {
+    const prevValue = prevProps[prop];
+    const nextValue = nextProps[prop];
+
+    if (prevValue !== nextValue) {
+      // Special handling for objects that might be the same reference
+      if (
+        prop === "icon" &&
+        typeof prevValue === "object" &&
+        typeof nextValue === "object" &&
+        prevValue &&
+        nextValue &&
+        "uri" in prevValue &&
+        "uri" in nextValue
+      ) {
+        if (prevValue.uri !== nextValue.uri) {
+          return false; // Re-render needed
+        }
+      } else {
+        return false; // Re-render needed for other changed props
+      }
+    }
+  }
+
+  // Function props rarely change, but check them anyway
+  if (
+    prevProps.onPress !== nextProps.onPress ||
+    prevProps.onEditPress !== nextProps.onEditPress ||
+    prevProps.onDeletePress !== nextProps.onDeletePress
+  ) {
+    return false;
+  }
+
+  return true; // No re-render needed
 };
 
 const ServiceCard: React.FC<ServiceCardProps> = ({
@@ -139,181 +196,228 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
 
   return (
     <Card
-      onPress={onPress}
       contentPadding="md"
       style={style}
       testID={testID}
       accessibilityLabel={cardAccessibilityLabel}
       accessibilityHint={cardAccessibilityHint}
       focusable={Boolean(onPress)}
+      variant="custom"
     >
-      <View style={styles.root}>
-        <Avatar.Icon
-          size={avatarSizes.lg}
-          icon={icon}
-          style={{ backgroundColor: theme.colors.primaryContainer }}
-          color={theme.colors.onPrimaryContainer}
-        />
+      <Pressable onPress={onPress} style={styles.pressable}>
+        <View style={styles.root}>
+          {/* Top Section: icon + name + status */}
+          <View style={styles.topSection}>
+            <View style={styles.topRow}>
+              {typeof icon === "object" && "uri" in icon ? (
+                <Avatar.Image
+                  size={avatarSizes.lg}
+                  source={icon}
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                />
+              ) : (
+                <Avatar.Icon
+                  size={avatarSizes.lg}
+                  icon={
+                    icon as React.ComponentProps<typeof Avatar.Icon>["icon"]
+                  }
+                  style={{ backgroundColor: theme.colors.primaryContainer }}
+                  color={theme.colors.onPrimaryContainer}
+                />
+              )}
 
-        <View style={[styles.meta, { marginLeft: theme.custom.spacing.md }]}>
-          <View style={styles.titleRow}>
-            <Text
-              variant="titleMedium"
-              style={{ color: theme.colors.onSurface }}
-              numberOfLines={1}
-            >
-              {name}
-            </Text>
-            <View style={styles.statusWrapper}>
-              <ServiceStatus status={status} />
+              <View
+                style={[styles.meta, { marginLeft: theme.custom.spacing.md }]}
+              >
+                <View style={styles.titleRow}>
+                  <Tooltip title={name}>
+                    <Text
+                      variant="titleMedium"
+                      style={{ color: theme.colors.onSurface }}
+                      numberOfLines={1}
+                    >
+                      {name}
+                    </Text>
+                  </Tooltip>
+                  <View style={styles.statusWrapper}>
+                    <ServiceStatus status={status} />
+                  </View>
+                </View>
+                <Tooltip title={url}>
+                  <Text
+                    variant="bodyMedium"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                    numberOfLines={2}
+                  >
+                    {url}
+                  </Text>
+                </Tooltip>
+              </View>
             </View>
           </View>
-          <Text
-            variant="bodyMedium"
-            style={{ color: theme.colors.onSurfaceVariant }}
-            numberOfLines={2}
-          >
-            {url}
-          </Text>
 
-          {/* Badges row: service type, status, latency, version */}
-          <View style={styles.badgesRow}>
-            {description ? (
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: theme.colors.primaryContainer },
-                ]}
-              >
-                <Text
-                  variant="labelSmall"
-                  style={{ color: theme.colors.primary }}
+          {/* Bottom Section: badges + actions */}
+          <View style={styles.bottomSection}>
+            <View style={styles.bottomRow}>
+              {/* Badges row: service type, status, latency, version */}
+              <View style={styles.badgesRow}>
+                {description ? (
+                  <View
+                    style={[
+                      styles.badge,
+                      { backgroundColor: theme.colors.primaryContainer },
+                    ]}
+                  >
+                    <Text
+                      variant="labelSmall"
+                      style={{ color: theme.colors.onPrimaryContainer }}
+                    >
+                      {description}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Status badge uses the appropriate container token */}
+                <View
+                  style={[
+                    styles.badge,
+                    {
+                      backgroundColor:
+                        status === "online"
+                          ? theme.colors.primaryContainer
+                          : status === "degraded"
+                            ? theme.colors.tertiaryContainer
+                            : theme.colors.errorContainer,
+                    },
+                  ]}
                 >
-                  {description}
-                </Text>
-              </View>
-            ) : null}
+                  <Text
+                    variant="labelSmall"
+                    style={{
+                      color:
+                        status === "online"
+                          ? theme.colors.onPrimaryContainer
+                          : status === "degraded"
+                            ? theme.colors.onTertiaryContainer
+                            : theme.colors.onErrorContainer,
+                    }}
+                  >
+                    {status === "online"
+                      ? "Connected"
+                      : status === "degraded"
+                        ? "Degraded"
+                        : "Offline"}
+                  </Text>
+                </View>
 
-            {/* Status badge uses the appropriate container token */}
-            <View
-              style={[
-                styles.badge,
-                {
-                  backgroundColor:
-                    status === "online"
-                      ? theme.colors.primaryContainer
-                      : status === "degraded"
-                        ? theme.colors.tertiaryContainer
-                        : theme.colors.errorContainer,
-                },
-              ]}
-            >
-              <Text
-                variant="labelSmall"
-                style={{
-                  color:
-                    status === "online"
-                      ? theme.colors.primary
-                      : status === "degraded"
-                        ? theme.colors.tertiary
-                        : theme.colors.error,
-                }}
-              >
-                {status === "online"
-                  ? "Connected"
-                  : status === "degraded"
-                    ? "Degraded"
-                    : "Offline"}
-              </Text>
+                {typeof latency === "number" ? (
+                  <View
+                    style={[
+                      styles.badge,
+                      { backgroundColor: theme.colors.surfaceVariant },
+                    ]}
+                  >
+                    <Text
+                      variant="labelSmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {`${latency} ms`}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {version ? (
+                  <View
+                    style={[
+                      styles.badge,
+                      { backgroundColor: theme.colors.surfaceVariant },
+                    ]}
+                  >
+                    <Text
+                      variant="labelSmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {`v${version}`}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {statusDescription ? (
+                  <Tooltip title={statusDescription}>
+                    <Text
+                      variant="bodySmall"
+                      style={{
+                        color: theme.colors.onSurfaceVariant,
+                        marginLeft: 8,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {statusDescription}
+                    </Text>
+                  </Tooltip>
+                ) : null}
+
+                {relativeTime ? (
+                  <Text
+                    variant="bodySmall"
+                    style={{
+                      color: theme.colors.onSurfaceVariant,
+                      marginLeft: 8,
+                    }}
+                  >
+                    Last checked {relativeTime}
+                  </Text>
+                ) : null}
+              </View>
+
+              <View style={styles.actions}>
+                {onEditPress ? (
+                  <IconButton
+                    icon="pencil"
+                    size={20}
+                    onPress={onEditPress}
+                    accessibilityLabel={`Edit ${name}`}
+                    accessibilityHint="Opens the edit service form"
+                  />
+                ) : null}
+                {onDeletePress ? (
+                  isDeleting ? (
+                    <View style={styles.deleteSpinner}>
+                      <SkiaLoader size={20} centered />
+                    </View>
+                  ) : (
+                    <IconButton
+                      icon="delete"
+                      size={20}
+                      onPress={onDeletePress}
+                      disabled={isDeleting}
+                      accessibilityLabel={`Delete ${name}`}
+                      accessibilityHint="Removes this service"
+                    />
+                  )
+                ) : null}
+              </View>
             </View>
-
-            {typeof latency === "number" ? (
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: theme.colors.elevation.level2 },
-                ]}
-              >
-                <Text
-                  variant="labelSmall"
-                  style={{ color: theme.colors.onSurface }}
-                >
-                  {`${latency} ms`}
-                </Text>
-              </View>
-            ) : null}
-
-            {version ? (
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: theme.colors.elevation.level2 },
-                ]}
-              >
-                <Text
-                  variant="labelSmall"
-                  style={{ color: theme.colors.onSurface }}
-                >
-                  {`v${version}`}
-                </Text>
-              </View>
-            ) : null}
-
-            {statusDescription ? (
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant, marginLeft: 8 }}
-                numberOfLines={1}
-              >
-                {statusDescription}
-              </Text>
-            ) : null}
-
-            {relativeTime ? (
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant, marginLeft: 8 }}
-              >
-                Last checked {relativeTime}
-              </Text>
-            ) : null}
           </View>
         </View>
-
-        <View style={styles.actions}>
-          {onEditPress ? (
-            <IconButton
-              icon="pencil"
-              size={20}
-              onPress={onEditPress}
-              accessibilityLabel={`Edit ${name}`}
-              accessibilityHint="Opens the edit service form"
-            />
-          ) : null}
-          {onDeletePress ? (
-            isDeleting ? (
-              <ActivityIndicator size={20} style={styles.deleteSpinner} />
-            ) : (
-              <IconButton
-                icon="delete"
-                size={20}
-                onPress={onDeletePress}
-                disabled={isDeleting}
-                accessibilityLabel={`Delete ${name}`}
-                accessibilityHint="Removes this service"
-              />
-            )
-          ) : null}
-        </View>
-      </View>
+      </Pressable>
     </Card>
   );
 };
 
-export default ServiceCard;
+export default React.memo(ServiceCard, arePropsEqual);
 
 const styles = StyleSheet.create({
+  pressable: {
+    flex: 1,
+  },
   root: {
+    flexDirection: "column",
+  },
+  topSection: {
+    marginBottom: spacing.sm,
+  },
+  topRow: {
     flexDirection: "row",
     alignItems: "flex-start",
   },
@@ -328,23 +432,27 @@ const styles = StyleSheet.create({
   statusWrapper: {
     marginLeft: spacing.md,
   },
+  bottomSection: {},
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   badgesRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: spacing.xs,
     flexWrap: "wrap",
     gap: spacing.xs,
+    flex: 1,
   },
   badge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: 999,
-    marginRight: spacing.xs,
   },
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: spacing.sm,
   },
   deleteSpinner: {
     marginHorizontal: spacing.xxxs,

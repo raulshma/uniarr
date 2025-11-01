@@ -18,7 +18,7 @@ import {
   SettingsListItem,
   AnimatedScrollView,
 } from "@/components/common";
-import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import ImageViewer from "@/components/cache/ImageViewer";
 import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
 import {
@@ -520,7 +520,7 @@ const CacheViewerScreen = () => {
                     onPress={handleClearAll}
                     loading={loading}
                     disabled={loading || !analysis || analysis.fileCount === 0}
-                    style={{ height: 32 }}
+                    style={{ height: 36 }}
                   >
                     Clear
                   </Button>
@@ -677,7 +677,7 @@ const CacheViewerScreen = () => {
       {renderContent}
 
       {previewImage && (
-        <ImagePreviewModal
+        <ImageViewer
           visible={!!previewImage}
           imageUri={previewImage.uri}
           fileName={previewImage.fileName}

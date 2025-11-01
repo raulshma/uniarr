@@ -469,6 +469,67 @@ const BackupExportScreen = () => {
               </View>
             </View>
 
+            {/* Library Filters */}
+            <View style={styles.checkboxContainer}>
+              <Checkbox
+                status={options.includeLibraryFilters ? "checked" : "unchecked"}
+                onPress={() =>
+                  handleOptionChange(
+                    "includeLibraryFilters",
+                    !options.includeLibraryFilters,
+                  )
+                }
+              />
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.checkboxLabel}>Library Filters</Text>
+                <Text style={styles.sensitiveLabel}>
+                  Saved per-service filter preferences
+                </Text>
+              </View>
+            </View>
+
+            {/* Voice Assistant Configuration */}
+            <View style={styles.checkboxContainer}>
+              <Checkbox
+                status={
+                  options.includeVoiceAssistantConfig ? "checked" : "unchecked"
+                }
+                onPress={() =>
+                  handleOptionChange(
+                    "includeVoiceAssistantConfig",
+                    !options.includeVoiceAssistantConfig,
+                  )
+                }
+              />
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.checkboxLabel}>Voice Assistant Config</Text>
+                <Text style={styles.sensitiveLabel}>
+                  Voice shortcuts and settings
+                </Text>
+              </View>
+            </View>
+
+            {/* Bookmark Health Checks */}
+            <View style={styles.checkboxContainer}>
+              <Checkbox
+                status={
+                  options.includeBookmarkHealthChecks ? "checked" : "unchecked"
+                }
+                onPress={() =>
+                  handleOptionChange(
+                    "includeBookmarkHealthChecks",
+                    !options.includeBookmarkHealthChecks,
+                  )
+                }
+              />
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.checkboxLabel}>Bookmark Health Checks</Text>
+                <Text style={styles.sensitiveLabel}>
+                  Saved bookmark status and health data
+                </Text>
+              </View>
+            </View>
+
             {/* Widgets Configuration */}
             <View style={styles.checkboxContainer}>
               <Checkbox
@@ -605,6 +666,9 @@ const BackupExportScreen = () => {
                   !options.includeRecentIPs &&
                   !options.includeDownloadConfig &&
                   !options.includeServicesViewState &&
+                  !options.includeLibraryFilters &&
+                  !options.includeVoiceAssistantConfig &&
+                  !options.includeBookmarkHealthChecks &&
                   !options.includeWidgetsConfig)
               }
               onPress={handleCreateBackup}

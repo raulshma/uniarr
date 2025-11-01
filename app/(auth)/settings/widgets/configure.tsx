@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -14,6 +15,7 @@ import WeatherWidgetConfigForm from "@/components/widgets/WeatherWidget/WeatherW
 import YouTubeWidgetConfigForm from "@/components/widgets/YouTubeWidget/YouTubeWidgetConfigForm";
 import TwitchWidgetConfigForm from "@/components/widgets/TwitchWidget/TwitchWidgetConfigForm";
 import ShortcutsWidgetConfigForm from "@/components/widgets/ShortcutsWidget/ShortcutsWidgetConfigForm";
+import ServiceStatusWidgetConfigForm from "@/components/widgets/ServiceStatusWidget/ServiceStatusWidgetConfigForm";
 import StatisticsWidgetConfigForm from "@/components/widgets/StatisticsWidget/StatisticsWidgetConfigForm";
 import CalendarPreviewWidgetConfigForm from "@/components/widgets/CalendarPreviewWidget/CalendarPreviewWidgetConfigForm";
 import DownloadProgressWidgetConfigForm from "@/components/widgets/DownloadProgressWidget/DownloadProgressWidgetConfigForm";
@@ -93,6 +95,13 @@ const WidgetConfigureScreen: React.FC = () => {
         return (
           <ShortcutsWidgetConfigForm widget={widget} onSaved={handleSaved} />
         );
+      case "service-status":
+        return (
+          <ServiceStatusWidgetConfigForm
+            widget={widget}
+            onSaved={handleSaved}
+          />
+        );
       case "statistics":
         return (
           <StatisticsWidgetConfigForm widget={widget} onSaved={handleSaved} />
@@ -141,7 +150,7 @@ const WidgetConfigureScreen: React.FC = () => {
 
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <SkiaLoader size={80} />
           <Text
             style={[
               styles.helperText,

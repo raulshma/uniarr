@@ -19,9 +19,12 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
-import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
+import { useSettingsStore } from "@/store/settingsStore";
+import WidgetHeader from "../common/WidgetHeader";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -136,8 +139,8 @@ const RssItemListItem: React.FC<RssItemListItemProps> = ({
 };
 
 const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
-  const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [items, setItems] = useState<RssFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -151,6 +154,10 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
   const { openDrawer } = useWidgetDrawer();
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const feedsConfigured = config.feeds && config.feeds.length > 0;
 
@@ -167,6 +174,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<RssFeedItem[]>(
             widget.id,
+            configSignature,
           );
           if (cached && cached.length > 0) {
             setItems(cached);
@@ -186,7 +194,10 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
 
         setItems(fresh);
         setError(null);
-        await widgetService.setWidgetData(widget.id, fresh, CACHE_TTL_MS);
+        await widgetService.setWidgetData(widget.id, fresh, {
+          ttlMs: CACHE_TTL_MS,
+          configSignature,
+        });
       } catch (error) {
         void logger.warn("RssWidget: failed to load feeds", {
           widgetId: widget.id,
@@ -198,7 +209,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
         setIsRefreshing(false);
       }
     },
-    [config.feeds, config.limit, feedsConfigured, widget.id],
+    [config.feeds, configSignature, config.limit, feedsConfigured, widget.id],
   );
 
   useEffect(() => {
@@ -257,11 +268,12 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
 
   if (!feedsConfigured) {
     return (
-      <View
+      <Card
+        contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.elevation.level1,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -273,7 +285,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
           actionLabel="Choose feeds"
           onAction={onEdit}
         />
-      </View>
+      </Card>
     );
   }
 
@@ -281,38 +293,21 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
     <>
       <Card
         contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.surface,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
         ])}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-            {widget.title}
-          </Text>
-          <View style={styles.actions}>
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                onPress={() => {
-                  onPress();
-                  onEdit();
-                }}
-              />
-            )}
-            <IconButton
-              icon={isRefreshing ? "progress-clock" : "refresh"}
-              size={20}
-              onPress={handleRefresh}
-              disabled={isRefreshing}
-            />
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={isRefreshing}
+        />
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -354,7 +349,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
       </Card>
 
       {/* Image Preview Modal */}
-      <ImagePreviewModal
+      <ImageViewer
         visible={imageModalVisible}
         imageUri={selectedImageUri}
         fileName="Article Thumbnail"
@@ -368,15 +363,6 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
 const styles = StyleSheet.create({
   card: {
     overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   loadingContainer: {
     gap: 12,

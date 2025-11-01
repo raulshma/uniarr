@@ -17,6 +17,8 @@ class ServiceHealthMonitor {
 
   private hasBootstrapped = false;
 
+  private isRunning = false;
+
   static getInstance(): ServiceHealthMonitor {
     if (!ServiceHealthMonitor.instance) {
       ServiceHealthMonitor.instance = new ServiceHealthMonitor();
@@ -26,9 +28,12 @@ class ServiceHealthMonitor {
   }
 
   start(): void {
-    if (this.timer) {
+    // Guard against duplicate interval creation
+    if (this.isRunning) {
       return;
     }
+
+    this.isRunning = true;
 
     void this.runCheck();
 
@@ -38,12 +43,16 @@ class ServiceHealthMonitor {
   }
 
   stop(): void {
-    if (!this.timer) {
+    if (!this.isRunning) {
       return;
     }
 
-    clearInterval(this.timer);
-    this.timer = null;
+    this.isRunning = false;
+
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
   }
 
   private async runCheck(): Promise<void> {

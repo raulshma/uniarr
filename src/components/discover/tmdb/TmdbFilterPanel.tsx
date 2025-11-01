@@ -1,13 +1,13 @@
 import React, { useMemo } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
-  ActivityIndicator,
   Chip,
   SegmentedButtons,
   Switch,
   Text,
   TextInput,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 
 import { spacing } from "@/theme/spacing";
 import type { TmdbDiscoverFilters } from "@/hooks/tmdb/useTmdbDiscover";
@@ -112,7 +112,7 @@ export const TmdbFilterPanel: React.FC<Props> = ({
       <View>
         <View style={styles.labelRow}>
           <Text variant="titleMedium">Genre</Text>
-          {genresLoading ? <ActivityIndicator size="small" /> : null}
+          {genresLoading ? <SkiaLoader size={20} centered /> : null}
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.chipRow}>

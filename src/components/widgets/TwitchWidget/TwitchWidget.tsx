@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, View } from "react-native";
-import { Button, IconButton, Text, useTheme } from "react-native-paper";
+import { Button, Text } from "react-native-paper";
 
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { useSettingsStore } from "@/store/settingsStore";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
-import { getComponentElevation } from "@/constants/elevation";
-import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { logger } from "@/services/logger/LoggerService";
 import {
@@ -22,6 +21,8 @@ import {
   SettingsListItem,
   getGroupPositions,
 } from "@/components/common";
+import WidgetHeader from "../common/WidgetHeader";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const LIVE_CACHE_TTL_MS = 5 * 60 * 1000;
 const OFFLINE_CACHE_TTL_MS = 20 * 60 * 1000;
@@ -74,47 +75,8 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
   onEdit,
   onRefresh,
 }) => {
-  const theme = useTheme<AppTheme>();
   const { onPress } = useHaptics();
-
-  const styles = useMemo(
-    () =>
-      StyleSheet.create({
-        card: {
-          borderRadius: borderRadius.xxl,
-          overflow: "hidden",
-        },
-        headerContainer: {
-          paddingHorizontal: spacing.sm,
-          paddingTop: spacing.sm,
-          backgroundColor: theme.colors.surface,
-        },
-        header: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        },
-        actions: {
-          flexDirection: "row",
-          alignItems: "center",
-        },
-        settingsGroup: {
-          marginHorizontal: spacing.sm,
-          marginBottom: spacing.sm,
-        },
-        loadingContainer: {
-          gap: 1,
-        },
-        errorContainer: {
-          paddingHorizontal: spacing.sm,
-          paddingBottom: spacing.sm,
-        },
-        error: {
-          color: "#ff6b6b",
-        },
-      }),
-    [theme],
-  );
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
 
   const [credentials, setCredentials] = useState<TwitchCredentials | null>(
     null,
@@ -128,6 +90,10 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
   const hasChannels = config.channelLogins && config.channelLogins.length > 0;
   const credentialsValid = Boolean(
     credentials?.clientId && credentials?.clientSecret,
+  );
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
   );
 
   const loadCredentials = useCallback(async () => {
@@ -155,6 +121,7 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<TwitchCacheEntry>(
             widget.id,
+            configSignature,
           );
           if (cached?.channels) {
             setChannels(cached.channels);
@@ -183,7 +150,10 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
         await widgetService.setWidgetData(
           widget.id,
           { channels: fresh, timestamp: Date.now() },
-          ttl,
+          {
+            ttlMs: ttl,
+            configSignature,
+          },
         );
       } catch (error) {
         void logger.warn("TwitchWidget: failed to load channels", {
@@ -198,6 +168,7 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
     },
     [
       config.channelLogins,
+      configSignature,
       credentials,
       credentialsValid,
       hasChannels,
@@ -235,10 +206,8 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
     return (
       <Card
         contentPadding="lg"
-        style={StyleSheet.flatten([
-          styles.card,
-          getComponentElevation("widget", theme),
-        ])}
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.card}
       >
         <WidgetConfigPlaceholder
           title="Twitch credentials required"
@@ -254,10 +223,8 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
     return (
       <Card
         contentPadding="lg"
-        style={StyleSheet.flatten([
-          styles.card,
-          getComponentElevation("widget", theme),
-        ])}
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={styles.card}
       >
         <WidgetConfigPlaceholder
           title="Choose Twitch channels"
@@ -272,39 +239,15 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
   return (
     <Card
       contentPadding="sm"
-      style={StyleSheet.flatten([
-        styles.card,
-        {
-          backgroundColor: theme.colors.surface,
-        },
-        getComponentElevation("widget", theme),
-      ])}
+      variant={frostedEnabled ? "frosted" : "custom"}
+      style={styles.card}
     >
-      <View style={styles.headerContainer}>
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-            {widget.title}
-          </Text>
-          <View style={styles.actions}>
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                onPress={() => {
-                  onPress();
-                  onEdit();
-                }}
-              />
-            )}
-            <IconButton
-              icon={refreshing ? "progress-clock" : "refresh"}
-              size={20}
-              onPress={handleRefresh}
-              disabled={refreshing}
-            />
-          </View>
-        </View>
-      </View>
+      <WidgetHeader
+        title={widget.title}
+        onEdit={onEdit}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
       <SettingsGroup style={styles.settingsGroup}>
         {loading ? (
@@ -367,5 +310,26 @@ const TwitchWidget: React.FC<TwitchWidgetProps> = ({
     </Card>
   );
 };
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: borderRadius.xxl,
+    overflow: "hidden",
+  },
+  settingsGroup: {
+    marginHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  loadingContainer: {
+    gap: 1,
+  },
+  errorContainer: {
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  error: {
+    color: "#ff6b6b",
+  },
+});
 
 export default TwitchWidget;

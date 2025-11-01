@@ -1,6 +1,7 @@
 import { backupRestoreService } from "@/services/backup/BackupRestoreService";
 import { widgetCredentialService } from "@/services/widgets/WidgetCredentialService";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
+import { StorageBackendManager } from "@/services/storage/MMKVStorage";
 import * as FileSystemLegacy from "expo-file-system/legacy";
 
 /**
@@ -15,8 +16,14 @@ import * as FileSystemLegacy from "expo-file-system/legacy";
 
 describe("Widget Secure Credential Backup and Restore Integration", () => {
   beforeEach(async () => {
-    // Clear AsyncStorage before each test
-    await AsyncStorage.clear();
+    // Initialize storage backend for tests
+    const manager = StorageBackendManager.getInstance();
+    if (!manager.isInitialized()) {
+      await manager.initialize();
+    }
+
+    // Clear storage before each test
+    await storageAdapter.clear();
 
     // Clean up any existing test backup files
     try {

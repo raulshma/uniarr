@@ -132,10 +132,12 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
     generateDelay: priority === "high" ? 0 : 50, // No delay for high priority (list items)
   });
 
-  // Preload image on demand - moved to Image component onLoad
+  // Preload image on demand - only if explicitly requested via preload prop
+  // Default is false to avoid per-instance prefetch overhead (centralize via useImagePrefetch)
   const shouldPrefetch = preload && uri && !imageState.resolvedUri;
   if (shouldPrefetch) {
     // Fire-and-forget prefetch without blocking render
+    // Note: prefer centralized list-level prefetch via useImagePrefetch for better concurrency control
     void imageCacheService.prefetch(uri);
   }
 

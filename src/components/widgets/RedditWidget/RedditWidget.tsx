@@ -22,9 +22,12 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
-import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
+import { useSettingsStore } from "@/store/settingsStore";
+import WidgetHeader from "../common/WidgetHeader";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 20 * 60 * 1000;
 
@@ -156,8 +159,8 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
   onEdit,
   onRefresh,
 }) => {
-  const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [posts, setPosts] = useState<RedditPostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +181,10 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const hasSources = config.subreddits && config.subreddits.length > 0;
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const loadPosts = useCallback(
     async (forceRefresh = false) => {
@@ -192,6 +199,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<RedditPostItem[]>(
             widget.id,
+            configSignature,
           );
           if (cached && cached.length > 0) {
             setPosts(cached);
@@ -213,7 +221,10 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
 
         setPosts(fresh);
         setError(null);
-        await widgetService.setWidgetData(widget.id, fresh, CACHE_TTL_MS);
+        await widgetService.setWidgetData(widget.id, fresh, {
+          ttlMs: CACHE_TTL_MS,
+          configSignature,
+        });
       } catch (error) {
         void logger.warn("RedditWidget: failed to load posts", {
           widgetId: widget.id,
@@ -227,6 +238,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
     },
     [
       config.limit,
+      configSignature,
       config.sort,
       config.subreddits,
       config.topTimeRange,
@@ -294,11 +306,12 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
 
   if (!hasSources) {
     return (
-      <View
+      <Card
+        contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.elevation.level1,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -310,7 +323,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
           actionLabel="Choose subreddits"
           onAction={onEdit}
         />
-      </View>
+      </Card>
     );
   }
 
@@ -318,38 +331,21 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
     <>
       <Card
         contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.surface,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
         ])}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-            {widget.title}
-          </Text>
-          <View style={styles.actions}>
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                onPress={() => {
-                  onPress();
-                  onEdit();
-                }}
-              />
-            )}
-            <IconButton
-              icon={refreshing ? "progress-clock" : "refresh"}
-              size={20}
-              onPress={handleRefresh}
-              disabled={refreshing}
-            />
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -391,7 +387,7 @@ const RedditWidget: React.FC<RedditWidgetProps> = ({
       </Card>
 
       {/* Image Preview Modal */}
-      <ImagePreviewModal
+      <ImageViewer
         visible={imageModalVisible}
         imageUri={selectedImageUri}
         fileName="Post Thumbnail"

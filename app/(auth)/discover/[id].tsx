@@ -28,6 +28,8 @@ import { avatarSizes } from "@/constants/sizes";
 import RelatedItems from "@/components/discover/RelatedItems";
 import { YouTubePlayer } from "@/components/media/VideoPlayer";
 import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
+import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
+import { skeletonTiming } from "@/constants/skeletonTiming";
 
 const DiscoverItemDetails = () => {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -148,6 +150,18 @@ const DiscoverItemDetails = () => {
     setDialogVisible(true);
   }, [item, router, services, inLibraryQuery.foundServices]);
 
+  // Initialize skeleton loading hook with medium complexity timing (700ms) for TMDB details
+  const skeleton = useSkeletonLoading(skeletonTiming.mediumComplexity);
+
+  // Effect to manage skeleton visibility based on loading state
+  React.useEffect(() => {
+    if (tmdbDetailsQuery.isLoading && !tmdbDetailsQuery.data) {
+      skeleton.startLoading();
+    } else {
+      skeleton.stopLoading();
+    }
+  }, [tmdbDetailsQuery.isLoading, tmdbDetailsQuery.data, skeleton]);
+
   const handleRelatedPress = useCallback(
     (relatedId: string) => {
       router.push(`/(auth)/discover/${relatedId}`);
@@ -193,7 +207,9 @@ const DiscoverItemDetails = () => {
         backdropUri={item.backdropUrl}
         onBack={() => router.back()}
       >
-        {tmdbDetailsQuery.isLoading && !tmdbDetailsQuery.data ? (
+        {skeleton.showSkeleton &&
+        tmdbDetailsQuery.isLoading &&
+        !tmdbDetailsQuery.data ? (
           <ScrollView contentContainerStyle={styles.content}>
             <DetailPageSkeleton />
           </ScrollView>

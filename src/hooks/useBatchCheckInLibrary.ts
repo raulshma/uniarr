@@ -188,10 +188,31 @@ export const useBatchCheckInLibrary = (
     retry: 1,
   });
 
+  // Normalize the returned data to always be a Map to avoid callers
+  // assuming a Map and calling .has/.get on something that may be
+  // undefined or a plain object (e.g. from mocks or serialization).
+  const safeData = query.data;
+  let itemsInLibraryMap: Map<string, FoundService>;
+
+  if (safeData instanceof Map) {
+    itemsInLibraryMap = safeData;
+  } else if (safeData && typeof safeData === "object") {
+    try {
+      // If data is a plain object keyed by id, convert to Map
+      itemsInLibraryMap = new Map(
+        Object.entries(safeData) as [string, FoundService][],
+      );
+    } catch {
+      itemsInLibraryMap = new Map();
+    }
+  } else {
+    itemsInLibraryMap = new Map();
+  }
+
   return {
     isLoading: query.isLoading,
     error: query.error,
-    itemsInLibrary: query.data ?? new Map(),
+    itemsInLibrary: itemsInLibraryMap,
     refetch: () => void query.refetch(),
   };
 };

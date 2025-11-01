@@ -5,7 +5,6 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  ActivityIndicator,
   Button,
   HelperText,
   Switch,
@@ -13,6 +12,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { useRouter } from "expo-router";
 
 import { alert } from "@/services/dialogService";
@@ -274,7 +274,7 @@ const TmdbSettingsScreen = () => {
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <ActivityIndicator animating size="large" />
+          <SkiaLoader size={80} />
         </View>
       </SafeAreaView>
     );
@@ -391,7 +391,7 @@ const TmdbSettingsScreen = () => {
               onPress={handleRemoveKey}
               trailing={
                 isRemoving ? (
-                  <ActivityIndicator animating />
+                  <SkiaLoader size={20} centered />
                 ) : (
                   <Button
                     mode="text"

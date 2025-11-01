@@ -1,14 +1,23 @@
-import { StyleSheet, View, Image, ActivityIndicator } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withRepeat,
   Easing,
+  useDerivedValue,
 } from "react-native-reanimated";
+import {
+  Canvas,
+  Circle,
+  Group,
+  Path,
+  Skia,
+  useClock,
+} from "@shopify/react-native-skia";
 import {
   Animated,
   ANIMATION_DURATIONS,
@@ -22,6 +31,117 @@ interface OAuthCallbackLoaderProps {
   onComplete?: () => void;
   status?: "loading" | "success" | "failure";
 }
+
+// Enhanced Skia Animated Loader Component with sophisticated animations
+const SkiaLoader = ({ size = 80, theme }: { size: number; theme: any }) => {
+  const clock = useClock();
+  const center = size / 2;
+  const radius = size / 2 - 8;
+
+  // Use clock for time-based animation (more performant)
+  const rotation = useDerivedValue(() => {
+    // 360 degrees per 1200ms = 0.3 degrees per ms
+    return (clock.value / 1200) * 360;
+  });
+
+  // Create multiple arcs for a more sophisticated loader effect
+  const arcPaths = useMemo(() => {
+    const paths: (ReturnType<typeof Skia.Path.Make> | null)[] = [];
+    const arcCount = 3;
+
+    for (let i = 0; i < arcCount; i++) {
+      const path = Skia.Path.Make();
+      if (!path) {
+        paths.push(null);
+        continue;
+      }
+
+      const startAngle = i * (360 / arcCount) * (Math.PI / 180);
+
+      // Create arc using addArc method
+      path.addArc(
+        {
+          x: center - radius,
+          y: center - radius,
+          width: radius * 2,
+          height: radius * 2,
+        },
+        (startAngle * 180) / Math.PI,
+        120, // 120-degree arc
+      );
+
+      paths.push(path);
+    }
+
+    return paths;
+  }, [center, radius]);
+
+  return (
+    <Canvas style={{ width: size, height: size }}>
+      {/* Static background circle */}
+      <Circle
+        cx={center}
+        cy={center}
+        r={radius}
+        color={theme.colors.surfaceVariant}
+        style="stroke"
+        strokeWidth={3}
+        opacity={0.12}
+      />
+
+      {/* Animated rotating arc group */}
+      <Group
+        transform={[{ rotate: rotation.value }]}
+        origin={{ x: center, y: center }}
+      >
+        {/* Primary rotating arc */}
+        {arcPaths[0] && (
+          <Path
+            path={arcPaths[0]}
+            color={theme.colors.primary}
+            style="stroke"
+            strokeWidth={4}
+            strokeCap="round"
+            opacity={0.95}
+          />
+        )}
+
+        {/* Secondary arc for depth effect */}
+        {arcPaths[1] && (
+          <Path
+            path={arcPaths[1]}
+            color={theme.colors.primary}
+            style="stroke"
+            strokeWidth={3}
+            strokeCap="round"
+            opacity={0.5}
+          />
+        )}
+
+        {/* Tertiary arc for trailing effect */}
+        {arcPaths[2] && (
+          <Path
+            path={arcPaths[2]}
+            color={theme.colors.primary}
+            style="stroke"
+            strokeWidth={2}
+            strokeCap="round"
+            opacity={0.25}
+          />
+        )}
+      </Group>
+
+      {/* Center dot with subtle breathing animation */}
+      <Circle
+        cx={center}
+        cy={center}
+        r={3}
+        color={theme.colors.primary}
+        opacity={0.7}
+      />
+    </Canvas>
+  );
+};
 
 export const OAuthCallbackLoader = ({
   message = "Processing authentication...",
@@ -114,18 +234,12 @@ export const OAuthCallbackLoader = ({
     },
     logoContainer: {
       marginBottom: 32,
-      width: 140,
-      height: 140,
+      width: 120,
+      height: 120,
       justifyContent: "center",
       alignItems: "center",
-      borderRadius: 70,
+      borderRadius: 60,
       backgroundColor: theme.colors.surfaceVariant,
-    },
-    logo: {
-      width: 100,
-      height: 100,
-      tintColor: theme.colors.primary,
-      resizeMode: "contain",
     },
     title: {
       fontSize: 24,
@@ -148,15 +262,11 @@ export const OAuthCallbackLoader = ({
       <View style={styles.content}>
         {shouldAnimateLayout(false) ? (
           <Animated.View style={[styles.logoContainer, animatedLogoStyle]}>
-            <Image
-              source={require("../../../assets/icon.png")}
-              style={styles.logo}
-              accessibilityLabel="App logo"
-            />
+            <SkiaLoader size={80} theme={theme} />
           </Animated.View>
         ) : (
           <View style={styles.logoContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <SkiaLoader size={80} theme={theme} />
           </View>
         )}
         <Text variant="titleLarge" style={styles.title}>

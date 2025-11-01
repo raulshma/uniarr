@@ -9,7 +9,6 @@ const DetailPageSkeleton = () => {
       StyleSheet.create({
         container: {
           flex: 1,
-          paddingHorizontal: spacing.lg,
           gap: spacing.lg,
         },
         hero: {

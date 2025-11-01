@@ -1,6 +1,7 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 
 export { shallow } from "zustand/shallow";
 
@@ -131,7 +132,7 @@ export const useLibraryFilterStore = create<LibraryFilterState>()(
     {
       name: STORAGE_KEY,
       version: 1,
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => storageAdapter),
       partialize: (state) => ({
         serviceFilters: state.serviceFilters,
       }),

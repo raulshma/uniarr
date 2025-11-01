@@ -39,6 +39,8 @@ export const queryKeys = {
   services: {
     base: ["services"] as const,
     overview: ["services", "overview"] as const,
+    health: (serviceId: string): QueryKeyBuilder =>
+      ["services", serviceId, "health"] as const,
   },
   activity: {
     base: ["activity"] as const,

@@ -70,7 +70,10 @@ const ServiceStatus: React.FC<ServiceStatusProps> = ({
         ]}
       />
       {showLabel ? (
-        <Text variant="labelMedium" style={[styles.label, { color }]}>
+        <Text
+          variant="labelMedium"
+          style={[styles.label, { color: theme.colors.onSurface }]}
+        >
           {appliedLabel}
         </Text>
       ) : null}

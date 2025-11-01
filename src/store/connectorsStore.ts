@@ -46,6 +46,10 @@ export const selectGetConnectorsByType = (state: ConnectorsState) =>
   state.getConnectorsByType;
 export const selectGetAllConnectors = (state: ConnectorsState) =>
   state.getAllConnectors;
+// Direct array selector for efficient memoization - returns array derived from connectors Map
+export const selectAllConnectorsArray = (
+  state: ConnectorsState,
+): IConnector[] => Array.from(state.connectors.values());
 // Lightweight selectors: prefer these in components when only metadata is needed
 export const selectConnectorIds = (state: ConnectorsState): string[] =>
   Array.from(state.connectors.keys());

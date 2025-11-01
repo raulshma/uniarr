@@ -31,7 +31,7 @@ import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { useJellyfinLibraries } from "@/hooks/useJellyfinLibraries";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useInfiniteQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/queryKeys";
 import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
 import type {
@@ -434,84 +434,93 @@ const JellyfinLibraryScreen = () => {
           return connector.getLatestItems(libraryState.selectedLibraryId, 16);
         },
       },
-      // Library items (main content)
-      {
-        queryKey:
-          serviceId && libraryState.selectedLibraryId
-            ? [
-                ...queryKeys.jellyfin.libraryItems(
-                  serviceId,
-                  libraryState.selectedLibraryId,
-                  {
-                    search: libraryState.debouncedSearch.toLowerCase(),
-                    includeItemTypes: activeSegmentConfig.includeItemTypes,
-                    mediaTypes: activeSegmentConfig.mediaTypes,
-                    sortBy: "SortName",
-                    sortOrder: "Ascending",
-                    limit: 30,
-                  },
-                ),
-                "consolidated",
-              ]
-            : [...queryKeys.jellyfin.base, "libraryItems"],
-        enabled: Boolean(serviceId && libraryState.selectedLibraryId),
-        staleTime: 30_000,
-        placeholderData: (previous?: JellyfinItem[] | undefined) =>
-          previous ?? [],
-        refetchOnWindowFocus: false,
-        queryFn: async () => {
-          if (!serviceId || !libraryState.selectedLibraryId) {
-            return [];
-          }
-
-          const connector = manager.getConnector(serviceId) as
-            | JellyfinConnector
-            | undefined;
-          if (!connector) {
-            return [];
-          }
-
-          const queryOptions = {
-            searchTerm: libraryState.debouncedSearch,
-            includeItemTypes: activeSegmentConfig.includeItemTypes,
-            mediaTypes: activeSegmentConfig.mediaTypes,
-            sortBy: "SortName",
-            sortOrder: "Ascending" as const,
-            limit: 30,
-          };
-
-          try {
-            let result = await connector.getLibraryItems(
-              libraryState.selectedLibraryId!,
-              queryOptions,
-            );
-
-            // If no results with filters and this is TV segment, try without filters
-            if (
-              (!result || result.length === 0) &&
-              libraryState.activeSegment === "tv"
-            ) {
-              result = await connector.getLibraryItems(
-                libraryState.selectedLibraryId!,
-                {
-                  sortBy: "SortName",
-                  sortOrder: "Ascending" as const,
-                  limit: 30,
-                },
-              );
-            }
-
-            return result ?? [];
-          } catch {
-            return [];
-          }
-        },
-      },
     ],
   });
 
+  // Infinite query for library items with pagination
+  const libraryItemsInfiniteQuery = useInfiniteQuery({
+    queryKey:
+      serviceId && libraryState.selectedLibraryId
+        ? [
+            ...queryKeys.jellyfin.libraryItems(
+              serviceId,
+              libraryState.selectedLibraryId,
+              {
+                search: libraryState.debouncedSearch.toLowerCase(),
+                includeItemTypes: activeSegmentConfig.includeItemTypes,
+                mediaTypes: activeSegmentConfig.mediaTypes,
+                sortBy: "SortName",
+                sortOrder: "Ascending",
+              },
+            ),
+            "infinite",
+          ]
+        : [...queryKeys.jellyfin.base, "libraryItems"],
+    enabled: Boolean(serviceId && libraryState.selectedLibraryId),
+    staleTime: 30_000,
+    queryFn: async ({ pageParam = 1 }) => {
+      if (!serviceId || !libraryState.selectedLibraryId) {
+        return { items: [], hasNextPage: false };
+      }
+
+      const connector = manager.getConnector(serviceId) as
+        | JellyfinConnector
+        | undefined;
+      if (!connector) {
+        return { items: [], hasNextPage: false };
+      }
+
+      const limit = 20;
+      const startIndex = (pageParam - 1) * limit;
+
+      const queryOptions = {
+        searchTerm: libraryState.debouncedSearch,
+        includeItemTypes: activeSegmentConfig.includeItemTypes,
+        mediaTypes: activeSegmentConfig.mediaTypes,
+        sortBy: "SortName",
+        sortOrder: "Ascending" as const,
+        limit,
+        startIndex,
+      };
+
+      try {
+        let result = await connector.getLibraryItems(
+          libraryState.selectedLibraryId!,
+          queryOptions,
+        );
+
+        // If no results with filters and this is TV segment, try without filters
+        if (
+          (!result || result.length === 0) &&
+          libraryState.activeSegment === "tv"
+        ) {
+          result = await connector.getLibraryItems(
+            libraryState.selectedLibraryId!,
+            {
+              sortBy: "SortName",
+              sortOrder: "Ascending" as const,
+              limit,
+              startIndex,
+            },
+          );
+        }
+
+        return {
+          items: result ?? [],
+          hasNextPage: (result?.length ?? 0) === limit,
+        };
+      } catch {
+        return { items: [], hasNextPage: false };
+      }
+    },
+    getNextPageParam: (lastPage, pages) => {
+      return lastPage.hasNextPage ? pages.length + 1 : undefined;
+    },
+    initialPageParam: 1,
+  });
+
   // Extract query results for cleaner usage
-  const [resumeQuery, latestQuery, libraryItemsQuery] = consolidatedQueries;
+  const [resumeQuery, latestQuery] = consolidatedQueries;
 
   // Keep now playing separate due to real-time polling requirement
   const nowPlayingQuery = useJellyfinNowPlaying({
@@ -526,12 +535,12 @@ const JellyfinLibraryScreen = () => {
   const isInitialLoad =
     libraryState.isBootstrapping ||
     librariesQuery.isLoading ||
-    libraryItemsQuery.isLoading ||
+    libraryItemsInfiniteQuery.isLoading ||
     resumeQuery.isLoading ||
     nowPlayingQuery.isLoading ||
     latestQuery.isLoading;
   const isRefreshing =
-    (libraryItemsQuery.isFetching ||
+    (libraryItemsInfiniteQuery.isFetching ||
       resumeQuery.isFetching ||
       latestQuery.isFetching ||
       librariesQuery.isFetching ||
@@ -555,7 +564,7 @@ const JellyfinLibraryScreen = () => {
 
   const aggregatedError =
     librariesQuery.error ??
-    libraryItemsQuery.error ??
+    libraryItemsInfiniteQuery.error ??
     resumeQuery.error ??
     nowPlayingQuery.error ??
     latestQuery.error;
@@ -567,8 +576,8 @@ const JellyfinLibraryScreen = () => {
         : null;
 
   const items = useMemo(
-    () => libraryItemsQuery.data ?? [],
-    [libraryItemsQuery.data],
+    () => libraryItemsInfiniteQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    [libraryItemsInfiniteQuery.data],
   );
 
   // Optimized displayItems: cache series grouping and reduce expensive operations
@@ -830,7 +839,7 @@ const JellyfinLibraryScreen = () => {
     // Refresh all queries in parallel for better performance
     await Promise.all([
       librariesQuery.refetch(),
-      libraryItemsQuery.refetch(),
+      libraryItemsInfiniteQuery.refetch(),
       resumeQuery.refetch(),
       nowPlayingQuery.refetch(),
       latestQuery.refetch(),
@@ -838,7 +847,7 @@ const JellyfinLibraryScreen = () => {
   }, [
     latestQuery,
     librariesQuery,
-    libraryItemsQuery,
+    libraryItemsInfiniteQuery,
     resumeQuery,
     nowPlayingQuery,
   ]);
@@ -1443,6 +1452,15 @@ const JellyfinLibraryScreen = () => {
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={listHeader}
           ListEmptyComponent={listEmptyComponent}
+          onEndReached={() => {
+            if (
+              libraryItemsInfiniteQuery.hasNextPage &&
+              !libraryItemsInfiniteQuery.isFetchingNextPage
+            ) {
+              void libraryItemsInfiniteQuery.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
           refreshControl={
             <ListRefreshControl
               refreshing={isRefreshing}

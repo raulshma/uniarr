@@ -1,24 +1,21 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo } from "react";
 import { ScrollView, View, StyleSheet, Linking } from "react-native";
-import {
-  Button,
-  Card,
-  Chip,
-  Text,
-  useTheme,
-  ActivityIndicator,
-} from "react-native-paper";
+import { Button, Card, Chip, Text, useTheme } from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
+import { skeletonTiming } from "@/constants/skeletonTiming";
+import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
+import DetailHero from "@/components/media/DetailHero/DetailHero";
+import { spacing } from "@/theme/spacing";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { AppTheme } from "@/constants/theme";
-import { spacing } from "@/theme/spacing";
 import { useJellyseerrMediaDetails } from "@/hooks/useJellyseerrMediaDetails";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
@@ -61,6 +58,18 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     mediaType ?? "movie",
     mediaId,
   );
+
+  // Initialize skeleton loading hook with high complexity timing (900ms) for external API data
+  const skeleton = useSkeletonLoading(skeletonTiming.highComplexity);
+
+  // Effect to manage skeleton visibility based on loading state
+  React.useEffect(() => {
+    if (isLoading && !data) {
+      skeleton.startLoading();
+    } else {
+      skeleton.stopLoading();
+    }
+  }, [isLoading, data, skeleton]);
   // Typed accessors for the generated MovieDetails | TvDetails union
   const getTitle = (d?: JellyDetails) => {
     if (!d) return "Unknown Title";
@@ -260,12 +269,27 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     );
   }
 
-  if (isLoading) {
+  if (skeleton.showSkeleton && isLoading && !data) {
+    const posterPath = getPosterPath(data);
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.container, { justifyContent: "center" }]}>
-          <ActivityIndicator animating />
-        </View>
+        <DetailHero
+          posterUri={
+            posterPath
+              ? `https://image.tmdb.org/t/p/w342${posterPath}`
+              : undefined
+          }
+          onBack={() => router.back()}
+        >
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: spacing.lg,
+              paddingBottom: spacing.xxxxl,
+            }}
+          >
+            <DetailPageSkeleton />
+          </ScrollView>
+        </DetailHero>
       </SafeAreaView>
     );
   }

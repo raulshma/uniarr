@@ -1,13 +1,14 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { ActivityIndicator, Text, useTheme } from "react-native-paper";
+import { Text, useTheme } from "react-native-paper";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 
 import type { AppTheme } from "@/constants/theme";
 
 const sizeMap = {
-  small: 24,
-  medium: 32,
-  large: 40,
+  small: 40,
+  medium: 60,
+  large: 80,
 } as const;
 
 export type LoadingStateProps = {
@@ -32,11 +33,7 @@ const LoadingState: React.FC<LoadingStateProps> = ({
       accessibilityLabel={message ?? "Loading"}
       testID={testID}
     >
-      <ActivityIndicator
-        size={indicatorSize}
-        color={theme.colors.primary}
-        animating
-      />
+      <SkiaLoader size={indicatorSize} />
       {message ? (
         <Text
           style={[styles.message, { color: theme.colors.onSurfaceVariant }]}

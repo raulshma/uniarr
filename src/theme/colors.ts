@@ -40,23 +40,24 @@ export type ThemePreset = {
 
 export const presetThemes: Record<string, ThemePreset> = {
   // Base/default brand theme
+  // Base/default brand theme now maps to the Royal palette
   uniarr: {
     common: {
-      primary: "#8B6914",
-      secondary: "#6B5E4F",
-      tertiary: "#5A6B4A",
+      primary: "#7E57C2",
+      secondary: "#64748B",
+      tertiary: "#4DB6AC",
       error: "#BA1A1A",
     },
     modes: {
       light: {
-        background: "#FFFCF7",
-        surface: "#FFFAF0",
-        surfaceVariant: "#E8E2D4",
+        background: "#F8F7FF",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E6E0F8",
       },
       dark: {
-        background: "#1B1407",
-        surface: "#241A0B",
-        surfaceVariant: "#33240F",
+        background: "#14121B",
+        surface: "#1F1C29",
+        surfaceVariant: "#2A263C",
       },
     },
   },
@@ -121,6 +122,133 @@ export const presetThemes: Record<string, ThemePreset> = {
         background: "#091223",
         surface: "#101A30",
         surfaceVariant: "#1B2840",
+      },
+    },
+  },
+  // New palettes added per design request
+  royal: {
+    common: {
+      primary: "#7E57C2",
+      secondary: "#64748B",
+      tertiary: "#4DB6AC",
+      error: "#BA1A1A",
+    },
+    modes: {
+      light: {
+        background: "#F8F7FF",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E6E0F8",
+      },
+      dark: {
+        background: "#14121B",
+        surface: "#1F1C29",
+        surfaceVariant: "#2A263C",
+      },
+    },
+  },
+
+  subzero: {
+    common: {
+      primary: "#03A9F4",
+      secondary: "#607D8B",
+      tertiary: "#FFCA28",
+      error: "#BA1A1A",
+    },
+    modes: {
+      light: {
+        background: "#F7FBFF",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E3F2FD",
+      },
+      dark: {
+        background: "#0D161F",
+        surface: "#131F2C",
+        surfaceVariant: "#1B293A",
+      },
+    },
+  },
+
+  emerald: {
+    common: {
+      primary: "#4CAF50",
+      secondary: "#757575",
+      tertiary: "#2196F3",
+      error: "#BA1A1A",
+    },
+    modes: {
+      light: {
+        background: "#F6FFF7",
+        surface: "#FFFFFF",
+        surfaceVariant: "#E8F5E9",
+      },
+      dark: {
+        background: "#101A10",
+        surface: "#182518",
+        surfaceVariant: "#223323",
+      },
+    },
+  },
+
+  slate: {
+    common: {
+      primary: "#607D8B",
+      secondary: "#B0BEC5",
+      tertiary: "#ECEFF1",
+      error: "#BA1A1A",
+    },
+    modes: {
+      light: {
+        background: "#FAFAFA",
+        surface: "#FFFFFF",
+        surfaceVariant: "#ECEFF1",
+      },
+      dark: {
+        background: "#121212",
+        surface: "#1E1E1E",
+        surfaceVariant: "#2C2C2C",
+      },
+    },
+  },
+
+  sunset: {
+    common: {
+      primary: "#FF7043",
+      secondary: "#5C6BC0",
+      tertiary: "#FFCA28",
+      error: "#BA1A1A",
+    },
+    modes: {
+      light: {
+        background: "#FFF8F5",
+        surface: "#FFFFFF",
+        surfaceVariant: "#FBEAE3",
+      },
+      dark: {
+        background: "#1B120E",
+        surface: "#271A15",
+        surfaceVariant: "#38251E",
+      },
+    },
+  },
+
+  // Preserve existing uniarr preset under a clear legacy key
+  legacy: {
+    common: {
+      primary: "#8B6914",
+      secondary: "#6B5E4F",
+      tertiary: "#5A6B4A",
+      error: "#BA1A1A",
+    },
+    modes: {
+      light: {
+        background: "#FFFCF7",
+        surface: "#FFFAF0",
+        surfaceVariant: "#E8E2D4",
+      },
+      dark: {
+        background: "#1B1407",
+        surface: "#241A0B",
+        surfaceVariant: "#33240F",
       },
     },
   },

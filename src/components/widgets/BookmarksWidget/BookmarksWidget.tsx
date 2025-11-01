@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import Animated from "react-native-reanimated";
-import { IconButton, Text, useTheme } from "react-native-paper";
+import { Text, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
@@ -19,12 +19,15 @@ import {
   ANIMATION_DURATIONS,
 } from "@/utils/animations.utils";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import BookmarkItem from "./BookmarkItem";
 import type {
   Bookmark,
   BookmarksWidgetProps,
   BookmarkHealth,
 } from "./BookmarksWidget.types";
+import { useSettingsStore } from "@/store/settingsStore";
+import { Card } from "@/components/common";
 
 const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
   widget,
@@ -34,6 +37,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 }) => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const { onPress: hapticPress } = useHaptics();
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -175,47 +179,41 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 
   if (loading) {
     return (
-      <Animated.View
-        style={[
-          styles.container,
-          gridLayout.container,
-          { backgroundColor: theme.colors.surface },
-          containerElevationStyle,
-        ]}
-        entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
-        exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.card, containerElevationStyle]}
+        contentPadding={0}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.title}>
-            {widget.title}
-          </Text>
-          <IconButton
-            icon={isEditMode ? "pencil" : "cog"}
-            size={20}
-            onPress={isEditMode ? onEdit : handleOpenConfig}
-            iconColor={theme.colors.onSurfaceVariant}
+        <Animated.View
+          style={[styles.container, gridLayout.container]}
+          entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
+          exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
+        >
+          <WidgetHeader
+            title={widget.title}
+            onEdit={isEditMode ? onEdit : handleOpenConfig}
           />
-        </View>
-        <View style={styles.loadingSkeleton}>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <View key={index} style={styles.skeletonBookmark}>
-              <View style={styles.skeletonIcon} />
-              <SkeletonPlaceholder
-                width="80%"
-                height={12}
-                borderRadius={4}
-                style={{ marginTop: spacing.xs }}
-              />
-              <SkeletonPlaceholder
-                width="60%"
-                height={10}
-                borderRadius={4}
-                style={{ marginTop: spacing.xs }}
-              />
-            </View>
-          ))}
-        </View>
-      </Animated.View>
+          <View style={styles.loadingSkeleton}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View key={index} style={styles.skeletonBookmark}>
+                <View style={styles.skeletonIcon} />
+                <SkeletonPlaceholder
+                  width="80%"
+                  height={12}
+                  borderRadius={4}
+                  style={{ marginTop: spacing.xs }}
+                />
+                <SkeletonPlaceholder
+                  width="60%"
+                  height={10}
+                  borderRadius={4}
+                  style={{ marginTop: spacing.xs }}
+                />
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+      </Card>
     );
   }
 
@@ -223,102 +221,95 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
 
   if (enabledBookmarks.length === 0) {
     return (
-      <View
-        style={[
-          styles.container,
-          gridLayout.container,
-          { backgroundColor: theme.colors.surface },
-          containerElevationStyle,
-        ]}
+      <Card
+        variant={frostedEnabled ? "frosted" : "custom"}
+        style={[styles.card, containerElevationStyle]}
+        contentPadding={0}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={styles.title}>
-            {widget.title}
-          </Text>
-          <IconButton
-            icon={isEditMode ? "pencil" : "cog"}
-            size={20}
-            onPress={isEditMode ? onEdit : handleOpenConfig}
-            iconColor={theme.colors.onSurfaceVariant}
+        <View style={[styles.container, gridLayout.container]}>
+          <WidgetHeader
+            title={widget.title}
+            onEdit={isEditMode ? onEdit : handleOpenConfig}
           />
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons
+              name="link-box"
+              size={theme.custom.sizes.iconSizes.xxl}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text variant="bodySmall" style={styles.emptyText}>
+              No bookmarks configured
+            </Text>
+          </View>
         </View>
-        <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons
-            name="link-box"
-            size={theme.custom.sizes.iconSizes.xxl}
-            color={theme.colors.onSurfaceVariant}
-          />
-          <Text variant="bodySmall" style={styles.emptyText}>
-            No bookmarks configured
-          </Text>
-        </View>
-      </View>
+      </Card>
     );
   }
 
   return (
-    <View
-      style={[
-        styles.container,
-        gridLayout.container,
-        { backgroundColor: theme.colors.surface },
-        containerElevationStyle,
-      ]}
+    <Card
+      variant={frostedEnabled ? "frosted" : "custom"}
+      style={[styles.card, containerElevationStyle]}
+      contentPadding={0}
     >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={styles.title}>
-          {widget.title}
-        </Text>
-        <IconButton
-          icon={isEditMode ? "pencil" : "cog"}
-          size={20}
-          onPress={isEditMode ? onEdit : handleOpenConfig}
-          iconColor={theme.colors.onSurfaceVariant}
+      <View style={[styles.container, gridLayout.container]}>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={isEditMode ? onEdit : handleOpenConfig}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
         />
-      </View>
 
-      <ScrollView
-        style={gridLayout.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
-      >
-        <Animated.View
-          style={styles.gridContainer}
-          entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
+        <ScrollView
+          style={gridLayout.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
         >
-          {enabledBookmarks.map((bookmark, index) => (
-            <Animated.View
-              key={bookmark.id}
-              entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(index, 50).delay(
-                150,
-              )}
-              style={[]}
-            >
-              <BookmarkItem
-                bookmark={bookmark}
-                health={health.get(bookmark.id)}
-                onPress={handleBookmarkPress}
-                size={widget.size}
-              />
-            </Animated.View>
-          ))}
-        </Animated.View>
-      </ScrollView>
-    </View>
+          <Animated.View
+            style={styles.gridContainer}
+            entering={COMPONENT_ANIMATIONS.SECTION_ENTRANCE(100)}
+          >
+            {enabledBookmarks.map((bookmark, index) => (
+              <Animated.View
+                key={bookmark.id}
+                entering={COMPONENT_ANIMATIONS.LIST_ITEM_STAGGER(
+                  index,
+                  50,
+                ).delay(150)}
+                style={
+                  widget.size === "large"
+                    ? styles.gridItemLarge
+                    : styles.gridItemMedium
+                }
+              >
+                <BookmarkItem
+                  bookmark={bookmark}
+                  health={health.get(bookmark.id)}
+                  onPress={handleBookmarkPress}
+                  size={widget.size}
+                />
+              </Animated.View>
+            ))}
+          </Animated.View>
+        </ScrollView>
+      </View>
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  card: {
     borderRadius: borderRadius.xl,
+  },
+  container: {
     padding: spacing.md,
   },
   smallContainer: {
@@ -328,16 +319,7 @@ const styles = StyleSheet.create({
     minHeight: 180,
   },
   largeContainer: {
-    minHeight: 220,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontWeight: "600",
+    padding: spacing.md,
   },
   smallScrollContainer: {
     maxHeight: 120,
@@ -354,9 +336,9 @@ const styles = StyleSheet.create({
   gridContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   loadingSkeleton: {
     flex: 1,
@@ -364,14 +346,25 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "flex-start",
     alignItems: "flex-start",
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    // skeleton spacing handled by individual skeleton items
+    paddingHorizontal: spacing.xs,
   },
   skeletonBookmark: {
     alignItems: "center",
     justifyContent: "center",
     width: "48%",
     padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  gridItemMedium: {
+    flexBasis: "48%",
+    maxWidth: "48%",
+    marginBottom: spacing.sm,
+  },
+  gridItemLarge: {
+    flexBasis: "32%",
+    maxWidth: "32%",
+    marginBottom: spacing.sm,
   },
   skeletonIcon: {
     width: 40,

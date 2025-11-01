@@ -20,9 +20,12 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
-import ImagePreviewModal from "@/components/cache/ImagePreviewModal";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
+import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
+import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -95,6 +98,7 @@ const StoryListItem: React.FC<StoryListItemProps> = ({
       <SettingsListItem
         title={story.title}
         subtitle={`${story.score ?? 0} points by ${story.by} • ${formatDistanceToNow(new Date(story.time * 1000), { addSuffix: true })}${story.descendants ? ` • ${story.descendants} comments` : ""}`}
+        frosted
         left={
           story.image
             ? {
@@ -150,8 +154,8 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
   onEdit,
   onRefresh,
 }) => {
-  const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [stories, setStories] = useState<HackerNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +177,10 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
   );
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const loadStories = useCallback(
     async (forceRefresh = false) => {
@@ -180,6 +188,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<HackerNewsItem[]>(
             widget.id,
+            configSignature,
           );
           if (cached && cached.length > 0) {
             setStories(cached);
@@ -199,7 +208,10 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
 
         setStories(fresh);
         setError(null);
-        await widgetService.setWidgetData(widget.id, fresh, CACHE_TTL_MS);
+        await widgetService.setWidgetData(widget.id, fresh, {
+          ttlMs: CACHE_TTL_MS,
+          configSignature,
+        });
       } catch (error) {
         void logger.warn("HackerNewsWidget: failed to load", {
           widgetId: widget.id,
@@ -211,7 +223,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
         setRefreshing(false);
       }
     },
-    [config.feedType, config.limit, widget.id],
+    [config.feedType, configSignature, config.limit, widget.id],
   );
 
   useEffect(() => {
@@ -276,38 +288,21 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
     <>
       <Card
         contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.surface,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
         ])}
       >
-        <View style={styles.header}>
-          <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-            {widget.title}
-          </Text>
-          <View style={styles.actions}>
-            {onEdit && (
-              <IconButton
-                icon="cog"
-                size={20}
-                onPress={() => {
-                  onPress();
-                  onEdit();
-                }}
-              />
-            )}
-            <IconButton
-              icon={refreshing ? "progress-clock" : "refresh"}
-              size={20}
-              onPress={handleRefresh}
-              disabled={refreshing}
-            />
-          </View>
-        </View>
+        <WidgetHeader
+          title={widget.title}
+          onEdit={onEdit}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
 
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -324,6 +319,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
           <SettingsListItem
             title="No stories available at the moment."
             groupPosition="single"
+            frosted
           />
         ) : (
           <View>
@@ -349,7 +345,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
       </Card>
 
       {/* Image Preview Modal */}
-      <ImagePreviewModal
+      <ImageViewer
         visible={imageModalVisible}
         imageUri={selectedImageUri}
         fileName="Story Favicon"
@@ -363,15 +359,6 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
 const styles = StyleSheet.create({
   card: {
     overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   loadingContainer: {
     gap: 12,

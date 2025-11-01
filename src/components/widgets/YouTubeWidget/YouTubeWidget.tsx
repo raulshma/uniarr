@@ -19,7 +19,10 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
+import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { HapticPressable } from "@/components/common/HapticPressable";
+import { useSettingsStore } from "@/store/settingsStore";
+import { createWidgetConfigSignature } from "@/utils/widget.utils";
 
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -71,6 +74,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress, onLongPress } = useHaptics();
+  const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +84,10 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const hasChannels = config.channelIds && config.channelIds.length > 0;
   const itemsPerChannel = config.itemsPerChannel ?? 3;
+  const configSignature = useMemo(
+    () => createWidgetConfigSignature(config),
+    [config],
+  );
 
   const loadCredentials = useCallback(async () => {
     const credentials = await widgetCredentialService.getCredentials(widget.id);
@@ -103,6 +111,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
         if (!forceRefresh) {
           const cached = await widgetService.getWidgetData<YouTubeCacheEntry>(
             widget.id,
+            configSignature,
           );
           if (cached?.videos?.length) {
             setVideos(cached.videos);
@@ -133,7 +142,10 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
         await widgetService.setWidgetData(
           widget.id,
           { videos: fresh },
-          CACHE_TTL_MS,
+          {
+            ttlMs: CACHE_TTL_MS,
+            configSignature,
+          },
         );
       } catch (error) {
         void logger.warn("YouTubeWidget: failed to load uploads", {
@@ -150,6 +162,7 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
       apiKey,
       config.channelIds,
       config.limit,
+      configSignature,
       hasChannels,
       itemsPerChannel,
       widget.id,
@@ -219,11 +232,12 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
 
   if (!apiKey) {
     return (
-      <View
+      <Card
+        contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.elevation.level1,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -235,17 +249,18 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           actionLabel="Add API key"
           onAction={onEdit}
         />
-      </View>
+      </Card>
     );
   }
 
   if (!hasChannels) {
     return (
-      <View
+      <Card
+        contentPadding="sm"
+        variant={frostedEnabled ? "frosted" : "custom"}
         style={StyleSheet.flatten([
           styles.card,
           {
-            backgroundColor: theme.colors.elevation.level1,
             borderRadius: borderRadius.xxl,
             padding: spacing.sm,
           },
@@ -257,45 +272,28 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
           actionLabel="Select channels"
           onAction={onEdit}
         />
-      </View>
+      </Card>
     );
   }
 
   return (
     <Card
       contentPadding="sm"
+      variant={frostedEnabled ? "frosted" : "custom"}
       style={StyleSheet.flatten([
         styles.card,
         {
-          backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.xxl,
           padding: spacing.sm,
         },
       ])}
     >
-      <View style={styles.header}>
-        <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
-          {widget.title}
-        </Text>
-        <View style={styles.actions}>
-          {onEdit && (
-            <IconButton
-              icon="cog"
-              size={20}
-              onPress={() => {
-                onPress();
-                onEdit();
-              }}
-            />
-          )}
-          <IconButton
-            icon={refreshing ? "progress-clock" : "refresh"}
-            size={20}
-            onPress={handleRefresh}
-            disabled={refreshing}
-          />
-        </View>
-      </View>
+      <WidgetHeader
+        title={widget.title}
+        onEdit={onEdit}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -374,15 +372,6 @@ const YouTubeWidget: React.FC<YouTubeWidgetProps> = ({
 const styles = StyleSheet.create({
   card: {
     overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   loadingContainer: {
     gap: 12,

@@ -6,10 +6,13 @@ export interface DrawerState {
   title: string;
   content?: string;
   metadata: ContentMetadata;
-  actionUrl: string;
+  actionUrl?: string;
   actionLabel?: string;
   loading?: boolean;
   maxHeight?: string | number;
+  customContent?: ReactNode;
+  showMetadata?: boolean;
+  showActionButton?: boolean;
 }
 
 interface WidgetDrawerContextType {
@@ -23,10 +26,13 @@ const initialState: DrawerState = {
   title: "",
   content: "",
   metadata: {},
-  actionUrl: "",
+  actionUrl: undefined,
   actionLabel: undefined,
   loading: false,
   maxHeight: undefined,
+  customContent: undefined,
+  showMetadata: true,
+  showActionButton: true,
 };
 
 const WidgetDrawerContext = createContext<WidgetDrawerContextType | undefined>(

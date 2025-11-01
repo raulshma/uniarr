@@ -36,8 +36,8 @@ export const useImagePrefetch = (
   const {
     prefetchRange = { before: 1, after: 3 },
     priority = "adaptive",
-    maxConcurrent = 3,
-    debounce = 100,
+    maxConcurrent = 2,
+    debounce = 150,
   } = options;
 
   const lastVisibleRangeRef = useRef<{ start: number; end: number } | null>(

@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   Image,
   FlatList,
-  ActivityIndicator,
   TouchableWithoutFeedback,
 } from "react-native";
+import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Text, useTheme, Portal, Button } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
@@ -362,10 +362,7 @@ const IconPicker: React.FC<IconPickerProps> = ({
                   </View>
                 ) : loading ? (
                   <View style={styles.loadingContainer}>
-                    <ActivityIndicator
-                      size="large"
-                      color={theme.colors.primary}
-                    />
+                    <SkiaLoader size={80} />
                     <Text variant="bodySmall" style={styles.loadingText}>
                       Searching icons...
                     </Text>

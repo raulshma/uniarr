@@ -52,3 +52,7 @@ export {
   AnimatedPressable,
   AnimatedScrollView,
 } from "./AnimatedComponents";
+
+export { SkiaLoader } from "./SkiaLoader";
+export type { SkiaLoaderProps } from "./SkiaLoader";
+export { useSkiaLoaderConfig } from "../../hooks/useSkiaLoaderConfig";

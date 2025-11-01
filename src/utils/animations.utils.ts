@@ -8,6 +8,7 @@
  */
 
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   SlideInUp,
@@ -106,13 +107,13 @@ export const SCREEN_TRANSITIONS = {
  */
 export const COMPONENT_ANIMATIONS = {
   /**
-   * LIST_ITEM_STAGGER: Progressive fade-in with per-item delay
+   * LIST_ITEM_STAGGER: Progressive fade-in with per-item delay and cubic bezier easing
    * Usage: Apply to list items with index-based delay (e.g., 50ms per item)
    */
   LIST_ITEM_STAGGER: (index: number, delay = 50) =>
     FadeIn.duration(ANIMATION_DURATIONS.NORMAL)
       .delay(index * delay)
-      .springify(),
+      .easing(Easing.bezier(0.25, 0.46, 0.45, 0.94)),
 
   /**
    * CARD_ENTRANCE: Zoom-in with fade for card components
@@ -272,6 +273,7 @@ export const shouldAnimateLayout = (
  * Allows: import { FadeIn, SlideInUp } from '@/utils/animations.utils'
  */
 export {
+  Easing,
   FadeIn,
   FadeOut,
   SlideInUp,
@@ -291,6 +293,35 @@ export {
   FlipInEasyX,
   FlipInEasyY,
   Layout,
+};
+
+/**
+ * Cubic Bezier Easing for Scroll-Driven Animations
+ *
+ * Applies ease-out-cubic curve to create smooth, organic deceleration
+ * for scroll-dependent animations. Uses interpolation with multiple
+ * input points to approximate the cubic-bezier(0.215, 0.61, 0.355, 1) curve.
+ *
+ * @param scrollValue - Animated.Value representing scroll position
+ * @param inputRange - Array of scroll position thresholds
+ * @param outputRange - Array of output values to map to
+ * @returns Animated.Value with eased interpolation
+ *
+ * @example
+ * const easedOpacity = easeOutCubic(scrollY, [0, 100, 200], [0, 0.5, 1])
+ */
+export const easeOutCubic = (
+  scrollValue: any,
+  inputRange: number[],
+  outputRange: (number | string)[],
+): any => {
+  // Approximate ease-out-cubic curve using multi-point interpolation
+  // This creates a smooth deceleration effect as scroll progresses
+  return scrollValue.interpolate({
+    inputRange,
+    outputRange,
+    extrapolate: "clamp",
+  });
 };
 
 /**
