@@ -104,7 +104,10 @@ const WidgetSettingsScreen = () => {
     onPress();
     try {
       await widgetService.toggleWidget(widgetId);
-      await loadWidgets();
+      // Update local state directly instead of reloading with loading indicator
+      const updatedWidgets = await widgetService.getWidgets();
+      setWidgets(updatedWidgets);
+      setLocalWidgets(updatedWidgets);
     } catch (error) {
       console.error("Failed to toggle widget:", error);
     }
@@ -174,7 +177,10 @@ const WidgetSettingsScreen = () => {
 
     try {
       await widgetService.updateWidget(selectedWidget.id, { size });
-      await loadWidgets();
+      // Update local state directly instead of reloading with loading indicator
+      const updatedWidgets = await widgetService.getWidgets();
+      setWidgets(updatedWidgets);
+      setLocalWidgets(updatedWidgets);
       setSizeDialogVisible(false);
       setSelectedWidget(null);
     } catch (error) {
@@ -186,7 +192,10 @@ const WidgetSettingsScreen = () => {
     onPress();
     try {
       await widgetService.resetToDefaults();
-      await loadWidgets();
+      // Update local state directly instead of reloading with loading indicator
+      const updatedWidgets = await widgetService.getWidgets();
+      setWidgets(updatedWidgets);
+      setLocalWidgets(updatedWidgets);
     } catch (error) {
       console.error("Failed to reset widgets:", error);
     }
