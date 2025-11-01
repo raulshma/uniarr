@@ -1,4 +1,4 @@
-import { useRef, useCallback, useMemo } from "react";
+import { useRef, useCallback, useMemo, useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { StyleSheet, View, RefreshControl, FlatList } from "react-native";
 import { Text, useTheme, Button, FAB } from "react-native-paper";
@@ -6,7 +6,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useServicesHealth } from "@/hooks/useServicesHealth";
 import { useAvailableServices } from "@/hooks/useAvailableServices";
-import { useConnectorsStore } from "@/store/connectorsStore";
+import {
+  useConnectorsStore,
+  selectAllConnectorsArray,
+} from "@/store/connectorsStore";
+import { secureStorage } from "@/services/storage/SecureStorage";
+import type { ServiceConfig } from "@/models/service.types";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -33,11 +38,37 @@ const ServicesHealthScreen = () => {
   const { overview, services, isLoading, isError, refetch, isRefreshing } =
     useServicesHealth();
 
-  const { connectors } = useConnectorsStore();
-  const configuredServices = useMemo(
-    () => Object.values(connectors).map((c) => c.config),
-    [connectors],
-  );
+  // Read connectors as an array using selector to avoid Map/Object mismatches
+  const connectorsArray = useConnectorsStore(selectAllConnectorsArray);
+
+  // Load persisted configs so we can include disabled/persisted-only entries in the UI
+  const [persistedConfigs, setPersistedConfigs] = useState<ServiceConfig[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const configs = await secureStorage.getServiceConfigs();
+        if (mounted) setPersistedConfigs(configs);
+      } catch (err) {
+        logger.warn("ServicesHealthScreen: failed to load persisted configs", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        // ignore; fall back to active connectors only
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const configuredServices = useMemo(() => {
+    const map = new Map<string, ServiceConfig>();
+    connectorsArray.forEach((c) => map.set(c.config.id, c.config));
+    persistedConfigs.forEach((pc) => {
+      if (!map.has(pc.id)) map.set(pc.id, pc);
+    });
+    return Array.from(map.values());
+  }, [connectorsArray, persistedConfigs]);
 
   const { unconfiguredServices } = useAvailableServices(configuredServices);
 
@@ -56,17 +87,21 @@ const ServicesHealthScreen = () => {
       data: { overview, isLoading, isError, refetch },
     });
 
-    // Add configured services section
-    if (services.length > 0) {
-      result.push({
-        type: "header",
-        title: "Configured Services",
+    // Add Active / Inactive sections
+    const activeServices = services.filter((s) => s.config.enabled);
+    const inactiveServices = services.filter((s) => !s.config.enabled);
+
+    if (activeServices.length > 0) {
+      result.push({ type: "header", title: "Active Services" });
+      activeServices.forEach((service) => {
+        result.push({ type: "service", data: service });
       });
-      services.forEach((service) => {
-        result.push({
-          type: "service",
-          data: service,
-        });
+    }
+
+    if (inactiveServices.length > 0) {
+      result.push({ type: "header", title: "Inactive" });
+      inactiveServices.forEach((service) => {
+        result.push({ type: "service", data: service });
       });
     }
 
@@ -226,7 +261,7 @@ const ServicesHealthScreen = () => {
         case "header":
           return renderHeader(
             item.title || "",
-            item.title === "Configured Services",
+            item.title === "Active Services",
           );
         case "overview":
           const { overview, isLoading, isError, refetch } = item.data;

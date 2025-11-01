@@ -1,8 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type { ServiceConfig } from "@/models/service.types";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
-import { useConnectorsStore } from "@/store/connectorsStore";
+import {
+  useConnectorsStore,
+  selectConnectorIds,
+} from "@/store/connectorsStore";
+import { secureStorage } from "@/services/storage/SecureStorage";
 import { queryKeys } from "@/hooks/queryKeys";
 import { getQueryConfig } from "@/hooks/queryConfig";
 import type { ServiceHealthResult } from "@/hooks/useServiceHealth";
@@ -34,24 +38,44 @@ export interface ServicesHealthData {
 }
 
 export const useServicesHealth = (): ServicesHealthData => {
-  const { connectors } = useConnectorsStore();
   const connectorManager = ConnectorManager.getInstance();
 
-  const serviceIds = useMemo(() => {
-    const ids = Object.keys(connectors);
-    logger.debug(
-      `[useServicesHealth] Monitoring ${ids.length} services: ${ids.join(", ")}`,
-    );
-    return ids;
-  }, [connectors]);
+  // Selector-first: get active service ids from the connectors store (Map -> keys)
+  const activeServiceIds = useConnectorsStore(selectConnectorIds);
+
+  // Load persisted service configs (includes disabled/persisted-only entries)
+  const [persistedConfigs, setPersistedConfigs] = useState<ServiceConfig[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const configs = await secureStorage.getServiceConfigs();
+        if (mounted) setPersistedConfigs(configs);
+      } catch (err) {
+        logger.warn("useServicesHealth: failed to load persisted configs", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  logger.debug(
+    `[useServicesHealth] Monitoring active=${activeServiceIds.length} persisted=${persistedConfigs.length}`,
+  );
 
   // Create health queries for all services
+  // Only create health queries for active (registered) connectors. Persisted-only configs
+  // will be surfaced later as offline/unknown entries.
   const healthQueries = useQueries({
-    queries: serviceIds.map((serviceId) => ({
+    queries: activeServiceIds.map((serviceId) => ({
       queryKey: queryKeys.services.health(serviceId),
       queryFn: async () => {
         const connector = connectorManager.getConnector(serviceId);
         if (!connector) {
+          // Shouldn't happen for activeServiceIds, but guard defensively
           throw new Error(`Service connector not found: ${serviceId}`);
         }
 
@@ -156,8 +180,9 @@ export const useServicesHealth = (): ServicesHealthData => {
     (query) => query.isFetching && !query.isLoading,
   );
 
-  const services = useMemo(() => {
-    return serviceIds
+  // Build active services from health queries
+  const activeServices = useMemo(() => {
+    return activeServiceIds
       .map((serviceId, index) => {
         const connector = connectorManager.getConnector(serviceId);
         const healthQuery = healthQueries[index];
@@ -181,7 +206,27 @@ export const useServicesHealth = (): ServicesHealthData => {
         return healthData;
       })
       .filter((service): service is ServiceHealthExtended => service !== null);
-  }, [serviceIds, healthQueries, connectorManager]);
+  }, [activeServiceIds, healthQueries, connectorManager]);
+
+  // Add persisted-only configs (not currently registered in ConnectorManager)
+  const persistedOnlyServices = useMemo(() => {
+    return persistedConfigs
+      .filter((pc) => !activeServiceIds.includes(pc.id))
+      .map((pc) => {
+        const healthData: ServiceHealthExtended = {
+          serviceId: pc.id,
+          config: pc,
+          status: pc.enabled ? "offline" : "offline",
+          statusDescription: "Service connector not found",
+          lastCheckedAt: undefined,
+        };
+        return healthData;
+      });
+  }, [persistedConfigs, activeServiceIds]);
+
+  const services = useMemo(() => {
+    return [...activeServices, ...persistedOnlyServices];
+  }, [activeServices, persistedOnlyServices]);
 
   const overview = useMemo((): ServicesHealthOverview => {
     const total = services.length;

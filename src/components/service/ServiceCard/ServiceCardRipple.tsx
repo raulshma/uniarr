@@ -4,11 +4,14 @@ import {
   Canvas,
   RuntimeShader,
   Skia,
-  useClock,
   RoundedRect,
 } from "@shopify/react-native-skia";
 import type { SkRuntimeEffect } from "@shopify/react-native-skia";
-import { useSharedValue, useDerivedValue } from "react-native-reanimated";
+import {
+  useSharedValue,
+  useAnimatedReaction,
+  runOnJS,
+} from "react-native-reanimated";
 
 export type ServiceCardRippleProps = {
   children?: React.ReactNode;
@@ -33,20 +36,15 @@ uniform float u_amplitude;
 uniform float u_frequency;
 uniform float u_decay;
 uniform float u_speed;
-uniform shader image;
 
 half4 main(float2 position) {
   float dist = distance(position, u_origin);
   float delay = dist / u_speed;
   float time = u_time - delay;
-  time -= delay;
   time = max(0.0, time);
   float rippleAmount = u_amplitude * sin(u_frequency * time) * exp(-u_decay * time);
-  float2 n = normalize(position - u_origin);
-  float2 newPosition = position + rippleAmount * n;
-  half4 color = image.eval(newPosition).rgba;
-  color.rgb += 0.3 * (rippleAmount / u_amplitude) * color.a;
-  return color;
+  float alpha = clamp(rippleAmount / u_amplitude, 0.0, 1.0);
+  return half4(1.0, 1.0, 1.0, alpha * 0.3);
 }
 `;
 
@@ -79,46 +77,73 @@ const ServiceCardRipple = forwardRef<RippleHandle, ServiceCardRippleProps>(
   ) => {
     const [layout, setLayout] = useState({ w: 0, h: 0 });
 
-    const clock = useClock();
-
+    // Use Reanimated shared values for touch state
     const touchX = useSharedValue(-9999);
     const touchY = useSharedValue(-9999);
-    const touchStart = useSharedValue(-9999);
+    // Use a timestamp (ms) for touch start so we do not mix Skia clock
+    const touchStart = useSharedValue(-999999999);
 
     useImperativeHandle(ref, () => ({
       trigger: (x: number, y: number) => {
+        console.log("ServiceCardRipple trigger called with:", x, y);
         touchX.value = x;
         touchY.value = y;
-        touchStart.value = clock.value;
+        touchStart.value = Date.now();
       },
     }));
 
-    const touchPoint = useDerivedValue(
-      () => ({ x: touchX.value, y: touchY.value }),
-      [touchX, touchY],
-    );
-
-    const elapsedTime = useDerivedValue(
-      () => (clock.value - touchStart.value) / 1000,
-      [clock, touchStart],
-    );
-
-    const shaderEnabled = useDerivedValue(() => {
-      return (
-        runtimeEffect && 0 < elapsedTime.value && elapsedTime.value < duration
-      );
-    }, [elapsedTime]);
-
-    const rippleUniforms = useDerivedValue(
-      () => ({
-        u_origin: touchPoint.value,
-        u_time: elapsedTime.value,
+    // Local React state to hold plain JS uniforms for RuntimeShader
+    const [shaderProps, setShaderProps] = useState<{
+      enabled: boolean;
+      uniforms: Record<string, any>;
+    }>({
+      enabled: false,
+      uniforms: {
+        u_origin: [-9999, -9999],
+        u_time: 0,
         u_amplitude: 12,
         u_frequency: 15,
         u_decay: 10,
-        u_speed: Math.max(600, Math.max(layout.w, layout.h)),
-      }),
-      [touchPoint, elapsedTime, layout],
+        u_speed: 600,
+      },
+    });
+
+    // Use an animated reaction to derive enabled/uniforms and push to React state
+    useAnimatedReaction(
+      () => {
+        const elapsed = (Date.now() - touchStart.value) / 1000;
+        const enabled =
+          runtimeEffect != null &&
+          !reduceMotion &&
+          elapsed > 0 &&
+          elapsed < duration;
+        const u_origin = [touchX.value, touchY.value];
+        const u_time = elapsed;
+        const u_speed = Math.max(600, Math.max(layout.w, layout.h));
+        return {
+          enabled,
+          uniforms: {
+            u_origin,
+            u_time,
+            u_amplitude: 12,
+            u_frequency: 15,
+            u_decay: 10,
+            u_speed,
+          },
+        };
+      },
+      (res, prev) => {
+        // Only call setState when something changed
+        if (
+          !prev ||
+          res.enabled !== prev.enabled ||
+          res.uniforms.u_time !== prev.uniforms.u_time ||
+          res.uniforms.u_origin[0] !== prev.uniforms.u_origin[0] ||
+          res.uniforms.u_origin[1] !== prev.uniforms.u_origin[1]
+        ) {
+          runOnJS(setShaderProps)(res as any);
+        }
+      },
     );
 
     const onLayout = (e: LayoutChangeEvent) => {
@@ -136,20 +161,21 @@ const ServiceCardRipple = forwardRef<RippleHandle, ServiceCardRippleProps>(
         {layout.w > 0 && layout.h > 0 ? (
           <View style={styles.overlay} pointerEvents="none">
             <Canvas style={{ width: layout.w, height: layout.h }}>
-              {shaderEnabled && runtimeEffect ? (
+              {shaderProps.enabled && runtimeEffect ? (
                 <RuntimeShader
                   source={runtimeEffect}
-                  uniforms={rippleUniforms}
-                />
+                  uniforms={shaderProps.uniforms}
+                >
+                  <RoundedRect
+                    x={0}
+                    y={0}
+                    r={borderRadius}
+                    width={layout.w}
+                    height={layout.h}
+                    color={color}
+                  />
+                </RuntimeShader>
               ) : null}
-              <RoundedRect
-                x={0}
-                y={0}
-                r={borderRadius}
-                width={layout.w}
-                height={layout.h}
-                color={color}
-              />
             </Canvas>
           </View>
         ) : null}

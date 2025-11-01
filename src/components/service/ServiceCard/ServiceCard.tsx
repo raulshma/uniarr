@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import type { StyleProp, ViewStyle, ImageSource } from "react-native";
-import { StyleSheet, View, AccessibilityInfo } from "react-native";
+import { StyleSheet, View, Pressable } from "react-native";
 import {
   Avatar,
   IconButton,
@@ -9,9 +9,7 @@ import {
   useTheme,
 } from "react-native-paper";
 import { SkiaLoader } from "@/components/common/SkiaLoader";
-import { ServiceCardRipple } from "./index";
 import type { CardProps } from "@/components/common/Card/Card";
-import type { RippleHandle } from "./ServiceCardRipple";
 
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
@@ -157,15 +155,6 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
-  const rippleRef = useRef<RippleHandle | null>(null);
-  const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
-
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then((v) =>
-      setReduceMotionEnabled(Boolean(v)),
-    );
-  }, []);
-
   const relativeTime = useMemo(
     () => formatRelativeTime(lastCheckedAt),
     [lastCheckedAt],
@@ -205,34 +194,17 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
 
   const cardAccessibilityHint = onPress ? "Open service details" : undefined;
 
-  const handlePressIn: CardProps["onPressIn"] = (e) => {
-    try {
-      const { locationX, locationY } = e?.nativeEvent ?? {};
-      if (typeof locationX === "number" && typeof locationY === "number") {
-        rippleRef.current?.trigger(locationX, locationY);
-      }
-    } catch (err) {
-      console.warn(err);
-    }
-  };
-
   return (
     <Card
-      onPress={onPress}
-      onPressIn={handlePressIn}
       contentPadding="md"
       style={style}
       testID={testID}
       accessibilityLabel={cardAccessibilityLabel}
       accessibilityHint={cardAccessibilityHint}
       focusable={Boolean(onPress)}
+      variant="custom"
     >
-      <ServiceCardRipple
-        ref={rippleRef}
-        borderRadius={16}
-        duration={600}
-        reduceMotion={reduceMotionEnabled}
-      >
+      <Pressable onPress={onPress} style={styles.pressable}>
         <View style={styles.root}>
           {/* Top Section: icon + name + status */}
           <View style={styles.topSection}>
@@ -428,7 +400,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
             </View>
           </View>
         </View>
-      </ServiceCardRipple>
+      </Pressable>
     </Card>
   );
 };
@@ -436,6 +408,9 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
 export default React.memo(ServiceCard, arePropsEqual);
 
 const styles = StyleSheet.create({
+  pressable: {
+    flex: 1,
+  },
   root: {
     flexDirection: "column",
   },
