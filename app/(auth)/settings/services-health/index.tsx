@@ -339,6 +339,8 @@ const ServicesHealthScreen = () => {
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={styles.contentContainer}
+        // Provide a small vertical gap between list items
+        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}

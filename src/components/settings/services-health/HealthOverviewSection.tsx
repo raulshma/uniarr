@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { View, StyleSheet } from "react-native";
-import { Text, useTheme, Card, Button, Chip } from "react-native-paper";
+import { Text, useTheme, Card, Chip, IconButton } from "react-native-paper";
 import { format } from "date-fns";
 
 import type { AppTheme } from "@/constants/theme";
@@ -127,17 +127,14 @@ export const HealthOverviewSection: React.FC<HealthOverviewSectionProps> = ({
         <View style={styles.cardContent}>
           <View style={styles.header}>
             <Text style={styles.title}>Service Health Overview</Text>
-            <Button
-              mode="outlined"
+            <IconButton
+              mode="contained-tonal"
               onPress={onRefresh}
               loading={isLoading}
               disabled={isLoading}
               style={styles.refreshButton}
-              compact
               icon="refresh"
-            >
-              Refresh
-            </Button>
+            />
           </View>
 
           <View style={styles.statsContainer}>
