@@ -1,6 +1,6 @@
 {
   "name": "uniarr",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",

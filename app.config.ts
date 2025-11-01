@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "uniarr",
   scheme: "uniarr",
   owner: "throwaway0acc",
-  version: "0.1.5",
+  version: "0.2.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
   newArchEnabled: true,
