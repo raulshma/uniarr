@@ -119,6 +119,19 @@ const DiscoverItemDetails = () => {
   const [currentConnector, setCurrentConnector] =
     useState<JellyseerrConnector | null>(null);
 
+  // --- New state: detect existing Jellyseerr requests for this media ---
+  const [matchedJellyseerrRequests, setMatchedJellyseerrRequests] = useState<
+    {
+      connector: JellyseerrConnector;
+      request: any;
+      serviceId: string | number | undefined;
+      serviceName: string | undefined;
+    }[]
+  >([]);
+  const [checkingJellyseerr, setCheckingJellyseerr] = useState(false);
+  const [removeDialogVisible, setRemoveDialogVisible] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+
   const [selectedSeasons, setSelectedSeasons] = useState<number[]>([]);
   const [availableSeasons, setAvailableSeasons] = useState<any[]>([]);
   const [selectAllSeasons, setSelectAllSeasons] = useState(false);
@@ -441,6 +454,107 @@ const DiscoverItemDetails = () => {
     preferredJellyseerrServiceId,
   ]);
 
+  // Refresh matched Jellyseerr requests for current item across configured connectors
+  const refreshJellyseerrMatches = useCallback(async () => {
+    setCheckingJellyseerr(true);
+    try {
+      if (!item || jellyseerrConnectors.length === 0) {
+        setMatchedJellyseerrRequests([]);
+        return;
+      }
+
+      const mediaType = item.mediaType === "series" ? "tv" : "movie";
+      const matches: {
+        connector: JellyseerrConnector;
+        request: any;
+        serviceId: string | number | undefined;
+        serviceName: string | undefined;
+      }[] = [];
+
+      // Query each configured jellyseerr connector for requests and find matches
+      await Promise.all(
+        jellyseerrConnectors.map(async (connector) => {
+          try {
+            const jelly = connector as unknown as JellyseerrConnector;
+            // Ensure connector initialized where possible
+            if (typeof jelly.initialize === "function") {
+              // Do not fail hard if initialize throws for a single connector
+              try {
+                await jelly.initialize();
+              } catch (initErr) {
+                console.warn("Jellyseerr connector initialize failed", initErr);
+              }
+            }
+
+            const requests = await jelly.getRequests({ mediaType });
+            if (requests && Array.isArray(requests.items)) {
+              const found = requests.items.filter(
+                (req: any) =>
+                  req &&
+                  ((req.media &&
+                    req.media.tmdbId &&
+                    item.tmdbId &&
+                    req.media.tmdbId === item.tmdbId) ||
+                    (req.media &&
+                      req.media.id &&
+                      item.sourceId &&
+                      String(req.media.id) === String(item.sourceId))),
+              );
+
+              found.forEach((r: any) =>
+                matches.push({
+                  connector: jelly,
+                  request: r,
+                  serviceId: (connector as any).config?.id,
+                  serviceName: (connector as any).config?.name,
+                }),
+              );
+            }
+          } catch (err) {
+            // Log and continue — we don't want a single connector failure to block the UI
+            console.warn(
+              "Error checking Jellyseerr requests for connector",
+              (connector as any)?.config?.name,
+              err,
+            );
+          }
+        }),
+      );
+
+      setMatchedJellyseerrRequests(matches);
+    } finally {
+      setCheckingJellyseerr(false);
+    }
+  }, [item, jellyseerrConnectors]);
+
+  // Run initial detection when item or connectors change
+  React.useEffect(() => {
+    void refreshJellyseerrMatches();
+  }, [refreshJellyseerrMatches]);
+
+  const handleRemoveJellyseerrRequest = useCallback(
+    async (connector: JellyseerrConnector, requestId: number) => {
+      setIsRemoving(true);
+      try {
+        await connector.deleteRequest(requestId);
+        void alert("Success", "Request removed from Jellyseerr");
+        // Refresh matches so UI updates
+        await refreshJellyseerrMatches();
+      } catch (error) {
+        console.error("Failed to delete Jellyseerr request", error);
+        void alert(
+          "Error",
+          `Failed to remove request: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      } finally {
+        setIsRemoving(false);
+      }
+    },
+    [refreshJellyseerrMatches],
+  );
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -610,16 +724,28 @@ const DiscoverItemDetails = () => {
                   : "Add to Library"}
             </Button>
 
-            {jellyseerrConnectors.length > 0 && (
-              <Button
-                mode="outlined"
-                onPress={handleJellyseerrRequest}
-                disabled={isRequesting}
-                style={styles.addButton}
-              >
-                {isRequesting ? "Requesting..." : "Request with Jellyseerr"}
-              </Button>
-            )}
+            {jellyseerrConnectors.length > 0 &&
+              (matchedJellyseerrRequests.length === 0 ? (
+                <Button
+                  mode="outlined"
+                  onPress={handleJellyseerrRequest}
+                  disabled={isRequesting}
+                  style={styles.addButton}
+                >
+                  {isRequesting ? "Requesting..." : "Request with Jellyseerr"}
+                </Button>
+              ) : (
+                <Button
+                  mode="outlined"
+                  onPress={() => setRemoveDialogVisible(true)}
+                  disabled={checkingJellyseerr || isRemoving}
+                  style={styles.addButton}
+                >
+                  {isRemoving
+                    ? "Removing..."
+                    : `Remove Jellyseerr Request${matchedJellyseerrRequests.length > 1 ? ` (${matchedJellyseerrRequests.length})` : ""}`}
+                </Button>
+              ))}
 
             {/* Related Items */}
             <RelatedItems
@@ -872,6 +998,65 @@ const DiscoverItemDetails = () => {
             >
               {isRequesting ? "Requesting..." : "Submit Request"}
             </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Dialog to show and remove existing Jellyseerr requests for this media */}
+        <Dialog
+          visible={removeDialogVisible}
+          onDismiss={() => setRemoveDialogVisible(false)}
+        >
+          <Dialog.Title>Jellyseerr Requests</Dialog.Title>
+          <Dialog.Content style={{ maxHeight: 400 }}>
+            {checkingJellyseerr ? (
+              <Text variant="bodyMedium">Checking existing requests...</Text>
+            ) : matchedJellyseerrRequests.length === 0 ? (
+              <Text variant="bodyMedium">
+                No Jellyseerr requests found for this item.
+              </Text>
+            ) : (
+              <ScrollView>
+                {matchedJellyseerrRequests.map((m, idx) => (
+                  <View
+                    key={`${String(m.serviceId)}-${String(m.request?.id ?? idx)}`}
+                    style={{ marginBottom: spacing.sm }}
+                  >
+                    <Text
+                      variant="titleSmall"
+                      style={{ marginBottom: spacing.xs }}
+                    >
+                      {m.serviceName ?? String(m.serviceId)}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ marginBottom: spacing.xs }}
+                    >
+                      Request ID: {String(m.request?.id ?? "unknown")}
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                      <Button
+                        mode="outlined"
+                        compact
+                        onPress={async () => {
+                          const reqId = m.request?.id;
+                          if (!reqId) return;
+                          await handleRemoveJellyseerrRequest(
+                            m.connector,
+                            reqId,
+                          );
+                        }}
+                        disabled={isRemoving}
+                      >
+                        Remove
+                      </Button>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setRemoveDialogVisible(false)}>Close</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
