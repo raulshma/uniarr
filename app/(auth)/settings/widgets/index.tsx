@@ -20,7 +20,7 @@ import {
   AnimatedSection,
   SettingsListItem,
   SettingsGroup,
-  SkiaLoader,
+  UniArrLoader,
 } from "@/components/common";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -326,7 +326,7 @@ const WidgetSettingsScreen = () => {
       <SafeAreaView style={styles.container}>
         <TabHeader title="Widget Settings" />
         <View style={styles.emptyState}>
-          <SkiaLoader size={64} centered />
+          <UniArrLoader size={64} centered />
         </View>
       </SafeAreaView>
     );

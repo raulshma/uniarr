@@ -1,7 +1,6 @@
 import React, { useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { SharedValue } from "react-native-reanimated";
-import { vec } from "@shopify/react-native-skia";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ImageBackground from "./ImageBackground";
 import BlurEdge from "./BlurEdge";
@@ -52,8 +51,8 @@ const AnimatedSkiaBackground = React.memo(
         <BlurEdge
           height={edgeHeight + insets.top}
           colors={["#FFFFFF90", "#FFFFFF00"]}
-          start={vec(0, 0 + insets.top)}
-          end={vec(0, edgeHeight + insets.top)}
+          start={{ x: 0, y: 0 + insets.top }}
+          end={{ x: 0, y: edgeHeight + insets.top }}
           style={StyleSheet.compose(styles.blur, styles.top)}
           theme={theme}
         />
@@ -63,8 +62,8 @@ const AnimatedSkiaBackground = React.memo(
         <BlurEdge
           enabled={bottomBlur}
           height={edgeHeight}
-          start={vec(0, 0)}
-          end={vec(0, edgeHeight)}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: edgeHeight }}
           colors={["#FFFFFF00", "#FFFFFF80"]}
           style={StyleSheet.compose(styles.blur, styles.bottom)}
           theme={theme}

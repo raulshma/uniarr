@@ -1,20 +1,15 @@
 import React from "react";
-import {
-  Canvas,
-  LinearGradient,
-  Rect,
-  SkPoint,
-} from "@shopify/react-native-skia";
+import { LinearGradient } from "expo-linear-gradient";
 import { StyleProp, ViewStyle, useWindowDimensions } from "react-native";
 import type { AppTheme } from "@/constants/theme";
 
 type Props = {
   enabled?: boolean;
   height: number;
-  colors: string[];
+  colors: readonly [string, string];
   style?: StyleProp<ViewStyle>;
-  start: SkPoint;
-  end: SkPoint;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
   theme: AppTheme;
 };
 
@@ -34,11 +29,12 @@ const BlurEdge: React.FC<Props> = ({
   }
 
   return (
-    <Canvas style={[style, { height }]}>
-      <Rect x={0} y={0} width={width} height={height}>
-        <LinearGradient start={start} end={end} colors={colors} />
-      </Rect>
-    </Canvas>
+    <LinearGradient
+      style={[style, { height, width }]}
+      colors={colors}
+      start={start}
+      end={end}
+    />
   );
 };
 

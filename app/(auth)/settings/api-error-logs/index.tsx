@@ -25,9 +25,12 @@ import {
 } from "react-native-paper";
 
 import { TabHeader } from "@/components/common/TabHeader";
-import { AnimatedListItem, AnimatedSection } from "@/components/common";
+import {
+  AnimatedListItem,
+  AnimatedSection,
+  UniArrLoader,
+} from "@/components/common";
 import { ErrorDetailModal } from "@/components/common/ErrorDetailModal";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { alert } from "@/services/dialogService";
 import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
 import { logger } from "@/services/logger/LoggerService";
@@ -865,7 +868,7 @@ const ApiErrorLogsScreen = () => {
               alignItems: "center",
             }}
           >
-            <SkiaLoader size={60} />
+            <UniArrLoader size={60} />
             <Text
               style={{
                 marginTop: spacing.md,

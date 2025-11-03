@@ -7,7 +7,7 @@ import {
   Text,
   TextInput,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 
 import { spacing } from "@/theme/spacing";
 import type { TmdbDiscoverFilters } from "@/hooks/tmdb/useTmdbDiscover";
@@ -112,7 +112,7 @@ export const TmdbFilterPanel: React.FC<Props> = ({
       <View>
         <View style={styles.labelRow}>
           <Text variant="titleMedium">Genre</Text>
-          {genresLoading ? <SkiaLoader size={20} centered /> : null}
+          {genresLoading ? <UniArrLoader size={20} centered /> : null}
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.chipRow}>

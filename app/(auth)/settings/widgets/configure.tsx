@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 
-import { AnimatedScrollView, AnimatedSection } from "@/components/common";
+import {
+  AnimatedScrollView,
+  AnimatedSection,
+  UniArrLoader,
+} from "@/components/common";
 import { TabHeader } from "@/components/common/TabHeader";
 import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
@@ -150,7 +153,7 @@ const WidgetConfigureScreen: React.FC = () => {
 
       {loading ? (
         <View style={styles.centered}>
-          <SkiaLoader size={80} />
+          <UniArrLoader size={80} />
           <Text
             style={[
               styles.helperText,

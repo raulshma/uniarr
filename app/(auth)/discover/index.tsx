@@ -5,13 +5,12 @@ import {
   RefreshControl,
   StyleSheet,
   View,
-  useWindowDimensions,
 } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
 } from "react-native-reanimated";
-import { BackdropBlur, Canvas, Fill } from "@shopify/react-native-skia";
+import { BlurView } from "expo-blur";
 import { alert } from "@/services/dialogService";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -151,7 +150,6 @@ const DiscoverCard = React.memo(
 
 const DiscoverScreen = () => {
   const theme = useTheme<AppTheme>();
-  const { width: screenWidth } = useWindowDimensions();
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -210,6 +208,9 @@ const DiscoverScreen = () => {
           height: 48,
           borderRadius: 24,
           overflow: "hidden",
+          backgroundColor: theme.dark
+            ? "rgba(30, 41, 59, 0.3)"
+            : "rgba(248, 250, 252, 0.5)",
         },
         searchBarContent: {
           position: "absolute",
@@ -489,25 +490,11 @@ const DiscoverScreen = () => {
               animated={allowAnimations}
             >
               <View style={styles.searchBar}>
-                <Canvas style={StyleSheet.absoluteFill}>
-                  <BackdropBlur
-                    blur={10}
-                    clip={{
-                      x: 0,
-                      y: 0,
-                      width: screenWidth - spacing.md * 2,
-                      height: 48,
-                    }}
-                  >
-                    <Fill
-                      color={
-                        theme.dark
-                          ? "rgba(30, 41, 59, 0.3)"
-                          : "rgba(248, 250, 252, 0.5)"
-                      }
-                    />
-                  </BackdropBlur>
-                </Canvas>
+                <BlurView
+                  style={StyleSheet.absoluteFill}
+                  intensity={10}
+                  tint={theme.dark ? "dark" : "light"}
+                />
                 <Pressable
                   style={styles.searchBarContent}
                   onPress={openUnifiedSearch}

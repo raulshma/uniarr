@@ -11,7 +11,15 @@ import {
   useTheme,
   PaperProvider,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import {
+  AnimatedListItem,
+  AnimatedScrollView,
+  AnimatedSection,
+  SettingsGroup,
+  SettingsListItem,
+  UniArrLoader,
+} from "@/components/common";
+import { ColorPicker } from "@/components/common/ColorPicker";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -19,14 +27,6 @@ import {
 import { router } from "expo-router";
 
 import { useThemeEditor } from "@/hooks/useThemeEditor";
-import { ColorPicker } from "@/components/common/ColorPicker";
-import {
-  AnimatedListItem,
-  AnimatedScrollView,
-  AnimatedSection,
-  SettingsGroup,
-  SettingsListItem,
-} from "@/components/common";
 import { TabHeader } from "@/components/common/TabHeader";
 import type { AppTheme } from "@/constants/theme";
 import { DensityMode, spacing } from "@/theme/spacing";
@@ -253,7 +253,7 @@ export default function ThemeEditorScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <SkiaLoader size={80} />
+        <UniArrLoader size={80} />
         <Text style={styles.loadingText}>Loading theme editor...</Text>
       </View>
     );
@@ -525,7 +525,14 @@ export default function ThemeEditorScreen() {
                     color: theme.colors.onSurfaceVariant,
                   }}
                 >
-                  Current: {borderRadius[config.globalBorderRadius || "md"]}px
+                  Current:{" "}
+                  {
+                    borderRadius[
+                      (config.globalBorderRadius ||
+                        "md") as keyof typeof borderRadius
+                    ]
+                  }
+                  px
                 </Text>
               </View>
             </AnimatedListItem>
@@ -717,7 +724,7 @@ export default function ThemeEditorScreen() {
         <ColorPicker
           visible={showColorPicker !== null}
           onDismiss={() => setShowColorPicker(null)}
-          onColorSelected={(color) => {
+          onColorSelected={(color: string) => {
             if (showColorPicker) {
               handleColorChange(showColorPicker, color);
               setShowColorPicker(null);

@@ -8,8 +8,7 @@ import {
   Tooltip,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
-import type { CardProps } from "@/components/common/Card/Card";
+import { UniArrLoader } from "@/components/common";
 
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
@@ -383,7 +382,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
                 {onDeletePress ? (
                   isDeleting ? (
                     <View style={styles.deleteSpinner}>
-                      <SkiaLoader size={20} centered />
+                      <UniArrLoader size={20} centered />
                     </View>
                   ) : (
                     <IconButton

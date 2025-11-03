@@ -12,7 +12,7 @@ import React, {
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { Portal } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import CustomConfirm from "./CustomConfirm";
 import CustomAlert from "./CustomAlert";
 import {
@@ -138,7 +138,7 @@ const CustomDialogRenderer = ({
                 justifyContent: "center",
               }}
             >
-              <SkiaLoader size={40} />
+              <UniArrLoader size={40} />
             </View>
           }
         >

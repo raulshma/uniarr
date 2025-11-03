@@ -11,7 +11,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -524,7 +524,7 @@ const SonarrAddSeriesScreen = () => {
           </View>
 
           <View style={styles.resultsContainer}>
-            {searchQuery.isLoading ? <SkiaLoader size={60} centered /> : null}
+            {searchQuery.isLoading ? <UniArrLoader size={60} centered /> : null}
             {!searchQuery.isLoading &&
             !searchQuery.isFetching &&
             debouncedTerm.length >= 2 &&
@@ -577,7 +577,7 @@ const SonarrAddSeriesScreen = () => {
               Quality Profile
             </Text>
             {qualityProfilesQuery.isLoading ? (
-              <SkiaLoader size={60} centered />
+              <UniArrLoader size={60} centered />
             ) : qualityProfilesQuery.isError ? (
               <HelperText
                 type="error"
@@ -645,7 +645,7 @@ const SonarrAddSeriesScreen = () => {
               Root Folder
             </Text>
             {rootFoldersQuery.isLoading ? (
-              <SkiaLoader size={60} centered />
+              <UniArrLoader size={60} centered />
             ) : rootFolders.length ? (
               <Controller<AddSeriesFormValues, "rootFolderPath">
                 control={control}

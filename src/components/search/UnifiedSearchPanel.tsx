@@ -17,7 +17,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -1515,7 +1515,7 @@ export const UnifiedSearchPanel: React.FC = () => {
         >
           {isBusy && (
             <View style={styles.loadingContainer}>
-              <SkiaLoader size={80} centered />
+              <UniArrLoader size={80} centered />
             </View>
           )}
 
@@ -1590,7 +1590,7 @@ export const UnifiedSearchPanel: React.FC = () => {
           </View>
 
           {isHistoryLoading ? (
-            <SkiaLoader size={40} centered />
+            <UniArrLoader size={40} centered />
           ) : history.length ? (
             <View style={styles.historyChips}>
               {history.map((entry) => (

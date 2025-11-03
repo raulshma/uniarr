@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet } from "react-native";
 import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 
 export type FullscreenLoadingProps = {
   message?: string;
@@ -24,7 +24,7 @@ const FullscreenLoading: React.FC<FullscreenLoadingProps> = ({
         entering={ZoomIn.duration(300).delay(100)}
         style={styles.spinner}
       >
-        <SkiaLoader size={80} centered />
+        <UniArrLoader size={80} centered />
       </Animated.View>
       {message ? (
         <Animated.Text

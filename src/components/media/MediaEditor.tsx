@@ -11,7 +11,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import { alert } from "@/services/dialogService";
 
 import { MediaPoster } from "./MediaPoster";
@@ -235,7 +235,7 @@ const MediaEditor: React.FC<MediaEditorProps> = ({
           <ScrollView style={styles.scrollContent}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
-                <SkiaLoader size={80} />
+                <UniArrLoader size={80} />
                 <Text variant="bodyMedium" style={{ marginTop: spacing.md }}>
                   Loading metadata...
                 </Text>

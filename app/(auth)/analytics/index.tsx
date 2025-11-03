@@ -9,7 +9,7 @@ import {
   Portal,
   Modal,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
@@ -209,7 +209,7 @@ const AnalyticsScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <SkiaLoader size={80} centered />
+          <UniArrLoader size={80} centered />
           <Text
             variant="bodyLarge"
             style={{ color: theme.colors.onSurface, marginTop: 16 }}

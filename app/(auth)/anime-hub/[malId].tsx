@@ -11,11 +11,14 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Chip, Text, useTheme, IconButton } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import { EmptyState } from "@/components/common/EmptyState";
-import { AnimatedSection, SettingsGroup } from "@/components/common";
+import {
+  AnimatedSection,
+  SettingsGroup,
+  UniArrLoader,
+} from "@/components/common";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useJikanAnimeDetails } from "@/hooks/useJikanAnimeDetails";
@@ -876,7 +879,7 @@ const AnimeHubDetailScreen: React.FC = () => {
 
               <View style={styles.primaryActions}>
                 {isRequesting ? (
-                  <SkiaLoader size={20} centered />
+                  <UniArrLoader size={20} centered />
                 ) : (
                   <IconButton
                     icon="playlist-plus"
