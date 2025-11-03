@@ -33,6 +33,7 @@ import {
 import { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import { useRelatedItems } from "@/hooks/useRelatedItems";
 import RatingsOverview from "@/components/media/RatingsOverview";
+import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
 import { avatarSizes } from "@/constants/sizes";
 import RelatedItems from "@/components/discover/RelatedItems";
@@ -285,14 +286,129 @@ const DiscoverItemDetails = () => {
           );
           setProfiles(profiles ?? []);
           setRootFolders(rootFolders ?? []);
+
+          // Get service config for defaults (prefer per-target Jellyseerr defaults)
+          const serviceId = (connector as any).config?.id;
+          let serviceConfig = null as any | null;
+          if (serviceId) {
+            try {
+              const configs = await secureStorage.getServiceConfigs();
+              serviceConfig = configs.find((c) => c.id === serviceId);
+            } catch (error) {
+              console.warn("Failed to load service config for defaults", error);
+            }
+          }
+
           const defaultProfile = Array.isArray(profiles)
             ? profiles[0]
             : undefined;
+          const defaultRootFolder = rootFolders?.[0]?.path || "";
+
+          const targetKey =
+            defaultServerId != null ? String(defaultServerId) : undefined;
+          const targetDefaults = serviceConfig?.jellyseerrTargetDefaults ?? {};
+          const targetDefault = targetKey
+            ? targetDefaults?.[targetKey]
+            : undefined;
+
+          // Determine whether this item appears to be anime.
+          const tmdbDetails = tmdbDetailsQuery.data?.details as any | undefined;
+          let isAnimeLocal = false;
+          try {
+            const originalLang = tmdbDetails?.original_language;
+            if (typeof originalLang === "string" && originalLang === "ja") {
+              isAnimeLocal = true;
+            }
+            const detGenres = tmdbDetails?.genres ?? [];
+            const names = (detGenres ?? []).map((g: any) => {
+              return (g.name || "").toLowerCase();
+            });
+            if (names.includes("anime") || names.includes("animation")) {
+              isAnimeLocal = true;
+            }
+          } catch {
+            /* ignore */
+          }
+
+          // Connector-provided anime-specific fields (if present on the server)
+          const serverAnimeProfileId =
+            (defaultServer as any)?.activeAnimeProfileId ?? null;
+          const serverAnimeDirectory =
+            (defaultServer as any)?.activeAnimeDirectory ?? null;
+
+          let selectedProfileId: number | undefined = undefined;
+          let selectedRootFolder: string | undefined = undefined;
+
+          if (isAnimeLocal) {
+            // Prefer per-target configured default
+            if (targetDefault?.profileId) {
+              selectedProfileId = profiles?.find(
+                (p: any) => p.id === targetDefault.profileId,
+              )?.id;
+            }
+
+            // Then prefer the connector/server-provided anime profile id
+            if (selectedProfileId == null && serverAnimeProfileId != null) {
+              selectedProfileId = profiles?.find(
+                (p: any) => p.id === serverAnimeProfileId,
+              )?.id;
+            }
+
+            // Fallback to service-level or first profile
+            if (selectedProfileId == null) {
+              selectedProfileId = targetDefault?.profileId
+                ? profiles?.find((p: any) => p.id === targetDefault.profileId)
+                    ?.id
+                : serviceConfig?.defaultProfileId
+                  ? profiles?.find(
+                      (p: any) => p.id === serviceConfig.defaultProfileId,
+                    )?.id
+                  : defaultProfile?.id;
+            }
+
+            // Root folder: prefer per-target, then connector anime directory, then service-level/default
+            if (targetDefault?.rootFolderPath) {
+              selectedRootFolder = rootFolders?.find(
+                (f: any) => f.path === targetDefault.rootFolderPath,
+              )?.path;
+            }
+            if (!selectedRootFolder && serverAnimeDirectory) {
+              selectedRootFolder = rootFolders?.find(
+                (f: any) => f.path === serverAnimeDirectory,
+              )?.path;
+            }
+            if (!selectedRootFolder) {
+              selectedRootFolder = serviceConfig?.defaultRootFolderPath
+                ? rootFolders?.find(
+                    (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                  )?.path
+                : defaultRootFolder;
+            }
+          } else {
+            // Non-anime fallback (existing behavior)
+            selectedProfileId = targetDefault?.profileId
+              ? profiles?.find((p: any) => p.id === targetDefault.profileId)?.id
+              : serviceConfig?.defaultProfileId
+                ? profiles?.find(
+                    (p: any) => p.id === serviceConfig.defaultProfileId,
+                  )?.id
+                : defaultProfile?.id;
+
+            selectedRootFolder = targetDefault?.rootFolderPath
+              ? rootFolders?.find(
+                  (f: any) => f.path === targetDefault.rootFolderPath,
+                )?.path
+              : serviceConfig?.defaultRootFolderPath
+                ? rootFolders?.find(
+                    (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                  )?.path
+                : defaultRootFolder;
+          }
+
           setSelectedProfile(
-            defaultProfile?.id != null ? Number(defaultProfile.id) : null,
+            selectedProfileId != null ? Number(selectedProfileId) : null,
           );
-          // Use activeDirectory if present, otherwise fallback to empty string
-          setSelectedRootFolder(rootFolders?.[0]?.path || "");
+          setSelectedRootFolder(selectedRootFolder || "");
 
           if (mediaType === "tv") {
             const details = await connector.getMediaDetails(
@@ -315,7 +431,7 @@ const DiscoverItemDetails = () => {
         console.warn("loadJellyseerrOptions failed", error);
       }
     },
-    [item],
+    [item, tmdbDetailsQuery.data?.details],
   );
 
   const handleServerChange = useCallback(
@@ -332,13 +448,125 @@ const DiscoverItemDetails = () => {
         );
         setProfiles(profiles ?? []);
         setRootFolders(rootFolders ?? []);
+
+        // Get service config for defaults (prefer per-target Jellyseerr defaults)
+        const serviceId: string | undefined = (currentConnector as any).config
+          ?.id;
+        let serviceConfig = null as any | null;
+        if (serviceId) {
+          try {
+            const configs = await secureStorage.getServiceConfigs();
+            serviceConfig = configs.find((c) => c.id === serviceId);
+          } catch (error) {
+            console.warn("Failed to load service config for defaults", error);
+          }
+        }
+
         const defaultProfile = Array.isArray(profiles)
           ? profiles[0]
           : undefined;
-        setSelectedProfile(
-          defaultProfile?.id != null ? Number(defaultProfile.id) : null,
+        const defaultRootFolder = rootFolders?.[0]?.path || "";
+
+        const targetKey = String(serverId);
+        const targetDefaults = serviceConfig?.jellyseerrTargetDefaults ?? {};
+        const targetDefault = targetDefaults?.[targetKey];
+
+        // Try to find the server object in the previously loaded servers list so
+        // we can use any connector-provided anime defaults (activeAnimeProfileId / activeAnimeDirectory).
+        const serverObj = servers.find(
+          (s) => String((s as any)?.id) === String(serverId),
         );
-        setSelectedRootFolder(rootFolders?.[0]?.path || "");
+        const serverAnimeProfileId =
+          (serverObj as any)?.activeAnimeProfileId ?? null;
+        const serverAnimeDirectory =
+          (serverObj as any)?.activeAnimeDirectory ?? null;
+
+        // Detect anime for the current item using the TMDB details if available.
+        const tmdbDetails = tmdbDetailsQuery.data?.details as any | undefined;
+        let isAnimeLocal = false;
+        try {
+          const originalLang = tmdbDetails?.original_language;
+          if (typeof originalLang === "string" && originalLang === "ja") {
+            isAnimeLocal = true;
+          }
+          const detGenres = tmdbDetails?.genres ?? [];
+          const names = (detGenres ?? []).map((g: any) => {
+            return (g.name || "").toLowerCase();
+          });
+          if (names.includes("anime") || names.includes("animation")) {
+            isAnimeLocal = true;
+          }
+        } catch {
+          /* ignore */
+        }
+
+        let selectedProfileId: number | undefined = undefined;
+        let selectedRootFolder: string | undefined = undefined;
+
+        if (isAnimeLocal) {
+          if (targetDefault?.profileId) {
+            selectedProfileId = profiles?.find(
+              (p: any) => p.id === targetDefault.profileId,
+            )?.id;
+          }
+
+          if (selectedProfileId == null && serverAnimeProfileId != null) {
+            selectedProfileId = profiles?.find(
+              (p: any) => p.id === serverAnimeProfileId,
+            )?.id;
+          }
+
+          if (selectedProfileId == null) {
+            selectedProfileId = targetDefault?.profileId
+              ? profiles?.find((p: any) => p.id === targetDefault.profileId)?.id
+              : serviceConfig?.defaultProfileId
+                ? profiles?.find(
+                    (p: any) => p.id === serviceConfig.defaultProfileId,
+                  )?.id
+                : defaultProfile?.id;
+          }
+
+          if (targetDefault?.rootFolderPath) {
+            selectedRootFolder = rootFolders?.find(
+              (f: any) => f.path === targetDefault.rootFolderPath,
+            )?.path;
+          }
+          if (!selectedRootFolder && serverAnimeDirectory) {
+            selectedRootFolder = rootFolders?.find(
+              (f: any) => f.path === serverAnimeDirectory,
+            )?.path;
+          }
+          if (!selectedRootFolder) {
+            selectedRootFolder = serviceConfig?.defaultRootFolderPath
+              ? rootFolders?.find(
+                  (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                )?.path
+              : defaultRootFolder;
+          }
+        } else {
+          selectedProfileId = targetDefault?.profileId
+            ? profiles?.find((p: any) => p.id === targetDefault.profileId)?.id
+            : serviceConfig?.defaultProfileId
+              ? profiles?.find(
+                  (p: any) => p.id === serviceConfig.defaultProfileId,
+                )?.id
+              : defaultProfile?.id;
+
+          selectedRootFolder = targetDefault?.rootFolderPath
+            ? rootFolders?.find(
+                (f: any) => f.path === targetDefault.rootFolderPath,
+              )?.path
+            : serviceConfig?.defaultRootFolderPath
+              ? rootFolders?.find(
+                  (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                )?.path
+              : defaultRootFolder;
+        }
+
+        setSelectedProfile(
+          selectedProfileId != null ? Number(selectedProfileId) : null,
+        );
+        setSelectedRootFolder(selectedRootFolder || "");
       } catch (error) {
         void alert(
           "Error",
@@ -349,7 +577,7 @@ const DiscoverItemDetails = () => {
         console.warn("handleServerChange failed", error);
       }
     },
-    [currentConnector, item],
+    [currentConnector, item, servers, tmdbDetailsQuery.data?.details],
   );
 
   const handleSubmitRequest = useCallback(async () => {

@@ -41,6 +41,8 @@ export const queryKeys = {
     overview: ["services", "overview"] as const,
     health: (serviceId: string): QueryKeyBuilder =>
       ["services", serviceId, "health"] as const,
+    config: (serviceId: string): QueryKeyBuilder =>
+      ["services", serviceId, "config"] as const,
   },
   activity: {
     base: ["activity"] as const,

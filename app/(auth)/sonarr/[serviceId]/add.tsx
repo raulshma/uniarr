@@ -36,6 +36,7 @@ import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 import { spacing } from "@/theme/spacing";
+import { secureStorage } from "@/services/storage/SecureStorage";
 
 const searchDebounceMs = 400;
 
@@ -182,6 +183,16 @@ const SonarrAddSeriesScreen = () => {
     gcTime: 5 * 60 * 1000,
   });
 
+  const serviceConfigQuery = useQuery({
+    queryKey: queryKeys.services.config(serviceKey),
+    queryFn: async () => {
+      const configs = await secureStorage.getServiceConfigs();
+      return configs.find((c) => c.id === serviceKey);
+    },
+    enabled: Boolean(serviceKey),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const qualityProfiles = useMemo(
     () => qualityProfilesQuery.data ?? [],
     [qualityProfilesQuery.data],
@@ -193,6 +204,10 @@ const SonarrAddSeriesScreen = () => {
   const searchResults = useMemo(
     () => searchQuery.data ?? [],
     [searchQuery.data],
+  );
+  const serviceConfig = useMemo(
+    () => serviceConfigQuery.data,
+    [serviceConfigQuery.data],
   );
 
   useEffect(() => {
@@ -250,22 +265,42 @@ const SonarrAddSeriesScreen = () => {
       return;
     }
     if (!watchedQualityProfileId) {
-      setValue("qualityProfileId", qualityProfiles[0]!.id, {
-        shouldValidate: true,
-      });
+      // Use service default if available, otherwise first available
+      const defaultProfileId = serviceConfig?.defaultProfileId;
+      const profileToUse = defaultProfileId
+        ? qualityProfiles.find((p) => p.id === defaultProfileId)?.id
+        : qualityProfiles[0]!.id;
+      if (profileToUse !== undefined) {
+        setValue("qualityProfileId", profileToUse, {
+          shouldValidate: true,
+        });
+      }
     }
-  }, [qualityProfiles, selectedSeries, setValue, watchedQualityProfileId]);
+  }, [
+    qualityProfiles,
+    selectedSeries,
+    setValue,
+    watchedQualityProfileId,
+    serviceConfig,
+  ]);
 
   useEffect(() => {
     if (!rootFolders.length) {
       return;
     }
     if (!watchedRootFolderPath) {
-      setValue("rootFolderPath", rootFolders[0]!.path, {
-        shouldValidate: true,
-      });
+      // Use service default if available, otherwise first available
+      const defaultRootPath = serviceConfig?.defaultRootFolderPath;
+      const folderToUse = defaultRootPath
+        ? rootFolders.find((f) => f.path === defaultRootPath)?.path
+        : rootFolders[0]!.path;
+      if (folderToUse !== undefined) {
+        setValue("rootFolderPath", folderToUse, {
+          shouldValidate: true,
+        });
+      }
     }
-  }, [rootFolders, setValue, watchedRootFolderPath]);
+  }, [rootFolders, setValue, watchedRootFolderPath, serviceConfig]);
 
   const addSeriesMutation = useMutation<Series, Error, AddSeriesRequest>({
     mutationKey: queryKeys.sonarr.seriesList(serviceKey),

@@ -33,6 +33,7 @@ export type ServiceCardProps = {
   onPress?: () => void;
   onEditPress?: () => void;
   onDeletePress?: () => void;
+  onSettingsPress?: () => void;
   isDeleting?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -127,7 +128,8 @@ const arePropsEqual = (
   if (
     prevProps.onPress !== nextProps.onPress ||
     prevProps.onEditPress !== nextProps.onEditPress ||
-    prevProps.onDeletePress !== nextProps.onDeletePress
+    prevProps.onDeletePress !== nextProps.onDeletePress ||
+    prevProps.onSettingsPress !== nextProps.onSettingsPress
   ) {
     return false;
   }
@@ -148,6 +150,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   onPress,
   onEditPress,
   onDeletePress,
+  onSettingsPress,
   isDeleting = false,
   style,
   testID,
@@ -370,6 +373,15 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               </View>
 
               <View style={styles.actions}>
+                {onSettingsPress ? (
+                  <IconButton
+                    icon="cog"
+                    size={20}
+                    onPress={onSettingsPress}
+                    accessibilityLabel={`Settings for ${name}`}
+                    accessibilityHint="Opens service settings"
+                  />
+                ) : null}
                 {onEditPress ? (
                   <IconButton
                     icon="pencil"

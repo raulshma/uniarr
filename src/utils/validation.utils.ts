@@ -37,6 +37,17 @@ export const serviceConfigSchema = z
     apiKey: z.string().trim().optional(),
     username: z.string().trim().optional(),
     password: z.string().trim().optional(),
+    defaultProfileId: z.number().int().optional(),
+    defaultRootFolderPath: z.string().trim().optional(),
+    jellyseerrTargetDefaults: z
+      .record(
+        z.string(),
+        z.object({
+          profileId: z.number().int().optional(),
+          rootFolderPath: z.string().optional(),
+        }),
+      )
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (data.type === "jellyfin") {

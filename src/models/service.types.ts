@@ -208,6 +208,18 @@ export interface ServiceConfig {
   enabled: boolean;
   proxyUrl?: string;
   timeout?: number;
+  defaultProfileId?: number;
+  defaultRootFolderPath?: string;
+  /**
+   * Jellyseerr-specific mapping of downstream target server id -> defaults
+   * The keys are downstream server ids (stringified), values hold optional
+   * profileId and rootFolderPath to apply when creating requests for that
+   * specific target inside a Jellyseerr server.
+   */
+  jellyseerrTargetDefaults?: Record<
+    string,
+    { profileId?: number; rootFolderPath?: string }
+  >;
   createdAt: Date;
   updatedAt: Date;
 }
