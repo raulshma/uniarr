@@ -11,6 +11,7 @@ import {
   useConnectorsStore,
   selectAllConnectorsArray,
 } from "@/store/connectorsStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import type { ServiceConfig } from "@/models/service.types";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
@@ -24,11 +25,175 @@ import { logger } from "@/services/logger/LoggerService";
 import ServiceHealthCard from "@/components/settings/services-health/ServiceHealthCard";
 import HealthOverviewSection from "@/components/settings/services-health/HealthOverviewSection";
 import AvailableServiceTile from "@/components/settings/services-health/AvailableServiceTile";
+import SettingsItemTile from "@/components/settings/services-health/SettingsItemTile";
+
+// Individual settings configuration with their state
+const CONFIGURABLE_SETTINGS = [
+  // Experimental Features
+  {
+    id: "frostedWidgets",
+    title: "Frosted Widgets",
+    description: "Frosted glass effect for all widgets",
+    icon: "blur",
+    category: "experimental",
+    stateSelector: (state: any) => state.frostedWidgetsEnabled,
+    setAction: "setFrostedWidgetsEnabled",
+  },
+  {
+    id: "gradientBackground",
+    title: "Dashboard Gradient",
+    description: "Animated gradient background effect",
+    icon: "gradient-vertical",
+    category: "experimental",
+    stateSelector: (state: any) => state.gradientBackgroundEnabled,
+    setAction: "setGradientBackgroundEnabled",
+  },
+
+  // TMDB Settings
+  {
+    id: "tmdbEnabled",
+    title: "TMDB Discover",
+    description: "TMDB recommendations in Discover",
+    icon: "movie-open-play",
+    category: "media",
+    stateSelector: (state: any) => state.tmdbEnabled,
+    setAction: "setTmdbEnabled",
+  },
+
+  // General Settings
+  {
+    id: "notificationsEnabled",
+    title: "Notifications",
+    description: "Enable all notifications",
+    icon: "bell",
+    category: "general",
+    stateSelector: (state: any) => state.notificationsEnabled,
+    setAction: "setNotificationsEnabled",
+  },
+  {
+    id: "releaseNotifications",
+    title: "Release Notifications",
+    description: "Notifications for new releases",
+    icon: "bell-ring",
+    category: "general",
+    stateSelector: (state: any) => state.releaseNotificationsEnabled,
+    setAction: "setReleaseNotificationsEnabled",
+  },
+  {
+    id: "downloadNotifications",
+    title: "Download Notifications",
+    description: "Notifications for download completion",
+    icon: "download",
+    category: "general",
+    stateSelector: (state: any) => state.downloadNotificationsEnabled,
+    setAction: "setDownloadNotificationsEnabled",
+  },
+  {
+    id: "failureNotifications",
+    title: "Failure Notifications",
+    description: "Notifications for failed downloads",
+    icon: "alert-circle",
+    category: "general",
+    stateSelector: (state: any) => state.failedDownloadNotificationsEnabled,
+    setAction: "setFailedDownloadNotificationsEnabled",
+  },
+  {
+    id: "requestNotifications",
+    title: "Request Notifications",
+    description: "Notifications for new requests",
+    icon: "account-plus",
+    category: "general",
+    stateSelector: (state: any) => state.requestNotificationsEnabled,
+    setAction: "setRequestNotificationsEnabled",
+  },
+  {
+    id: "serviceHealthNotifications",
+    title: "Service Health Notifications",
+    description: "Notifications for service health events",
+    icon: "server-network",
+    category: "general",
+    stateSelector: (state: any) => state.serviceHealthNotificationsEnabled,
+    setAction: "setServiceHealthNotificationsEnabled",
+  },
+  {
+    id: "oledEnabled",
+    title: "OLED Mode",
+    description: "Pure black backgrounds for OLED displays",
+    icon: "monitor-star",
+    category: "appearance",
+    stateSelector: (state: any) => state.oledEnabled,
+    setAction: "setOledEnabled",
+  },
+  {
+    id: "hapticFeedback",
+    title: "Haptic Feedback",
+    description: "Vibration feedback on interactions",
+    icon: "vibrate",
+    category: "general",
+    stateSelector: (state: any) => state.hapticFeedback,
+    setAction: "setHapticFeedback",
+  },
+  {
+    id: "apiErrorLoggerEnabled",
+    title: "API Error Logging",
+    description: "Log and track API errors",
+    icon: "bug",
+    category: "diagnostics",
+    stateSelector: (state: any) => state.apiErrorLoggerEnabled,
+    setAction: "setApiErrorLoggerEnabled",
+  },
+  {
+    id: "criticalHealthAlertsBypassQuietHours",
+    title: "Critical Alerts Bypass Quiet Hours",
+    description: "Allow critical health alerts during quiet hours",
+    icon: "bell-alert",
+    category: "general",
+    stateSelector: (state: any) => state.criticalHealthAlertsBypassQuietHours,
+    setAction: "setCriticalHealthAlertsBypassQuietHours",
+  },
+  {
+    id: "apiErrorLoggerCaptureRequestBody",
+    title: "Log Request Bodies",
+    description: "Include request bodies in error logs",
+    icon: "file-document-edit",
+    category: "diagnostics",
+    stateSelector: (state: any) => state.apiErrorLoggerCaptureRequestBody,
+    setAction: "setApiErrorLoggerCaptureRequestBody",
+  },
+  {
+    id: "apiErrorLoggerCaptureResponseBody",
+    title: "Log Response Bodies",
+    description: "Include response bodies in error logs",
+    icon: "file-document-outline",
+    category: "diagnostics",
+    stateSelector: (state: any) => state.apiErrorLoggerCaptureResponseBody,
+    setAction: "setApiErrorLoggerCaptureResponseBody",
+  },
+  {
+    id: "apiErrorLoggerCaptureRequestHeaders",
+    title: "Log Request Headers",
+    description: "Include request headers in error logs",
+    icon: "file-chart",
+    category: "diagnostics",
+    stateSelector: (state: any) => state.apiErrorLoggerCaptureRequestHeaders,
+    setAction: "setApiErrorLoggerCaptureRequestHeaders",
+  },
+];
 
 interface ListItemData {
-  type: "header" | "overview" | "service" | "available";
+  type: "header" | "overview" | "service" | "available" | "setting";
   title?: string;
   data?: any;
+}
+
+interface SettingItem {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: string;
+  isActive: boolean;
+  toggleAction: () => void;
 }
 
 const ServicesHealthScreen = () => {
@@ -41,6 +206,9 @@ const ServicesHealthScreen = () => {
 
   // Read connectors as an array using selector to avoid Map/Object mismatches
   const connectorsArray = useConnectorsStore(selectAllConnectorsArray);
+
+  // Get settings store for individual settings
+  const settingsStore = useSettingsStore();
 
   // Load persisted configs so we can include disabled/persisted-only entries in the UI
   const [persistedConfigs, setPersistedConfigs] = useState<ServiceConfig[]>([]);
@@ -120,8 +288,70 @@ const ServicesHealthScreen = () => {
       });
     }
 
+    // Add Active Settings section
+    const activeSettings = CONFIGURABLE_SETTINGS.filter((setting) =>
+      setting.stateSelector(settingsStore),
+    );
+    if (activeSettings.length > 0) {
+      result.push({
+        type: "header",
+        title: "Active Settings",
+      });
+      activeSettings.forEach((setting) => {
+        const settingItem: SettingItem = {
+          ...setting,
+          isActive: true,
+          toggleAction: () => {
+            const setter = settingsStore[
+              setting.setAction as keyof typeof settingsStore
+            ] as (value: boolean) => void;
+            setter(false);
+          },
+        };
+        result.push({
+          type: "setting",
+          data: settingItem,
+        });
+      });
+    }
+
+    // Add Inactive Settings section
+    const inactiveSettings = CONFIGURABLE_SETTINGS.filter(
+      (setting) => !setting.stateSelector(settingsStore),
+    );
+    if (inactiveSettings.length > 0) {
+      result.push({
+        type: "header",
+        title: "Inactive Settings",
+      });
+      inactiveSettings.forEach((setting) => {
+        const settingItem: SettingItem = {
+          ...setting,
+          isActive: false,
+          toggleAction: () => {
+            const setter = settingsStore[
+              setting.setAction as keyof typeof settingsStore
+            ] as (value: boolean) => void;
+            setter(true);
+          },
+        };
+        result.push({
+          type: "setting",
+          data: settingItem,
+        });
+      });
+    }
+
     return result;
-  }, [overview, isLoading, isError, refetch, services, unconfiguredServices]);
+  }, [
+    overview,
+    isLoading,
+    isError,
+    refetch,
+    services,
+    unconfiguredServices,
+    settingsStore,
+  ]);
 
   const handleRefreshAll = useCallback(() => {
     logger.info("ServicesHealthScreen: Manual refresh triggered");
@@ -299,6 +529,18 @@ const ServicesHealthScreen = () => {
               animated={animationsEnabled}
               onAddService={() => handleAddService(item.data.type)}
               totalItems={unconfiguredServices.length}
+            />
+          );
+        case "setting":
+          return (
+            <SettingsItemTile
+              key={item.data.id}
+              setting={item.data}
+              index={CONFIGURABLE_SETTINGS.findIndex(
+                (s) => s.id === item.data.id,
+              )}
+              animated={animationsEnabled}
+              totalItems={CONFIGURABLE_SETTINGS.length}
             />
           );
         default:
