@@ -26,6 +26,7 @@ import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
 import { createWidgetConfigSignature } from "@/utils/widget.utils";
+import { useImagePrefetch } from "@/hooks/useImagePrefetch";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -110,10 +111,13 @@ const StoryListItem: React.FC<StoryListItemProps> = ({
                     <Image
                       source={{ uri: story.image }}
                       style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
+                        width: 60,
+                        height: 60,
+                        borderRadius: 30,
                       }}
+                      placeholder="data:image/svg+xml,%3Csvg %3E%3Crect width='60' height='60' fill='%23e2e8f0' rx='30'/%3E%3C/svg%3E"
+                      contentFit="cover"
+                      transition={200}
                     />
                   </HapticPressable>
                 ),
@@ -181,6 +185,33 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
     () => createWidgetConfigSignature(config),
     [config],
   );
+
+  // Image prefetching setup
+  const getImageUrls = useCallback(
+    (index: number) => {
+      if (index >= 0 && index < stories.length && stories[index]?.image) {
+        return stories[index]?.image;
+      }
+      return undefined;
+    },
+    [stories],
+  );
+
+  const { preloadInitial } = useImagePrefetch(getImageUrls, {
+    priority: "immediate",
+    prefetchRange: { before: 1, after: 2 },
+    maxConcurrent: 3,
+  });
+
+  // Prefetch initial items when widget loads
+  useEffect(() => {
+    if (stories.length > 0 && !loading && !error) {
+      void preloadInitial(
+        { start: 0, end: Math.min(2, stories.length - 1) },
+        stories.length,
+      );
+    }
+  }, [stories, loading, error, preloadInitial]);
 
   const loadStories = useCallback(
     async (forceRefresh = false) => {
@@ -281,6 +312,7 @@ const HackerNewsWidget: React.FC<HackerNewsWidgetProps> = ({
         : `https://news.ycombinator.com/item?id=${story.id || ""}`,
       actionLabel: "Open on Hacker News",
       loading: contentLoading,
+      imageUrl: story.image,
     });
   };
 

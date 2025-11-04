@@ -264,14 +264,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         <Image
           source={{ uri: resolvedUri }}
           style={styles.image}
-          contentFit="contain"
+          contentFit="cover"
           onLoadEnd={handleImageLoadEnd}
           onError={handleImageError}
-          placeholder="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-          placeholderContentFit="contain"
+          placeholder="data:image/svg+xml,%3Csvg %3E%3Crect width='100' height='100' fill='%23e2e8f0'/%3E%3C/svg%3E"
           transition={300}
-          cachePolicy="memory-disk"
-          blurRadius={0}
         />
       </TouchableOpacity>
     );

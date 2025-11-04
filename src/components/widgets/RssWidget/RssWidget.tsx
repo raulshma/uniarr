@@ -19,12 +19,12 @@ import SettingsListItem from "@/components/common/SettingsListItem";
 import { borderRadius } from "@/constants/sizes";
 import { spacing } from "@/theme/spacing";
 import { Card } from "@/components/common";
-import ImageViewer from "@/components/cache/ImageViewer";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { HapticPressable } from "@/components/common/HapticPressable";
 import { useSettingsStore } from "@/store/settingsStore";
 import WidgetHeader from "../common/WidgetHeader";
 import { createWidgetConfigSignature } from "@/utils/widget.utils";
+import { useImagePrefetch } from "@/hooks/useImagePrefetch";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -112,10 +112,13 @@ const RssItemListItem: React.FC<RssItemListItemProps> = ({
                     <Image
                       source={{ uri: item.image }}
                       style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
+                        width: 60,
+                        height: 60,
+                        borderRadius: 30,
                       }}
+                      placeholder="data:image/svg+xml,%3Csvg %3E%3Crect width='60' height='60' fill='%23e2e8f0' rx='30'/%3E%3C/svg%3E"
+                      contentFit="cover"
+                      transition={200}
                     />
                   </HapticPressable>
                 ),
@@ -146,10 +149,6 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // State for image preview modal
-  const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState<string>("");
-
   // Get drawer hook for content display
   const { openDrawer } = useWidgetDrawer();
 
@@ -158,6 +157,33 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
     () => createWidgetConfigSignature(config),
     [config],
   );
+
+  // Image prefetching setup
+  const getImageUrls = useCallback(
+    (index: number) => {
+      if (index >= 0 && index < items.length && items[index]?.image) {
+        return items[index]?.image;
+      }
+      return undefined;
+    },
+    [items],
+  );
+
+  const { preloadInitial } = useImagePrefetch(getImageUrls, {
+    priority: "immediate",
+    prefetchRange: { before: 1, after: 2 },
+    maxConcurrent: 3,
+  });
+
+  // Prefetch initial items when widget loads
+  useEffect(() => {
+    if (items.length > 0 && !loading && !error) {
+      void preloadInitial(
+        { start: 0, end: Math.min(2, items.length - 1) },
+        items.length,
+      );
+    }
+  }, [items, loading, error, preloadInitial]);
 
   const feedsConfigured = config.feeds && config.feeds.length > 0;
 
@@ -234,18 +260,6 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
     }
   };
 
-  const handleLongPressImage = async (imageUri: string) => {
-    onLongPress();
-    // Validate that the image URI is a proper HTTP(S) URL
-    if (!imageUri || !imageUri.startsWith("http")) {
-      void logger.warn("RssWidget: Invalid image URI", { imageUri });
-      setError("Invalid image URL");
-      return;
-    }
-    setSelectedImageUri(imageUri);
-    setImageModalVisible(true);
-  };
-
   const handleLongPressItem = (item: RssFeedItem) => {
     onLongPress();
     openDrawer({
@@ -263,6 +277,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
       actionUrl: item.link || "",
       actionLabel: "Open Full Article",
       loading: false,
+      imageUrl: item.image,
     });
   };
 
@@ -335,7 +350,7 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
                 itemsLength={items.length}
                 onPress={() => openLink(item.link)}
                 onLongPress={() => handleLongPressItem(item)}
-                onLongPressImage={() => handleLongPressImage(item.image!)}
+                onLongPressImage={() => handleLongPressItem(item)}
               />
             ))}
           </View>
@@ -347,15 +362,6 @@ const RssWidget: React.FC<RssWidgetProps> = ({ widget, onRefresh, onEdit }) => {
           </Text>
         )}
       </Card>
-
-      {/* Image Preview Modal */}
-      <ImageViewer
-        visible={imageModalVisible}
-        imageUri={selectedImageUri}
-        fileName="Article Thumbnail"
-        fileSize="Image"
-        onClose={() => setImageModalVisible(false)}
-      />
     </>
   );
 };
