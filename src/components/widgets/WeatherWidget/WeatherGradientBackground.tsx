@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
-import { Canvas, Rect, LinearGradient, vec } from "@shopify/react-native-skia";
-import { temperatureToColor } from "@/utils/skia.utils";
+import { LinearGradient } from "expo-linear-gradient";
+import { temperatureToColor } from "@/utils/color.utils";
 
 interface WeatherGradientBackgroundProps {
   temperature: number;
@@ -38,15 +38,12 @@ const WeatherGradientBackground: React.FC<WeatherGradientBackgroundProps> = ({
   }
 
   return (
-    <Canvas style={{ width, height, position: "absolute" }}>
-      <Rect x={0} y={0} width={width} height={height}>
-        <LinearGradient
-          start={vec(0, 0)}
-          end={vec(width, height)}
-          colors={[startColor, endColor]}
-        />
-      </Rect>
-    </Canvas>
+    <LinearGradient
+      style={{ width, height, position: "absolute" }}
+      colors={[startColor, endColor]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: width, y: height }}
+    />
   );
 };
 

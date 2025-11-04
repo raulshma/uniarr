@@ -9,7 +9,7 @@ import {
   FlatList,
   TouchableWithoutFeedback,
 } from "react-native";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Text, useTheme, Portal, Button } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
@@ -362,7 +362,7 @@ const IconPicker: React.FC<IconPickerProps> = ({
                   </View>
                 ) : loading ? (
                   <View style={styles.loadingContainer}>
-                    <SkiaLoader size={80} />
+                    <UniArrLoader size={80} />
                     <Text variant="bodySmall" style={styles.loadingText}>
                       Searching icons...
                     </Text>

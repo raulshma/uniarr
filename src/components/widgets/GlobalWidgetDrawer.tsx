@@ -19,6 +19,7 @@ export const GlobalWidgetDrawer = () => {
       customContent={drawerState.customContent}
       showMetadata={drawerState.showMetadata}
       showActionButton={drawerState.showActionButton}
+      imageUrl={drawerState.imageUrl}
     />
   );
 };

@@ -5,7 +5,7 @@
 [![Expo SDK](https://img.shields.io/badge/Expo%20SDK-54-000.svg)](https://expo.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://www.typescriptlang.org/)
 
-A sophisticated unified mobile dashboard for managing your entire media ecosystem, built with React Native and Expo.
+UniArr consolidates your media tooling into a single mobile app. Using connector implementations and secure storage, it lets you discover, manage, and sync releases across services while supporting offline workflows and robust diagnostics. Ideal for power users who run self-hosted media stacks and want a polished, mobile-first control surface.
 
 ## Overview
 

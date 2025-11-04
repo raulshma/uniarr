@@ -11,7 +11,7 @@ import Animated, {
 import { useTheme } from "react-native-paper";
 import { useLoaderConfig } from "@/hooks/useLoaderConfig";
 
-export interface SkiaLoaderProps {
+export interface UniArrLoaderProps {
   size?: number;
   strokeWidth?: number;
   duration?: number;
@@ -21,7 +21,7 @@ export interface SkiaLoaderProps {
   containerStyle?: any;
 }
 
-export const SkiaLoader = (props: SkiaLoaderProps) => {
+export const UniArrLoader = (props: UniArrLoaderProps) => {
   const { loaderConfig } = useLoaderConfig();
   const theme = useTheme();
   const {
@@ -29,7 +29,7 @@ export const SkiaLoader = (props: SkiaLoaderProps) => {
     strokeWidth = loaderConfig.strokeWidth,
     duration = loaderConfig.duration,
     colors = loaderConfig.useThemeColors
-      ? [theme.colors.primary, theme.colors.secondary]
+      ? [theme.colors.primary, theme.colors.tertiary]
       : loaderConfig.colors,
     centered = false,
     containerStyle,

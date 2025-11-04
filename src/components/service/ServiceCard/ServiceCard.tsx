@@ -8,8 +8,7 @@ import {
   Tooltip,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
-import type { CardProps } from "@/components/common/Card/Card";
+import { UniArrLoader } from "@/components/common";
 
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
@@ -34,6 +33,7 @@ export type ServiceCardProps = {
   onPress?: () => void;
   onEditPress?: () => void;
   onDeletePress?: () => void;
+  onSettingsPress?: () => void;
   isDeleting?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -128,7 +128,8 @@ const arePropsEqual = (
   if (
     prevProps.onPress !== nextProps.onPress ||
     prevProps.onEditPress !== nextProps.onEditPress ||
-    prevProps.onDeletePress !== nextProps.onDeletePress
+    prevProps.onDeletePress !== nextProps.onDeletePress ||
+    prevProps.onSettingsPress !== nextProps.onSettingsPress
   ) {
     return false;
   }
@@ -149,6 +150,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   onPress,
   onEditPress,
   onDeletePress,
+  onSettingsPress,
   isDeleting = false,
   style,
   testID,
@@ -371,6 +373,15 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               </View>
 
               <View style={styles.actions}>
+                {onSettingsPress ? (
+                  <IconButton
+                    icon="cog"
+                    size={20}
+                    onPress={onSettingsPress}
+                    accessibilityLabel={`Settings for ${name}`}
+                    accessibilityHint="Opens service settings"
+                  />
+                ) : null}
                 {onEditPress ? (
                   <IconButton
                     icon="pencil"
@@ -383,7 +394,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
                 {onDeletePress ? (
                   isDeleting ? (
                     <View style={styles.deleteSpinner}>
-                      <SkiaLoader size={20} centered />
+                      <UniArrLoader size={20} centered />
                     </View>
                   ) : (
                     <IconButton

@@ -12,7 +12,6 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
 import { useRouter } from "expo-router";
 
 import { alert } from "@/services/dialogService";
@@ -27,6 +26,7 @@ import {
   AnimatedSection,
   SettingsGroup,
   SettingsListItem,
+  UniArrLoader,
 } from "@/components/common";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
 
@@ -274,7 +274,7 @@ const TmdbSettingsScreen = () => {
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <SkiaLoader size={80} />
+          <UniArrLoader size={80} />
         </View>
       </SafeAreaView>
     );
@@ -391,7 +391,7 @@ const TmdbSettingsScreen = () => {
               onPress={handleRemoveKey}
               trailing={
                 isRemoving ? (
-                  <SkiaLoader size={20} centered />
+                  <UniArrLoader size={20} centered />
                 ) : (
                   <Button
                     mode="text"

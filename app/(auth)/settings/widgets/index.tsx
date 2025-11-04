@@ -20,7 +20,7 @@ import {
   AnimatedSection,
   SettingsListItem,
   SettingsGroup,
-  SkiaLoader,
+  UniArrLoader,
 } from "@/components/common";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -104,7 +104,10 @@ const WidgetSettingsScreen = () => {
     onPress();
     try {
       await widgetService.toggleWidget(widgetId);
-      await loadWidgets();
+      // Update local state directly instead of reloading with loading indicator
+      const updatedWidgets = await widgetService.getWidgets();
+      setWidgets(updatedWidgets);
+      setLocalWidgets(updatedWidgets);
     } catch (error) {
       console.error("Failed to toggle widget:", error);
     }
@@ -174,7 +177,10 @@ const WidgetSettingsScreen = () => {
 
     try {
       await widgetService.updateWidget(selectedWidget.id, { size });
-      await loadWidgets();
+      // Update local state directly instead of reloading with loading indicator
+      const updatedWidgets = await widgetService.getWidgets();
+      setWidgets(updatedWidgets);
+      setLocalWidgets(updatedWidgets);
       setSizeDialogVisible(false);
       setSelectedWidget(null);
     } catch (error) {
@@ -186,7 +192,10 @@ const WidgetSettingsScreen = () => {
     onPress();
     try {
       await widgetService.resetToDefaults();
-      await loadWidgets();
+      // Update local state directly instead of reloading with loading indicator
+      const updatedWidgets = await widgetService.getWidgets();
+      setWidgets(updatedWidgets);
+      setLocalWidgets(updatedWidgets);
     } catch (error) {
       console.error("Failed to reset widgets:", error);
     }
@@ -317,7 +326,7 @@ const WidgetSettingsScreen = () => {
       <SafeAreaView style={styles.container}>
         <TabHeader title="Widget Settings" />
         <View style={styles.emptyState}>
-          <SkiaLoader size={64} centered />
+          <UniArrLoader size={64} centered />
         </View>
       </SafeAreaView>
     );

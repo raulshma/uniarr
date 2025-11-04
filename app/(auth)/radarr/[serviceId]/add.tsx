@@ -11,7 +11,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
@@ -32,6 +32,7 @@ import { queryKeys } from "@/hooks/queryKeys";
 import type { AddMovieRequest, Movie } from "@/models/movie.types";
 import type { QualityProfile, RootFolder } from "@/models/media.types";
 import { spacing } from "@/theme/spacing";
+import { secureStorage } from "@/services/storage/SecureStorage";
 
 const searchDebounceMs = 400;
 
@@ -202,6 +203,16 @@ const RadarrAddMovieScreen = () => {
     gcTime: 5 * 60 * 1000,
   });
 
+  const serviceConfigQuery = useQuery({
+    queryKey: queryKeys.services.config(serviceKey),
+    queryFn: async () => {
+      const configs = await secureStorage.getServiceConfigs();
+      return configs.find((c) => c.id === serviceKey);
+    },
+    enabled: Boolean(serviceKey),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const qualityProfiles = useMemo(
     () => qualityProfilesQuery.data ?? [],
     [qualityProfilesQuery.data],
@@ -213,6 +224,10 @@ const RadarrAddMovieScreen = () => {
   const searchResults = useMemo(
     () => searchQuery.data ?? [],
     [searchQuery.data],
+  );
+  const serviceConfig = useMemo(
+    () => serviceConfigQuery.data,
+    [serviceConfigQuery.data],
   );
 
   useEffect(() => {
@@ -262,22 +277,42 @@ const RadarrAddMovieScreen = () => {
       return;
     }
     if (!watchedQualityProfileId) {
-      setValue("qualityProfileId", qualityProfiles[0]!.id, {
-        shouldValidate: true,
-      });
+      // Use service default if available, otherwise first available
+      const defaultProfileId = serviceConfig?.defaultProfileId;
+      const profileToUse = defaultProfileId
+        ? qualityProfiles.find((p) => p.id === defaultProfileId)?.id
+        : qualityProfiles[0]!.id;
+      if (profileToUse !== undefined) {
+        setValue("qualityProfileId", profileToUse, {
+          shouldValidate: true,
+        });
+      }
     }
-  }, [qualityProfiles, selectedMovie, setValue, watchedQualityProfileId]);
+  }, [
+    qualityProfiles,
+    selectedMovie,
+    setValue,
+    watchedQualityProfileId,
+    serviceConfig,
+  ]);
 
   useEffect(() => {
     if (!rootFolders.length) {
       return;
     }
     if (!watchedRootFolderPath) {
-      setValue("rootFolderPath", rootFolders[0]!.path, {
-        shouldValidate: true,
-      });
+      // Use service default if available, otherwise first available
+      const defaultRootPath = serviceConfig?.defaultRootFolderPath;
+      const folderToUse = defaultRootPath
+        ? rootFolders.find((f) => f.path === defaultRootPath)?.path
+        : rootFolders[0]!.path;
+      if (folderToUse !== undefined) {
+        setValue("rootFolderPath", folderToUse, {
+          shouldValidate: true,
+        });
+      }
     }
-  }, [rootFolders, setValue, watchedRootFolderPath]);
+  }, [rootFolders, setValue, watchedRootFolderPath, serviceConfig]);
 
   const addMovieMutation = useMutation<Movie, Error, AddMovieRequest>({
     mutationKey: queryKeys.radarr.moviesList(serviceKey),
@@ -549,7 +584,7 @@ const RadarrAddMovieScreen = () => {
           </View>
 
           <View style={styles.resultsContainer}>
-            {searchQuery.isLoading ? <SkiaLoader size={60} centered /> : null}
+            {searchQuery.isLoading ? <UniArrLoader size={60} centered /> : null}
             {!searchQuery.isLoading &&
             !searchQuery.isFetching &&
             debouncedTerm.length >= 2 &&
@@ -602,7 +637,7 @@ const RadarrAddMovieScreen = () => {
               Quality Profile
             </Text>
             {qualityProfilesQuery.isLoading ? (
-              <SkiaLoader size={60} centered />
+              <UniArrLoader size={60} centered />
             ) : qualityProfilesQuery.isError ? (
               <HelperText
                 type="error"
@@ -670,7 +705,7 @@ const RadarrAddMovieScreen = () => {
               Root Folder
             </Text>
             {rootFoldersQuery.isLoading ? (
-              <SkiaLoader size={60} centered />
+              <UniArrLoader size={60} centered />
             ) : rootFolders.length ? (
               <Controller<AddMovieFormValues, "rootFolderPath">
                 control={control}

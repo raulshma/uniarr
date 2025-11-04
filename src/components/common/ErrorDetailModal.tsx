@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { StyleSheet, View, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, useTheme, Divider } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import type { ApiErrorLogEntry } from "@/models/apiErrorLog.types";
@@ -178,7 +178,7 @@ export const ErrorDetailModal: React.FC<ErrorDetailModalProps> = ({
       {/* Loading State */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <SkiaLoader size={60} />
+          <UniArrLoader size={60} />
           <Text
             style={{
               marginTop: spacing.md,

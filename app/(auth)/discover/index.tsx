@@ -1,18 +1,17 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   View,
-  useWindowDimensions,
+  Animated as RNAnimated,
 } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
 } from "react-native-reanimated";
-import { BackdropBlur, Canvas, Fill } from "@shopify/react-native-skia";
-import { alert } from "@/services/dialogService";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   IconButton,
@@ -23,6 +22,7 @@ import {
   Text,
   useTheme,
   Badge,
+  Banner,
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 
@@ -45,6 +45,7 @@ import { spacing } from "@/theme/spacing";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
 import { useSettingsStore } from "@/store/settingsStore";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
+import { alert } from "@/services/dialogService";
 
 const placeholderText = "Search for movies, shows, and more";
 type DiscoverSection = ReturnType<
@@ -151,7 +152,6 @@ const DiscoverCard = React.memo(
 
 const DiscoverScreen = () => {
   const theme = useTheme<AppTheme>();
-  const { width: screenWidth } = useWindowDimensions();
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -161,6 +161,21 @@ const DiscoverScreen = () => {
   const router = useRouter();
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const { apiKey: tmdbKey } = useTmdbKey();
+
+  // Backdrop with blur settings
+  const enableBackdropWithBlur = useSettingsStore(
+    (state) => state.enableBackdropWithBlur,
+  );
+  const discoverBannerDismissed = useSettingsStore(
+    (state) => state.discoverBannerDismissed,
+  );
+  const setDiscoverBannerDismissed = useSettingsStore(
+    (state) => state.setDiscoverBannerDismissed,
+  );
+
+  // State for banner visibility with delay
+  const [showBanner, setShowBanner] = useState(false);
+  const [bannerVisible, setBannerVisible] = useState(false); // For animation
 
   const { sections, services, isLoading, isFetching, isError, error, refetch } =
     useUnifiedDiscover();
@@ -191,6 +206,26 @@ const DiscoverScreen = () => {
   );
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
 
+  // Banner delay effect
+  useEffect(() => {
+    // Only show banner if backdrop is disabled and not previously dismissed
+    if (!enableBackdropWithBlur && !discoverBannerDismissed) {
+      const timer = setTimeout(() => {
+        setShowBanner(true);
+        // Start animation after a small delay
+        setTimeout(() => setBannerVisible(true), 50);
+      }, 2000); // 2-second delay
+
+      return () => clearTimeout(timer);
+    }
+
+    // Auto-hide banner if feature gets enabled
+    if (enableBackdropWithBlur && showBanner) {
+      setBannerVisible(false);
+      setTimeout(() => setShowBanner(false), 600); // Match fade animation duration
+    }
+  }, [enableBackdropWithBlur, discoverBannerDismissed, showBanner]);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -210,6 +245,9 @@ const DiscoverScreen = () => {
           height: 48,
           borderRadius: 24,
           overflow: "hidden",
+          backgroundColor: theme.dark
+            ? "rgba(30, 41, 59, 0.3)"
+            : "rgba(248, 250, 252, 0.5)",
         },
         searchBarContent: {
           position: "absolute",
@@ -267,6 +305,18 @@ const DiscoverScreen = () => {
         emptyWrapper: {
           marginTop: spacing.xl,
         },
+        banner: {
+          marginHorizontal: spacing.md,
+          marginBottom: spacing.md,
+        },
+        bannerAnimated: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          height: 80,
+        },
       }),
     [theme],
   );
@@ -282,6 +332,23 @@ const DiscoverScreen = () => {
   const openSettings = useCallback(() => {
     router.push("/(auth)/(tabs)/settings");
   }, [router]);
+
+  const openExperimentalSettings = useCallback(() => {
+    router.push("/(auth)/settings/experimental-features");
+  }, [router]);
+
+  const handleBannerDismiss = useCallback(() => {
+    setBannerVisible(false);
+    setTimeout(() => setShowBanner(false), 600); // Match fade animation duration
+    setDiscoverBannerDismissed(true);
+  }, [setDiscoverBannerDismissed]);
+
+  const handleBannerSettingsPress = useCallback(() => {
+    setBannerVisible(false);
+    setTimeout(() => setShowBanner(false), 600); // Match fade animation duration
+    setDiscoverBannerDismissed(true);
+    openExperimentalSettings();
+  }, [setDiscoverBannerDismissed, openExperimentalSettings]);
 
   const openTmdbDiscover = useCallback(() => {
     router.push("/(auth)/discover/tmdb");
@@ -447,11 +514,46 @@ const DiscoverScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AnimatedSkiaBackground
-        theme={theme}
-        imageUri={backgroundImageUri}
-        scrollY={scrollY}
-      />
+      {enableBackdropWithBlur ? (
+        <RNAnimated.View style={{ opacity: 1 }}>
+          <AnimatedSkiaBackground
+            theme={theme}
+            imageUri={backgroundImageUri}
+            scrollY={scrollY}
+          />
+        </RNAnimated.View>
+      ) : null}
+
+      {/* Banner with delay and animation */}
+      {showBanner && (
+        <RNAnimated.View
+          style={[
+            styles.bannerAnimated,
+            {
+              opacity: bannerVisible ? 1 : 0,
+              top: spacing.sm,
+            },
+          ]}
+        >
+          <Banner
+            visible={true}
+            actions={[
+              {
+                label: "Settings",
+                onPress: handleBannerSettingsPress,
+              },
+              {
+                label: "Dismiss",
+                onPress: handleBannerDismiss,
+              },
+            ]}
+            icon="information"
+          >
+            Enable backdrop effects in Experimental Settings
+          </Banner>
+        </RNAnimated.View>
+      )}
+
       <PageTransition style={styles.page} transitionType="fade">
         <AnimatedSection animated={allowHeaderAnimations} delay={0}>
           <TabHeader
@@ -489,25 +591,11 @@ const DiscoverScreen = () => {
               animated={allowAnimations}
             >
               <View style={styles.searchBar}>
-                <Canvas style={StyleSheet.absoluteFill}>
-                  <BackdropBlur
-                    blur={10}
-                    clip={{
-                      x: 0,
-                      y: 0,
-                      width: screenWidth - spacing.md * 2,
-                      height: 48,
-                    }}
-                  >
-                    <Fill
-                      color={
-                        theme.dark
-                          ? "rgba(30, 41, 59, 0.3)"
-                          : "rgba(248, 250, 252, 0.5)"
-                      }
-                    />
-                  </BackdropBlur>
-                </Canvas>
+                <BlurView
+                  style={StyleSheet.absoluteFill}
+                  intensity={10}
+                  tint={theme.dark ? "dark" : "light"}
+                />
                 <Pressable
                   style={styles.searchBarContent}
                   onPress={openUnifiedSearch}

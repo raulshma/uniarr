@@ -57,7 +57,7 @@ const ElementsScreen = () => {
           <SettingsGroup>
             <AnimatedListItem index={0} totalItems={1} animated>
               <SettingsListItem
-                title="Skia Loader"
+                title="UniArr Loader"
                 subtitle="Configure the animated loading indicator"
                 left={{ iconName: "loading" }}
                 trailing={
@@ -66,7 +66,7 @@ const ElementsScreen = () => {
                   </Text>
                 }
                 onPress={() =>
-                  router.push("/(auth)/settings/elements/skia-loader")
+                  router.push("/(auth)/settings/elements/uniarr-loader")
                 }
                 groupPosition="single"
               />

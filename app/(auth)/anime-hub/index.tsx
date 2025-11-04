@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useEffect } from "react";
+import React, { useCallback, useMemo, useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -6,14 +6,14 @@ import {
   FlatList,
   RefreshControl,
   Pressable,
-  useWindowDimensions,
+  Animated as RNAnimated,
 } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
 } from "react-native-reanimated";
-import { BackdropBlur, Canvas, Fill } from "@shopify/react-native-skia";
-import { Text, useTheme, IconButton } from "react-native-paper";
+import { BlurView } from "expo-blur";
+import { Text, useTheme, IconButton, Banner } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import type { AppTheme } from "@/constants/theme";
@@ -25,6 +25,7 @@ import {
 } from "@/hooks/useJikanDiscover";
 import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { useConnectorsStore } from "@/store/connectorsStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { AnimeCard, AnimeHubSectionSkeleton } from "@/components/anime";
 import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import AnimatedSkiaBackground from "@/components/common/AnimatedSkiaBackground";
@@ -36,7 +37,6 @@ type JellyseerrSearchResult =
 
 const AnimeHubScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
-  const { width: screenWidth } = useWindowDimensions();
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -45,6 +45,21 @@ const AnimeHubScreen: React.FC = () => {
   });
   const router = useRouter();
   const { getAllConnectors } = useConnectorsStore();
+
+  // Backdrop with blur settings
+  const enableBackdropWithBlur = useSettingsStore(
+    (state) => state.enableBackdropWithBlur,
+  );
+  const animeHubBannerDismissed = useSettingsStore(
+    (state) => state.animeHubBannerDismissed,
+  );
+  const setAnimeHubBannerDismissed = useSettingsStore(
+    (state) => state.setAnimeHubBannerDismissed,
+  );
+
+  // State for banner visibility with delay
+  const [showBanner, setShowBanner] = useState(false);
+  const [bannerVisible, setBannerVisible] = useState(false); // For animation
 
   // Initialize skeleton loading hook with 500ms minimum display time
   const skeleton = useSkeletonLoading({ minLoadingTime: 500 });
@@ -107,6 +122,26 @@ const AnimeHubScreen: React.FC = () => {
     return undefined; // Will use default image
   }, [recommendations, upcoming, trending, movies, jikan]);
 
+  // Banner delay effect
+  useEffect(() => {
+    // Only show banner if backdrop is disabled and not previously dismissed
+    if (!enableBackdropWithBlur && !animeHubBannerDismissed) {
+      const timer = setTimeout(() => {
+        setShowBanner(true);
+        // Start animation after a small delay
+        setTimeout(() => setBannerVisible(true), 50);
+      }, 2000); // 2-second delay
+
+      return () => clearTimeout(timer);
+    }
+
+    // Auto-hide banner if feature gets enabled
+    if (enableBackdropWithBlur && showBanner) {
+      setBannerVisible(false);
+      setTimeout(() => setShowBanner(false), 600); // Match fade animation duration
+    }
+  }, [enableBackdropWithBlur, animeHubBannerDismissed, showBanner]);
+
   // Effect to manage skeleton visibility based on loading state
   useEffect(() => {
     const combinedLoading =
@@ -153,6 +188,23 @@ const AnimeHubScreen: React.FC = () => {
     });
   }, [router]);
 
+  const openExperimentalSettings = useCallback(() => {
+    router.push("/(auth)/settings/experimental-features");
+  }, [router]);
+
+  const handleBannerDismiss = useCallback(() => {
+    setBannerVisible(false);
+    setTimeout(() => setShowBanner(false), 600); // Match fade animation duration
+    setAnimeHubBannerDismissed(true);
+  }, [setAnimeHubBannerDismissed]);
+
+  const handleBannerSettingsPress = useCallback(() => {
+    setBannerVisible(false);
+    setTimeout(() => setShowBanner(false), 600); // Match fade animation duration
+    setAnimeHubBannerDismissed(true);
+    openExperimentalSettings();
+  }, [setAnimeHubBannerDismissed, openExperimentalSettings]);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -182,6 +234,9 @@ const AnimeHubScreen: React.FC = () => {
           borderRadius: 24,
           overflow: "hidden",
           marginBottom: spacing.md,
+          backgroundColor: theme.dark
+            ? "rgba(30, 41, 59, 0.3)"
+            : "rgba(248, 250, 252, 0.5)",
         },
         searchBarContent: {
           position: "absolute",
@@ -244,6 +299,18 @@ const AnimeHubScreen: React.FC = () => {
         menuButton: {
           margin: 0,
         },
+        banner: {
+          marginHorizontal: spacing.md,
+          marginBottom: spacing.md,
+        },
+        bannerAnimated: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          height: 80,
+        },
       }),
     [theme],
   );
@@ -257,11 +324,46 @@ const AnimeHubScreen: React.FC = () => {
   if (skeleton.showSkeleton && combinedLoading) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <AnimatedSkiaBackground
-          theme={theme}
-          imageUri={backgroundImageUri}
-          scrollY={scrollY}
-        />
+        {enableBackdropWithBlur ? (
+          <RNAnimated.View style={{ opacity: 1 }}>
+            <AnimatedSkiaBackground
+              theme={theme}
+              imageUri={backgroundImageUri}
+              scrollY={scrollY}
+            />
+          </RNAnimated.View>
+        ) : null}
+
+        {/* Banner with delay and animation */}
+        {showBanner && (
+          <RNAnimated.View
+            style={[
+              styles.bannerAnimated,
+              {
+                opacity: bannerVisible ? 1 : 0,
+                top: spacing.sm,
+              },
+            ]}
+          >
+            <Banner
+              visible={true}
+              actions={[
+                {
+                  label: "Settings",
+                  onPress: handleBannerSettingsPress,
+                },
+                {
+                  label: "Dismiss",
+                  onPress: handleBannerDismiss,
+                },
+              ]}
+              icon="information"
+            >
+              Enable backdrop effects in Experimental Settings
+            </Banner>
+          </RNAnimated.View>
+        )}
+
         <View style={[styles.header, { backgroundColor: "transparent" }]}>
           <View style={styles.headerTop}>
             <Text style={styles.title}>Anime Hub</Text>
@@ -286,11 +388,46 @@ const AnimeHubScreen: React.FC = () => {
   if (combinedError) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <AnimatedSkiaBackground
-          theme={theme}
-          imageUri={backgroundImageUri}
-          scrollY={scrollY}
-        />
+        {enableBackdropWithBlur ? (
+          <RNAnimated.View style={{ opacity: 1 }}>
+            <AnimatedSkiaBackground
+              theme={theme}
+              imageUri={backgroundImageUri}
+              scrollY={scrollY}
+            />
+          </RNAnimated.View>
+        ) : null}
+
+        {/* Banner with delay and animation */}
+        {showBanner && (
+          <RNAnimated.View
+            style={[
+              styles.bannerAnimated,
+              {
+                opacity: bannerVisible ? 1 : 0,
+                top: spacing.sm,
+              },
+            ]}
+          >
+            <Banner
+              visible={true}
+              actions={[
+                {
+                  label: "Settings",
+                  onPress: handleBannerSettingsPress,
+                },
+                {
+                  label: "Dismiss",
+                  onPress: handleBannerDismiss,
+                },
+              ]}
+              icon="information"
+            >
+              Enable backdrop effects in Experimental Settings
+            </Banner>
+          </RNAnimated.View>
+        )}
+
         <View style={[styles.header, { backgroundColor: "transparent" }]}>
           <View style={styles.headerTop}>
             <Text style={styles.title}>Anime Hub</Text>
@@ -379,11 +516,46 @@ const AnimeHubScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AnimatedSkiaBackground
-        theme={theme}
-        imageUri={backgroundImageUri}
-        scrollY={scrollY}
-      />
+      {enableBackdropWithBlur ? (
+        <RNAnimated.View style={{ opacity: 1 }}>
+          <AnimatedSkiaBackground
+            theme={theme}
+            imageUri={backgroundImageUri}
+            scrollY={scrollY}
+          />
+        </RNAnimated.View>
+      ) : null}
+
+      {/* Banner with delay and animation */}
+      {showBanner && (
+        <RNAnimated.View
+          style={[
+            styles.bannerAnimated,
+            {
+              opacity: bannerVisible ? 1 : 0,
+              top: spacing.sm,
+            },
+          ]}
+        >
+          <Banner
+            visible={true}
+            actions={[
+              {
+                label: "Settings",
+                onPress: handleBannerSettingsPress,
+              },
+              {
+                label: "Dismiss",
+                onPress: handleBannerDismiss,
+              },
+            ]}
+            icon="information"
+          >
+            Enable backdrop effects in Experimental Settings
+          </Banner>
+        </RNAnimated.View>
+      )}
+
       {/* Fixed Header */}
       <View style={[styles.header, { backgroundColor: "transparent" }]}>
         <View style={styles.headerTop}>
@@ -400,25 +572,11 @@ const AnimeHubScreen: React.FC = () => {
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
-          <Canvas style={StyleSheet.absoluteFill}>
-            <BackdropBlur
-              blur={10}
-              clip={{
-                x: 0,
-                y: 0,
-                width: screenWidth - spacing.md * 2,
-                height: 48,
-              }}
-            >
-              <Fill
-                color={
-                  theme.dark
-                    ? "rgba(30, 41, 59, 0.3)"
-                    : "rgba(248, 250, 252, 0.5)"
-                }
-              />
-            </BackdropBlur>
-          </Canvas>
+          <BlurView
+            style={StyleSheet.absoluteFill}
+            intensity={10}
+            tint={theme.dark ? "dark" : "light"}
+          />
           <Pressable
             style={styles.searchBarContent}
             onPress={handleSearch}

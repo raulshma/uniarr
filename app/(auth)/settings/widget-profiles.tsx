@@ -11,7 +11,7 @@ import {
   Dialog,
   Divider,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { TabHeader } from "@/components/common/TabHeader";
@@ -329,7 +329,7 @@ const WidgetProfilesScreen = () => {
             { justifyContent: "center", alignItems: "center" },
           ]}
         >
-          <SkiaLoader size={80} />
+          <UniArrLoader size={80} />
         </View>
       ) : (
         <ScrollView

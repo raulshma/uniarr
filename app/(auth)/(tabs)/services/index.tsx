@@ -273,6 +273,7 @@ const ServiceRowWithHealth = React.memo(
     setSelectedService,
     handleEditService,
     handleDeleteService,
+    handleSettingsPress,
   }: {
     config: ServiceConfig;
     index: number;
@@ -287,6 +288,7 @@ const ServiceRowWithHealth = React.memo(
     setSelectedService: (service: ServiceOverviewItem | null) => void;
     handleEditService: () => void;
     handleDeleteService: () => void;
+    handleSettingsPress: (service: ServiceOverviewItem) => void;
   }) => {
     const { data: healthData } = useServiceHealth(config.id);
     const { icon: homarrUrl } = useServiceIcon(config.type, isDarkTheme);
@@ -326,6 +328,13 @@ const ServiceRowWithHealth = React.memo(
           lastCheckedAt={serviceItem.lastCheckedAt}
           icon={icon}
           onPress={() => handleServicePress(serviceItem)}
+          onSettingsPress={
+            config.type === "sonarr" ||
+            config.type === "radarr" ||
+            config.type === "jellyseerr"
+              ? () => handleSettingsPress(serviceItem)
+              : undefined
+          }
           onEditPress={() => {
             setSelectedService(serviceItem);
             handleEditService();
@@ -561,8 +570,38 @@ const ServicesScreen = () => {
     router.push("/(auth)/add-service");
   }, [router]);
 
+  const handleSettingsPress = useCallback(
+    (service: ServiceOverviewItem) => {
+      switch (service.config.type) {
+        case "sonarr":
+          router.push({
+            pathname: "/(auth)/settings/sonarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "radarr":
+          router.push({
+            pathname: "/(auth)/settings/radarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "jellyseerr":
+          router.push({
+            pathname: "/(auth)/settings/jellyseerr/[serviceid]",
+            params: { serviceid: service.config.id },
+          });
+          break;
+        default:
+          // Should not happen since we only show settings for sonarr/radarr
+          break;
+      }
+    },
+    [router],
+  );
+
   const handleServicePress = useCallback(
     (service: ServiceOverviewItem) => {
+      // Navigate to the appropriate service screen based on type
       switch (service.config.type) {
         case "sonarr":
           router.push({
@@ -573,12 +612,6 @@ const ServicesScreen = () => {
         case "radarr":
           router.push({
             pathname: "/(auth)/radarr/[serviceId]",
-            params: { serviceId: service.config.id },
-          });
-          break;
-        case "lidarr":
-          router.push({
-            pathname: "/(auth)/lidarr/[serviceId]",
             params: { serviceId: service.config.id },
           });
           break;
@@ -600,9 +633,45 @@ const ServicesScreen = () => {
             params: { serviceId: service.config.id },
           });
           break;
+        case "transmission":
+          router.push({
+            pathname: "/(auth)/transmission/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "deluge":
+          router.push({
+            pathname: "/(auth)/deluge/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "sabnzbd":
+          router.push({
+            pathname: "/(auth)/sabnzbd/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "nzbget":
+          router.push({
+            pathname: "/(auth)/nzbget/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "rtorrent":
+          router.push({
+            pathname: "/(auth)/rtorrent/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
         case "prowlarr":
           router.push({
             pathname: "/(auth)/prowlarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
+        case "bazarr":
+          router.push({
+            pathname: "/(auth)/bazarr/[serviceId]",
             params: { serviceId: service.config.id },
           });
           break;
@@ -612,8 +681,18 @@ const ServicesScreen = () => {
             params: { serviceId: service.config.id },
           });
           break;
+        case "lidarr":
+          router.push({
+            pathname: "/(auth)/lidarr/[serviceId]",
+            params: { serviceId: service.config.id },
+          });
+          break;
         default:
-          // For now, just show a message for unsupported services
+          // For unknown service types, just show an alert
+          alert(
+            "Service Navigation",
+            `Navigation for ${service.config.type} is not implemented yet.`,
+          );
           break;
       }
     },
@@ -697,6 +776,7 @@ const ServicesScreen = () => {
         setSelectedService={setSelectedService}
         handleEditService={handleEditService}
         handleDeleteService={handleDeleteService}
+        handleSettingsPress={handleSettingsPress}
       />
     ),
     [
@@ -708,6 +788,7 @@ const ServicesScreen = () => {
       setSelectedService,
       handleEditService,
       handleDeleteService,
+      handleSettingsPress,
     ],
   );
 

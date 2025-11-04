@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 
 import type { AppTheme } from "@/constants/theme";
 
@@ -33,7 +33,7 @@ const LoadingState: React.FC<LoadingStateProps> = ({
       accessibilityLabel={message ?? "Loading"}
       testID={testID}
     >
-      <SkiaLoader size={indicatorSize} />
+      <UniArrLoader size={indicatorSize} />
       {message ? (
         <Text
           style={[styles.message, { color: theme.colors.onSurfaceVariant }]}

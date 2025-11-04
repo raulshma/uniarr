@@ -9,7 +9,7 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 
@@ -410,7 +410,7 @@ const JellyfinNowPlayingScreen = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <SkiaLoader size={80} centered />
+          <UniArrLoader size={80} centered />
         </View>
       </SafeAreaView>
     );

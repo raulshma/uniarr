@@ -1316,4 +1316,82 @@ export class JellyseerrConnector extends BaseConnector<
       throw apiError;
     }
   }
+
+  async getServers(
+    mediaType: "movie" | "tv",
+  ): Promise<
+    | components["schemas"]["RadarrSettings"][]
+    | components["schemas"]["SonarrSettings"][]
+  > {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint =
+        mediaType === "movie"
+          ? `${API_PREFIX}/service/radarr`
+          : `${API_PREFIX}/service/sonarr`;
+      const response = await this.getWithRetry<
+        | components["schemas"]["RadarrSettings"][]
+        | components["schemas"]["SonarrSettings"][]
+      >(endpoint, undefined, "getServers");
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getServers",
+        endpoint:
+          mediaType === "movie"
+            ? `${API_PREFIX}/service/radarr`
+            : `${API_PREFIX}/service/sonarr`,
+      });
+    }
+  }
+
+  async getProfiles(serverId: number, mediaType: "movie" | "tv"): Promise<any> {
+    await this.ensureAuthenticated();
+
+    try {
+      const endpoint =
+        mediaType === "movie"
+          ? `${API_PREFIX}/service/radarr/${serverId}`
+          : `${API_PREFIX}/service/sonarr/${serverId}`;
+      const response = await this.getWithRetry<any>(
+        endpoint,
+        undefined,
+        "getProfiles",
+      );
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getProfiles",
+        endpoint:
+          mediaType === "movie"
+            ? `${API_PREFIX}/service/radarr/${serverId}`
+            : `${API_PREFIX}/service/sonarr/${serverId}`,
+      });
+    }
+  }
+
+  async getCurrentUser(): Promise<components["schemas"]["User"]> {
+    await this.ensureAuthenticated();
+
+    try {
+      const response = await this.getWithRetry<components["schemas"]["User"]>(
+        `${API_PREFIX}/auth/me`,
+        undefined,
+        "getCurrentUser",
+      );
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getCurrentUser",
+        endpoint: `${API_PREFIX}/auth/me`,
+      });
+    }
+  }
 }

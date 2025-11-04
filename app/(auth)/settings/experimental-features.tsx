@@ -26,11 +26,17 @@ const ExperimentalFeaturesScreen = () => {
   const gradientBackgroundEnabled = useSettingsStore(
     (s) => s.gradientBackgroundEnabled,
   );
+  const enableBackdropWithBlur = useSettingsStore(
+    (s) => s.enableBackdropWithBlur,
+  );
   const setFrostedWidgetsEnabled = useSettingsStore(
     (s) => s.setFrostedWidgetsEnabled,
   );
   const setGradientBackgroundEnabled = useSettingsStore(
     (s) => s.setGradientBackgroundEnabled,
+  );
+  const setBackdropWithBlurEnabled = useSettingsStore(
+    (s) => s.setBackdropWithBlurEnabled,
   );
 
   const handleBackPress = () => {
@@ -69,7 +75,22 @@ const ExperimentalFeaturesScreen = () => {
         <AnimatedSection style={styles.section} delay={0} animated>
           <Text style={styles.sectionTitle}>Appearance</Text>
           <SettingsGroup>
-            <AnimatedListItem index={0} totalItems={2} animated>
+            <AnimatedListItem index={0} totalItems={3} animated>
+              <SettingsListItem
+                title="Backdrop with Blur"
+                subtitle="Blurry background effect with dissolve fade in Discover and Anime Hub"
+                left={{ iconName: "image-filter-hdr" }}
+                trailing={
+                  <Switch
+                    value={enableBackdropWithBlur}
+                    onValueChange={setBackdropWithBlurEnabled}
+                    color={theme.colors.primary}
+                  />
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem index={1} totalItems={3} animated>
               <SettingsListItem
                 title="Frosted Widgets"
                 subtitle="Frosted glass effect for all widgets"
@@ -81,10 +102,10 @@ const ExperimentalFeaturesScreen = () => {
                     color={theme.colors.primary}
                   />
                 }
-                groupPosition="top"
+                groupPosition="middle"
               />
             </AnimatedListItem>
-            <AnimatedListItem index={1} totalItems={2} animated>
+            <AnimatedListItem index={2} totalItems={3} animated>
               <SettingsListItem
                 title="Dashboard Gradient"
                 subtitle="Animated gradient background effect"

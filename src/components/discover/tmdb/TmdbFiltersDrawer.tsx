@@ -9,7 +9,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 
 import BottomDrawer from "@/components/common/BottomDrawer";
 import type { AppTheme } from "@/constants/theme";
@@ -134,7 +134,7 @@ export const TmdbFiltersDrawer: React.FC<Props> = ({
       <View style={styles.section}>
         <View style={styles.row}>
           <Text variant="titleMedium">Genre</Text>
-          {genresLoading ? <SkiaLoader size={20} centered /> : null}
+          {genresLoading ? <UniArrLoader size={20} centered /> : null}
         </View>
         <View style={styles.chipRow}>
           <Chip

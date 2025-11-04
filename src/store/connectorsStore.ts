@@ -8,6 +8,9 @@ export { shallow } from "zustand/shallow";
 
 type ConnectorsState = {
   connectors: Map<string, IConnector>;
+  // Cached derived arrays to provide stable references to consumers
+  connectorIds: string[];
+  allConnectorsArray: IConnector[];
   getConnector: (id: string) => IConnector | undefined;
   getConnectorsByType: (type: ServiceType) => IConnector[];
   getAllConnectors: () => IConnector[];
@@ -18,7 +21,14 @@ export const useConnectorsStore = create<ConnectorsState>((set, get) => {
 
   // Set the update callback to sync the store
   manager.setUpdateStore((connectors) =>
-    set({ connectors: new Map(connectors) }),
+    set(() => {
+      const map = new Map(connectors);
+      return {
+        connectors: map,
+        connectorIds: Array.from(map.keys()),
+        allConnectorsArray: Array.from(map.values()),
+      };
+    }),
   );
 
   // Initialize with current connectors
@@ -28,12 +38,12 @@ export const useConnectorsStore = create<ConnectorsState>((set, get) => {
 
   return {
     connectors: initialConnectors,
+    connectorIds: Array.from(initialConnectors.keys()),
+    allConnectorsArray: Array.from(initialConnectors.values()),
     getConnector: (id) => get().connectors.get(id),
     getConnectorsByType: (type) =>
-      Array.from(get().connectors.values()).filter(
-        (c) => c.config.type === type,
-      ),
-    getAllConnectors: () => Array.from(get().connectors.values()),
+      get().allConnectorsArray.filter((c) => c.config.type === type),
+    getAllConnectors: () => get().allConnectorsArray,
   };
 });
 
@@ -49,9 +59,9 @@ export const selectGetAllConnectors = (state: ConnectorsState) =>
 // Direct array selector for efficient memoization - returns array derived from connectors Map
 export const selectAllConnectorsArray = (
   state: ConnectorsState,
-): IConnector[] => Array.from(state.connectors.values());
+): IConnector[] => state.allConnectorsArray;
 // Lightweight selectors: prefer these in components when only metadata is needed
 export const selectConnectorIds = (state: ConnectorsState): string[] =>
-  Array.from(state.connectors.keys());
+  state.connectorIds;
 export const selectConnectorsCount = (state: ConnectorsState): number =>
   state.connectors.size;

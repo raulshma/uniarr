@@ -22,6 +22,14 @@ export { shallow } from "zustand/shallow";
 
 export type ThemePreference = "system" | "light" | "dark";
 
+export type LoaderConfig = {
+  size: number;
+  strokeWidth: number;
+  duration: number;
+  colors: string[];
+  useThemeColors: boolean;
+};
+
 type SettingsData = {
   theme: ThemePreference;
   customThemeConfig: CustomThemeConfig;
@@ -68,15 +76,6 @@ type SettingsData = {
   frostedWidgetsEnabled: boolean;
   // Show animated gradient background on dashboard
   gradientBackgroundEnabled: boolean;
-  // SkiaLoader configuration
-  skiaLoaderConfig?: {
-    size: number;
-    strokeWidth: number;
-    duration: number;
-    blur: number;
-    blurStyle: "inner" | "outer" | "solid" | "normal";
-    colors: string[];
-  };
   // API Error Logger configuration
   apiErrorLoggerEnabled: boolean;
   apiErrorLoggerActivePreset: string; // "CRITICAL", "SERVER", "RATE_LIMIT", "CLIENT_ERRORS", "STRICT", "CUSTOM"
@@ -87,7 +86,13 @@ type SettingsData = {
   apiErrorLoggerCaptureRequestHeaders: boolean; // Capture request headers in error logs (default: false)
   // Hydration tracking
   _hasHydrated: boolean;
+  // Loader configuration for SVG spinner
+  loaderConfig: LoaderConfig;
   // (thumbnail generation removed)
+  // Backdrop with blur experimental feature
+  enableBackdropWithBlur: boolean;
+  discoverBannerDismissed: boolean;
+  animeHubBannerDismissed: boolean;
 };
 
 interface SettingsState extends SettingsData {
@@ -126,14 +131,6 @@ interface SettingsState extends SettingsData {
   setLastReleaseNotesCheckedAt: (timestamp: string | undefined) => void;
   setFrostedWidgetsEnabled: (enabled: boolean) => void;
   setGradientBackgroundEnabled: (enabled: boolean) => void;
-  setSkiaLoaderConfig: (config: {
-    size: number;
-    strokeWidth: number;
-    duration: number;
-    blur: number;
-    blurStyle: "inner" | "outer" | "solid" | "normal";
-    colors: string[];
-  }) => void;
   setApiErrorLoggerEnabled: (enabled: boolean) => void;
   setApiErrorLoggerActivePreset: (preset: string) => void;
   setApiErrorLoggerCustomCodes: (codes: (number | string)[]) => void;
@@ -141,9 +138,13 @@ interface SettingsState extends SettingsData {
   setApiErrorLoggerCaptureRequestBody: (capture: boolean) => void;
   setApiErrorLoggerCaptureResponseBody: (capture: boolean) => void;
   setApiErrorLoggerCaptureRequestHeaders: (capture: boolean) => void;
+  setLoaderConfig: (config: LoaderConfig) => void;
   // (thumbnail setters removed)
+  // Backdrop with blur experimental feature
+  setBackdropWithBlurEnabled: (enabled: boolean) => void;
+  setDiscoverBannerDismissed: (dismissed: boolean) => void;
+  setAnimeHubBannerDismissed: (dismissed: boolean) => void;
 }
-
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
 const MAX_REFRESH_INTERVAL = 120;
@@ -221,28 +222,6 @@ const createDefaultSettings = (): SettingsData => ({
   lastReleaseNotesCheckedAt: undefined,
   frostedWidgetsEnabled: false,
   gradientBackgroundEnabled: false,
-  skiaLoaderConfig: {
-    size: 80,
-    strokeWidth: 10,
-    duration: 1000,
-    blur: 5,
-    blurStyle: "outer" as const,
-    colors: [
-      "#FF0080", // Hot Pink
-      "#FF1493", // Deep Pink
-      "#FF69B4", // Hot Pink (lighter)
-      "#00FFFF", // Electric Blue
-      "#00BFFF", // Deep Sky Blue
-      "#1E90FF", // Dodger Blue
-      "#FF4500", // Neon Red
-      "#FF6347", // Tomato
-      "#FFA500", // Orange
-      "#00FF7F", // Spring Green
-      "#32CD32", // Lime Green
-      "#00FA9A", // Medium Spring Green
-      "#FF0080", // Hot Pink (repeat for smooth transition)
-    ],
-  },
   apiErrorLoggerEnabled: false,
   apiErrorLoggerActivePreset: "CRITICAL",
   apiErrorLoggerCustomCodes: [],
@@ -251,7 +230,18 @@ const createDefaultSettings = (): SettingsData => ({
   apiErrorLoggerCaptureResponseBody: false,
   apiErrorLoggerCaptureRequestHeaders: false,
   _hasHydrated: false,
+  loaderConfig: {
+    size: 50,
+    strokeWidth: 4,
+    duration: 1000,
+    colors: ["#FF0080", "#00FFFF"],
+    useThemeColors: false,
+  },
   // (thumbnail defaults removed)
+  // Backdrop with blur defaults
+  enableBackdropWithBlur: false, // Opt-in feature
+  discoverBannerDismissed: false,
+  animeHubBannerDismissed: false,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -319,7 +309,6 @@ export const useSettingsStore = create<SettingsState>()(
         set({ frostedWidgetsEnabled: enabled }),
       setGradientBackgroundEnabled: (enabled: boolean) =>
         set({ gradientBackgroundEnabled: enabled }),
-      setSkiaLoaderConfig: (config) => set({ skiaLoaderConfig: config }),
       setApiErrorLoggerEnabled: (enabled: boolean) =>
         set({ apiErrorLoggerEnabled: enabled }),
       setApiErrorLoggerActivePreset: (preset: string) =>
@@ -334,6 +323,13 @@ export const useSettingsStore = create<SettingsState>()(
         set({ apiErrorLoggerCaptureResponseBody: capture }),
       setApiErrorLoggerCaptureRequestHeaders: (capture: boolean) =>
         set({ apiErrorLoggerCaptureRequestHeaders: capture }),
+      setLoaderConfig: (config: LoaderConfig) => set({ loaderConfig: config }),
+      setBackdropWithBlurEnabled: (enabled: boolean) =>
+        set({ enableBackdropWithBlur: enabled }),
+      setDiscoverBannerDismissed: (dismissed: boolean) =>
+        set({ discoverBannerDismissed: dismissed }),
+      setAnimeHubBannerDismissed: (dismissed: boolean) =>
+        set({ animeHubBannerDismissed: dismissed }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -374,7 +370,6 @@ export const useSettingsStore = create<SettingsState>()(
         lastReleaseNotesCheckedAt: state.lastReleaseNotesCheckedAt,
         frostedWidgetsEnabled: state.frostedWidgetsEnabled,
         gradientBackgroundEnabled: state.gradientBackgroundEnabled,
-        skiaLoaderConfig: state.skiaLoaderConfig,
         apiErrorLoggerEnabled: state.apiErrorLoggerEnabled,
         apiErrorLoggerActivePreset: state.apiErrorLoggerActivePreset,
         apiErrorLoggerCustomCodes: state.apiErrorLoggerCustomCodes,
@@ -385,10 +380,14 @@ export const useSettingsStore = create<SettingsState>()(
           state.apiErrorLoggerCaptureResponseBody,
         apiErrorLoggerCaptureRequestHeaders:
           state.apiErrorLoggerCaptureRequestHeaders,
+        loaderConfig: state.loaderConfig,
         // thumbnail fields removed
+        enableBackdropWithBlur: state.enableBackdropWithBlur,
+        discoverBannerDismissed: state.discoverBannerDismissed,
+        animeHubBannerDismissed: state.animeHubBannerDismissed,
       }),
       // Bump version since we're adding new persisted fields
-      version: 11,
+      version: 12,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -569,8 +568,7 @@ export const useSettingsStore = create<SettingsState>()(
           gradientBackgroundEnabled:
             partial.gradientBackgroundEnabled ??
             baseDefaults.gradientBackgroundEnabled,
-          skiaLoaderConfig:
-            partial.skiaLoaderConfig ?? baseDefaults.skiaLoaderConfig,
+          loaderConfig: partial.loaderConfig ?? baseDefaults.loaderConfig,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -634,3 +632,4 @@ export const selectFrostedWidgetsEnabled = (state: SettingsState): boolean =>
 export const selectGradientBackgroundEnabled = (
   state: SettingsState,
 ): boolean => state.gradientBackgroundEnabled;
+export const selectLoaderConfig = (state: SettingsState) => state.loaderConfig;

@@ -41,7 +41,7 @@ const extractYear = (date?: string | null): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-const createDiscoverId = (
+export const createDiscoverId = (
   mediaType: DiscoverMediaKind,
   tmdbId: number | undefined,
 ): string => {

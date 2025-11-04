@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { View, StyleSheet } from "react-native";
 import {
   Text,
@@ -27,7 +27,7 @@ interface ServiceHealthCardProps {
   onEditService: () => void;
 }
 
-export const ServiceHealthCard: React.FC<ServiceHealthCardProps> = ({
+const ServiceHealthCard: React.FC<ServiceHealthCardProps> = ({
   service,
   index,
   totalItems,
@@ -298,3 +298,5 @@ export const ServiceHealthCard: React.FC<ServiceHealthCardProps> = ({
     </AnimatedListItem>
   );
 };
+
+export default memo(ServiceHealthCard);

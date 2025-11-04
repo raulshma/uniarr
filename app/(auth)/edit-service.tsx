@@ -110,6 +110,8 @@ const buildServiceConfig = (
     apiKey,
     username,
     password,
+    defaultProfileId: values.defaultProfileId,
+    defaultRootFolderPath: values.defaultRootFolderPath,
     updatedAt: now,
   };
 };
@@ -183,6 +185,8 @@ const EditServiceScreen = () => {
       apiKey: "",
       username: "",
       password: "",
+      defaultProfileId: undefined,
+      defaultRootFolderPath: "",
     },
     mode: "onChange",
   });
@@ -197,6 +201,8 @@ const EditServiceScreen = () => {
         apiKey: existingConfig.apiKey || "",
         username: existingConfig.username || "",
         password: existingConfig.password || "",
+        defaultProfileId: existingConfig.defaultProfileId,
+        defaultRootFolderPath: existingConfig.defaultRootFolderPath,
       });
     }
   }, [existingConfig, reset]);

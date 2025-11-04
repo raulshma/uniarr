@@ -1,7 +1,8 @@
 import React from "react";
 import { View, StyleSheet, Linking } from "react-native";
 import { Text, Button, useTheme } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { Image } from "expo-image";
+import { UniArrLoader } from "@/components/common";
 import BottomDrawer from "@/components/common/BottomDrawer";
 import SettingsGroup from "@/components/common/SettingsGroup";
 import SettingsListItem from "@/components/common/SettingsListItem";
@@ -31,6 +32,7 @@ interface ContentDrawerProps {
   customContent?: React.ReactNode;
   showMetadata?: boolean;
   showActionButton?: boolean;
+  imageUrl?: string; // Add image URL prop
 }
 
 const ContentDrawer: React.FC<ContentDrawerProps> = ({
@@ -46,7 +48,9 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
   customContent,
   showMetadata = true,
   showActionButton = true,
+  imageUrl,
 }) => {
+  // Calculate max image height based on screen dimensions
   const theme = useTheme<AppTheme>();
   const { onPress } = useHaptics();
 
@@ -73,13 +77,46 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
       closeOnBackdropPress={true}
     >
       <View style={styles.contentContainer}>
-        {/* Metadata Section - Using SettingsGroup and SettingsListItem */}
+        {/* Full-Width Image Section */}
+        {imageUrl && (
+          <View style={styles.fullWidthImageContainer}>
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.fullWidthArticleImage}
+              contentFit="cover"
+              placeholder="data:image/svg+xml,%3Csvg %3E%3Crect width='100' height='100' fill='%23e2e8f0'/%3E%3C/svg%3E"
+              transition={300}
+            />
+          </View>
+        )}
+
+        {/* Inline Metadata Section */}
+        {showMetadata && (metadata.source || metadata.date) && (
+          <View style={styles.inlineMetadataSection}>
+            {metadata.source && (
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {metadata.source}
+              </Text>
+            )}
+            {metadata.date && (
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                {metadata.date}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Extended Metadata Section */}
         {showMetadata &&
           (metadata.score !== undefined ||
             metadata.author ||
-            metadata.comments !== undefined ||
-            metadata.date ||
-            metadata.source) && (
+            metadata.comments !== undefined) && (
             <SettingsGroup>
               {metadata.score !== undefined && (
                 <SettingsListItem
@@ -117,35 +154,7 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
                       {metadata.comments}
                     </Text>
                   }
-                  groupPosition={metadata.author ? "middle" : "top"}
-                />
-              )}
-
-              {metadata.date && (
-                <SettingsListItem
-                  title="Date"
-                  trailing={
-                    <Text style={{ color: theme.colors.onSurface }}>
-                      {metadata.date}
-                    </Text>
-                  }
-                  groupPosition={
-                    metadata.author || metadata.comments !== undefined
-                      ? "middle"
-                      : "top"
-                  }
-                />
-              )}
-
-              {metadata.source && (
-                <SettingsListItem
-                  title="Source"
-                  trailing={
-                    <Text style={{ color: theme.colors.onSurface }}>
-                      {metadata.source}
-                    </Text>
-                  }
-                  groupPosition="bottom"
+                  groupPosition={metadata.author ? "bottom" : "single"}
                 />
               )}
             </SettingsGroup>
@@ -156,7 +165,7 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
           customContent
         ) : loading ? (
           <View style={styles.loadingContainer}>
-            <SkiaLoader size={80} />
+            <UniArrLoader size={80} />
             <Text
               variant="bodySmall"
               style={{
@@ -179,10 +188,9 @@ const ContentDrawer: React.FC<ContentDrawerProps> = ({
             ]}
           >
             <Text
-              style={{
-                color: theme.colors.onSurface,
-                lineHeight: 22,
-              }}
+              style={[styles.contentText, { color: theme.colors.onSurface }]}
+              selectable={true}
+              allowFontScaling={true}
             >
               {content}
             </Text>
@@ -211,11 +219,33 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  contentSection: {
+  fullWidthImageContainer: {
+    width: "100%",
+    height: 200,
+    borderRadius: borderRadius.lg,
+    overflow: "hidden",
+    marginHorizontal: spacing.none,
+    marginTop: spacing.xs,
+  },
+  fullWidthArticleImage: {
+    width: "100%",
+    height: "100%",
+  },
+  inlineMetadataSection: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    gap: spacing.xs,
+  },
+  contentSection: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     borderWidth: 1,
   },
+  contentText: {
+    fontSize: 16,
+    lineHeight: 24,
+    letterSpacing: 0.2,
+  },
+
   loadingContainer: {
     minHeight: 100,
     justifyContent: "center",

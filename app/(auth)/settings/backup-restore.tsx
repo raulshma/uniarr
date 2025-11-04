@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, View } from "react-native";
 import { Text, useTheme, Button, Icon } from "react-native-paper";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
 import * as Sharing from "expo-sharing";
 
 import { TabHeader } from "@/components/common/TabHeader";
@@ -11,8 +10,9 @@ import {
   AnimatedListItem,
   AnimatedScrollView,
   AnimatedSection,
-  SettingsListItem,
   SettingsGroup,
+  SettingsListItem,
+  UniArrLoader,
 } from "@/components/common";
 import { alert } from "@/services/dialogService";
 import { logger } from "@/services/logger/LoggerService";
@@ -441,7 +441,7 @@ const BackupRestoreScreen = () => {
 
           {isLoadingBackups ? (
             <View style={styles.loadingContainer}>
-              <SkiaLoader size={80} centered />
+              <UniArrLoader size={80} centered />
             </View>
           ) : recentBackups.length === 0 ? (
             <View style={styles.emptyState}>

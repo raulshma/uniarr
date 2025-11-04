@@ -9,6 +9,7 @@ import {
   Dialog,
   Portal,
   RadioButton,
+  Checkbox,
   Surface,
   Text,
   useTheme,
@@ -33,7 +34,10 @@ import {
 } from "@/connectors/implementations/TmdbConnector";
 import { useTmdbDetails } from "@/hooks/tmdb/useTmdbDetails";
 import { useTmdbKey } from "@/hooks/useTmdbKey";
-import { useSettingsStore } from "@/store/settingsStore";
+import {
+  useSettingsStore,
+  selectPreferredJellyseerrServiceId,
+} from "@/store/settingsStore";
 import {
   useConnectorsStore,
   selectGetConnectorsByType,
@@ -51,7 +55,14 @@ import {
 } from "@/utils/tmdb.utils";
 import { spacing } from "@/theme/spacing";
 import { alert } from "@/services/dialogService";
-
+import { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
+import type { RootFolder } from "@/models/media.types";
+import { secureStorage } from "@/services/storage/SecureStorage";
+// Note: we intentionally do not import useJellyseerrRequests here because
+// calling that hook dynamically for each connector would violate the
+// Rules of Hooks (can't call hooks inside callbacks/loops). The file
+// interacts with Jellyseerr connectors directly when necessary.
 const formatRuntime = (minutes?: number | null): string | undefined => {
   if (!minutes || minutes <= 0) {
     return undefined;
@@ -250,6 +261,56 @@ const TmdbDetailPage = () => {
     null,
   );
   const [errorBannerDismissed, setErrorBannerDismissed] = useState(false);
+
+  // --- Jellyseerr in-place request state and hooks ---
+  const jellyseerrConnectors = getConnectorsByType("jellyseerr");
+  // NOTE: we do NOT call useJellyseerrRequests dynamically for each
+  // configured connector because Hooks must not be invoked inside
+  // callbacks/loops. Instead, when we need per-service data we call the
+  // connector methods (getRequests / createRequest) directly.
+
+  const preferredJellyseerrServiceId = useSettingsStore(
+    selectPreferredJellyseerrServiceId,
+  );
+
+  const [jellyseerrServiceDialogVisible, setJellyseerrServiceDialogVisible] =
+    useState(false);
+  const [selectedJellyseerrServiceId, setSelectedJellyseerrServiceId] =
+    useState<string>("");
+  const [isRequesting, setIsRequesting] = useState(false);
+
+  const [jellyseerrDialogVisible, setJellyseerrDialogVisible] = useState(false);
+  const [selectedServer, setSelectedServer] = useState<number | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<number | null>(null);
+  const [selectedRootFolder, setSelectedRootFolder] = useState<string>("");
+  type JellyServer =
+    | components["schemas"]["RadarrSettings"]
+    | components["schemas"]["SonarrSettings"];
+  type ServiceProfile = components["schemas"]["ServiceProfile"];
+  type JellyRequest = components["schemas"]["MediaRequest"];
+
+  const [servers, setServers] = useState<JellyServer[]>([]);
+  const [profiles, setProfiles] = useState<ServiceProfile[]>([]);
+  const [rootFolders, setRootFolders] = useState<RootFolder[]>([]);
+  const [currentConnector, setCurrentConnector] =
+    useState<JellyseerrConnector | null>(null);
+
+  const [matchedJellyseerrRequests, setMatchedJellyseerrRequests] = useState<
+    {
+      connector: JellyseerrConnector;
+      request: JellyRequest;
+      serviceId: string | number | undefined;
+      serviceName: string | undefined;
+    }[]
+  >([]);
+  const [checkingJellyseerr, setCheckingJellyseerr] = useState(false);
+  const [removeDialogVisible, setRemoveDialogVisible] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const [selectedSeasons, setSelectedSeasons] = useState<number[]>([]);
+  const [availableSeasons, setAvailableSeasons] = useState<any[]>([]);
+  const [selectAllSeasons, setSelectAllSeasons] = useState(false);
+  const [submitError, setSubmitError] = useState<string>("");
 
   useEffect(() => {
     if (!detailsQuery.isError) {
@@ -459,6 +520,553 @@ const TmdbDetailPage = () => {
     selectedDestinationKey,
   ]);
 
+  // --- Jellyseerr handlers (mirror discover/[id].tsx behavior) ---
+  const loadJellyseerrOptions = useCallback(
+    async (connector: JellyseerrConnector) => {
+      if (!tmdbId || !mediaTypeParam) return;
+
+      setCurrentConnector(connector);
+      setSubmitError("");
+
+      const mediaType = mediaTypeParam === "tv" ? "tv" : "movie";
+
+      try {
+        try {
+          if (typeof connector.initialize === "function") {
+            await connector.initialize();
+          }
+        } catch (initError) {
+          void alert(
+            "Error",
+            `Failed to initialize Jellyseerr connector: ${
+              initError instanceof Error ? initError.message : String(initError)
+            }`,
+          );
+          console.warn("Jellyseerr initialize failed", initError);
+          return;
+        }
+
+        const srv = await connector.getServers(mediaType);
+        const validServers = Array.isArray(srv)
+          ? srv.filter(
+              (s) =>
+                s &&
+                s.id != null &&
+                ((typeof s.id === "number" && s.id >= 0) ||
+                  (typeof s.id === "string" && (s.id as string).trim() !== "")),
+            )
+          : [];
+        setServers(validServers);
+        const defaultServer =
+          validServers.find((s) => (s as any).isDefault) || validServers[0];
+
+        const defaultServerId =
+          defaultServer?.id !== undefined && defaultServer?.id !== null
+            ? Number(defaultServer.id)
+            : null;
+        setSelectedServer(defaultServerId);
+
+        if (validServers.length === 0) {
+          void alert(
+            "No servers available",
+            "No valid servers are configured in Jellyseerr for this media type.",
+          );
+          return;
+        }
+
+        if (defaultServerId !== null) {
+          const { profiles: profs, rootFolders: rf } =
+            await connector.getProfiles(defaultServerId, mediaType);
+          setProfiles(profs ?? []);
+          setRootFolders(rf ?? []);
+
+          // Get service config for defaults (prefer per-target Jellyseerr defaults)
+          const serviceId = (connector as any).config?.id;
+          let serviceConfig = null as any | null;
+          if (serviceId) {
+            try {
+              const configs = await secureStorage.getServiceConfigs();
+              serviceConfig = configs.find((c) => c.id === serviceId);
+            } catch (error) {
+              console.warn("Failed to load service config for defaults", error);
+            }
+          }
+
+          // Use per-target jellyseerr defaults if present, then fall back to service-level
+          const defaultProfile = Array.isArray(profs) ? profs[0] : undefined;
+          const defaultRootFolder = rf?.[0]?.path || "";
+
+          const targetKey =
+            defaultServerId != null ? String(defaultServerId) : undefined;
+          const targetDefaults = serviceConfig?.jellyseerrTargetDefaults ?? {};
+          const targetDefault = targetKey
+            ? targetDefaults?.[targetKey]
+            : undefined;
+
+          // Determine whether this TMDB item appears to be anime.
+          const tmdbDetails = detailsQuery.data?.details as any | undefined;
+          let isAnimeLocal = false;
+          try {
+            const originalLang = tmdbDetails?.original_language;
+            if (typeof originalLang === "string" && originalLang === "ja") {
+              isAnimeLocal = true;
+            }
+            const detGenres = tmdbDetails?.genres ?? [];
+            const names = (detGenres ?? []).map((g: any) => {
+              return (g.name || "").toLowerCase();
+            });
+            if (names.includes("anime") || names.includes("animation")) {
+              isAnimeLocal = true;
+            }
+          } catch {
+            /* ignore */
+          }
+
+          // Connector-provided anime-specific fields (if present on the server)
+          const serverAnimeProfileId =
+            (defaultServer as any)?.activeAnimeProfileId ?? null;
+          const serverAnimeDirectory =
+            (defaultServer as any)?.activeAnimeDirectory ?? null;
+
+          let selectedProfileId: number | undefined = undefined;
+          let selectedRootFolder: string | undefined = undefined;
+
+          if (isAnimeLocal) {
+            // Prefer per-target configured default
+            if (targetDefault?.profileId) {
+              selectedProfileId = profs?.find(
+                (p: any) => p.id === targetDefault.profileId,
+              )?.id;
+            }
+
+            // Then prefer the connector/server-provided anime profile id
+            if (selectedProfileId == null && serverAnimeProfileId != null) {
+              selectedProfileId = profs?.find(
+                (p: any) => p.id === serverAnimeProfileId,
+              )?.id;
+            }
+
+            // Fallback to service-level or first profile
+            if (selectedProfileId == null) {
+              selectedProfileId = targetDefault?.profileId
+                ? profs?.find((p: any) => p.id === targetDefault.profileId)?.id
+                : serviceConfig?.defaultProfileId
+                  ? profs?.find(
+                      (p: any) => p.id === serviceConfig.defaultProfileId,
+                    )?.id
+                  : defaultProfile?.id;
+            }
+
+            // Root folder: prefer per-target, then connector anime directory, then service-level/default
+            if (targetDefault?.rootFolderPath) {
+              selectedRootFolder = rf?.find(
+                (f: any) => f.path === targetDefault.rootFolderPath,
+              )?.path;
+            }
+            if (!selectedRootFolder && serverAnimeDirectory) {
+              selectedRootFolder = rf?.find(
+                (f: any) => f.path === serverAnimeDirectory,
+              )?.path;
+            }
+            if (!selectedRootFolder) {
+              selectedRootFolder = serviceConfig?.defaultRootFolderPath
+                ? rf?.find(
+                    (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                  )?.path
+                : defaultRootFolder;
+            }
+          } else {
+            // Non-anime fallback (existing behavior)
+            selectedProfileId = targetDefault?.profileId
+              ? profs?.find((p: any) => p.id === targetDefault.profileId)?.id
+              : serviceConfig?.defaultProfileId
+                ? profs?.find(
+                    (p: any) => p.id === serviceConfig.defaultProfileId,
+                  )?.id
+                : defaultProfile?.id;
+
+            selectedRootFolder = targetDefault?.rootFolderPath
+              ? rf?.find((f: any) => f.path === targetDefault.rootFolderPath)
+                  ?.path
+              : serviceConfig?.defaultRootFolderPath
+                ? rf?.find(
+                    (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                  )?.path
+                : defaultRootFolder;
+          }
+
+          setSelectedProfile(
+            selectedProfileId != null ? Number(selectedProfileId) : null,
+          );
+          setSelectedRootFolder(selectedRootFolder || "");
+
+          if (mediaType === "tv") {
+            const details = await connector.getMediaDetails(tmdbId, "tv");
+            setAvailableSeasons((details as any).seasons || []);
+            setSelectedSeasons([]);
+            setSelectAllSeasons(false);
+          }
+        }
+
+        setJellyseerrDialogVisible(true);
+      } catch (error) {
+        void alert(
+          "Error",
+          `Failed to load options: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        console.warn("loadJellyseerrOptions failed", error);
+      }
+    },
+    [mediaTypeParam, tmdbId, detailsQuery.data],
+  );
+
+  const handleServerChange = useCallback(
+    async (serverId: number) => {
+      if (!currentConnector) return;
+      if (serverId < 0) return;
+
+      const mediaType = mediaTypeParam === "tv" ? "tv" : "movie";
+
+      try {
+        const { profiles: profs, rootFolders: rf } =
+          await currentConnector.getProfiles(serverId, mediaType);
+        setProfiles(profs ?? []);
+        setRootFolders(rf ?? []);
+
+        // Get service config for defaults (prefer per-target Jellyseerr defaults)
+        const serviceId: string | undefined = (currentConnector as any).config
+          ?.id;
+        let serviceConfig = null as any | null;
+        if (serviceId) {
+          try {
+            const configs = await secureStorage.getServiceConfigs();
+            serviceConfig = configs.find((c) => c.id === serviceId);
+          } catch (error) {
+            console.warn("Failed to load service config for defaults", error);
+          }
+        }
+
+        const defaultProfile = Array.isArray(profs) ? profs[0] : undefined;
+        const defaultRootFolder = rf?.[0]?.path || "";
+
+        const targetKey = String(serverId);
+        const targetDefaults = serviceConfig?.jellyseerrTargetDefaults ?? {};
+        const targetDefault = targetDefaults?.[targetKey];
+
+        // Try to find the server object in the previously loaded servers list so
+        // we can use any connector-provided anime defaults (activeAnimeProfileId / activeAnimeDirectory).
+        const serverObj = servers.find(
+          (s) => String((s as any)?.id) === String(serverId),
+        );
+        const serverAnimeProfileId =
+          (serverObj as any)?.activeAnimeProfileId ?? null;
+        const serverAnimeDirectory =
+          (serverObj as any)?.activeAnimeDirectory ?? null;
+
+        // Detect anime for the current TMDB item using the details we already
+        // have from the TMDB details hook, if available.
+        const tmdbDetails = detailsQuery.data?.details as any | undefined;
+        let isAnimeLocal = false;
+        try {
+          const originalLang = tmdbDetails?.original_language;
+          if (typeof originalLang === "string" && originalLang === "ja") {
+            isAnimeLocal = true;
+          }
+          const detGenres = tmdbDetails?.genres ?? [];
+          const names = (detGenres ?? []).map((g: any) => {
+            return (g.name || "").toLowerCase();
+          });
+          if (names.includes("anime") || names.includes("animation")) {
+            isAnimeLocal = true;
+          }
+        } catch {
+          /* ignore */
+        }
+
+        let selectedProfileId: number | undefined = undefined;
+        let selectedRootFolder: string | undefined = undefined;
+
+        if (isAnimeLocal) {
+          if (targetDefault?.profileId) {
+            selectedProfileId = profs?.find(
+              (p: any) => p.id === targetDefault.profileId,
+            )?.id;
+          }
+
+          if (selectedProfileId == null && serverAnimeProfileId != null) {
+            selectedProfileId = profs?.find(
+              (p: any) => p.id === serverAnimeProfileId,
+            )?.id;
+          }
+
+          if (selectedProfileId == null) {
+            selectedProfileId = targetDefault?.profileId
+              ? profs?.find((p: any) => p.id === targetDefault.profileId)?.id
+              : serviceConfig?.defaultProfileId
+                ? profs?.find(
+                    (p: any) => p.id === serviceConfig.defaultProfileId,
+                  )?.id
+                : defaultProfile?.id;
+          }
+
+          if (targetDefault?.rootFolderPath) {
+            selectedRootFolder = rf?.find(
+              (f: any) => f.path === targetDefault.rootFolderPath,
+            )?.path;
+          }
+          if (!selectedRootFolder && serverAnimeDirectory) {
+            selectedRootFolder = rf?.find(
+              (f: any) => f.path === serverAnimeDirectory,
+            )?.path;
+          }
+          if (!selectedRootFolder) {
+            selectedRootFolder = serviceConfig?.defaultRootFolderPath
+              ? rf?.find(
+                  (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                )?.path
+              : defaultRootFolder;
+          }
+        } else {
+          selectedProfileId = targetDefault?.profileId
+            ? profs?.find((p: any) => p.id === targetDefault.profileId)?.id
+            : serviceConfig?.defaultProfileId
+              ? profs?.find((p: any) => p.id === serviceConfig.defaultProfileId)
+                  ?.id
+              : defaultProfile?.id;
+
+          selectedRootFolder = targetDefault?.rootFolderPath
+            ? rf?.find((f: any) => f.path === targetDefault.rootFolderPath)
+                ?.path
+            : serviceConfig?.defaultRootFolderPath
+              ? rf?.find(
+                  (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                )?.path
+              : defaultRootFolder;
+        }
+
+        setSelectedProfile(
+          selectedProfileId != null ? Number(selectedProfileId) : null,
+        );
+        setSelectedRootFolder(selectedRootFolder || "");
+      } catch (error) {
+        void alert(
+          "Error",
+          `Failed to load profiles: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        console.warn("handleServerChange failed", error);
+      }
+    },
+    [currentConnector, mediaTypeParam, servers, detailsQuery.data],
+  );
+  const refreshJellyseerrMatches = useCallback(async () => {
+    setCheckingJellyseerr(true);
+    try {
+      if (!tmdbId || jellyseerrConnectors.length === 0) {
+        setMatchedJellyseerrRequests([]);
+        return;
+      }
+
+      const matches: {
+        connector: JellyseerrConnector;
+        request: any;
+        serviceId: string | number | undefined;
+        serviceName: string | undefined;
+      }[] = [];
+
+      await Promise.all(
+        jellyseerrConnectors.map(async (connector) => {
+          try {
+            const jelly = connector as unknown as JellyseerrConnector;
+            if (typeof jelly.initialize === "function") {
+              try {
+                await jelly.initialize();
+              } catch (initErr) {
+                console.warn("Jellyseerr connector initialize failed", initErr);
+              }
+            }
+
+            const list = await jelly.getRequests();
+            const requests = list?.items ?? [];
+            if (Array.isArray(requests)) {
+              const found = requests.filter(
+                (req: any) =>
+                  req &&
+                  ((req.media &&
+                    req.media.tmdbId &&
+                    tmdbId &&
+                    req.media.tmdbId === tmdbId) ||
+                    (req.media &&
+                      req.media.id &&
+                      tmdbId &&
+                      String(req.media.id) === String(tmdbId))),
+              );
+
+              found.forEach((r: any) =>
+                matches.push({
+                  connector: jelly,
+                  request: r,
+                  serviceId: (connector as any).config?.id,
+                  serviceName: (connector as any).config?.name,
+                }),
+              );
+            }
+          } catch (err) {
+            console.warn(
+              "Error checking Jellyseerr requests for connector",
+              (connector as any)?.config?.name,
+              err,
+            );
+          }
+        }),
+      );
+
+      setMatchedJellyseerrRequests(matches);
+    } finally {
+      setCheckingJellyseerr(false);
+    }
+  }, [jellyseerrConnectors, tmdbId]);
+
+  const handleSubmitRequest = useCallback(async () => {
+    if (!currentConnector || !tmdbId || !mediaTypeParam) {
+      setSubmitError("Please select a server and profile.");
+      return;
+    }
+
+    if (selectedServer == null || selectedProfile == null) {
+      setSubmitError("Please select a server and profile.");
+      return;
+    }
+
+    setSubmitError("");
+
+    const mediaType = mediaTypeParam === "tv" ? "tv" : "movie";
+
+    if (mediaType === "tv" && selectedSeasons.length === 0) {
+      setSubmitError("Please select at least one season.");
+      return;
+    }
+
+    setIsRequesting(true);
+
+    try {
+      // Check existing requests using the current connector directly.
+      let existing;
+      try {
+        const list = await currentConnector.getRequests();
+        const requests = list?.items ?? [];
+        existing = requests.find(
+          (req: any) =>
+            (req.media && req.media.tmdbId && req.media.tmdbId === tmdbId) ||
+            (req.media &&
+              req.media.id &&
+              String(req.media.id) === String(tmdbId)),
+        );
+      } catch (innerErr) {
+        // Non-fatal; continue to attempt create if connector fails to list.
+        console.warn("Failed to fetch existing Jellyseerr requests", innerErr);
+      }
+
+      if (existing) {
+        setSubmitError("This item has already been requested.");
+        return;
+      }
+
+      await currentConnector.createRequest({
+        mediaType,
+        mediaId: tmdbId,
+        tvdbId: undefined,
+        is4k: false,
+        ...(mediaType === "tv" && { seasons: selectedSeasons }),
+        serverId: selectedServer,
+        profileId: selectedProfile,
+        rootFolder: selectedRootFolder || undefined,
+      });
+
+      void alert("Success", "Request submitted successfully!");
+      setJellyseerrDialogVisible(false);
+      await refreshJellyseerrMatches();
+    } catch (error) {
+      console.error(error);
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to submit request",
+      );
+    } finally {
+      setIsRequesting(false);
+    }
+  }, [
+    currentConnector,
+    mediaTypeParam,
+    refreshJellyseerrMatches,
+    selectedProfile,
+    selectedRootFolder,
+    selectedSeasons,
+    selectedServer,
+    tmdbId,
+  ]);
+
+  const handleJellyseerrRequest = useCallback(async () => {
+    if (!mediaTypeParam || jellyseerrConnectors.length === 0) return;
+
+    if (preferredJellyseerrServiceId) {
+      const pref = jellyseerrConnectors.find(
+        (c) =>
+          String((c as any).config?.id) ===
+          String(preferredJellyseerrServiceId),
+      ) as JellyseerrConnector | undefined;
+      if (pref) {
+        await loadJellyseerrOptions(pref);
+        return;
+      }
+    }
+
+    if (jellyseerrConnectors.length > 1) {
+      const preselect =
+        preferredJellyseerrServiceId ??
+        (jellyseerrConnectors[0] as any)?.config?.id;
+      setSelectedJellyseerrServiceId(preselect ? String(preselect) : "");
+      setJellyseerrServiceDialogVisible(true);
+    } else {
+      await loadJellyseerrOptions(
+        jellyseerrConnectors[0] as JellyseerrConnector,
+      );
+    }
+  }, [
+    jellyseerrConnectors,
+    loadJellyseerrOptions,
+    mediaTypeParam,
+    preferredJellyseerrServiceId,
+  ]);
+
+  React.useEffect(() => {
+    void refreshJellyseerrMatches();
+  }, [tmdbId, jellyseerrConnectors, refreshJellyseerrMatches]);
+
+  const handleRemoveJellyseerrRequest = useCallback(
+    async (connector: JellyseerrConnector, requestId: number) => {
+      setIsRemoving(true);
+      try {
+        await connector.deleteRequest(requestId);
+        void alert("Success", "Request removed from Jellyseerr");
+        await refreshJellyseerrMatches();
+      } catch (error) {
+        console.error("Failed to delete Jellyseerr request", error);
+        void alert(
+          "Error",
+          `Failed to remove request: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      } finally {
+        setIsRemoving(false);
+      }
+    },
+    [refreshJellyseerrMatches],
+  );
+
   const movieDetails =
     mediaTypeParam === "movie"
       ? (detailsQuery.data?.details as
@@ -580,12 +1188,19 @@ const TmdbDetailPage = () => {
         );
   const ratingValue = movieDetails?.vote_average ?? tvDetails?.vote_average;
   const statusLabel = movieDetails?.status ?? tvDetails?.status;
-  const genresList = ((mediaTypeParam === "movie"
-    ? movieDetails?.genres
-    : tvDetails?.genres) ?? []) as {
-    id: number;
-    name?: string;
-  }[];
+  const genresList = useMemo(
+    () =>
+      ((mediaTypeParam === "movie"
+        ? movieDetails?.genres
+        : tvDetails?.genres) ?? []) as {
+        id: number;
+        name?: string;
+      }[],
+    [mediaTypeParam, movieDetails, tvDetails],
+  );
+
+  // (anime detection is performed in the Jellyseerr flows where needed so we
+  // avoid ordering issues with hooks/closures)
   const homepageUrl =
     typeof movieDetails?.homepage === "string"
       ? movieDetails.homepage
@@ -783,6 +1398,26 @@ const TmdbDetailPage = () => {
                 Official site
               </Button>
             ) : null}
+            {jellyseerrConnectors.length > 0 &&
+              (matchedJellyseerrRequests.length === 0 ? (
+                <Button
+                  mode="outlined"
+                  onPress={handleJellyseerrRequest}
+                  disabled={isRequesting}
+                >
+                  {isRequesting ? "Requesting..." : "Request with Jellyseerr"}
+                </Button>
+              ) : (
+                <Button
+                  mode="outlined"
+                  onPress={() => setRemoveDialogVisible(true)}
+                  disabled={checkingJellyseerr || isRemoving}
+                >
+                  {isRemoving
+                    ? "Removing..."
+                    : `Remove Jellyseerr Request${matchedJellyseerrRequests.length > 1 ? ` (${matchedJellyseerrRequests.length})` : ""}`}
+                </Button>
+              ))}
           </View>
 
           {providers ? (
@@ -946,6 +1581,265 @@ const TmdbDetailPage = () => {
             <Button onPress={confirmAdd} disabled={!selectedDestinationKey}>
               Continue
             </Button>
+          </Dialog.Actions>
+        </Dialog>
+        {/* Jellyseerr service selector dialog */}
+        <Dialog
+          visible={jellyseerrServiceDialogVisible}
+          onDismiss={() => setJellyseerrServiceDialogVisible(false)}
+        >
+          <Dialog.Title>Select Jellyseerr Service</Dialog.Title>
+          <Dialog.Content>
+            <RadioButton.Group
+              onValueChange={setSelectedJellyseerrServiceId}
+              value={selectedJellyseerrServiceId}
+            >
+              {jellyseerrConnectors.map((service) => (
+                <RadioButton.Item
+                  key={(service as any).config.id}
+                  value={String((service as any).config.id)}
+                  label={(service as any).config.name}
+                />
+              ))}
+            </RadioButton.Group>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setJellyseerrServiceDialogVisible(false)}>
+              Cancel
+            </Button>
+            <Button
+              onPress={async () => {
+                const connector = jellyseerrConnectors.find(
+                  (c) =>
+                    String((c as any).config?.id) ===
+                    selectedJellyseerrServiceId,
+                ) as JellyseerrConnector | undefined;
+                if (connector) {
+                  // Persist preferred service
+                  useSettingsStore
+                    .getState()
+                    .setPreferredJellyseerrServiceId(
+                      selectedJellyseerrServiceId,
+                    );
+                  await loadJellyseerrOptions(connector);
+                }
+                setJellyseerrServiceDialogVisible(false);
+              }}
+            >
+              Select
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Jellyseerr Request Options dialog */}
+        <Dialog
+          visible={jellyseerrDialogVisible}
+          onDismiss={() => {
+            setJellyseerrDialogVisible(false);
+            setSubmitError("");
+          }}
+        >
+          <Dialog.Title>Request Options</Dialog.Title>
+          <Dialog.Content style={{ maxHeight: 400 }}>
+            <ScrollView>
+              <Text variant="bodyMedium" style={{ marginBottom: spacing.sm }}>
+                Configure request for{" "}
+                <Text style={{ fontWeight: "600" }}>{title}</Text>
+              </Text>
+
+              <Text variant="titleSmall" style={{ marginBottom: spacing.xs }}>
+                Server
+              </Text>
+              <RadioButton.Group
+                onValueChange={(value) => {
+                  const serverId = parseInt(value);
+                  setSelectedServer(serverId);
+                  handleServerChange(serverId);
+                }}
+                value={selectedServer?.toString() || ""}
+              >
+                {servers.map((server, idx) => (
+                  <RadioButton.Item
+                    key={String(server.id ?? idx)}
+                    value={server.id != null ? String(server.id) : ""}
+                    label={server.name ?? String(server.id ?? idx)}
+                  />
+                ))}
+              </RadioButton.Group>
+
+              <Text
+                variant="titleSmall"
+                style={{ marginTop: spacing.sm, marginBottom: spacing.xs }}
+              >
+                Profile
+              </Text>
+              <RadioButton.Group
+                onValueChange={(value) => setSelectedProfile(parseInt(value))}
+                value={selectedProfile?.toString() || ""}
+              >
+                {profiles.map((profile, idx) => {
+                  const profileLabel =
+                    profile.name ?? `Profile ${String(profile.id ?? idx)}`;
+                  return (
+                    <RadioButton.Item
+                      key={String(profile.id ?? idx)}
+                      value={profile.id != null ? String(profile.id) : ""}
+                      label={profileLabel}
+                    />
+                  );
+                })}
+              </RadioButton.Group>
+
+              <Text
+                variant="titleSmall"
+                style={{ marginTop: spacing.sm, marginBottom: spacing.xs }}
+              >
+                Root Folder
+              </Text>
+              <RadioButton.Group
+                onValueChange={setSelectedRootFolder}
+                value={selectedRootFolder}
+              >
+                {rootFolders.map((folder, idx) => {
+                  const rootLabel =
+                    folder.freeSpace != null
+                      ? `${folder.path} (${(folder.freeSpace / (1024 * 1024 * 1024)).toFixed(2)} GB free)`
+                      : (folder.path ?? `Root ${idx}`);
+                  return (
+                    <RadioButton.Item
+                      key={folder.path ?? String(idx)}
+                      value={folder.path ?? ""}
+                      label={rootLabel}
+                    />
+                  );
+                })}
+              </RadioButton.Group>
+
+              {availableSeasons.length > 0 && (
+                <>
+                  <Text
+                    variant="titleSmall"
+                    style={{ marginTop: spacing.sm, marginBottom: spacing.xs }}
+                  >
+                    Seasons
+                  </Text>
+                  <Checkbox.Item
+                    label="All Seasons"
+                    status={selectAllSeasons ? "checked" : "unchecked"}
+                    onPress={() => {
+                      const newSelectAll = !selectAllSeasons;
+                      setSelectAllSeasons(newSelectAll);
+                      setSelectedSeasons(
+                        newSelectAll
+                          ? availableSeasons.map((s) => s.seasonNumber)
+                          : [],
+                      );
+                    }}
+                  />
+                  {availableSeasons.map((season) => (
+                    <Checkbox.Item
+                      key={season.seasonNumber}
+                      label={`Season ${season.seasonNumber}`}
+                      status={
+                        selectedSeasons.includes(season.seasonNumber)
+                          ? "checked"
+                          : "unchecked"
+                      }
+                      disabled={selectAllSeasons}
+                      onPress={() => {
+                        setSelectedSeasons((prev) =>
+                          prev.includes(season.seasonNumber)
+                            ? prev.filter((s) => s !== season.seasonNumber)
+                            : [...prev, season.seasonNumber],
+                        );
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+            </ScrollView>
+            {submitError && (
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.error, marginTop: spacing.sm }}
+              >
+                {submitError}
+              </Text>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setJellyseerrDialogVisible(false)}>
+              Cancel
+            </Button>
+            <Button
+              onPress={handleSubmitRequest}
+              disabled={
+                isRequesting ||
+                selectedServer === null ||
+                selectedProfile === null
+              }
+            >
+              {isRequesting ? "Requesting..." : "Submit Request"}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Dialog to show and remove existing Jellyseerr requests for this media */}
+        <Dialog
+          visible={removeDialogVisible}
+          onDismiss={() => setRemoveDialogVisible(false)}
+        >
+          <Dialog.Title>Jellyseerr Requests</Dialog.Title>
+          <Dialog.Content style={{ maxHeight: 400 }}>
+            {checkingJellyseerr ? (
+              <Text variant="bodyMedium">Checking existing requests...</Text>
+            ) : matchedJellyseerrRequests.length === 0 ? (
+              <Text variant="bodyMedium">
+                No Jellyseerr requests found for this item.
+              </Text>
+            ) : (
+              <ScrollView>
+                {matchedJellyseerrRequests.map((m, idx) => (
+                  <View
+                    key={`${String(m.serviceId)}-${String(m.request?.id ?? idx)}`}
+                    style={{ marginBottom: spacing.sm }}
+                  >
+                    <Text
+                      variant="titleSmall"
+                      style={{ marginBottom: spacing.xs }}
+                    >
+                      {m.serviceName ?? String(m.serviceId)}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ marginBottom: spacing.xs }}
+                    >
+                      Request ID: {String(m.request?.id ?? "unknown")}
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                      <Button
+                        mode="outlined"
+                        compact
+                        onPress={async () => {
+                          const reqId = m.request?.id;
+                          if (!reqId) return;
+                          await handleRemoveJellyseerrRequest(
+                            m.connector,
+                            reqId,
+                          );
+                        }}
+                        disabled={isRemoving}
+                      >
+                        Remove
+                      </Button>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setRemoveDialogVisible(false)}>Close</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

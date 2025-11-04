@@ -233,6 +233,10 @@ const SettingsScreen = () => {
       marginHorizontal: spacing.xs,
       marginTop: spacing.md,
       marginBottom: spacing.xl,
+      borderRadius: 12,
+      overflow: "hidden",
+      // Make button span comfortably and align label
+      justifyContent: "center",
     },
     notificationGroup: {
       backgroundColor: theme.colors.elevation.level1,
@@ -1221,10 +1225,11 @@ const SettingsScreen = () => {
           animated={animationsEnabled}
         >
           <Button
-            mode="outlined"
+            mode="contained"
             onPress={confirmSignOut}
-            style={[styles.signOutButton, { height: 40 }]}
-            textColor={theme.colors.error}
+            style={[styles.signOutButton, { height: 44 }]}
+            buttonColor={theme.colors.error}
+            textColor={theme.colors.onError}
             icon="logout"
           >
             Sign out

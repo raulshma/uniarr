@@ -3,7 +3,7 @@ import { StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useTheme } from "react-native-paper";
-import { useBreathingAnimation } from "@/utils/skia.utils";
+import { useBreathingAnimation } from "@/utils/color.utils";
 import type { AppTheme } from "@/constants/theme";
 import { mapConditionToIcon } from "./weatherIcons";
 

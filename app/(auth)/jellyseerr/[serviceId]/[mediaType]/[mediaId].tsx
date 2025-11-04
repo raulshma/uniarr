@@ -1,7 +1,23 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo } from "react";
-import { ScrollView, View, StyleSheet, Linking } from "react-native";
-import { Button, Card, Chip, Text, useTheme } from "react-native-paper";
+import React, { useMemo, useCallback, useState, useEffect } from "react";
+import {
+  ScrollView,
+  View,
+  StyleSheet,
+  Linking,
+  useWindowDimensions,
+} from "react-native";
+import {
+  Button,
+  Card,
+  Chip,
+  Text,
+  useTheme,
+  Portal,
+  Dialog,
+  Checkbox,
+  IconButton,
+} from "react-native-paper";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -15,11 +31,14 @@ import { spacing } from "@/theme/spacing";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { EmptyState } from "@/components/common/EmptyState";
+import { alert } from "@/services/dialogService";
 import type { AppTheme } from "@/constants/theme";
 import { useJellyseerrMediaDetails } from "@/hooks/useJellyseerrMediaDetails";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
+import { secureStorage } from "@/services/storage/SecureStorage";
+import type { RootFolder } from "@/models/media.types";
 type MovieDetails = components["schemas"]["MovieDetails"];
 type TvDetails = components["schemas"]["TvDetails"];
 type JellyDetails = MovieDetails | TvDetails;
@@ -176,6 +195,316 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
       | undefined;
     return c && c.config.type === "jellyseerr" ? c : undefined;
   }, [serviceId]);
+
+  // --- Jellyseerr request modal state ---
+  const [jellyseerrDialogVisible, setJellyseerrDialogVisible] = useState(false);
+  const [selectedServer, setSelectedServer] = useState<number | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<number | null>(null);
+  const [selectedRootFolder, setSelectedRootFolder] = useState<string>("");
+
+  type JellyServer =
+    | components["schemas"]["RadarrSettings"]
+    | components["schemas"]["SonarrSettings"];
+
+  type ServiceProfile = components["schemas"]["ServiceProfile"];
+
+  const [servers, setServers] = useState<JellyServer[]>([]);
+  const [profiles, setProfiles] = useState<ServiceProfile[]>([]);
+  const [rootFolders, setRootFolders] = useState<RootFolder[]>([]);
+  const [availableSeasons, setAvailableSeasons] = useState<any[]>([]);
+  const [selectedSeasons, setSelectedSeasons] = useState<number[] | null>(null);
+  const [matchedRequests, setMatchedRequests] = useState<any[]>([]);
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const mediaTypeNormalized =
+    mediaType ?? (isMovieDetails(data) ? "movie" : "tv");
+  const { height } = useWindowDimensions();
+
+  const loadJellyseerrOptions = useCallback(
+    async (c: JellyseerrConnector) => {
+      if (!c) return;
+      setSubmitError("");
+      try {
+        if (typeof c.initialize === "function") {
+          await c.initialize();
+        }
+
+        const srv = await c.getServers(mediaTypeNormalized);
+        const validServers = Array.isArray(srv)
+          ? srv.filter((s) => s && s.id != null)
+          : [];
+        setServers(validServers);
+        const defaultServer =
+          validServers.find((s: any) => s.isDefault) || validServers[0];
+        const defaultServerId =
+          defaultServer?.id != null ? Number(defaultServer.id) : null;
+        setSelectedServer(defaultServerId);
+
+        if (defaultServerId != null) {
+          const { profiles: profs, rootFolders: rf } = await c.getProfiles(
+            defaultServerId,
+            mediaTypeNormalized,
+          );
+          setProfiles(profs ?? []);
+          setRootFolders(rf ?? []);
+
+          // load per-service config defaults if present
+          const serviceIdVal = (c as any).config?.id;
+          let serviceConfig: any = null;
+          if (serviceIdVal) {
+            try {
+              const configs = await secureStorage.getServiceConfigs();
+              serviceConfig = Array.isArray(configs)
+                ? (configs.find((x) => String(x.id) === String(serviceIdVal)) ??
+                  null)
+                : null;
+            } catch {
+              serviceConfig = null;
+            }
+          }
+
+          const defaultProfile = Array.isArray(profs) ? profs[0] : undefined;
+          const defaultRootFolder = rf?.[0]?.path || "";
+
+          const targetKey =
+            defaultServerId != null ? String(defaultServerId) : undefined;
+          const targetDefaults = serviceConfig?.jellyseerrTargetDefaults ?? {};
+          const targetDefault = targetKey
+            ? targetDefaults?.[targetKey]
+            : undefined;
+
+          // Determine whether this Jellyseerr item appears to be anime.
+          const jellyDetails = data as any | undefined;
+          let isAnimeLocal = false;
+          try {
+            const originalLang =
+              jellyDetails?.originalLanguage ?? jellyDetails?.original_language;
+            if (typeof originalLang === "string" && originalLang === "ja") {
+              isAnimeLocal = true;
+            }
+            const detGenres =
+              jellyDetails?.genres ?? jellyDetails?.mediaInfo?.genres ?? [];
+            const names = (detGenres ?? []).map((g: any) =>
+              (g?.name || "").toLowerCase(),
+            );
+            if (names.includes("anime") || names.includes("animation")) {
+              isAnimeLocal = true;
+            }
+          } catch {
+            /* ignore */
+          }
+
+          // Connector-provided anime-specific fields (if present on the server)
+          const serverAnimeProfileId =
+            (defaultServer as any)?.activeAnimeProfileId ?? null;
+          const serverAnimeDirectory =
+            (defaultServer as any)?.activeAnimeDirectory ?? null;
+
+          let selectedProfileId: number | undefined = undefined;
+          let selectedRootFolderStr: string | undefined = undefined;
+
+          if (isAnimeLocal) {
+            // Prefer per-target configured default
+            if (targetDefault?.profileId) {
+              selectedProfileId = profs?.find(
+                (p: any) => p.id === targetDefault.profileId,
+              )?.id;
+            }
+
+            // Then prefer the connector/server-provided anime profile id
+            if (selectedProfileId == null && serverAnimeProfileId != null) {
+              selectedProfileId = profs?.find(
+                (p: any) => p.id === serverAnimeProfileId,
+              )?.id;
+            }
+
+            // Fallback to service-level or first profile
+            if (selectedProfileId == null) {
+              selectedProfileId = targetDefault?.profileId
+                ? profs?.find((p: any) => p.id === targetDefault.profileId)?.id
+                : serviceConfig?.defaultProfileId
+                  ? profs?.find(
+                      (p: any) => p.id === serviceConfig.defaultProfileId,
+                    )?.id
+                  : defaultProfile?.id;
+            }
+
+            // Root folder: prefer per-target, then connector anime directory, then service-level/default
+            if (targetDefault?.rootFolderPath) {
+              selectedRootFolderStr = rf?.find(
+                (f: any) => f.path === targetDefault.rootFolderPath,
+              )?.path;
+            }
+            if (!selectedRootFolderStr && serverAnimeDirectory) {
+              selectedRootFolderStr = rf?.find(
+                (f: any) => f.path === serverAnimeDirectory,
+              )?.path;
+            }
+            if (!selectedRootFolderStr) {
+              selectedRootFolderStr = serviceConfig?.defaultRootFolderPath
+                ? rf?.find(
+                    (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                  )?.path
+                : defaultRootFolder;
+            }
+          } else {
+            // Non-anime fallback
+            selectedProfileId = targetDefault?.profileId
+              ? profs?.find((p: any) => p.id === targetDefault.profileId)?.id
+              : serviceConfig?.defaultProfileId
+                ? profs?.find(
+                    (p: any) => p.id === serviceConfig.defaultProfileId,
+                  )?.id
+                : defaultProfile?.id;
+
+            selectedRootFolderStr = targetDefault?.rootFolderPath
+              ? rf?.find((f: any) => f.path === targetDefault.rootFolderPath)
+                  ?.path
+              : serviceConfig?.defaultRootFolderPath
+                ? rf?.find(
+                    (f: any) => f.path === serviceConfig.defaultRootFolderPath,
+                  )?.path
+                : defaultRootFolder;
+          }
+
+          setSelectedProfile(
+            selectedProfileId != null ? Number(selectedProfileId) : null,
+          );
+          setSelectedRootFolder(selectedRootFolderStr || "");
+
+          if (mediaTypeNormalized === "tv") {
+            try {
+              const details = await c.getMediaDetails(mediaId as any, "tv");
+              setAvailableSeasons((details as any)?.seasons ?? []);
+              setSelectedSeasons([]);
+            } catch {
+              setAvailableSeasons([]);
+              setSelectedSeasons([]);
+            }
+          }
+        }
+
+        setJellyseerrDialogVisible(true);
+      } catch (error) {
+        console.warn("loadJellyseerrOptions failed", error);
+      }
+    },
+    [data, mediaTypeNormalized],
+  );
+
+  const handleServerChange = useCallback(
+    async (serverId: number) => {
+      if (!connector) return;
+      if (serverId == null) return;
+      try {
+        const { profiles: profs, rootFolders: rf } =
+          await connector.getProfiles(serverId, mediaTypeNormalized);
+        setProfiles(profs ?? []);
+        setRootFolders(rf ?? []);
+        const defaultProfile = Array.isArray(profs) ? profs[0] : undefined;
+        setSelectedProfile(
+          defaultProfile && (defaultProfile as any).id != null
+            ? Number((defaultProfile as any).id)
+            : null,
+        );
+        setSelectedRootFolder(rf?.[0]?.path || "");
+      } catch (error) {
+        console.warn("handleServerChange failed", error);
+      }
+    },
+    [connector, mediaTypeNormalized],
+  );
+
+  const refreshJellyseerrMatches = useCallback(async () => {
+    if (!connector || !mediaId) {
+      setMatchedRequests([]);
+      return;
+    }
+    try {
+      const requests = await connector.getRequests();
+      const matches = Array.isArray(requests)
+        ? requests.filter((r: any) => {
+            const media = r?.media as any;
+            const mediaTmdb = media?.tmdbId ?? media?.tmdb_id ?? undefined;
+            const mediaIdVal = mediaTmdb ?? media?.id ?? undefined;
+            return mediaIdVal === mediaId;
+          })
+        : [];
+      setMatchedRequests(matches);
+    } catch {
+      setMatchedRequests([]);
+    }
+  }, [connector, mediaId]);
+
+  const handleRemoveJellyseerrRequest = useCallback(
+    async (requestId: number) => {
+      if (!connector) return;
+      setIsRemoving(true);
+      try {
+        await connector.deleteRequest(requestId);
+        await refreshJellyseerrMatches();
+      } catch (error) {
+        console.warn("Failed to delete request", error);
+      } finally {
+        setIsRemoving(false);
+      }
+    },
+    [connector, refreshJellyseerrMatches],
+  );
+
+  const handleSubmitRequest = useCallback(async () => {
+    if (!connector) {
+      setSubmitError("Connector unavailable");
+      return;
+    }
+
+    if (selectedServer == null || selectedProfile == null) {
+      setSubmitError("Please select a server and profile.");
+      return;
+    }
+
+    setSubmitError("");
+    setIsRequesting(true);
+    try {
+      const payload: Parameters<JellyseerrConnector["createRequest"]>[0] = {
+        mediaType: mediaTypeNormalized as any,
+        mediaId: mediaId as any,
+        serverId: selectedServer,
+        profileId: selectedProfile,
+        rootFolder: selectedRootFolder || undefined,
+        is4k: false,
+        ...(selectedSeasons && selectedSeasons.length
+          ? { seasons: selectedSeasons }
+          : { seasons: "all" }),
+      } as any;
+
+      await connector.createRequest(payload);
+      setJellyseerrDialogVisible(false);
+      await refreshJellyseerrMatches();
+    } catch (error) {
+      console.error(error);
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to submit request",
+      );
+    } finally {
+      setIsRequesting(false);
+    }
+  }, [
+    connector,
+    mediaId,
+    mediaTypeNormalized,
+    refreshJellyseerrMatches,
+    selectedProfile,
+    selectedRootFolder,
+    selectedSeasons,
+    selectedServer,
+  ]);
+
+  useEffect(() => {
+    void refreshJellyseerrMatches();
+  }, [connector, refreshJellyseerrMatches]);
 
   const styles = useMemo(
     () =>
@@ -616,6 +945,22 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
             >
               Open in Jellyseerr
             </Button>
+            <Button
+              mode="outlined"
+              onPress={() => {
+                if (!connector) {
+                  void alert(
+                    "Connector unavailable",
+                    "This Jellyseerr service is not available.",
+                  );
+                  return;
+                }
+                void loadJellyseerrOptions(connector);
+              }}
+              style={{ flex: 1 }}
+            >
+              Request
+            </Button>
             {getExternalUrl(data) ? (
               <Button
                 mode="outlined"
@@ -626,6 +971,225 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
               </Button>
             ) : null}
           </Animated.View>
+
+          <Portal>
+            <Dialog
+              visible={jellyseerrDialogVisible}
+              onDismiss={() => setJellyseerrDialogVisible(false)}
+            >
+              <Dialog.Title>Send request</Dialog.Title>
+              <Dialog.Content>
+                <ScrollView
+                  style={{ maxHeight: Math.max(240, height * 0.6) }}
+                  contentContainerStyle={{ paddingVertical: spacing.md }}
+                >
+                  <Text variant="bodyMedium">Server</Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: spacing.sm,
+                      marginTop: spacing.xs,
+                    }}
+                  >
+                    {servers.map((s: any) => (
+                      <Button
+                        key={String((s as any).id)}
+                        mode={
+                          Number(selectedServer) === Number((s as any).id)
+                            ? "contained"
+                            : "outlined"
+                        }
+                        onPress={() => {
+                          const id = (s as any).id;
+                          setSelectedServer(id != null ? Number(id) : null);
+                          void handleServerChange(Number(id));
+                        }}
+                        style={{ marginRight: spacing.xs }}
+                      >
+                        {(s as any).name || String((s as any).id)}
+                      </Button>
+                    ))}
+                  </View>
+
+                  <Text variant="bodyMedium" style={{ marginTop: spacing.md }}>
+                    Profile
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: spacing.sm,
+                      marginTop: spacing.xs,
+                    }}
+                  >
+                    {profiles.map((p: any) => (
+                      <Button
+                        key={String((p as any).id)}
+                        mode={
+                          Number(selectedProfile) === Number((p as any).id)
+                            ? "contained"
+                            : "outlined"
+                        }
+                        onPress={() =>
+                          setSelectedProfile(Number((p as any).id))
+                        }
+                        style={{ marginRight: spacing.xs }}
+                      >
+                        {(p as any).name || String((p as any).id)}
+                      </Button>
+                    ))}
+                  </View>
+
+                  <Text variant="bodyMedium" style={{ marginTop: spacing.md }}>
+                    Root folder
+                  </Text>
+                  <View style={{ marginTop: spacing.xs }}>
+                    {rootFolders.map((r) => {
+                      const free = (r as any).freeSpace;
+                      const label =
+                        free != null
+                          ? `${r.path} (${(free / (1024 * 1024 * 1024)).toFixed(2)} GB free)`
+                          : r.path;
+                      return (
+                        <View key={r.path} style={{ marginTop: spacing.xs }}>
+                          <Button
+                            mode={
+                              selectedRootFolder === r.path
+                                ? "contained"
+                                : "outlined"
+                            }
+                            onPress={() => setSelectedRootFolder(r.path)}
+                          >
+                            {r.path}
+                          </Button>
+                          {free != null ? (
+                            <Text
+                              variant="labelSmall"
+                              style={{
+                                color: theme.colors.onSurfaceVariant,
+                                marginTop: 4,
+                              }}
+                            >
+                              {(free / (1024 * 1024 * 1024)).toFixed(2)} GB free
+                            </Text>
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {availableSeasons && availableSeasons.length ? (
+                    <>
+                      <Text
+                        variant="bodyMedium"
+                        style={{ marginTop: spacing.md }}
+                      >
+                        Seasons
+                      </Text>
+                      <View style={{ marginTop: spacing.xs }}>
+                        {availableSeasons.map((s: any, idx: number) => {
+                          const val = s.seasonNumber ?? s.number ?? idx + 1;
+                          const checked = Array.isArray(selectedSeasons)
+                            ? selectedSeasons.includes(Number(val))
+                            : false;
+                          return (
+                            <View
+                              key={String(val)}
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: spacing.sm,
+                              }}
+                            >
+                              <Checkbox.Android
+                                status={checked ? "checked" : "unchecked"}
+                                onPress={() => {
+                                  if (!Array.isArray(selectedSeasons))
+                                    setSelectedSeasons([Number(val)]);
+                                  else if (checked)
+                                    setSelectedSeasons(
+                                      selectedSeasons.filter(
+                                        (x) => x !== Number(val),
+                                      ),
+                                    );
+                                  else
+                                    setSelectedSeasons([
+                                      ...selectedSeasons,
+                                      Number(val),
+                                    ]);
+                                }}
+                              />
+                              <Text>{s.name ?? `Season ${val}`}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </>
+                  ) : null}
+
+                  {submitError ? (
+                    <Text
+                      style={{
+                        color: theme.colors.error,
+                        marginTop: spacing.sm,
+                      }}
+                    >
+                      {submitError}
+                    </Text>
+                  ) : null}
+
+                  {matchedRequests.length ? (
+                    <>
+                      <Text
+                        variant="titleMedium"
+                        style={{ marginTop: spacing.md }}
+                      >
+                        Existing requests
+                      </Text>
+                      {matchedRequests.map((r: any) => (
+                        <View
+                          key={String(r.id)}
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginTop: spacing.xs,
+                          }}
+                        >
+                          <Text>
+                            {r.media?.title ||
+                              r.media?.name ||
+                              `Request #${r.id}`}
+                          </Text>
+                          <IconButton
+                            icon="delete"
+                            size={20}
+                            onPress={() =>
+                              void handleRemoveJellyseerrRequest(r.id)
+                            }
+                            disabled={isRemoving}
+                          />
+                        </View>
+                      ))}
+                    </>
+                  ) : null}
+                </ScrollView>
+              </Dialog.Content>
+              <Dialog.Actions>
+                <Button onPress={() => setJellyseerrDialogVisible(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onPress={() => void handleSubmitRequest()}
+                  loading={isRequesting}
+                  disabled={isRequesting}
+                >
+                  Request
+                </Button>
+              </Dialog.Actions>
+            </Dialog>
+          </Portal>
         </ScrollView>
       </View>
     </SafeAreaView>

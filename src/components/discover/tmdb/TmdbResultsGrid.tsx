@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { RefreshControl, StyleSheet, View } from "react-native";
-import { SkiaLoader } from "@/components/common/SkiaLoader";
+import { UniArrLoader } from "@/components/common";
 import { FlashList } from "@shopify/flash-list";
 import { Text, useTheme } from "react-native-paper";
 
@@ -87,7 +87,7 @@ export const TmdbResultsGrid: React.FC<Props> = ({
     if (onEndReached && isFetchingMore) {
       return (
         <View style={styles.footer}>
-          <SkiaLoader size={40} />
+          <UniArrLoader size={40} />
         </View>
       );
     }

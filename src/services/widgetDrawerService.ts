@@ -13,6 +13,7 @@ export interface DrawerState {
   customContent?: ReactNode;
   showMetadata?: boolean;
   showActionButton?: boolean;
+  imageUrl?: string; // Add image URL property
 }
 
 interface WidgetDrawerContextType {
@@ -33,6 +34,7 @@ const initialState: DrawerState = {
   customContent: undefined,
   showMetadata: true,
   showActionButton: true,
+  imageUrl: undefined,
 };
 
 const WidgetDrawerContext = createContext<WidgetDrawerContextType | undefined>(

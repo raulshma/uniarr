@@ -17,9 +17,23 @@ export interface RssFeedItem {
 
 const parser = new XMLParser({
   ignoreAttributes: false,
-  attributeNamePrefix: "@",
+  attributeNamePrefix: "@", // Use @ prefix for attributes
   trimValues: true,
   parseAttributeValue: true,
+  // Handle different media namespace formats better
+  isArray: (name, jpath) => {
+    if (
+      ["media:content", "media:thumbnail", "media:group", "enclosure"].includes(
+        name,
+      )
+    ) {
+      return true;
+    }
+    return false;
+  },
+  // Support processing of unprefixed namespaces
+  processEntities: false,
+  stopNodes: ["script", "style"],
 });
 
 const normalizeArray = <T>(value: T | T[] | undefined): T[] => {
@@ -75,22 +89,153 @@ const parseRssChannelItems = (feed: any, feedUrl: string): RssFeedItem[] => {
         return null;
       }
 
-      // Extract image from enclosures or media content
+      // Enhanced image extraction from multiple sources
       let image: string | undefined;
+
+      // Helper function to try multiple possible paths for media content
+      const getMediaContent = (obj: any, key: string) => {
+        // Try with media: prefix
+        if (obj?.[`media:${key}`]) {
+          return obj[`media:${key}`];
+        }
+        // Try without prefix (for unprefixed namespaces)
+        if (obj?.[key]) {
+          return obj[key];
+        }
+        return undefined;
+      };
+
+      // Check enclosures first
       const enclosures = normalizeArray(item?.enclosure);
       const imageEnclosure = enclosures.find(
         (enc: any) =>
-          typeof enc?.url === "string" && enc?.["@type"]?.startsWith("image/"),
+          typeof enc?.["@url"] === "string" &&
+          enc?.["@type"]?.startsWith("image/"),
       );
       if (imageEnclosure) {
-        image = imageEnclosure.url;
-      } else if (
-        item?.["media:content"]?.url &&
-        item?.["media:content"]?.["@type"]?.startsWith("image/")
-      ) {
-        image = item["media:content"].url;
-      } else if (item?.["media:thumbnail"]?.url) {
-        image = item["media:thumbnail"].url;
+        image = imageEnclosure["@url"];
+      } else {
+        // Try to get media:content with or without namespace prefix
+        const mediaContent = getMediaContent(item, "content");
+        if (mediaContent) {
+          const mediaContentArray = normalizeArray(mediaContent);
+          if (Array.isArray(mediaContentArray)) {
+            // If it's an array, find the first image
+            const imageContent = mediaContentArray.find((mc: any) => {
+              const mediaType = mc["@type"] || mc.type || "";
+              const medium = mc["@medium"] || mc.medium || "";
+              return mediaType.startsWith("image/") || medium === "image";
+            });
+            if (imageContent?.["@url"]) {
+              image = imageContent["@url"];
+            }
+          } else {
+            // Single media:content element
+            // Check for MIME type first
+            const mediaType = mediaContent["@type"] || mediaContent.type || "";
+
+            // Also check for medium="image" attribute
+            const medium = mediaContent["@medium"] || mediaContent.medium || "";
+
+            if (mediaType.startsWith("image/") || medium === "image") {
+              image = mediaContent["@url"];
+            }
+          }
+        }
+
+        if (!image) {
+          // Try to get media:thumbnail with or without namespace prefix
+          const mediaThumbnail = getMediaContent(item, "thumbnail");
+          if (mediaThumbnail?.["@url"]) {
+            image = mediaThumbnail["@url"];
+          } else if (
+            item?.["content"]?.["@url"] &&
+            (item?.["content"]?.["@type"]?.startsWith("image/") ||
+              item?.["content"]?.type?.startsWith("image/"))
+          ) {
+            image = item.content["@url"];
+          }
+        }
+      }
+
+      // Handle media:group
+      if (!image && item?.["media:group"]) {
+        // Try media:content in media:group
+        const groupMediaContent = getMediaContent(
+          item["media:group"],
+          "content",
+        );
+        if (groupMediaContent) {
+          const groupMediaContentArray = normalizeArray(groupMediaContent);
+          if (Array.isArray(groupMediaContentArray)) {
+            // If it's an array, find the first image
+            const imageContent = groupMediaContentArray.find((mc: any) => {
+              const mediaType = mc["@type"] || mc.type || "";
+              const medium = mc["@medium"] || mc.medium || "";
+              return mediaType.startsWith("image/") || medium === "image";
+            });
+            if (imageContent?.["@url"]) {
+              image = imageContent["@url"];
+            }
+          } else {
+            // Single media:content element
+            const groupMediaType =
+              groupMediaContent["@type"] || groupMediaContent.type || "";
+            const groupMedium =
+              groupMediaContent["@medium"] || groupMediaContent.medium || "";
+
+            if (
+              groupMediaType.startsWith("image/") ||
+              groupMedium === "image"
+            ) {
+              image = groupMediaContent["@url"];
+            }
+          }
+        }
+
+        // Try media:thumbnail in media:group
+        if (!image) {
+          const groupMediaThumbnail = getMediaContent(
+            item["media:group"],
+            "thumbnail",
+          );
+          if (groupMediaThumbnail?.["@url"]) {
+            image = groupMediaThumbnail["@url"];
+          }
+        }
+      }
+
+      // Last resort: try to extract first image from description/content
+      if (!image) {
+        const description =
+          item.description || item["content:encoded"] || item.content;
+        if (typeof description === "string") {
+          const imgMatch = description.match(/<img[^>]+src="([^"]+)"[^>]*>/i);
+          if (imgMatch && imgMatch[1]) {
+            image = imgMatch[1];
+          }
+        }
+      }
+
+      // Debug logging for better troubleshooting
+      const description =
+        item.description || item["content:encoded"] || item.content;
+      if (item?.["media:content"]?.url) {
+        logger.debug("RSS Item has media:content element", {
+          title: item?.title,
+          mediaContent: item?.["media:content"],
+          extractedImage: image,
+        });
+      }
+      if (!image) {
+        logger.debug("No image found in RSS item", {
+          title: item?.title,
+          hasEnclosure: !!item?.enclosure,
+          hasMediaContent: !!item?.["media:content"],
+          hasMediaThumbnail: !!item?.["media:thumbnail"],
+          descriptionLength:
+            typeof description === "string" ? description.length : 0,
+        });
       }
 
       return {
@@ -138,15 +283,62 @@ const parseAtomEntries = (root: any, feedUrl: string): RssFeedItem[] => {
             ? entry.content
             : undefined;
 
+      // Helper function to try multiple possible paths for media content
+      const getMediaContent = (obj: any, key: string) => {
+        // Try with media: prefix
+        if (obj?.[`media:${key}`]) {
+          return obj[`media:${key}`];
+        }
+        // Try without prefix (for unprefixed namespaces)
+        if (obj?.[key]) {
+          return obj[key];
+        }
+        return undefined;
+      };
+
       // Extract image from media content
       let image: string | undefined;
-      if (
-        entry?.["media:content"]?.url &&
-        entry?.["media:content"]?.["@type"]?.startsWith("image/")
-      ) {
-        image = entry["media:content"].url;
-      } else if (entry?.["media:thumbnail"]?.url) {
-        image = entry["media:thumbnail"].url;
+
+      // Try to get media:content with or without namespace prefix
+      const mediaContent = getMediaContent(entry, "content");
+      if (mediaContent) {
+        const mediaContentArray = normalizeArray(mediaContent);
+        if (Array.isArray(mediaContentArray)) {
+          // If it's an array, find the first image
+          const imageContent = mediaContentArray.find((mc: any) => {
+            const mediaType = mc["@type"] || mc.type || "";
+            const medium = mc["@medium"] || mc.medium || "";
+            return mediaType.startsWith("image/") || medium === "image";
+          });
+          if (imageContent?.["@url"]) {
+            image = imageContent["@url"];
+            logger.debug("Extracted media:content image from array", {
+              url: image,
+            });
+          }
+        } else {
+          // Single media:content element
+          const mediaType = mediaContent["@type"] || mediaContent.type || "";
+          const medium = mediaContent["@medium"] || mediaContent.medium || "";
+
+          if (mediaType.startsWith("image/") || medium === "image") {
+            image = mediaContent["@url"];
+            logger.debug("Extracted media:content image", {
+              url: image,
+              type: mediaType,
+              medium: medium,
+            });
+          }
+        }
+      }
+
+      // Try to get media:thumbnail if no image found yet
+      if (!image) {
+        const mediaThumbnail = getMediaContent(entry, "thumbnail");
+        if (mediaThumbnail?.["@url"]) {
+          image = mediaThumbnail["@url"];
+          logger.debug("Extracted media:thumbnail image", { url: image });
+        }
       }
 
       return {
