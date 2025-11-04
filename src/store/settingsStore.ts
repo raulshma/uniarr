@@ -89,6 +89,10 @@ type SettingsData = {
   // Loader configuration for SVG spinner
   loaderConfig: LoaderConfig;
   // (thumbnail generation removed)
+  // Backdrop with blur experimental feature
+  enableBackdropWithBlur: boolean;
+  discoverBannerDismissed: boolean;
+  animeHubBannerDismissed: boolean;
 };
 
 interface SettingsState extends SettingsData {
@@ -136,6 +140,10 @@ interface SettingsState extends SettingsData {
   setApiErrorLoggerCaptureRequestHeaders: (capture: boolean) => void;
   setLoaderConfig: (config: LoaderConfig) => void;
   // (thumbnail setters removed)
+  // Backdrop with blur experimental feature
+  setBackdropWithBlurEnabled: (enabled: boolean) => void;
+  setDiscoverBannerDismissed: (dismissed: boolean) => void;
+  setAnimeHubBannerDismissed: (dismissed: boolean) => void;
 }
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
@@ -230,6 +238,10 @@ const createDefaultSettings = (): SettingsData => ({
     useThemeColors: false,
   },
   // (thumbnail defaults removed)
+  // Backdrop with blur defaults
+  enableBackdropWithBlur: false, // Opt-in feature
+  discoverBannerDismissed: false,
+  animeHubBannerDismissed: false,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -312,6 +324,12 @@ export const useSettingsStore = create<SettingsState>()(
       setApiErrorLoggerCaptureRequestHeaders: (capture: boolean) =>
         set({ apiErrorLoggerCaptureRequestHeaders: capture }),
       setLoaderConfig: (config: LoaderConfig) => set({ loaderConfig: config }),
+      setBackdropWithBlurEnabled: (enabled: boolean) =>
+        set({ enableBackdropWithBlur: enabled }),
+      setDiscoverBannerDismissed: (dismissed: boolean) =>
+        set({ discoverBannerDismissed: dismissed }),
+      setAnimeHubBannerDismissed: (dismissed: boolean) =>
+        set({ animeHubBannerDismissed: dismissed }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -364,6 +382,9 @@ export const useSettingsStore = create<SettingsState>()(
           state.apiErrorLoggerCaptureRequestHeaders,
         loaderConfig: state.loaderConfig,
         // thumbnail fields removed
+        enableBackdropWithBlur: state.enableBackdropWithBlur,
+        discoverBannerDismissed: state.discoverBannerDismissed,
+        animeHubBannerDismissed: state.animeHubBannerDismissed,
       }),
       // Bump version since we're adding new persisted fields
       version: 12,
