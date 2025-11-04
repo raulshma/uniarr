@@ -20,7 +20,7 @@ import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 import { useCheckInLibrary } from "@/hooks/useCheckInLibrary";
 import { useDiscoverReleases } from "@/hooks/useDiscoverReleases";
 import type { AppTheme } from "@/constants/theme";
-import { buildProfileUrl } from "@/utils/tmdb.utils";
+import { buildProfileUrl, createDiscoverId } from "@/utils/tmdb.utils";
 import { useTmdbDetails, getDeviceRegion } from "@/hooks/tmdb/useTmdbDetails";
 import {
   useConnectorsStore,
@@ -73,6 +73,53 @@ const DiscoverItemDetails = () => {
           (i.sourceId && `${i.mediaType}-${i.sourceId}` === id),
       );
       if (found) return found;
+    }
+
+    // If still not found, check if it's a TMDB prefixed ID for virtual item
+    if (id.startsWith("movie-")) {
+      const tmdbId = parseInt(id.slice(6), 10);
+      if (!isNaN(tmdbId)) {
+        return {
+          id,
+          mediaType: "movie" as const,
+          tmdbId,
+          title: "Loading...",
+          posterUrl: undefined,
+          backdropUrl: undefined,
+          rating: undefined,
+          voteCount: undefined,
+          overview: undefined,
+          releaseDate: undefined,
+          year: undefined,
+          tvdbId: undefined,
+          imdbId: undefined,
+          sourceId: undefined,
+          source: "tmdb" as const,
+          sourceServiceId: undefined,
+        };
+      }
+    } else if (id.startsWith("series-")) {
+      const tmdbId = parseInt(id.slice(7), 10);
+      if (!isNaN(tmdbId)) {
+        return {
+          id,
+          mediaType: "series" as const,
+          tmdbId,
+          title: "Loading...",
+          posterUrl: undefined,
+          backdropUrl: undefined,
+          rating: undefined,
+          voteCount: undefined,
+          overview: undefined,
+          releaseDate: undefined,
+          year: undefined,
+          tvdbId: undefined,
+          imdbId: undefined,
+          sourceId: undefined,
+          source: "tmdb" as const,
+          sourceServiceId: undefined,
+        };
+      }
     }
 
     return undefined;
@@ -218,9 +265,20 @@ const DiscoverItemDetails = () => {
 
   const handleRelatedPress = useCallback(
     (relatedId: string) => {
-      router.push(`/(auth)/discover/${relatedId}`);
+      if (!item) return;
+
+      // Normalize incoming relatedId: if it already looks like
+      // 'movie-<id>' or 'series-<id>' use as-is. Otherwise build a
+      // canonical discover id using createDiscoverId.
+      const trimmed = String(relatedId).trim();
+      const isPrefixed = /^\s*(movie|series)-\d+\s*$/i.test(trimmed);
+      const finalId = isPrefixed
+        ? trimmed
+        : createDiscoverId(item.mediaType, Number(trimmed));
+
+      router.push(`/(auth)/discover/${finalId}`);
     },
-    [router],
+    [router, item],
   );
 
   const loadJellyseerrOptions = useCallback(
@@ -817,8 +875,16 @@ const DiscoverItemDetails = () => {
   return (
     <SafeAreaView style={styles.safeArea} edges={["left", "right", "bottom"]}>
       <DetailHero
-        posterUri={item.posterUrl}
-        backdropUri={item.backdropUrl}
+        posterUri={
+          tmdbDetailsQuery.data?.details?.poster_path
+            ? `https://image.tmdb.org/t/p/w500${tmdbDetailsQuery.data.details.poster_path}`
+            : item.posterUrl
+        }
+        backdropUri={
+          tmdbDetailsQuery.data?.details?.backdrop_path
+            ? `https://image.tmdb.org/t/p/w1280${tmdbDetailsQuery.data.details.backdrop_path}`
+            : item.backdropUrl
+        }
         onBack={() => router.back()}
       >
         {skeleton.showSkeleton &&
@@ -846,7 +912,13 @@ const DiscoverItemDetails = () => {
                   flex: 1,
                 }}
               >
-                {item.title}
+                {tmdbDetailsQuery.data?.details &&
+                "title" in tmdbDetailsQuery.data.details
+                  ? tmdbDetailsQuery.data.details.title
+                  : tmdbDetailsQuery.data?.details &&
+                      "name" in tmdbDetailsQuery.data.details
+                    ? tmdbDetailsQuery.data.details.name
+                    : item.title}
               </Text>
               {inLibraryQuery.foundServices.length > 0 && (
                 <Chip
@@ -860,7 +932,7 @@ const DiscoverItemDetails = () => {
               )}
             </View>
 
-            {item.overview ? (
+            {tmdbDetailsQuery.data?.details?.overview || item.overview ? (
               <View style={styles.synopsis}>
                 <Text
                   variant="bodyLarge"
@@ -869,7 +941,7 @@ const DiscoverItemDetails = () => {
                     lineHeight: 22,
                   }}
                 >
-                  {item.overview}
+                  {tmdbDetailsQuery.data?.details?.overview || item.overview}
                 </Text>
               </View>
             ) : null}
@@ -903,7 +975,14 @@ const DiscoverItemDetails = () => {
             <CastRow item={item} tmdbDetailsData={tmdbDetailsQuery.data} />
 
             {/* Ratings */}
-            <RatingsOverview rating={item.rating} votes={item.voteCount} />
+            <RatingsOverview
+              rating={
+                tmdbDetailsQuery.data?.details?.vote_average || item.rating
+              }
+              votes={
+                tmdbDetailsQuery.data?.details?.vote_count || item.voteCount
+              }
+            />
 
             {/* Release Date & Runtime */}
             <ReleaseMetadata item={item} tmdbDetails={tmdbDetailsQuery.data} />
@@ -1514,11 +1593,17 @@ const ReleaseMetadata: React.FC<{
     return movieRuntime ? `${movieRuntime}m` : undefined;
   }, [tmdbDetails, item.mediaType]);
 
-  const releaseYear = useMemo(
-    () =>
-      item.releaseDate ? new Date(item.releaseDate).getFullYear() : item.year,
-    [item.releaseDate, item.year],
-  );
+  const releaseYear = useMemo(() => {
+    const fromItem = item.releaseDate
+      ? new Date(item.releaseDate).getFullYear()
+      : item.year;
+    const releaseDateKey =
+      item.mediaType === "movie" ? "release_date" : "first_air_date";
+    const fromTmdb = (tmdbDetails?.details as any)?.[releaseDateKey]
+      ? new Date((tmdbDetails?.details as any)[releaseDateKey]).getFullYear()
+      : undefined;
+    return fromTmdb ?? fromItem;
+  }, [tmdbDetails, item.releaseDate, item.year, item.mediaType]);
 
   if (!runtime && !releaseYear) return null;
 
