@@ -391,7 +391,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
         console.warn("loadJellyseerrOptions failed", error);
       }
     },
-    [data, mediaTypeNormalized],
+    [data, mediaTypeNormalized, mediaId],
   );
 
   const handleServerChange = useCallback(
@@ -1047,10 +1047,6 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   <View style={{ marginTop: spacing.xs }}>
                     {rootFolders.map((r) => {
                       const free = (r as any).freeSpace;
-                      const label =
-                        free != null
-                          ? `${r.path} (${(free / (1024 * 1024 * 1024)).toFixed(2)} GB free)`
-                          : r.path;
                       return (
                         <View key={r.path} style={{ marginTop: spacing.xs }}>
                           <Button

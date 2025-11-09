@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
-import { Card, Chip, Text, Surface, useTheme } from "react-native-paper";
+import { Chip, Text, Surface, useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AppTheme } from "@/constants/theme";
 
