@@ -60,10 +60,14 @@ const SonarrSeriesDetailsScreen = () => {
     isTogglingMonitor,
     toggleSeasonMonitor,
     isTogglingSeasonMonitor,
+    toggleEpisodeMonitor,
+    isTogglingEpisodeMonitor,
     triggerSearch,
     isTriggeringSearch,
     searchMissingEpisodes,
     isSearchingMissing,
+    searchMissingEpisode,
+    isSearchingMissingEpisode,
     unmonitorAllEpisodes,
     isUnmonitoringAll,
     deleteSeriesAsync,
@@ -88,8 +92,10 @@ const SonarrSeriesDetailsScreen = () => {
   const isMutating =
     isTogglingMonitor ||
     isTogglingSeasonMonitor ||
+    isTogglingEpisodeMonitor ||
     isTriggeringSearch ||
     isSearchingMissing ||
+    isSearchingMissingEpisode ||
     isUnmonitoringAll ||
     isDeleting;
   const animationsEnabled = shouldAnimateLayout(
@@ -296,15 +302,19 @@ const SonarrSeriesDetailsScreen = () => {
                 imdbId={series.imdbId}
                 onToggleMonitor={handleToggleMonitor}
                 onToggleSeasonMonitor={toggleSeasonMonitor}
+                onToggleEpisodeMonitor={toggleEpisodeMonitor}
                 onSearchPress={handleTriggerSearch}
                 onSearchMissingPress={searchMissingEpisodes}
+                onSearchMissingEpisodePress={searchMissingEpisode}
                 onUnmonitorAllPress={unmonitorAllEpisodes}
                 onDeletePress={handleDeleteSeries}
                 isUpdatingMonitor={isTogglingMonitor}
                 isSearching={isTriggeringSearch}
                 isSearchingMissing={isSearchingMissing}
+                isSearchingMissingEpisode={isSearchingMissingEpisode}
                 isUnmonitoringAll={isUnmonitoringAll}
                 isTogglingSeasonMonitor={isTogglingSeasonMonitor}
+                isTogglingEpisodeMonitor={isTogglingEpisodeMonitor}
                 isDeleting={isDeleting}
                 showPoster={false}
                 disableScroll={true}

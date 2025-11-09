@@ -57,12 +57,23 @@ export type MediaDetailsProps = {
   onToggleSeasonMonitor?: (seasonNumber: number, nextState: boolean) => void;
   onSearchMissingPress?: () => void;
   onUnmonitorAllPress?: () => void;
+  onToggleEpisodeMonitor?: (
+    seasonNumber: number,
+    episodeNumber: number,
+    nextState: boolean,
+  ) => void;
+  onSearchMissingEpisodePress?: (
+    seasonNumber: number,
+    episodeNumber: number,
+  ) => void;
   isUpdatingMonitor?: boolean;
   isSearching?: boolean;
   isDeleting?: boolean;
   isSearchingMissing?: boolean;
   isUnmonitoringAll?: boolean;
   isTogglingSeasonMonitor?: boolean;
+  isTogglingEpisodeMonitor?: boolean;
+  isSearchingMissingEpisode?: boolean;
   /** Service configuration for download functionality */
   serviceConfig?: ServiceConfig;
   /** Content ID for download functionality */
@@ -113,12 +124,16 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   onToggleSeasonMonitor,
   onSearchMissingPress,
   onUnmonitorAllPress,
+  onToggleEpisodeMonitor,
+  onSearchMissingEpisodePress,
   isUpdatingMonitor = false,
   isSearching = false,
   isDeleting = false,
   isSearchingMissing = false,
   isUnmonitoringAll = false,
   isTogglingSeasonMonitor = false,
+  isTogglingEpisodeMonitor = false,
+  isSearchingMissingEpisode = false,
   showPoster = true,
   contentInsetTop = 0,
   disableScroll = false,
@@ -743,9 +758,69 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                       contentId={contentId}
                       size="small"
                       variant="icon"
-                      style={{ alignSelf: "center" }}
+                      style={{ alignSelf: "center", marginBottom: 8 }}
                     />
                   )}
+
+                  {/* Episode Action Buttons */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 6,
+                      marginTop: 8,
+                    }}
+                  >
+                    {!episode.hasFile && onSearchMissingEpisodePress && (
+                      <Button
+                        mode="contained"
+                        loading={isSearchingMissingEpisode}
+                        disabled={isSearchingMissingEpisode}
+                        onPress={() =>
+                          onSearchMissingEpisodePress(
+                            selectedSeason?.seasonNumber ??
+                              seasons?.[0]?.seasonNumber ??
+                              0,
+                            episode.episodeNumber,
+                          )
+                        }
+                        buttonColor={theme.colors.primary}
+                        textColor={theme.colors.onPrimary}
+                        style={{ flex: 1 }}
+                        labelStyle={{ fontWeight: "600", fontSize: 11 }}
+                      >
+                        Search
+                      </Button>
+                    )}
+
+                    {onToggleEpisodeMonitor && (
+                      <Button
+                        mode={episode.monitored ? "contained" : "outlined"}
+                        loading={isTogglingEpisodeMonitor}
+                        disabled={isTogglingEpisodeMonitor}
+                        onPress={() =>
+                          onToggleEpisodeMonitor(
+                            selectedSeason?.seasonNumber ??
+                              seasons?.[0]?.seasonNumber ??
+                              0,
+                            episode.episodeNumber,
+                            !episode.monitored,
+                          )
+                        }
+                        buttonColor={
+                          episode.monitored ? theme.colors.primary : undefined
+                        }
+                        textColor={
+                          episode.monitored
+                            ? theme.colors.onPrimary
+                            : theme.colors.onSurfaceVariant
+                        }
+                        style={{ flex: 1 }}
+                        labelStyle={{ fontWeight: "600", fontSize: 11 }}
+                      >
+                        {episode.monitored ? "Monitored" : "Unmonitored"}
+                      </Button>
+                    )}
+                  </View>
                 </Animated.View>
               ),
             ) || (

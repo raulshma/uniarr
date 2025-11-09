@@ -41,6 +41,18 @@ export interface UseSonarrSeriesDetailsResult {
   ) => Promise<void>;
   isTogglingSeasonMonitor: boolean;
   toggleSeasonMonitorError: unknown;
+  toggleEpisodeMonitor: (
+    seasonNumber: number,
+    episodeNumber: number,
+    nextState: boolean,
+  ) => void;
+  toggleEpisodeMonitorAsync: (
+    seasonNumber: number,
+    episodeNumber: number,
+    nextState: boolean,
+  ) => Promise<void>;
+  isTogglingEpisodeMonitor: boolean;
+  toggleEpisodeMonitorError: unknown;
   triggerSearch: () => void;
   triggerSearchAsync: () => Promise<void>;
   isTriggeringSearch: boolean;
@@ -49,6 +61,13 @@ export interface UseSonarrSeriesDetailsResult {
   searchMissingEpisodesAsync: () => Promise<void>;
   isSearchingMissing: boolean;
   searchMissingError: unknown;
+  searchMissingEpisode: (seasonNumber: number, episodeNumber: number) => void;
+  searchMissingEpisodeAsync: (
+    seasonNumber: number,
+    episodeNumber: number,
+  ) => Promise<void>;
+  isSearchingMissingEpisode: boolean;
+  searchMissingEpisodeError: unknown;
   unmonitorAllEpisodes: () => void;
   unmonitorAllEpisodesAsync: () => Promise<void>;
   isUnmonitoringAll: boolean;
@@ -160,6 +179,43 @@ export const useSonarrSeriesDetails = ({
     },
   });
 
+  const toggleEpisodeMonitorMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "episodeMonitor",
+    ],
+    mutationFn: async ({
+      seasonNumber,
+      episodeNumber,
+      nextState,
+    }: {
+      seasonNumber: number;
+      episodeNumber: number;
+      nextState: boolean;
+    }) => {
+      const connector = resolveConnector();
+      await connector.setEpisodeMonitored(
+        seriesId,
+        seasonNumber,
+        episodeNumber,
+        nextState,
+      );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceId),
+        }),
+      ]);
+    },
+  });
+
   const triggerSearchMutation = useMutation({
     mutationKey: [
       ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
@@ -179,6 +235,27 @@ export const useSonarrSeriesDetails = ({
     mutationFn: async () => {
       const connector = resolveConnector();
       await connector.searchMissingEpisodes(seriesId);
+    },
+  });
+
+  const searchMissingEpisodeMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "searchMissingEpisode",
+    ],
+    mutationFn: async ({
+      seasonNumber,
+      episodeNumber,
+    }: {
+      seasonNumber: number;
+      episodeNumber: number;
+    }) => {
+      const connector = resolveConnector();
+      await connector.searchMissingEpisode(
+        seriesId,
+        seasonNumber,
+        episodeNumber,
+      );
     },
   });
 
@@ -253,6 +330,28 @@ export const useSonarrSeriesDetails = ({
       toggleSeasonMonitorMutation.mutateAsync({ seasonNumber, nextState }),
     isTogglingSeasonMonitor: toggleSeasonMonitorMutation.isPending,
     toggleSeasonMonitorError: toggleSeasonMonitorMutation.error,
+    toggleEpisodeMonitor: (
+      seasonNumber: number,
+      episodeNumber: number,
+      nextState: boolean,
+    ) =>
+      toggleEpisodeMonitorMutation.mutate({
+        seasonNumber,
+        episodeNumber,
+        nextState,
+      }),
+    toggleEpisodeMonitorAsync: (
+      seasonNumber: number,
+      episodeNumber: number,
+      nextState: boolean,
+    ) =>
+      toggleEpisodeMonitorMutation.mutateAsync({
+        seasonNumber,
+        episodeNumber,
+        nextState,
+      }),
+    isTogglingEpisodeMonitor: toggleEpisodeMonitorMutation.isPending,
+    toggleEpisodeMonitorError: toggleEpisodeMonitorMutation.error,
     triggerSearch: triggerSearchMutation.mutate,
     triggerSearchAsync: triggerSearchMutation.mutateAsync,
     isTriggeringSearch: triggerSearchMutation.isPending,
@@ -261,6 +360,15 @@ export const useSonarrSeriesDetails = ({
     searchMissingEpisodesAsync: searchMissingEpisodesMutation.mutateAsync,
     isSearchingMissing: searchMissingEpisodesMutation.isPending,
     searchMissingError: searchMissingEpisodesMutation.error,
+    searchMissingEpisode: (seasonNumber: number, episodeNumber: number) =>
+      searchMissingEpisodeMutation.mutate({ seasonNumber, episodeNumber }),
+    searchMissingEpisodeAsync: (seasonNumber: number, episodeNumber: number) =>
+      searchMissingEpisodeMutation.mutateAsync({
+        seasonNumber,
+        episodeNumber,
+      }),
+    isSearchingMissingEpisode: searchMissingEpisodeMutation.isPending,
+    searchMissingEpisodeError: searchMissingEpisodeMutation.error,
     unmonitorAllEpisodes: unmonitorAllEpisodesMutation.mutate,
     unmonitorAllEpisodesAsync: unmonitorAllEpisodesMutation.mutateAsync,
     isUnmonitoringAll: unmonitorAllEpisodesMutation.isPending,
