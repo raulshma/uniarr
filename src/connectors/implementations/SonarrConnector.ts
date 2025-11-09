@@ -836,6 +836,41 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
+  async getEpisodesByIds(episodeIds: number[]): Promise<SonarrEpisode[]> {
+    try {
+      if (!episodeIds || episodeIds.length === 0) {
+        return [];
+      }
+
+      // Fetch episodes in parallel (max 5 at a time to avoid overwhelming the API)
+      const batchSize = 5;
+      const episodes: SonarrEpisode[] = [];
+
+      for (let i = 0; i < episodeIds.length; i += batchSize) {
+        const batch = episodeIds.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map((episodeId) =>
+            this.client
+              .get<SonarrEpisode>(`/api/v3/episode/${episodeId}`)
+              .then((res) => res.data)
+              .catch(() => null),
+          ),
+        );
+
+        episodes.push(...results.filter((ep) => ep !== null));
+      }
+
+      return episodes;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getEpisodesByIds",
+        endpoint: "/api/v3/episode/{id}",
+      });
+    }
+  }
+
   private buildAddPayload(request: AddSeriesRequest): Record<string, unknown> {
     const addOptions = {
       searchForMissingEpisodes:

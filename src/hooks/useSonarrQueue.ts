@@ -137,7 +137,64 @@ export const useSonarrQueue = (
 
         // Get queue data from connector
         const response = await (connector as any).client.get("/api/v3/queue");
-        const rawQueueItems = response.data?.records ?? [];
+        let rawQueueItems = response.data?.records ?? [];
+
+        // Collect episode IDs that are missing episode details
+        const missingEpisodeIds = rawQueueItems
+          .filter(
+            (item: components["schemas"]["QueueResource"]) =>
+              item.episodeId && (!item.episode || !item.episode.title),
+          )
+          .map(
+            (item: components["schemas"]["QueueResource"]) => item.episodeId!,
+          )
+          .filter(
+            (id: number, index: number, arr: number[]) =>
+              arr.indexOf(id) === index,
+          ); // Remove duplicates
+
+        // Fetch missing episode details if needed
+        if (missingEpisodeIds.length > 0) {
+          logger.debug("[useSonarrQueue] Fetching missing episode details", {
+            serviceId,
+            count: missingEpisodeIds.length,
+          });
+
+          try {
+            const episodes = await (connector as any).getEpisodesByIds(
+              missingEpisodeIds,
+            );
+
+            // Create a map of episode ID to episode details
+            const episodeMap = new Map(
+              episodes.map((ep: components["schemas"]["EpisodeResource"]) => [
+                ep.id,
+                ep,
+              ]),
+            );
+
+            // Enrich queue items with fetched episode details
+            rawQueueItems = rawQueueItems.map(
+              (item: components["schemas"]["QueueResource"]) => {
+                if (item.episodeId && episodeMap.has(item.episodeId)) {
+                  return {
+                    ...item,
+                    episode: episodeMap.get(item.episodeId),
+                  };
+                }
+                return item;
+              },
+            );
+          } catch (episodeError) {
+            logger.warn("[useSonarrQueue] Failed to fetch episode details", {
+              serviceId,
+              missingEpisodeIds,
+              error: episodeError,
+            });
+            // Continue with the data we have, episode details are just enrichment
+          }
+        }
+
         const detailedItems = rawQueueItems.map(transformQueueItem);
 
         logger.debug("[useSonarrQueue] Queue fetched successfully", {

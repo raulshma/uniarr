@@ -13,7 +13,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { formatDistanceToNow } from "date-fns";
 import type { AppTheme } from "@/constants/theme";
 import type { DetailedSonarrQueueItem } from "@/models/queue.types";
-import { MediaPoster } from "@/components/media/MediaPoster";
 import { formatBytes } from "@/utils/format.utils";
 
 interface SonarrQueueItemProps {
@@ -185,16 +184,6 @@ const SonarrQueueItemComponent = ({
         disabled={!onSelect}
       >
         <View style={styles.container}>
-          {/* Series Poster */}
-          <View style={styles.posterContainer}>
-            <MediaPoster
-              uri={item.seriesPosterUrl}
-              title={item.seriesTitle}
-              size="small"
-              style={styles.poster}
-            />
-          </View>
-
           {/* Content */}
           <View style={styles.content}>
             {/* Series Title */}
@@ -206,19 +195,25 @@ const SonarrQueueItemComponent = ({
               {item.seriesTitle}
             </Text>
 
-            {/* Episode Info */}
-            <Text
-              variant="bodyMedium"
-              numberOfLines={2}
-              style={styles.episodeInfo}
-            >
-              {item.seasonNumber &&
-                item.episodeNumber &&
-                `S${item.seasonNumber.toString().padStart(2, "0")}E${item.episodeNumber
-                  .toString()
-                  .padStart(2, "0")}: `}
-              {item.episodeTitle}
-            </Text>
+            {/* Episode Number and Title */}
+            <View style={styles.episodeNumberContainer}>
+              {item.seasonNumber !== undefined &&
+              item.seasonNumber !== null &&
+              item.episodeNumber !== undefined &&
+              item.episodeNumber !== null ? (
+                <Text variant="labelMedium" style={styles.episodeNumber}>
+                  S{(item.seasonNumber as number).toString().padStart(2, "0")}E
+                  {(item.episodeNumber as number).toString().padStart(2, "0")}
+                </Text>
+              ) : null}
+              <Text
+                variant="bodyMedium"
+                numberOfLines={1}
+                style={styles.episodeTitle}
+              >
+                {item.episodeTitle || "No episode title"}
+              </Text>
+            </View>
 
             {/* Added Time */}
             {item.added && (
@@ -296,7 +291,6 @@ export const SonarrQueueItem = memo(SonarrQueueItemComponent);
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: 16,
     marginVertical: 6,
   },
   touchable: {
@@ -305,23 +299,26 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     padding: 12,
-  },
-  posterContainer: {
-    marginRight: 12,
-  },
-  poster: {
-    borderRadius: 8,
-    overflow: "hidden",
+    gap: 12,
   },
   content: {
     flex: 1,
-    justifyContent: "space-between",
+    gap: 4,
   },
   seriesTitle: {
     fontWeight: "500",
   },
-  episodeInfo: {
-    marginTop: 2,
+  episodeNumberContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  episodeNumber: {
+    fontWeight: "600",
+    minWidth: 50,
+  },
+  episodeTitle: {
+    flex: 1,
   },
   addedTime: {
     marginTop: 2,
