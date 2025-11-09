@@ -746,6 +746,67 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     }
   }
 
+  async removeFromQueue(
+    id: number,
+    options: {
+      removeFromClient?: boolean;
+      blocklist?: boolean;
+      skipRedownload?: boolean;
+      changeCategory?: boolean;
+    } = {},
+  ): Promise<void> {
+    try {
+      const params = {
+        removeFromClient: options.removeFromClient ?? true,
+        blocklist: options.blocklist ?? false,
+        skipRedownload: options.skipRedownload ?? false,
+        changeCategory: options.changeCategory ?? false,
+      };
+
+      await this.client.delete(`/api/v3/queue/${id}`, { params });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "removeFromQueue",
+        endpoint: `/api/v3/queue/${id}`,
+      });
+    }
+  }
+
+  async bulkRemoveFromQueue(
+    ids: number[],
+    options: {
+      removeFromClient?: boolean;
+      blocklist?: boolean;
+      skipRedownload?: boolean;
+      changeCategory?: boolean;
+    } = {},
+  ): Promise<void> {
+    try {
+      const params = {
+        removeFromClient: options.removeFromClient ?? true,
+        blocklist: options.blocklist ?? false,
+        skipRedownload: options.skipRedownload ?? false,
+        changeCategory: options.changeCategory ?? false,
+      };
+
+      const payload = { ids };
+
+      await this.client.delete("/api/v3/queue/bulk", {
+        params,
+        data: payload,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "bulkRemoveFromQueue",
+        endpoint: "/api/v3/queue/bulk",
+      });
+    }
+  }
+
   async getHistory(options?: {
     page?: number;
     pageSize?: number;

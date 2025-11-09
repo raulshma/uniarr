@@ -7,7 +7,6 @@ import { alert } from "@/services/dialogService";
 import {
   Chip,
   Icon,
-  IconButton,
   Menu,
   Searchbar,
   Text,
@@ -33,6 +32,7 @@ import {
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { SeriesListItemSkeleton } from "@/components/media/skeletons";
 import { LibraryFilterModal } from "@/components/library/LibraryFilterModal";
+import { SonarrNavbar } from "@/components/sonarr/SonarrNavbar";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useSonarrSeries } from "@/hooks/useSonarrSeries";
@@ -197,6 +197,7 @@ const SonarrSeriesListScreen = () => {
     ? manager.getConnector(serviceId)
     : undefined;
   const connectorIsSonarr = connector?.config.type === "sonarr";
+  const serviceName = connector?.config.name ?? "Sonarr";
 
   const isRefreshing = isFetching && !isLoading;
   const isInitialLoad = isBootstrapping || isLoading;
@@ -296,22 +297,18 @@ const SonarrSeriesListScreen = () => {
           paddingTop: spacing.lg,
           paddingBottom: spacing.lg,
         },
-        topBar: {
+        sectionHeader: {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
           marginBottom: spacing.lg,
         },
-        topBarSpacer: {
-          width: 48,
+        sectionTitle: {
+          color: theme.colors.onSurface,
         },
-        topBarTitle: {
-          flex: 1,
-          textAlign: "center",
-          color: theme.colors.onBackground,
-        },
-        topBarAction: {
-          margin: 0,
+        sectionMeta: {
+          color: theme.colors.onSurfaceVariant,
+          marginTop: spacing.xxs,
         },
         searchBar: {
           borderRadius: 20,
@@ -461,6 +458,13 @@ const SonarrSeriesListScreen = () => {
     setStatusMenuVisible(false);
   }, []);
 
+  const handleNavigateToQueue = useCallback(() => {
+    router.push({
+      pathname: "/(auth)/sonarr/[serviceId]/queue",
+      params: { serviceId },
+    });
+  }, [router, serviceId]);
+
   const renderSeriesItem = useCallback(
     ({ item, index }: { item: Series; index: number }) => {
       const totalEpisodes =
@@ -548,21 +552,15 @@ const SonarrSeriesListScreen = () => {
         style={styles.listHeader}
         delay={50}
       >
-        <View style={styles.topBar}>
-          <View style={styles.topBarSpacer} />
-          <Text variant="headlineSmall" style={styles.topBarTitle}>
-            TV Series
-          </Text>
-          <IconButton
-            icon="plus"
-            size={24}
-            mode="contained"
-            style={styles.topBarAction}
-            containerColor={theme.colors.primary}
-            iconColor={theme.colors.onPrimary}
-            accessibilityLabel="Add series"
-            onPress={handleAddSeries}
-          />
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text variant="headlineSmall" style={styles.sectionTitle}>
+              TV Series
+            </Text>
+            <Text variant="bodySmall" style={styles.sectionMeta}>
+              Showing {filteredSeries.length} of {totalSeries} series
+            </Text>
+          </View>
         </View>
         <View>
           <Searchbar
@@ -713,7 +711,6 @@ const SonarrSeriesListScreen = () => {
     [
       animationsEnabled,
       filterValue,
-      handleAddSeries,
       handleStatusChange,
       searchTerm,
       statusMenuVisible,
@@ -726,6 +723,8 @@ const SonarrSeriesListScreen = () => {
       handleRemoveTag,
       handleRemoveQualityProfile,
       handleRemoveMonitoredFilter,
+      filteredSeries.length,
+      totalSeries,
     ],
   );
 
@@ -788,6 +787,14 @@ const SonarrSeriesListScreen = () => {
   if (isInitialLoad) {
     return (
       <SafeAreaView style={styles.safeArea}>
+        <SonarrNavbar
+          serviceName={serviceName}
+          activeTab="series"
+          onBackPress={() => router.back()}
+          onNavigateToSeries={() => {}}
+          onNavigateToQueue={handleNavigateToQueue}
+          onAddSeries={handleAddSeries}
+        />
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: spacing.lg,
@@ -795,12 +802,20 @@ const SonarrSeriesListScreen = () => {
           }}
         >
           <View style={styles.listHeader}>
-            <View style={styles.topBar}>
-              <View style={styles.topBarSpacer}>
-                <SkeletonPlaceholder width={32} height={32} borderRadius={16} />
+            <View style={styles.sectionHeader}>
+              <View style={{ flex: 1 }}>
+                <SkeletonPlaceholder
+                  width="50%"
+                  height={28}
+                  borderRadius={10}
+                />
+                <SkeletonPlaceholder
+                  width="35%"
+                  height={18}
+                  borderRadius={8}
+                  style={{ marginTop: spacing.xxs }}
+                />
               </View>
-              <SkeletonPlaceholder width="40%" height={28} borderRadius={10} />
-              <SkeletonPlaceholder width={44} height={44} borderRadius={22} />
             </View>
             <SkeletonPlaceholder
               width="100%"
@@ -808,7 +823,17 @@ const SonarrSeriesListScreen = () => {
               borderRadius={24}
               style={{ marginBottom: spacing.md }}
             />
-            <SkeletonPlaceholder width="55%" height={36} borderRadius={18} />
+            <View
+              style={{
+                flexDirection: "row",
+                gap: spacing.sm,
+                marginBottom: spacing.md,
+              }}
+            >
+              <SkeletonPlaceholder width="48%" height={44} borderRadius={16} />
+              <SkeletonPlaceholder width="48%" height={44} borderRadius={16} />
+            </View>
+            <SkeletonPlaceholder width="60%" height={28} borderRadius={14} />
           </View>
           {Array.from({ length: 6 }).map((_, index) => (
             <View key={index} style={{ marginBottom: spacing.md }}>
@@ -858,6 +883,14 @@ const SonarrSeriesListScreen = () => {
   return (
     <MediaSelectorProvider>
       <SafeAreaView style={styles.safeArea}>
+        <SonarrNavbar
+          serviceName={serviceName}
+          activeTab="series"
+          onBackPress={() => router.back()}
+          onNavigateToSeries={() => {}}
+          onNavigateToQueue={handleNavigateToQueue}
+          onAddSeries={handleAddSeries}
+        />
         <View style={{ flex: 1 }}>
           <FlashList<Series>
             data={filteredSeries}

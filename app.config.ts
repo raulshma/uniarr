@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "uniarr",
   scheme: "uniarr",
   owner: "throwaway0acc",
-  version: "0.2.0",
+  version: "0.2.1",
   orientation: "portrait",
   icon: "./assets/icon.png",
   newArchEnabled: true,
@@ -17,6 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     backgroundColor: "#1F1F1F", // Dark theme background
   },
   experiments: {
+    typedRoutes: true,
     reactCompiler: true,
   },
   ios: {

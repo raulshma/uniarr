@@ -10,6 +10,12 @@ export default function SonarrServiceLayout() {
         }}
       />
       <Stack.Screen
+        name="queue"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="series/[id]"
         options={{
           presentation: "transparentModal",

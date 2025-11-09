@@ -25,6 +25,7 @@ const sizeMap = {
 export type MediaPosterSize = keyof typeof sizeMap;
 
 export type MediaPosterProps = {
+  source?: { uri: string } | number;
   uri?: string;
   size?: MediaPosterSize | number;
   aspectRatio?: number;

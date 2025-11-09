@@ -80,8 +80,11 @@ export const queryKeys = {
         "search",
         { term, filters },
       ] as const,
-    queue: (serviceId: string): QueryKeyBuilder =>
-      [...queryKeys.sonarr.service(serviceId), "queue"] as const,
+    queue: (
+      serviceId: string,
+      options?: Record<string, unknown>,
+    ): QueryKeyBuilder =>
+      [...queryKeys.sonarr.service(serviceId), "queue", options ?? {}] as const,
   },
   radarr: {
     base: ["radarr"] as const,
