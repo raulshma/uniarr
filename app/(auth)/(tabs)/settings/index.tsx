@@ -68,6 +68,7 @@ const SettingsScreen = () => {
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const [errorLogCount, setErrorLogCount] = useState(0);
   const [cleanupLogCount, setCleanupLogCount] = useState(0);
+  const [hasTriggeredUpdateCheck, setHasTriggeredUpdateCheck] = useState(false);
   const theme = useTheme<AppTheme>();
 
   // Get dynamic app version from Expo Constants
@@ -281,16 +282,22 @@ const SettingsScreen = () => {
     void loadImageCacheUsage();
   }, [loadImageCacheUsage]);
 
-  // Update dialog when update check completes
+  // Update dialog when update check completes (only if user manually triggered it)
   useEffect(() => {
-    if (!isCheckingUpdate && (updateData || updateError)) {
+    if (
+      hasTriggeredUpdateCheck &&
+      !isCheckingUpdate &&
+      (updateData || updateError)
+    ) {
       showCustomDialog("updateCheck", {
         updateData,
         isLoading: false,
         error: updateError ? String(updateError) : null,
       });
+      // Reset the flag after showing the dialog
+      setHasTriggeredUpdateCheck(false);
     }
-  }, [updateData, isCheckingUpdate, updateError]);
+  }, [updateData, isCheckingUpdate, updateError, hasTriggeredUpdateCheck]);
 
   // Load error log count on mount
   useEffect(() => {
@@ -359,6 +366,8 @@ const SettingsScreen = () => {
 
   const handleCheckForUpdate = useCallback(async () => {
     setLastReleaseNotesCheckedAt(new Date().toISOString());
+    // Mark that we've triggered an update check manually
+    setHasTriggeredUpdateCheck(true);
     // Show update dialog with loading state
     showCustomDialog("updateCheck", {
       updateData: null,
