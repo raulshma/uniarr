@@ -93,6 +93,9 @@ const AnimeHubDetailScreen: React.FC = () => {
   const preferredJellyseerrServiceId = useSettingsStore(
     selectPreferredJellyseerrServiceId,
   );
+  const trailerFeatureEnabled = useSettingsStore(
+    (s) => s.trailerFeatureEnabled,
+  );
 
   const [jellyseerrServiceDialogVisible, setJellyseerrServiceDialogVisible] =
     useState(false);
@@ -974,7 +977,7 @@ const AnimeHubDetailScreen: React.FC = () => {
         ) : null}
 
         {/* Trailer */}
-        {trailerVideoKey && trailerBackdropUri ? (
+        {trailerFeatureEnabled && trailerVideoKey && trailerBackdropUri ? (
           <TrailerFadeOverlay
             videoKey={trailerVideoKey}
             backdropUri={trailerBackdropUri}
