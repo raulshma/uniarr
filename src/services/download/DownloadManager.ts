@@ -1273,11 +1273,35 @@ export class DownloadManager {
     }
     this.progressUpdateTimers.clear();
 
+    // Cancel all download tasks to release references
+    for (const task of this.downloadTasks.values()) {
+      try {
+        if (task && typeof task.pauseAsync === "function") {
+          await task.pauseAsync();
+        }
+      } catch (error) {
+        logger.warn("Failed to pause download task during cleanup", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    this.downloadTasks.clear();
+
+    // Clear all state
+    this.downloads.clear();
+    this.downloadQueue.splice(0);
+    this.activeDownloads.clear();
+    this.lastProgressUpdate.clear();
+
     // Save final state
     if (this.enablePersistence) {
       await this.saveState();
     }
 
-    logger.info("DownloadManager cleaned up");
+    logger.info("DownloadManager cleaned up", {
+      downloadsCleared: true,
+      timersCleared: true,
+      tasksCleared: true,
+    });
   }
 }

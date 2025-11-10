@@ -1779,6 +1779,37 @@ class ImageCacheService {
       return "Unknown error";
     }
   }
+
+  /**
+   * Cleanup resources (call on service shutdown)
+   * Clears in-memory caches and tracking structures
+   */
+  destroy(): void {
+    try {
+      // Clear tracked URIs
+      this.trackedUris.clear();
+
+      // Clear prefetch queue and related tracking
+      this.prefetchQueue.splice(0);
+      this.queuedPrefetches.clear();
+      this.inFlightPrefetches.clear();
+
+      // Reset processing flag
+      this.isProcessingQueue = false;
+
+      // Reset cache statistics
+      this.resetCacheStats();
+
+      // Reset initialization state
+      this.isInitialized = false;
+
+      logger.debug("[ImageCacheService] Cleanup completed");
+    } catch (error) {
+      logger.warn("[ImageCacheService] Cleanup failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 }
 
 export const imageCacheService = ImageCacheService.getInstance();

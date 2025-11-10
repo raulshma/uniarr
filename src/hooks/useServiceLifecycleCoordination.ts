@@ -3,6 +3,9 @@ import { AppState, type AppStateStatus } from "react-native";
 
 import { webhookService } from "@/services/webhooks/WebhookService";
 import { serviceHealthMonitor } from "@/services/notifications/ServiceHealthMonitor";
+import { quietHoursService } from "@/services/notifications/QuietHoursService";
+import { healthCheckService } from "@/services/bookmarks/HealthCheckService";
+import { imageCacheService } from "@/services/image/ImageCacheService";
 import { StorageBackendManager } from "@/services/storage/MMKVStorage";
 
 /**
@@ -11,6 +14,9 @@ import { StorageBackendManager } from "@/services/storage/MMKVStorage";
  * Ensures proper cleanup of:
  * - WebhookService listeners and event queue
  * - ServiceHealthMonitor timers
+ * - QuietHoursService pending flush timers
+ * - HealthCheckService active health checks
+ * - ImageCacheService memory and prefetch queue
  * - MMKV storage resources
  *
  * This hook manages services that consume memory and should clean up
@@ -63,6 +69,15 @@ export const useServiceLifecycleCoordination = (): void => {
 
         // Destroy webhook service resources (listeners, cleanup timer)
         webhookService.destroy();
+
+        // Destroy quiet hours service resources (pending flush timers)
+        quietHoursService.destroy();
+
+        // Destroy health check service resources (active checks)
+        healthCheckService.destroy();
+
+        // Destroy image cache service resources (memory cache, prefetch queue)
+        imageCacheService.destroy();
 
         // Destroy storage backend resources
         const storageManager = StorageBackendManager.getInstance();

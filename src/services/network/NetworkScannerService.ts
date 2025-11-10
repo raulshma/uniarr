@@ -861,4 +861,17 @@ export class NetworkScannerService {
       });
     }
   }
+
+  /**
+   * Cleanup resources (call on service shutdown)
+   */
+  destroy(): void {
+    try {
+      this.stopScan();
+      this.abortController = null;
+      this.isScanning = false;
+    } catch (error) {
+      void logger.warn("Error during NetworkScannerService cleanup", { error });
+    }
+  }
 }
