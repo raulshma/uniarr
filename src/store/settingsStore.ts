@@ -95,6 +95,8 @@ type SettingsData = {
   trailerFeatureEnabled: boolean;
   discoverBannerDismissed: boolean;
   animeHubBannerDismissed: boolean;
+  // BYOK (Bring Your Own Keys) - API key configurations
+  byokGeocodeMapsCoApiKey?: string;
 };
 
 interface SettingsState extends SettingsData {
@@ -147,6 +149,7 @@ interface SettingsState extends SettingsData {
   setTrailerFeatureEnabled: (enabled: boolean) => void;
   setDiscoverBannerDismissed: (dismissed: boolean) => void;
   setAnimeHubBannerDismissed: (dismissed: boolean) => void;
+  setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) => void;
 }
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
@@ -246,6 +249,7 @@ const createDefaultSettings = (): SettingsData => ({
   trailerFeatureEnabled: false, // Opt-in feature
   discoverBannerDismissed: false,
   animeHubBannerDismissed: false,
+  byokGeocodeMapsCoApiKey: undefined,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -336,6 +340,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ discoverBannerDismissed: dismissed }),
       setAnimeHubBannerDismissed: (dismissed: boolean) =>
         set({ animeHubBannerDismissed: dismissed }),
+      setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) =>
+        set({ byokGeocodeMapsCoApiKey: apiKey }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -392,9 +398,10 @@ export const useSettingsStore = create<SettingsState>()(
         trailerFeatureEnabled: state.trailerFeatureEnabled,
         discoverBannerDismissed: state.discoverBannerDismissed,
         animeHubBannerDismissed: state.animeHubBannerDismissed,
+        byokGeocodeMapsCoApiKey: state.byokGeocodeMapsCoApiKey,
       }),
       // Bump version since we're adding new persisted fields
-      version: 12,
+      version: 13,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -583,6 +590,7 @@ export const useSettingsStore = create<SettingsState>()(
           loaderConfig: partial.loaderConfig ?? baseDefaults.loaderConfig,
           trailerFeatureEnabled:
             partial.trailerFeatureEnabled ?? baseDefaults.trailerFeatureEnabled,
+          byokGeocodeMapsCoApiKey: partial.byokGeocodeMapsCoApiKey ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;
       },

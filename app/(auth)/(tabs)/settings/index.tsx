@@ -72,8 +72,7 @@ const SettingsScreen = () => {
   const theme = useTheme<AppTheme>();
 
   // Get dynamic app version from Expo Constants
-  const appVersion =
-    Constants.expoConfig?.version || Constants.manifest?.version || "Unknown";
+  const appVersion = Constants.expoConfig?.version || "Unknown";
   const appVersionString = `UniArr v${appVersion}`;
 
   // App update check hook
@@ -1038,6 +1037,37 @@ const SettingsScreen = () => {
                   </Button>
                 }
                 groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* BYOK Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>API Keys & Credentials</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Bring Your Own Keys (BYOK)"
+                subtitle="Configure your own API keys"
+                left={{ iconName: "key-variant" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/settings/byok")}
+                groupPosition="single"
               />
             </AnimatedListItem>
           </SettingsGroup>
