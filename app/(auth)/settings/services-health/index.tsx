@@ -178,6 +178,26 @@ const CONFIGURABLE_SETTINGS = [
     stateSelector: (state: any) => state.apiErrorLoggerCaptureRequestHeaders,
     setAction: "setApiErrorLoggerCaptureRequestHeaders",
   },
+
+  // Experimental Features
+  {
+    id: "backdropWithBlur",
+    title: "Backdrop with Blur",
+    description: "Experimental: Blurred backdrop effect on detail pages",
+    icon: "blur",
+    category: "experimental",
+    stateSelector: (state: any) => state.enableBackdropWithBlur,
+    setAction: "setBackdropWithBlurEnabled",
+  },
+  {
+    id: "trailerFeature",
+    title: "Video Trailers",
+    description: "Show video trailers in detail pages",
+    icon: "play-circle",
+    category: "experimental",
+    stateSelector: (state: any) => state.trailerFeatureEnabled,
+    setAction: "setTrailerFeatureEnabled",
+  },
 ];
 
 interface ListItemData {
