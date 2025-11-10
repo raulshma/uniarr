@@ -200,25 +200,53 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
 
   async getById(id: number): Promise<Series> {
     try {
-      const [seriesResponse, episodesResponse] = await Promise.all([
-        this.client.get<components["schemas"]["SeriesResource"]>(
-          `/api/v3/series/${id}`,
-          {
-            params: { includeSeasonImages: true },
-          },
-        ),
-        this.client.get<components["schemas"]["EpisodeResource"][]>(
-          `/api/v3/episode`,
-          {
-            params: { seriesId: id, includeImages: true },
-          },
-        ),
-      ]);
+      const [seriesResponse, episodesResponse, episodeFilesResponse] =
+        await Promise.all([
+          this.client.get<components["schemas"]["SeriesResource"]>(
+            `/api/v3/series/${id}`,
+            {
+              params: { includeSeasonImages: true },
+            },
+          ),
+          this.client.get<components["schemas"]["EpisodeResource"][]>(
+            `/api/v3/episode`,
+            {
+              params: { seriesId: id, includeImages: true },
+            },
+          ),
+          this.client.get<components["schemas"]["EpisodeFileResource"][]>(
+            "/api/v3/episodefile",
+            {
+              params: { seriesId: id },
+            },
+          ),
+        ]);
 
       const series = this.mapSeries(seriesResponse.data);
+
+      // Create a map of episode files by episodeFileId for quick lookup
+      const episodeFilesMap = new Map<
+        number,
+        components["schemas"]["EpisodeFileResource"]
+      >();
+      episodeFilesResponse.data.forEach((file) => {
+        if (file.id) {
+          episodeFilesMap.set(file.id, file);
+        }
+      });
+
       const episodesBySeason = this.groupEpisodesBySeason(
         episodesResponse.data,
         series.id,
+        episodeFilesMap,
+      );
+
+      // Calculate total size on disk
+      const totalSizeOnDiskMB = episodeFilesResponse.data.reduce(
+        (sum, file) => {
+          return sum + (file.size ?? 0) / (1024 * 1024);
+        },
+        0,
       );
 
       const seasons: Season[] | undefined = series.seasons?.map((season) => ({
@@ -229,6 +257,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       return {
         ...series,
         seasons,
+        totalSizeOnDiskMB,
       };
     } catch (error) {
       throw handleApiError(error, {
@@ -236,6 +265,26 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         serviceType: this.config.type,
         operation: "getById",
         endpoint: `/api/v3/series/${id}`,
+      });
+    }
+  }
+
+  async getEpisodeFiles(
+    seriesId: number,
+  ): Promise<components["schemas"]["EpisodeFileResource"][]> {
+    try {
+      const response = await this.client.get<
+        components["schemas"]["EpisodeFileResource"][]
+      >("/api/v3/episodefile", {
+        params: { seriesId },
+      });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getEpisodeFiles",
+        endpoint: "/api/v3/episodefile",
       });
     }
   }
@@ -1080,6 +1129,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   private mapEpisode(
     episode: components["schemas"]["EpisodeResource"],
     seriesId?: number,
+    episodeFilesMap?: Map<number, components["schemas"]["EpisodeFileResource"]>,
   ): Episode {
     // Try to get poster from images array first (if available in API response)
     // Try screenshot first as it's more commonly available for episodes
@@ -1089,6 +1139,21 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       (seriesId && episode.id
         ? this.buildEpisodePosterUrl(seriesId, episode.id)
         : undefined);
+
+    // Extract size from episodeFile if available (size is in bytes, convert to MB)
+    const sizeInMB = episode.episodeFile?.size
+      ? episode.episodeFile.size / (1024 * 1024)
+      : undefined;
+
+    // Get detailed episode file info from the episodeFilesMap if available
+    let detailedEpisodeFile:
+      | components["schemas"]["EpisodeFileResource"]
+      | undefined;
+    if (episode.episodeFileId && episodeFilesMap) {
+      detailedEpisodeFile = episodeFilesMap.get(episode.episodeFileId);
+    } else if (episode.episodeFile) {
+      detailedEpisodeFile = episode.episodeFile;
+    }
 
     return {
       id: episode.id ?? 0,
@@ -1110,9 +1175,42 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
               .quality!.quality!,
           )
         : undefined,
+      qualityInfo: detailedEpisodeFile?.quality?.quality
+        ? {
+            id: detailedEpisodeFile.quality.quality.id,
+            name: detailedEpisodeFile.quality.quality.name ?? "Unknown",
+            source: detailedEpisodeFile.quality.quality.source,
+            resolution: detailedEpisodeFile.quality.quality.resolution,
+          }
+        : undefined,
       relativePath:
         (episode as unknown as { relativePath?: string })?.relativePath ??
         undefined,
+      sizeInMB,
+      mediaInfo: detailedEpisodeFile?.mediaInfo
+        ? {
+            videoCodec: detailedEpisodeFile.mediaInfo.videoCodec ?? undefined,
+            audioCodec: detailedEpisodeFile.mediaInfo.audioCodec ?? undefined,
+            audioChannels:
+              detailedEpisodeFile.mediaInfo.audioChannels ?? undefined,
+            resolution: detailedEpisodeFile.mediaInfo.resolution ?? undefined,
+            videoBitrate:
+              detailedEpisodeFile.mediaInfo.videoBitrate ?? undefined,
+            audioBitrate:
+              detailedEpisodeFile.mediaInfo.audioBitrate ?? undefined,
+            videoFps: detailedEpisodeFile.mediaInfo.videoFps ?? undefined,
+            videoDynamicRange:
+              detailedEpisodeFile.mediaInfo.videoDynamicRange ?? undefined,
+            videoBitDepth:
+              detailedEpisodeFile.mediaInfo.videoBitDepth ?? undefined,
+            scanType: detailedEpisodeFile.mediaInfo.scanType ?? undefined,
+            subtitles: detailedEpisodeFile.mediaInfo.subtitles ?? undefined,
+            runTime: detailedEpisodeFile.mediaInfo.runTime ?? undefined,
+          }
+        : undefined,
+      releaseGroup: detailedEpisodeFile?.releaseGroup ?? undefined,
+      sceneName: detailedEpisodeFile?.sceneName ?? undefined,
+      dateAdded: detailedEpisodeFile?.dateAdded ?? undefined,
       posterUrl,
     };
   }
@@ -1120,11 +1218,12 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
   private groupEpisodesBySeason(
     episodes: components["schemas"]["EpisodeResource"][],
     seriesId: number,
+    episodeFilesMap?: Map<number, components["schemas"]["EpisodeFileResource"]>,
   ): Map<number, Episode[]> {
     return episodes.reduce((accumulator, episode) => {
       const seasonNum = episode.seasonNumber ?? 0;
       const collection = accumulator.get(seasonNum) ?? [];
-      collection.push(this.mapEpisode(episode, seriesId));
+      collection.push(this.mapEpisode(episode, seriesId, episodeFilesMap));
       accumulator.set(seasonNum, collection);
       return accumulator;
     }, new Map<number, Episode[]>());

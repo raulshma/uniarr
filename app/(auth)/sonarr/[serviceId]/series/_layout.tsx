@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 
-export default function SonarrServiceLayout() {
+export default function SeriesDetailsLayout() {
   return (
     <Stack
       screenOptions={{
@@ -8,23 +8,15 @@ export default function SonarrServiceLayout() {
       }}
     >
       <Stack.Screen
-        name="index"
+        name="[id]"
         options={{
           headerShown: false,
         }}
       />
       <Stack.Screen
-        name="queue"
+        name="episode/[episodeId]"
         options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="series/[id]"
-        options={{
-          presentation: "transparentModal",
-          contentStyle: { backgroundColor: "transparent" },
-          headerShown: false,
+          presentation: "formSheet",
           gestureDirection: "vertical",
           animation: "slide_from_bottom",
           sheetGrabberVisible: true,
@@ -33,12 +25,6 @@ export default function SonarrServiceLayout() {
           sheetCornerRadius: 20,
           sheetExpandsWhenScrolledToEdge: true,
           sheetElevation: 24,
-        }}
-      />
-      <Stack.Screen
-        name="add"
-        options={{
-          title: "Add Series",
           headerShown: false,
         }}
       />

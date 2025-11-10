@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Linking, ScrollView, View } from "react-native";
+import { Linking, ScrollView, View, Pressable } from "react-native";
 import {
   Chip,
   Text,
@@ -88,6 +88,8 @@ export type MediaDetailsProps = {
   serviceConfig?: ServiceConfig;
   /** Content ID for download functionality */
   contentId?: string;
+  /** Total size of all episode files on disk in MB (for series) */
+  totalSizeOnDiskMB?: number;
   /**
    * When rendered inside a page-level hero (DetailHero) the poster and
    * scroll container are provided by the hero. Set showPoster=false to
@@ -105,6 +107,8 @@ export type MediaDetailsProps = {
    */
   disableScroll?: boolean;
   testID?: string;
+  /** Callback when an episode is long-pressed */
+  onEpisodeLongPress?: (episodeId: string, episode: any) => void;
 };
 
 // Removed top-level MB-based formatter (duplicate). Per-file helpers are defined below where needed.
@@ -153,6 +157,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   testID = "media-details",
   serviceConfig,
   contentId,
+  totalSizeOnDiskMB,
+  onEpisodeLongPress,
 }) => {
   const theme = useTheme<AppTheme>();
   // episodesModalVisible removed — seasons use inline selectedSeason state instead
@@ -482,7 +488,11 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             </View>
 
             <View
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
             >
               <Text
                 variant="labelMedium"
@@ -497,6 +507,30 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                 {getFileSize()}
               </Text>
             </View>
+
+            {totalSizeOnDiskMB !== undefined &&
+              totalSizeOnDiskMB > 0 &&
+              type === "series" && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text
+                    variant="labelMedium"
+                    style={{ color: theme.colors.onSurfaceVariant }}
+                  >
+                    Total Series Size
+                  </Text>
+                  <Text
+                    variant="bodyLarge"
+                    style={{ color: theme.colors.onSurface, fontWeight: "600" }}
+                  >
+                    {formatFileSizeFromMB(totalSizeOnDiskMB)}
+                  </Text>
+                </View>
+              )}
           </Card.Content>
         </Card>
       </Animated.View>
@@ -708,215 +742,218 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             }}
           >
             {(selectedSeason || seasons?.[0])?.episodes?.map(
-              (episode, index) => (
-                <Animated.View
-                  key={
-                    episode.id ??
-                    `${(selectedSeason || seasons?.[0])?.seasonNumber}-${
-                      episode.episodeNumber
-                    }`
+              (episode, index) => {
+                const episodeKey =
+                  episode.id?.toString() ??
+                  `${(selectedSeason || seasons?.[0])?.seasonNumber}-${
+                    episode.episodeNumber
+                  }`;
+
+                const handleEpisodeLongPress = () => {
+                  if (onEpisodeLongPress) {
+                    onEpisodeLongPress(episodeKey, episode);
                   }
-                  entering={FadeIn.delay(index * 30).duration(300)}
-                  style={{
-                    width: "48%",
-                    backgroundColor: theme.colors.elevation.level1,
-                    borderRadius: 12,
-                    padding: 12,
-                    borderWidth: 1,
-                    borderColor: episode.hasFile
-                      ? theme.colors.outlineVariant
-                      : theme.colors.error,
-                  }}
-                >
-                  <View style={{ alignItems: "center", marginBottom: 12 }}>
-                    <MediaPoster
-                      uri={episode.posterUrl}
-                      size={80}
-                      borderRadius={8}
-                      accessibilityLabel={`Episode ${episode.episodeNumber} poster`}
-                      showPlaceholderLabel
-                    />
-                  </View>
+                };
 
-                  <Text
-                    variant="bodyMedium"
-                    numberOfLines={2}
+                return (
+                  <Animated.View
+                    key={episodeKey}
+                    entering={FadeIn.delay(index * 30).duration(300)}
                     style={{
-                      color: theme.colors.onSurface,
-                      fontWeight: "600",
-                      marginBottom: 8,
-                      textAlign: "center",
+                      width: "48%",
                     }}
                   >
-                    E{episode.episodeNumber}: {episode.title}
-                  </Text>
-
-                  <View
-                    style={{
-                      height: 4,
-                      borderRadius: 2,
-                      backgroundColor: episode.hasFile
-                        ? theme.colors.primary
-                        : theme.colors.error,
-                      marginBottom: 8,
-                    }}
-                  />
-
-                  <View
-                    style={{
-                      backgroundColor: episode.hasFile
-                        ? theme.colors.primaryContainer
-                        : theme.colors.errorContainer,
-                      borderRadius: 8,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      alignItems: "center",
-                      marginBottom: 8,
-                    }}
-                  >
-                    <Text
-                      variant="labelSmall"
+                    <Pressable
+                      onLongPress={handleEpisodeLongPress}
                       style={{
-                        color: episode.hasFile
-                          ? theme.colors.onPrimaryContainer
-                          : theme.colors.onErrorContainer,
-                        fontWeight: "600",
+                        backgroundColor: theme.colors.elevation.level1,
+                        borderRadius: 12,
+                        padding: 12,
+                        borderWidth: 1,
+                        borderColor: episode.hasFile
+                          ? theme.colors.outlineVariant
+                          : theme.colors.error,
                       }}
                     >
-                      {episode.hasFile ? "Downloaded • 42m" : "Missing • 35m"}
-                    </Text>
-                  </View>
+                      <View style={{ alignItems: "center", marginBottom: 12 }}>
+                        <MediaPoster
+                          uri={episode.posterUrl}
+                          size={80}
+                          borderRadius={8}
+                          accessibilityLabel={`Episode ${episode.episodeNumber} poster`}
+                          showPlaceholderLabel
+                        />
+                      </View>
 
-                  {episode.hasFile && episode.sizeInMB && (
-                    <Text
-                      variant="bodySmall"
-                      style={{
-                        color: theme.colors.onSurfaceVariant,
-                        marginBottom: 8,
-                        textAlign: "center",
-                        fontWeight: "500",
-                      }}
-                    >
-                      {formatFileSizeFromMB(episode.sizeInMB)}
-                    </Text>
-                  )}
+                      <Text
+                        variant="bodyMedium"
+                        numberOfLines={2}
+                        style={{
+                          color: theme.colors.onSurface,
+                          fontWeight: "600",
+                          marginBottom: 8,
+                          textAlign: "center",
+                        }}
+                      >
+                        E{episode.episodeNumber}: {episode.title}
+                      </Text>
 
-                  {!episode.hasFile && serviceConfig && contentId && (
-                    <DownloadButton
-                      serviceConfig={serviceConfig}
-                      contentId={contentId}
-                      size="small"
-                      variant="icon"
-                      style={{ alignSelf: "center", marginBottom: 8 }}
-                    />
-                  )}
+                      <View
+                        style={{
+                          height: 4,
+                          borderRadius: 2,
+                          backgroundColor: episode.hasFile
+                            ? theme.colors.primary
+                            : theme.colors.error,
+                          marginBottom: 8,
+                        }}
+                      />
 
-                  {/* Episode Action Buttons */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      gap: 4,
-                      marginTop: 8,
-                      justifyContent: "center",
-                    }}
-                  >
-                    {episode.hasFile &&
-                      episode.episodeFileId &&
-                      onRemoveAndSearchEpisodePress && (
-                        <Tooltip title="Remove & Search">
-                          <IconButton
-                            icon="delete-restore"
-                            size={18}
-                            loading={
-                              isRemovingAndSearchingEpisodeFileId ===
-                              episode.episodeFileId
-                            }
-                            disabled={
-                              isRemovingAndSearching ||
-                              !!(
-                                isRemovingAndSearchingEpisodeFileId &&
-                                isRemovingAndSearchingEpisodeFileId !==
-                                  episode.episodeFileId
-                              )
-                            }
-                            onPress={() =>
-                              handleRemoveAndSearchEpisode(
-                                episode.episodeFileId!,
-                                selectedSeason?.seasonNumber ??
-                                  seasons?.[0]?.seasonNumber ??
-                                  0,
-                                episode.episodeNumber,
-                              )
-                            }
-                            iconColor={theme.colors.error}
-                            style={{
-                              backgroundColor: `${theme.colors.errorContainer}`,
-                            }}
-                          />
-                        </Tooltip>
+                      <View
+                        style={{
+                          backgroundColor: episode.hasFile
+                            ? theme.colors.primaryContainer
+                            : theme.colors.errorContainer,
+                          borderRadius: 8,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          alignItems: "center",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text
+                          variant="labelSmall"
+                          style={{
+                            color: episode.hasFile
+                              ? theme.colors.onPrimaryContainer
+                              : theme.colors.onErrorContainer,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {episode.hasFile
+                            ? "Downloaded • 42m"
+                            : "Missing • 35m"}
+                        </Text>
+                      </View>
+
+                      {!episode.hasFile && serviceConfig && contentId && (
+                        <DownloadButton
+                          serviceConfig={serviceConfig}
+                          contentId={contentId}
+                          size="small"
+                          variant="icon"
+                          style={{ alignSelf: "center", marginBottom: 8 }}
+                        />
                       )}
 
-                    {!episode.hasFile && onSearchMissingEpisodePress && (
-                      <Tooltip title="Search">
-                        <IconButton
-                          icon="magnify"
-                          size={18}
-                          loading={isSearchingMissingEpisode}
-                          disabled={isSearchingMissingEpisode}
-                          onPress={() =>
-                            onSearchMissingEpisodePress(
-                              selectedSeason?.seasonNumber ??
-                                seasons?.[0]?.seasonNumber ??
-                                0,
-                              episode.episodeNumber,
-                            )
-                          }
-                          iconColor={theme.colors.primary}
-                          style={{
-                            backgroundColor: theme.colors.primaryContainer,
-                          }}
-                        />
-                      </Tooltip>
-                    )}
-
-                    {onToggleEpisodeMonitor && (
-                      <Tooltip
-                        title={
-                          episode.monitored
-                            ? "Unmonitor Episode"
-                            : "Monitor Episode"
-                        }
+                      {/* Episode Action Buttons */}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 4,
+                          marginTop: 8,
+                          justifyContent: "center",
+                        }}
                       >
-                        <IconButton
-                          icon={episode.monitored ? "eye" : "eye-off"}
-                          size={18}
-                          loading={isTogglingEpisodeMonitor}
-                          disabled={isTogglingEpisodeMonitor}
-                          onPress={() =>
-                            onToggleEpisodeMonitor(
-                              selectedSeason?.seasonNumber ??
-                                seasons?.[0]?.seasonNumber ??
-                                0,
-                              episode.episodeNumber,
-                              !episode.monitored,
-                            )
-                          }
-                          iconColor={
-                            episode.monitored
-                              ? theme.colors.primary
-                              : theme.colors.onSurfaceVariant
-                          }
-                          style={{
-                            backgroundColor: episode.monitored
-                              ? theme.colors.primaryContainer
-                              : theme.colors.surfaceVariant,
-                          }}
-                        />
-                      </Tooltip>
-                    )}
-                  </View>
-                </Animated.View>
-              ),
+                        {episode.hasFile &&
+                          episode.episodeFileId &&
+                          onRemoveAndSearchEpisodePress && (
+                            <Tooltip title="Remove & Search">
+                              <IconButton
+                                icon="delete-restore"
+                                size={18}
+                                loading={
+                                  isRemovingAndSearchingEpisodeFileId ===
+                                  episode.episodeFileId
+                                }
+                                disabled={
+                                  isRemovingAndSearching ||
+                                  !!(
+                                    isRemovingAndSearchingEpisodeFileId &&
+                                    isRemovingAndSearchingEpisodeFileId !==
+                                      episode.episodeFileId
+                                  )
+                                }
+                                onPress={() =>
+                                  handleRemoveAndSearchEpisode(
+                                    episode.episodeFileId!,
+                                    selectedSeason?.seasonNumber ??
+                                      seasons?.[0]?.seasonNumber ??
+                                      0,
+                                    episode.episodeNumber,
+                                  )
+                                }
+                                iconColor={theme.colors.error}
+                                style={{
+                                  backgroundColor: `${theme.colors.errorContainer}`,
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+
+                        {!episode.hasFile && onSearchMissingEpisodePress && (
+                          <Tooltip title="Search">
+                            <IconButton
+                              icon="magnify"
+                              size={18}
+                              loading={isSearchingMissingEpisode}
+                              disabled={isSearchingMissingEpisode}
+                              onPress={() =>
+                                onSearchMissingEpisodePress(
+                                  selectedSeason?.seasonNumber ??
+                                    seasons?.[0]?.seasonNumber ??
+                                    0,
+                                  episode.episodeNumber,
+                                )
+                              }
+                              iconColor={theme.colors.primary}
+                              style={{
+                                backgroundColor: theme.colors.primaryContainer,
+                              }}
+                            />
+                          </Tooltip>
+                        )}
+
+                        {onToggleEpisodeMonitor && (
+                          <Tooltip
+                            title={
+                              episode.monitored
+                                ? "Unmonitor Episode"
+                                : "Monitor Episode"
+                            }
+                          >
+                            <IconButton
+                              icon={episode.monitored ? "eye" : "eye-off"}
+                              size={18}
+                              loading={isTogglingEpisodeMonitor}
+                              disabled={isTogglingEpisodeMonitor}
+                              onPress={() =>
+                                onToggleEpisodeMonitor(
+                                  selectedSeason?.seasonNumber ??
+                                    seasons?.[0]?.seasonNumber ??
+                                    0,
+                                  episode.episodeNumber,
+                                  !episode.monitored,
+                                )
+                              }
+                              iconColor={
+                                episode.monitored
+                                  ? theme.colors.primary
+                                  : theme.colors.onSurfaceVariant
+                              }
+                              style={{
+                                backgroundColor: episode.monitored
+                                  ? theme.colors.primaryContainer
+                                  : theme.colors.surfaceVariant,
+                              }}
+                            />
+                          </Tooltip>
+                        )}
+                      </View>
+                    </Pressable>
+                  </Animated.View>
+                );
+              },
             ) || (
               <Animated.View
                 entering={FadeIn.duration(300)}

@@ -217,6 +217,39 @@ const SonarrSeriesDetailsScreen = () => {
     [removeAndSearchEpisodeAsync],
   );
 
+  const handleEpisodeLongPress = useCallback(
+    (episodeId: string, episode: any) => {
+      if (!series) return;
+
+      // Find which season this episode belongs to
+      let seasonNumber = 0;
+      for (const season of series.seasons || []) {
+        const foundEpisode = season.episodes?.find(
+          (ep) =>
+            ep.id === episode.id || ep.episodeNumber === episode.episodeNumber,
+        );
+        if (foundEpisode) {
+          seasonNumber = season.seasonNumber;
+          break;
+        }
+      }
+
+      // Navigate to episode details modal with episode data
+      router.push({
+        pathname: `/sonarr/[serviceId]/series/[id]/episode/[episodeId]`,
+        params: {
+          serviceId: serviceKey,
+          id: numericSeriesId.toString(),
+          episodeId: episodeId,
+          seasonNumber: seasonNumber.toString(),
+          seriesTitle: series.title,
+          episodeData: JSON.stringify(episode),
+        },
+      });
+    },
+    [router, series, serviceKey, numericSeriesId],
+  );
+
   // Handle error states outside of sheet for immediate feedback
   if (!serviceId || !isSeriesIdValid) {
     return (
@@ -355,6 +388,8 @@ const SonarrSeriesDetailsScreen = () => {
                 disableScroll={true}
                 serviceConfig={serviceConfig}
                 contentId={numericSeriesId.toString()}
+                totalSizeOnDiskMB={series.totalSizeOnDiskMB}
+                onEpisodeLongPress={handleEpisodeLongPress}
               />
             </DetailHero>
           </AnimatedSection>

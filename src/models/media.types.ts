@@ -1,4 +1,32 @@
 /**
+ * Media information for an episode file including codec and resolution details.
+ */
+export interface EpisodeMediaInfo {
+  readonly videoCodec?: string;
+  readonly audioCodec?: string;
+  readonly audioChannels?: number;
+  readonly resolution?: string;
+  readonly videoBitrate?: number;
+  readonly audioBitrate?: number;
+  readonly videoFps?: number;
+  readonly videoDynamicRange?: string;
+  readonly videoBitDepth?: number;
+  readonly scanType?: string;
+  readonly subtitles?: string;
+  readonly runTime?: string;
+}
+
+/**
+ * Extended quality information for an episode file.
+ */
+export interface EpisodeQualityInfo {
+  readonly id?: number;
+  readonly name: string;
+  readonly source?: string;
+  readonly resolution?: number;
+}
+
+/**
  * Representation of a single Sonarr episode, matching the API v3 response shape.
  */
 export interface Episode {
@@ -28,12 +56,22 @@ export interface Episode {
   readonly episodeFileId?: number;
   /** Quality assigned to the downloaded episode file. */
   readonly quality?: Quality;
+  /** Extended quality information for the downloaded episode file. */
+  readonly qualityInfo?: EpisodeQualityInfo;
   /** Relative path to the episode file, if downloaded. */
   readonly relativePath?: string;
   /** Poster URL for the episode if available. */
   readonly posterUrl?: string;
   /** Size of the episode file in MB if downloaded. */
   readonly sizeInMB?: number;
+  /** Media information (codec, resolution, bitrate, etc.) for the episode file. */
+  readonly mediaInfo?: EpisodeMediaInfo;
+  /** Release group of the episode file. */
+  readonly releaseGroup?: string;
+  /** Scene name of the episode file. */
+  readonly sceneName?: string;
+  /** Date the episode file was added. */
+  readonly dateAdded?: string;
 }
 
 /**
@@ -90,6 +128,8 @@ export interface Series {
   readonly statistics?: MediaStatistics;
   readonly episodeCount?: number;
   readonly episodeFileCount?: number;
+  /** Total size of all episode files on disk in MB. */
+  readonly totalSizeOnDiskMB?: number;
 }
 
 /**
