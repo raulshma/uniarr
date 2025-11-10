@@ -91,6 +91,30 @@ const SonarrQueueItemComponent = ({
     }
   };
 
+  const getTrackedDownloadStateText = (state?: string): string | null => {
+    if (!state) return null;
+    switch (state) {
+      case "importing":
+        return "Importing";
+      case "importBlocked":
+        return "Import Blocked";
+      case "importPending":
+        return "Import Pending";
+      case "failedPending":
+        return "Failed - Pending Action";
+      case "downloading":
+        return "Downloading";
+      case "imported":
+        return "Imported";
+      case "failed":
+        return "Import Failed";
+      case "ignored":
+        return "Ignored";
+      default:
+        return state;
+    }
+  };
+
   const renderStatusIndicator = () => (
     <View style={styles.statusContainer}>
       <MaterialCommunityIcons
@@ -109,6 +133,40 @@ const SonarrQueueItemComponent = ({
       </Text>
     </View>
   );
+
+  const renderTrackedDownloadState = () => {
+    const stateText = getTrackedDownloadStateText(item.trackedDownloadState);
+    if (!stateText) return null;
+
+    const isBlockedOrFailed =
+      item.trackedDownloadState === "importBlocked" ||
+      item.trackedDownloadState === "failedPending";
+
+    const stateColor = isBlockedOrFailed
+      ? theme.colors.error
+      : theme.colors.onSurfaceVariant;
+    const stateIcon = isBlockedOrFailed ? "alert-octagon" : "information";
+
+    return (
+      <Chip
+        compact
+        mode="flat"
+        icon={stateIcon}
+        style={[
+          styles.trackedStateChip,
+          isBlockedOrFailed && {
+            backgroundColor: theme.colors.errorContainer,
+          },
+        ]}
+        textStyle={[
+          styles.trackedStateText,
+          { color: isBlockedOrFailed ? theme.colors.error : stateColor },
+        ]}
+      >
+        {stateText}
+      </Chip>
+    );
+  };
 
   const renderQualityInfo = () => (
     <View style={styles.qualityContainer}>
@@ -231,6 +289,9 @@ const SonarrQueueItemComponent = ({
               {renderStatusIndicator()}
               {renderQualityInfo()}
             </View>
+
+            {/* Tracked Download State (manual intervention indicator) */}
+            {renderTrackedDownloadState()}
 
             {/* Progress Bar */}
             {renderProgressBar()}
@@ -372,6 +433,12 @@ const styles = StyleSheet.create({
   },
   protocolText: {
     fontSize: 10,
+  },
+  trackedStateChip: {
+    marginTop: 6,
+  },
+  trackedStateText: {
+    fontSize: 11,
   },
   actionsContainer: {
     justifyContent: "center",

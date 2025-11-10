@@ -93,6 +93,13 @@ const SonarrQueueFilterComponent = ({
     [],
   );
 
+  // Apply preset filter for items requiring manual intervention
+  const handleShowOnlyRequiringAction = useCallback(() => {
+    setTempFilters({
+      status: ["failed" as QueueStatus, "warning" as QueueStatus],
+    });
+  }, []);
+
   const handleApply = useCallback(() => {
     // Validate filters before applying
     const validatedFilters = {
@@ -122,6 +129,21 @@ const SonarrQueueFilterComponent = ({
         <Dialog.Title>Queue Filters</Dialog.Title>
         <Dialog.ScrollArea style={styles.scrollArea}>
           <ScrollView>
+            {/* Quick Action Presets */}
+            <View style={styles.section}>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Quick Actions
+              </Text>
+              <Button
+                mode="outlined"
+                onPress={handleShowOnlyRequiringAction}
+                style={styles.quickActionButton}
+                icon="alert-circle"
+              >
+                Show Items Requiring Action
+              </Button>
+            </View>
+
             {/* Status Filters */}
             <View style={styles.section}>
               <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -221,6 +243,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
+    marginBottom: 8,
+  },
+  quickActionButton: {
+    marginHorizontal: 16,
     marginBottom: 8,
   },
   chipsContainer: {

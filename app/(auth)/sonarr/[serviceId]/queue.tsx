@@ -9,6 +9,7 @@ import {
   Searchbar,
   Text,
   useTheme,
+  Banner,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { AppTheme } from "@/constants/theme";
@@ -23,6 +24,7 @@ import { useSonarrQueue, useSonarrQueueActions } from "@/hooks/useSonarrQueue";
 import type {
   DetailedSonarrQueueItem,
   QueueFilters,
+  QueueStatus,
 } from "@/models/queue.types";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { logger } from "@/services/logger/LoggerService";
@@ -195,49 +197,96 @@ const SonarrQueueScreen = () => {
     });
   };
 
-  // Handle queue item actions
-  const handleRemoveItem = (item: DetailedSonarrQueueItem) => {
-    Alert.alert(
-      "Remove from Queue",
-      `Remove "${item.episodeTitle}" from the queue?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => {
-            removeFromQueue([item.id]);
-          },
-        },
-      ],
+  // Check if an item requires manual intervention
+  const isItemRequiringAction = (item: DetailedSonarrQueueItem): boolean => {
+    return (
+      item.trackedDownloadState === "importBlocked" ||
+      item.trackedDownloadState === "failedPending" ||
+      item.status === "failed" ||
+      item.status === "warning"
     );
   };
 
+  // Handle queue item actions
+  const handleRemoveItem = (item: DetailedSonarrQueueItem) => {
+    const actionMessage =
+      item.trackedDownloadState === "importBlocked"
+        ? `This item is blocked from importing. Remove "${item.episodeTitle}" from the queue?`
+        : item.trackedDownloadState === "failedPending"
+          ? `This item failed to import and requires manual intervention. Remove "${item.episodeTitle}" from the queue?`
+          : `Remove "${item.episodeTitle}" from the queue?`;
+
+    Alert.alert("Remove from Queue", actionMessage, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => {
+          removeFromQueue([item.id]);
+        },
+      },
+    ]);
+  };
+
   const handleBlockItem = (item: DetailedSonarrQueueItem) => {
-    Alert.alert(
-      "Block and Remove",
-      `Block and remove "${item.episodeTitle}" from the queue? This will add it to the blocklist.`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
+    const actionMessage =
+      item.trackedDownloadState === "importBlocked"
+        ? `Block and remove "${item.episodeTitle}" from the queue? This release will be added to the blocklist and won't be downloaded again.`
+        : item.trackedDownloadState === "failedPending"
+          ? `Block and remove "${item.episodeTitle}" from the queue? The failed release will be added to the blocklist to prevent re-importing.`
+          : `Block and remove "${item.episodeTitle}" from the queue? This will add it to the blocklist.`;
+
+    Alert.alert("Block and Remove", actionMessage, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Block",
+        style: "destructive",
+        onPress: () => {
+          removeFromQueue([item.id], { blocklist: true });
         },
-        {
-          text: "Block",
-          style: "destructive",
-          onPress: () => {
-            removeFromQueue([item.id], { blocklist: true });
-          },
-        },
-      ],
-    );
+      },
+    ]);
   };
 
   const handleRetryItem = (item: DetailedSonarrQueueItem) => {
     // This would need to be implemented in the connector to retry a failed download
+    // For now, guide user to block and re-search manually
+    Alert.alert(
+      "Manual Retry",
+      `To retry downloading "${item.episodeTitle}", you can:\n\n1. Block this release (adds to blocklist)\n2. Manually search for another release in the series view`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Block This Release",
+          style: "destructive",
+          onPress: () => {
+            handleBlockItem(item);
+          },
+        },
+        {
+          text: "View Series",
+          style: "default",
+          onPress: () => {
+            // Navigate to series details for manual search
+            if (item.seriesId) {
+              router.push({
+                pathname: "/(auth)/sonarr/[serviceId]/series/[seriesId]",
+                params: { serviceId, seriesId: item.seriesId.toString() },
+              });
+            }
+          },
+        },
+      ],
+    );
   };
 
   // Handle bulk actions
@@ -348,6 +397,11 @@ const SonarrQueueScreen = () => {
     return null;
   };
 
+  // Count items requiring manual intervention
+  const itemsRequiringAction = useMemo(() => {
+    return items.filter(isItemRequiringAction);
+  }, [items]);
+
   // Render list header
   const renderListHeader = () => {
     if (items.length === 0) return null;
@@ -432,6 +486,33 @@ const SonarrQueueScreen = () => {
         onNavigateToQueue={() => {}}
       />
 
+      {/* Banner for items requiring action */}
+      {itemsRequiringAction.length > 0 && (
+        <Banner
+          visible={true}
+          icon="alert-octagon"
+          style={styles.actionBanner}
+          contentStyle={styles.actionBannerContent}
+          actions={[
+            {
+              label: "View",
+              onPress: () => {
+                const newFilters: QueueFilters = {
+                  status: ["failed" as QueueStatus, "warning" as QueueStatus],
+                };
+                setFilters(newFilters);
+              },
+            },
+          ]}
+        >
+          <Text style={styles.bannerText}>
+            {itemsRequiringAction.length} item
+            {itemsRequiringAction.length > 1 ? "s" : ""} require
+            {itemsRequiringAction.length > 1 ? "" : "s"} manual intervention
+          </Text>
+        </Banner>
+      )}
+
       <FlashList<DetailedSonarrQueueItem>
         data={filteredItems}
         renderItem={renderQueueItem}
@@ -506,6 +587,16 @@ const createStyles = (theme: AppTheme) =>
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    actionBanner: {
+      backgroundColor: theme.colors.errorContainer,
+    },
+    actionBannerContent: {
+      paddingVertical: spacing.sm,
+    },
+    bannerText: {
+      color: theme.colors.onErrorContainer,
+      fontWeight: "500",
     },
     listContent: {
       paddingHorizontal: spacing.lg,
