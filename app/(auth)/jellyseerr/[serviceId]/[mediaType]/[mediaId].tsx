@@ -27,6 +27,7 @@ import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { skeletonTiming } from "@/constants/skeletonTiming";
 import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
+import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import { spacing } from "@/theme/spacing";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
@@ -34,6 +35,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { alert } from "@/services/dialogService";
 import type { AppTheme } from "@/constants/theme";
 import { useJellyseerrMediaDetails } from "@/hooks/useJellyseerrMediaDetails";
+import { useSettingsStore } from "@/store/settingsStore";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
@@ -115,6 +117,15 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     return typeof p === "string" ? p : undefined;
   };
 
+  const getBackdropPath = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const b =
+      r?.backdropPath ??
+      (r?.mediaInfo && (r.mediaInfo as any)?.backdropPath) ??
+      undefined;
+    return typeof b === "string" ? b : undefined;
+  };
+
   const getExternalUrl = (d?: JellyDetails) => {
     const r = toRecord(d);
     const v =
@@ -138,6 +149,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
 
   // Local convenience values used in render
   const posterPath = getPosterPath(data);
+  const backdropPath = getBackdropPath(data);
   const title = getTitle(data);
   const originalTitle = getOriginalTitle(data);
   const tagline = getTagline(data);
@@ -185,9 +197,23 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     return Array.isArray(s) ? (s as any[]) : [];
   };
 
+  const getTrailerVideoKey = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const videos = r?.relatedVideos ?? undefined;
+    if (!Array.isArray(videos)) return undefined;
+    const trailer = (videos as any[]).find(
+      (v: any) => v?.site === "YouTube" && v?.type === "Trailer",
+    );
+    return trailer?.key ?? undefined;
+  };
+
   const genres = getGenres(data);
   const alternateTitles = getAlternateTitles(data);
   const seasons = isTv ? getSeasons(data) : [];
+  const trailerVideoKey = getTrailerVideoKey(data);
+  const trailerFeatureEnabled = useSettingsStore(
+    (s) => s.trailerFeatureEnabled,
+  );
 
   const connector = useMemo(() => {
     const c = ConnectorManager.getInstance().getConnector(serviceId) as
@@ -529,6 +555,11 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
           alignItems: "center",
           marginBottom: spacing.lg,
         },
+        trailerContainer: {
+          marginBottom: spacing.lg,
+          borderRadius: 12,
+          overflow: "hidden",
+        },
         titleContainer: {
           alignItems: "center",
           marginBottom: spacing.md,
@@ -727,6 +758,19 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   </Text>
                 </Card.Content>
               </Card>
+            </Animated.View>
+          ) : null}
+          {/* Trailer Fade Overlay - shows trailer if enabled and available */}
+          {trailerFeatureEnabled && trailerVideoKey && backdropPath ? (
+            <Animated.View
+              style={styles.trailerContainer}
+              entering={FadeIn.delay(350)}
+            >
+              <TrailerFadeOverlay
+                backdropUri={`https://image.tmdb.org/t/p/w1280${backdropPath}`}
+                videoKey={trailerVideoKey}
+                height={200}
+              />
             </Animated.View>
           ) : null}
 

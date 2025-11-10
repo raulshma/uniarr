@@ -29,6 +29,9 @@ const ExperimentalFeaturesScreen = () => {
   const enableBackdropWithBlur = useSettingsStore(
     (s) => s.enableBackdropWithBlur,
   );
+  const trailerFeatureEnabled = useSettingsStore(
+    (s) => s.trailerFeatureEnabled,
+  );
   const setFrostedWidgetsEnabled = useSettingsStore(
     (s) => s.setFrostedWidgetsEnabled,
   );
@@ -37,6 +40,9 @@ const ExperimentalFeaturesScreen = () => {
   );
   const setBackdropWithBlurEnabled = useSettingsStore(
     (s) => s.setBackdropWithBlurEnabled,
+  );
+  const setTrailerFeatureEnabled = useSettingsStore(
+    (s) => s.setTrailerFeatureEnabled,
   );
 
   const handleBackPress = () => {
@@ -75,7 +81,7 @@ const ExperimentalFeaturesScreen = () => {
         <AnimatedSection style={styles.section} delay={0} animated>
           <Text style={styles.sectionTitle}>Appearance</Text>
           <SettingsGroup>
-            <AnimatedListItem index={0} totalItems={3} animated>
+            <AnimatedListItem index={0} totalItems={4} animated>
               <SettingsListItem
                 title="Backdrop with Blur"
                 subtitle="Blurry background effect with dissolve fade in Discover and Anime Hub"
@@ -90,7 +96,7 @@ const ExperimentalFeaturesScreen = () => {
                 groupPosition="top"
               />
             </AnimatedListItem>
-            <AnimatedListItem index={1} totalItems={3} animated>
+            <AnimatedListItem index={1} totalItems={4} animated>
               <SettingsListItem
                 title="Frosted Widgets"
                 subtitle="Frosted glass effect for all widgets"
@@ -105,7 +111,7 @@ const ExperimentalFeaturesScreen = () => {
                 groupPosition="middle"
               />
             </AnimatedListItem>
-            <AnimatedListItem index={2} totalItems={3} animated>
+            <AnimatedListItem index={2} totalItems={4} animated>
               <SettingsListItem
                 title="Dashboard Gradient"
                 subtitle="Animated gradient background effect"
@@ -114,6 +120,21 @@ const ExperimentalFeaturesScreen = () => {
                   <Switch
                     value={gradientBackgroundEnabled}
                     onValueChange={setGradientBackgroundEnabled}
+                    color={theme.colors.primary}
+                  />
+                }
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem index={3} totalItems={4} animated>
+              <SettingsListItem
+                title="Video Trailers"
+                subtitle="Show trailers in detail pages"
+                left={{ iconName: "play-circle" }}
+                trailing={
+                  <Switch
+                    value={trailerFeatureEnabled}
+                    onValueChange={setTrailerFeatureEnabled}
                     color={theme.colors.primary}
                   />
                 }

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/common/Button";
 import { alert } from "@/services/dialogService";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
+import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { useJellyseerrMediaCredits } from "@/hooks/useJellyseerrMediaCredits";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
@@ -29,6 +30,7 @@ import {
 import {
   useSettingsStore,
   selectPreferredJellyseerrServiceId,
+  selectTrailerFeatureEnabled,
 } from "@/store/settingsStore";
 import { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import { useRelatedItems } from "@/hooks/useRelatedItems";
@@ -37,7 +39,6 @@ import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
 import { avatarSizes } from "@/constants/sizes";
 import RelatedItems from "@/components/discover/RelatedItems";
-import { YouTubePlayer } from "@/components/media/VideoPlayer";
 import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
 import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { skeletonTiming } from "@/constants/skeletonTiming";
@@ -56,6 +57,7 @@ const DiscoverItemDetails = () => {
   const preferredJellyseerrServiceId = useSettingsStore(
     selectPreferredJellyseerrServiceId,
   );
+  const trailerFeatureEnabled = useSettingsStore(selectTrailerFeatureEnabled);
 
   const item = useMemo(() => {
     // First try to find by exact ID match
@@ -841,6 +843,18 @@ const DiscoverItemDetails = () => {
     [refreshJellyseerrMatches],
   );
 
+  // Extract YouTube trailer video key from TMDB details
+  const trailerVideoKey = useMemo(() => {
+    const videos = (tmdbDetailsQuery.data?.details as any)?.videos;
+    if (!Array.isArray(videos?.results)) return undefined;
+    const match = videos.results.find((video: any) => {
+      const site = typeof video.site === "string" ? video.site : undefined;
+      const type = typeof video.type === "string" ? video.type : undefined;
+      return site === "YouTube" && (type === "Trailer" || type === "Teaser");
+    });
+    return match?.key ?? undefined;
+  }, [tmdbDetailsQuery.data]);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -988,19 +1002,18 @@ const DiscoverItemDetails = () => {
             <ReleaseMetadata item={item} tmdbDetails={tmdbDetailsQuery.data} />
 
             {/* Trailer */}
-            {tmdbDetailsQuery.data?.videos?.results &&
+            {trailerFeatureEnabled &&
+            tmdbDetailsQuery.data?.videos?.results &&
             tmdbDetailsQuery.data.videos.results.length > 0 ? (
-              <View style={{ marginBottom: spacing.lg }}>
-                <YouTubePlayer
-                  videoKey={
-                    tmdbDetailsQuery.data.videos.results.find(
-                      (v: any) =>
-                        v.site?.toLowerCase() === "youtube" &&
-                        v.type?.toLowerCase() === "trailer",
-                    )?.key
-                  }
-                />
-              </View>
+              <TrailerFadeOverlay
+                videoKey={trailerVideoKey}
+                backdropUri={
+                  tmdbDetailsQuery.data?.details?.backdrop_path
+                    ? `https://image.tmdb.org/t/p/w1280${tmdbDetailsQuery.data.details.backdrop_path}`
+                    : item.backdropUrl
+                }
+                height={200}
+              />
             ) : null}
 
             {/* Watch Providers */}
@@ -1610,7 +1623,7 @@ const ReleaseMetadata: React.FC<{
   return (
     <View
       style={{
-        marginBottom: spacing.lg,
+        marginBottom: spacing.sm,
         flexDirection: "row",
         gap: spacing.md,
       }}
@@ -1674,7 +1687,7 @@ const WatchProvidersSection: React.FC<{
   }
 
   return (
-    <View style={{ marginBottom: spacing.lg }}>
+    <View style={{ marginBottom: spacing.sm }}>
       <Text
         variant="titleMedium"
         style={{

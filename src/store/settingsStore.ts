@@ -91,6 +91,8 @@ type SettingsData = {
   // (thumbnail generation removed)
   // Backdrop with blur experimental feature
   enableBackdropWithBlur: boolean;
+  // Show video trailers in detail pages
+  trailerFeatureEnabled: boolean;
   discoverBannerDismissed: boolean;
   animeHubBannerDismissed: boolean;
 };
@@ -142,6 +144,7 @@ interface SettingsState extends SettingsData {
   // (thumbnail setters removed)
   // Backdrop with blur experimental feature
   setBackdropWithBlurEnabled: (enabled: boolean) => void;
+  setTrailerFeatureEnabled: (enabled: boolean) => void;
   setDiscoverBannerDismissed: (dismissed: boolean) => void;
   setAnimeHubBannerDismissed: (dismissed: boolean) => void;
 }
@@ -240,6 +243,7 @@ const createDefaultSettings = (): SettingsData => ({
   // (thumbnail defaults removed)
   // Backdrop with blur defaults
   enableBackdropWithBlur: false, // Opt-in feature
+  trailerFeatureEnabled: false, // Opt-in feature
   discoverBannerDismissed: false,
   animeHubBannerDismissed: false,
 });
@@ -326,6 +330,8 @@ export const useSettingsStore = create<SettingsState>()(
       setLoaderConfig: (config: LoaderConfig) => set({ loaderConfig: config }),
       setBackdropWithBlurEnabled: (enabled: boolean) =>
         set({ enableBackdropWithBlur: enabled }),
+      setTrailerFeatureEnabled: (enabled: boolean) =>
+        set({ trailerFeatureEnabled: enabled }),
       setDiscoverBannerDismissed: (dismissed: boolean) =>
         set({ discoverBannerDismissed: dismissed }),
       setAnimeHubBannerDismissed: (dismissed: boolean) =>
@@ -383,6 +389,7 @@ export const useSettingsStore = create<SettingsState>()(
         loaderConfig: state.loaderConfig,
         // thumbnail fields removed
         enableBackdropWithBlur: state.enableBackdropWithBlur,
+        trailerFeatureEnabled: state.trailerFeatureEnabled,
         discoverBannerDismissed: state.discoverBannerDismissed,
         animeHubBannerDismissed: state.animeHubBannerDismissed,
       }),
@@ -486,6 +493,11 @@ export const useSettingsStore = create<SettingsState>()(
           state.gradientBackgroundEnabled = true;
         }
 
+        // Ensure trailerFeatureEnabled is properly initialized
+        if (typeof state.trailerFeatureEnabled !== "boolean") {
+          state.trailerFeatureEnabled = false;
+        }
+
         if (state.lastCalendarRange) {
           const { start, end } = state.lastCalendarRange;
           const startDate = start ? new Date(start) : undefined;
@@ -569,6 +581,8 @@ export const useSettingsStore = create<SettingsState>()(
             partial.gradientBackgroundEnabled ??
             baseDefaults.gradientBackgroundEnabled,
           loaderConfig: partial.loaderConfig ?? baseDefaults.loaderConfig,
+          trailerFeatureEnabled:
+            partial.trailerFeatureEnabled ?? baseDefaults.trailerFeatureEnabled,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -632,4 +646,6 @@ export const selectFrostedWidgetsEnabled = (state: SettingsState): boolean =>
 export const selectGradientBackgroundEnabled = (
   state: SettingsState,
 ): boolean => state.gradientBackgroundEnabled;
+export const selectTrailerFeatureEnabled = (state: SettingsState): boolean =>
+  state.trailerFeatureEnabled;
 export const selectLoaderConfig = (state: SettingsState) => state.loaderConfig;

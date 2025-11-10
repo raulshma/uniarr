@@ -11,12 +11,16 @@ import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import { MediaDetails } from "@/components/media/MediaDetails";
 import { MovieDetailsSkeleton } from "@/components/media/skeletons";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
+import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import type { AppTheme } from "@/constants/theme";
 import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { skeletonTiming } from "@/constants/skeletonTiming";
 import { useRadarrMovieDetails } from "@/hooks/useRadarrMovieDetails";
+import { useTmdbDetails } from "@/hooks/tmdb/useTmdbDetails";
+import { useSettingsStore } from "@/store/settingsStore";
 import { spacing } from "@/theme/spacing";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
+import Animated, { FadeIn } from "react-native-reanimated";
 
 const RadarrMovieDetailsScreen = () => {
   const router = useRouter();
@@ -98,6 +102,29 @@ const RadarrMovieDetailsScreen = () => {
   const handleTriggerSearch = useCallback(() => {
     triggerSearch();
   }, [triggerSearch]);
+
+  // Fetch TMDB video data if we have a TMDB ID
+  const tmdbDetailsQuery = useTmdbDetails("movie", movie?.tmdbId ?? null, {
+    enabled: !!movie?.tmdbId,
+  });
+
+  // Extract trailer video key
+  const trailerVideoKey = useMemo(() => {
+    const videos = (tmdbDetailsQuery.data?.details as any)?.videos;
+    if (!Array.isArray(videos?.results)) return undefined;
+
+    const match = videos.results.find((video: any) => {
+      const site = typeof video.site === "string" ? video.site : undefined;
+      const type = typeof video.type === "string" ? video.type : undefined;
+      return site === "YouTube" && (type === "Trailer" || type === "Teaser");
+    });
+
+    return match?.key ?? undefined;
+  }, [tmdbDetailsQuery.data]);
+
+  const trailerFeatureEnabled = useSettingsStore(
+    (s) => s.trailerFeatureEnabled,
+  );
 
   const handleDeleteMovie = useCallback(() => {
     alert(
@@ -228,6 +255,19 @@ const RadarrMovieDetailsScreen = () => {
               backdropUri={movie.backdropUrl}
               onBack={handleClose}
               isFetching={isFetching}
+              trailerOverlay={
+                trailerFeatureEnabled &&
+                trailerVideoKey &&
+                movie.backdropUrl ? (
+                  <Animated.View entering={FadeIn.delay(350)}>
+                    <TrailerFadeOverlay
+                      backdropUri={movie.backdropUrl}
+                      videoKey={trailerVideoKey}
+                      height={320}
+                    />
+                  </Animated.View>
+                ) : undefined
+              }
             >
               <MediaDetails
                 title={movie.title}

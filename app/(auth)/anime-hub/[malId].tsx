@@ -23,6 +23,7 @@ import {
 } from "react-native-paper";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
+import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import { EmptyState } from "@/components/common/EmptyState";
 import {
   AnimatedSection,
@@ -327,6 +328,11 @@ const AnimeHubDetailScreen: React.FC = () => {
       return images.maximum_image_url ?? images.large_image_url ?? undefined;
     }
     return undefined;
+  })();
+  const trailerVideoKey = (() => {
+    const trailer = anime?.trailer as JikanTrailer | undefined;
+    if (!trailer) return undefined;
+    return trailer.youtube_id ?? undefined;
   })();
   useEffect(() => {
     let mounted = true;
@@ -965,6 +971,15 @@ const AnimeHubDetailScreen: React.FC = () => {
               </View>
             </SettingsGroup>
           </AnimatedSection>
+        ) : null}
+
+        {/* Trailer */}
+        {trailerVideoKey && trailerBackdropUri ? (
+          <TrailerFadeOverlay
+            videoKey={trailerVideoKey}
+            backdropUri={trailerBackdropUri}
+            height={200}
+          />
         ) : null}
 
         {/* Quick Stats Overview */}

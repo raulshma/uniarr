@@ -105,6 +105,7 @@ export type TvDetailsWithExtrasResponse = TvDetailsResponse & {
 export interface GetDetailsOptions {
   language?: string;
   appendToResponse?: string[];
+  includeVideoLanguage?: string;
 }
 
 export type SearchMultiQuery = NonNullable<
@@ -460,7 +461,7 @@ export class TmdbConnector {
     try {
       const url =
         mediaType === "movie" ? `/3/movie/${tmdbId}` : `/3/tv/${tmdbId}`;
-      const { language, appendToResponse } = options;
+      const { language, appendToResponse, includeVideoLanguage } = options;
       const response = await this.requestWithRetry<
         MovieDetailsResponse | TvDetailsResponse
       >({
@@ -471,6 +472,7 @@ export class TmdbConnector {
           append_to_response: appendToResponse?.length
             ? appendToResponse.join(",")
             : undefined,
+          include_video_language: includeVideoLanguage,
         }),
       });
 
