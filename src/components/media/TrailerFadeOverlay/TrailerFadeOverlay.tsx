@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -26,6 +26,7 @@ export type TrailerFadeOverlayProps = {
   onVideoReady?: () => void;
   /** Optional callback when video fails to load */
   onVideoError?: () => void;
+  viewStyle?: StyleProp<ViewStyle>;
 };
 
 /**
@@ -54,6 +55,7 @@ const TrailerFadeOverlay: React.FC<TrailerFadeOverlayProps> = ({
   height = 320,
   onVideoReady,
   onVideoError,
+  viewStyle,
 }) => {
   const theme = useTheme<AppTheme>();
   const [showTrailer, setShowTrailer] = useState(false);
@@ -70,8 +72,8 @@ const TrailerFadeOverlay: React.FC<TrailerFadeOverlayProps> = ({
   }));
 
   useEffect(() => {
-    // Only proceed if we have a video key and backdrop
-    if (!videoKey || !backdropUri) {
+    // Only proceed if we have a video key
+    if (!videoKey) {
       return;
     }
 
@@ -86,7 +88,7 @@ const TrailerFadeOverlay: React.FC<TrailerFadeOverlayProps> = ({
         clearTimeout(timerRef.current);
       }
     };
-  }, [videoKey, backdropUri]);
+  }, [videoKey]);
 
   const handleVideoReady = () => {
     setVideoLoaded(true);
@@ -148,7 +150,7 @@ const TrailerFadeOverlay: React.FC<TrailerFadeOverlayProps> = ({
     return (
       <View style={styles.container}>
         <Animated.View
-          style={[styles.backdrop, backdropAnimatedStyle]}
+          style={[styles.backdrop, backdropAnimatedStyle, viewStyle]}
           entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
         >
           {backdropUri && (
@@ -164,7 +166,7 @@ const TrailerFadeOverlay: React.FC<TrailerFadeOverlayProps> = ({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, viewStyle]}>
       {/* Backdrop - fades out once video is ready */}
       {backdropUri && (
         <Animated.View

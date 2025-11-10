@@ -124,22 +124,29 @@ const AnimeHubScreen: React.FC = () => {
 
   // Banner delay effect
   useEffect(() => {
+    let timers: NodeJS.Timeout[] = [];
+
     // Only show banner if backdrop is disabled and not previously dismissed
     if (!enableBackdropWithBlur && !animeHubBannerDismissed) {
       const timer = setTimeout(() => {
         setShowBanner(true);
         // Start animation after a small delay
-        setTimeout(() => setBannerVisible(true), 50);
+        const animTimer = setTimeout(() => setBannerVisible(true), 50);
+        timers.push(animTimer);
       }, 2000); // 2-second delay
-
-      return () => clearTimeout(timer);
+      timers.push(timer);
     }
 
     // Auto-hide banner if feature gets enabled
     if (enableBackdropWithBlur && showBanner) {
       setBannerVisible(false);
-      setTimeout(() => setShowBanner(false), 600); // Match fade animation duration
+      const hideTimer = setTimeout(() => setShowBanner(false), 600); // Match fade animation duration
+      timers.push(hideTimer);
     }
+
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, [enableBackdropWithBlur, animeHubBannerDismissed, showBanner]);
 
   // Effect to manage skeleton visibility based on loading state

@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useState, useEffect } from "react";
+import React, {
+  useCallback,
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 import {
   StyleSheet,
   View,
@@ -132,6 +138,9 @@ const AnimeHubDetailScreen: React.FC = () => {
   const [availableSeasons, setAvailableSeasons] = useState<any[]>([]);
   const [selectAllSeasons, setSelectAllSeasons] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
+
+  // Track anime mal_id to avoid unnecessary refresh calls
+  const prevMalIdRef = useRef<number | undefined>(undefined);
 
   const styles = useMemo(
     () =>
@@ -335,7 +344,23 @@ const AnimeHubDetailScreen: React.FC = () => {
   const trailerVideoKey = (() => {
     const trailer = anime?.trailer as JikanTrailer | undefined;
     if (!trailer) return undefined;
-    return trailer.youtube_id ?? undefined;
+
+    // Try to get youtube_id first
+    if (trailer.youtube_id) {
+      return trailer.youtube_id;
+    }
+
+    // If embed_url is available, extract the video ID from it
+    if ((trailer as any).embed_url) {
+      const embedUrl = (trailer as any).embed_url as string;
+      // Extract video ID from URLs like: https://www.youtube-nocookie.com/embed/MUJFsL_rE6E?...
+      const match = embedUrl.match(/\/embed\/([^/?]+)/);
+      if (match?.[1]) {
+        return match[1];
+      }
+    }
+
+    return undefined;
   })();
   useEffect(() => {
     let mounted = true;
@@ -354,39 +379,47 @@ const AnimeHubDetailScreen: React.FC = () => {
 
         if (animeId && pics.length > 0) {
           const key = `animeBackdropChoice:${animeId}`;
-          const stored = await AsyncStorage.getItem(key);
-          let index: number | undefined = undefined;
-          if (stored !== null) {
-            const parsed = Number.parseInt(stored, 10);
-            if (
-              Number.isFinite(parsed) &&
-              parsed >= 0 &&
-              parsed < pics.length
-            ) {
-              index = parsed;
-            }
-          }
+          try {
+            const stored = await AsyncStorage.getItem(key);
+            if (!mounted) return; // Check after async operation
 
-          if (index === undefined) {
-            index = Math.floor(Math.random() * pics.length);
-            try {
-              await AsyncStorage.setItem(key, String(index));
-            } catch {
-              // ignore storage errors — fallback still works
+            let index: number | undefined = undefined;
+            if (stored !== null) {
+              const parsed = Number.parseInt(stored, 10);
+              if (
+                Number.isFinite(parsed) &&
+                parsed >= 0 &&
+                parsed < pics.length
+              ) {
+                index = parsed;
+              }
             }
-          }
 
-          const picture = pics[index];
-          const uri =
-            picture?.jpg?.large_image_url ??
-            picture?.jpg?.image_url ??
-            undefined;
-          if (mounted) setSelectedBackdropUri(uri ?? posterUri);
-          return;
+            if (index === undefined) {
+              index = Math.floor(Math.random() * pics.length);
+              try {
+                await AsyncStorage.setItem(key, String(index));
+              } catch {
+                // ignore storage errors — fallback still works
+              }
+            }
+
+            if (mounted) {
+              const picture = pics[index];
+              const uri =
+                picture?.jpg?.large_image_url ??
+                picture?.jpg?.image_url ??
+                undefined;
+              setSelectedBackdropUri(uri ?? posterUri);
+            }
+            return;
+          } catch {
+            if (mounted) setSelectedBackdropUri(posterUri);
+          }
+        } else {
+          // 3) Fallback to posterUri (may be undefined)
+          if (mounted) setSelectedBackdropUri(posterUri);
         }
-
-        // 3) Fallback to posterUri (may be undefined)
-        if (mounted) setSelectedBackdropUri(posterUri);
       } catch {
         if (mounted) setSelectedBackdropUri(posterUri);
       }
@@ -395,6 +428,7 @@ const AnimeHubDetailScreen: React.FC = () => {
     void chooseBackdrop();
     return () => {
       mounted = false;
+      // Ensure async operations don't continue after unmount
     };
   }, [anime, posterUri, trailerBackdropUri]);
 
@@ -408,6 +442,8 @@ const AnimeHubDetailScreen: React.FC = () => {
   // --- Jellyseerr: load servers/profiles and populate dialog ---
   const loadJellyseerrOptions = useCallback(
     async (connector: JellyseerrConnector) => {
+      let isMounted = true;
+
       if (!anime) return;
 
       setCurrentConnector(connector);
@@ -421,17 +457,23 @@ const AnimeHubDetailScreen: React.FC = () => {
             await connector.initialize();
           }
         } catch (initError) {
-          void alert(
-            "Error",
-            `Failed to initialize Jellyseerr connector: ${
-              initError instanceof Error ? initError.message : String(initError)
-            }`,
-          );
+          if (isMounted) {
+            void alert(
+              "Error",
+              `Failed to initialize Jellyseerr connector: ${
+                initError instanceof Error
+                  ? initError.message
+                  : String(initError)
+              }`,
+            );
+          }
           console.warn("Jellyseerr initialize failed", initError);
           return;
         }
 
         const srv = await connector.getServers(mediaType);
+        if (!isMounted) return;
+
         const validServers = Array.isArray(srv)
           ? srv.filter(
               (s) =>
@@ -441,7 +483,10 @@ const AnimeHubDetailScreen: React.FC = () => {
                   (typeof s.id === "string" && (s.id as string).trim() !== "")),
             )
           : [];
-        setServers(validServers);
+
+        if (isMounted) {
+          setServers(validServers);
+        }
 
         const defaultServer =
           validServers.find((s) => (s as any).isDefault) || validServers[0];
@@ -449,19 +494,26 @@ const AnimeHubDetailScreen: React.FC = () => {
           defaultServer?.id !== undefined && defaultServer?.id !== null
             ? Number(defaultServer.id)
             : null;
-        setSelectedServer(defaultServerId);
+
+        if (isMounted) {
+          setSelectedServer(defaultServerId);
+        }
 
         if (validServers.length === 0) {
-          void alert(
-            "No servers available",
-            "No valid servers are configured in Jellyseerr for this media type.",
-          );
+          if (isMounted) {
+            void alert(
+              "No servers available",
+              "No valid servers are configured in Jellyseerr for this media type.",
+            );
+          }
           return;
         }
 
         if (defaultServerId != null) {
           const { profiles: profs, rootFolders: rf } =
             await connector.getProfiles(defaultServerId, mediaType);
+          if (!isMounted) return;
+
           setProfiles(profs ?? []);
           setRootFolders(rf ?? []);
 
@@ -474,6 +526,7 @@ const AnimeHubDetailScreen: React.FC = () => {
           if (serviceId) {
             try {
               const configs = await secureStorage.getServiceConfigs();
+              if (!isMounted) return;
               serviceConfig = Array.isArray(configs)
                 ? (configs.find((c) => String(c.id) === String(serviceId)) ??
                   null)
@@ -520,10 +573,12 @@ const AnimeHubDetailScreen: React.FC = () => {
             selectedRootFolderStr = defaultRootFolder;
           }
 
-          setSelectedProfile(
-            selectedProfileId != null ? Number(selectedProfileId) : null,
-          );
-          setSelectedRootFolder(selectedRootFolderStr || "");
+          if (isMounted) {
+            setSelectedProfile(
+              selectedProfileId != null ? Number(selectedProfileId) : null,
+            );
+            setSelectedRootFolder(selectedRootFolderStr || "");
+          }
 
           // load available seasons for confirmation if connector supports getMediaDetails
           try {
@@ -536,23 +591,32 @@ const AnimeHubDetailScreen: React.FC = () => {
                 mediaId,
                 mediaType,
               );
+              if (!isMounted) return;
               const seasons = details?.seasons ?? [];
               setAvailableSeasons(Array.isArray(seasons) ? seasons : []);
-            } else {
+            } else if (isMounted) {
               setAvailableSeasons([]);
             }
           } catch {
-            setAvailableSeasons([]);
+            if (isMounted) {
+              setAvailableSeasons([]);
+            }
           }
         }
 
-        setJellyseerrDialogVisible(true);
+        if (isMounted) {
+          setJellyseerrDialogVisible(true);
+        }
       } catch (error) {
-        void alert(
-          "Error",
-          `Failed to load options: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        if (isMounted) {
+          void alert(
+            "Error",
+            `Failed to load options: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
         console.warn("loadJellyseerrOptions failed", error);
+      } finally {
+        isMounted = false; // Prevent further state updates after component unmounts
       }
     },
     [anime],
@@ -563,10 +627,13 @@ const AnimeHubDetailScreen: React.FC = () => {
       if (!currentConnector) return;
       if (serverId < 0) return;
 
+      let isMounted = true;
       const mediaType = "tv";
       try {
         const { profiles: profs, rootFolders: rf } =
           await currentConnector.getProfiles(serverId, mediaType);
+        if (!isMounted) return;
+
         setProfiles(profs ?? []);
         setRootFolders(rf ?? []);
 
@@ -576,6 +643,7 @@ const AnimeHubDetailScreen: React.FC = () => {
         if (serviceId) {
           try {
             const configs = await secureStorage.getServiceConfigs();
+            if (!isMounted) return;
             serviceConfig = Array.isArray(configs)
               ? (configs.find((c) => String(c.id) === String(serviceId)) ??
                 null)
@@ -623,29 +691,38 @@ const AnimeHubDetailScreen: React.FC = () => {
           selectedRootFolderStr = defaultRootFolder;
         }
 
-        setSelectedProfile(
-          selectedProfileId != null ? Number(selectedProfileId) : null,
-        );
-        setSelectedRootFolder(selectedRootFolderStr || "");
+        if (isMounted) {
+          setSelectedProfile(
+            selectedProfileId != null ? Number(selectedProfileId) : null,
+          );
+          setSelectedRootFolder(selectedRootFolderStr || "");
+        }
       } catch (error) {
-        void alert(
-          "Error",
-          `Failed to load profiles: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        if (isMounted) {
+          void alert(
+            "Error",
+            `Failed to load profiles: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
         console.warn("handleServerChange failed", error);
+      } finally {
+        isMounted = false; // Prevent further state updates
       }
     },
     [currentConnector, servers],
   );
 
   const refreshJellyseerrMatches = useCallback(async () => {
+    let isMounted = true;
     // scanning starts
     try {
       if (!anime || jellyseerrConnectors.length === 0) {
-        setMatchedJellyseerrRequests([]);
+        if (isMounted) setMatchedJellyseerrRequests([]);
         return;
       }
 
+      const malId = anime.mal_id;
+      const connectorList = Array.from(jellyseerrConnectors);
       const matches: {
         connector: JellyseerrConnector;
         request: any;
@@ -654,20 +731,17 @@ const AnimeHubDetailScreen: React.FC = () => {
       }[] = [];
 
       await Promise.all(
-        jellyseerrConnectors.map(async (connector) => {
+        connectorList.map(async (connector) => {
           try {
             const requests = await connector.getRequests();
-            if (!Array.isArray(requests)) return;
+            if (!isMounted || !Array.isArray(requests)) return;
 
             for (const req of requests) {
               const media = req?.media as any;
               const mediaTmdb = media?.tmdbId ?? media?.tmdb_id ?? undefined;
               const mediaId = mediaTmdb ?? media?.id ?? undefined;
               // match by mal_id if connector stores it, otherwise tmdb
-              if (
-                mediaId &&
-                (mediaId === anime.mal_id || mediaId === anime?.mal_id)
-              ) {
+              if (mediaId && (mediaId === malId || mediaId === malId)) {
                 matches.push({
                   connector,
                   request: req,
@@ -682,51 +756,63 @@ const AnimeHubDetailScreen: React.FC = () => {
         }),
       );
 
-      setMatchedJellyseerrRequests(matches);
+      if (isMounted) setMatchedJellyseerrRequests(matches);
     } finally {
       // scanning finished
+      isMounted = false;
     }
   }, [anime, jellyseerrConnectors]);
 
   const handleRemoveJellyseerrRequest = useCallback(
     async (connector: JellyseerrConnector, requestId: number) => {
+      let isMounted = true;
       setIsRemoving(true);
       try {
         await connector.deleteRequest(requestId);
-        void alert("Success", "Request removed from Jellyseerr");
-        await refreshJellyseerrMatches();
+        if (isMounted) {
+          void alert("Success", "Request removed from Jellyseerr");
+          await refreshJellyseerrMatches();
+        }
       } catch (error) {
         console.error("Failed to delete Jellyseerr request", error);
-        void alert(
-          "Error",
-          `Failed to remove request: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        if (isMounted) {
+          void alert(
+            "Error",
+            `Failed to remove request: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       } finally {
-        setIsRemoving(false);
+        if (isMounted) setIsRemoving(false);
+        isMounted = false;
       }
     },
     [refreshJellyseerrMatches],
   );
 
   const handleSubmitRequest = useCallback(async () => {
+    let isMounted = true;
+
     if (!currentConnector || !anime) {
-      setSubmitError("Please select a server and profile.");
+      if (isMounted) setSubmitError("Please select a server and profile.");
       return;
     }
 
     if (selectedServer == null || selectedProfile == null) {
-      setSubmitError("Please select a server and profile.");
+      if (isMounted) setSubmitError("Please select a server and profile.");
       return;
     }
 
-    setSubmitError("");
-    setIsRequesting(true);
+    if (isMounted) {
+      setSubmitError("");
+      setIsRequesting(true);
+    }
 
     try {
       // Check existing requests
       let existing;
       try {
         const requests = await currentConnector.getRequests();
+        if (!isMounted) return;
         existing =
           Array.isArray(requests) &&
           requests.find((r) => {
@@ -739,7 +825,8 @@ const AnimeHubDetailScreen: React.FC = () => {
       }
 
       if (existing) {
-        setSubmitError("This title already has a request in Jellyseerr.");
+        if (isMounted)
+          setSubmitError("This title already has a request in Jellyseerr.");
         return;
       }
 
@@ -756,16 +843,21 @@ const AnimeHubDetailScreen: React.FC = () => {
       } as any;
 
       await currentConnector.createRequest(payload);
-      void alert("Success", "Request submitted successfully!");
-      setJellyseerrDialogVisible(false);
-      await refreshJellyseerrMatches();
+      if (isMounted) {
+        void alert("Success", "Request submitted successfully!");
+        setJellyseerrDialogVisible(false);
+        await refreshJellyseerrMatches();
+      }
     } catch (error) {
       console.error(error);
-      setSubmitError(
-        error instanceof Error ? error.message : "Failed to submit request",
-      );
+      if (isMounted) {
+        setSubmitError(
+          error instanceof Error ? error.message : "Failed to submit request",
+        );
+      }
     } finally {
-      setIsRequesting(false);
+      if (isMounted) setIsRequesting(false);
+      isMounted = false;
     }
   }, [
     currentConnector,
@@ -807,8 +899,22 @@ const AnimeHubDetailScreen: React.FC = () => {
   ]);
 
   React.useEffect(() => {
+    const malId = anime?.mal_id;
+
+    if (!malId || jellyseerrConnectors.length === 0) {
+      setMatchedJellyseerrRequests([]);
+      prevMalIdRef.current = malId;
+      return;
+    }
+
+    // Only refresh if the mal_id actually changed
+    if (prevMalIdRef.current === malId) {
+      return;
+    }
+
+    prevMalIdRef.current = malId;
     void refreshJellyseerrMatches();
-  }, [anime?.mal_id, jellyseerrConnectors, refreshJellyseerrMatches]);
+  }, [anime, jellyseerrConnectors, refreshJellyseerrMatches]);
 
   if (skeleton.showSkeleton && isLoading && !anime) {
     return (
@@ -873,7 +979,7 @@ const AnimeHubDetailScreen: React.FC = () => {
 
   const metaItems = [
     anime?.type,
-    anime?.episodes ? `${anime.episodes} episodes` : undefined,
+    anime?.episodes ? `${anime.episodes.length} episodes` : undefined,
     anime?.duration ?? undefined,
     anime?.status ?? undefined,
     anime?.score ? `${anime.score.toFixed(1)} rating` : undefined,
@@ -977,11 +1083,12 @@ const AnimeHubDetailScreen: React.FC = () => {
         ) : null}
 
         {/* Trailer */}
-        {trailerFeatureEnabled && trailerVideoKey && trailerBackdropUri ? (
+        {trailerFeatureEnabled && trailerVideoKey ? (
           <TrailerFadeOverlay
             videoKey={trailerVideoKey}
             backdropUri={trailerBackdropUri}
             height={200}
+            viewStyle={{ marginTop: spacing.md }}
           />
         ) : null}
 
