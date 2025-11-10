@@ -25,10 +25,9 @@ import {
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { skeletonTiming } from "@/constants/skeletonTiming";
-import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
-import DetailHero from "@/components/media/DetailHero/DetailHero";
 import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import { spacing } from "@/theme/spacing";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -630,26 +629,152 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
   }
 
   if (skeleton.showSkeleton && isLoading && !data) {
-    const posterPath = getPosterPath(data);
     return (
       <SafeAreaView style={styles.safeArea}>
-        <DetailHero
-          posterUri={
-            posterPath
-              ? `https://image.tmdb.org/t/p/w342${posterPath}`
-              : undefined
-          }
-          onBack={() => router.back()}
-        >
-          <ScrollView
-            contentContainerStyle={{
-              paddingHorizontal: spacing.lg,
-              paddingBottom: spacing.xxxxl,
-            }}
+        <View style={styles.container}>
+          <Animated.View
+            style={styles.header}
+            entering={FadeInDown.delay(200).springify()}
           >
-            <DetailPageSkeleton />
+            <Button mode="text" onPress={() => router.back()}>
+              Back
+            </Button>
+          </Animated.View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: spacing.xl }}
+          >
+            {/* Poster skeleton */}
+            <Animated.View
+              style={styles.posterContainer}
+              entering={FadeIn.delay(400)}
+            >
+              <SkeletonPlaceholder width={200} height={300} borderRadius={12} />
+            </Animated.View>
+
+            {/* Title skeleton */}
+            <Animated.View
+              style={styles.titleContainer}
+              entering={FadeIn.delay(500)}
+            >
+              <SkeletonPlaceholder
+                width="80%"
+                height={32}
+                borderRadius={4}
+                style={{ alignSelf: "center", marginBottom: spacing.xs }}
+              />
+              <SkeletonPlaceholder
+                width="60%"
+                height={20}
+                borderRadius={4}
+                style={{ alignSelf: "center", marginTop: spacing.xs }}
+              />
+              <SkeletonPlaceholder
+                width="70%"
+                height={18}
+                borderRadius={4}
+                style={{ alignSelf: "center", marginTop: spacing.xs }}
+              />
+            </Animated.View>
+
+            {/* Overview card skeleton */}
+            <Animated.View entering={FadeIn.delay(600)}>
+              <Card style={styles.card}>
+                <Card.Content style={styles.cardContent}>
+                  <SkeletonPlaceholder
+                    width="100%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="100%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="100%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="60%"
+                    height={16}
+                    borderRadius={4}
+                  />
+                </Card.Content>
+              </Card>
+            </Animated.View>
+
+            {/* Media details card skeleton */}
+            <Animated.View entering={FadeIn.delay(700)}>
+              <Card style={styles.card}>
+                <Card.Content style={styles.cardContent}>
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <View key={i} style={styles.detailRow}>
+                      <SkeletonPlaceholder
+                        width="30%"
+                        height={16}
+                        borderRadius={4}
+                      />
+                      <SkeletonPlaceholder
+                        width="40%"
+                        height={16}
+                        borderRadius={4}
+                      />
+                    </View>
+                  ))}
+                </Card.Content>
+              </Card>
+            </Animated.View>
+
+            {/* Genres card skeleton */}
+            <Animated.View entering={FadeIn.delay(800)}>
+              <Card style={styles.card}>
+                <Card.Content style={styles.cardContent}>
+                  <SkeletonPlaceholder
+                    width="30%"
+                    height={20}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.sm }}
+                  />
+                  <View style={styles.genresContainer}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <SkeletonPlaceholder
+                        key={i}
+                        width={80}
+                        height={32}
+                        borderRadius={16}
+                      />
+                    ))}
+                  </View>
+                </Card.Content>
+              </Card>
+            </Animated.View>
+
+            {/* Action buttons skeleton */}
+            <Animated.View
+              style={styles.buttonsContainer}
+              entering={FadeIn.delay(1100)}
+            >
+              <SkeletonPlaceholder
+                width="100%"
+                height={48}
+                borderRadius={4}
+                style={{ flex: 1 }}
+              />
+              <SkeletonPlaceholder
+                width="100%"
+                height={48}
+                borderRadius={4}
+                style={{ flex: 1 }}
+              />
+            </Animated.View>
           </ScrollView>
-        </DetailHero>
+        </View>
       </SafeAreaView>
     );
   }
