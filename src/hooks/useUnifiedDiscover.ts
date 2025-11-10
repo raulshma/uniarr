@@ -389,9 +389,6 @@ export const useUnifiedDiscover = () => {
   const query = useQuery<UnifiedDiscoverPayload>({
     queryKey: [...queryKeys.discover.unified, { tmdbEnabled }] as const,
     queryFn: async (context) => {
-      // Use AbortSignal from TanStack Query to cancel prefetch on unmount
-      const signal = context.signal;
-
       const payload = await fetchUnifiedDiscover(getConnectorsByType, {
         tmdbEnabled,
       });
@@ -406,11 +403,9 @@ export const useUnifiedDiscover = () => {
       }
 
       // Batch prefetch with "low" priority (background task) to avoid blocking UI
-      // Pass abort signal to allow cancellation on unmount
       if (imagesToPrefetch.length > 0) {
         void imageCacheService.prefetchList(imagesToPrefetch, {
           priority: "low",
-          signal,
         });
       }
 
