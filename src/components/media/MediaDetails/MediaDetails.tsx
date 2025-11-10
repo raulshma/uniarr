@@ -8,6 +8,9 @@ import {
   TouchableRipple,
   Button,
   Switch,
+  Snackbar,
+  IconButton,
+  Tooltip,
 } from "react-native-paper";
 import Animated, { FadeIn, FadeInUp, ZoomIn } from "react-native-reanimated";
 
@@ -66,6 +69,11 @@ export type MediaDetailsProps = {
     seasonNumber: number,
     episodeNumber: number,
   ) => void;
+  onRemoveAndSearchEpisodePress?: (
+    episodeFileId: number,
+    seasonNumber: number,
+    episodeNumber: number,
+  ) => void;
   isUpdatingMonitor?: boolean;
   isSearching?: boolean;
   isDeleting?: boolean;
@@ -73,6 +81,8 @@ export type MediaDetailsProps = {
   isUnmonitoringAll?: boolean;
   isTogglingSeasonMonitor?: boolean;
   isTogglingEpisodeMonitor?: boolean;
+  isRemovingAndSearching?: boolean;
+  isRemovingAndSearchingEpisodeFileId?: number | null;
   isSearchingMissingEpisode?: boolean;
   /** Service configuration for download functionality */
   serviceConfig?: ServiceConfig;
@@ -126,6 +136,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   onUnmonitorAllPress,
   onToggleEpisodeMonitor,
   onSearchMissingEpisodePress,
+  onRemoveAndSearchEpisodePress,
   isUpdatingMonitor = false,
   isSearching = false,
   isDeleting = false,
@@ -134,6 +145,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   isTogglingSeasonMonitor = false,
   isTogglingEpisodeMonitor = false,
   isSearchingMissingEpisode = false,
+  isRemovingAndSearching = false,
+  isRemovingAndSearchingEpisodeFileId = null,
   showPoster = true,
   contentInsetTop = 0,
   disableScroll = false,
@@ -144,6 +157,9 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   const theme = useTheme<AppTheme>();
   // episodesModalVisible removed — seasons use inline selectedSeason state instead
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarOnRetry] = useState<(() => void) | null>(null);
 
   const jellyfinLocalAddress = useSettingsStore(selectJellyfinLocalAddress);
   const jellyfinPublicAddress = useSettingsStore(selectJellyfinPublicAddress);
@@ -218,6 +234,39 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
       );
     }
   }, [jellyfinLocalAddress, jellyfinPublicAddress, imdbId, tmdbId, tvdbId]);
+
+  const handleRemoveAndSearchEpisode = useCallback(
+    (episodeFileId: number, seasonNumber: number, episodeNumber: number) => {
+      alert(
+        "Remove & Search Episode",
+        "This will delete the downloaded episode file and start searching for a replacement. Continue?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Remove & Search",
+            style: "destructive",
+            onPress: () => {
+              if (onRemoveAndSearchEpisodePress) {
+                try {
+                  onRemoveAndSearchEpisodePress(
+                    episodeFileId,
+                    seasonNumber,
+                    episodeNumber,
+                  );
+                } catch (error) {
+                  console.error("Failed to remove and search episode:", error);
+                  setSnackbarMessage("Failed to remove and search episode");
+                  setSnackbarVisible(true);
+                }
+              }
+            },
+          },
+        ],
+        { cancelable: true },
+      );
+    },
+    [onRemoveAndSearchEpisodePress],
+  );
 
   const showSeasons = type === "series" && seasons?.length;
   const showEpisodes = showSeasons && (selectedSeason || seasons?.length === 1);
@@ -766,59 +815,104 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                   <View
                     style={{
                       flexDirection: "row",
-                      gap: 6,
+                      gap: 4,
                       marginTop: 8,
+                      justifyContent: "center",
                     }}
                   >
+                    {episode.hasFile &&
+                      episode.episodeFileId &&
+                      onRemoveAndSearchEpisodePress && (
+                        <Tooltip title="Remove & Search">
+                          <IconButton
+                            icon="delete-restore"
+                            size={18}
+                            loading={
+                              isRemovingAndSearchingEpisodeFileId ===
+                              episode.episodeFileId
+                            }
+                            disabled={
+                              isRemovingAndSearching ||
+                              !!(
+                                isRemovingAndSearchingEpisodeFileId &&
+                                isRemovingAndSearchingEpisodeFileId !==
+                                  episode.episodeFileId
+                              )
+                            }
+                            onPress={() =>
+                              handleRemoveAndSearchEpisode(
+                                episode.episodeFileId!,
+                                selectedSeason?.seasonNumber ??
+                                  seasons?.[0]?.seasonNumber ??
+                                  0,
+                                episode.episodeNumber,
+                              )
+                            }
+                            iconColor={theme.colors.error}
+                            style={{
+                              backgroundColor: `${theme.colors.errorContainer}`,
+                            }}
+                          />
+                        </Tooltip>
+                      )}
+
                     {!episode.hasFile && onSearchMissingEpisodePress && (
-                      <Button
-                        mode="contained"
-                        loading={isSearchingMissingEpisode}
-                        disabled={isSearchingMissingEpisode}
-                        onPress={() =>
-                          onSearchMissingEpisodePress(
-                            selectedSeason?.seasonNumber ??
-                              seasons?.[0]?.seasonNumber ??
-                              0,
-                            episode.episodeNumber,
-                          )
-                        }
-                        buttonColor={theme.colors.primary}
-                        textColor={theme.colors.onPrimary}
-                        style={{ flex: 1 }}
-                        labelStyle={{ fontWeight: "600", fontSize: 11 }}
-                      >
-                        Search
-                      </Button>
+                      <Tooltip title="Search">
+                        <IconButton
+                          icon="magnify"
+                          size={18}
+                          loading={isSearchingMissingEpisode}
+                          disabled={isSearchingMissingEpisode}
+                          onPress={() =>
+                            onSearchMissingEpisodePress(
+                              selectedSeason?.seasonNumber ??
+                                seasons?.[0]?.seasonNumber ??
+                                0,
+                              episode.episodeNumber,
+                            )
+                          }
+                          iconColor={theme.colors.primary}
+                          style={{
+                            backgroundColor: theme.colors.primaryContainer,
+                          }}
+                        />
+                      </Tooltip>
                     )}
 
                     {onToggleEpisodeMonitor && (
-                      <Button
-                        mode={episode.monitored ? "contained" : "outlined"}
-                        loading={isTogglingEpisodeMonitor}
-                        disabled={isTogglingEpisodeMonitor}
-                        onPress={() =>
-                          onToggleEpisodeMonitor(
-                            selectedSeason?.seasonNumber ??
-                              seasons?.[0]?.seasonNumber ??
-                              0,
-                            episode.episodeNumber,
-                            !episode.monitored,
-                          )
-                        }
-                        buttonColor={
-                          episode.monitored ? theme.colors.primary : undefined
-                        }
-                        textColor={
+                      <Tooltip
+                        title={
                           episode.monitored
-                            ? theme.colors.onPrimary
-                            : theme.colors.onSurfaceVariant
+                            ? "Unmonitor Episode"
+                            : "Monitor Episode"
                         }
-                        style={{ flex: 1 }}
-                        labelStyle={{ fontWeight: "600", fontSize: 11 }}
                       >
-                        {episode.monitored ? "Monitored" : "Unmonitored"}
-                      </Button>
+                        <IconButton
+                          icon={episode.monitored ? "eye" : "eye-off"}
+                          size={18}
+                          loading={isTogglingEpisodeMonitor}
+                          disabled={isTogglingEpisodeMonitor}
+                          onPress={() =>
+                            onToggleEpisodeMonitor(
+                              selectedSeason?.seasonNumber ??
+                                seasons?.[0]?.seasonNumber ??
+                                0,
+                              episode.episodeNumber,
+                              !episode.monitored,
+                            )
+                          }
+                          iconColor={
+                            episode.monitored
+                              ? theme.colors.primary
+                              : theme.colors.onSurfaceVariant
+                          }
+                          style={{
+                            backgroundColor: episode.monitored
+                              ? theme.colors.primaryContainer
+                              : theme.colors.surfaceVariant,
+                          }}
+                        />
+                      </Tooltip>
                     )}
                   </View>
                 </Animated.View>
@@ -879,6 +973,24 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
           </View>
         </Animated.View>
       ) : null}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+        action={
+          snackbarOnRetry
+            ? {
+                label: "Retry",
+                onPress: () => {
+                  snackbarOnRetry();
+                  setSnackbarVisible(false);
+                },
+              }
+            : undefined
+        }
+      >
+        {snackbarMessage}
+      </Snackbar>
     </>
   );
 

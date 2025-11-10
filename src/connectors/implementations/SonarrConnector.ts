@@ -335,17 +335,50 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
     episodeNumber: number,
   ): Promise<void> {
     try {
+      // Get all episodes for the series to find the specific episode ID
+      const episodesResponse = await this.client.get<
+        components["schemas"]["EpisodeResource"][]
+      >(`/api/v3/episode`, {
+        params: { seriesId },
+      });
+
+      // Find the episode matching season and episode number
+      const episode = episodesResponse.data.find(
+        (ep) =>
+          ep.seasonNumber === seasonNumber &&
+          ep.episodeNumber === episodeNumber,
+      );
+
+      if (!episode || !episode.id) {
+        throw new Error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
+      }
+
+      // Search using episodeIds with correct API format
       await this.client.post("/api/v3/command", {
         name: "EpisodeSearch",
-        seriesId,
-        seasonNumber,
-        episodeNumber,
+        episodeIds: [episode.id],
       });
     } catch (error) {
       throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "searchMissingEpisode",
+        endpoint: "/api/v3/command",
+      });
+    }
+  }
+
+  async searchEpisodesByIds(episodeIds: number[]): Promise<void> {
+    try {
+      await this.client.post("/api/v3/command", {
+        name: "EpisodeSearch",
+        episodeIds,
+      });
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "searchEpisodesByIds",
         endpoint: "/api/v3/command",
       });
     }
@@ -386,6 +419,19 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
         serviceType: this.config.type,
         operation: "setEpisodeMonitored",
         endpoint: `/api/v3/episode`,
+      });
+    }
+  }
+
+  async deleteEpisodeFile(episodeFileId: number): Promise<void> {
+    try {
+      await this.client.delete(`/api/v3/episodefile/${episodeFileId}`);
+    } catch (error) {
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "deleteEpisodeFile",
+        endpoint: `/api/v3/episodefile/${episodeFileId}`,
       });
     }
   }
