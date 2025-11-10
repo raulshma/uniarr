@@ -88,6 +88,12 @@ const RadarrMovieDetailsScreen = () => {
           justifyContent: "space-between",
           marginBottom: spacing.md,
         },
+        trailerContainer: {
+          marginBottom: spacing.md,
+          marginHorizontal: spacing.lg,
+          borderRadius: 12,
+          overflow: "hidden",
+        },
       }),
     [theme],
   );
@@ -255,20 +261,20 @@ const RadarrMovieDetailsScreen = () => {
               backdropUri={movie.backdropUrl}
               onBack={handleClose}
               isFetching={isFetching}
-              trailerOverlay={
-                trailerFeatureEnabled &&
-                trailerVideoKey &&
-                movie.backdropUrl ? (
-                  <Animated.View entering={FadeIn.delay(350)}>
-                    <TrailerFadeOverlay
-                      backdropUri={movie.backdropUrl}
-                      videoKey={trailerVideoKey}
-                      height={320}
-                    />
-                  </Animated.View>
-                ) : undefined
-              }
             >
+              {/* Trailer Fade Overlay - shows trailer if enabled and available */}
+              {trailerFeatureEnabled && trailerVideoKey && movie.backdropUrl ? (
+                <Animated.View
+                  style={styles.trailerContainer}
+                  entering={FadeIn.delay(350)}
+                >
+                  <TrailerFadeOverlay
+                    backdropUri={movie.backdropUrl}
+                    videoKey={trailerVideoKey}
+                    height={200}
+                  />
+                </Animated.View>
+              ) : null}
               <MediaDetails
                 title={movie.title}
                 year={movie.year}
