@@ -544,6 +544,12 @@ class WidgetService {
       (widget) => widget.type === "bookmarks" && widget.enabled,
     );
   }
+
+  getWeatherWidgets(): Widget[] {
+    return Array.from(this.widgets.values()).filter(
+      (widget) => widget.type === "weather" && widget.enabled,
+    );
+  }
 }
 
 export const widgetService = WidgetService.getInstance();

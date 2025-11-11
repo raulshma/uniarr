@@ -77,6 +77,7 @@ const transformQueueItem = (
     episodeHasFile: item.episodeHasFile,
     downloadClientHasPostImportCategory:
       item.downloadClientHasPostImportCategory,
+    statusMessages: item.statusMessages || undefined,
     progress,
     timeRemaining,
     seriesTitle,
@@ -161,17 +162,19 @@ export const useSonarrQueue = (
           });
 
           try {
-            const episodes = await (connector as any).getEpisodesByIds(
-              missingEpisodeIds,
-            );
+            const episodes =
+              await connector.getEpisodesByIds(missingEpisodeIds);
 
             // Create a map of episode ID to episode details
-            const episodeMap = new Map(
-              episodes.map((ep: components["schemas"]["EpisodeResource"]) => [
-                ep.id,
-                ep,
-              ]),
-            );
+            const episodeMap = new Map<
+              number,
+              components["schemas"]["EpisodeResource"]
+            >();
+            episodes.forEach((ep) => {
+              if (ep.id !== undefined) {
+                episodeMap.set(ep.id, ep);
+              }
+            });
 
             // Enrich queue items with fetched episode details
             rawQueueItems = rawQueueItems.map(
@@ -251,8 +254,8 @@ export const useSonarrQueue = (
     if (queryOptions.languages && queryOptions.languages.length > 0) {
       result = result.filter((item: DetailedSonarrQueueItem) => {
         if (!item.languages) return false;
-        return item.languages.some((lang: any) =>
-          queryOptions.languages!.includes(lang.id),
+        return item.languages.some((lang: components["schemas"]["Language"]) =>
+          queryOptions.languages!.includes(lang.id!),
         );
       });
     }
@@ -265,7 +268,6 @@ export const useSonarrQueue = (
           queryOptions.quality!.includes(item.quality.quality.id),
       );
     }
-
     return result;
   }, [data?.items, queryOptions]);
 
@@ -283,7 +285,18 @@ export const useSonarrQueue = (
       };
 
     return data.items.reduce(
-      (acc: any, item: DetailedSonarrQueueItem) => {
+      (
+        acc: {
+          total: number;
+          downloading: number;
+          completed: number;
+          paused: number;
+          failed: number;
+          warning: number;
+          queued: number;
+        },
+        item: DetailedSonarrQueueItem,
+      ) => {
         acc.total++;
 
         switch (item.status) {
@@ -372,32 +385,19 @@ export const useSonarrQueueActions = (serviceId: string) => {
 
         // Use bulk delete endpoint if multiple items
         if (ids.length > 1) {
-          const payload = {
-            ids,
-          };
-
-          const params = {
+          await connector.bulkRemoveFromQueue(ids, {
             removeFromClient,
             blocklist,
             skipRedownload,
             changeCategory,
-          };
-
-          await (connector as any).client.delete(`/api/v3/queue/bulk`, {
-            data: payload,
-            params,
           });
         } else {
           // For single item, use regular delete
-          const params = {
+          await connector.removeFromQueue(ids[0]!, {
             removeFromClient,
             blocklist,
             skipRedownload,
             changeCategory,
-          };
-
-          await (connector as any).client.delete(`/api/v3/queue/${ids[0]}`, {
-            params,
           });
         }
 
@@ -411,6 +411,145 @@ export const useSonarrQueueActions = (serviceId: string) => {
         logger.error("[useSonarrQueueActions] Failed to remove items", {
           serviceId,
           ids,
+          error,
+        });
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate the queue query to refetch the updated data
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.sonarr.queue(serviceId),
+      });
+    },
+  });
+
+  // Grab item to force import
+  const grabItemMutation = useMutation({
+    mutationFn: async (id: number) => {
+      try {
+        if (!serviceId || serviceId.trim() === "") {
+          throw new Error("Service ID is required to perform queue actions");
+        }
+
+        const manager = ConnectorManager.getInstance();
+        const connector = manager.getConnector(serviceId) as SonarrConnector;
+
+        if (!connector) {
+          throw new Error(`Sonarr connector with ID ${serviceId} not found`);
+        }
+
+        logger.debug("[useSonarrQueueActions] Grabbing item", {
+          serviceId,
+          id,
+        });
+
+        // Using private client access for grab operation since no public method exists
+        await (connector as any).client.post(`/api/v3/queue/grab/${id}`);
+
+        logger.debug("[useSonarrQueueActions] Item grabbed successfully", {
+          serviceId,
+          id,
+        });
+
+        return { success: true };
+      } catch (error) {
+        logger.error("[useSonarrQueueActions] Failed to grab item", {
+          serviceId,
+          id,
+          error,
+        });
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      // Invalidate the queue query to refetch the updated data
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.sonarr.queue(serviceId),
+      });
+    },
+  });
+
+  // Manual import item (explicit selection from manualimport list)
+  const manualImportMutation = useMutation({
+    mutationFn: async ({
+      item,
+      importItem,
+    }: {
+      item: DetailedSonarrQueueItem;
+      importItem: components["schemas"]["ManualImportResource"];
+    }) => {
+      try {
+        if (!serviceId || serviceId.trim() === "") {
+          throw new Error("Service ID is required to perform queue actions");
+        }
+
+        const manager = ConnectorManager.getInstance();
+        const connector = manager.getConnector(serviceId) as SonarrConnector;
+
+        if (!connector) {
+          throw new Error(`Sonarr connector with ID ${serviceId} not found`);
+        }
+
+        const seriesId = importItem.series?.id ?? item.seriesId ?? undefined;
+        if (!seriesId) {
+          throw new Error("Missing seriesId for manual import");
+        }
+
+        const derivedEpisodeIdsFromEpisodes = Array.isArray(importItem.episodes)
+          ? importItem.episodes
+              .map((ep) => ep?.id)
+              .filter((id): id is number => Number.isInteger(id as number))
+          : undefined;
+
+        const fallbackEpisodeIds =
+          !derivedEpisodeIdsFromEpisodes?.length &&
+          Number.isInteger(item.episodeId)
+            ? [item.episodeId as number]
+            : [];
+
+        const episodeIds =
+          (derivedEpisodeIdsFromEpisodes?.length
+            ? derivedEpisodeIdsFromEpisodes
+            : fallbackEpisodeIds) ?? [];
+
+        if (!episodeIds.length) {
+          throw new Error("Missing episodeIds for manual import");
+        }
+
+        const payload = {
+          id: importItem.id,
+          path: importItem.path,
+          seriesId,
+          seasonNumber: importItem.seasonNumber ?? item.seasonNumber ?? null,
+          episodeIds,
+          quality: importItem.quality,
+          languages: importItem.languages,
+          downloadId: importItem.downloadId ?? item.downloadId,
+        };
+
+        logger.debug("[useSonarrQueueActions] Manual importing item", {
+          serviceId,
+          itemId: item.id,
+          payload,
+        });
+
+        // Using private client access for manual import since no public method exists
+        await (connector as any).client.post("/api/v3/manualimport", [payload]);
+
+        logger.debug(
+          "[useSonarrQueueActions] Manual import completed successfully",
+          {
+            serviceId,
+            itemId: item.id,
+          },
+        );
+
+        return { success: true };
+      } catch (error) {
+        logger.error("[useSonarrQueueActions] Failed to manually import item", {
+          serviceId,
+          itemId: item.id,
           error,
         });
         throw error;
@@ -445,9 +584,30 @@ export const useSonarrQueueActions = (serviceId: string) => {
     [removeFromQueueMutation],
   );
 
+  const grabItem = useCallback(
+    (id: number) => {
+      grabItemMutation.mutate(id);
+    },
+    [grabItemMutation],
+  );
+
+  const manualImportItem = useCallback(
+    (
+      item: DetailedSonarrQueueItem,
+      importItem: components["schemas"]["ManualImportResource"],
+    ) => {
+      manualImportMutation.mutate({ item, importItem });
+    },
+    [manualImportMutation],
+  );
+
   return {
     removeFromQueue,
+    grabItem,
+    manualImportItem,
     isRemoving: removeFromQueueMutation.isPending,
+    isGrabbing: grabItemMutation.isPending,
+    isManualImporting: manualImportMutation.isPending,
     error: removeFromQueueMutation.error as ApiError | null,
   };
 };

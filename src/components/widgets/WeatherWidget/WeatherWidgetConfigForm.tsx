@@ -33,6 +33,7 @@ const schema = z.object({
   locations: z.array(z.object({ value: z.string().trim().optional() })),
   units: z.enum(UNIT_OPTIONS),
   forecastDays: z.enum(FORECAST_OPTIONS),
+  showInDashboardHeader: z.boolean().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -93,6 +94,10 @@ const WeatherWidgetConfigForm: React.FC<WeatherWidgetConfigFormProps> = ({
           ? widget.config.units
           : "metric",
       forecastDays,
+      showInDashboardHeader:
+        typeof widget.config?.showInDashboardHeader === "boolean"
+          ? widget.config.showInDashboardHeader
+          : false,
     } satisfies FormValues;
   }, [widget.config]);
 
@@ -281,6 +286,7 @@ const WeatherWidgetConfigForm: React.FC<WeatherWidgetConfigFormProps> = ({
           locations: trimmedLocations,
           units: values.units,
           forecastDays: Number(values.forecastDays),
+          showInDashboardHeader: values.showInDashboardHeader ?? false,
         },
       });
 
@@ -446,6 +452,30 @@ const WeatherWidgetConfigForm: React.FC<WeatherWidgetConfigFormProps> = ({
                 value: option,
                 label: `${option} day${option === "1" ? "" : "s"}`,
               }))}
+              style={styles.segmented}
+            />
+          )}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          Show weather in dashboard header
+        </Text>
+        <Controller
+          control={control}
+          name="showInDashboardHeader"
+          render={({ field: { value, onChange } }) => (
+            <SegmentedButtons
+              value={value ? "true" : "false"}
+              onValueChange={(next) => {
+                onPress();
+                onChange(next === "true");
+              }}
+              buttons={[
+                { value: "false", label: "Disabled" },
+                { value: "true", label: "Enabled" },
+              ]}
               style={styles.segmented}
             />
           )}

@@ -25,8 +25,6 @@ const createStyles = (theme: AppTheme) =>
     },
     segmentContainer: {
       paddingHorizontal: spacing.lg,
-      paddingTop: spacing.xs,
-      paddingBottom: spacing.md,
     },
     segmentedButtons: {
       borderRadius: spacing.lg,
@@ -37,7 +35,7 @@ const createStyles = (theme: AppTheme) =>
     },
   });
 
-export const SonarrNavbar: React.FC<SonarrNavbarProps> = ({
+export const SonarrHeader: React.FC<SonarrNavbarProps> = ({
   serviceName,
   activeTab,
   onBackPress,

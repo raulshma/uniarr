@@ -38,6 +38,7 @@ interface WeatherWidgetConfig {
   locations?: string[];
   units?: WeatherUnits;
   forecastDays?: number;
+  showInDashboardHeader?: boolean;
 }
 
 interface WeatherCacheEntry {
@@ -70,11 +71,17 @@ const normalizeConfig = (config: Widget["config"]): WeatherWidgetConfig => {
   const forecastDays =
     typeof config.forecastDays === "number" ? config.forecastDays : undefined;
 
+  const showInDashboardHeader =
+    typeof config.showInDashboardHeader === "boolean"
+      ? config.showInDashboardHeader
+      : false;
+
   return {
     mode,
     locations,
     units,
     forecastDays,
+    showInDashboardHeader,
   } satisfies WeatherWidgetConfig;
 };
 
@@ -103,6 +110,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const units: WeatherUnits = config.units ?? "metric";
   const unitsLabel = units === "imperial" ? "imperial" : "metric";
+  const showInDashboardHeader = config.showInDashboardHeader ?? false;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const configSignature = useMemo(
     () => createWidgetConfigSignature(config),

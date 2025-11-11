@@ -85,6 +85,12 @@ export const queryKeys = {
       options?: Record<string, unknown>,
     ): QueryKeyBuilder =>
       [...queryKeys.sonarr.service(serviceId), "queue", options ?? {}] as const,
+    manualImport: (serviceId: string, downloadId?: string): QueryKeyBuilder =>
+      [
+        ...queryKeys.sonarr.service(serviceId),
+        "manualImport",
+        downloadId,
+      ] as const,
   },
   radarr: {
     base: ["radarr"] as const,

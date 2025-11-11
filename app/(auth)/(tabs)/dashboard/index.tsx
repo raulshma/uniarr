@@ -20,6 +20,8 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
 import { easeOutCubic } from "@/utils/animations.utils";
+import { widgetService } from "@/services/widgets/WidgetService";
+import { mapConditionToIcon } from "@/components/widgets/WeatherWidget/weatherIcons";
 
 // Helper function to calculate progress percentage
 
@@ -34,10 +36,60 @@ const DashboardScreen = () => {
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
 
+  const [weatherSummary, setWeatherSummary] = React.useState<{
+    icon: string;
+    temperature: string;
+  } | null>(null);
+
   // Performance monitoring
   useEffect(() => {
     const mountTime = Date.now();
     console.log("[Dashboard] Component mounted");
+
+    const loadWeatherSummary = async () => {
+      try {
+        await widgetService.initialize();
+        const widgets = await widgetService.getWeatherWidgets();
+        const headerWidget = widgets.find((w) =>
+          Boolean(w.config?.showInDashboardHeader),
+        );
+
+        if (!headerWidget) {
+          setWeatherSummary(null);
+          return;
+        }
+
+        const cached = await widgetService.getWidgetData<any>(headerWidget.id);
+        const payload = cached?.payload;
+        if (!payload || typeof payload !== "object") {
+          setWeatherSummary(null);
+          return;
+        }
+
+        const firstKey = Object.keys(payload)[0];
+        const first = firstKey ? payload[firstKey] : null;
+        const weather = first ?? null;
+
+        if (
+          !weather ||
+          !weather.current ||
+          typeof weather.current.temperature !== "number"
+        ) {
+          setWeatherSummary(null);
+          return;
+        }
+
+        setWeatherSummary({
+          icon: mapConditionToIcon(weather.current.condition.text),
+          temperature: `${Math.round(weather.current.temperature)}°`,
+        });
+      } catch (error) {
+        console.log("[Dashboard] Failed to load weather summary", error);
+        setWeatherSummary(null);
+      }
+    };
+
+    void loadWeatherSummary();
 
     return () => {
       const unmountTime = Date.now();
@@ -209,6 +261,12 @@ const DashboardScreen = () => {
         titleContainer: {
           alignItems: "center",
         },
+        stickyTitleContainer: {
+          flex: 1,
+          flexDirection: "row",
+          gap: theme.custom.spacing.xs,
+          alignItems: "center",
+        },
         title: {
           fontSize: theme.custom.typography.titleLarge.fontSize,
           fontWeight: "800",
@@ -331,6 +389,30 @@ const DashboardScreen = () => {
               ]}
             >
               <Text style={styles.title}>Dashboard</Text>
+              {weatherSummary && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: theme.custom.spacing.xxxs,
+                  }}
+                >
+                  <IconButton
+                    icon={weatherSummary.icon}
+                    size={14}
+                    style={{ margin: 0 }}
+                    iconColor={theme.colors.onBackground}
+                  />
+                  <Text
+                    style={{
+                      fontSize: theme.custom.typography.labelSmall.fontSize,
+                      color: theme.colors.onBackground,
+                    }}
+                  >
+                    {weatherSummary.temperature}
+                  </Text>
+                </View>
+              )}
             </Animated.View>
           </Animated.View>
         </Animated.View>
@@ -345,16 +427,28 @@ const DashboardScreen = () => {
           ]}
         >
           <View style={styles.stickyHeader}>
-            <Animated.Text
+            <Animated.View
               style={[
-                styles.stickyTitle,
+                styles.stickyTitleContainer,
                 {
                   opacity: animatedValues.stickyTitleOpacity,
                 },
               ]}
             >
-              Dashboard
-            </Animated.Text>
+              <Text style={styles.stickyTitle}>Dashboard</Text>
+              {weatherSummary && (
+                <Animated.Text
+                  style={{
+                    fontSize: theme.custom.typography.titleSmall.fontSize,
+                    color: theme.colors.onBackground,
+                    opacity: animatedValues.stickyTitleOpacity,
+                  }}
+                  numberOfLines={1}
+                >
+                  {weatherSummary.temperature}
+                </Animated.Text>
+              )}
+            </Animated.View>
             <Animated.View
               style={[
                 styles.stickyButtons,

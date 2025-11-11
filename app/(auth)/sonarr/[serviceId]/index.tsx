@@ -32,7 +32,7 @@ import {
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { SeriesListItemSkeleton } from "@/components/media/skeletons";
 import { LibraryFilterModal } from "@/components/library/LibraryFilterModal";
-import { SonarrNavbar } from "@/components/sonarr/SonarrNavbar";
+import { SonarrHeader } from "@/components/sonarr/SonarrHeader";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { useSonarrSeries } from "@/hooks/useSonarrSeries";
@@ -787,7 +787,7 @@ const SonarrSeriesListScreen = () => {
   if (isInitialLoad) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <SonarrNavbar
+        <SonarrHeader
           serviceName={serviceName}
           activeTab="series"
           onBackPress={() => router.back()}
@@ -883,7 +883,7 @@ const SonarrSeriesListScreen = () => {
   return (
     <MediaSelectorProvider>
       <SafeAreaView style={styles.safeArea}>
-        <SonarrNavbar
+        <SonarrHeader
           serviceName={serviceName}
           activeTab="series"
           onBackPress={() => router.back()}
