@@ -388,7 +388,7 @@ export const useUnifiedDiscover = () => {
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const query = useQuery<UnifiedDiscoverPayload>({
     queryKey: [...queryKeys.discover.unified, { tmdbEnabled }] as const,
-    queryFn: async () => {
+    queryFn: async (context) => {
       const payload = await fetchUnifiedDiscover(getConnectorsByType, {
         tmdbEnabled,
       });

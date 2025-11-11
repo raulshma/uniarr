@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
@@ -60,18 +60,29 @@ const SonarrSeriesDetailsScreen = () => {
     isTogglingMonitor,
     toggleSeasonMonitor,
     isTogglingSeasonMonitor,
+    toggleEpisodeMonitor,
+    isTogglingEpisodeMonitor,
     triggerSearch,
     isTriggeringSearch,
     searchMissingEpisodes,
     isSearchingMissing,
+    searchMissingEpisode,
+    isSearchingMissingEpisode,
     unmonitorAllEpisodes,
     isUnmonitoringAll,
     deleteSeriesAsync,
     isDeleting,
+    removeAndSearchEpisodeAsync,
+    isRemovingAndSearching,
   } = useSonarrSeriesDetails({
     serviceId: serviceKey,
     seriesId: numericSeriesId,
   });
+
+  // Track which episode is currently being processed for remove & search
+  const [processingEpisodeFileId, setProcessingEpisodeFileId] = useState<
+    number | null
+  >(null);
 
   // Initialize skeleton loading hook with low complexity timing (500ms) for local service queries
   const skeleton = useSkeletonLoading(skeletonTiming.lowComplexity);
@@ -88,10 +99,13 @@ const SonarrSeriesDetailsScreen = () => {
   const isMutating =
     isTogglingMonitor ||
     isTogglingSeasonMonitor ||
+    isTogglingEpisodeMonitor ||
     isTriggeringSearch ||
     isSearchingMissing ||
+    isSearchingMissingEpisode ||
     isUnmonitoringAll ||
-    isDeleting;
+    isDeleting ||
+    isRemovingAndSearching;
   const animationsEnabled = shouldAnimateLayout(
     isLoading,
     isFetching,
@@ -178,6 +192,63 @@ const SonarrSeriesDetailsScreen = () => {
       { cancelable: true },
     );
   }, [deleteSeriesAsync, router]);
+
+  const handleRemoveAndSearchEpisode = useCallback(
+    (episodeFileId: number, seasonNumber: number, episodeNumber: number) => {
+      setProcessingEpisodeFileId(episodeFileId);
+      void removeAndSearchEpisodeAsync(
+        episodeFileId,
+        seasonNumber,
+        episodeNumber,
+      )
+        .then(() => {
+          // Success is handled by query invalidation and UI update
+          setProcessingEpisodeFileId(null);
+        })
+        .catch((err) => {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Failed to remove and search episode.";
+          alert("Operation Failed", message);
+          setProcessingEpisodeFileId(null);
+        });
+    },
+    [removeAndSearchEpisodeAsync],
+  );
+
+  const handleEpisodeLongPress = useCallback(
+    (episodeId: string, episode: any) => {
+      if (!series) return;
+
+      // Find which season this episode belongs to
+      let seasonNumber = 0;
+      for (const season of series.seasons || []) {
+        const foundEpisode = season.episodes?.find(
+          (ep) =>
+            ep.id === episode.id || ep.episodeNumber === episode.episodeNumber,
+        );
+        if (foundEpisode) {
+          seasonNumber = season.seasonNumber;
+          break;
+        }
+      }
+
+      // Navigate to episode details modal with episode data
+      router.push({
+        pathname: `/sonarr/[serviceId]/series/[id]/episode/[episodeId]`,
+        params: {
+          serviceId: serviceKey,
+          id: numericSeriesId.toString(),
+          episodeId: episodeId,
+          seasonNumber: seasonNumber.toString(),
+          seriesTitle: series.title,
+          episodeData: JSON.stringify(episode),
+        },
+      });
+    },
+    [router, series, serviceKey, numericSeriesId],
+  );
 
   // Handle error states outside of sheet for immediate feedback
   if (!serviceId || !isSeriesIdValid) {
@@ -296,20 +367,29 @@ const SonarrSeriesDetailsScreen = () => {
                 imdbId={series.imdbId}
                 onToggleMonitor={handleToggleMonitor}
                 onToggleSeasonMonitor={toggleSeasonMonitor}
+                onToggleEpisodeMonitor={toggleEpisodeMonitor}
                 onSearchPress={handleTriggerSearch}
                 onSearchMissingPress={searchMissingEpisodes}
+                onSearchMissingEpisodePress={searchMissingEpisode}
+                onRemoveAndSearchEpisodePress={handleRemoveAndSearchEpisode}
                 onUnmonitorAllPress={unmonitorAllEpisodes}
                 onDeletePress={handleDeleteSeries}
                 isUpdatingMonitor={isTogglingMonitor}
                 isSearching={isTriggeringSearch}
                 isSearchingMissing={isSearchingMissing}
+                isSearchingMissingEpisode={isSearchingMissingEpisode}
+                isRemovingAndSearching={isRemovingAndSearching}
+                isRemovingAndSearchingEpisodeFileId={processingEpisodeFileId}
                 isUnmonitoringAll={isUnmonitoringAll}
                 isTogglingSeasonMonitor={isTogglingSeasonMonitor}
+                isTogglingEpisodeMonitor={isTogglingEpisodeMonitor}
                 isDeleting={isDeleting}
                 showPoster={false}
                 disableScroll={true}
                 serviceConfig={serviceConfig}
                 contentId={numericSeriesId.toString()}
+                totalSizeOnDiskMB={series.totalSizeOnDiskMB}
+                onEpisodeLongPress={handleEpisodeLongPress}
               />
             </DetailHero>
           </AnimatedSection>

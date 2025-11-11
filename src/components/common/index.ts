@@ -51,6 +51,7 @@ export {
   AnimatedStatus,
   AnimatedPressable,
   AnimatedScrollView,
+  PageTransition,
 } from "./AnimatedComponents";
 
 export { UniArrLoader } from "./UniArrLoader";

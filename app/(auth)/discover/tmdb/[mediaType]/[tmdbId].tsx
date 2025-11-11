@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, ScrollView, StyleSheet, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import Animated, { FadeIn } from "react-native-reanimated";
 import {
   Banner,
   Button,
@@ -16,6 +17,7 @@ import {
 } from "react-native-paper";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
+import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { AppTheme } from "@/constants/theme";
@@ -101,6 +103,28 @@ const getTrailerUrl = (
   }
 
   return `https://www.youtube.com/watch?v=${key}`;
+};
+
+const getTrailerVideoKey = (
+  videos?: MovieVideosResponse | TvVideosResponse,
+): string | undefined => {
+  const results = videos?.results;
+  if (!Array.isArray(results)) {
+    return undefined;
+  }
+
+  const match = results.find((video) => {
+    const site = typeof video.site === "string" ? video.site : undefined;
+    const type = typeof video.type === "string" ? video.type : undefined;
+    return site === "YouTube" && (type === "Trailer" || type === "Teaser");
+  });
+
+  if (!match) {
+    return undefined;
+  }
+
+  const key = typeof match.key === "string" ? match.key : undefined;
+  return key ?? undefined;
 };
 
 const getProviderNames = (
@@ -356,6 +380,11 @@ const TmdbDetailPage = () => {
         recommendationCard: {
           width: 140,
           gap: spacing.sm,
+        },
+        trailerContainer: {
+          marginBottom: spacing.none,
+          borderRadius: 12,
+          overflow: "hidden",
         },
         dialogText: {
           marginBottom: spacing.sm,
@@ -1096,6 +1125,18 @@ const TmdbDetailPage = () => {
     [detailsQuery.data],
   );
 
+  const trailerVideoKey = useMemo(
+    () =>
+      detailsQuery.data
+        ? getTrailerVideoKey(detailsQuery.data.videos)
+        : undefined,
+    [detailsQuery.data],
+  );
+
+  const trailerFeatureEnabled = useSettingsStore(
+    (s) => s.trailerFeatureEnabled,
+  );
+
   const providers = useMemo(
     () =>
       detailsQuery.data
@@ -1419,6 +1460,24 @@ const TmdbDetailPage = () => {
                 </Button>
               ))}
           </View>
+
+          {/* Trailer Fade Overlay - shows trailer if enabled and available */}
+          {trailerFeatureEnabled &&
+          trailerVideoKey &&
+          detailsQuery.data?.details?.backdrop_path ? (
+            <Animated.View
+              style={styles.trailerContainer}
+              entering={FadeIn.delay(350)}
+            >
+              <TrailerFadeOverlay
+                backdropUri={buildBackdropUrl(
+                  detailsQuery.data.details.backdrop_path,
+                )}
+                videoKey={trailerVideoKey}
+                height={200}
+              />
+            </Animated.View>
+          ) : null}
 
           {providers ? (
             <View style={styles.section}>

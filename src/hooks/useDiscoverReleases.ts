@@ -92,13 +92,15 @@ export const useDiscoverReleases = (
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
     networkMode: "offlineFirst",
-    queryFn: async () => {
+    queryFn: async (context) => {
       if (!tmdbId && !tvdbId && !imdbId) {
         throw new Error(
           "TMDB ID, TVDB ID, or IMDB ID is required for release lookup.",
         );
       }
 
+      // Use AbortSignal from TanStack Query to cancel in-flight requests on unmount
+      const signal = context.signal;
       const allReleases: NormalizedRelease[] = [];
 
       try {
@@ -110,6 +112,11 @@ export const useDiscoverReleases = (
 
           const radarrResults = await Promise.allSettled(
             radarrConnectors.map(async (connector) => {
+              // Early exit if query was cancelled
+              if (signal.aborted) {
+                return [] as NormalizedRelease[];
+              }
+
               try {
                 let internalMovieId: number | undefined;
 
@@ -219,15 +226,19 @@ export const useDiscoverReleases = (
           ) as ProwlarrConnector[];
 
           const prowlarrResults = await Promise.allSettled(
-            prowlarrConnectors.map((connector) =>
-              connector.searchReleases({
+            prowlarrConnectors.map(async (connector) => {
+              // Early exit if query was cancelled
+              if (signal.aborted) {
+                return [] as NormalizedRelease[];
+              }
+              return connector.searchReleases({
                 tmdbId,
                 imdbId,
                 title,
                 year,
                 minSeeders,
-              }),
-            ),
+              });
+            }),
           );
 
           prowlarrResults.forEach((result) => {
@@ -257,6 +268,11 @@ export const useDiscoverReleases = (
 
           const sonarrResults = await Promise.allSettled(
             sonarrConnectors.map(async (connector) => {
+              // Early exit if query was cancelled
+              if (signal.aborted) {
+                return [] as NormalizedRelease[];
+              }
+
               try {
                 let internalSeriesId: number | undefined;
 
@@ -404,14 +420,18 @@ export const useDiscoverReleases = (
           ) as ProwlarrConnector[];
 
           const prowlarrResults = await Promise.allSettled(
-            prowlarrConnectors.map((connector) =>
-              connector.searchReleases({
+            prowlarrConnectors.map(async (connector) => {
+              // Early exit if query was cancelled
+              if (signal.aborted) {
+                return [] as NormalizedRelease[];
+              }
+              return connector.searchReleases({
                 tmdbId,
                 title,
                 year,
                 minSeeders,
-              }),
-            ),
+              });
+            }),
           );
 
           prowlarrResults.forEach((result) => {
@@ -428,11 +448,14 @@ export const useDiscoverReleases = (
           });
         }
       } catch (error) {
-        logger.error("Error fetching discover releases", {
-          mediaType,
-          tmdbId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        // Don't log cancellation errors from AbortSignal
+        if (!(error instanceof Error && error.name === "AbortError")) {
+          logger.error("Error fetching discover releases", {
+            mediaType,
+            tmdbId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       // Merge, deduplicate, and rank releases

@@ -43,6 +43,8 @@ export type DetailHeroProps = {
   onShare?: () => void;
   onMal?: () => void;
   isFetching?: boolean;
+  /** Optional trailer overlay component to display over the backdrop */
+  trailerOverlay?: React.ReactNode;
   children?: React.ReactNode;
 };
 
@@ -61,6 +63,7 @@ const DetailHero: React.FC<DetailHeroProps> = ({
   onShare,
   onMal,
   isFetching,
+  trailerOverlay,
   children,
 }) => {
   const theme = useTheme<AppTheme>();
@@ -262,6 +265,11 @@ const DetailHero: React.FC<DetailHeroProps> = ({
             style={RNStyleSheet.absoluteFill}
           />
         )}
+
+        {/* Trailer overlay - positioned absolutely over backdrop */}
+        {trailerOverlay ? (
+          <View style={RNStyleSheet.absoluteFill}>{trailerOverlay}</View>
+        ) : null}
 
         <Animated.View
           pointerEvents={isHeaderCollapsed ? "none" : "auto"}

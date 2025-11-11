@@ -11,6 +11,7 @@ import {
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useRouter } from "expo-router";
 
 import { useHaptics } from "@/hooks/useHaptics";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
@@ -20,6 +21,7 @@ import {
   fetchWeatherForecast,
   type WeatherUnits,
 } from "@/services/widgets/dataProviders";
+import { useWeatherLocationStore } from "@/store/weatherLocationStore";
 
 const MODE_OPTIONS = ["device", "manual"] as const;
 const UNIT_OPTIONS = ["metric", "imperial"] as const;
@@ -45,6 +47,14 @@ const WeatherWidgetConfigForm: React.FC<WeatherWidgetConfigFormProps> = ({
   onSaved,
 }) => {
   const { onPress } = useHaptics();
+  const router = useRouter();
+  const selectedLocationSearch = useWeatherLocationStore(
+    (state) => state.selectedLocationSearch,
+  );
+  const selectedLocationMap = useWeatherLocationStore(
+    (state) => state.selectedLocationMap,
+  );
+
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -52,6 +62,8 @@ const WeatherWidgetConfigForm: React.FC<WeatherWidgetConfigFormProps> = ({
     success: boolean;
     message: string;
   } | null>(null);
+  const [selectedLocationIndex, setSelectedLocationIndex] = useState(0);
+  const [apiKeyValue, setApiKeyValue] = useState("");
 
   const defaultValues = useMemo<FormValues>(() => {
     const locations = Array.isArray(widget.config?.locations)
@@ -174,11 +186,73 @@ const WeatherWidgetConfigForm: React.FC<WeatherWidgetConfigFormProps> = ({
       );
       if (credentials?.apiKey) {
         setValue("apiKey", credentials.apiKey, { shouldDirty: false });
+        setApiKeyValue(credentials.apiKey);
       }
     };
 
     void loadCredentials();
   }, [setValue, widget.id]);
+
+  // Handle location selection from search sheet
+  useEffect(() => {
+    if (selectedLocationSearch) {
+      setValue(
+        `locations.${selectedLocationIndex}.value`,
+        `${selectedLocationSearch.latitude},${selectedLocationSearch.longitude}`,
+        { shouldDirty: true },
+      );
+      onPress();
+    }
+  }, [selectedLocationSearch, selectedLocationIndex, setValue, onPress]);
+
+  // Handle location selection from map sheet
+  useEffect(() => {
+    if (selectedLocationMap) {
+      setValue(
+        `locations.${selectedLocationIndex}.value`,
+        `${selectedLocationMap.latitude},${selectedLocationMap.longitude}`,
+        { shouldDirty: true },
+      );
+      onPress();
+    }
+  }, [selectedLocationMap, selectedLocationIndex, setValue, onPress]);
+
+  const handleLocationSearch = (index: number) => {
+    setSelectedLocationIndex(index);
+    router.push({
+      pathname: "/(auth)/+modal/weather-location-search",
+      params: {
+        apiKey: apiKeyValue,
+      },
+    });
+  };
+
+  const handleLocationMapPick = (index: number) => {
+    setSelectedLocationIndex(index);
+    const currentValue = watch(`locations.${index}.value`);
+    let initialLat = 51.5074;
+    let initialLon = -0.1278;
+
+    if (currentValue) {
+      const coords = currentValue.split(",");
+      if (coords.length === 2) {
+        const lat = parseFloat(coords[0]?.trim() || "");
+        const lon = parseFloat(coords[1]?.trim() || "");
+        if (!isNaN(lat) && !isNaN(lon)) {
+          initialLat = lat;
+          initialLon = lon;
+        }
+      }
+    }
+
+    router.push({
+      pathname: "/(auth)/+modal/weather-location-map",
+      params: {
+        initialLatitude: String(initialLat),
+        initialLongitude: String(initialLon),
+      },
+    });
+  };
 
   const onSubmit = async (values: FormValues) => {
     const trimmedLocations = values.locations
@@ -294,15 +368,27 @@ const WeatherWidgetConfigForm: React.FC<WeatherWidgetConfigFormProps> = ({
                   />
                 )}
               />
-              {fields.length > 1 && (
+              <View style={styles.buttonGroup}>
                 <IconButton
-                  icon="delete"
-                  onPress={() => {
-                    onPress();
-                    remove(index);
-                  }}
+                  icon="magnify"
+                  size={20}
+                  onPress={() => handleLocationSearch(index)}
                 />
-              )}
+                <IconButton
+                  icon="map-marker"
+                  size={20}
+                  onPress={() => handleLocationMapPick(index)}
+                />
+                {fields.length > 1 && (
+                  <IconButton
+                    icon="delete"
+                    onPress={() => {
+                      onPress();
+                      remove(index);
+                    }}
+                  />
+                )}
+              </View>
             </View>
           ))}
 
@@ -416,6 +502,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  buttonGroup: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   flex: {
     flex: 1,

@@ -287,6 +287,15 @@ class QuietHoursService {
     await this.flushIfEligible(category, config, new Date());
   }
 
+  /**
+   * Cleanup all pending timers (call on service shutdown)
+   */
+  destroy(): void {
+    this.flushTimers.forEach((timer) => clearTimeout(timer));
+    this.flushTimers.clear();
+    this.isInitialized = false;
+  }
+
   private buildSummaryMessage(
     category: NotificationCategory,
     entries: DeferredNotificationEntry[],

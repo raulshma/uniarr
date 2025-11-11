@@ -206,6 +206,15 @@ class HealthCheckService {
     this.healthCache.clear();
   }
 
+  /**
+   * Cleanup all active health checks (call on service shutdown)
+   */
+  destroy(): void {
+    this.stopAllHealthChecks();
+    this.healthCache.clear();
+    this.isInitialized = false;
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();

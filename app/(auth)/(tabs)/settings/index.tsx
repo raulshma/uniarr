@@ -68,11 +68,11 @@ const SettingsScreen = () => {
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const [errorLogCount, setErrorLogCount] = useState(0);
   const [cleanupLogCount, setCleanupLogCount] = useState(0);
+  const [hasTriggeredUpdateCheck, setHasTriggeredUpdateCheck] = useState(false);
   const theme = useTheme<AppTheme>();
 
   // Get dynamic app version from Expo Constants
-  const appVersion =
-    Constants.expoConfig?.version || Constants.manifest?.version || "Unknown";
+  const appVersion = Constants.expoConfig?.version || "Unknown";
   const appVersionString = `UniArr v${appVersion}`;
 
   // App update check hook
@@ -281,16 +281,22 @@ const SettingsScreen = () => {
     void loadImageCacheUsage();
   }, [loadImageCacheUsage]);
 
-  // Update dialog when update check completes
+  // Update dialog when update check completes (only if user manually triggered it)
   useEffect(() => {
-    if (!isCheckingUpdate && (updateData || updateError)) {
+    if (
+      hasTriggeredUpdateCheck &&
+      !isCheckingUpdate &&
+      (updateData || updateError)
+    ) {
       showCustomDialog("updateCheck", {
         updateData,
         isLoading: false,
         error: updateError ? String(updateError) : null,
       });
+      // Reset the flag after showing the dialog
+      setHasTriggeredUpdateCheck(false);
     }
-  }, [updateData, isCheckingUpdate, updateError]);
+  }, [updateData, isCheckingUpdate, updateError, hasTriggeredUpdateCheck]);
 
   // Load error log count on mount
   useEffect(() => {
@@ -359,6 +365,8 @@ const SettingsScreen = () => {
 
   const handleCheckForUpdate = useCallback(async () => {
     setLastReleaseNotesCheckedAt(new Date().toISOString());
+    // Mark that we've triggered an update check manually
+    setHasTriggeredUpdateCheck(true);
     // Show update dialog with loading state
     showCustomDialog("updateCheck", {
       updateData: null,
@@ -1029,6 +1037,37 @@ const SettingsScreen = () => {
                   </Button>
                 }
                 groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* BYOK Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>API Keys & Credentials</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Bring Your Own Keys (BYOK)"
+                subtitle="Configure your own API keys"
+                left={{ iconName: "key-variant" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/settings/byok")}
+                groupPosition="single"
               />
             </AnimatedListItem>
           </SettingsGroup>

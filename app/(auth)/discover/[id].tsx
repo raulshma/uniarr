@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/common/Button";
 import { alert } from "@/services/dialogService";
 import DetailHero from "@/components/media/DetailHero/DetailHero";
+import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
 import { useJellyseerrMediaCredits } from "@/hooks/useJellyseerrMediaCredits";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
@@ -29,6 +30,7 @@ import {
 import {
   useSettingsStore,
   selectPreferredJellyseerrServiceId,
+  selectTrailerFeatureEnabled,
 } from "@/store/settingsStore";
 import { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import { useRelatedItems } from "@/hooks/useRelatedItems";
@@ -37,7 +39,6 @@ import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
 import { avatarSizes } from "@/constants/sizes";
 import RelatedItems from "@/components/discover/RelatedItems";
-import { YouTubePlayer } from "@/components/media/VideoPlayer";
 import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
 import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { skeletonTiming } from "@/constants/skeletonTiming";
@@ -56,6 +57,7 @@ const DiscoverItemDetails = () => {
   const preferredJellyseerrServiceId = useSettingsStore(
     selectPreferredJellyseerrServiceId,
   );
+  const trailerFeatureEnabled = useSettingsStore(selectTrailerFeatureEnabled);
 
   const item = useMemo(() => {
     // First try to find by exact ID match
@@ -185,6 +187,11 @@ const DiscoverItemDetails = () => {
   const [selectAllSeasons, setSelectAllSeasons] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
 
+  // Track pending async operations for cleanup on unmount
+  const abortControllerRef = React.useRef<AbortController>(
+    new AbortController(),
+  );
+
   // Fetch releases on-demand when user expands the releases section
   const releasesQuery = useDiscoverReleases(
     item?.mediaType === "series" ? "series" : "movie",
@@ -198,6 +205,14 @@ const DiscoverItemDetails = () => {
       year: showReleases && item?.year ? item.year : undefined,
     },
   );
+
+  // Cleanup pending operations on unmount
+  React.useEffect(() => {
+    const controller = abortControllerRef.current;
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   const openServicePicker = useCallback(() => {
     if (!item) return;
@@ -283,7 +298,7 @@ const DiscoverItemDetails = () => {
 
   const loadJellyseerrOptions = useCallback(
     async (connector: JellyseerrConnector) => {
-      if (!item) return;
+      if (!item || abortControllerRef.current.signal.aborted) return;
 
       setCurrentConnector(connector);
       setSubmitError("");
@@ -297,13 +312,17 @@ const DiscoverItemDetails = () => {
             await connector.initialize();
           }
         } catch (initError) {
-          void alert(
-            "Error",
-            `Failed to initialize Jellyseerr connector: ${
-              initError instanceof Error ? initError.message : String(initError)
-            }`,
-          );
-          console.warn("Jellyseerr initialize failed", initError);
+          if (!abortControllerRef.current.signal.aborted) {
+            void alert(
+              "Error",
+              `Failed to initialize Jellyseerr connector: ${
+                initError instanceof Error
+                  ? initError.message
+                  : String(initError)
+              }`,
+            );
+            console.warn("Jellyseerr initialize failed", initError);
+          }
           return;
         }
 
@@ -318,7 +337,14 @@ const DiscoverItemDetails = () => {
                   (typeof s.id === "string" && (s.id as string).trim() !== "")),
             )
           : [];
-        setServers(validServers);
+
+        // Only update state if component is still mounted
+        if (!abortControllerRef.current.signal.aborted) {
+          setServers(validServers);
+        } else {
+          return;
+        }
+
         const defaultServer =
           validServers.find((s) => (s as any).isDefault) || validServers[0];
 
@@ -327,13 +353,20 @@ const DiscoverItemDetails = () => {
           defaultServer?.id !== undefined && defaultServer?.id !== null
             ? Number(defaultServer.id)
             : null;
-        setSelectedServer(defaultServerId);
+
+        if (!abortControllerRef.current.signal.aborted) {
+          setSelectedServer(defaultServerId);
+        } else {
+          return;
+        }
 
         if (validServers.length === 0) {
-          void alert(
-            "No servers available",
-            "No valid servers are configured in Jellyseerr for this media type.",
-          );
+          if (!abortControllerRef.current.signal.aborted) {
+            void alert(
+              "No servers available",
+              "No valid servers are configured in Jellyseerr for this media type.",
+            );
+          }
           return;
         }
 
@@ -342,6 +375,11 @@ const DiscoverItemDetails = () => {
             defaultServerId,
             mediaType,
           );
+
+          if (abortControllerRef.current.signal.aborted) {
+            return;
+          }
+
           setProfiles(profiles ?? []);
           setRootFolders(rootFolders ?? []);
 
@@ -473,19 +511,32 @@ const DiscoverItemDetails = () => {
               item.tmdbId || item.sourceId!,
               "tv",
             );
-            setAvailableSeasons((details as any).seasons || []);
-            setSelectedSeasons([]);
-            setSelectAllSeasons(false);
+
+            // Only update state if component is still mounted
+            if (!abortControllerRef.current.signal.aborted) {
+              setAvailableSeasons((details as any).seasons || []);
+              setSelectedSeasons([]);
+              setSelectAllSeasons(false);
+            } else {
+              return;
+            }
           }
         }
-        setJellyseerrDialogVisible(true);
+
+        // Only show dialog if component is still mounted
+        if (!abortControllerRef.current.signal.aborted) {
+          setJellyseerrDialogVisible(true);
+        }
       } catch (error) {
-        void alert(
-          "Error",
-          `Failed to load options: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
+        // Don't show alert if component was unmounted
+        if (!abortControllerRef.current.signal.aborted) {
+          void alert(
+            "Error",
+            `Failed to load options: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
         console.warn("loadJellyseerrOptions failed", error);
       }
     },
@@ -494,7 +545,12 @@ const DiscoverItemDetails = () => {
 
   const handleServerChange = useCallback(
     async (serverId: number) => {
-      if (!currentConnector || !item) return;
+      if (
+        !currentConnector ||
+        !item ||
+        abortControllerRef.current.signal.aborted
+      )
+        return;
       if (serverId < 0) return;
 
       const mediaType = item.mediaType === "series" ? "tv" : "movie";
@@ -504,6 +560,12 @@ const DiscoverItemDetails = () => {
           serverId,
           mediaType,
         );
+
+        // Only update state if component is still mounted
+        if (abortControllerRef.current.signal.aborted) {
+          return;
+        }
+
         setProfiles(profiles ?? []);
         setRootFolders(rootFolders ?? []);
 
@@ -626,12 +688,15 @@ const DiscoverItemDetails = () => {
         );
         setSelectedRootFolder(selectedRootFolder || "");
       } catch (error) {
-        void alert(
-          "Error",
-          `Failed to load profiles: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
+        // Don't show alert if component was unmounted
+        if (!abortControllerRef.current.signal.aborted) {
+          void alert(
+            "Error",
+            `Failed to load profiles: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
         console.warn("handleServerChange failed", error);
       }
     },
@@ -644,7 +709,8 @@ const DiscoverItemDetails = () => {
       !currentConnector ||
       !item ||
       selectedServer == null ||
-      selectedProfile == null
+      selectedProfile == null ||
+      abortControllerRef.current.signal.aborted
     ) {
       setSubmitError("Please select a server and profile.");
       return;
@@ -667,6 +733,12 @@ const DiscoverItemDetails = () => {
       const requests = await currentConnector.getRequests({
         mediaType,
       });
+
+      // Only continue if component is still mounted
+      if (abortControllerRef.current.signal.aborted) {
+        return;
+      }
+
       const existingRequest = requests.items.find(
         (req) =>
           req.media?.tmdbId === item.tmdbId || req.media?.id === item.sourceId,
@@ -689,13 +761,18 @@ const DiscoverItemDetails = () => {
         rootFolder: selectedRootFolder || undefined,
       });
 
-      void alert("Success", "Request submitted successfully!");
-      setJellyseerrDialogVisible(false);
+      // Only show success alert and clear dialog if component is still mounted
+      if (!abortControllerRef.current.signal.aborted) {
+        void alert("Success", "Request submitted successfully!");
+        setJellyseerrDialogVisible(false);
+      }
     } catch (error) {
       console.error(error);
-      setSubmitError(
-        error instanceof Error ? error.message : "Failed to submit request",
-      );
+      if (!abortControllerRef.current.signal.aborted) {
+        setSubmitError(
+          error instanceof Error ? error.message : "Failed to submit request",
+        );
+      }
     } finally {
       setIsRequesting(false);
     }
@@ -740,11 +817,14 @@ const DiscoverItemDetails = () => {
     preferredJellyseerrServiceId,
   ]);
 
-  // Refresh matched Jellyseerr requests for current item across configured connectors
   const refreshJellyseerrMatches = useCallback(async () => {
     setCheckingJellyseerr(true);
     try {
-      if (!item || jellyseerrConnectors.length === 0) {
+      if (
+        !item ||
+        jellyseerrConnectors.length === 0 ||
+        abortControllerRef.current.signal.aborted
+      ) {
         setMatchedJellyseerrRequests([]);
         return;
       }
@@ -760,6 +840,11 @@ const DiscoverItemDetails = () => {
       // Query each configured jellyseerr connector for requests and find matches
       await Promise.all(
         jellyseerrConnectors.map(async (connector) => {
+          // Check abort status before making request
+          if (abortControllerRef.current.signal.aborted) {
+            return;
+          }
+
           try {
             const jelly = connector as unknown as JellyseerrConnector;
             // Ensure connector initialized where possible
@@ -772,7 +857,18 @@ const DiscoverItemDetails = () => {
               }
             }
 
+            // Early exit if aborted before API call
+            if (abortControllerRef.current.signal.aborted) {
+              return;
+            }
+
             const requests = await jelly.getRequests({ mediaType });
+
+            // Only update state if component is still mounted
+            if (abortControllerRef.current.signal.aborted) {
+              return;
+            }
+
             if (requests && Array.isArray(requests.items)) {
               const found = requests.items.filter(
                 (req: any) =>
@@ -807,7 +903,10 @@ const DiscoverItemDetails = () => {
         }),
       );
 
-      setMatchedJellyseerrRequests(matches);
+      // Only update state if component is still mounted
+      if (!abortControllerRef.current.signal.aborted) {
+        setMatchedJellyseerrRequests(matches);
+      }
     } finally {
       setCheckingJellyseerr(false);
     }
@@ -820,26 +919,50 @@ const DiscoverItemDetails = () => {
 
   const handleRemoveJellyseerrRequest = useCallback(
     async (connector: JellyseerrConnector, requestId: number) => {
+      if (abortControllerRef.current.signal.aborted) {
+        return;
+      }
+
       setIsRemoving(true);
       try {
         await connector.deleteRequest(requestId);
-        void alert("Success", "Request removed from Jellyseerr");
-        // Refresh matches so UI updates
-        await refreshJellyseerrMatches();
+
+        // Only show alert and refresh if component is still mounted
+        if (!abortControllerRef.current.signal.aborted) {
+          void alert("Success", "Request removed from Jellyseerr");
+          // Refresh matches so UI updates
+          await refreshJellyseerrMatches();
+        }
       } catch (error) {
         console.error("Failed to delete Jellyseerr request", error);
-        void alert(
-          "Error",
-          `Failed to remove request: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
+
+        // Only show alert if component is still mounted
+        if (!abortControllerRef.current.signal.aborted) {
+          void alert(
+            "Error",
+            `Failed to remove request: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
       } finally {
         setIsRemoving(false);
       }
     },
     [refreshJellyseerrMatches],
   );
+
+  // Extract YouTube trailer video key from TMDB details
+  const trailerVideoKey = useMemo(() => {
+    const videos = (tmdbDetailsQuery.data?.details as any)?.videos;
+    if (!Array.isArray(videos?.results)) return undefined;
+    const match = videos.results.find((video: any) => {
+      const site = typeof video.site === "string" ? video.site : undefined;
+      const type = typeof video.type === "string" ? video.type : undefined;
+      return site === "YouTube" && (type === "Trailer" || type === "Teaser");
+    });
+    return match?.key ?? undefined;
+  }, [tmdbDetailsQuery.data]);
 
   const styles = useMemo(
     () =>
@@ -988,19 +1111,18 @@ const DiscoverItemDetails = () => {
             <ReleaseMetadata item={item} tmdbDetails={tmdbDetailsQuery.data} />
 
             {/* Trailer */}
-            {tmdbDetailsQuery.data?.videos?.results &&
+            {trailerFeatureEnabled &&
+            tmdbDetailsQuery.data?.videos?.results &&
             tmdbDetailsQuery.data.videos.results.length > 0 ? (
-              <View style={{ marginBottom: spacing.lg }}>
-                <YouTubePlayer
-                  videoKey={
-                    tmdbDetailsQuery.data.videos.results.find(
-                      (v: any) =>
-                        v.site?.toLowerCase() === "youtube" &&
-                        v.type?.toLowerCase() === "trailer",
-                    )?.key
-                  }
-                />
-              </View>
+              <TrailerFadeOverlay
+                videoKey={trailerVideoKey}
+                backdropUri={
+                  tmdbDetailsQuery.data?.details?.backdrop_path
+                    ? `https://image.tmdb.org/t/p/w1280${tmdbDetailsQuery.data.details.backdrop_path}`
+                    : item.backdropUrl
+                }
+                height={200}
+              />
             ) : null}
 
             {/* Watch Providers */}
@@ -1610,7 +1732,7 @@ const ReleaseMetadata: React.FC<{
   return (
     <View
       style={{
-        marginBottom: spacing.lg,
+        marginBottom: spacing.sm,
         flexDirection: "row",
         gap: spacing.md,
       }}
@@ -1674,7 +1796,7 @@ const WatchProvidersSection: React.FC<{
   }
 
   return (
-    <View style={{ marginBottom: spacing.lg }}>
+    <View style={{ marginBottom: spacing.sm }}>
       <Text
         variant="titleMedium"
         style={{

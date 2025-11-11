@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, type ViewStyle, type TextStyle } from "react-native";
 import { alert } from "@/services/dialogService";
 import {
   Text,
@@ -223,21 +223,27 @@ const ServiceOverviewHeader = React.memo(
         {({ overviewMetrics, averageLatency, isAnyServiceLoading }) => (
           <AnimatedSection
             animated={animationsEnabled && !isAnyServiceLoading}
-            style={styles.summarySection}
+            style={styles.summarySection as ViewStyle}
             delay={50}
           >
-            <Text style={styles.summaryTitle}>Service overview</Text>
-            <View style={styles.summaryGrid}>
+            <Text style={styles.summaryTitle as TextStyle}>
+              Service overview
+            </Text>
+            <View style={styles.summaryGrid as ViewStyle}>
               {overviewMetrics.map((metric, index) => (
                 <AnimatedListItem
                   key={metric.label}
                   animated={animationsEnabled && !isAnyServiceLoading}
                   index={index}
                   totalItems={overviewMetrics.length + 1}
-                  style={styles.summaryCard}
+                  style={styles.summaryCard as ViewStyle}
                 >
-                  <Text style={styles.summaryValue}>{metric.value}</Text>
-                  <Text style={styles.summaryLabel}>{metric.label}</Text>
+                  <Text style={styles.summaryValue as TextStyle}>
+                    {metric.value}
+                  </Text>
+                  <Text style={styles.summaryLabel as TextStyle}>
+                    {metric.label}
+                  </Text>
                 </AnimatedListItem>
               ))}
             </View>
@@ -245,10 +251,14 @@ const ServiceOverviewHeader = React.memo(
               animated={animationsEnabled && !isAnyServiceLoading}
               index={overviewMetrics.length}
               totalItems={overviewMetrics.length + 1}
-              style={styles.latencyChip}
+              style={styles.latencyChip as ViewStyle}
             >
-              <Text style={styles.latencyLabel}>Average latency</Text>
-              <Text style={styles.latencyValue}>{averageLatency}</Text>
+              <Text style={styles.latencyLabel as TextStyle}>
+                Average latency
+              </Text>
+              <Text style={styles.latencyValue as TextStyle}>
+                {averageLatency}
+              </Text>
             </AnimatedListItem>
           </AnimatedSection>
         )}
@@ -343,7 +353,7 @@ const ServiceRowWithHealth = React.memo(
             setSelectedService(serviceItem);
             handleDeleteService();
           }}
-          style={styles.serviceCard}
+          style={styles.serviceCard as ViewStyle}
         />
       </AnimatedListItem>
     );
@@ -434,54 +444,54 @@ const ServicesScreen = () => {
           paddingHorizontal: spacing.md,
           marginTop: spacing.md,
           gap: spacing.sm,
-        },
+        } as ViewStyle,
         summaryTitle: {
           color: theme.colors.onSurface,
           fontSize: 18,
           fontWeight: "600",
-        },
+        } as TextStyle,
         summaryGrid: {
           flexDirection: "row",
           flexWrap: "wrap",
           justifyContent: "space-between",
           rowGap: spacing.sm,
-        },
+        } as ViewStyle,
         summaryCard: {
           width: "48%",
           backgroundColor: theme.colors.surface,
           borderRadius: spacing.lg,
           paddingVertical: spacing.md,
           paddingHorizontal: spacing.md,
-        },
+        } as ViewStyle,
         summaryValue: {
           color: theme.colors.onSurface,
           fontSize: 20,
           fontWeight: "700",
-        },
+        } as TextStyle,
         summaryLabel: {
           color: theme.colors.onSurfaceVariant,
           fontSize: 12,
           marginTop: spacing.xs,
-        },
+        } as TextStyle,
         latencyChip: {
           backgroundColor: theme.colors.surface,
           borderRadius: borderRadius.lg,
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
-        },
+        } as ViewStyle,
         latencyLabel: {
           color: theme.colors.onSurfaceVariant,
           fontSize: 12,
           marginBottom: spacing.xs,
-        },
+        } as TextStyle,
         latencyValue: {
           color: theme.colors.primary,
           fontSize: 14,
           fontWeight: "600",
-        },
+        } as TextStyle,
         section: {
           marginTop: spacing.lg,
-        },
+        } as ViewStyle,
         sectionTitle: {
           color: theme.colors.onBackground,
           fontSize: theme.custom.typography.titleLarge.fontSize,
@@ -490,18 +500,18 @@ const ServicesScreen = () => {
           letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
           fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
           marginBottom: spacing.md,
-        },
+        } as TextStyle,
         serviceCard: {
           backgroundColor: theme.colors.surface,
           marginHorizontal: spacing.md,
           marginVertical: spacing.xs,
           borderRadius: borderRadius.xxxl,
           padding: spacing.xs,
-        },
+        } as ViewStyle,
         serviceContent: {
           flexDirection: "row",
           alignItems: "center",
-        },
+        } as ViewStyle,
         serviceIcon: {
           width: 48,
           height: 48,
@@ -510,10 +520,10 @@ const ServicesScreen = () => {
           alignItems: "center",
           justifyContent: "center",
           marginRight: spacing.md,
-        },
+        } as ViewStyle,
         serviceInfo: {
           flex: 1,
-        },
+        } as ViewStyle,
         serviceName: {
           color: theme.colors.onSurface,
           fontSize: theme.custom.typography.titleMedium.fontSize,
@@ -522,7 +532,7 @@ const ServicesScreen = () => {
           letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
           fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
           marginBottom: spacing.xxs,
-        },
+        } as TextStyle,
         serviceType: {
           color: theme.colors.onSurfaceVariant,
           fontSize: theme.custom.typography.bodyMedium.fontSize,
@@ -531,34 +541,34 @@ const ServicesScreen = () => {
           letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
           fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
           marginBottom: spacing.xs,
-        },
+        } as TextStyle,
         serviceStatus: {
           flexDirection: "row",
           alignItems: "center",
-        },
+        } as ViewStyle,
         serviceMenu: {
           color: theme.colors.outline,
-        },
+        } as ViewStyle,
         listSpacer: {
           height: spacing.sm,
-        },
+        } as ViewStyle,
         emptyContainer: {
           flexGrow: 1,
           paddingTop: spacing.xl,
-        },
+        } as ViewStyle,
         skeletonContainer: {
           paddingVertical: spacing.lg,
           paddingBottom: spacing.xxxxl,
           gap: spacing.md,
-        },
+        } as ViewStyle,
         skeletonHeader: {
           marginHorizontal: spacing.md,
-        },
+        } as ViewStyle,
         skeletonCard: {
           marginBottom: spacing.sm,
           marginHorizontal: spacing.md,
-        },
-      }),
+        } as ViewStyle,
+      } as const),
     [theme],
   );
 

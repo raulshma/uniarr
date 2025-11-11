@@ -35,8 +35,7 @@ export class AppUpdateService {
    * Get the current app version from Expo Constants
    */
   static getCurrentVersion(): string {
-    const version =
-      Constants.expoConfig?.version || Constants.manifest?.version || "0.0.0";
+    const version = Constants.expoConfig?.version || "0.0.0";
     return version;
   }
 

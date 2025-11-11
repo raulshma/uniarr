@@ -30,6 +30,7 @@ import { useQuietHoursManager } from "@/hooks/useQuietHoursManager";
 import { useApiErrorLoggerLifecycle } from "@/hooks/useApiErrorLoggerLifecycle";
 import { useVoiceCommandHandler } from "@/hooks/useVoiceCommandHandler";
 import { useServiceLifecycleCoordination } from "@/hooks/useServiceLifecycleCoordination";
+import { useJellyfinSettingsSync } from "@/hooks/useJellyfinSettingsSync";
 import { WidgetDrawerProvider } from "@/services/widgetDrawerService";
 import { GlobalWidgetDrawer } from "@/components/widgets/GlobalWidgetDrawer";
 import { storageInitPromise } from "@/services/storage/MMKVStorage";
@@ -271,6 +272,7 @@ const AppContent = () => {
   useApiErrorLoggerLifecycle();
   useVoiceCommandHandler();
   useServiceLifecycleCoordination();
+  useJellyfinSettingsSync();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>

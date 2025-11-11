@@ -45,6 +45,17 @@ export interface UseTmdbDetailsOptions {
   language?: string;
 }
 
+const buildIncludeVideoLanguageParam = (language?: string): string => {
+  const normalized = new Set<string>();
+  const trimmed = language?.trim().toLowerCase();
+  if (trimmed) {
+    normalized.add(trimmed);
+  }
+  normalized.add("en");
+  normalized.add("null");
+  return Array.from(normalized).join(",");
+};
+
 /**
  * Gets the device locale language code (e.g., "en", "es", "fr").
  * Fallback to "en" if unavailable.
@@ -127,10 +138,13 @@ export const useTmdbDetails = <TType extends TmdbMediaType>(
         "similar",
       ];
 
+      const includeVideoLanguage = buildIncludeVideoLanguageParam(language);
+
       if (mediaType === "movie") {
         const details = await connector.getDetails("movie", tmdbId, {
           language,
           appendToResponse: appendExtras,
+          includeVideoLanguage,
         });
         const movieDetails = details as MovieDetailsWithExtrasResponse;
 
@@ -148,6 +162,7 @@ export const useTmdbDetails = <TType extends TmdbMediaType>(
       const details = await connector.getDetails("tv", tmdbId, {
         language,
         appendToResponse: appendExtras,
+        includeVideoLanguage,
       });
       const tvDetails = details as TvDetailsWithExtrasResponse;
 

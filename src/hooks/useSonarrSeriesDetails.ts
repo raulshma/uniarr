@@ -41,6 +41,18 @@ export interface UseSonarrSeriesDetailsResult {
   ) => Promise<void>;
   isTogglingSeasonMonitor: boolean;
   toggleSeasonMonitorError: unknown;
+  toggleEpisodeMonitor: (
+    seasonNumber: number,
+    episodeNumber: number,
+    nextState: boolean,
+  ) => void;
+  toggleEpisodeMonitorAsync: (
+    seasonNumber: number,
+    episodeNumber: number,
+    nextState: boolean,
+  ) => Promise<void>;
+  isTogglingEpisodeMonitor: boolean;
+  toggleEpisodeMonitorError: unknown;
   triggerSearch: () => void;
   triggerSearchAsync: () => Promise<void>;
   isTriggeringSearch: boolean;
@@ -49,6 +61,13 @@ export interface UseSonarrSeriesDetailsResult {
   searchMissingEpisodesAsync: () => Promise<void>;
   isSearchingMissing: boolean;
   searchMissingError: unknown;
+  searchMissingEpisode: (seasonNumber: number, episodeNumber: number) => void;
+  searchMissingEpisodeAsync: (
+    seasonNumber: number,
+    episodeNumber: number,
+  ) => Promise<void>;
+  isSearchingMissingEpisode: boolean;
+  searchMissingEpisodeError: unknown;
   unmonitorAllEpisodes: () => void;
   unmonitorAllEpisodesAsync: () => Promise<void>;
   isUnmonitoringAll: boolean;
@@ -63,6 +82,22 @@ export interface UseSonarrSeriesDetailsResult {
   }) => Promise<void>;
   isDeleting: boolean;
   deleteError: unknown;
+  deleteEpisodeFile: (episodeFileId: number) => void;
+  deleteEpisodeFileAsync: (episodeFileId: number) => Promise<void>;
+  isDeletingEpisodeFile: boolean;
+  deleteEpisodeFileError: unknown;
+  removeAndSearchEpisode: (
+    episodeFileId: number,
+    seasonNumber: number,
+    episodeNumber: number,
+  ) => void;
+  removeAndSearchEpisodeAsync: (
+    episodeFileId: number,
+    seasonNumber: number,
+    episodeNumber: number,
+  ) => Promise<void>;
+  isRemovingAndSearching: boolean;
+  removeAndSearchError: unknown;
 }
 
 const SONARR_SERVICE_TYPE = "sonarr";
@@ -160,6 +195,43 @@ export const useSonarrSeriesDetails = ({
     },
   });
 
+  const toggleEpisodeMonitorMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "episodeMonitor",
+    ],
+    mutationFn: async ({
+      seasonNumber,
+      episodeNumber,
+      nextState,
+    }: {
+      seasonNumber: number;
+      episodeNumber: number;
+      nextState: boolean;
+    }) => {
+      const connector = resolveConnector();
+      await connector.setEpisodeMonitored(
+        seriesId,
+        seasonNumber,
+        episodeNumber,
+        nextState,
+      );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceId),
+        }),
+      ]);
+    },
+  });
+
   const triggerSearchMutation = useMutation({
     mutationKey: [
       ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
@@ -179,6 +251,39 @@ export const useSonarrSeriesDetails = ({
     mutationFn: async () => {
       const connector = resolveConnector();
       await connector.searchMissingEpisodes(seriesId);
+    },
+  });
+
+  const searchMissingEpisodeMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "searchMissingEpisode",
+    ],
+    mutationFn: async ({
+      seasonNumber,
+      episodeNumber,
+    }: {
+      seasonNumber: number;
+      episodeNumber: number;
+    }) => {
+      const connector = resolveConnector();
+
+      // Fetch series to get the episode ID
+      const series = await connector.getById(seriesId);
+      const episode = series.seasons
+        ?.flatMap((s) => s.episodes ?? [])
+        .find(
+          (ep) =>
+            ep.seasonNumber === seasonNumber &&
+            ep.episodeNumber === episodeNumber,
+        );
+
+      if (!episode || !episode.id) {
+        throw new Error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
+      }
+
+      // Search using episodeIds with correct API format
+      await connector.searchEpisodesByIds([episode.id]);
     },
   });
 
@@ -236,6 +341,103 @@ export const useSonarrSeriesDetails = ({
     },
   });
 
+  const deleteEpisodeFileMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "deleteEpisodeFile",
+    ],
+    mutationFn: async (episodeFileId: number) => {
+      const connector = resolveConnector();
+      await connector.deleteEpisodeFile(episodeFileId);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceId),
+        }),
+      ]);
+    },
+  });
+
+  const removeAndSearchEpisodeMutation = useMutation({
+    mutationKey: [
+      ...queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+      "removeAndSearchEpisode",
+    ],
+    mutationFn: async ({
+      episodeFileId,
+      seasonNumber,
+      episodeNumber,
+    }: {
+      episodeFileId: number;
+      seasonNumber: number;
+      episodeNumber: number;
+    }) => {
+      const connector = resolveConnector();
+
+      // First, fetch series to get the episode ID
+      const series = await connector.getById(seriesId);
+      const episode = series.seasons
+        ?.flatMap((s) => s.episodes ?? [])
+        .find(
+          (ep) =>
+            ep.seasonNumber === seasonNumber &&
+            ep.episodeNumber === episodeNumber,
+        );
+
+      if (!episode || !episode.id) {
+        throw new Error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
+      }
+
+      // Delete the episode file
+      await connector.deleteEpisodeFile(episodeFileId);
+      // Wait
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Ensure the episode is monitored
+      await connector.setEpisodeMonitored(
+        seriesId,
+        seasonNumber,
+        episodeNumber,
+        true,
+      );
+
+      // Search for the episode BEFORE deleting the file using episodeIds
+      // This ensures the search command works while episode is in valid state
+      await connector.searchEpisodesByIds([episode.id]);
+
+      // Wait for deletion to complete
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Re-monitor the episode after deletion
+      // (Sonarr automatically unmonitors episodes when their files are deleted)
+      await connector.setEpisodeMonitored(
+        seriesId,
+        seasonNumber,
+        episodeNumber,
+        true,
+      );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.seriesList(serviceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.sonarr.queue(serviceId),
+        }),
+      ]);
+    },
+  });
+
   return {
     series: detailsQuery.data,
     isLoading: detailsQuery.isLoading,
@@ -253,6 +455,28 @@ export const useSonarrSeriesDetails = ({
       toggleSeasonMonitorMutation.mutateAsync({ seasonNumber, nextState }),
     isTogglingSeasonMonitor: toggleSeasonMonitorMutation.isPending,
     toggleSeasonMonitorError: toggleSeasonMonitorMutation.error,
+    toggleEpisodeMonitor: (
+      seasonNumber: number,
+      episodeNumber: number,
+      nextState: boolean,
+    ) =>
+      toggleEpisodeMonitorMutation.mutate({
+        seasonNumber,
+        episodeNumber,
+        nextState,
+      }),
+    toggleEpisodeMonitorAsync: (
+      seasonNumber: number,
+      episodeNumber: number,
+      nextState: boolean,
+    ) =>
+      toggleEpisodeMonitorMutation.mutateAsync({
+        seasonNumber,
+        episodeNumber,
+        nextState,
+      }),
+    isTogglingEpisodeMonitor: toggleEpisodeMonitorMutation.isPending,
+    toggleEpisodeMonitorError: toggleEpisodeMonitorMutation.error,
     triggerSearch: triggerSearchMutation.mutate,
     triggerSearchAsync: triggerSearchMutation.mutateAsync,
     isTriggeringSearch: triggerSearchMutation.isPending,
@@ -261,6 +485,15 @@ export const useSonarrSeriesDetails = ({
     searchMissingEpisodesAsync: searchMissingEpisodesMutation.mutateAsync,
     isSearchingMissing: searchMissingEpisodesMutation.isPending,
     searchMissingError: searchMissingEpisodesMutation.error,
+    searchMissingEpisode: (seasonNumber: number, episodeNumber: number) =>
+      searchMissingEpisodeMutation.mutate({ seasonNumber, episodeNumber }),
+    searchMissingEpisodeAsync: (seasonNumber: number, episodeNumber: number) =>
+      searchMissingEpisodeMutation.mutateAsync({
+        seasonNumber,
+        episodeNumber,
+      }),
+    isSearchingMissingEpisode: searchMissingEpisodeMutation.isPending,
+    searchMissingEpisodeError: searchMissingEpisodeMutation.error,
     unmonitorAllEpisodes: unmonitorAllEpisodesMutation.mutate,
     unmonitorAllEpisodesAsync: unmonitorAllEpisodesMutation.mutateAsync,
     isUnmonitoringAll: unmonitorAllEpisodesMutation.isPending,
@@ -269,5 +502,33 @@ export const useSonarrSeriesDetails = ({
     deleteSeriesAsync: deleteSeriesMutation.mutateAsync,
     isDeleting: deleteSeriesMutation.isPending,
     deleteError: deleteSeriesMutation.error,
+    deleteEpisodeFile: (episodeFileId: number) =>
+      deleteEpisodeFileMutation.mutate(episodeFileId),
+    deleteEpisodeFileAsync: (episodeFileId: number) =>
+      deleteEpisodeFileMutation.mutateAsync(episodeFileId),
+    isDeletingEpisodeFile: deleteEpisodeFileMutation.isPending,
+    deleteEpisodeFileError: deleteEpisodeFileMutation.error,
+    removeAndSearchEpisode: (
+      episodeFileId: number,
+      seasonNumber: number,
+      episodeNumber: number,
+    ) =>
+      removeAndSearchEpisodeMutation.mutate({
+        episodeFileId,
+        seasonNumber,
+        episodeNumber,
+      }),
+    removeAndSearchEpisodeAsync: (
+      episodeFileId: number,
+      seasonNumber: number,
+      episodeNumber: number,
+    ) =>
+      removeAndSearchEpisodeMutation.mutateAsync({
+        episodeFileId,
+        seasonNumber,
+        episodeNumber,
+      }),
+    isRemovingAndSearching: removeAndSearchEpisodeMutation.isPending,
+    removeAndSearchError: removeAndSearchEpisodeMutation.error,
   };
 };

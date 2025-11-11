@@ -91,8 +91,12 @@ type SettingsData = {
   // (thumbnail generation removed)
   // Backdrop with blur experimental feature
   enableBackdropWithBlur: boolean;
+  // Show video trailers in detail pages
+  trailerFeatureEnabled: boolean;
   discoverBannerDismissed: boolean;
   animeHubBannerDismissed: boolean;
+  // BYOK (Bring Your Own Keys) - API key configurations
+  byokGeocodeMapsCoApiKey?: string;
 };
 
 interface SettingsState extends SettingsData {
@@ -142,8 +146,10 @@ interface SettingsState extends SettingsData {
   // (thumbnail setters removed)
   // Backdrop with blur experimental feature
   setBackdropWithBlurEnabled: (enabled: boolean) => void;
+  setTrailerFeatureEnabled: (enabled: boolean) => void;
   setDiscoverBannerDismissed: (dismissed: boolean) => void;
   setAnimeHubBannerDismissed: (dismissed: boolean) => void;
+  setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) => void;
 }
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
@@ -240,8 +246,10 @@ const createDefaultSettings = (): SettingsData => ({
   // (thumbnail defaults removed)
   // Backdrop with blur defaults
   enableBackdropWithBlur: false, // Opt-in feature
+  trailerFeatureEnabled: false, // Opt-in feature
   discoverBannerDismissed: false,
   animeHubBannerDismissed: false,
+  byokGeocodeMapsCoApiKey: undefined,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -326,10 +334,14 @@ export const useSettingsStore = create<SettingsState>()(
       setLoaderConfig: (config: LoaderConfig) => set({ loaderConfig: config }),
       setBackdropWithBlurEnabled: (enabled: boolean) =>
         set({ enableBackdropWithBlur: enabled }),
+      setTrailerFeatureEnabled: (enabled: boolean) =>
+        set({ trailerFeatureEnabled: enabled }),
       setDiscoverBannerDismissed: (dismissed: boolean) =>
         set({ discoverBannerDismissed: dismissed }),
       setAnimeHubBannerDismissed: (dismissed: boolean) =>
         set({ animeHubBannerDismissed: dismissed }),
+      setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) =>
+        set({ byokGeocodeMapsCoApiKey: apiKey }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -383,11 +395,13 @@ export const useSettingsStore = create<SettingsState>()(
         loaderConfig: state.loaderConfig,
         // thumbnail fields removed
         enableBackdropWithBlur: state.enableBackdropWithBlur,
+        trailerFeatureEnabled: state.trailerFeatureEnabled,
         discoverBannerDismissed: state.discoverBannerDismissed,
         animeHubBannerDismissed: state.animeHubBannerDismissed,
+        byokGeocodeMapsCoApiKey: state.byokGeocodeMapsCoApiKey,
       }),
       // Bump version since we're adding new persisted fields
-      version: 12,
+      version: 13,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -486,6 +500,11 @@ export const useSettingsStore = create<SettingsState>()(
           state.gradientBackgroundEnabled = true;
         }
 
+        // Ensure trailerFeatureEnabled is properly initialized
+        if (typeof state.trailerFeatureEnabled !== "boolean") {
+          state.trailerFeatureEnabled = false;
+        }
+
         if (state.lastCalendarRange) {
           const { start, end } = state.lastCalendarRange;
           const startDate = start ? new Date(start) : undefined;
@@ -569,6 +588,9 @@ export const useSettingsStore = create<SettingsState>()(
             partial.gradientBackgroundEnabled ??
             baseDefaults.gradientBackgroundEnabled,
           loaderConfig: partial.loaderConfig ?? baseDefaults.loaderConfig,
+          trailerFeatureEnabled:
+            partial.trailerFeatureEnabled ?? baseDefaults.trailerFeatureEnabled,
+          byokGeocodeMapsCoApiKey: partial.byokGeocodeMapsCoApiKey ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -632,4 +654,6 @@ export const selectFrostedWidgetsEnabled = (state: SettingsState): boolean =>
 export const selectGradientBackgroundEnabled = (
   state: SettingsState,
 ): boolean => state.gradientBackgroundEnabled;
+export const selectTrailerFeatureEnabled = (state: SettingsState): boolean =>
+  state.trailerFeatureEnabled;
 export const selectLoaderConfig = (state: SettingsState) => state.loaderConfig;

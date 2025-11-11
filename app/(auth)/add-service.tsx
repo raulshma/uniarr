@@ -36,6 +36,8 @@ import {
 } from "@/utils/validation.utils";
 import { testApiKeyFormat } from "@/utils/api-key-validator";
 import { debugLogger } from "@/utils/debug-logger";
+import { extractJellyfinAddress } from "@/utils/jellyfin.utils";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const allServiceTypes: ServiceType[] = [
   "sonarr",
@@ -136,6 +138,12 @@ const AddServiceScreen = () => {
   const params = useLocalSearchParams();
   const queryClient = useQueryClient();
   const theme = useTheme<AppTheme>();
+  const setJellyfinLocalAddress = useSettingsStore(
+    (state) => state.setJellyfinLocalAddress,
+  );
+  const setJellyfinPublicAddress = useSettingsStore(
+    (state) => state.setJellyfinPublicAddress,
+  );
 
   const supportedTypes = useMemo(
     () => ConnectorFactory.getSupportedTypes(),
@@ -530,6 +538,15 @@ const AddServiceScreen = () => {
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
 
+        // Auto-populate Jellyfin addresses in settings store
+        if (config.type === "jellyfin") {
+          const jellyfinAddress = extractJellyfinAddress(config);
+          if (jellyfinAddress) {
+            setJellyfinLocalAddress(jellyfinAddress);
+            setJellyfinPublicAddress(jellyfinAddress);
+          }
+        }
+
         await queryClient.invalidateQueries({
           queryKey: queryKeys.services.overview,
         });
@@ -575,6 +592,8 @@ const AddServiceScreen = () => {
       router,
       runConnectionTest,
       supportedTypeSet,
+      setJellyfinLocalAddress,
+      setJellyfinPublicAddress,
     ],
   );
 

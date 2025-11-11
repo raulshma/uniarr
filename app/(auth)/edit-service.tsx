@@ -35,6 +35,8 @@ import {
 } from "@/utils/validation.utils";
 import { testApiKeyFormat } from "@/utils/api-key-validator";
 import { debugLogger } from "@/utils/debug-logger";
+import { extractJellyfinAddress } from "@/utils/jellyfin.utils";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const allServiceTypes: ServiceType[] = [
   "sonarr",
@@ -120,6 +122,12 @@ const EditServiceScreen = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const theme = useTheme<AppTheme>();
+  const setJellyfinLocalAddress = useSettingsStore(
+    (state) => state.setJellyfinLocalAddress,
+  );
+  const setJellyfinPublicAddress = useSettingsStore(
+    (state) => state.setJellyfinPublicAddress,
+  );
   const { serviceId } = useLocalSearchParams<{ serviceId: string }>();
 
   const [existingConfig, setExistingConfig] = useState<ServiceConfig | null>(
@@ -521,6 +529,15 @@ const EditServiceScreen = () => {
         const manager = ConnectorManager.getInstance();
         await manager.addConnector(config);
 
+        // Auto-populate Jellyfin addresses in settings store when updating a Jellyfin service
+        if (config.type === "jellyfin") {
+          const jellyfinAddress = extractJellyfinAddress(config);
+          if (jellyfinAddress) {
+            setJellyfinLocalAddress(jellyfinAddress);
+            setJellyfinPublicAddress(jellyfinAddress);
+          }
+        }
+
         await queryClient.invalidateQueries({
           queryKey: queryKeys.services.overview,
         });
@@ -557,6 +574,8 @@ const EditServiceScreen = () => {
       router,
       runConnectionTest,
       supportedTypeSet,
+      setJellyfinLocalAddress,
+      setJellyfinPublicAddress,
     ],
   );
 

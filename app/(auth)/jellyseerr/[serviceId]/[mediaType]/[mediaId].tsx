@@ -25,15 +25,16 @@ import {
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { skeletonTiming } from "@/constants/skeletonTiming";
-import DetailPageSkeleton from "@/components/discover/DetailPageSkeleton";
-import DetailHero from "@/components/media/DetailHero/DetailHero";
+import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import { spacing } from "@/theme/spacing";
+import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { EmptyState } from "@/components/common/EmptyState";
 import { alert } from "@/services/dialogService";
 import type { AppTheme } from "@/constants/theme";
 import { useJellyseerrMediaDetails } from "@/hooks/useJellyseerrMediaDetails";
+import { useSettingsStore } from "@/store/settingsStore";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
@@ -115,6 +116,15 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     return typeof p === "string" ? p : undefined;
   };
 
+  const getBackdropPath = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const b =
+      r?.backdropPath ??
+      (r?.mediaInfo && (r.mediaInfo as any)?.backdropPath) ??
+      undefined;
+    return typeof b === "string" ? b : undefined;
+  };
+
   const getExternalUrl = (d?: JellyDetails) => {
     const r = toRecord(d);
     const v =
@@ -138,6 +148,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
 
   // Local convenience values used in render
   const posterPath = getPosterPath(data);
+  const backdropPath = getBackdropPath(data);
   const title = getTitle(data);
   const originalTitle = getOriginalTitle(data);
   const tagline = getTagline(data);
@@ -185,9 +196,23 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     return Array.isArray(s) ? (s as any[]) : [];
   };
 
+  const getTrailerVideoKey = (d?: JellyDetails) => {
+    const r = toRecord(d);
+    const videos = r?.relatedVideos ?? undefined;
+    if (!Array.isArray(videos)) return undefined;
+    const trailer = (videos as any[]).find(
+      (v: any) => v?.site === "YouTube" && v?.type === "Trailer",
+    );
+    return trailer?.key ?? undefined;
+  };
+
   const genres = getGenres(data);
   const alternateTitles = getAlternateTitles(data);
   const seasons = isTv ? getSeasons(data) : [];
+  const trailerVideoKey = getTrailerVideoKey(data);
+  const trailerFeatureEnabled = useSettingsStore(
+    (s) => s.trailerFeatureEnabled,
+  );
 
   const connector = useMemo(() => {
     const c = ConnectorManager.getInstance().getConnector(serviceId) as
@@ -391,7 +416,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
         console.warn("loadJellyseerrOptions failed", error);
       }
     },
-    [data, mediaTypeNormalized],
+    [data, mediaTypeNormalized, mediaId],
   );
 
   const handleServerChange = useCallback(
@@ -529,6 +554,11 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
           alignItems: "center",
           marginBottom: spacing.lg,
         },
+        trailerContainer: {
+          marginBottom: spacing.lg,
+          borderRadius: 12,
+          overflow: "hidden",
+        },
         titleContainer: {
           alignItems: "center",
           marginBottom: spacing.md,
@@ -599,26 +629,152 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
   }
 
   if (skeleton.showSkeleton && isLoading && !data) {
-    const posterPath = getPosterPath(data);
     return (
       <SafeAreaView style={styles.safeArea}>
-        <DetailHero
-          posterUri={
-            posterPath
-              ? `https://image.tmdb.org/t/p/w342${posterPath}`
-              : undefined
-          }
-          onBack={() => router.back()}
-        >
-          <ScrollView
-            contentContainerStyle={{
-              paddingHorizontal: spacing.lg,
-              paddingBottom: spacing.xxxxl,
-            }}
+        <View style={styles.container}>
+          <Animated.View
+            style={styles.header}
+            entering={FadeInDown.delay(200).springify()}
           >
-            <DetailPageSkeleton />
+            <Button mode="text" onPress={() => router.back()}>
+              Back
+            </Button>
+          </Animated.View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: spacing.xl }}
+          >
+            {/* Poster skeleton */}
+            <Animated.View
+              style={styles.posterContainer}
+              entering={FadeIn.delay(400)}
+            >
+              <SkeletonPlaceholder width={200} height={300} borderRadius={12} />
+            </Animated.View>
+
+            {/* Title skeleton */}
+            <Animated.View
+              style={styles.titleContainer}
+              entering={FadeIn.delay(500)}
+            >
+              <SkeletonPlaceholder
+                width="80%"
+                height={32}
+                borderRadius={4}
+                style={{ alignSelf: "center", marginBottom: spacing.xs }}
+              />
+              <SkeletonPlaceholder
+                width="60%"
+                height={20}
+                borderRadius={4}
+                style={{ alignSelf: "center", marginTop: spacing.xs }}
+              />
+              <SkeletonPlaceholder
+                width="70%"
+                height={18}
+                borderRadius={4}
+                style={{ alignSelf: "center", marginTop: spacing.xs }}
+              />
+            </Animated.View>
+
+            {/* Overview card skeleton */}
+            <Animated.View entering={FadeIn.delay(600)}>
+              <Card style={styles.card}>
+                <Card.Content style={styles.cardContent}>
+                  <SkeletonPlaceholder
+                    width="100%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="100%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="100%"
+                    height={16}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.xs }}
+                  />
+                  <SkeletonPlaceholder
+                    width="60%"
+                    height={16}
+                    borderRadius={4}
+                  />
+                </Card.Content>
+              </Card>
+            </Animated.View>
+
+            {/* Media details card skeleton */}
+            <Animated.View entering={FadeIn.delay(700)}>
+              <Card style={styles.card}>
+                <Card.Content style={styles.cardContent}>
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <View key={i} style={styles.detailRow}>
+                      <SkeletonPlaceholder
+                        width="30%"
+                        height={16}
+                        borderRadius={4}
+                      />
+                      <SkeletonPlaceholder
+                        width="40%"
+                        height={16}
+                        borderRadius={4}
+                      />
+                    </View>
+                  ))}
+                </Card.Content>
+              </Card>
+            </Animated.View>
+
+            {/* Genres card skeleton */}
+            <Animated.View entering={FadeIn.delay(800)}>
+              <Card style={styles.card}>
+                <Card.Content style={styles.cardContent}>
+                  <SkeletonPlaceholder
+                    width="30%"
+                    height={20}
+                    borderRadius={4}
+                    style={{ marginBottom: spacing.sm }}
+                  />
+                  <View style={styles.genresContainer}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <SkeletonPlaceholder
+                        key={i}
+                        width={80}
+                        height={32}
+                        borderRadius={16}
+                      />
+                    ))}
+                  </View>
+                </Card.Content>
+              </Card>
+            </Animated.View>
+
+            {/* Action buttons skeleton */}
+            <Animated.View
+              style={styles.buttonsContainer}
+              entering={FadeIn.delay(1100)}
+            >
+              <SkeletonPlaceholder
+                width="100%"
+                height={48}
+                borderRadius={4}
+                style={{ flex: 1 }}
+              />
+              <SkeletonPlaceholder
+                width="100%"
+                height={48}
+                borderRadius={4}
+                style={{ flex: 1 }}
+              />
+            </Animated.View>
           </ScrollView>
-        </DetailHero>
+        </View>
       </SafeAreaView>
     );
   }
@@ -727,6 +883,19 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   </Text>
                 </Card.Content>
               </Card>
+            </Animated.View>
+          ) : null}
+          {/* Trailer Fade Overlay - shows trailer if enabled and available */}
+          {trailerFeatureEnabled && trailerVideoKey && backdropPath ? (
+            <Animated.View
+              style={styles.trailerContainer}
+              entering={FadeIn.delay(350)}
+            >
+              <TrailerFadeOverlay
+                backdropUri={`https://image.tmdb.org/t/p/w1280${backdropPath}`}
+                videoKey={trailerVideoKey}
+                height={200}
+              />
             </Animated.View>
           ) : null}
 
@@ -1047,10 +1216,6 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                   <View style={{ marginTop: spacing.xs }}>
                     {rootFolders.map((r) => {
                       const free = (r as any).freeSpace;
-                      const label =
-                        free != null
-                          ? `${r.path} (${(free / (1024 * 1024 * 1024)).toFixed(2)} GB free)`
-                          : r.path;
                       return (
                         <View key={r.path} style={{ marginTop: spacing.xs }}>
                           <Button
