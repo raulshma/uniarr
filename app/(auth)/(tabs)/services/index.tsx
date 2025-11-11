@@ -90,6 +90,7 @@ const serviceDisplayNames: Record<ServiceType, string> = {
   prowlarr: "Indexer",
   bazarr: "Subtitle Manager",
   adguard: "DNS Protection",
+  homarr: "Dashboard",
 };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
@@ -107,6 +108,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
   adguard: "AdGuard Home",
+  homarr: "Homarr",
 };
 
 const serviceIcons: Record<ServiceType, string> = {
@@ -124,6 +126,7 @@ const serviceIcons: Record<ServiceType, string> = {
   prowlarr: "radar",
   bazarr: "subtitles",
   adguard: "shield-check",
+  homarr: "view-dashboard",
 };
 
 const fetchServiceConfigs = async (): Promise<ServiceConfig[]> => {

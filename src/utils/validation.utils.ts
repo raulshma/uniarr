@@ -17,6 +17,7 @@ const serviceTypeValues = [
   "prowlarr",
   "bazarr",
   "adguard",
+  "homarr",
 ] as const satisfies readonly ServiceType[];
 
 const httpSchemeRegex = /^https?:\/\//i;

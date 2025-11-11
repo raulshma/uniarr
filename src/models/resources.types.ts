@@ -36,7 +36,8 @@ export type ServiceType =
   | "jellyfin"
   | "bazarr"
   | "adguard"
-  | "tmdb";
+  | "tmdb"
+  | "homarr";
 
 export interface ResourceLink {
   title: string;

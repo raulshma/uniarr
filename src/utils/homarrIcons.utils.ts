@@ -20,6 +20,7 @@ const homarrIconNames: Record<ServiceType, string> = {
   prowlarr: "prowlarr",
   bazarr: "bazarr",
   adguard: "adguard",
+  homarr: "homarr",
 };
 
 /**
