@@ -1073,6 +1073,37 @@ const SettingsScreen = () => {
           </SettingsGroup>
         </AnimatedSection>
 
+        {/* Resources Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>Learning & Support</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Resources & Documentation"
+                subtitle="Guides, troubleshooting, and API reference"
+                left={{ iconName: "book-open-variant" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/resources")}
+                groupPosition="single"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
         {/* System Section */}
         <AnimatedSection
           style={styles.section}

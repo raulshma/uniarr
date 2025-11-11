@@ -72,6 +72,7 @@
     "react-native-get-random-values": "^1.11.0",
     "react-native-localize": "^3.5.4",
     "react-native-maps": "1.20.1",
+    "react-native-marked": "^7.0.2",
     "react-native-mmkv": "^4.0.0",
     "react-native-network-info": "^5.2.1",
     "react-native-nitro-modules": "^0.31.3",
