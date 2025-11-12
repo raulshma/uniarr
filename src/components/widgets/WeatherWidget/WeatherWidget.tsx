@@ -110,7 +110,6 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const units: WeatherUnits = config.units ?? "metric";
   const unitsLabel = units === "imperial" ? "imperial" : "metric";
-  const showInDashboardHeader = config.showInDashboardHeader ?? false;
   const styles = useMemo(() => createStyles(theme), [theme]);
   const configSignature = useMemo(
     () => createWidgetConfigSignature(config),

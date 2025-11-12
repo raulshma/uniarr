@@ -187,6 +187,19 @@ const DiscoverScreen = () => {
 
   const { itemsInLibrary } = useBatchCheckInLibrary(allItems);
 
+  const inLibraryIds = useMemo(() => {
+    if (itemsInLibrary instanceof Map) {
+      const ids = new Set<string>();
+      itemsInLibrary.forEach((entry, id) => {
+        if (entry?.services?.length) {
+          ids.add(id);
+        }
+      });
+      return ids;
+    }
+    return new Set<string>();
+  }, [itemsInLibrary]);
+
   // Get a backdrop image from the discover data for the background
   const backgroundImageUri = useMemo(() => {
     // Find the first item with a backdrop URL
@@ -435,82 +448,104 @@ const DiscoverScreen = () => {
     handleDialogDismiss();
   }, [dialogItem, handleDialogDismiss, router, selectedServiceId]);
 
-  const renderSection = (
-    section: DiscoverSection,
-    order: number,
-  ): React.ReactElement => {
-    const { id: sectionId, title, subtitle, items } = section;
+  const renderSection = useCallback(
+    (section: DiscoverSection, order: number): React.ReactElement => {
+      const { id: sectionId, title, subtitle, items } = section;
 
-    const shouldShowSkeleton =
-      sectionId.startsWith("placeholder-") ||
-      (items.length === 0 && isFetching);
+      const shouldShowSkeleton =
+        sectionId.startsWith("placeholder-") ||
+        (items.length === 0 && isFetching);
 
-    if (shouldShowSkeleton) {
-      return <SectionSkeleton />;
-    }
+      if (shouldShowSkeleton) {
+        return <SectionSkeleton />;
+      }
 
-    const entranceDelay = Math.min(order * 80, 320);
+      const entranceDelay = Math.min(order * 80, 320);
 
-    return (
-      <AnimatedSection
-        delay={entranceDelay}
-        animated={allowAnimations}
-        style={styles.sectionContainer}
-      >
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>{title}</Text>
-            {subtitle ? (
-              <Text style={styles.sectionSubtitle}>{subtitle}</Text>
-            ) : null}
+      const handleViewAllPress = () => openSectionPage(sectionId);
+
+      const getItemLayout = (
+        _: unknown,
+        index: number,
+      ): { length: number; offset: number; index: number } => {
+        const ITEM_WIDTH = 152 + spacing.md; // card width + marginRight
+        return {
+          length: ITEM_WIDTH,
+          offset: ITEM_WIDTH * index,
+          index,
+        };
+      };
+
+      return (
+        <AnimatedSection
+          delay={entranceDelay}
+          animated={allowAnimations}
+          style={styles.sectionContainer}
+        >
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>{title}</Text>
+              {subtitle ? (
+                <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+              ) : null}
+            </View>
+            <PaperButton
+              mode="text"
+              compact
+              onPress={handleViewAllPress}
+              textColor={theme.colors.primary}
+            >
+              View all
+            </PaperButton>
           </View>
-          <PaperButton
-            mode="text"
-            compact
-            onPress={() => openSectionPage(sectionId)}
-            textColor={theme.colors.primary}
-          >
-            View all
-          </PaperButton>
-        </View>
-        <FlatList
-          data={items}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item, index }) => {
-            const itemsInLibraryHas =
-              !!itemsInLibrary &&
-              typeof (itemsInLibrary as any).has === "function";
+          <FlatList
+            data={items}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            getItemLayout={getItemLayout}
+            initialNumToRender={6}
+            windowSize={5}
+            renderItem={({ item, index }) => {
+              const isInLibrary = inLibraryIds.has(item.id);
 
-            const isInLibrary =
-              itemsInLibraryHas &&
-              (itemsInLibrary as Map<string, any>).has(item.id) &&
-              ((itemsInLibrary as Map<string, any>).get(item.id)?.services
-                ?.length ?? 0) > 0;
-
-            return (
-              <AnimatedListItem
-                index={index}
-                totalItems={items.length}
-                staggerDelay={50}
-                animated={allowAnimations}
-              >
-                <DiscoverCard
-                  item={item}
-                  isInLibrary={isInLibrary}
-                  onPress={handleCardPress}
-                  onAdd={openServicePicker}
-                  theme={theme}
-                />
-              </AnimatedListItem>
-            );
-          }}
-        />
-      </AnimatedSection>
-    );
-  };
+              return (
+                <AnimatedListItem
+                  index={index}
+                  totalItems={items.length}
+                  staggerDelay={50}
+                  animated={allowAnimations}
+                >
+                  <DiscoverCard
+                    item={item}
+                    isInLibrary={isInLibrary}
+                    onPress={handleCardPress}
+                    onAdd={openServicePicker}
+                    theme={theme}
+                  />
+                </AnimatedListItem>
+              );
+            }}
+          />
+        </AnimatedSection>
+      );
+    },
+    [
+      allowAnimations,
+      handleCardPress,
+      inLibraryIds,
+      isFetching,
+      openSectionPage,
+      openServicePicker,
+      styles.listContent,
+      styles.sectionContainer,
+      styles.sectionHeader,
+      styles.sectionSubtitle,
+      styles.sectionTitle,
+      theme,
+    ],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -583,6 +618,8 @@ const DiscoverScreen = () => {
           renderItem={({ item, index }) => renderSection(item, index)}
           contentContainerStyle={[styles.content, styles.sectionsContainer]}
           onScroll={scrollHandler}
+          initialNumToRender={3}
+          windowSize={5}
           scrollEventThrottle={16}
           ListHeaderComponent={
             <AnimatedSection

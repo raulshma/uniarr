@@ -116,7 +116,7 @@ const TmdbDiscoverScreen = () => {
     [theme],
   );
 
-  const { apiKey } = useTmdbKey();
+  const { apiKey, isLoading: keyLoading } = useTmdbKey();
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
 
@@ -135,11 +135,11 @@ const TmdbDiscoverScreen = () => {
   const [errorBannerDismissed, setErrorBannerDismissed] = useState(false);
 
   const genresQuery = useTmdbGenres(filters.mediaType, {
-    enabled: tmdbEnabled && Boolean(apiKey),
+    enabled: tmdbEnabled && Boolean(apiKey) && !keyLoading,
   });
 
   const discoverQuery = useTmdbDiscover(filters, {
-    enabled: tmdbEnabled && Boolean(apiKey),
+    enabled: tmdbEnabled && Boolean(apiKey) && !keyLoading,
   });
 
   useEffect(() => {
@@ -214,6 +214,7 @@ const TmdbDiscoverScreen = () => {
   }, [discoverQuery.error]);
 
   const hasCredentials = Boolean(apiKey);
+  const isCheckingCredentials = keyLoading;
 
   const sonarrServices = useMemo(
     () => mapServiceSummaries(getConnectorsByType("sonarr")),
@@ -421,7 +422,8 @@ const TmdbDiscoverScreen = () => {
 
     return chips;
   }, [filters, genresQuery.data]);
-  const isInitialLoading = discoverQuery.isLoading && !discoverQuery.isFetched;
+  const isInitialLoading =
+    keyLoading || (discoverQuery.isLoading && !discoverQuery.isFetched);
   const showErrorEmptyState = Boolean(
     !items.length && discoverQuery.isError && errorMessage,
   );
@@ -436,7 +438,7 @@ const TmdbDiscoverScreen = () => {
     discoverQuery.isFetching,
   );
 
-  const renderContent = () => {
+  const renderContent = useCallback(() => {
     let body: React.ReactNode;
 
     if (isInitialLoading) {
@@ -532,7 +534,22 @@ const TmdbDiscoverScreen = () => {
         {body}
       </View>
     );
-  };
+  }, [
+    allowAnimations,
+    discoverQuery,
+    errorMessage,
+    fetchNextPage,
+    filterSummaryChips,
+    handleAdd,
+    handleCardPress,
+    isInitialLoading,
+    items,
+    setErrorBannerDismissed,
+    setFiltersDrawerVisible,
+    styles,
+    showErrorBanner,
+    showErrorEmptyState,
+  ]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -553,6 +570,14 @@ const TmdbDiscoverScreen = () => {
               description="Enable TMDB integration in Settings to start browsing TMDB recommendations."
               actionLabel="Open settings"
               onActionPress={() => router.push("/(auth)/settings/tmdb")}
+            />
+          </View>
+        ) : isCheckingCredentials ? (
+          <View style={styles.emptyWrapper}>
+            <EmptyState
+              title="Loading"
+              description="Checking TMDB credentials..."
+              icon="progress-clock"
             />
           </View>
         ) : !hasCredentials ? (

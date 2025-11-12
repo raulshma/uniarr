@@ -134,6 +134,8 @@ const fetchServiceConfigs = async (): Promise<ServiceConfig[]> => {
   return configs;
 };
 
+const getItemType = () => "service";
+
 // Component that collects health data from all services for overview metrics
 // Handles up to 10 services with individual queries (covers most realistic use cases)
 const ServiceOverviewMetrics = React.memo(
@@ -798,7 +800,6 @@ const ServicesScreen = () => {
       isDarkTheme,
       styles,
       handleServicePress,
-      setSelectedService,
       handleEditService,
       handleDeleteService,
       handleSettingsPress,
@@ -809,8 +810,6 @@ const ServicesScreen = () => {
     (item: ServiceConfig) => `service-${item.id}`,
     [],
   );
-
-  const getItemType = useCallback(() => "service", []);
 
   const listEmptyComponent = useMemo(() => {
     if (isError) {

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useRef } from "react";
 import { View, ScrollView, StyleSheet, Pressable, Linking } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -188,9 +188,26 @@ const DiscoverItemDetails = () => {
   const [submitError, setSubmitError] = useState<string>("");
 
   // Track pending async operations for cleanup on unmount
-  const abortControllerRef = React.useRef<AbortController>(
-    new AbortController(),
-  );
+  const abortControllerRef = useRef<AbortController>(new AbortController());
+
+  // Detect anime for the current item using the TMDB details if available.
+  const isAnimeLocal = useMemo(() => {
+    const tmdbDetails = tmdbDetailsQuery.data?.details as any | undefined;
+    if (!tmdbDetails) return false;
+    try {
+      const originalLang = tmdbDetails?.original_language;
+      if (typeof originalLang === "string" && originalLang === "ja") {
+        return true;
+      }
+      const detGenres = tmdbDetails?.genres ?? [];
+      const names = (detGenres ?? []).map((g: any) =>
+        (g.name || "").toLowerCase(),
+      );
+      return names.includes("anime") || names.includes("animation");
+    } catch {
+      return false;
+    }
+  }, [tmdbDetailsQuery.data?.details]);
 
   // Fetch releases on-demand when user expands the releases section
   const releasesQuery = useDiscoverReleases(
@@ -601,25 +618,6 @@ const DiscoverItemDetails = () => {
         const serverAnimeDirectory =
           (serverObj as any)?.activeAnimeDirectory ?? null;
 
-        // Detect anime for the current item using the TMDB details if available.
-        const tmdbDetails = tmdbDetailsQuery.data?.details as any | undefined;
-        let isAnimeLocal = false;
-        try {
-          const originalLang = tmdbDetails?.original_language;
-          if (typeof originalLang === "string" && originalLang === "ja") {
-            isAnimeLocal = true;
-          }
-          const detGenres = tmdbDetails?.genres ?? [];
-          const names = (detGenres ?? []).map((g: any) => {
-            return (g.name || "").toLowerCase();
-          });
-          if (names.includes("anime") || names.includes("animation")) {
-            isAnimeLocal = true;
-          }
-        } catch {
-          /* ignore */
-        }
-
         let selectedProfileId: number | undefined = undefined;
         let selectedRootFolder: string | undefined = undefined;
 
@@ -700,7 +698,7 @@ const DiscoverItemDetails = () => {
         console.warn("handleServerChange failed", error);
       }
     },
-    [currentConnector, item, servers, tmdbDetailsQuery.data?.details],
+    [currentConnector, isAnimeLocal, item, servers],
   );
 
   const handleSubmitRequest = useCallback(async () => {

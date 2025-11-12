@@ -306,7 +306,6 @@ const DashboardWidgets = React.memo(({ theme }: DashboardWidgetsProps) => (
 ));
 
 const DashboardScreen = () => {
-  const router = useRouter();
   const theme = useTheme();
   const { onPress } = useHaptics();
   const insets = useSafeAreaInsets();
@@ -331,10 +330,7 @@ const DashboardScreen = () => {
     any | null
   >(null);
 
-  // Performance monitoring
   useEffect(() => {
-    const mountTime = Date.now();
-
     const loadWeatherSummary = async () => {
       try {
         await widgetService.initialize();
@@ -386,7 +382,7 @@ const DashboardScreen = () => {
     void loadWeatherSummary();
 
     return () => {
-      const unmountTime = Date.now();
+      // Cleanup if needed
     };
   }, []);
 
@@ -466,7 +462,7 @@ const DashboardScreen = () => {
         extrapolate: "clamp",
       }),
     }),
-    [scrollY, headerMaxHeight, headerMinHeight, collapseRange],
+    [scrollY, headerMaxHeight, collapseRange],
   );
 
   // Memoize gradient background to prevent unnecessary re-renders
@@ -518,25 +514,7 @@ const DashboardScreen = () => {
     );
   }, [gradientEnabled, animatedValues]);
 
-  const weatherHeaderRowStyle = useMemo(
-    () => ({
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-      marginTop: theme.custom.spacing.xxxs,
-      gap: theme.custom.spacing.none,
-    }),
-    [theme.custom.spacing.xxxs, theme.custom.spacing.none],
-  );
-
-  const stickyWeatherHeaderRowStyle = useMemo(
-    () => ({
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.custom.spacing.none,
-    }),
-    [theme.custom.spacing.none],
-  );
+  // These styles are defined in DashboardHeader component
 
   const styles = useMemo(
     () =>

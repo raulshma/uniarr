@@ -42,6 +42,15 @@ import { borderRadius } from "@/constants/sizes";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
 // Backup & restore moved to its own settings screen
 
+const ChevronTrailing = ({ onPress }: { onPress?: () => void }) => (
+  <IconButton
+    icon="chevron-right"
+    size={16}
+    iconColor={useTheme<AppTheme>().colors.outline}
+    onPress={onPress}
+  />
+);
+
 // Helper function to format bytes
 const formatBytes = (bytes: number): string => {
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -144,6 +153,10 @@ const SettingsScreen = () => {
   );
 
   // Overview removed — metrics moved or omitted
+
+  const sectionTitleColor = theme.colors.onBackground;
+  const signOutButtonColor = theme.colors.error;
+  const signOutTextColor = theme.colors.onError;
 
   const styles = StyleSheet.create({
     container: {
@@ -396,15 +409,11 @@ const SettingsScreen = () => {
     setCacheLimitVisible(true);
   };
 
-  const handleCacheLimitSelect = (size: number) => {
-    setMaxImageCacheSize(size);
-    setCacheLimitVisible(false);
-
-    // Enforce the new cache limit after setting it (fire-and-forget)
-    void (async () => {
+  const enforceCacheLimit = useCallback(
+    async (size: number) => {
       try {
         await imageCacheService.enforceCacheLimit(size);
-        await loadImageCacheUsage(); // Refresh the usage display
+        await loadImageCacheUsage();
       } catch (error) {
         const message = getReadableErrorMessage(error);
         void logger.error(
@@ -414,7 +423,14 @@ const SettingsScreen = () => {
           },
         );
       }
-    })();
+    },
+    [loadImageCacheUsage],
+  );
+
+  const handleCacheLimitSelect = (size: number) => {
+    setMaxImageCacheSize(size);
+    setCacheLimitVisible(false);
+    void enforceCacheLimit(size);
   };
 
   const getThemeChipColor = (chipTheme: "light" | "dark" | "system") => {
@@ -461,7 +477,9 @@ const SettingsScreen = () => {
           delay={50}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Appearance</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Appearance
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -561,13 +579,7 @@ const SettingsScreen = () => {
                 title="Customize Theme"
                 subtitle="Colors, fonts & more"
                 left={{ iconName: "palette-swatch" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={18}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/theme-editor")}
                 groupPosition="bottom"
               />
@@ -591,13 +603,7 @@ const SettingsScreen = () => {
                 title="Experimental Features"
                 subtitle="Advanced settings and experimental options"
                 left={{ iconName: "beaker" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={18}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() =>
                   router.push("/(auth)/settings/experimental-features")
                 }
@@ -613,13 +619,7 @@ const SettingsScreen = () => {
                 title="Elements Configuration"
                 subtitle="Configure UI elements and animations"
                 left={{ iconName: "palette-swatch-variant" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/elements")}
                 groupPosition="bottom"
               />
@@ -633,7 +633,9 @@ const SettingsScreen = () => {
           delay={100}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Notifications</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Notifications
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -788,10 +790,7 @@ const SettingsScreen = () => {
                   ),
                 }}
                 trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
+                  <ChevronTrailing
                     onPress={() => router.push("/(auth)/settings/quiet-hours")}
                   />
                 }
@@ -807,7 +806,9 @@ const SettingsScreen = () => {
           delay={150}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Quick Actions
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -819,11 +820,7 @@ const SettingsScreen = () => {
                 subtitle={`${refreshIntervalMinutes} minutes`}
                 left={{ iconName: "refresh" }}
                 trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
+                  <ChevronTrailing onPress={handleRefreshIntervalPress} />
                 }
                 onPress={handleRefreshIntervalPress}
                 groupPosition="top"
@@ -838,13 +835,7 @@ const SettingsScreen = () => {
                 title="Voice Assistant"
                 subtitle="Siri & Google Assistant"
                 left={{ iconName: "microphone" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/voice-assistant")}
                 groupPosition="bottom"
               />
@@ -858,11 +849,13 @@ const SettingsScreen = () => {
           delay={200}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Storage</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Storage
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
-              totalItems={3}
+              totalItems={2}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -906,8 +899,8 @@ const SettingsScreen = () => {
               />
             </AnimatedListItem>
             <AnimatedListItem
-              index={0}
-              totalItems={1}
+              index={1}
+              totalItems={2}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -934,7 +927,9 @@ const SettingsScreen = () => {
           delay={250}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Services</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Services
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -945,13 +940,7 @@ const SettingsScreen = () => {
                 title="Manage Services"
                 subtitle="Configure connected services"
                 left={{ iconName: "server" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/(tabs)/services")}
                 groupPosition="top"
               />
@@ -965,13 +954,7 @@ const SettingsScreen = () => {
                 title="Service Health & Configuration"
                 subtitle="Monitor and manage service health"
                 left={{ iconName: "server-network" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/services-health")}
                 groupPosition="middle"
               />
@@ -985,13 +968,7 @@ const SettingsScreen = () => {
                 title="TMDB Integration"
                 subtitle={tmdbEnabled ? "Enabled" : "Disabled"}
                 left={{ iconName: "movie-open" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/tmdb")}
                 groupPosition="middle"
               />
@@ -1005,13 +982,7 @@ const SettingsScreen = () => {
                 title="Widget Settings"
                 subtitle="Configure dashboard widgets"
                 left={{ iconName: "widgets" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/widgets")}
                 groupPosition="middle"
               />
@@ -1059,13 +1030,7 @@ const SettingsScreen = () => {
                 title="Bring Your Own Keys (BYOK)"
                 subtitle="Configure your own API keys"
                 left={{ iconName: "key-variant" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/byok")}
                 groupPosition="single"
               />
@@ -1079,7 +1044,9 @@ const SettingsScreen = () => {
           delay={250}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Learning & Support</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Learning & Support
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -1090,13 +1057,7 @@ const SettingsScreen = () => {
                 title="Resources & Documentation"
                 subtitle="Guides, troubleshooting, and API reference"
                 left={{ iconName: "book-open-variant" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/resources")}
                 groupPosition="single"
               />
@@ -1110,7 +1071,9 @@ const SettingsScreen = () => {
           delay={300}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>System</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            System
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -1121,20 +1084,14 @@ const SettingsScreen = () => {
                 title="Backup & Restore"
                 subtitle="Export, import & cloud backups"
                 left={{ iconName: "backup-restore" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/backup-restore")}
                 groupPosition="top"
               />
             </AnimatedListItem>
             <AnimatedListItem
               index={1}
-              totalItems={4}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1157,7 +1114,7 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={2}
-              totalItems={4}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1178,20 +1135,14 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={3}
-              totalItems={4}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
                 title="Debugging"
                 subtitle="Logs & diagnostics"
                 left={{ iconName: "bug-outline" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/dev")}
                 groupPosition="bottom"
               />
@@ -1204,7 +1155,9 @@ const SettingsScreen = () => {
           delay={250}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Logging & Diagnostics</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Logging & Diagnostics
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -1215,13 +1168,7 @@ const SettingsScreen = () => {
                 title="API Error Logger"
                 subtitle="Configure error capture settings"
                 left={{ iconName: "cog" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() =>
                   router.push("/(auth)/settings/api-error-logs/configure")
                 }
@@ -1245,11 +1192,7 @@ const SettingsScreen = () => {
                   errorLogCount > 0 ? (
                     <Chip>{errorLogCount}</Chip>
                   ) : (
-                    <IconButton
-                      icon="chevron-right"
-                      size={16}
-                      iconColor={theme.colors.outline}
-                    />
+                    <ChevronTrailing />
                   )
                 }
                 onPress={() => router.push("/(auth)/settings/api-error-logs")}
@@ -1273,11 +1216,7 @@ const SettingsScreen = () => {
                   cleanupLogCount > 0 ? (
                     <Chip>{cleanupLogCount}</Chip>
                   ) : (
-                    <IconButton
-                      icon="chevron-right"
-                      size={16}
-                      iconColor={theme.colors.outline}
-                    />
+                    <ChevronTrailing />
                   )
                 }
                 onPress={() => router.push("/(auth)/settings/cleanup-history")}
@@ -1298,8 +1237,8 @@ const SettingsScreen = () => {
             mode="contained"
             onPress={confirmSignOut}
             style={[styles.signOutButton, { height: 44 }]}
-            buttonColor={theme.colors.error}
-            textColor={theme.colors.onError}
+            buttonColor={signOutButtonColor}
+            textColor={signOutTextColor}
             icon="logout"
           >
             Sign out
@@ -1330,7 +1269,9 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
               Refresh Interval
             </Dialog.Title>
             <Dialog.Content>
@@ -1376,7 +1317,9 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
               Jellyseerr Retries
             </Dialog.Title>
             <Dialog.Content>
@@ -1426,7 +1369,11 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>Log Level</Dialog.Title>
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
+              Log Level
+            </Dialog.Title>
             <Dialog.Content>
               <Text
                 style={{ ...styles.settingValue, marginBottom: spacing.md }}
@@ -1475,7 +1422,11 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>Cache Limit</Dialog.Title>
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
+              Cache Limit
+            </Dialog.Title>
             <Dialog.Content>
               <Text
                 style={{ ...styles.settingValue, marginBottom: spacing.md }}
