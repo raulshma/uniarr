@@ -26,6 +26,9 @@ const ExperimentalFeaturesScreen = () => {
   const gradientBackgroundEnabled = useSettingsStore(
     (s) => s.gradientBackgroundEnabled,
   );
+  const experimentalWeatherEffectsEnabled = useSettingsStore(
+    (s) => s.experimentalWeatherEffectsEnabled,
+  );
   const enableBackdropWithBlur = useSettingsStore(
     (s) => s.enableBackdropWithBlur,
   );
@@ -37,6 +40,9 @@ const ExperimentalFeaturesScreen = () => {
   );
   const setGradientBackgroundEnabled = useSettingsStore(
     (s) => s.setGradientBackgroundEnabled,
+  );
+  const setExperimentalWeatherEffectsEnabled = useSettingsStore(
+    (s) => s.setExperimentalWeatherEffectsEnabled,
   );
   const setBackdropWithBlurEnabled = useSettingsStore(
     (s) => s.setBackdropWithBlurEnabled,
@@ -81,7 +87,7 @@ const ExperimentalFeaturesScreen = () => {
         <AnimatedSection style={styles.section} delay={0} animated>
           <Text style={styles.sectionTitle}>Appearance</Text>
           <SettingsGroup>
-            <AnimatedListItem index={0} totalItems={4} animated>
+            <AnimatedListItem index={0} totalItems={5} animated>
               <SettingsListItem
                 title="Backdrop with Blur"
                 subtitle="Blurry background effect with dissolve fade in Discover and Anime Hub"
@@ -96,7 +102,7 @@ const ExperimentalFeaturesScreen = () => {
                 groupPosition="top"
               />
             </AnimatedListItem>
-            <AnimatedListItem index={1} totalItems={4} animated>
+            <AnimatedListItem index={1} totalItems={5} animated>
               <SettingsListItem
                 title="Frosted Widgets"
                 subtitle="Frosted glass effect for all widgets"
@@ -111,7 +117,7 @@ const ExperimentalFeaturesScreen = () => {
                 groupPosition="middle"
               />
             </AnimatedListItem>
-            <AnimatedListItem index={2} totalItems={4} animated>
+            <AnimatedListItem index={2} totalItems={5} animated>
               <SettingsListItem
                 title="Dashboard Gradient"
                 subtitle="Animated gradient background effect"
@@ -126,7 +132,22 @@ const ExperimentalFeaturesScreen = () => {
                 groupPosition="middle"
               />
             </AnimatedListItem>
-            <AnimatedListItem index={3} totalItems={4} animated>
+            <AnimatedListItem index={3} totalItems={5} animated>
+              <SettingsListItem
+                title="Weather Background Effects"
+                subtitle="Ambient weather animations on dashboard (experimental)"
+                left={{ iconName: "weather-partly-rainy" }}
+                trailing={
+                  <Switch
+                    value={experimentalWeatherEffectsEnabled}
+                    onValueChange={setExperimentalWeatherEffectsEnabled}
+                    color={theme.colors.primary}
+                  />
+                }
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem index={4} totalItems={5} animated>
               <SettingsListItem
                 title="Video Trailers"
                 subtitle="Show trailers in detail pages"

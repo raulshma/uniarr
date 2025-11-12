@@ -1,5 +1,11 @@
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo, useRef, useEffect } from "react";
+import React, {
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  useState,
+} from "react";
 import {
   StyleSheet,
   View,
@@ -8,6 +14,7 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
+import { AppState, type AppStateStatus } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Text, IconButton, Portal } from "react-native-paper";
@@ -22,6 +29,10 @@ import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContaine
 import { easeOutCubic } from "@/utils/animations.utils";
 import { widgetService } from "@/services/widgets/WidgetService";
 import { mapConditionToIcon } from "@/components/widgets/WeatherWidget/weatherIcons";
+import { WeatherBackdrop } from "@/components/weather/WeatherBackdrop";
+import { mapWeatherToBackdrop } from "@/services/weather/weatherMapping";
+import WeatherAwareBackdrop from "@/components/weather/WeatherAwareBackdrop";
+import { useIsFocused } from "@react-navigation/native";
 
 // Helper function to calculate progress percentage
 
@@ -32,14 +43,24 @@ const DashboardScreen = () => {
   const insets = useSafeAreaInsets();
   const gradientEnabled = useSettingsStore((s) => s.gradientBackgroundEnabled);
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
+  const weatherEffectsEnabled = useSettingsStore(
+    (s) => s.experimentalWeatherEffectsEnabled,
+  );
   const [refreshing, setRefreshing] = React.useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
+  const isFocused = useIsFocused();
+  const [appState, setAppState] = useState<AppStateStatus>(
+    AppState.currentState,
+  );
 
   const [weatherSummary, setWeatherSummary] = React.useState<{
     icon: string;
     temperature: string;
   } | null>(null);
+  const [weatherForBackdrop, setWeatherForBackdrop] = React.useState<
+    any | null
+  >(null);
 
   // Performance monitoring
   useEffect(() => {
@@ -76,6 +97,7 @@ const DashboardScreen = () => {
           typeof weather.current.temperature !== "number"
         ) {
           setWeatherSummary(null);
+          setWeatherForBackdrop(null);
           return;
         }
 
@@ -83,9 +105,11 @@ const DashboardScreen = () => {
           icon: mapConditionToIcon(weather.current.condition.text),
           temperature: `${Math.round(weather.current.temperature)}°`,
         });
+        setWeatherForBackdrop(weather);
       } catch (error) {
         console.log("[Dashboard] Failed to load weather summary", error);
         setWeatherSummary(null);
+        setWeatherForBackdrop(null);
       }
     };
 
@@ -97,6 +121,11 @@ const DashboardScreen = () => {
         `[Dashboard] Component unmounted after ${unmountTime - mountTime}ms`,
       );
     };
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", setAppState);
+    return () => sub.remove();
   }, []);
 
   const handleRefresh = useCallback(async () => {
@@ -476,6 +505,77 @@ const DashboardScreen = () => {
         </Animated.View>
 
         {/* Content */}
+        {weatherEffectsEnabled &&
+          weatherForBackdrop &&
+          isFocused &&
+          appState === "active" && (
+            <WeatherBackdrop
+              {...mapWeatherToBackdrop({ weather: weatherForBackdrop })}
+              visible={true}
+            />
+          )}
+
+        {/* Test weather effects - forcing rain for debugging */}
+        {weatherEffectsEnabled && isFocused && appState === "active" && (
+          <WeatherBackdrop
+            condition="rain"
+            isDaytime={false}
+            intensity="medium"
+            visible={true}
+          />
+        )}
+
+        {/* Debug info for weather effects */}
+        {__DEV__ && (
+          <View
+            style={{
+              position: "absolute",
+              top: 100,
+              left: 10,
+              backgroundColor: "rgba(0,0,0,0.7)",
+              padding: 8,
+              borderRadius: 4,
+            }}
+          >
+            <Text style={{ color: "white", fontSize: 10 }}>
+              Weather Effects: {weatherEffectsEnabled ? "ON" : "OFF"}
+            </Text>
+            <Text style={{ color: "white", fontSize: 10 }}>
+              Weather Data: {weatherForBackdrop ? "Available" : "None"}
+            </Text>
+            <Text style={{ color: "white", fontSize: 10 }}>
+              Screen Focused: {isFocused ? "Yes" : "No"}
+            </Text>
+            <Text style={{ color: "white", fontSize: 10 }}>
+              App State: {appState}
+            </Text>
+            {weatherForBackdrop && (
+              <>
+                <Text style={{ color: "white", fontSize: 10 }}>
+                  Condition:{" "}
+                  {JSON.stringify(
+                    mapWeatherToBackdrop({ weather: weatherForBackdrop })
+                      .condition,
+                  )}
+                </Text>
+                <Text style={{ color: "white", fontSize: 10 }}>
+                  Daytime:{" "}
+                  {JSON.stringify(
+                    mapWeatherToBackdrop({ weather: weatherForBackdrop })
+                      .isDaytime,
+                  )}
+                </Text>
+                <Text style={{ color: "white", fontSize: 10 }}>
+                  Intensity:{" "}
+                  {JSON.stringify(
+                    mapWeatherToBackdrop({ weather: weatherForBackdrop })
+                      .intensity,
+                  )}
+                </Text>
+              </>
+            )}
+          </View>
+        )}
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}

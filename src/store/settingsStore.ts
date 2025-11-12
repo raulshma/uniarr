@@ -76,6 +76,8 @@ type SettingsData = {
   frostedWidgetsEnabled: boolean;
   // Show animated gradient background on dashboard
   gradientBackgroundEnabled: boolean;
+  // Experimental: animated weather background effects on dashboard
+  experimentalWeatherEffectsEnabled: boolean;
   // API Error Logger configuration
   apiErrorLoggerEnabled: boolean;
   apiErrorLoggerActivePreset: string; // "CRITICAL", "SERVER", "RATE_LIMIT", "CLIENT_ERRORS", "STRICT", "CUSTOM"
@@ -135,6 +137,7 @@ interface SettingsState extends SettingsData {
   setLastReleaseNotesCheckedAt: (timestamp: string | undefined) => void;
   setFrostedWidgetsEnabled: (enabled: boolean) => void;
   setGradientBackgroundEnabled: (enabled: boolean) => void;
+  setExperimentalWeatherEffectsEnabled: (enabled: boolean) => void;
   setApiErrorLoggerEnabled: (enabled: boolean) => void;
   setApiErrorLoggerActivePreset: (preset: string) => void;
   setApiErrorLoggerCustomCodes: (codes: (number | string)[]) => void;
@@ -228,6 +231,7 @@ const createDefaultSettings = (): SettingsData => ({
   lastReleaseNotesCheckedAt: undefined,
   frostedWidgetsEnabled: false,
   gradientBackgroundEnabled: false,
+  experimentalWeatherEffectsEnabled: false,
   apiErrorLoggerEnabled: false,
   apiErrorLoggerActivePreset: "CRITICAL",
   apiErrorLoggerCustomCodes: [],
@@ -317,6 +321,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ frostedWidgetsEnabled: enabled }),
       setGradientBackgroundEnabled: (enabled: boolean) =>
         set({ gradientBackgroundEnabled: enabled }),
+      setExperimentalWeatherEffectsEnabled: (enabled: boolean) =>
+        set({ experimentalWeatherEffectsEnabled: enabled }),
       setApiErrorLoggerEnabled: (enabled: boolean) =>
         set({ apiErrorLoggerEnabled: enabled }),
       setApiErrorLoggerActivePreset: (preset: string) =>
@@ -382,6 +388,8 @@ export const useSettingsStore = create<SettingsState>()(
         lastReleaseNotesCheckedAt: state.lastReleaseNotesCheckedAt,
         frostedWidgetsEnabled: state.frostedWidgetsEnabled,
         gradientBackgroundEnabled: state.gradientBackgroundEnabled,
+        experimentalWeatherEffectsEnabled:
+          state.experimentalWeatherEffectsEnabled,
         apiErrorLoggerEnabled: state.apiErrorLoggerEnabled,
         apiErrorLoggerActivePreset: state.apiErrorLoggerActivePreset,
         apiErrorLoggerCustomCodes: state.apiErrorLoggerCustomCodes,
@@ -401,7 +409,7 @@ export const useSettingsStore = create<SettingsState>()(
         byokGeocodeMapsCoApiKey: state.byokGeocodeMapsCoApiKey,
       }),
       // Bump version since we're adding new persisted fields
-      version: 13,
+      version: 14,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -500,6 +508,11 @@ export const useSettingsStore = create<SettingsState>()(
           state.gradientBackgroundEnabled = true;
         }
 
+        // Ensure experimentalWeatherEffectsEnabled is properly initialized
+        if (typeof state.experimentalWeatherEffectsEnabled !== "boolean") {
+          state.experimentalWeatherEffectsEnabled = false;
+        }
+
         // Ensure trailerFeatureEnabled is properly initialized
         if (typeof state.trailerFeatureEnabled !== "boolean") {
           state.trailerFeatureEnabled = false;
@@ -587,6 +600,9 @@ export const useSettingsStore = create<SettingsState>()(
           gradientBackgroundEnabled:
             partial.gradientBackgroundEnabled ??
             baseDefaults.gradientBackgroundEnabled,
+          experimentalWeatherEffectsEnabled:
+            partial.experimentalWeatherEffectsEnabled ??
+            baseDefaults.experimentalWeatherEffectsEnabled,
           loaderConfig: partial.loaderConfig ?? baseDefaults.loaderConfig,
           trailerFeatureEnabled:
             partial.trailerFeatureEnabled ?? baseDefaults.trailerFeatureEnabled,
@@ -654,6 +670,9 @@ export const selectFrostedWidgetsEnabled = (state: SettingsState): boolean =>
 export const selectGradientBackgroundEnabled = (
   state: SettingsState,
 ): boolean => state.gradientBackgroundEnabled;
+export const selectExperimentalWeatherEffectsEnabled = (
+  state: SettingsState,
+): boolean => state.experimentalWeatherEffectsEnabled;
 export const selectTrailerFeatureEnabled = (state: SettingsState): boolean =>
   state.trailerFeatureEnabled;
 export const selectLoaderConfig = (state: SettingsState) => state.loaderConfig;
