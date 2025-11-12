@@ -140,7 +140,7 @@ export class AIService {
         },
       });
 
-      // Log successful call
+      // Log successful call with response text (captured asynchronously)
       const durationMs = Date.now() - startTime;
       await this.apiLogger.addAiCall({
         provider: providerType,
@@ -150,6 +150,23 @@ export class AIService {
         prompt,
         durationMs,
       });
+
+      // Capture response text asynchronously after logging
+      result.text
+        .then((text) => {
+          void this.apiLogger.addAiCall({
+            provider: providerType,
+            model,
+            operation: "streamText",
+            status: "success",
+            prompt,
+            response: text,
+            durationMs,
+          });
+        })
+        .catch((error) => {
+          logger.error("Failed to log streamText response", { error });
+        });
 
       return result;
     } catch (error) {
@@ -225,12 +242,14 @@ export class AIService {
 
       // Log successful call
       const durationMs = Date.now() - startTime;
+      const responseText = JSON.stringify(result.object);
       await this.apiLogger.addAiCall({
         provider: providerType,
         model,
         operation: "generateObject",
         status: "success",
         prompt,
+        response: responseText,
         durationMs,
       });
 
@@ -320,6 +339,23 @@ export class AIService {
         prompt,
         durationMs,
       });
+
+      // Capture response object asynchronously after logging
+      result.object
+        .then((obj) => {
+          void this.apiLogger.addAiCall({
+            provider: providerType,
+            model,
+            operation: "streamObject",
+            status: "success",
+            prompt,
+            response: JSON.stringify(obj),
+            durationMs,
+          });
+        })
+        .catch((error) => {
+          logger.error("Failed to log streamObject response", { error });
+        });
 
       return result;
     } catch (error) {
@@ -416,6 +452,26 @@ export class AIService {
         durationMs,
       });
 
+      // Capture responses asynchronously
+      Promise.all([textResult.text, objectResult.object])
+        .then(([text, obj]) => {
+          void this.apiLogger.addAiCall({
+            provider: providerType,
+            model,
+            operation: "streamTextAndObject",
+            status: "success",
+            prompt: `${explainPrompt} | ${structuredPrompt}`,
+            response: JSON.stringify({
+              text,
+              object: obj,
+            }),
+            durationMs,
+          });
+        })
+        .catch((error) => {
+          logger.error("Failed to log streamTextAndObject response", { error });
+        });
+
       return {
         textStream: textResult.textStream,
         partialObjectStream: objectResult.partialObjectStream,
@@ -500,8 +556,34 @@ export class AIService {
         operation: "progressiveGeneration",
         status: "success",
         prompt,
+        response: JSON.stringify({
+          basic: basicResult.object,
+        }),
         durationMs,
       });
+
+      // Capture detailed response asynchronously
+      detailedPromise.object
+        .then((detailed) => {
+          void this.apiLogger.addAiCall({
+            provider: providerType,
+            model,
+            operation: "progressiveGeneration",
+            status: "success",
+            prompt,
+            response: JSON.stringify({
+              basic: basicResult.object,
+              detailed,
+            }),
+            durationMs,
+          });
+        })
+        .catch((error) => {
+          logger.error(
+            "Failed to log progressiveGeneration detailed response",
+            { error },
+          );
+        });
 
       return {
         basic: basicResult.object,
