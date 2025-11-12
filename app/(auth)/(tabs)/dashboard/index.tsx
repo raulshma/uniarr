@@ -33,7 +33,277 @@ import { WeatherBackdrop } from "@/components/weather/WeatherBackdrop";
 import { mapWeatherToBackdrop } from "@/services/weather/weatherMapping";
 import { useIsFocused } from "@react-navigation/native";
 
+const headerMinHeight = 80; // Minimum collapsed height
+
 // Helper function to calculate progress percentage
+
+interface AnimatedValues {
+  headerHeight: Animated.AnimatedInterpolation<string | number>;
+  titleOpacity: Animated.AnimatedInterpolation<string | number>;
+  titleTranslateY: Animated.AnimatedInterpolation<string | number>;
+  buttonsTranslateY: Animated.AnimatedInterpolation<string | number>;
+  buttonsPosition: Animated.AnimatedInterpolation<string | number>;
+  stickyTitleOpacity: Animated.AnimatedInterpolation<string | number>;
+  headerBackgroundOpacity: Animated.AnimatedInterpolation<string | number>;
+}
+
+interface DashboardHeaderProps {
+  animatedValues: AnimatedValues;
+  weatherSummary: { condition: string; temperature: string } | null;
+  theme: ReturnType<typeof useTheme>;
+  frostedEnabled: boolean;
+  gradientEnabled: boolean;
+}
+
+const DashboardHeader = React.memo(
+  ({
+    animatedValues,
+    weatherSummary,
+    theme,
+    frostedEnabled,
+    gradientEnabled,
+  }: DashboardHeaderProps) => {
+    const insets = useSafeAreaInsets();
+
+    const weatherHeaderRowStyle = useMemo(
+      () => ({
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        marginTop: theme.custom.spacing.xxxs,
+        gap: theme.custom.spacing.none,
+      }),
+      [theme.custom.spacing.xxxs, theme.custom.spacing.none],
+    );
+
+    const stickyWeatherHeaderRowStyle = useMemo(
+      () => ({
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        gap: theme.custom.spacing.none,
+        opacity: animatedValues.stickyTitleOpacity,
+      }),
+      [theme.custom.spacing.none, animatedValues.stickyTitleOpacity],
+    );
+
+    const styles = useMemo(
+      () =>
+        StyleSheet.create({
+          headerContainer: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+          },
+          headerBackground: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: "transparent",
+          },
+          headerContent: {
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: theme.custom.spacing.lg,
+          },
+          titleContainer: {
+            alignItems: "center",
+          },
+          stickyButtonsContainer: {
+            position: "absolute",
+            top: 0,
+            right: 0,
+            left: 0,
+            zIndex: 15,
+            paddingHorizontal: theme.custom.spacing.lg,
+            paddingTop: insets.top,
+          },
+          stickyHeader: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            minHeight: headerMinHeight,
+          },
+          stickyTitleContainer: {
+            flex: 1,
+            flexDirection: "row",
+            gap: theme.custom.spacing.xs,
+            alignItems: "center",
+          },
+          title: {
+            fontSize: theme.custom.typography.titleLarge.fontSize,
+            fontWeight: "800",
+            color: theme.colors.onBackground,
+            letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
+          },
+          stickyTitle: {
+            fontSize: theme.custom.typography.titleMedium.fontSize,
+            fontWeight: "600",
+            color: theme.colors.onBackground,
+            letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          },
+        }),
+      [theme, insets.top],
+    );
+
+    const router = useRouter();
+
+    return (
+      <>
+        <Animated.View
+          style={[
+            styles.headerContainer,
+            { height: animatedValues.headerHeight },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.headerBackground,
+              {
+                height: animatedValues.headerHeight,
+                opacity: animatedValues.headerBackgroundOpacity,
+                backgroundColor: theme.colors.background,
+              },
+            ]}
+          >
+            {frostedEnabled && gradientEnabled && (
+              <BlurView
+                intensity={25}
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    backgroundColor: theme.dark
+                      ? "rgba(15, 15, 35, 0.3)"
+                      : "rgba(255, 255, 255, 0.2)",
+                  },
+                ]}
+              />
+            )}
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.headerContent,
+              { height: animatedValues.headerHeight },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.titleContainer,
+                {
+                  opacity: animatedValues.titleOpacity,
+                  transform: [{ translateY: animatedValues.titleTranslateY }],
+                },
+              ]}
+            >
+              <Text style={styles.title}>Dashboard</Text>
+              {weatherSummary && (
+                <View style={weatherHeaderRowStyle}>
+                  <LottieWeatherIcon
+                    condition={weatherSummary.condition}
+                    size={40}
+                    autoPlay
+                    loop
+                  />
+                  <Text
+                    style={{
+                      fontSize: theme.custom.typography.labelSmall.fontSize,
+                      color: theme.colors.onBackground,
+                    }}
+                  >
+                    {weatherSummary.temperature}
+                  </Text>
+                </View>
+              )}
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.stickyButtonsContainer,
+            {
+              transform: [{ translateY: animatedValues.buttonsTranslateY }],
+            },
+          ]}
+        >
+          <View style={styles.stickyHeader}>
+            <Animated.View
+              style={[
+                styles.stickyTitleContainer,
+                {
+                  opacity: animatedValues.stickyTitleOpacity,
+                },
+              ]}
+            >
+              <Text style={styles.stickyTitle}>Dashboard</Text>
+              {weatherSummary && (
+                <Animated.View style={stickyWeatherHeaderRowStyle}>
+                  <LottieWeatherIcon
+                    condition={weatherSummary.condition}
+                    size={34}
+                    autoPlay
+                    loop
+                  />
+                  <Text
+                    style={{
+                      fontSize: theme.custom.typography.titleSmall.fontSize,
+                      color: theme.colors.onBackground,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {weatherSummary.temperature}
+                  </Text>
+                </Animated.View>
+              )}
+            </Animated.View>
+            <Animated.View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: theme.custom.spacing.sm,
+                opacity: animatedValues.buttonsPosition,
+              }}
+            >
+              <IconButton
+                icon="download"
+                size={20}
+                iconColor={theme.colors.onSurfaceVariant}
+                style={{ backgroundColor: theme.colors.surfaceVariant }}
+                onPress={() => router.push("/(auth)/jellyfin-downloads")}
+              />
+              <IconButton
+                icon="cog"
+                size={20}
+                iconColor={theme.colors.onSurfaceVariant}
+                style={{ backgroundColor: theme.colors.surfaceVariant }}
+                onPress={() => router.push("/(auth)/settings")}
+              />
+            </Animated.View>
+          </View>
+        </Animated.View>
+      </>
+    );
+  },
+);
+
+interface DashboardWidgetsProps {
+  theme: ReturnType<typeof useTheme>;
+}
+
+const DashboardWidgets = React.memo(({ theme }: DashboardWidgetsProps) => (
+  <AnimatedSection
+    delay={100}
+    style={{
+      paddingHorizontal: theme.custom.spacing.sm,
+      marginTop: theme.custom.spacing.sm,
+    }}
+  >
+    <WidgetContainer editable={true} />
+  </AnimatedSection>
+));
 
 const DashboardScreen = () => {
   const router = useRouter();
@@ -64,7 +334,6 @@ const DashboardScreen = () => {
   // Performance monitoring
   useEffect(() => {
     const mountTime = Date.now();
-    console.log("[Dashboard] Component mounted");
 
     const loadWeatherSummary = async () => {
       try {
@@ -76,6 +345,7 @@ const DashboardScreen = () => {
 
         if (!headerWidget) {
           setWeatherSummary(null);
+          setWeatherForBackdrop(null);
           return;
         }
 
@@ -83,6 +353,7 @@ const DashboardScreen = () => {
         const payload = cached?.payload;
         if (!payload || typeof payload !== "object") {
           setWeatherSummary(null);
+          setWeatherForBackdrop(null);
           return;
         }
 
@@ -116,9 +387,6 @@ const DashboardScreen = () => {
 
     return () => {
       const unmountTime = Date.now();
-      console.log(
-        `[Dashboard] Component unmounted after ${unmountTime - mountTime}ms`,
-      );
     };
   }, []);
 
@@ -138,7 +406,6 @@ const DashboardScreen = () => {
 
   const screenHeight = Dimensions.get("window").height;
   const headerMaxHeight = screenHeight * 0.4; // 40% screen height
-  const headerMinHeight = 80; // Minimum collapsed height
   const collapseRange = headerMaxHeight - headerMinHeight;
 
   // Memoize animated styles to prevent recalculation on every render
@@ -251,6 +518,26 @@ const DashboardScreen = () => {
     );
   }, [gradientEnabled, animatedValues]);
 
+  const weatherHeaderRowStyle = useMemo(
+    () => ({
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      marginTop: theme.custom.spacing.xxxs,
+      gap: theme.custom.spacing.none,
+    }),
+    [theme.custom.spacing.xxxs, theme.custom.spacing.none],
+  );
+
+  const stickyWeatherHeaderRowStyle = useMemo(
+    () => ({
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.custom.spacing.none,
+    }),
+    [theme.custom.spacing.none],
+  );
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -265,75 +552,6 @@ const DashboardScreen = () => {
         scrollContent: {
           paddingBottom: 100,
           paddingTop: headerMaxHeight + insets.top,
-        },
-        headerContainer: {
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-        },
-        headerBackground: {
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: "transparent",
-        },
-        headerContent: {
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          paddingHorizontal: theme.custom.spacing.lg,
-        },
-        titleContainer: {
-          alignItems: "center",
-        },
-        stickyTitleContainer: {
-          flex: 1,
-          flexDirection: "row",
-          gap: theme.custom.spacing.xs,
-          alignItems: "center",
-        },
-        title: {
-          fontSize: theme.custom.typography.titleLarge.fontSize,
-          fontWeight: "800",
-          color: theme.colors.onBackground,
-          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
-        },
-        stickyButtonsContainer: {
-          position: "absolute",
-          top: 0,
-          right: 0,
-          left: 0,
-          zIndex: 15,
-          paddingHorizontal: theme.custom.spacing.lg,
-          paddingTop: insets.top,
-        },
-        stickyHeader: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          height: headerMinHeight,
-        },
-        stickyTitle: {
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontWeight: "600",
-          color: theme.colors.onBackground,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
-        },
-        stickyButtons: {
-          flexDirection: "row",
-          alignItems: "center",
-          gap: theme.custom.spacing.sm,
-        },
-        floatingButtons: {
-          flexDirection: "row",
-          alignItems: "center",
-          gap: theme.custom.spacing.sm,
-        },
-        settingsButton: {
-          backgroundColor: theme.colors.surfaceVariant,
         },
       }),
     [theme, insets.top, headerMaxHeight],
@@ -351,14 +569,16 @@ const DashboardScreen = () => {
     <Portal.Host>
       <View style={styles.container}>
         {/* Frosted Glass Overlay */}
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: "rgba(255, 255, 255, 0.1)",
-            },
-          ]}
-        />
+        {frostedEnabled && (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: "rgba(255, 255, 255, 0.06)",
+              },
+            ]}
+          />
+        )}
 
         {gradientBackground}
         {!gradientEnabled && (
@@ -369,155 +589,14 @@ const DashboardScreen = () => {
             ]}
           />
         )}
-        {/* Animated Header */}
-        <Animated.View
-          style={[
-            styles.headerContainer,
-            { height: animatedValues.headerHeight },
-          ]}
-        >
-          {/* Header Background - Fades in when reaching top */}
-          <Animated.View
-            style={[
-              styles.headerBackground,
-              {
-                height: animatedValues.headerHeight,
-                opacity: animatedValues.headerBackgroundOpacity,
-                backgroundColor: theme.colors.background,
-              },
-            ]}
-          >
-            {frostedEnabled && gradientEnabled && (
-              <BlurView
-                intensity={25}
-                style={[
-                  StyleSheet.absoluteFill,
-                  {
-                    backgroundColor: theme.dark
-                      ? "rgba(15, 15, 35, 0.3)"
-                      : "rgba(255, 255, 255, 0.2)",
-                  },
-                ]}
-              />
-            )}
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.headerContent,
-              { height: animatedValues.headerHeight },
-            ]}
-          >
-            <Animated.View
-              style={[
-                styles.titleContainer,
-                {
-                  opacity: animatedValues.titleOpacity,
-                  transform: [{ translateY: animatedValues.titleTranslateY }],
-                },
-              ]}
-            >
-              <Text style={styles.title}>Dashboard</Text>
-              {weatherSummary && (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginTop: theme.custom.spacing.xxxs,
-                    gap: theme.custom.spacing.none,
-                  }}
-                >
-                  <LottieWeatherIcon
-                    condition={weatherSummary.condition}
-                    size={40}
-                    autoPlay
-                    loop
-                  />
-                  <Text
-                    style={{
-                      fontSize: theme.custom.typography.labelSmall.fontSize,
-                      color: theme.colors.onBackground,
-                    }}
-                  >
-                    {weatherSummary.temperature}
-                  </Text>
-                </View>
-              )}
-            </Animated.View>
-          </Animated.View>
-        </Animated.View>
 
-        {/* Sticky Header */}
-        <Animated.View
-          style={[
-            styles.stickyButtonsContainer,
-            {
-              transform: [{ translateY: animatedValues.buttonsTranslateY }],
-            },
-          ]}
-        >
-          <View style={styles.stickyHeader}>
-            <Animated.View
-              style={[
-                styles.stickyTitleContainer,
-                {
-                  opacity: animatedValues.stickyTitleOpacity,
-                },
-              ]}
-            >
-              <Text style={styles.stickyTitle}>Dashboard</Text>
-              {weatherSummary && (
-                <Animated.View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: theme.custom.spacing.none,
-                    opacity: animatedValues.stickyTitleOpacity,
-                  }}
-                >
-                  <LottieWeatherIcon
-                    condition={weatherSummary.condition}
-                    size={34}
-                    autoPlay
-                    loop
-                  />
-                  <Text
-                    style={{
-                      fontSize: theme.custom.typography.titleSmall.fontSize,
-                      color: theme.colors.onBackground,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {weatherSummary.temperature}
-                  </Text>
-                </Animated.View>
-              )}
-            </Animated.View>
-            <Animated.View
-              style={[
-                styles.stickyButtons,
-                {
-                  opacity: animatedValues.buttonsPosition,
-                },
-              ]}
-            >
-              <IconButton
-                icon="download"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                style={styles.settingsButton}
-                onPress={() => router.push("/(auth)/jellyfin-downloads")}
-              />
-              <IconButton
-                icon="cog"
-                size={20}
-                iconColor={theme.colors.onSurfaceVariant}
-                style={styles.settingsButton}
-                onPress={() => router.push("/(auth)/settings")}
-              />
-            </Animated.View>
-          </View>
-        </Animated.View>
+        <DashboardHeader
+          animatedValues={animatedValues}
+          weatherSummary={weatherSummary}
+          theme={theme}
+          frostedEnabled={frostedEnabled}
+          gradientEnabled={gradientEnabled}
+        />
 
         {/* Content */}
         {weatherEffectsEnabled &&
@@ -526,7 +605,7 @@ const DashboardScreen = () => {
           appState === "active" && (
             <WeatherBackdrop
               {...mapWeatherToBackdrop({ weather: weatherForBackdrop })}
-              visible={true}
+              visible
             />
           )}
 
@@ -542,15 +621,7 @@ const DashboardScreen = () => {
           }
         >
           {/* Widgets Section */}
-          <AnimatedSection
-            delay={100}
-            style={{
-              paddingHorizontal: theme.custom.spacing.sm,
-              marginTop: theme.custom.spacing.sm,
-            }}
-          >
-            <WidgetContainer editable={true} />
-          </AnimatedSection>
+          <DashboardWidgets theme={theme} />
         </ScrollView>
       </View>
     </Portal.Host>
