@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Text, useTheme, Divider, Button, Icon } from "react-native-paper";
+import { Text, useTheme, Divider, Icon } from "react-native-paper";
 import { UniArrLoader } from "@/components/common";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -24,7 +24,7 @@ export const ErrorDetailModal: React.FC<ErrorDetailModalProps> = ({
   error,
   details,
   isLoading = false,
-  onClose,
+  onClose: _onClose,
 }) => {
   const theme = useTheme<AppTheme>();
 
@@ -53,6 +53,7 @@ ${details?.responseBody ? `Response: ${JSON.stringify(JSON.parse(details.respons
           },
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       // Silently fail if sharing is not available
     }
@@ -203,7 +204,7 @@ ${details?.responseBody ? `Response: ${JSON.stringify(JSON.parse(details.respons
           <TouchableOpacity onPress={handleShare} style={styles.shareButton}>
             <Icon source="share" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity onPress={_onClose} style={styles.closeButton}>
             <Icon source="close" size={20} color={theme.colors.onSurface} />
           </TouchableOpacity>
         </View>

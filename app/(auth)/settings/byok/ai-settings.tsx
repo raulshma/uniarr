@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, Card, Switch, Divider, useTheme } from "react-native-paper";
-import { useRouter } from "expo-router";
 import { AIKeyInputForm } from "@/components/settings/AIKeyInputForm";
 import { AIProviderList } from "@/components/settings/AIProviderList";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
@@ -18,7 +17,6 @@ import { spacing } from "@/theme/spacing";
  */
 export default function AISettingsScreen() {
   const theme = useTheme();
-  const router = useRouter();
   const [isAIConfigured, setIsAIConfigured] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -48,6 +46,11 @@ export default function AISettingsScreen() {
     setRefreshKey((prev) => prev + 1);
     const activeProvider = providerManager.getActiveProvider();
     setIsAIConfigured(!!activeProvider);
+  };
+
+  const handleAddAnother = () => {
+    // Just keep the form visible, user will add another key
+    // No need to clear or reset - form already cleared after save
   };
 
   const handleProviderRemoved = () => {
@@ -154,7 +157,10 @@ export default function AISettingsScreen() {
           <Text variant="titleSmall" style={styles.sectionTitle}>
             Add AI Provider
           </Text>
-          <AIKeyInputForm onSuccess={handleProviderAdded} />
+          <AIKeyInputForm
+            onSuccess={handleProviderAdded}
+            onAddAnother={handleAddAnother}
+          />
         </View>
 
         {/* List providers */}

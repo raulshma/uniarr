@@ -14,6 +14,10 @@ import {
   type SearchInterpretation,
 } from "@/utils/validation/searchSchemas";
 
+export type InterpretationStreamItem =
+  | { type: "partial"; data: Partial<SearchInterpretation> }
+  | { type: "final"; data: SearchInterpretation };
+
 const SEARCH_SYSTEM_PROMPT = `You are UniArr Search Assistant, an expert at understanding media search queries.
 
 You have extensive knowledge about:
@@ -108,20 +112,38 @@ export class IntelligentSearchService {
    * @param query The user's search query
    * @yields Complete interpretation when available
    */
-  async *streamInterpretation(query: string) {
+  async *streamInterpretation(
+    query: string,
+  ): AsyncGenerator<InterpretationStreamItem, void, unknown> {
     try {
       if (!query || query.trim().length < 2) {
-        yield this.createEmptyInterpretation(query);
+        yield {
+          type: "final",
+          data: this.createEmptyInterpretation(query),
+        };
         return;
       }
 
-      // Use generateObject for reliable parsing
-      const interpretation = await this.interpretQuery(query);
-      yield interpretation;
+      const context = await this.contextBuilder.buildContext();
+      const { partialObjectStream, object } = await this.aiService.streamObject(
+        SearchInterpretationSchema,
+        this.buildSearchPrompt(query, context),
+        SEARCH_SYSTEM_PROMPT,
+      );
+
+      for await (const partial of partialObjectStream) {
+        yield {
+          type: "partial",
+          data: partial as Partial<SearchInterpretation>,
+        };
+      }
+
+      const finalResult = await object;
+      yield { type: "final", data: finalResult };
 
       logger.debug("Query interpretation streamed", {
         query,
-        confidence: interpretation.confidence,
+        confidence: finalResult.confidence,
       });
     } catch (error) {
       const errorMessage =
@@ -135,7 +157,10 @@ export class IntelligentSearchService {
       });
 
       // Yield fallback on error
-      yield this.createFallbackInterpretation(query);
+      yield {
+        type: "final",
+        data: this.createFallbackInterpretation(query),
+      };
     }
   }
 

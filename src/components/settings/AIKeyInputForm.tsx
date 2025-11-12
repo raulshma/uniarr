@@ -1,8 +1,7 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   FlatList,
   Modal,
@@ -30,6 +29,8 @@ interface AIKeyInputFormProps {
   onSuccess?: (config: AIKeyConfig) => void;
   onError?: (error: string) => void;
   isLoading?: boolean;
+  showMultiKeyInfo?: boolean;
+  onAddAnother?: () => void;
 }
 
 /**
@@ -40,6 +41,8 @@ export function AIKeyInputForm({
   onSuccess,
   onError,
   isLoading: parentLoading = false,
+  showMultiKeyInfo = true,
+  onAddAnother,
 }: AIKeyInputFormProps) {
   const { colors } = useTheme();
   const [provider, setProvider] = useState<AIProviderType>("google");
@@ -53,6 +56,9 @@ export function AIKeyInputForm({
   const [validationStatus, setValidationStatus] = useState<
     "idle" | "validating" | "valid" | "invalid"
   >("idle");
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [lastAddedProvider, setLastAddedProvider] =
+    useState<AIProviderType | null>(null);
 
   const keyManager = AIKeyManager.getInstance();
   const providerManager = AIProviderManager.getInstance();
@@ -121,15 +127,31 @@ export function AIKeyInputForm({
         provider,
         apiKey,
         modelName,
-        isDefault,
+        isDefault: false, // Always store as false initially
         createdAt: Date.now(),
       };
 
       await keyManager.storeKey(config);
 
+      // If user selected this as default, set it as default for the provider
+      if (isDefault) {
+        // Get the keyId that was just created
+        const allKeys = await keyManager.listKeysForProvider(provider);
+        const newKey = allKeys.find(
+          (k) => k.createdAt === config.createdAt && k.provider === provider,
+        );
+        if (newKey) {
+          await keyManager.setKeyAsDefault(newKey.keyId);
+        }
+      }
+
       // Register with provider manager
       await providerManager.registerProvider(config);
 
+      setLastAddedProvider(provider);
+      setSuccessMessage(
+        `${AI_PROVIDERS[provider].name} API key has been saved successfully`,
+      );
       setApiKey("");
       setModelName("");
       setIsDefault(false);
@@ -160,6 +182,23 @@ export function AIKeyInputForm({
           <Text variant="titleMedium" style={styles.title}>
             Add AI Provider Key
           </Text>
+
+          {/* Multi-key info */}
+          {showMultiKeyInfo && (
+            <View
+              style={[
+                styles.infoBox,
+                { backgroundColor: "rgba(33, 150, 243, 0.1)" },
+              ]}
+            >
+              <Text variant="bodySmall">
+                💡 <Text style={{ fontWeight: "600" }}>Multiple keys:</Text> You
+                can add multiple API keys for the same provider. If one key hits
+                the rate limit (429), the system will automatically rotate to
+                the next available key.
+              </Text>
+            </View>
+          )}
 
           {/* Provider Selection */}
           <View style={styles.section}>
@@ -368,6 +407,12 @@ export function AIKeyInputForm({
             >
               {isDefault ? "Default" : "Set as Default"}
             </Button>
+            <Text
+              variant="bodySmall"
+              style={{ marginTop: 8, marginLeft: 4, opacity: 0.6 }}
+            >
+              (Only the default key is used; additional keys are for rotation)
+            </Text>
           </View>
 
           {/* Buttons */}
@@ -389,6 +434,8 @@ export function AIKeyInputForm({
                 setIsDefault(false);
                 setValidationStatus("idle");
                 setError(null);
+                setSuccessMessage(null);
+                setLastAddedProvider(null);
               }}
               disabled={isLoading || parentLoading}
               style={styles.button}
@@ -396,6 +443,56 @@ export function AIKeyInputForm({
               Clear
             </Button>
           </View>
+
+          {/* Success state with "Add Another Key" option */}
+          {successMessage && lastAddedProvider && (
+            <View style={styles.successSection}>
+              <View
+                style={[
+                  styles.successBox,
+                  { backgroundColor: "rgba(76, 175, 80, 0.1)" },
+                ]}
+              >
+                <Text
+                  variant="bodySmall"
+                  style={{ color: "#4CAF50", fontWeight: "600" }}
+                >
+                  ✓ {successMessage}
+                </Text>
+                <Text
+                  variant="bodySmall"
+                  style={{ color: "#4CAF50", marginTop: 8, opacity: 0.8 }}
+                >
+                  You can add more keys for this or other providers. Additional
+                  keys provide automatic fallback when a key hits rate limits.
+                </Text>
+              </View>
+
+              <View style={styles.successButtonGroup}>
+                <Button
+                  mode="contained"
+                  onPress={() => {
+                    setSuccessMessage(null);
+                    setLastAddedProvider(null);
+                    onAddAnother?.();
+                  }}
+                  style={styles.button}
+                >
+                  Add Another Key
+                </Button>
+                <Button
+                  mode="outlined"
+                  onPress={() => {
+                    setSuccessMessage(null);
+                    setLastAddedProvider(null);
+                  }}
+                  style={styles.button}
+                >
+                  Done
+                </Button>
+              </View>
+            </View>
+          )}
         </Card.Content>
       </Card>
     </View>
@@ -524,5 +621,22 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
+  },
+  successSection: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0, 0, 0, 0.1)",
+  },
+  successBox: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: "#4CAF50",
+  },
+  successButtonGroup: {
+    flexDirection: "row",
+    gap: 12,
   },
 });

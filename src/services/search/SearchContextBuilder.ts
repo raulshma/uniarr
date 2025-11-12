@@ -183,7 +183,10 @@ export class SearchContextBuilder {
             if (Array.isArray(series)) {
               totalSeries += series.length;
             }
-          } catch (e) {
+          } catch (
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            e
+          ) {
             // Continue on individual connector errors
           }
         }
@@ -194,7 +197,10 @@ export class SearchContextBuilder {
             if (Array.isArray(movies)) {
               totalMovies += movies.length;
             }
-          } catch (e) {
+          } catch (
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            e
+          ) {
             // Continue on individual connector errors
           }
         }

@@ -1,20 +1,11 @@
-import React, { useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import {
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
-  FlatList,
   type ViewStyle,
 } from "react-native";
-import {
-  Text,
-  Card,
-  Chip,
-  IconButton,
-  useTheme,
-  ProgressBar,
-} from "react-native-paper";
+import { Text, Chip, IconButton, useTheme } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
@@ -25,6 +16,7 @@ interface RecommendationsViewProps {
   isLoading?: boolean;
   onSelectRecommendation?: (recommendation: RecommendationItem) => void;
   containerStyle?: ViewStyle;
+  onRefresh?: () => void;
 }
 
 /**
@@ -36,6 +28,7 @@ export function RecommendationsView({
   isLoading = false,
   onSelectRecommendation,
   containerStyle,
+  onRefresh,
 }: RecommendationsViewProps) {
   const theme = useTheme<AppTheme>();
 
@@ -211,6 +204,17 @@ export function RecommendationsView({
     [onSelectRecommendation],
   );
 
+  /**
+   * Ensure match score is in 0-100 range
+   * Handles both 0-1 and 0-100 formats from AI
+   */
+  const normalizeMatchScore = useCallback((score: number): number => {
+    if (score <= 1) {
+      return Math.round(score * 100);
+    }
+    return Math.min(Math.max(Math.round(score), 0), 100);
+  }, []);
+
   if (isLoading) {
     return (
       <View style={[styles.container, containerStyle]}>
@@ -240,7 +244,13 @@ export function RecommendationsView({
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Recommended For You</Text>
-        <IconButton icon="refresh" size={20} style={styles.refreshButton} />
+        <IconButton
+          icon="refresh"
+          size={20}
+          style={styles.refreshButton}
+          onPress={onRefresh}
+          disabled={isLoading}
+        />
       </View>
 
       {/* Recommendations by Category */}
@@ -279,14 +289,14 @@ export function RecommendationsView({
                   <View style={styles.scoreBar}>
                     <View
                       style={{
-                        width: `${rec.estimatedMatchScore}%`,
+                        width: `${normalizeMatchScore(rec.estimatedMatchScore)}%`,
                         height: "100%",
                         backgroundColor: getTypeColor(rec.type),
                       }}
                     />
                   </View>
                   <Text style={styles.scoreValue}>
-                    {rec.estimatedMatchScore}%
+                    {normalizeMatchScore(rec.estimatedMatchScore)}%
                   </Text>
                 </View>
 

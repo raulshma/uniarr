@@ -1,13 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { View, StyleSheet, FlatList } from "react-native";
-import {
-  Card,
-  Text,
-  Button,
-  Chip,
-  ProgressBar,
-  Divider,
-} from "react-native-paper";
+import { Card, Text, Button, Divider } from "react-native-paper";
 import { useTheme } from "@/hooks/useTheme";
 import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
@@ -23,6 +16,7 @@ interface ProviderListItem {
   isHealthy?: boolean;
   responseTime?: number;
   modelName?: string;
+  isCurrent?: boolean; // Currently active key for rotation
 }
 
 interface AIProviderListProps {
@@ -40,20 +34,23 @@ export function AIProviderList({
   const { colors } = useTheme();
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeProvider, setActiveProvider] = useState<AIProviderType | null>(
-    null,
-  );
   const [healthStatus, setHealthStatus] = useState<
     Record<string, { isHealthy: boolean; responseTime?: number }>
   >({});
   const [checkingHealth, setCheckingHealth] = useState<Record<string, boolean>>(
     {},
   );
-  const [editingProvider, setEditingProvider] = useState<AIProviderType | null>(
-    null,
-  );
-  const [updatingProvider, setUpdatingProvider] =
-    useState<AIProviderType | null>(null);
+  const [keyStats, setKeyStats] = useState<
+    Record<
+      string,
+      {
+        totalKeys: number;
+        activeKey: string;
+        usedKeys: number;
+        availableKeys: number;
+      }
+    >
+  >({});
 
   const keyManager = AIKeyManager.getInstance();
   const providerManager = AIProviderManager.getInstance();
@@ -62,21 +59,43 @@ export function AIProviderList({
     try {
       setIsLoading(true);
       const keys = await keyManager.listKeys();
-      const active = providerManager.getActiveProvider();
 
-      const providerItems: ProviderListItem[] = keys.map((key) => ({
-        keyId: key.keyId,
-        provider: key.provider as AIProviderType,
-        createdAt: key.createdAt,
-        lastUsed: key.lastUsed,
-        isDefault: active?.provider === key.provider,
-        modelName: key.modelName,
-      }));
+      const providerItems: ProviderListItem[] = keys.map((key) => {
+        const currentKeyId = providerManager.getRotationState(
+          key.provider as AIProviderType,
+        )?.currentKeyId;
+        return {
+          keyId: key.keyId,
+          provider: key.provider as AIProviderType,
+          createdAt: key.createdAt,
+          lastUsed: key.lastUsed,
+          isDefault: key.isDefault || false, // Use actual isDefault from key data
+          modelName: key.modelName,
+          isCurrent: currentKeyId === key.keyId,
+        };
+      });
 
       setProviders(providerItems);
-      setActiveProvider(active?.provider ?? null);
-    } catch (error) {
-      console.error("Failed to load providers:", error);
+
+      // Update key statistics
+      const stats: typeof keyStats = {};
+      const providerTypes = new Set(
+        keys.map((k) => k.provider as AIProviderType),
+      );
+      for (const provider of providerTypes) {
+        const rotationState = providerManager.getRotationState(provider);
+        if (rotationState) {
+          stats[provider] = {
+            totalKeys: providerManager.getProviderKeys(provider).length,
+            activeKey: rotationState.currentKeyId,
+            usedKeys: providerManager.getUsedKeyCount(provider),
+            availableKeys: providerManager.getAvailableKeyCount(provider),
+          };
+        }
+      }
+      setKeyStats(stats);
+    } catch (_error) {
+      console.error("Failed to load providers:", _error);
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +113,7 @@ export function AIProviderList({
             responseTime: health.responseTime,
           },
         }));
-      } catch (error) {
+      } catch {
         setHealthStatus((prev) => ({
           ...prev,
           [provider]: {
@@ -113,20 +132,21 @@ export function AIProviderList({
   }, [loadProviders]);
 
   const handleSetDefault = useCallback(
-    async (provider: AIProviderType) => {
+    async (keyId: string, provider: AIProviderType) => {
       try {
+        await keyManager.setKeyAsDefault(keyId);
         providerManager.setActiveProvider(provider);
-        setActiveProvider(provider);
         onProviderSelected?.(provider);
         alert(
           "Success",
           `${AI_PROVIDERS[provider].name} is now your default provider`,
         );
-      } catch (error) {
+        await loadProviders();
+      } catch {
         alert("Error", "Failed to set default provider");
       }
     },
-    [providerManager, onProviderSelected],
+    [keyManager, providerManager, onProviderSelected, loadProviders],
   );
 
   const handleEditProvider = useCallback(
@@ -145,16 +165,15 @@ export function AIProviderList({
               try {
                 await providerManager.removeProvider(provider);
                 await loadProviders();
-                setEditingProvider(null);
                 onProviderRemoved?.();
                 alert(
                   "Success",
                   `${AI_PROVIDERS[provider].name} has been removed. You can now add a new key with updated credentials.`,
                 );
-              } catch (error) {
+              } catch (_error) {
                 const errorMsg =
-                  error instanceof Error
-                    ? error.message
+                  _error instanceof Error
+                    ? _error.message
                     : "Failed to update provider";
                 alert("Error", errorMsg);
               }
@@ -163,14 +182,14 @@ export function AIProviderList({
         ],
       );
     },
-    [providerManager, keyManager, onProviderRemoved],
+    [providerManager, onProviderRemoved, loadProviders],
   );
 
   const handleDeleteProvider = useCallback(
-    (provider: AIProviderType) => {
+    (keyId: string, provider: AIProviderType) => {
       alert(
         "Delete Provider",
-        `Are you sure you want to remove ${AI_PROVIDERS[provider].name}?`,
+        `Are you sure you want to remove this ${AI_PROVIDERS[provider].name} key?`,
         [
           {
             text: "Cancel",
@@ -180,18 +199,18 @@ export function AIProviderList({
             text: "Delete",
             onPress: async () => {
               try {
-                await providerManager.removeProvider(provider);
+                await providerManager.removeProviderKey(keyId);
                 await loadProviders();
                 onProviderRemoved?.();
                 alert(
                   "Success",
-                  `${AI_PROVIDERS[provider].name} has been removed`,
+                  `${AI_PROVIDERS[provider].name} key has been removed`,
                 );
-              } catch (error) {
+              } catch (_error) {
                 const errorMsg =
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to remove provider";
+                  _error instanceof Error
+                    ? _error.message
+                    : "Failed to remove provider key";
                 alert("Error", errorMsg);
               }
             },
@@ -200,7 +219,7 @@ export function AIProviderList({
         ],
       );
     },
-    [keyManager, providerManager, onProviderRemoved],
+    [providerManager, onProviderRemoved, loadProviders],
   );
 
   const formatDate = (timestamp: number) => {
@@ -215,6 +234,7 @@ export function AIProviderList({
     const providerInfo = AI_PROVIDERS[item.provider];
     const health = healthStatus[item.provider];
     const checking = checkingHealth[item.provider];
+    const stats = keyStats[item.provider];
 
     return (
       <Card
@@ -234,17 +254,72 @@ export function AIProviderList({
                 Added: {formatDate(item.createdAt)}
               </Text>
             </View>
-            {item.isDefault && (
-              <View style={styles.defaultChip}>
+            <View style={styles.statusChips}>
+              {item.isDefault && (
+                <View style={styles.defaultChip}>
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: colors.primary, fontWeight: "600" }}
+                  >
+                    Default
+                  </Text>
+                </View>
+              )}
+              {item.isCurrent && stats && (
+                <View style={[styles.defaultChip, { marginLeft: 8 }]}>
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: "#4CAF50", fontWeight: "600" }}
+                  >
+                    Active
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Multi-key rotation info */}
+          {stats && stats.totalKeys > 1 && (
+            <View
+              style={[
+                styles.rotationSection,
+                { borderColor: "rgba(33, 150, 243, 0.2)" },
+              ]}
+            >
+              <Text variant="labelSmall" style={{ fontWeight: "600" }}>
+                🔄 Multiple Keys Configuration
+              </Text>
+              <View style={styles.rotationStats}>
+                <Text variant="labelSmall">
+                  Total Keys:{" "}
+                  <Text style={{ fontWeight: "600" }}>{stats.totalKeys}</Text>
+                </Text>
+                <Text variant="labelSmall">
+                  Active:{" "}
+                  <Text style={{ fontWeight: "600" }}>
+                    {stats.availableKeys}
+                  </Text>
+                </Text>
+                {stats.usedKeys > 0 && (
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: colors.error, fontWeight: "500" }}
+                  >
+                    Exhausted:{" "}
+                    <Text style={{ fontWeight: "600" }}>{stats.usedKeys}</Text>
+                  </Text>
+                )}
+              </View>
+              {stats.availableKeys === 0 && (
                 <Text
                   variant="labelSmall"
-                  style={{ color: colors.primary, fontWeight: "600" }}
+                  style={{ color: colors.error, marginTop: 4 }}
                 >
-                  Default
+                  ⚠️ All keys exhausted by rate limits
                 </Text>
-              </View>
-            )}
-          </View>
+              )}
+            </View>
+          )}
 
           {/* Health status */}
           {health && (
@@ -294,7 +369,7 @@ export function AIProviderList({
             {!item.isDefault && (
               <Button
                 mode="outlined"
-                onPress={() => handleSetDefault(item.provider)}
+                onPress={() => handleSetDefault(item.keyId, item.provider)}
                 style={styles.actionButton}
               >
                 Set Default
@@ -319,7 +394,7 @@ export function AIProviderList({
             <Button
               mode="outlined"
               textColor={colors.error}
-              onPress={() => handleDeleteProvider(item.provider)}
+              onPress={() => handleDeleteProvider(item.keyId, item.provider)}
               style={styles.actionButton}
             >
               Remove
@@ -403,6 +478,21 @@ const styles = StyleSheet.create({
   },
   defaultChip: {
     marginLeft: 8,
+  },
+  statusChips: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  rotationSection: {
+    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: "rgba(33, 150, 243, 0.3)",
+  },
+  rotationStats: {
+    marginTop: 4,
+    gap: 2,
   },
   healthSection: {
     marginBottom: 8,

@@ -32,11 +32,48 @@ export class AIService {
   }
 
   /**
+   * Check if an error is a rate limit (429) error
+   */
+  private isRateLimitError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const errorObj = error as unknown as Record<string, unknown>;
+
+    // Check for status code 429
+    if (errorObj.statusCode === 429) {
+      return true;
+    }
+
+    // Check response status
+    if (errorObj.response !== undefined) {
+      const response = errorObj.response as Record<string, unknown>;
+      if (response.status === 429) {
+        return true;
+      }
+    }
+
+    // Check message for rate limit indicators
+    const message = error.message.toLowerCase();
+    if (
+      message.includes("429") ||
+      message.includes("rate limit") ||
+      message.includes("too many requests")
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Extract detailed error information from AI SDK errors
    * Captures APICallError and AISDKError context, including validation failures
    */
   private extractErrorDetails(error: unknown): {
     message: string;
+    statusCode?: number;
     metadata?: Record<string, unknown>;
   } {
     if (!(error instanceof Error)) {
@@ -46,17 +83,20 @@ export class AIService {
     const message = error.message;
     const metadata: Record<string, unknown> = {};
     const errorObj = error as unknown as Record<string, unknown>;
+    let statusCode: number | undefined;
 
     // Extract properties from AI SDK errors
-    if (errorObj.statusCode !== undefined) {
-      metadata.statusCode = errorObj.statusCode;
+    if (typeof errorObj.statusCode === "number") {
+      statusCode = errorObj.statusCode;
+      metadata.statusCode = statusCode;
     }
     if (errorObj.cause !== undefined) {
       metadata.cause = String(errorObj.cause);
     }
     if (errorObj.response !== undefined) {
       const response = errorObj.response as Record<string, unknown> | undefined;
-      if (response?.status !== undefined) {
+      if (typeof response?.status === "number") {
+        statusCode = response.status;
         metadata.responseStatus = response.status;
       }
     }
@@ -95,6 +135,7 @@ export class AIService {
 
     return {
       message,
+      statusCode,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
   }
@@ -116,7 +157,7 @@ export class AIService {
    * }
    * ```
    */
-  async streamText(prompt: string, system?: string) {
+  async streamText(prompt: string, system?: string): Promise<any> {
     const startTime = Date.now();
     const provider = this.providerManager.getActiveProvider();
     const providerType = provider?.provider || "unknown";
@@ -171,8 +212,34 @@ export class AIService {
       return result;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      const { message: errorMessage, metadata } =
-        this.extractErrorDetails(error);
+      const {
+        message: errorMessage,
+        statusCode,
+        metadata,
+      } = this.extractErrorDetails(error);
+
+      // Check if this is a rate limit error and try to rotate
+      if (statusCode === 429 && this.isRateLimitError(error)) {
+        logger.warn("Rate limit error encountered, attempting key rotation", {
+          provider: providerType,
+          statusCode,
+        });
+
+        const rotated = await this.providerManager.rotateToNextKey(
+          providerType as any,
+        );
+        if (rotated) {
+          logger.info("Key rotated successfully, retrying request", {
+            provider: providerType,
+          });
+          // Recursively retry with the new key
+          return this.streamText(prompt, system);
+        } else {
+          logger.error("Key rotation failed, all keys exhausted", {
+            provider: providerType,
+          });
+        }
+      }
 
       // Log failed call
       await this.apiLogger.addAiCall({
@@ -261,8 +328,34 @@ export class AIService {
       return result;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      const { message: errorMessage, metadata } =
-        this.extractErrorDetails(error);
+      const {
+        message: errorMessage,
+        statusCode,
+        metadata,
+      } = this.extractErrorDetails(error);
+
+      // Check if this is a rate limit error and try to rotate
+      if (statusCode === 429 && this.isRateLimitError(error)) {
+        logger.warn("Rate limit error encountered, attempting key rotation", {
+          provider: providerType,
+          statusCode,
+        });
+
+        const rotated = await this.providerManager.rotateToNextKey(
+          providerType as any,
+        );
+        if (rotated) {
+          logger.info("Key rotated successfully, retrying request", {
+            provider: providerType,
+          });
+          // Recursively retry with the new key
+          return this.generateObject(schema, prompt, system);
+        } else {
+          logger.error("Key rotation failed, all keys exhausted", {
+            provider: providerType,
+          });
+        }
+      }
 
       // Log failed call
       await this.apiLogger.addAiCall({
@@ -305,7 +398,11 @@ export class AIService {
    * }
    * ```
    */
-  async streamObject<T>(schema: z.ZodType<T>, prompt: string, system?: string) {
+  async streamObject<T>(
+    schema: z.ZodType<T>,
+    prompt: string,
+    system?: string,
+  ): Promise<any> {
     const startTime = Date.now();
     const provider = this.providerManager.getActiveProvider();
     const providerType = provider?.provider || "unknown";
@@ -360,8 +457,34 @@ export class AIService {
       return result;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      const { message: errorMessage, metadata } =
-        this.extractErrorDetails(error);
+      const {
+        message: errorMessage,
+        statusCode,
+        metadata,
+      } = this.extractErrorDetails(error);
+
+      // Check if this is a rate limit error and try to rotate
+      if (statusCode === 429 && this.isRateLimitError(error)) {
+        logger.warn("Rate limit error encountered, attempting key rotation", {
+          provider: providerType,
+          statusCode,
+        });
+
+        const rotated = await this.providerManager.rotateToNextKey(
+          providerType as any,
+        );
+        if (rotated) {
+          logger.info("Key rotated successfully, retrying request", {
+            provider: providerType,
+          });
+          // Recursively retry with the new key
+          return this.streamObject(schema, prompt, system);
+        } else {
+          logger.error("Key rotation failed, all keys exhausted", {
+            provider: providerType,
+          });
+        }
+      }
 
       // Log failed call
       await this.apiLogger.addAiCall({

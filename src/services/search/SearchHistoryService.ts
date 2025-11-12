@@ -40,7 +40,6 @@ export interface SearchHistoryStats {
 }
 
 const HISTORY_STORAGE_KEY = "ai_search_history";
-const STATS_STORAGE_KEY = "ai_search_stats";
 const HISTORY_LIMIT = 100; // Keep last 100 searches
 
 /**

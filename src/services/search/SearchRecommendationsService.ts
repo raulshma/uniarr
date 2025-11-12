@@ -7,6 +7,7 @@ import { z } from "zod";
 import { AIService } from "@/services/ai/core/AIService";
 import { useSettingsStore } from "@/store/settingsStore";
 import { logger } from "@/services/logger/LoggerService";
+import { storageAdapter } from "@/services/storage/StorageAdapter";
 import {
   SearchContextBuilder,
   type UserSearchContext,
@@ -48,6 +49,10 @@ const RECOMMENDATION_SCHEMA = z.object({
         .number()
         .min(0)
         .max(100)
+        .transform((score) => {
+          // Normalize 0-1 range to 0-100 if needed
+          return score <= 1 ? Math.round(score * 100) : Math.round(score);
+        })
         .describe("Match score 0-100 based on user preferences"),
     }),
   ),
@@ -65,7 +70,7 @@ Your role is to:
 
 Always provide:
 - Clear, helpful reasons for each recommendation
-- Realistic match scores based on user preferences
+- Match scores as INTEGERS between 0-100 (e.g., 45, 87, 92) based on user preferences
 - A mix of different recommendation types
 - Focus on content NOT already in their library
 
@@ -85,7 +90,23 @@ export class SearchRecommendationsService {
   private aiService = AIService.getInstance();
   private contextBuilder = SearchContextBuilder.getInstance();
 
-  private constructor() {}
+  // Cache with 24-hour TTL (persisted to storage)
+  private cachedRecommendations: RecommendationResult | null = null;
+  private cacheTimestamp: number = 0;
+  private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+  private readonly CACHE_STORAGE_KEY = "SearchRecommendationsService:cache";
+  private readonly CACHE_TIMESTAMP_KEY =
+    "SearchRecommendationsService:cacheTimestamp";
+  private cacheLoaded = false;
+
+  private constructor() {
+    // Load persisted cache on instantiation
+    this.loadPersistedCache().catch((error) => {
+      logger.error("Failed to load persisted recommendations cache", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
 
   static getInstance(): SearchRecommendationsService {
     if (!SearchRecommendationsService.instance) {
@@ -96,12 +117,113 @@ export class SearchRecommendationsService {
   }
 
   /**
+   * Load cache from persistent storage
+   */
+  private async loadPersistedCache(): Promise<void> {
+    try {
+      const cachedJson = await storageAdapter.getItem(this.CACHE_STORAGE_KEY);
+      const timestampJson = await storageAdapter.getItem(
+        this.CACHE_TIMESTAMP_KEY,
+      );
+
+      if (cachedJson && timestampJson) {
+        const recommendations = JSON.parse(cachedJson) as RecommendationResult;
+        const timestamp = parseInt(timestampJson, 10);
+
+        // Validate cache is not expired
+        const age = Date.now() - timestamp;
+        if (age < this.CACHE_TTL_MS) {
+          this.cachedRecommendations = recommendations;
+          this.cacheTimestamp = timestamp;
+          logger.debug("Loaded persisted recommendations cache", {
+            ageHours: Math.round(age / 3600000),
+            count: recommendations.recommendations.length,
+          });
+        } else {
+          // Cache expired, remove it
+          await storageAdapter.removeItem(this.CACHE_STORAGE_KEY);
+          await storageAdapter.removeItem(this.CACHE_TIMESTAMP_KEY);
+          logger.debug("Persisted cache expired and removed");
+        }
+      }
+    } catch (error) {
+      logger.warn("Failed to load persisted cache", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      this.cacheLoaded = true;
+    }
+  }
+
+  /**
+   * Save cache to persistent storage
+   */
+  private async persistCache(): Promise<void> {
+    try {
+      if (!this.cachedRecommendations || !this.cacheTimestamp) {
+        return;
+      }
+      await storageAdapter.setItem(
+        this.CACHE_STORAGE_KEY,
+        JSON.stringify(this.cachedRecommendations),
+      );
+      await storageAdapter.setItem(
+        this.CACHE_TIMESTAMP_KEY,
+        this.cacheTimestamp.toString(),
+      );
+      logger.debug("Persisted recommendations cache");
+    } catch (error) {
+      logger.warn("Failed to persist cache", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Check if cache is valid
+   */
+  private isCacheValid(): boolean {
+    if (!this.cachedRecommendations || !this.cacheTimestamp) {
+      return false;
+    }
+    const now = Date.now();
+    const age = now - this.cacheTimestamp;
+    return age < this.CACHE_TTL_MS;
+  }
+
+  /**
    * Generate recommendations (non-streaming)
+   * Uses 24-hour persistent cache, pass forceRefresh=true to bypass
    *
+   * @param forceRefresh - Bypass cache and fetch fresh recommendations
    * @returns Recommendations for the user
    */
-  async generateRecommendations(): Promise<RecommendationResult> {
+  async generateRecommendations(
+    forceRefresh: boolean = false,
+  ): Promise<RecommendationResult> {
     try {
+      // Wait for persisted cache to load on first call
+      if (!this.cacheLoaded) {
+        await new Promise((resolve) => {
+          const checkLoaded = () => {
+            if (this.cacheLoaded) {
+              resolve(undefined);
+            } else {
+              setTimeout(checkLoaded, 10);
+            }
+          };
+          checkLoaded();
+        });
+      }
+
+      // Return cached result if valid and not forced refresh
+      if (!forceRefresh && this.isCacheValid()) {
+        logger.debug("Returning cached recommendations", {
+          ageHours: Math.round((Date.now() - this.cacheTimestamp) / 3600000),
+        });
+        return this.cachedRecommendations!;
+      }
+
       // Check if AI Recommendations are enabled in settings
       const enableAIRecommendations =
         useSettingsStore.getState().enableAIRecommendations;
@@ -121,7 +243,15 @@ export class SearchRecommendationsService {
       logger.debug("Recommendations generated", {
         count: object.recommendations.length,
         types: object.recommendations.map((r) => r.type),
+        forced: forceRefresh,
       });
+
+      // Cache the result
+      this.cachedRecommendations = object;
+      this.cacheTimestamp = Date.now();
+
+      // Persist cache to storage (fire and forget)
+      void this.persistCache();
 
       return object;
     } catch (error) {
@@ -217,7 +347,7 @@ export class SearchRecommendationsService {
   async isAvailable(): Promise<boolean> {
     try {
       return await this.aiService.isConfigured();
-    } catch (error) {
+    } catch {
       return false;
     }
   }

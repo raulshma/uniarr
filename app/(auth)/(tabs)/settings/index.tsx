@@ -31,7 +31,6 @@ import {
 import {
   CustomConfirm,
   AnimatedListItem,
-  AnimatedScrollView,
   AnimatedSection,
   SettingsListItem,
   SettingsGroup,
@@ -146,7 +145,7 @@ const SettingsHeader = React.memo(
             letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
           },
         }),
-      [theme, insets.top],
+      [theme],
     );
 
     return (

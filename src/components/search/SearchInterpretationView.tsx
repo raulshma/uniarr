@@ -6,7 +6,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { Text, Chip, Card, IconButton, useTheme } from "react-native-paper";
+import { Text, Chip, IconButton, useTheme } from "react-native-paper";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
@@ -72,7 +72,6 @@ export function SearchInterpretationView({
         },
         tagContainer: {
           flexDirection: "row",
-          flexWrap: "wrap",
           gap: spacing.sm,
         },
         chip: {
@@ -169,18 +168,24 @@ export function SearchInterpretationView({
               <IconButton icon="pencil" size={16} />
             </TouchableOpacity>
           </View>
-          <View style={styles.tagContainer}>
-            {interpretation.mediaTypes.map((type, index) => (
-              <Chip
-                key={`mediatype-${index}`}
-                style={styles.chip}
-                textStyle={styles.chipText}
-                icon="play"
-              >
-                {type}
-              </Chip>
-            ))}
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled={true}
+          >
+            <View style={styles.tagContainer}>
+              {interpretation.mediaTypes.map((type, index) => (
+                <Chip
+                  key={`mediatype-${index}`}
+                  style={styles.chip}
+                  textStyle={styles.chipText}
+                  icon="play"
+                >
+                  {type}
+                </Chip>
+              ))}
+            </View>
+          </ScrollView>
         </View>
       )}
 
@@ -196,18 +201,24 @@ export function SearchInterpretationView({
               <IconButton icon="pencil" size={16} />
             </TouchableOpacity>
           </View>
-          <View style={styles.tagContainer}>
-            {interpretation.genres.map((genre, index) => (
-              <Chip
-                key={`genre-${index}`}
-                style={styles.chip}
-                textStyle={styles.chipText}
-                icon="tag"
-              >
-                {genre}
-              </Chip>
-            ))}
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled={true}
+          >
+            <View style={styles.tagContainer}>
+              {interpretation.genres.map((genre, index) => (
+                <Chip
+                  key={`genre-${index}`}
+                  style={styles.chip}
+                  textStyle={styles.chipText}
+                  icon="tag"
+                >
+                  {genre}
+                </Chip>
+              ))}
+            </View>
+          </ScrollView>
         </View>
       )}
 

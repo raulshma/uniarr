@@ -2,7 +2,6 @@ import React, { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
-  TouchableOpacity,
   View,
   type ViewStyle,
 } from "react-native";
@@ -22,6 +21,7 @@ interface SearchInputProps {
   isStreaming?: boolean;
   interpretation?: Partial<SearchInterpretation>;
   containerStyle?: ViewStyle;
+  onClear?: () => void;
 }
 
 /**
@@ -38,6 +38,7 @@ export function SearchInput({
   isStreaming = false,
   interpretation,
   containerStyle,
+  onClear,
 }: SearchInputProps) {
   const theme = useTheme<AppTheme>();
 
@@ -114,8 +115,9 @@ export function SearchInput({
   );
 
   const handleClearInput = useCallback(() => {
+    onClear?.();
     onChangeText("");
-  }, [onChangeText]);
+  }, [onChangeText, onClear]);
 
   const confidencePercentage = interpretation?.confidence
     ? Math.round((interpretation.confidence as number) * 100)

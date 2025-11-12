@@ -132,6 +132,120 @@ export class AIKeyManager {
   }
 
   /**
+   * List all stored API keys for a specific provider (without revealing the actual keys)
+   */
+  async listKeysForProvider(
+    provider: AIProvider,
+  ): Promise<({ keyId: string } & Omit<AIKeyConfig, "apiKey">)[]> {
+    try {
+      const allKeys = await this.listKeys();
+      return allKeys.filter((key) => key.provider === provider);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("Failed to list keys for provider", {
+        error: errorMessage,
+        provider,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Get all key IDs for a specific provider
+   */
+  async getKeyIdsForProvider(provider: AIProvider): Promise<string[]> {
+    try {
+      const keys = await this.listKeysForProvider(provider);
+      return keys.map((k) => k.keyId);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("Failed to get key IDs for provider", {
+        error: errorMessage,
+        provider,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Set a specific key as default and unset default flag for other keys of the same provider
+   */
+  async setKeyAsDefault(keyId: string): Promise<void> {
+    try {
+      const config = await this.getKey(keyId);
+      if (!config) {
+        throw new Error(`Key not found: ${keyId}`);
+      }
+
+      // Get all keys for this provider
+      const allKeys = await this.listKeysForProvider(config.provider);
+
+      // Update all other keys to not be default
+      for (const key of allKeys) {
+        if (key.keyId !== keyId) {
+          const keyConfig = await this.getKey(key.keyId);
+          if (keyConfig && keyConfig.isDefault) {
+            const updatedConfig = { ...keyConfig, isDefault: false };
+            const storageKey = `${SECURE_STORE_PREFIX}${key.keyId}`;
+            await SecureStore.setItemAsync(
+              storageKey,
+              JSON.stringify(updatedConfig),
+            );
+          }
+        }
+      }
+
+      // Set the target key as default
+      const updatedConfig = { ...config, isDefault: true };
+      const storageKey = `${SECURE_STORE_PREFIX}${keyId}`;
+      await SecureStore.setItemAsync(storageKey, JSON.stringify(updatedConfig));
+
+      logger.info("Key set as default", { keyId, provider: config.provider });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("Failed to set key as default", {
+        error: errorMessage,
+        keyId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Clear default flag for all keys of a provider
+   */
+  async clearDefaultForProvider(provider: AIProvider): Promise<void> {
+    try {
+      const keys = await this.listKeysForProvider(provider);
+
+      for (const key of keys) {
+        const config = await this.getKey(key.keyId);
+        if (config && config.isDefault) {
+          const updatedConfig = { ...config, isDefault: false };
+          const storageKey = `${SECURE_STORE_PREFIX}${key.keyId}`;
+          await SecureStore.setItemAsync(
+            storageKey,
+            JSON.stringify(updatedConfig),
+          );
+        }
+      }
+
+      logger.info("Cleared default for all keys", { provider });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("Failed to clear default", {
+        error: errorMessage,
+        provider,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Delete a stored API key
    */
   async deleteKey(keyId: string): Promise<void> {
@@ -365,6 +479,7 @@ export class AIKeyManager {
           }
 
           validKeyIds.push(keyId);
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
           // Malformed JSON; skip this entry
           continue;

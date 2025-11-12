@@ -4,14 +4,18 @@ import {
   SearchHistoryService,
   AISearchHistoryEntry,
 } from "@/services/search/SearchHistoryService";
+import { SearchRecommendationsService } from "@/services/search/SearchRecommendationsService";
 import { UnifiedSearchService } from "@/services/search/UnifiedSearchService";
 import { useSettingsStore } from "@/store/settingsStore";
 import { logger } from "@/services/logger/LoggerService";
 import type { SearchInterpretation } from "@/utils/validation/searchSchemas";
 import type {
+  UnifiedSearchError,
+  UnifiedSearchMediaType,
   UnifiedSearchResult,
   UnifiedSearchResponse,
 } from "@/models/search.types";
+import type { RecommendationItem } from "@/services/search/SearchRecommendationsService";
 
 interface UseAISearchOptions {
   debounceMs?: number;
@@ -19,52 +23,109 @@ interface UseAISearchOptions {
 }
 
 interface UseAISearchReturn {
-  // Input management
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-
-  // Interpretation
   interpretation: SearchInterpretation | null;
   partialInterpretation: Partial<SearchInterpretation>;
   isInterpretingSearch: boolean;
   interpretationError: Error | null;
-
-  // Results
+  interpretedQuery: string | null;
+  recommendedServiceIds: string[];
   results: UnifiedSearchResult[];
   isSearching: boolean;
   searchError: Error | null;
-
-  // Recommendations
-  recommendations: any[];
+  searchErrors: UnifiedSearchError[];
+  lastSearchDurationMs: number;
+  hasPerformedSearch: boolean;
+  recommendations: RecommendationItem[];
   isLoadingRecommendations: boolean;
-
-  // History
+  recommendationsError: Error | null;
   searchHistory: AISearchHistoryEntry[];
+  lastHistoryEntry: AISearchHistoryEntry | null;
   clearHistory: () => Promise<void>;
-
-  // Actions
+  refreshRecommendations: () => Promise<void>;
   performSearch: (query?: string) => Promise<void>;
   refineInterpretation: (changes: Partial<SearchInterpretation>) => void;
   bookmarkResult: (result: UnifiedSearchResult) => Promise<void>;
   clearSearch: () => void;
 }
 
-/**
- * Hook for AI-powered search with interpretation and recommendations
- */
+const mergeInterpretationPartial = (
+  previous: Partial<SearchInterpretation>,
+  update: Partial<SearchInterpretation>,
+): Partial<SearchInterpretation> => {
+  const next: Partial<SearchInterpretation> = { ...previous };
+
+  const target = next as Record<
+    keyof SearchInterpretation,
+    SearchInterpretation[keyof SearchInterpretation] | undefined
+  >;
+
+  (Object.keys(update) as (keyof SearchInterpretation)[]).forEach((key) => {
+    const value = update[key];
+
+    if (value === undefined) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      target[key] = [...value] as unknown as SearchInterpretation[typeof key];
+      return;
+    }
+
+    if (value && typeof value === "object") {
+      const existing = next[key];
+      const existingObject =
+        existing && typeof existing === "object" ? existing : {};
+      target[key] = {
+        ...(existingObject as Record<string, unknown>),
+        ...(value as Record<string, unknown>),
+      } as unknown as SearchInterpretation[typeof key];
+      return;
+    }
+
+    target[key] = value as unknown as SearchInterpretation[typeof key];
+  });
+
+  return next;
+};
+
+const mapInterpretationMediaTypes = (
+  mediaTypes?: SearchInterpretation["mediaTypes"],
+): UnifiedSearchMediaType[] | undefined => {
+  if (!mediaTypes?.length) {
+    return undefined;
+  }
+
+  const mapped = new Set<UnifiedSearchMediaType>();
+
+  mediaTypes.forEach((type) => {
+    if (type === "anime") {
+      mapped.add("series");
+      mapped.add("movie");
+      return;
+    }
+
+    if (type === "series" || type === "movie") {
+      mapped.add(type);
+    }
+  });
+
+  return mapped.size ? Array.from(mapped) : undefined;
+};
+
 export function useAISearch(
   options: UseAISearchOptions = {},
 ): UseAISearchReturn {
   const { debounceMs = 500, autoSearch = false } = options;
 
   const intelligentSearchService = IntelligentSearchService.getInstance();
+  const recommendationsService = SearchRecommendationsService.getInstance();
   const searchHistoryService = SearchHistoryService.getInstance();
   const unifiedSearchService = UnifiedSearchService.getInstance();
 
-  // Get AI Search toggle from settings
-  const enableAISearch = useSettingsStore((s) => s.enableAISearch);
+  const enableAISearch = useSettingsStore((state) => state.enableAISearch);
 
-  // State
   const [searchQuery, setSearchQuery] = useState("");
   const [interpretation, setInterpretation] =
     useState<SearchInterpretation | null>(null);
@@ -79,129 +140,224 @@ export function useAISearch(
   const [results, setResults] = useState<UnifiedSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<Error | null>(null);
+  const [searchErrors, setSearchErrors] = useState<UnifiedSearchError[]>([]);
+  const [lastSearchDurationMs, setLastSearchDurationMs] = useState(0);
+  const [hasPerformedSearch, setHasPerformedSearch] = useState(false);
 
-  const [recommendations] = useState<any[]>([]);
-  const [isLoadingRecommendations] = useState(false);
+  const [recommendations, setRecommendations] = useState<RecommendationItem[]>(
+    [],
+  );
+  const [isLoadingRecommendations, setIsLoadingRecommendations] =
+    useState(false);
+  const [recommendationsError, setRecommendationsError] =
+    useState<Error | null>(null);
 
-  const [searchHistory, setSearchHistory] = useState<any[]>([]);
+  const [searchHistory, setSearchHistory] = useState<AISearchHistoryEntry[]>(
+    [],
+  );
+  const [lastHistoryEntry, setLastHistoryEntry] =
+    useState<AISearchHistoryEntry | null>(null);
 
-  // Refs
+  const interpretationRef = useRef<SearchInterpretation | null>(null);
+  const interpretedQueryRef = useRef<string | null>(null);
+  const interpretationRequestIdRef = useRef(0);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  /**
-   * Load search history
-   */
   const loadHistory = useCallback(async () => {
     try {
       const history = await searchHistoryService.getHistory();
       setSearchHistory(history);
+      setLastHistoryEntry(history[0] ?? null);
     } catch (error) {
       logger.error("Failed to load search history", { error });
     }
   }, [searchHistoryService]);
 
-  /**
-   * Interpret search query with streaming
-   */
+  const refreshRecommendations = useCallback(async () => {
+    try {
+      setIsLoadingRecommendations(true);
+      setRecommendationsError(null);
+      // Force refresh to bypass 24-hour cache on manual refresh
+      const { recommendations: items } =
+        await recommendationsService.generateRecommendations(true);
+      setRecommendations(items);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const err = new Error(errorMessage);
+      setRecommendationsError(err);
+      logger.error("Failed to load recommendations", { error: errorMessage });
+    } finally {
+      setIsLoadingRecommendations(false);
+    }
+  }, [recommendationsService]);
+
+  const loadRecommendations = useCallback(async () => {
+    try {
+      setIsLoadingRecommendations(true);
+      setRecommendationsError(null);
+      // Initial load uses cache if valid (false = use cache)
+      const { recommendations: items } =
+        await recommendationsService.generateRecommendations(false);
+      setRecommendations(items);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const err = new Error(errorMessage);
+      setRecommendationsError(err);
+      logger.error("Failed to load recommendations", { error: errorMessage });
+    } finally {
+      setIsLoadingRecommendations(false);
+    }
+  }, [recommendationsService]);
+
   const interpretQuery = useCallback(
-    async (query: string) => {
+    async (query: string): Promise<SearchInterpretation | null> => {
+      const trimmed = query.trim();
+
       if (!enableAISearch) {
         logger.debug("AI Search is disabled in settings");
         setInterpretation(null);
         setPartialInterpretation({});
-        return;
+        interpretationRef.current = null;
+        interpretedQueryRef.current = null;
+        return null;
       }
 
-      if (!query || query.trim().length < 2) {
+      if (trimmed.length < 2) {
         setInterpretation(null);
         setPartialInterpretation({});
-        return;
+        interpretationRef.current = null;
+        interpretedQueryRef.current = null;
+        return null;
       }
+
+      const requestId = interpretationRequestIdRef.current + 1;
+      interpretationRequestIdRef.current = requestId;
 
       setIsInterpretingSearch(true);
       setInterpretationError(null);
       setPartialInterpretation({});
 
+      let latestSnapshot: Partial<SearchInterpretation> = {};
+
       try {
-        // Interpret query using generateObject
-        const result = await intelligentSearchService.interpretQuery(query);
+        for await (const chunk of intelligentSearchService.streamInterpretation(
+          trimmed,
+        )) {
+          if (interpretationRequestIdRef.current !== requestId) {
+            return null;
+          }
 
-        setInterpretation(result);
-        setPartialInterpretation(result);
+          if (chunk.type === "partial") {
+            latestSnapshot = mergeInterpretationPartial(
+              latestSnapshot,
+              chunk.data,
+            );
+            setPartialInterpretation((previous) =>
+              mergeInterpretationPartial(previous, chunk.data),
+            );
+            continue;
+          }
 
-        logger.debug("Query interpretation completed", {
-          query,
-          confidence: result.confidence,
-        });
+          interpretationRef.current = chunk.data;
+          interpretedQueryRef.current = trimmed;
+          setInterpretation(chunk.data);
+          setPartialInterpretation(chunk.data);
+
+          logger.debug("Query interpretation completed", {
+            query: trimmed,
+            confidence: chunk.data.confidence,
+          });
+
+          return chunk.data;
+        }
+
+        return interpretationRef.current;
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         const err = new Error(errorMessage);
         setInterpretationError(err);
+        interpretationRef.current = null;
+        interpretedQueryRef.current = null;
         logger.error("Failed to interpret query", { error: errorMessage });
+        return null;
       } finally {
-        setIsInterpretingSearch(false);
+        if (interpretationRequestIdRef.current === requestId) {
+          setIsInterpretingSearch(false);
+          if (
+            !interpretationRef.current &&
+            Object.keys(latestSnapshot).length
+          ) {
+            setPartialInterpretation(latestSnapshot);
+          }
+        }
       }
     },
-    [intelligentSearchService, enableAISearch],
+    [enableAISearch, intelligentSearchService],
   );
 
-  /**
-   * Perform unified search with interpretation
-   */
   const performSearch = useCallback(
     async (query?: string) => {
-      const queryToSearch = query || searchQuery;
+      const queryToSearch = (query ?? searchQuery).trim();
 
-      if (!queryToSearch || queryToSearch.trim().length < 2) {
+      if (queryToSearch.length < 2) {
         return;
       }
 
       setIsSearching(true);
       setSearchError(null);
+      setSearchErrors([]);
+      setLastSearchDurationMs(0);
 
       try {
-        // Get current interpretation or interpret if not available
-        let currentInterpretation = interpretation;
-        if (!currentInterpretation) {
-          await interpretQuery(queryToSearch);
-          currentInterpretation = interpretation;
-        }
+        let currentInterpretation = interpretationRef.current;
 
-        // Search services
         if (
-          currentInterpretation &&
-          currentInterpretation.recommendedServices &&
-          currentInterpretation.recommendedServices.length > 0
+          !currentInterpretation ||
+          interpretedQueryRef.current !== queryToSearch
         ) {
-          const searchResponse: UnifiedSearchResponse =
-            await unifiedSearchService.search(queryToSearch, {
-              serviceIds: currentInterpretation.recommendedServices,
-              mediaTypes: currentInterpretation.mediaTypes as any,
-              aiInterpretation: currentInterpretation,
-              // Add other filter options as needed
-            });
-
-          setResults(searchResponse.results);
-
-          // Record in history
-          await searchHistoryService.addSearch({
-            query: queryToSearch,
-            mediaTypes: currentInterpretation.mediaTypes,
-            genres: currentInterpretation.genres,
-            confidence: currentInterpretation.confidence,
-            resultsCount: searchResponse.results.length,
-            resultServices: currentInterpretation.recommendedServices,
-            resultMediaTypes: currentInterpretation.mediaTypes,
-          });
-        } else {
-          setResults([]);
+          currentInterpretation = await interpretQuery(queryToSearch);
         }
+
+        if (!currentInterpretation) {
+          setResults([]);
+          return;
+        }
+
+        const response: UnifiedSearchResponse =
+          await unifiedSearchService.search(queryToSearch, {
+            serviceIds: currentInterpretation.recommendedServices,
+            mediaTypes: mapInterpretationMediaTypes(
+              currentInterpretation.mediaTypes,
+            ),
+            genres: currentInterpretation.genres,
+            releaseYearMin: currentInterpretation.yearRange?.start,
+            releaseYearMax: currentInterpretation.yearRange?.end,
+            aiInterpretation: currentInterpretation,
+          });
+
+        setResults(response.results);
+        setSearchErrors(response.errors);
+        setLastSearchDurationMs(response.durationMs);
+        setHasPerformedSearch(true);
+
+        await searchHistoryService.addSearch({
+          query: queryToSearch,
+          mediaTypes: currentInterpretation.mediaTypes,
+          genres: currentInterpretation.genres,
+          confidence: currentInterpretation.confidence,
+          resultsCount: response.results.length,
+          resultServices: currentInterpretation.recommendedServices,
+          resultMediaTypes: currentInterpretation.mediaTypes,
+        });
+
+        await loadHistory();
 
         logger.debug("Search completed", {
           query: queryToSearch,
-          resultsCount: results.length,
+          resultsCount: response.results.length,
         });
       } catch (error) {
         const errorMessage =
@@ -215,112 +371,187 @@ export function useAISearch(
     },
     [
       searchQuery,
-      interpretation,
       interpretQuery,
       unifiedSearchService,
       searchHistoryService,
-      results.length,
+      loadHistory,
     ],
   );
 
-  /**
-   * Refine interpretation with manual changes
-   */
   const refineInterpretation = useCallback(
     (changes: Partial<SearchInterpretation>) => {
-      setInterpretation((prev) => (prev ? { ...prev, ...changes } : null));
+      setInterpretation((previous) => {
+        const next = {
+          ...(previous ?? {}),
+        } as SearchInterpretation;
+
+        (Object.keys(changes) as (keyof SearchInterpretation)[]).forEach(
+          (key) => {
+            const value = changes[key];
+
+            if (value === null || value === undefined) {
+              delete (next as Record<string, unknown>)[key as string];
+              return;
+            }
+
+            if (Array.isArray(value)) {
+              (next as Record<string, unknown>)[key as string] = [...value];
+              return;
+            }
+
+            if (typeof value === "object") {
+              (next as Record<string, unknown>)[key as string] = {
+                ...(value as Record<string, unknown>),
+              };
+              return;
+            }
+
+            (next as Record<string, unknown>)[key as string] = value;
+          },
+        );
+
+        interpretationRef.current = next;
+        return next;
+      });
+
+      setPartialInterpretation((previous) => {
+        const next: Partial<SearchInterpretation> = { ...previous };
+
+        (Object.keys(changes) as (keyof SearchInterpretation)[]).forEach(
+          (key) => {
+            const value = changes[key];
+
+            if (value === null || value === undefined) {
+              delete (next as Record<string, unknown>)[key as string];
+              return;
+            }
+
+            if (Array.isArray(value)) {
+              (next as Record<string, unknown>)[key as string] = [...value];
+              return;
+            }
+
+            if (typeof value === "object") {
+              (next as Record<string, unknown>)[key as string] = {
+                ...(value as Record<string, unknown>),
+              };
+              return;
+            }
+
+            (next as Record<string, unknown>)[key as string] = value;
+          },
+        );
+
+        return next;
+      });
     },
     [],
   );
 
-  /**
-   * Bookmark a search result
-   */
-  const bookmarkResult = useCallback(async (result: UnifiedSearchResult) => {
-    try {
-      // This would typically save to a bookmarks service
-      logger.debug("Result bookmarked", { resultId: result.id });
-    } catch (error) {
-      logger.error("Failed to bookmark result", { error });
-      throw error;
-    }
-  }, []);
+  const bookmarkResult = useCallback(
+    async (result: UnifiedSearchResult) => {
+      try {
+        await searchHistoryService.addSearch({
+          query: searchQuery || result.title,
+          mediaTypes: interpretationRef.current?.mediaTypes,
+          genres: interpretationRef.current?.genres,
+          confidence: interpretationRef.current?.confidence,
+          resultsCount: 1,
+          resultServices: [result.serviceId],
+          resultMediaTypes: interpretationRef.current?.mediaTypes,
+          userSelected: true,
+          selectedResultId: result.id,
+          notes: "Bookmarked from AI Search",
+        });
+        await loadHistory();
+        logger.debug("Result bookmarked", { resultId: result.id });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error("Failed to bookmark result", { error: errorMessage });
+        throw error;
+      }
+    },
+    [loadHistory, searchHistoryService, searchQuery],
+  );
 
-  /**
-   * Clear search state
-   */
   const clearSearch = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    interpretationRequestIdRef.current += 1;
+    interpretationRef.current = null;
+    interpretedQueryRef.current = null;
+
     setSearchQuery("");
     setInterpretation(null);
     setPartialInterpretation({});
     setResults([]);
     setSearchError(null);
     setInterpretationError(null);
+    setSearchErrors([]);
+    setLastSearchDurationMs(0);
+    setHasPerformedSearch(false);
+    setLastHistoryEntry(null);
   }, []);
 
-  /**
-   * Clear search history
-   */
   const clearHistoryCallback = useCallback(async () => {
     try {
       await searchHistoryService.clearHistory();
       setSearchHistory([]);
+      setLastHistoryEntry(null);
       logger.debug("Search history cleared");
     } catch (error) {
-      logger.error("Failed to clear history", { error });
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("Failed to clear history", { error: errorMessage });
       throw error;
     }
   }, [searchHistoryService]);
 
-  /**
-   * Debounced search query interpretation
-   */
   useEffect(() => {
-    if (!autoSearch || !enableAISearch) return;
+    if (!autoSearch || !enableAISearch) {
+      return;
+    }
 
-    // Clear existing timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Set new timer
     debounceTimerRef.current = setTimeout(() => {
-      if (searchQuery.trim().length >= 2) {
-        interpretQuery(searchQuery);
+      const trimmed = searchQuery.trim();
+      if (trimmed.length >= 2) {
+        void interpretQuery(trimmed);
       } else {
+        interpretationRequestIdRef.current += 1;
+        interpretationRef.current = null;
+        interpretedQueryRef.current = null;
         setInterpretation(null);
         setPartialInterpretation({});
       }
     }, debounceMs);
 
-    // Cleanup
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [searchQuery, autoSearch, debounceMs, interpretQuery, enableAISearch]);
+  }, [searchQuery, autoSearch, debounceMs, enableAISearch, interpretQuery]);
 
-  /**
-   * Load history on mount
-   */
   useEffect(() => {
-    loadHistory();
+    void loadHistory();
   }, [loadHistory]);
 
-  /**
-   * Cleanup on unmount
-   */
   useEffect(() => {
-    const abortController = abortControllerRef.current;
-    const debounceTimer = debounceTimerRef.current;
+    void loadRecommendations();
+  }, [loadRecommendations]);
 
+  useEffect(() => {
     return () => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-      if (abortController) {
-        abortController.abort();
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
     };
   }, []);
@@ -335,10 +566,18 @@ export function useAISearch(
     results,
     isSearching,
     searchError,
+    searchErrors,
+    lastSearchDurationMs,
+    hasPerformedSearch,
     recommendations,
     isLoadingRecommendations,
+    recommendationsError,
+    interpretedQuery: interpretedQueryRef.current,
+    recommendedServiceIds: interpretationRef.current?.recommendedServices ?? [],
     searchHistory,
+    lastHistoryEntry,
     clearHistory: clearHistoryCallback,
+    refreshRecommendations,
     performSearch,
     refineInterpretation,
     bookmarkResult,
