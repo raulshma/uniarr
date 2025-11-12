@@ -424,12 +424,12 @@ const DashboardScreen = () => {
                     alignItems: "center",
                     justifyContent: "center",
                     marginTop: theme.custom.spacing.xxxs,
-                    gap: theme.custom.spacing.xs,
+                    gap: theme.custom.spacing.none,
                   }}
                 >
                   <LottieWeatherIcon
                     condition={weatherSummary.condition}
-                    size={24}
+                    size={40}
                     autoPlay
                     loop
                   />
@@ -471,13 +471,13 @@ const DashboardScreen = () => {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: theme.custom.spacing.xs,
+                    gap: theme.custom.spacing.none,
                     opacity: animatedValues.stickyTitleOpacity,
                   }}
                 >
                   <LottieWeatherIcon
                     condition={weatherSummary.condition}
-                    size={18}
+                    size={34}
                     autoPlay
                     loop
                   />
