@@ -28,10 +28,9 @@ import { AnimatedSection } from "@/components/common/AnimatedComponents";
 import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContainer";
 import { easeOutCubic } from "@/utils/animations.utils";
 import { widgetService } from "@/services/widgets/WidgetService";
-import { mapConditionToIcon } from "@/components/widgets/WeatherWidget/weatherIcons";
+import LottieWeatherIcon from "@/components/widgets/WeatherWidget/LottieWeatherIcon";
 import { WeatherBackdrop } from "@/components/weather/WeatherBackdrop";
 import { mapWeatherToBackdrop } from "@/services/weather/weatherMapping";
-import WeatherAwareBackdrop from "@/components/weather/WeatherAwareBackdrop";
 import { useIsFocused } from "@react-navigation/native";
 
 // Helper function to calculate progress percentage
@@ -55,7 +54,7 @@ const DashboardScreen = () => {
   );
 
   const [weatherSummary, setWeatherSummary] = React.useState<{
-    icon: string;
+    condition: string;
     temperature: string;
   } | null>(null);
   const [weatherForBackdrop, setWeatherForBackdrop] = React.useState<
@@ -102,7 +101,7 @@ const DashboardScreen = () => {
         }
 
         setWeatherSummary({
-          icon: mapConditionToIcon(weather.current.condition.text),
+          condition: weather.current.condition.text,
           temperature: `${Math.round(weather.current.temperature)}°`,
         });
         setWeatherForBackdrop(weather);
@@ -423,14 +422,16 @@ const DashboardScreen = () => {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
+                    justifyContent: "center",
                     marginTop: theme.custom.spacing.xxxs,
+                    gap: theme.custom.spacing.xs,
                   }}
                 >
-                  <IconButton
-                    icon={weatherSummary.icon}
-                    size={14}
-                    style={{ margin: 0 }}
-                    iconColor={theme.colors.onBackground}
+                  <LottieWeatherIcon
+                    condition={weatherSummary.condition}
+                    size={24}
+                    autoPlay
+                    loop
                   />
                   <Text
                     style={{
@@ -466,16 +467,30 @@ const DashboardScreen = () => {
             >
               <Text style={styles.stickyTitle}>Dashboard</Text>
               {weatherSummary && (
-                <Animated.Text
+                <Animated.View
                   style={{
-                    fontSize: theme.custom.typography.titleSmall.fontSize,
-                    color: theme.colors.onBackground,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: theme.custom.spacing.xs,
                     opacity: animatedValues.stickyTitleOpacity,
                   }}
-                  numberOfLines={1}
                 >
-                  {weatherSummary.temperature}
-                </Animated.Text>
+                  <LottieWeatherIcon
+                    condition={weatherSummary.condition}
+                    size={18}
+                    autoPlay
+                    loop
+                  />
+                  <Text
+                    style={{
+                      fontSize: theme.custom.typography.titleSmall.fontSize,
+                      color: theme.colors.onBackground,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {weatherSummary.temperature}
+                  </Text>
+                </Animated.View>
               )}
             </Animated.View>
             <Animated.View
@@ -515,67 +530,6 @@ const DashboardScreen = () => {
             />
           )}
 
-        {/* Test weather effects - forcing rain for debugging */}
-        {weatherEffectsEnabled && isFocused && appState === "active" && (
-          <WeatherBackdrop
-            condition="rain"
-            isDaytime={false}
-            intensity="medium"
-            visible={true}
-          />
-        )}
-
-        {/* Debug info for weather effects */}
-        {__DEV__ && (
-          <View
-            style={{
-              position: "absolute",
-              top: 100,
-              left: 10,
-              backgroundColor: "rgba(0,0,0,0.7)",
-              padding: 8,
-              borderRadius: 4,
-            }}
-          >
-            <Text style={{ color: "white", fontSize: 10 }}>
-              Weather Effects: {weatherEffectsEnabled ? "ON" : "OFF"}
-            </Text>
-            <Text style={{ color: "white", fontSize: 10 }}>
-              Weather Data: {weatherForBackdrop ? "Available" : "None"}
-            </Text>
-            <Text style={{ color: "white", fontSize: 10 }}>
-              Screen Focused: {isFocused ? "Yes" : "No"}
-            </Text>
-            <Text style={{ color: "white", fontSize: 10 }}>
-              App State: {appState}
-            </Text>
-            {weatherForBackdrop && (
-              <>
-                <Text style={{ color: "white", fontSize: 10 }}>
-                  Condition:{" "}
-                  {JSON.stringify(
-                    mapWeatherToBackdrop({ weather: weatherForBackdrop })
-                      .condition,
-                  )}
-                </Text>
-                <Text style={{ color: "white", fontSize: 10 }}>
-                  Daytime:{" "}
-                  {JSON.stringify(
-                    mapWeatherToBackdrop({ weather: weatherForBackdrop })
-                      .isDaytime,
-                  )}
-                </Text>
-                <Text style={{ color: "white", fontSize: 10 }}>
-                  Intensity:{" "}
-                  {JSON.stringify(
-                    mapWeatherToBackdrop({ weather: weatherForBackdrop })
-                      .intensity,
-                  )}
-                </Text>
-              </>
-            )}
-          </View>
-        )}
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}

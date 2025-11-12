@@ -6,6 +6,8 @@ export type WeatherBackdropCondition =
   | "rain"
   | "drizzle"
   | "snow"
+  | "sleet"
+  | "freezing-rain"
   | "thunderstorm"
   | "fog";
 
@@ -39,13 +41,22 @@ export const mapWeatherToBackdrop = ({
   let condition: WeatherBackdropCondition = "clear";
   if (includesAny(text, ["thunder", "storm"])) {
     condition = "thunderstorm";
-  } else if (includesAny(text, ["snow", "sleet", "blizzard"])) {
+  } else if (includesAny(text, ["blizzard", "blowing snow"])) {
+    condition = "snow";
+  } else if (
+    includesAny(text, ["freezing rain", "freezing drizzle"]) &&
+    !text.includes("possible")
+  ) {
+    condition = "freezing-rain";
+  } else if (includesAny(text, ["sleet"]) && !text.includes("possible")) {
+    condition = "sleet";
+  } else if (includesAny(text, ["snow", "ice pellet"])) {
     condition = "snow";
   } else if (includesAny(text, ["drizzle"])) {
     condition = "drizzle";
   } else if (includesAny(text, ["rain", "shower"])) {
     condition = "rain";
-  } else if (includesAny(text, ["fog", "mist", "haze", "smoke"])) {
+  } else if (includesAny(text, ["fog", "mist"])) {
     condition = "fog";
   } else if (includesAny(text, ["overcast", "cloud"])) {
     condition = "clouds";
@@ -68,6 +79,11 @@ const computeIntensity = (
     case "drizzle":
       if (precipMm >= 6) return "high";
       if (precipMm >= 2) return "medium";
+      return "low";
+    case "sleet":
+    case "freezing-rain":
+      if (precipMm >= 4) return "high";
+      if (precipMm >= 1) return "medium";
       return "low";
     case "snow":
       if (precipMm >= 4) return "high";
