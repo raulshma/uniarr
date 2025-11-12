@@ -1,7 +1,20 @@
 import { useRouter } from "expo-router";
-import { StyleSheet, View, useColorScheme } from "react-native";
+import {
+  StyleSheet,
+  View,
+  useColorScheme,
+  ScrollView,
+  Dimensions,
+  Animated,
+} from "react-native";
 import { alert, showCustomDialog } from "@/services/dialogService";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import Constants from "expo-constants";
 
 import {
@@ -23,7 +36,10 @@ import {
   SettingsListItem,
   SettingsGroup,
 } from "@/components/common";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import type { AppTheme } from "@/constants/theme";
 import { useAuth } from "@/services/auth/AuthProvider";
@@ -39,8 +55,10 @@ import { useAppUpdateCheck } from "@/hooks/useAppUpdateCheck";
 import type { NotificationCategory } from "@/models/notification.types";
 import { getCategoryFriendlyName } from "@/utils/quietHours.utils";
 import { borderRadius } from "@/constants/sizes";
-import { shouldAnimateLayout } from "@/utils/animations.utils";
+import { shouldAnimateLayout, easeOutCubic } from "@/utils/animations.utils";
 // Backup & restore moved to its own settings screen
+
+const headerMinHeight = 60; // Minimum collapsed height
 
 const ChevronTrailing = ({ onPress }: { onPress?: () => void }) => (
   <IconButton
@@ -49,6 +67,147 @@ const ChevronTrailing = ({ onPress }: { onPress?: () => void }) => (
     iconColor={useTheme<AppTheme>().colors.outline}
     onPress={onPress}
   />
+);
+
+// Header component matching the dashboard style
+interface AnimatedValues {
+  headerHeight: Animated.AnimatedInterpolation<string | number>;
+  titleOpacity: Animated.AnimatedInterpolation<string | number>;
+  stickyTitleOpacity: Animated.AnimatedInterpolation<string | number>;
+  headerBackgroundOpacity: Animated.AnimatedInterpolation<string | number>;
+}
+
+interface SettingsHeaderProps {
+  animatedValues: AnimatedValues;
+  theme: any;
+}
+
+const SettingsHeader = React.memo(
+  ({ animatedValues, theme }: SettingsHeaderProps) => {
+    const insets = useSafeAreaInsets();
+
+    const styles = useMemo(
+      () =>
+        StyleSheet.create({
+          headerContainer: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+          },
+          headerBackground: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: "transparent",
+          },
+          headerContent: {
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: theme.custom.spacing.lg,
+          },
+          titleContainer: {
+            alignItems: "center",
+          },
+          stickyButtonsContainer: {
+            position: "absolute",
+            top: 0,
+            right: 0,
+            left: 0,
+            zIndex: 15,
+            paddingHorizontal: theme.custom.spacing.lg,
+            // paddingTop: insets.top,
+          },
+          stickyHeader: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            minHeight: headerMinHeight,
+          },
+          stickyTitleContainer: {
+            flex: 1,
+            flexDirection: "row",
+            gap: theme.custom.spacing.xs,
+            alignItems: "center",
+          },
+          title: {
+            fontSize: theme.custom.typography.titleLarge.fontSize,
+            fontWeight: "800",
+            color: theme.colors.onBackground,
+            letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
+          },
+          stickyTitle: {
+            fontSize: theme.custom.typography.titleMedium.fontSize,
+            fontWeight: "600",
+            color: theme.colors.onBackground,
+            letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          },
+        }),
+      [theme, insets.top],
+    );
+
+    return (
+      <>
+        <Animated.View
+          style={[
+            styles.headerContainer,
+            { height: animatedValues.headerHeight },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.headerBackground,
+              {
+                height: animatedValues.headerHeight,
+                opacity: animatedValues.headerBackgroundOpacity,
+                backgroundColor: theme.colors.background,
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.headerContent,
+              { height: animatedValues.headerHeight },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.titleContainer,
+                {
+                  opacity: animatedValues.titleOpacity,
+                },
+              ]}
+            >
+              <Text style={styles.title}>Settings</Text>
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
+
+        <Animated.View style={[styles.stickyButtonsContainer]}>
+          <View
+            style={[
+              styles.stickyHeader,
+              { paddingTop: insets.top, height: headerMinHeight },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.stickyTitleContainer,
+                {
+                  opacity: animatedValues.stickyTitleOpacity,
+                },
+              ]}
+            >
+              <Text style={styles.stickyTitle}>Settings</Text>
+            </Animated.View>
+          </View>
+        </Animated.View>
+      </>
+    );
+  },
 );
 
 // Helper function to format bytes
@@ -72,13 +231,16 @@ const formatBytes = (bytes: number): string => {
 const SettingsScreen = () => {
   const router = useRouter();
   const { signOut } = useAuth();
+  const theme = useTheme<AppTheme>();
+  const insets = useSafeAreaInsets();
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const [errorLogCount, setErrorLogCount] = useState(0);
   const [cleanupLogCount, setCleanupLogCount] = useState(0);
   const [hasTriggeredUpdateCheck, setHasTriggeredUpdateCheck] = useState(false);
-  const theme = useTheme<AppTheme>();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Get dynamic app version from Expo Constants
   const appVersion = Constants.expoConfig?.version || "Unknown";
@@ -158,14 +320,45 @@ const SettingsScreen = () => {
   const signOutButtonColor = theme.colors.error;
   const signOutTextColor = theme.colors.onError;
 
+  const screenHeight = Dimensions.get("window").height;
+  const headerMaxHeight = screenHeight * 0.4; // 25% screen height
+  const collapseRange = headerMaxHeight - headerMinHeight;
+
+  // Memoize animated styles
+  const animatedValues = useMemo(
+    () => ({
+      headerHeight: easeOutCubic(
+        scrollY,
+        [0, collapseRange],
+        [headerMaxHeight, headerMinHeight],
+      ),
+      titleOpacity: easeOutCubic(scrollY, [0, collapseRange * 0.6], [1, 0]),
+      stickyTitleOpacity: easeOutCubic(
+        scrollY,
+        [collapseRange * 0.6, collapseRange],
+        [0, 1],
+      ),
+      headerBackgroundOpacity: scrollY.interpolate({
+        inputRange: [0, collapseRange - 10, collapseRange],
+        outputRange: [0, 0, 1],
+        extrapolate: "clamp",
+      }),
+    }),
+    [scrollY, headerMaxHeight, collapseRange],
+  );
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    scrollContainer: {
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
       paddingHorizontal: spacing.xs,
       paddingBottom: spacing.xxxxl,
+      paddingTop: headerMaxHeight + insets.top,
     },
     // Overview styles removed
     listSpacer: {
@@ -464,10 +657,19 @@ const SettingsScreen = () => {
   }, [quietHours]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AnimatedScrollView
-        contentContainerStyle={styles.scrollContainer}
-        animated={animationsEnabled}
+    <SafeAreaView style={styles.container} edges={["left", "right"]}>
+      <SettingsHeader animatedValues={animatedValues} theme={theme} />
+
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false },
+        )}
+        scrollEventThrottle={16}
       >
         {/* Overview removed */}
 
@@ -1469,7 +1671,7 @@ const SettingsScreen = () => {
             </Dialog.Actions>
           </Dialog>
         </Portal>
-      </AnimatedScrollView>
+      </ScrollView>
     </SafeAreaView>
   );
 };
