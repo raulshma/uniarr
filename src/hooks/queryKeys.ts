@@ -336,13 +336,33 @@ export const queryKeys = {
     releases: (
       currentDate: string,
       filters?: Record<string, unknown>,
-    ): QueryKeyBuilder =>
-      ["calendar", "releases", currentDate, filters ?? {}] as const,
+    ): QueryKeyBuilder => {
+      // Normalize filters to prevent cache misses due to property ordering
+      const normalizedFilters = filters
+        ? Object.keys(filters)
+            .sort()
+            .reduce((acc: Record<string, unknown>, key) => {
+              acc[key] = filters[key];
+              return acc;
+            }, {})
+        : {};
+      return ["calendar", "releases", currentDate, normalizedFilters] as const;
+    },
     stats: (
       currentDate: string,
       filters?: Record<string, unknown>,
-    ): QueryKeyBuilder =>
-      ["calendar", "stats", currentDate, filters ?? {}] as const,
+    ): QueryKeyBuilder => {
+      // Normalize filters to prevent cache misses due to property ordering
+      const normalizedFilters = filters
+        ? Object.keys(filters)
+            .sort()
+            .reduce((acc: Record<string, unknown>, key) => {
+              acc[key] = filters[key];
+              return acc;
+            }, {})
+        : {};
+      return ["calendar", "stats", currentDate, normalizedFilters] as const;
+    },
   },
   discover: {
     base: ["discover"] as const,

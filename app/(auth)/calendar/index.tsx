@@ -51,10 +51,12 @@ import BottomDrawer from "@/components/common/BottomDrawer";
 import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
 import { useCalendar } from "@/hooks/useCalendar";
+import { useImagePrefetch } from "@/hooks/useImagePrefetch";
 import type {
   CalendarDay,
   CalendarFilters,
   CalendarMonth,
+  CalendarRange,
   CalendarServiceType,
   CalendarView,
   CalendarWeek,
@@ -224,6 +226,19 @@ const CalendarScreen = () => {
     const diff = differenceInCalendarDays(end, start) + 1;
     setActiveQuickRange(diff > 0 ? diff : null);
   }, [state.filters.dateRange]);
+
+  // Prefetch poster images for visible releases
+  useImagePrefetch(
+    (index: number) => {
+      const release = releasesForView[index];
+      return release?.posterUrl ?? release?.backdropUrl;
+    },
+    {
+      prefetchRange: { before: 2, after: 5 },
+      priority: "low",
+      maxConcurrent: 2,
+    },
+  );
 
   const styles = useMemo(
     () =>
@@ -491,6 +506,11 @@ const CalendarScreen = () => {
         .flatMap((day) => day.releases);
     }
 
+    if (state.view === "custom" && "startDate" in calendarData) {
+      const rangeData = calendarData as CalendarRange;
+      return [...rangeData.releases];
+    }
+
     if (state.view === "custom") {
       return [...releases];
     }
@@ -727,6 +747,11 @@ const CalendarScreen = () => {
           onReleasePress={handleReleasePress}
         />
       );
+    }
+
+    if (state.view === "custom" && "startDate" in calendarData) {
+      // For custom range view, use agenda-style rendering (handled by FlashList below)
+      return null;
     }
 
     if ("weeks" in calendarData) {

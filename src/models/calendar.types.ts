@@ -66,6 +66,12 @@ export interface CalendarMonth {
   readonly totalReleases: number;
 }
 
+export interface CalendarRange {
+  readonly startDate: string; // ISO date string (YYYY-MM-DD)
+  readonly endDate: string; // ISO date string (YYYY-MM-DD)
+  readonly releases: MediaRelease[];
+}
+
 export interface CalendarFilters {
   readonly mediaTypes: MediaType[];
   readonly statuses: ReleaseStatus[];
