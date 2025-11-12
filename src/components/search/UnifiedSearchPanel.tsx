@@ -15,6 +15,7 @@ import {
   Modal,
   Text,
   TextInput,
+  Button as PaperButton,
   useTheme,
 } from "react-native-paper";
 import { UniArrLoader } from "@/components/common";
@@ -217,12 +218,29 @@ export const UnifiedSearchPanel: React.FC = () => {
           paddingTop: spacing.sm,
           paddingBottom: spacing.xs,
         },
+        searchInputRow: {
+          flexDirection: "row",
+          gap: spacing.sm,
+          alignItems: "center",
+        },
         searchInput: {
           height: theme.custom.sizes.touchSizes.md,
           backgroundColor: theme.colors.surfaceVariant,
           borderRadius: borderRadius.round,
           fontSize: 16,
           paddingHorizontal: spacing.lg,
+        },
+        searchInputWithButton: {
+          flex: 1,
+        },
+        aiSearchButton: {
+          height: theme.custom.sizes.touchSizes.md,
+          justifyContent: "center",
+          minWidth: 50,
+          borderRadius: borderRadius.round,
+        },
+        aiSearchButtonLabel: {
+          fontSize: 14,
         },
         filtersContainer: {
           paddingHorizontal: spacing.sm,
@@ -1028,33 +1046,44 @@ export const UnifiedSearchPanel: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Search Input */}
+      {/* Search Input with AI Button */}
       <AnimatedSection
         style={styles.searchContainer}
         delay={0}
         animated={allowAnimations}
       >
-        <TextInput
-          mode="flat"
-          placeholder="Search"
-          placeholderTextColor={theme.colors.onSurfaceVariant}
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          style={styles.searchInput}
-          contentStyle={{
-            backgroundColor: "transparent",
-            paddingLeft: spacing.lg - spacing.sm, // Account for icon
-          }}
-          underlineStyle={{ display: "none" }}
-          left={<TextInput.Icon icon="magnify" size={20} />}
-          right={
-            <TextInput.Icon
-              icon="filter-variant"
-              onPress={() => setShowFilterDrawer(true)}
-              size={20}
-            />
-          }
-        />
+        <View style={styles.searchInputRow}>
+          <TextInput
+            mode="flat"
+            placeholder="Search"
+            placeholderTextColor={theme.colors.onSurfaceVariant}
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            style={[styles.searchInput, styles.searchInputWithButton]}
+            contentStyle={{
+              backgroundColor: "transparent",
+              paddingLeft: spacing.lg - spacing.sm, // Account for icon
+            }}
+            underlineStyle={{ display: "none" }}
+            left={<TextInput.Icon icon="magnify" size={20} />}
+            right={
+              <TextInput.Icon
+                icon="filter-variant"
+                onPress={() => setShowFilterDrawer(true)}
+                size={20}
+              />
+            }
+          />
+          <PaperButton
+            mode="contained-tonal"
+            icon="lightbulb-on"
+            onPress={() => router.push("/(auth)/search/intelligent-search")}
+            style={styles.aiSearchButton}
+            labelStyle={styles.aiSearchButtonLabel}
+          >
+            AI
+          </PaperButton>
+        </View>
       </AnimatedSection>
 
       {/* Filter Summary */}

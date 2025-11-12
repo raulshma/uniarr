@@ -88,6 +88,20 @@ export const QUERY_CONFIG = {
     ...RETRY_CONFIG.DEFAULT,
     ...REFETCH_CONFIG.DEFAULT,
   },
+  // AI search interpretation - 5 minutes (users may refine)
+  AI_SEARCH_INTERPRETATION: {
+    staleTime: STALE_TIME.LONG,
+    cacheTime: CACHE_TIME.LONG,
+    ...RETRY_CONFIG.DEFAULT,
+    ...REFETCH_CONFIG.DEFAULT,
+  },
+  // Search recommendations - 30 minutes (relatively static)
+  SEARCH_RECOMMENDATIONS: {
+    staleTime: STALE_TIME.VERY_LONG,
+    cacheTime: CACHE_TIME.VERY_LONG,
+    ...RETRY_CONFIG.DEFAULT,
+    ...REFETCH_CONFIG.DEFAULT,
+  },
   // Search history - static data
   SEARCH_HISTORY: {
     staleTime: STALE_TIME.RARELY,

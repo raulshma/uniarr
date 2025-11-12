@@ -11,6 +11,15 @@ type QueryKeyBuilder = readonly QueryKeySegment[];
 
 /** Centralised query key factories for TanStack Query resources. */
 export const queryKeys = {
+  search: {
+    base: ["search"] as const,
+    interpreted: (query: string): QueryKeyBuilder =>
+      ["search", "interpreted", query.trim()] as const,
+    results: (query: string): QueryKeyBuilder =>
+      ["search", "results", query.trim()] as const,
+    recommendations: ["search", "recommendations"] as const,
+    history: ["search", "history"] as const,
+  },
   unifiedSearch: {
     base: ["unifiedSearch"] as const,
     results: (

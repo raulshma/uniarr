@@ -2,9 +2,9 @@ import { isAxiosError, type AxiosError } from "axios";
 
 import { type ServiceType } from "@/models/service.types";
 import { logger } from "@/services/logger/LoggerService";
-import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
+import { apiLogger } from "@/services/logger/ApiLoggerService";
 import { useSettingsStore } from "@/store/settingsStore";
-import { ERROR_CODE_PRESETS } from "@/models/apiErrorLog.types";
+import { ERROR_CODE_PRESETS } from "@/models/apiLogger.types";
 
 export interface ErrorContext {
   serviceId?: string;
@@ -145,18 +145,18 @@ const shouldLogErrorCode = (
 ): boolean => {
   try {
     const settings = useSettingsStore.getState();
-    if (!settings.apiErrorLoggerEnabled) {
+    if (!settings.apiLoggerEnabled) {
       return false;
     }
 
-    const preset = ERROR_CODE_PRESETS[settings.apiErrorLoggerActivePreset];
+    const preset = ERROR_CODE_PRESETS[settings.apiLoggerActivePreset];
     if (!preset) {
       return false;
     }
 
     let codesToLog = preset.codes;
-    if (settings.apiErrorLoggerActivePreset === "CUSTOM") {
-      codesToLog = settings.apiErrorLoggerCustomCodes;
+    if (settings.apiLoggerActivePreset === "CUSTOM") {
+      codesToLog = settings.apiLoggerCustomCodes;
     }
 
     // Check if error code matches
@@ -234,9 +234,9 @@ export const handleApiError = (
       void logger.warn("API error captured.", logContext);
     }
 
-    // Log to API error logger if enabled and code matches config
+    // Log to API logger if enabled and code matches config
     if (shouldLogErrorCode(statusCode, isNetwork)) {
-      void apiErrorLogger.addError(apiError, context);
+      void apiLogger.addError(apiError, context);
     }
 
     return apiError;

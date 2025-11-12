@@ -8,6 +8,7 @@ import * as Crypto from "expo-crypto";
 import { logger } from "@/services/logger/LoggerService";
 import { base64Encode, base64Decode } from "@/utils/base64";
 import { secureStorage } from "@/services/storage/SecureStorage";
+import { useSettingsStore } from "@/store/settingsStore";
 import { type ServiceConfig, type ServiceType } from "@/models/service.types";
 import {
   getStoredTmdbKey,
@@ -43,6 +44,9 @@ export interface BackupExportOptions {
   includeWidgetProfileCredentials: boolean;
   includeVoiceAssistantConfig: boolean;
   includeBookmarkHealthChecks: boolean;
+  includeByokConfig: boolean;
+  includeAiConfig: boolean;
+  includeApiLoggingConfig: boolean;
   encryptSensitive: boolean;
   password?: string;
 }
@@ -98,6 +102,18 @@ export interface BackupSelectionConfig {
     enabled: boolean;
     sensitive: boolean;
     includeCredentials: boolean;
+  };
+  byokConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  aiConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  apiLoggingConfig: {
+    enabled: boolean;
+    sensitive: boolean;
   };
 }
 
@@ -172,6 +188,27 @@ export interface EncryptedBackupData {
     widgetsCredentials?: Record<string, any>;
     widgetSecureCredentials?: Record<string, any>;
     widgetProfiles?: any[];
+    byokConfig?: {
+      byokGeocodeMapsCoApiKey?: string;
+    };
+    aiConfig?: {
+      enableAISearch: boolean;
+      enableAIRecommendations: boolean;
+    };
+    apiLoggingConfig?: {
+      apiLoggerEnabled: boolean;
+      apiLoggerActivePreset: string;
+      apiLoggerCustomCodes: (number | string)[];
+      apiLoggerRetentionDays: number;
+      apiLoggerCaptureRequestBody: boolean;
+      apiLoggerCaptureResponseBody: boolean;
+      apiLoggerCaptureRequestHeaders: boolean;
+      apiLoggerAiLoggingEnabled: boolean;
+      apiLoggerAiCapturePrompt: boolean;
+      apiLoggerAiCaptureResponse: boolean;
+      apiLoggerAiCaptureMetadata: boolean;
+      apiLoggerAiRetentionDays: number;
+    };
   };
 }
 
@@ -246,6 +283,27 @@ export interface BackupData {
     widgetsCredentials?: Record<string, any>;
     widgetSecureCredentials?: Record<string, any>;
     widgetProfiles?: any[];
+    byokConfig?: {
+      byokGeocodeMapsCoApiKey?: string;
+    };
+    aiConfig?: {
+      enableAISearch: boolean;
+      enableAIRecommendations: boolean;
+    };
+    apiLoggingConfig?: {
+      apiLoggerEnabled: boolean;
+      apiLoggerActivePreset: string;
+      apiLoggerCustomCodes: (number | string)[];
+      apiLoggerRetentionDays: number;
+      apiLoggerCaptureRequestBody: boolean;
+      apiLoggerCaptureResponseBody: boolean;
+      apiLoggerCaptureRequestHeaders: boolean;
+      apiLoggerAiLoggingEnabled: boolean;
+      apiLoggerAiCapturePrompt: boolean;
+      apiLoggerAiCaptureResponse: boolean;
+      apiLoggerAiCaptureMetadata: boolean;
+      apiLoggerAiRetentionDays: number;
+    };
   };
 }
 
@@ -740,6 +798,72 @@ class BackupRestoreService {
         }
       }
 
+      // Collect BYOK configuration
+      if (options.includeByokConfig) {
+        const settings = useSettingsStore.getState();
+        if (settings.byokGeocodeMapsCoApiKey) {
+          const byokConfigToBackup = {
+            byokGeocodeMapsCoApiKey: settings.byokGeocodeMapsCoApiKey,
+          };
+
+          if (options.encryptSensitive) {
+            sensitiveData.byokConfig = byokConfigToBackup;
+          } else {
+            backupData.appData.byokConfig = byokConfigToBackup;
+          }
+
+          await logger.info("BYOK configuration collected for backup", {
+            location: "BackupRestoreService.createSelectiveBackup",
+            hasGeocodeMapsCoApiKey: !!settings.byokGeocodeMapsCoApiKey,
+          });
+        }
+      }
+
+      // Collect AI configuration
+      if (options.includeAiConfig) {
+        const settings = useSettingsStore.getState();
+        const aiConfig = {
+          enableAISearch: settings.enableAISearch,
+          enableAIRecommendations: settings.enableAIRecommendations,
+        };
+
+        backupData.appData.aiConfig = aiConfig;
+
+        await logger.info("AI configuration collected for backup", {
+          location: "BackupRestoreService.createSelectiveBackup",
+          enableAISearch: settings.enableAISearch,
+          enableAIRecommendations: settings.enableAIRecommendations,
+        });
+      }
+
+      // Collect API logging configuration
+      if (options.includeApiLoggingConfig) {
+        const settings = useSettingsStore.getState();
+        const apiLoggingConfig = {
+          apiLoggerEnabled: settings.apiLoggerEnabled,
+          apiLoggerActivePreset: settings.apiLoggerActivePreset,
+          apiLoggerCustomCodes: settings.apiLoggerCustomCodes,
+          apiLoggerRetentionDays: settings.apiLoggerRetentionDays,
+          apiLoggerCaptureRequestBody: settings.apiLoggerCaptureRequestBody,
+          apiLoggerCaptureResponseBody: settings.apiLoggerCaptureResponseBody,
+          apiLoggerCaptureRequestHeaders:
+            settings.apiLoggerCaptureRequestHeaders,
+          apiLoggerAiLoggingEnabled: settings.apiLoggerAiLoggingEnabled,
+          apiLoggerAiCapturePrompt: settings.apiLoggerAiCapturePrompt,
+          apiLoggerAiCaptureResponse: settings.apiLoggerAiCaptureResponse,
+          apiLoggerAiCaptureMetadata: settings.apiLoggerAiCaptureMetadata,
+          apiLoggerAiRetentionDays: settings.apiLoggerAiRetentionDays,
+        };
+
+        backupData.appData.apiLoggingConfig = apiLoggingConfig;
+
+        await logger.info("API logging configuration collected for backup", {
+          location: "BackupRestoreService.createSelectiveBackup",
+          apiLoggerEnabled: settings.apiLoggerEnabled,
+          apiLoggerAiLoggingEnabled: settings.apiLoggerAiLoggingEnabled,
+        });
+      }
+
       // Collect widgets configuration
       if (options.includeWidgetsConfig) {
         const widgetsStorageKey = "WidgetService:widgets";
@@ -1095,6 +1219,40 @@ class BackupRestoreService {
         }
       }
 
+      // Fetch BYOK configuration
+      const settingsStore = useSettingsStore.getState();
+      const byokConfig = settingsStore.byokGeocodeMapsCoApiKey
+        ? { byokGeocodeMapsCoApiKey: settingsStore.byokGeocodeMapsCoApiKey }
+        : undefined;
+
+      // Fetch AI configuration
+      const aiConfig = {
+        enableAISearch: settingsStore.enableAISearch,
+        enableAIRecommendations: settingsStore.enableAIRecommendations,
+      };
+
+      // Fetch API logging configuration
+      const settingsForLogging = useSettingsStore.getState();
+      const apiLoggingConfig = {
+        apiLoggerEnabled: settingsForLogging.apiLoggerEnabled,
+        apiLoggerActivePreset: settingsForLogging.apiLoggerActivePreset,
+        apiLoggerCustomCodes: settingsForLogging.apiLoggerCustomCodes,
+        apiLoggerRetentionDays: settingsForLogging.apiLoggerRetentionDays,
+        apiLoggerCaptureRequestBody:
+          settingsForLogging.apiLoggerCaptureRequestBody,
+        apiLoggerCaptureResponseBody:
+          settingsForLogging.apiLoggerCaptureResponseBody,
+        apiLoggerCaptureRequestHeaders:
+          settingsForLogging.apiLoggerCaptureRequestHeaders,
+        apiLoggerAiLoggingEnabled: settingsForLogging.apiLoggerAiLoggingEnabled,
+        apiLoggerAiCapturePrompt: settingsForLogging.apiLoggerAiCapturePrompt,
+        apiLoggerAiCaptureResponse:
+          settingsForLogging.apiLoggerAiCaptureResponse,
+        apiLoggerAiCaptureMetadata:
+          settingsForLogging.apiLoggerAiCaptureMetadata,
+        apiLoggerAiRetentionDays: settingsForLogging.apiLoggerAiRetentionDays,
+      };
+
       // Prepare backup data structure
       const backupData: BackupData = {
         version: "1.1",
@@ -1132,6 +1290,9 @@ class BackupRestoreService {
           ...(voiceAssistantConfig && { voiceAssistantConfig }),
           ...(bookmarkHealthChecks && { bookmarkHealthChecks }),
           ...(widgetsConfig && { widgetsConfig }),
+          ...(byokConfig && { byokConfig }),
+          ...(aiConfig && { aiConfig }),
+          ...(apiLoggingConfig && { apiLoggingConfig }),
         },
       };
 
@@ -1157,6 +1318,9 @@ class BackupRestoreService {
         hasVoiceAssistantConfig: !!voiceAssistantConfig,
         hasBookmarkHealthChecks: !!bookmarkHealthChecks,
         hasWidgetsConfig: !!widgetsConfig,
+        hasByokConfig: !!byokConfig,
+        hasAiConfig: !!aiConfig,
+        hasApiLoggingConfig: !!apiLoggingConfig,
       });
 
       return filePath;
@@ -1542,6 +1706,111 @@ class BackupRestoreService {
         }
       }
 
+      // Restore BYOK configuration if available
+      if (backupData.appData.byokConfig) {
+        try {
+          const settingsStore = useSettingsStore.getState();
+          if (backupData.appData.byokConfig.byokGeocodeMapsCoApiKey) {
+            settingsStore.setByokGeocodeMapsCoApiKey(
+              backupData.appData.byokConfig.byokGeocodeMapsCoApiKey,
+            );
+          }
+
+          await logger.info("BYOK configuration restored", {
+            location: "BackupRestoreService.restoreBackup",
+            hasGeocodeMapsCoApiKey:
+              !!backupData.appData.byokConfig.byokGeocodeMapsCoApiKey,
+          });
+        } catch (byokError) {
+          await logger.warn("Failed to restore BYOK configuration", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              byokError instanceof Error
+                ? byokError.message
+                : String(byokError),
+          });
+        }
+      }
+
+      // Restore AI configuration if available
+      if (backupData.appData.aiConfig) {
+        try {
+          const settingsStore = useSettingsStore.getState();
+          settingsStore.setEnableAISearch(
+            backupData.appData.aiConfig.enableAISearch,
+          );
+          settingsStore.setEnableAIRecommendations(
+            backupData.appData.aiConfig.enableAIRecommendations,
+          );
+
+          await logger.info("AI configuration restored", {
+            location: "BackupRestoreService.restoreBackup",
+            enableAISearch: backupData.appData.aiConfig.enableAISearch,
+            enableAIRecommendations:
+              backupData.appData.aiConfig.enableAIRecommendations,
+          });
+        } catch (aiError) {
+          await logger.warn("Failed to restore AI configuration", {
+            location: "BackupRestoreService.restoreBackup",
+            error: aiError instanceof Error ? aiError.message : String(aiError),
+          });
+        }
+      }
+
+      // Restore API logging configuration if available
+      if (backupData.appData.apiLoggingConfig) {
+        try {
+          const settingsStore = useSettingsStore.getState();
+          const config = backupData.appData.apiLoggingConfig;
+
+          settingsStore.setApiLoggerEnabled(config.apiLoggerEnabled);
+          settingsStore.setApiLoggerActivePreset(config.apiLoggerActivePreset);
+          settingsStore.setApiLoggerCustomCodes(config.apiLoggerCustomCodes);
+          settingsStore.setApiLoggerRetentionDays(
+            config.apiLoggerRetentionDays,
+          );
+          settingsStore.setApiLoggerCaptureRequestBody(
+            config.apiLoggerCaptureRequestBody,
+          );
+          settingsStore.setApiLoggerCaptureResponseBody(
+            config.apiLoggerCaptureResponseBody,
+          );
+          settingsStore.setApiLoggerCaptureRequestHeaders(
+            config.apiLoggerCaptureRequestHeaders,
+          );
+          settingsStore.setApiLoggerAiLoggingEnabled(
+            config.apiLoggerAiLoggingEnabled,
+          );
+          settingsStore.setApiLoggerAiCapturePrompt(
+            config.apiLoggerAiCapturePrompt,
+          );
+          settingsStore.setApiLoggerAiCaptureResponse(
+            config.apiLoggerAiCaptureResponse,
+          );
+          settingsStore.setApiLoggerAiCaptureMetadata(
+            config.apiLoggerAiCaptureMetadata,
+          );
+          settingsStore.setApiLoggerAiRetentionDays(
+            config.apiLoggerAiRetentionDays,
+          );
+
+          await logger.info("API logging configuration restored", {
+            location: "BackupRestoreService.restoreBackup",
+            apiLoggerEnabled: config.apiLoggerEnabled,
+            apiLoggerAiLoggingEnabled: config.apiLoggerAiLoggingEnabled,
+            activePreset: config.apiLoggerActivePreset,
+          });
+        } catch (apiLoggingError) {
+          await logger.warn("Failed to restore API logging configuration", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              apiLoggingError instanceof Error
+                ? apiLoggingError.message
+                : String(apiLoggingError),
+          });
+        }
+      }
+
       // Restore widgets configuration if available
       if (
         backupData.appData.widgetsConfig &&
@@ -1775,6 +2044,9 @@ class BackupRestoreService {
       includeWidgetProfileCredentials: true,
       includeVoiceAssistantConfig: true,
       includeBookmarkHealthChecks: true,
+      includeByokConfig: true,
+      includeAiConfig: true,
+      includeApiLoggingConfig: true,
       encryptSensitive: false,
     };
   }
@@ -1834,6 +2106,18 @@ class BackupRestoreService {
         enabled: true,
         sensitive: false,
         includeCredentials: true,
+      },
+      byokConfig: {
+        enabled: true,
+        sensitive: true,
+      },
+      aiConfig: {
+        enabled: true,
+        sensitive: false,
+      },
+      apiLoggingConfig: {
+        enabled: true,
+        sensitive: false,
       },
     };
   }

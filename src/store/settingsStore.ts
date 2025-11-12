@@ -78,14 +78,19 @@ type SettingsData = {
   gradientBackgroundEnabled: boolean;
   // Experimental: animated weather background effects on dashboard
   experimentalWeatherEffectsEnabled: boolean;
-  // API Error Logger configuration
-  apiErrorLoggerEnabled: boolean;
-  apiErrorLoggerActivePreset: string; // "CRITICAL", "SERVER", "RATE_LIMIT", "CLIENT_ERRORS", "STRICT", "CUSTOM"
-  apiErrorLoggerCustomCodes: (number | string)[]; // Used when preset is CUSTOM
-  apiErrorLoggerRetentionDays: number; // How many days to keep error logs (default: 7)
-  apiErrorLoggerCaptureRequestBody: boolean; // Capture request body in error logs (default: false)
-  apiErrorLoggerCaptureResponseBody: boolean; // Capture response body in error logs (default: false)
-  apiErrorLoggerCaptureRequestHeaders: boolean; // Capture request headers in error logs (default: false)
+  // API Logger configuration
+  apiLoggerEnabled: boolean; // Error logging toggle (legacy behavior)
+  apiLoggerActivePreset: string; // "CRITICAL", "SERVER", "RATE_LIMIT", "CLIENT_ERRORS", "STRICT", "CUSTOM"
+  apiLoggerCustomCodes: (number | string)[]; // Used when preset is CUSTOM
+  apiLoggerRetentionDays: number; // How many days to keep error logs (default: 7)
+  apiLoggerCaptureRequestBody: boolean; // Capture request body in error logs (default: false)
+  apiLoggerCaptureResponseBody: boolean; // Capture response body in error logs (default: false)
+  apiLoggerCaptureRequestHeaders: boolean; // Capture request headers in error logs (default: false)
+  apiLoggerAiLoggingEnabled: boolean; // Capture AI API calls
+  apiLoggerAiCapturePrompt: boolean; // Capture prompts for AI logs
+  apiLoggerAiCaptureResponse: boolean; // Capture AI responses
+  apiLoggerAiCaptureMetadata: boolean; // Capture token usage / metadata
+  apiLoggerAiRetentionDays: number; // How many days to keep AI logs (default: 14)
   // Hydration tracking
   _hasHydrated: boolean;
   // Loader configuration for SVG spinner
@@ -99,6 +104,9 @@ type SettingsData = {
   animeHubBannerDismissed: boolean;
   // BYOK (Bring Your Own Keys) - API key configurations
   byokGeocodeMapsCoApiKey?: string;
+  // AI Features toggles
+  enableAISearch: boolean;
+  enableAIRecommendations: boolean;
 };
 
 interface SettingsState extends SettingsData {
@@ -138,13 +146,18 @@ interface SettingsState extends SettingsData {
   setFrostedWidgetsEnabled: (enabled: boolean) => void;
   setGradientBackgroundEnabled: (enabled: boolean) => void;
   setExperimentalWeatherEffectsEnabled: (enabled: boolean) => void;
-  setApiErrorLoggerEnabled: (enabled: boolean) => void;
-  setApiErrorLoggerActivePreset: (preset: string) => void;
-  setApiErrorLoggerCustomCodes: (codes: (number | string)[]) => void;
-  setApiErrorLoggerRetentionDays: (days: number) => void;
-  setApiErrorLoggerCaptureRequestBody: (capture: boolean) => void;
-  setApiErrorLoggerCaptureResponseBody: (capture: boolean) => void;
-  setApiErrorLoggerCaptureRequestHeaders: (capture: boolean) => void;
+  setApiLoggerEnabled: (enabled: boolean) => void;
+  setApiLoggerActivePreset: (preset: string) => void;
+  setApiLoggerCustomCodes: (codes: (number | string)[]) => void;
+  setApiLoggerRetentionDays: (days: number) => void;
+  setApiLoggerCaptureRequestBody: (capture: boolean) => void;
+  setApiLoggerCaptureResponseBody: (capture: boolean) => void;
+  setApiLoggerCaptureRequestHeaders: (capture: boolean) => void;
+  setApiLoggerAiLoggingEnabled: (enabled: boolean) => void;
+  setApiLoggerAiCapturePrompt: (capture: boolean) => void;
+  setApiLoggerAiCaptureResponse: (capture: boolean) => void;
+  setApiLoggerAiCaptureMetadata: (capture: boolean) => void;
+  setApiLoggerAiRetentionDays: (days: number) => void;
   setLoaderConfig: (config: LoaderConfig) => void;
   // (thumbnail setters removed)
   // Backdrop with blur experimental feature
@@ -153,6 +166,8 @@ interface SettingsState extends SettingsData {
   setDiscoverBannerDismissed: (dismissed: boolean) => void;
   setAnimeHubBannerDismissed: (dismissed: boolean) => void;
   setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) => void;
+  setEnableAISearch: (enabled: boolean) => void;
+  setEnableAIRecommendations: (enabled: boolean) => void;
 }
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
@@ -232,13 +247,18 @@ const createDefaultSettings = (): SettingsData => ({
   frostedWidgetsEnabled: false,
   gradientBackgroundEnabled: false,
   experimentalWeatherEffectsEnabled: false,
-  apiErrorLoggerEnabled: false,
-  apiErrorLoggerActivePreset: "CRITICAL",
-  apiErrorLoggerCustomCodes: [],
-  apiErrorLoggerRetentionDays: 7,
-  apiErrorLoggerCaptureRequestBody: false,
-  apiErrorLoggerCaptureResponseBody: false,
-  apiErrorLoggerCaptureRequestHeaders: false,
+  apiLoggerEnabled: false,
+  apiLoggerActivePreset: "CRITICAL",
+  apiLoggerCustomCodes: [],
+  apiLoggerRetentionDays: 7,
+  apiLoggerCaptureRequestBody: false,
+  apiLoggerCaptureResponseBody: false,
+  apiLoggerCaptureRequestHeaders: false,
+  apiLoggerAiLoggingEnabled: false,
+  apiLoggerAiCapturePrompt: false,
+  apiLoggerAiCaptureResponse: false,
+  apiLoggerAiCaptureMetadata: true,
+  apiLoggerAiRetentionDays: 14,
   _hasHydrated: false,
   loaderConfig: {
     size: 50,
@@ -254,6 +274,8 @@ const createDefaultSettings = (): SettingsData => ({
   discoverBannerDismissed: false,
   animeHubBannerDismissed: false,
   byokGeocodeMapsCoApiKey: undefined,
+  enableAISearch: false,
+  enableAIRecommendations: false,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -323,20 +345,30 @@ export const useSettingsStore = create<SettingsState>()(
         set({ gradientBackgroundEnabled: enabled }),
       setExperimentalWeatherEffectsEnabled: (enabled: boolean) =>
         set({ experimentalWeatherEffectsEnabled: enabled }),
-      setApiErrorLoggerEnabled: (enabled: boolean) =>
-        set({ apiErrorLoggerEnabled: enabled }),
-      setApiErrorLoggerActivePreset: (preset: string) =>
-        set({ apiErrorLoggerActivePreset: preset }),
-      setApiErrorLoggerCustomCodes: (codes: (number | string)[]) =>
-        set({ apiErrorLoggerCustomCodes: codes }),
-      setApiErrorLoggerRetentionDays: (days: number) =>
-        set({ apiErrorLoggerRetentionDays: Math.max(1, Math.min(365, days)) }),
-      setApiErrorLoggerCaptureRequestBody: (capture: boolean) =>
-        set({ apiErrorLoggerCaptureRequestBody: capture }),
-      setApiErrorLoggerCaptureResponseBody: (capture: boolean) =>
-        set({ apiErrorLoggerCaptureResponseBody: capture }),
-      setApiErrorLoggerCaptureRequestHeaders: (capture: boolean) =>
-        set({ apiErrorLoggerCaptureRequestHeaders: capture }),
+      setApiLoggerEnabled: (enabled: boolean) =>
+        set({ apiLoggerEnabled: enabled }),
+      setApiLoggerActivePreset: (preset: string) =>
+        set({ apiLoggerActivePreset: preset }),
+      setApiLoggerCustomCodes: (codes: (number | string)[]) =>
+        set({ apiLoggerCustomCodes: codes }),
+      setApiLoggerRetentionDays: (days: number) =>
+        set({ apiLoggerRetentionDays: Math.max(1, Math.min(365, days)) }),
+      setApiLoggerCaptureRequestBody: (capture: boolean) =>
+        set({ apiLoggerCaptureRequestBody: capture }),
+      setApiLoggerCaptureResponseBody: (capture: boolean) =>
+        set({ apiLoggerCaptureResponseBody: capture }),
+      setApiLoggerCaptureRequestHeaders: (capture: boolean) =>
+        set({ apiLoggerCaptureRequestHeaders: capture }),
+      setApiLoggerAiLoggingEnabled: (enabled: boolean) =>
+        set({ apiLoggerAiLoggingEnabled: enabled }),
+      setApiLoggerAiCapturePrompt: (capture: boolean) =>
+        set({ apiLoggerAiCapturePrompt: capture }),
+      setApiLoggerAiCaptureResponse: (capture: boolean) =>
+        set({ apiLoggerAiCaptureResponse: capture }),
+      setApiLoggerAiCaptureMetadata: (capture: boolean) =>
+        set({ apiLoggerAiCaptureMetadata: capture }),
+      setApiLoggerAiRetentionDays: (days: number) =>
+        set({ apiLoggerAiRetentionDays: Math.max(1, Math.min(365, days)) }),
       setLoaderConfig: (config: LoaderConfig) => set({ loaderConfig: config }),
       setBackdropWithBlurEnabled: (enabled: boolean) =>
         set({ enableBackdropWithBlur: enabled }),
@@ -348,6 +380,9 @@ export const useSettingsStore = create<SettingsState>()(
         set({ animeHubBannerDismissed: dismissed }),
       setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) =>
         set({ byokGeocodeMapsCoApiKey: apiKey }),
+      setEnableAISearch: (enabled: boolean) => set({ enableAISearch: enabled }),
+      setEnableAIRecommendations: (enabled: boolean) =>
+        set({ enableAIRecommendations: enabled }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -390,16 +425,18 @@ export const useSettingsStore = create<SettingsState>()(
         gradientBackgroundEnabled: state.gradientBackgroundEnabled,
         experimentalWeatherEffectsEnabled:
           state.experimentalWeatherEffectsEnabled,
-        apiErrorLoggerEnabled: state.apiErrorLoggerEnabled,
-        apiErrorLoggerActivePreset: state.apiErrorLoggerActivePreset,
-        apiErrorLoggerCustomCodes: state.apiErrorLoggerCustomCodes,
-        apiErrorLoggerRetentionDays: state.apiErrorLoggerRetentionDays,
-        apiErrorLoggerCaptureRequestBody:
-          state.apiErrorLoggerCaptureRequestBody,
-        apiErrorLoggerCaptureResponseBody:
-          state.apiErrorLoggerCaptureResponseBody,
-        apiErrorLoggerCaptureRequestHeaders:
-          state.apiErrorLoggerCaptureRequestHeaders,
+        apiLoggerEnabled: state.apiLoggerEnabled,
+        apiLoggerActivePreset: state.apiLoggerActivePreset,
+        apiLoggerCustomCodes: state.apiLoggerCustomCodes,
+        apiLoggerRetentionDays: state.apiLoggerRetentionDays,
+        apiLoggerCaptureRequestBody: state.apiLoggerCaptureRequestBody,
+        apiLoggerCaptureResponseBody: state.apiLoggerCaptureResponseBody,
+        apiLoggerCaptureRequestHeaders: state.apiLoggerCaptureRequestHeaders,
+        apiLoggerAiLoggingEnabled: state.apiLoggerAiLoggingEnabled,
+        apiLoggerAiCapturePrompt: state.apiLoggerAiCapturePrompt,
+        apiLoggerAiCaptureResponse: state.apiLoggerAiCaptureResponse,
+        apiLoggerAiCaptureMetadata: state.apiLoggerAiCaptureMetadata,
+        apiLoggerAiRetentionDays: state.apiLoggerAiRetentionDays,
         loaderConfig: state.loaderConfig,
         // thumbnail fields removed
         enableBackdropWithBlur: state.enableBackdropWithBlur,
@@ -407,9 +444,11 @@ export const useSettingsStore = create<SettingsState>()(
         discoverBannerDismissed: state.discoverBannerDismissed,
         animeHubBannerDismissed: state.animeHubBannerDismissed,
         byokGeocodeMapsCoApiKey: state.byokGeocodeMapsCoApiKey,
+        enableAISearch: state.enableAISearch,
+        enableAIRecommendations: state.enableAIRecommendations,
       }),
       // Bump version since we're adding new persisted fields
-      version: 14,
+      version: 16,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -545,6 +584,7 @@ export const useSettingsStore = create<SettingsState>()(
         }
 
         const partial = persistedState as Partial<SettingsData>;
+        const legacy = persistedState as Record<string, unknown>;
         const baseDefaults = createDefaultSettings();
 
         const quietHours = (
@@ -606,6 +646,73 @@ export const useSettingsStore = create<SettingsState>()(
           loaderConfig: partial.loaderConfig ?? baseDefaults.loaderConfig,
           trailerFeatureEnabled:
             partial.trailerFeatureEnabled ?? baseDefaults.trailerFeatureEnabled,
+          apiLoggerEnabled:
+            (partial as Partial<SettingsData>).apiLoggerEnabled ??
+            (legacy.apiErrorLoggerEnabled as boolean | undefined) ??
+            baseDefaults.apiLoggerEnabled,
+          apiLoggerActivePreset:
+            (partial as Partial<SettingsData>).apiLoggerActivePreset ??
+            (legacy.apiErrorLoggerActivePreset as string | undefined) ??
+            baseDefaults.apiLoggerActivePreset,
+          apiLoggerCustomCodes: Array.isArray(partial.apiLoggerCustomCodes)
+            ? partial.apiLoggerCustomCodes
+            : Array.isArray(legacy.apiErrorLoggerCustomCodes as unknown[])
+              ? (legacy.apiErrorLoggerCustomCodes as (number | string)[])
+              : baseDefaults.apiLoggerCustomCodes,
+          apiLoggerRetentionDays: Math.max(
+            1,
+            Math.min(
+              365,
+              typeof partial.apiLoggerRetentionDays === "number"
+                ? partial.apiLoggerRetentionDays
+                : typeof legacy.apiErrorLoggerRetentionDays === "number"
+                  ? (legacy.apiErrorLoggerRetentionDays as number)
+                  : baseDefaults.apiLoggerRetentionDays,
+            ),
+          ),
+          apiLoggerCaptureRequestBody:
+            typeof partial.apiLoggerCaptureRequestBody === "boolean"
+              ? partial.apiLoggerCaptureRequestBody
+              : typeof legacy.apiErrorLoggerCaptureRequestBody === "boolean"
+                ? (legacy.apiErrorLoggerCaptureRequestBody as boolean)
+                : baseDefaults.apiLoggerCaptureRequestBody,
+          apiLoggerCaptureResponseBody:
+            typeof partial.apiLoggerCaptureResponseBody === "boolean"
+              ? partial.apiLoggerCaptureResponseBody
+              : typeof legacy.apiErrorLoggerCaptureResponseBody === "boolean"
+                ? (legacy.apiErrorLoggerCaptureResponseBody as boolean)
+                : baseDefaults.apiLoggerCaptureResponseBody,
+          apiLoggerCaptureRequestHeaders:
+            typeof partial.apiLoggerCaptureRequestHeaders === "boolean"
+              ? partial.apiLoggerCaptureRequestHeaders
+              : typeof legacy.apiErrorLoggerCaptureRequestHeaders === "boolean"
+                ? (legacy.apiErrorLoggerCaptureRequestHeaders as boolean)
+                : baseDefaults.apiLoggerCaptureRequestHeaders,
+          apiLoggerAiLoggingEnabled:
+            typeof partial.apiLoggerAiLoggingEnabled === "boolean"
+              ? partial.apiLoggerAiLoggingEnabled
+              : baseDefaults.apiLoggerAiLoggingEnabled,
+          apiLoggerAiCapturePrompt:
+            typeof partial.apiLoggerAiCapturePrompt === "boolean"
+              ? partial.apiLoggerAiCapturePrompt
+              : baseDefaults.apiLoggerAiCapturePrompt,
+          apiLoggerAiCaptureResponse:
+            typeof partial.apiLoggerAiCaptureResponse === "boolean"
+              ? partial.apiLoggerAiCaptureResponse
+              : baseDefaults.apiLoggerAiCaptureResponse,
+          apiLoggerAiCaptureMetadata:
+            typeof partial.apiLoggerAiCaptureMetadata === "boolean"
+              ? partial.apiLoggerAiCaptureMetadata
+              : baseDefaults.apiLoggerAiCaptureMetadata,
+          apiLoggerAiRetentionDays: Math.max(
+            1,
+            Math.min(
+              365,
+              typeof partial.apiLoggerAiRetentionDays === "number"
+                ? partial.apiLoggerAiRetentionDays
+                : baseDefaults.apiLoggerAiRetentionDays,
+            ),
+          ),
           byokGeocodeMapsCoApiKey: partial.byokGeocodeMapsCoApiKey ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;

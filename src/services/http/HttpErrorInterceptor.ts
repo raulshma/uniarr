@@ -3,7 +3,7 @@
  *
  * Provides a reusable, maintainable HTTP error interceptor that ensures
  * all API calls across all connectors and services are automatically
- * captured and logged to the API error logger.
+ * captured and logged to the API logger.
  *
  * This service integrates seamlessly with Axios interceptors and ensures:
  * - Consistent error handling and logging across all HTTP calls
@@ -17,7 +17,7 @@ import type {
   AxiosInstance,
   InternalAxiosRequestConfig,
 } from "axios";
-import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
+import { apiLogger } from "@/services/logger/ApiLoggerService";
 import { handleApiError, type ErrorContext } from "@/utils/error.utils";
 import { logger } from "@/services/logger/LoggerService";
 
@@ -38,7 +38,7 @@ function sanitizeDataLocation(
  */
 export interface HttpErrorInterceptorConfig {
   /**
-   * Whether to automatically log errors to the API error logger
+   * Whether to automatically log errors to the API logger
    * @default true
    */
   enableErrorLogging?: boolean;
@@ -345,8 +345,8 @@ class HttpErrorInterceptor {
           : undefined;
 
       // Log error with details and sensitive data detection
-      // The ApiErrorLoggerService will attach sensitiveDataDetection to the entry
-      await apiErrorLogger.addError(
+      // The ApiLoggerService will attach sensitiveDataDetection to the entry
+      await apiLogger.addError(
         apiError,
         context,
         0,
@@ -415,7 +415,6 @@ class HttpErrorInterceptor {
       /credential/i,
       /bearer/i,
       /x-api-key/i,
-      /x-secret/i,
     ];
 
     const detected: string[] = [];

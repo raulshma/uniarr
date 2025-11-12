@@ -100,9 +100,23 @@ export class UnifiedSearchService {
       .getAllConnectors()
       .filter((connector) => typeof connector.search === "function");
 
-    const filteredConnectors = options.serviceIds?.length
+    // Use AI interpretation to determine which services to search if provided
+    let targetServiceIds = options.serviceIds;
+    if (options.aiInterpretation?.recommendedServices && !options.serviceIds) {
+      // Filter to only services that are configured
+      const configuredIds = new Set(
+        connectors
+          .map((c) => c.config.id)
+          .concat(options.aiInterpretation.recommendedServices),
+      );
+      targetServiceIds = options.aiInterpretation.recommendedServices.filter(
+        (serviceId) => configuredIds.has(serviceId),
+      );
+    }
+
+    const filteredConnectors = targetServiceIds?.length
       ? connectors.filter((connector) =>
-          options.serviceIds!.includes(connector.config.id),
+          targetServiceIds!.includes(connector.config.id),
         )
       : connectors;
 
@@ -757,6 +771,54 @@ export class UnifiedSearchService {
     options: UnifiedSearchOptions,
   ): UnifiedSearchResult[] {
     return results.filter((result) => {
+      // Apply AI interpretation filters if provided
+      if (options.aiInterpretation) {
+        const interp = options.aiInterpretation;
+
+        // Filter by media types from AI interpretation
+        if (interp.mediaTypes && interp.mediaTypes.length > 0) {
+          const aiMediaTypes = interp.mediaTypes as UnifiedSearchMediaType[];
+          if (!aiMediaTypes.includes(result.mediaType)) {
+            return false;
+          }
+        }
+
+        // Filter by year range from AI interpretation
+        if (interp.yearRange && result.year) {
+          if (result.year < interp.yearRange.start) {
+            return false;
+          }
+          if (result.year > interp.yearRange.end) {
+            return false;
+          }
+        }
+
+        // Filter by quality preference
+        if (interp.qualityPreference && result.rating !== undefined) {
+          const qualityMap: Record<string, number> = {
+            "1080p": 6.0,
+            "720p": 5.5,
+            "480p": 5.0,
+            "4k": 7.0,
+            "8k": 8.0,
+          };
+          const threshold = qualityMap[interp.qualityPreference] ?? 6.0;
+          if (result.rating < threshold) {
+            return false;
+          }
+        }
+
+        // Filter by AI-interpreted filters
+        if (interp.filters) {
+          if (
+            interp.filters.minRating &&
+            (result.rating ?? 0) < interp.filters.minRating
+          ) {
+            return false;
+          }
+        }
+      }
+
       // Filter by status
       if (options.status && options.status !== "Any") {
         const status = options.status.toLowerCase();

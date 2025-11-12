@@ -48,7 +48,7 @@ import {
   type ImageCacheUsage,
 } from "@/services/image/ImageCacheService";
 import { logger } from "@/services/logger/LoggerService";
-import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
+import { apiLogger } from "@/services/logger/ApiLoggerService";
 import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useAppUpdateCheck } from "@/hooks/useAppUpdateCheck";
@@ -508,7 +508,7 @@ const SettingsScreen = () => {
   useEffect(() => {
     const loadErrorCount = async () => {
       try {
-        const errors = await apiErrorLogger.getErrors({});
+        const errors = await apiLogger.getErrors({});
         setErrorLogCount(errors.length);
       } catch {
         // Silently fail - not critical
@@ -1367,12 +1367,12 @@ const SettingsScreen = () => {
               animated={animationsEnabled}
             >
               <SettingsListItem
-                title="API Error Logger"
-                subtitle="Configure error capture settings"
+                title="API Logger"
+                subtitle="Configure error and AI logging"
                 left={{ iconName: "cog" }}
                 trailing={<ChevronTrailing />}
                 onPress={() =>
-                  router.push("/(auth)/settings/api-error-logs/configure")
+                  router.push("/(auth)/settings/api-logs/configure")
                 }
                 groupPosition="top"
               />
@@ -1383,7 +1383,7 @@ const SettingsScreen = () => {
               animated={animationsEnabled}
             >
               <SettingsListItem
-                title="API Error Logs"
+                title="API Logs"
                 subtitle={
                   errorLogCount > 0
                     ? `${errorLogCount} errors logged`
@@ -1397,7 +1397,7 @@ const SettingsScreen = () => {
                     <ChevronTrailing />
                   )
                 }
-                onPress={() => router.push("/(auth)/settings/api-error-logs")}
+                onPress={() => router.push("/(auth)/settings/api-logs")}
                 groupPosition="middle"
               />
             </AnimatedListItem>

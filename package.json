@@ -14,6 +14,7 @@
     "generate:client-schemas": "node ./scripts/generate-openapi.js"
   },
   "dependencies": {
+    "@ai-sdk/google": "^2.0.31",
     "@clerk/clerk-expo": "^2.16.0",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",
@@ -29,6 +30,7 @@
     "@tanstack/query-sync-storage-persister": "^5.90.7",
     "@tanstack/react-query": "^5.90.2",
     "@tanstack/react-query-persist-client": "^5.90.7",
+    "ai": "^5.0.92",
     "axios": "^1.12.2",
     "babel-preset-expo": "^54.0.3",
     "buffer": "^6.0.3",

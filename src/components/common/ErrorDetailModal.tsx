@@ -1,11 +1,13 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Text, useTheme, Divider } from "react-native-paper";
+import { Text, useTheme, Divider, Button, Icon } from "react-native-paper";
 import { UniArrLoader } from "@/components/common";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import type { ApiErrorLogEntry } from "@/models/apiErrorLog.types";
+import * as Sharing from "expo-sharing";
+import { Buffer } from "buffer";
 
 interface ErrorDetailModalProps {
   error: ApiErrorLogEntry;
@@ -26,6 +28,36 @@ export const ErrorDetailModal: React.FC<ErrorDetailModalProps> = ({
 }) => {
   const theme = useTheme<AppTheme>();
 
+  const handleShare = async () => {
+    try {
+      const shareText = `API Error Details:
+
+Service: ${error.serviceId}${error.serviceType ? ` (${error.serviceType})` : ""}
+Endpoint: ${error.method} ${error.endpoint}
+Status: ${error.statusCode ?? "N/A"}
+Error: ${error.errorCode || "N/A"}
+Message: ${error.message}
+Time: ${new Date(error.timestamp).toLocaleString()}
+
+${details?.requestBody ? `Request: ${JSON.stringify(JSON.parse(details.requestBody), null, 2)}` : ""}
+${details?.responseBody ? `Response: ${JSON.stringify(JSON.parse(details.responseBody), null, 2)}` : ""}`;
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(
+          `data:text/plain;base64,${Buffer.from(shareText).toString("base64")}`,
+          {
+            mimeType: "text/plain",
+            dialogTitle: "Share Error Details",
+            UTI: "public.plain-text",
+          },
+        );
+      }
+    } catch (error) {
+      // Silently fail if sharing is not available
+    }
+  };
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -40,6 +72,7 @@ export const ErrorDetailModal: React.FC<ErrorDetailModalProps> = ({
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
+      paddingTop: spacing.xl, // Extra padding for status bar
     },
     headerTitle: {
       fontSize: 18,
@@ -127,7 +160,11 @@ export const ErrorDetailModal: React.FC<ErrorDetailModalProps> = ({
       fontStyle: "italic",
     },
     closeButton: {
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+    },
+    shareButton: {
+      paddingHorizontal: spacing.sm,
       paddingVertical: spacing.sm,
     },
   });
@@ -162,17 +199,14 @@ export const ErrorDetailModal: React.FC<ErrorDetailModalProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Error Details</Text>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Text
-            style={{
-              color: theme.colors.primary,
-              fontSize: 14,
-              fontWeight: "600",
-            }}
-          >
-            Close
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <TouchableOpacity onPress={handleShare} style={styles.shareButton}>
+            <Icon source="share" size={20} color={theme.colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Icon source="close" size={20} color={theme.colors.onSurface} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Loading State */}

@@ -7,11 +7,13 @@ import { quietHoursService } from "@/services/notifications/QuietHoursService";
 import { healthCheckService } from "@/services/bookmarks/HealthCheckService";
 import { imageCacheService } from "@/services/image/ImageCacheService";
 import { StorageBackendManager } from "@/services/storage/MMKVStorage";
+import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 
 /**
  * Coordinates lifecycle of background services to prevent memory leaks
  *
- * Ensures proper cleanup of:
+ * Ensures proper initialization and cleanup of:
+ * - AIProviderManager (loads stored AI provider configurations)
  * - WebhookService listeners and event queue
  * - ServiceHealthMonitor timers
  * - QuietHoursService pending flush timers
@@ -25,6 +27,23 @@ import { StorageBackendManager } from "@/services/storage/MMKVStorage";
  * Should be called once in the root layout alongside other lifecycle hooks.
  */
 export const useServiceLifecycleCoordination = (): void => {
+  // Initialize AI provider manager on first mount
+  useEffect(() => {
+    const initializeAIProviders = async () => {
+      try {
+        const providerManager = AIProviderManager.getInstance();
+        await providerManager.initialize();
+      } catch (error) {
+        console.warn(
+          "[ServiceLifecycleCoordination] Error initializing AI providers",
+          error,
+        );
+      }
+    };
+
+    initializeAIProviders();
+  }, []);
+
   useEffect(() => {
     const handleAppStateChange = (status: AppStateStatus) => {
       if (status === "background" || status === "inactive") {
@@ -40,7 +59,7 @@ export const useServiceLifecycleCoordination = (): void => {
         }
       } else if (status === "active") {
         // App coming to foreground - services typically auto-start as needed
-        // (ApiErrorLogger already has its own lifecycle via useApiErrorLoggerLifecycle)
+        // (ApiLogger already has its own lifecycle via useApiLoggerLifecycle)
         try {
           // Optionally restart health monitor if needed by settings
           // This is managed separately by the notification system

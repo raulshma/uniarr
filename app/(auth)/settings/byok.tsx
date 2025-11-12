@@ -73,10 +73,41 @@ const ByokLandingScreen = () => {
           </Text>
         </AnimatedSection>
 
-        {/* Location Services Section */}
+        {/* AI Services Section */}
         <AnimatedSection
           style={styles.section}
           delay={50}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>AI Services</Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="AI Search & Recommendations"
+                subtitle="Configure AI provider keys"
+                left={{ iconName: "sparkles" }}
+                trailing={
+                  <IconButton
+                    icon="chevron-right"
+                    size={16}
+                    iconColor={theme.colors.outline}
+                  />
+                }
+                onPress={() => router.push("/(auth)/settings/byok/ai-settings")}
+                groupPosition="single"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* Location Services Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={100}
           animated={animationsEnabled}
         >
           <Text style={styles.sectionTitle}>Location Services</Text>

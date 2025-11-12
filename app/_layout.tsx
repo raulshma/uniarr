@@ -27,7 +27,7 @@ import { useOfflineAwareActions } from "@/hooks/useOfflineAwareActions";
 import { useNotificationRegistration } from "@/hooks/useNotificationRegistration";
 import { useNotificationResponseHandler } from "@/hooks/useNotificationResponseHandler";
 import { useQuietHoursManager } from "@/hooks/useQuietHoursManager";
-import { useApiErrorLoggerLifecycle } from "@/hooks/useApiErrorLoggerLifecycle";
+import { useApiLoggerLifecycle } from "@/hooks/useApiLoggerLifecycle";
 import { useVoiceCommandHandler } from "@/hooks/useVoiceCommandHandler";
 import { useServiceLifecycleCoordination } from "@/hooks/useServiceLifecycleCoordination";
 import { useJellyfinSettingsSync } from "@/hooks/useJellyfinSettingsSync";
@@ -269,7 +269,7 @@ const AppContent = () => {
   useNotificationRegistration();
   useNotificationResponseHandler();
   useQuietHoursManager();
-  useApiErrorLoggerLifecycle();
+  useApiLoggerLifecycle();
   useVoiceCommandHandler();
   useServiceLifecycleCoordination();
   useJellyfinSettingsSync();

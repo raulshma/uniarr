@@ -1,4 +1,5 @@
 import type { ServiceType } from "@/models/service.types";
+import type { SearchInterpretation } from "@/utils/validation/searchSchemas";
 
 export type UnifiedSearchMediaType =
   | "series"
@@ -73,4 +74,5 @@ export interface UnifiedSearchOptions {
   readonly releaseYearMin?: number;
   readonly releaseYearMax?: number;
   readonly releaseType?: string;
+  readonly aiInterpretation?: SearchInterpretation;
 }

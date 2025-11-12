@@ -220,7 +220,7 @@ export abstract class BaseConnector<
   /**
    * Create a configured Axios instance with logging and error handling.
    *
-   * @note API Error Logger Capture Settings
+   * @note API Logger Capture Settings
    * The capture settings (requestBody, responseBody, requestHeaders) are read at
    * HTTP client initialization time. If users change these settings at runtime,
    * the changes will NOT automatically apply to already-initialized connectors.
@@ -239,15 +239,15 @@ export abstract class BaseConnector<
     // Get capture settings from user preferences
     const settings = useSettingsStore.getState();
 
-    // Setup HTTP error interceptor for automatic error logging
+    // Setup HTTP error interceptor for automatic API logging
     // This ensures ALL API calls through this connector are captured
     httpErrorInterceptor.setup(
       instance,
       {
         enableErrorLogging: true,
-        captureRequestBody: settings.apiErrorLoggerCaptureRequestBody,
-        captureResponseBody: settings.apiErrorLoggerCaptureResponseBody,
-        captureRequestHeaders: settings.apiErrorLoggerCaptureRequestHeaders,
+        captureRequestBody: settings.apiLoggerCaptureRequestBody,
+        captureResponseBody: settings.apiLoggerCaptureResponseBody,
+        captureRequestHeaders: settings.apiLoggerCaptureRequestHeaders,
         excludeStatusCodes: [401, 403, 404], // Skip common expected errors
       },
       {

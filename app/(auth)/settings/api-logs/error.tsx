@@ -32,7 +32,7 @@ import {
 } from "@/components/common";
 import { ErrorDetailModal } from "@/components/common/ErrorDetailModal";
 import { alert } from "@/services/dialogService";
-import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
+import { apiLogger } from "@/services/logger/ApiLoggerService";
 import { logger } from "@/services/logger/LoggerService";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -41,12 +41,13 @@ import type {
   ApiErrorLogEntry,
   HistogramData,
   GroupedErrorStats,
-} from "@/models/apiErrorLog.types";
+} from "@/models/apiLogger.types";
 import * as Sharing from "expo-sharing";
 import { BarChart, PieChart, LineChart } from "react-native-chart-kit";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
+import { Buffer } from "buffer";
 
 const ApiErrorLogsScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -106,18 +107,18 @@ const ApiErrorLogsScreen = () => {
     const loadErrors = async () => {
       try {
         setIsLoading(true);
-        const loadedErrors = await apiErrorLogger.getErrors();
+        const loadedErrors = await apiLogger.getErrors();
         setErrors(loadedErrors.reverse()); // Show newest first by default
 
         // Load stats
-        const newStats = await apiErrorLogger.getGroupedStats();
+        const newStats = await apiLogger.getGroupedStats();
         setStats(newStats);
 
-        const serviceHist = await apiErrorLogger.getServiceHistogram();
+        const serviceHist = await apiLogger.getServiceHistogram();
         setServiceHistogram(serviceHist);
 
         // Load trend data (last 7 days)
-        const trendHist = await apiErrorLogger.getStatusCodeHistogram();
+        const trendHist = await apiLogger.getStatusCodeHistogram();
         setTrendData(trendHist);
 
         setLastRefresh(new Date());
@@ -140,9 +141,9 @@ const ApiErrorLogsScreen = () => {
 
     const interval = setInterval(async () => {
       try {
-        const loadedErrors = await apiErrorLogger.getErrors();
+        const loadedErrors = await apiLogger.getErrors();
         setErrors(loadedErrors.reverse());
-        const newStats = await apiErrorLogger.getGroupedStats();
+        const newStats = await apiLogger.getGroupedStats();
         setStats(newStats);
         setLastRefresh(new Date());
       } catch (error) {
@@ -318,15 +319,15 @@ const ApiErrorLogsScreen = () => {
 
   const handleDeleteSelected = useCallback(async () => {
     try {
-      await apiErrorLogger.deleteErrors(Array.from(selectedErrorIds));
+      await apiLogger.deleteErrors(Array.from(selectedErrorIds));
       setSelectedErrorIds(new Set());
       setIsSelectingMultiple(false);
 
       // Reload
-      const loadedErrors = await apiErrorLogger.getErrors();
+      const loadedErrors = await apiLogger.getErrors();
       setErrors(loadedErrors.reverse());
 
-      const newStats = await apiErrorLogger.getGroupedStats();
+      const newStats = await apiLogger.getGroupedStats();
       setStats(newStats);
     } catch (error) {
       await alert(
@@ -375,7 +376,7 @@ const ApiErrorLogsScreen = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              await apiErrorLogger.clearAll();
+              await apiLogger.clearAll();
               setErrors([]);
               setSelectedErrorIds(new Set());
               setIsSelectingMultiple(false);
@@ -410,7 +411,7 @@ const ApiErrorLogsScreen = () => {
       setSelectedErrorForDetail(error);
       setIsLoadingDetails(true);
       try {
-        const details = await apiErrorLogger.getErrorDetails(error.id);
+        const details = await apiLogger.getErrorDetails(error.id);
         setErrorDetails(details);
       } catch (err) {
         await logger.error("Failed to load error details", { error: err });
@@ -425,11 +426,11 @@ const ApiErrorLogsScreen = () => {
   const handleRefresh = useCallback(async () => {
     try {
       setIsLoading(true);
-      const loadedErrors = await apiErrorLogger.getErrors();
+      const loadedErrors = await apiLogger.getErrors();
       setErrors(loadedErrors.reverse());
-      const newStats = await apiErrorLogger.getGroupedStats();
+      const newStats = await apiLogger.getGroupedStats();
       setStats(newStats);
-      const serviceHist = await apiErrorLogger.getServiceHistogram();
+      const serviceHist = await apiLogger.getServiceHistogram();
       setServiceHistogram(serviceHist);
       setLastRefresh(new Date());
     } catch (error) {
@@ -1222,8 +1223,12 @@ const ApiErrorLogsScreen = () => {
                     placeholderTextColor={theme.colors.onSurfaceVariant}
                     value={statusCodeFilter?.toString() || ""}
                     onChangeText={(text) => {
-                      const num = text ? parseInt(text, 10) : null;
-                      setStatusCodeFilter(isNaN(num!) ? null : num);
+                      if (!text) {
+                        setStatusCodeFilter(null);
+                        return;
+                      }
+                      const parsed = Number(text);
+                      setStatusCodeFilter(Number.isNaN(parsed) ? null : parsed);
                     }}
                     keyboardType="numeric"
                   />
