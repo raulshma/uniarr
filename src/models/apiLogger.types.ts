@@ -135,6 +135,7 @@ export interface AiApiLogMetadata {
   tokenUsage?: AiTokenUsage;
   costUsd?: number;
   extras?: Record<string, unknown>;
+  fallbackReason?: string;
 }
 
 export interface AiApiLogEntry {

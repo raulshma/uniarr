@@ -1,4 +1,10 @@
-import { streamText, generateObject, streamObject } from "ai";
+import {
+  streamText,
+  generateObject,
+  streamObject,
+  generateText,
+  APICallError,
+} from "ai";
 import { z } from "zod";
 import { logger } from "@/services/logger/LoggerService";
 import { apiLogger } from "@/services/logger/ApiLoggerService";
@@ -65,6 +71,51 @@ export class AIService {
     }
 
     return false;
+  }
+
+  /**
+   * Create a wrapper stream that passes through chunks but tracks errors during consumption
+   */
+  /**
+   * Generic stream wrapper to detect API errors during consumption.
+   * If a recoverable stream error is detected (`shouldFallbackToBufferedResponse`),
+   * the wrapper stops iteration quietly and lets the caller handle partial data.
+   */
+  private createErrorDetectingStream<T = unknown>(
+    sourceStream: AsyncIterable<T>,
+    hasError: () => boolean,
+    getError: () => Error | null,
+  ): AsyncIterable<T> {
+    const self = this;
+    return (async function* () {
+      try {
+        for await (const chunk of sourceStream) {
+          if (hasError()) {
+            const error = getError();
+            if (error && self.shouldFallbackToBufferedResponse(error)) {
+              // Stop iteration without throwing to allow a graceful fallback
+              logger.debug(
+                "Stream encountered API error during consumption; stopping iteration.",
+              );
+              return;
+            }
+          }
+          yield chunk;
+        }
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          self.shouldFallbackToBufferedResponse(error)
+        ) {
+          logger.debug("Stream consumption threw recoverable error", {
+            errorName: error.name,
+            errorMessage: error.message,
+          });
+          return; // suppress recoverable stream errors
+        }
+        throw error;
+      }
+    })();
   }
 
   /**
@@ -162,14 +213,18 @@ export class AIService {
     const provider = this.providerManager.getActiveProvider();
     const providerType = provider?.provider || "unknown";
     const model = provider?.model || "unknown";
+    let modelInstance: any;
 
     try {
-      const modelInstance = this.providerManager.getModelInstance();
+      modelInstance = this.providerManager.getModelInstance();
       if (!modelInstance) {
         throw new Error(
           "No AI model configured. Please set up an AI provider first.",
         );
       }
+
+      let streamEncounteredError = false;
+      let streamError: Error | null = null;
 
       const result = await streamText({
         model: modelInstance,
@@ -179,7 +234,91 @@ export class AIService {
           // Optional: Custom chunk processing
           logger.debug("Text stream chunk", { chunkType: chunk.type });
         },
+        onError: ({ error }) => {
+          // Track that stream encountered an error
+          streamEncounteredError = true;
+          streamError =
+            error instanceof Error ? error : new Error(String(error));
+          // Log stream-time errors for debugging
+          const errorName = error instanceof Error ? error.name : "unknown";
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          logger.warn("Text stream error callback triggered", {
+            errorName,
+            errorMessage,
+          });
+        },
       });
+
+      // Wrap the text stream to detect errors during consumption
+      const wrappedStream = this.createErrorDetectingStream(
+        result.textStream as AsyncIterable<string>,
+        () => streamEncounteredError,
+        () => streamError,
+      );
+
+      // If stream encountered a parsing error immediately, use buffered response instead
+      // This handles cases where the provider returns valid data but SDK can't parse it as a stream
+      if (streamEncounteredError && streamError !== null) {
+        const err = streamError as Error;
+        const errorMsg = err.message ?? String(err);
+        const errorName = err.name ?? "unknown";
+
+        void logger.warn(
+          "Text stream encountered parsing error, attempting buffered recovery",
+          {
+            errorName,
+            errorMessage: errorMsg,
+          },
+        );
+
+        const bufferedText = await this.tryRecoverBufferedStreamText(
+          result,
+          err,
+        );
+
+        if (!bufferedText || bufferedText.length === 0) {
+          void logger.warn("Buffered recovery failed, will trigger fallback", {
+            errorName,
+            errorMessage: errorMsg,
+          });
+          throw err;
+        }
+
+        const bufferedStream = this.createBufferedTextStream(bufferedText);
+
+        const durationMs = Date.now() - startTime;
+        await this.apiLogger.addAiCall({
+          provider: providerType,
+          model,
+          operation: "streamText",
+          status: "success",
+          prompt,
+          response: bufferedText,
+          durationMs,
+          metadata: {
+            fallbackReason: "stream-error-recovered",
+            extras: {
+              streamErrorName: errorName,
+              streamErrorMessage: errorMsg,
+            },
+          },
+        });
+
+        void logger.info(
+          "Recovered AI response from buffered text after stream error",
+          {
+            provider: providerType,
+            model,
+          },
+        );
+
+        return {
+          ...result,
+          textStream: bufferedStream,
+          text: Promise.resolve(bufferedText),
+        };
+      }
 
       // Log successful call with response text (captured asynchronously)
       const durationMs = Date.now() - startTime;
@@ -193,24 +332,51 @@ export class AIService {
       });
 
       // Capture response text asynchronously after logging
-      result.text
-        .then((text) => {
-          void this.apiLogger.addAiCall({
-            provider: providerType,
-            model,
-            operation: "streamText",
-            status: "success",
-            prompt,
-            response: text,
-            durationMs,
+      // Only attempt if stream did not encounter errors to avoid AI_NoOutputGeneratedError
+      if (!streamEncounteredError) {
+        result.text
+          .then((text) => {
+            void this.apiLogger.addAiCall({
+              provider: providerType,
+              model,
+              operation: "streamText",
+              status: "success",
+              prompt,
+              response: text,
+              durationMs,
+            });
+          })
+          .catch((error) => {
+            logger.debug(
+              "Failed to log streamText response (stream may have partial data)",
+              { error },
+            );
           });
-        })
-        .catch((error) => {
-          logger.error("Failed to log streamText response", { error });
-        });
+      }
 
-      return result;
+      return {
+        ...result,
+        textStream: wrappedStream,
+      };
     } catch (error) {
+      if (
+        modelInstance &&
+        this.shouldFallbackToBufferedResponse(error as Error)
+      ) {
+        try {
+          return await this.generateBufferedFallback({
+            modelInstance,
+            prompt,
+            system,
+            providerType,
+            model,
+            cause: error,
+          });
+        } catch (fallbackError) {
+          error = fallbackError;
+        }
+      }
+
       const durationMs = Date.now() - startTime;
       const {
         message: errorMessage,
@@ -416,6 +582,9 @@ export class AIService {
         );
       }
 
+      let streamEncounteredError = false;
+      let streamError: Error | null = null;
+
       const result = await streamObject({
         model: modelInstance,
         schema,
@@ -424,7 +593,68 @@ export class AIService {
         onChunk: ({ chunk }: { chunk: unknown }) => {
           logger.debug("Object stream chunk", { chunkType: typeof chunk });
         },
+        onError: ({ error }) => {
+          // Track that stream encountered an error
+          streamEncounteredError = true;
+          streamError =
+            error instanceof Error ? error : new Error(String(error));
+          // Log stream-time errors for debugging
+          const errorName = error instanceof Error ? error.name : "unknown";
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          logger.warn("Object stream error callback triggered", {
+            errorName,
+            errorMessage,
+          });
+        },
       });
+
+      // Wrap the object stream to detect errors during consumption
+      const wrappedPartialStream = this.createErrorDetectingStream(
+        result.partialObjectStream as AsyncIterable<unknown>,
+        () => streamEncounteredError,
+        () => streamError,
+      );
+
+      // If stream encountered a parsing error immediately, use buffered response instead
+      if (streamEncounteredError && streamError !== null) {
+        const err = streamError as Error;
+        const errorMsg = err.message ?? String(err);
+        const errorName = err.name ?? "unknown";
+
+        logger.warn(
+          "Object stream encountered parsing error, switching to buffered response",
+          {
+            errorName,
+            errorMessage: errorMsg,
+          },
+        );
+
+        // Return the buffered object response
+        const bufferedObject = await result.object;
+
+        const durationMs = Date.now() - startTime;
+        await this.apiLogger.addAiCall({
+          provider: providerType,
+          model,
+          operation: "streamObject",
+          status: "success",
+          prompt,
+          response: JSON.stringify(bufferedObject),
+          durationMs,
+        });
+
+        // Create a stream that yields the complete object
+        const completeObjectStream = (async function* () {
+          yield bufferedObject;
+        })();
+
+        return {
+          ...result,
+          partialObjectStream: completeObjectStream,
+          object: Promise.resolve(bufferedObject),
+        };
+      }
 
       // Log successful call
       const durationMs = Date.now() - startTime;
@@ -438,23 +668,32 @@ export class AIService {
       });
 
       // Capture response object asynchronously after logging
-      result.object
-        .then((obj) => {
-          void this.apiLogger.addAiCall({
-            provider: providerType,
-            model,
-            operation: "streamObject",
-            status: "success",
-            prompt,
-            response: JSON.stringify(obj),
-            durationMs,
+      // Only attempt if stream did not encounter errors to avoid AI_NoOutputGeneratedError
+      if (!streamEncounteredError) {
+        result.object
+          .then((obj) => {
+            void this.apiLogger.addAiCall({
+              provider: providerType,
+              model,
+              operation: "streamObject",
+              status: "success",
+              prompt,
+              response: JSON.stringify(obj),
+              durationMs,
+            });
+          })
+          .catch((error) => {
+            logger.debug(
+              "Failed to log streamObject response (stream may have partial data)",
+              { error },
+            );
           });
-        })
-        .catch((error) => {
-          logger.error("Failed to log streamObject response", { error });
-        });
+      }
 
-      return result;
+      return {
+        ...result,
+        partialObjectStream: wrappedPartialStream,
+      };
     } catch (error) {
       const durationMs = Date.now() - startTime;
       const {
@@ -794,6 +1033,267 @@ export class AIService {
       provider: provider.provider,
       model: provider.model,
       info: providerInfo,
+    };
+  }
+
+  private async tryRecoverBufferedStreamText(
+    result: any,
+    streamError: Error,
+  ): Promise<string | null> {
+    if (this.isPromiseLike<string>(result?.text)) {
+      try {
+        const buffered = await result.text;
+        if (typeof buffered === "string" && buffered.length > 0) {
+          return buffered;
+        }
+      } catch (error) {
+        void logger.debug(
+          "streamText result.text promise rejected after stream error",
+          {
+            errorName: error instanceof Error ? error.name : "unknown",
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
+          },
+        );
+      }
+    }
+
+    const fallbackText = await this.extractTextFromErrorResponse(streamError);
+    if (fallbackText && fallbackText.length > 0) {
+      return fallbackText;
+    }
+
+    return null;
+  }
+
+  private async extractTextFromErrorResponse(
+    error: Error,
+  ): Promise<string | null> {
+    const typedError = error as Error & {
+      response?: unknown;
+      responseBody?: unknown;
+      data?: unknown;
+      cause?: unknown;
+    };
+
+    const candidates: unknown[] = [];
+    if (typedError.response) {
+      candidates.push(typedError.response);
+      const response = typedError.response as { clone?: () => unknown };
+      if (typeof response.clone === "function") {
+        candidates.push(response.clone());
+      }
+    }
+
+    const cause = typedError.cause as {
+      response?: unknown;
+      responseBody?: unknown;
+      data?: unknown;
+      clone?: () => unknown;
+    } | null;
+
+    if (cause?.response) {
+      candidates.push(cause.response);
+      const causeResponse = cause.response as { clone?: () => unknown };
+      if (typeof causeResponse.clone === "function") {
+        candidates.push(causeResponse.clone());
+      }
+    }
+
+    for (const candidate of candidates) {
+      const text = await this.readTextFromResponse(candidate);
+      if (text && text.length > 0) {
+        return text;
+      }
+    }
+
+    const maybeStrings = [
+      typedError.responseBody,
+      typedError.data,
+      cause?.responseBody,
+      cause?.data,
+    ];
+
+    for (const value of maybeStrings) {
+      if (typeof value === "string" && value.length > 0) {
+        return value;
+      }
+    }
+
+    return null;
+  }
+
+  private async readTextFromResponse(
+    responseLike: unknown,
+  ): Promise<string | null> {
+    if (
+      !responseLike ||
+      typeof responseLike !== "object" ||
+      typeof (responseLike as { text?: unknown }).text !== "function"
+    ) {
+      return null;
+    }
+
+    try {
+      const text = await (
+        responseLike as { text: () => Promise<string> }
+      ).text();
+      if (typeof text === "string") {
+        return text;
+      }
+    } catch (error) {
+      void logger.debug("Failed to read buffered AI response", {
+        errorName: error instanceof Error ? error.name : "unknown",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return null;
+  }
+
+  private isPromiseLike<T = unknown>(value: unknown): value is Promise<T> {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as Promise<T>).then === "function"
+    );
+  }
+
+  private shouldFallbackToBufferedResponse(error: Error | unknown): boolean {
+    const target = error instanceof Error ? error : null;
+    if (!target) {
+      return false;
+    }
+
+    const message = target.message?.toLowerCase?.() ?? "";
+    const name = target.name ?? "";
+
+    if (this.isEmptyOutputError(name, message)) {
+      return true;
+    }
+
+    if (this.isApiCallStreamError(target)) {
+      return true;
+    }
+
+    const cause = (target as Error & { cause?: unknown }).cause;
+    if (cause && cause instanceof Error) {
+      const causeName = cause.name ?? "";
+      const causeMessage = cause.message?.toLowerCase?.() ?? "";
+      if (this.isEmptyOutputError(causeName, causeMessage)) {
+        return true;
+      }
+
+      if (this.isApiCallStreamError(cause)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private isEmptyOutputError(name: string, message: string): boolean {
+    if (!name && !message) {
+      return false;
+    }
+
+    const normalized = message.toLowerCase();
+    return (
+      name === "AI_EmptyResponseBodyError" ||
+      name === "AI_NoOutputGeneratedError" ||
+      normalized.includes("empty response body") ||
+      normalized.includes("no output generated") ||
+      normalized.includes("no output")
+    );
+  }
+
+  private isApiCallStreamError(error: Error): boolean {
+    if (!APICallError || !APICallError.isInstance) {
+      return false;
+    }
+
+    if (!APICallError.isInstance(error)) {
+      return false;
+    }
+
+    const normalized = error.message?.toLowerCase?.() ?? "";
+    return (
+      normalized.includes("failed to process successful response") ||
+      normalized.includes("failed to process response")
+    );
+  }
+
+  private createBufferedTextStream(text: string, chunkSize = 600) {
+    const safeText = text ?? "";
+
+    return (async function* streamChunks() {
+      if (!safeText.length) {
+        return;
+      }
+
+      for (let index = 0; index < safeText.length; index += chunkSize) {
+        yield safeText.slice(index, index + chunkSize);
+      }
+    })();
+  }
+
+  private async generateBufferedFallback({
+    modelInstance,
+    prompt,
+    system,
+    providerType,
+    model,
+    cause,
+  }: {
+    modelInstance: any;
+    prompt: string;
+    system?: string;
+    providerType: string;
+    model: string;
+    cause: unknown;
+  }): Promise<any> {
+    const fallbackStart = Date.now();
+    const result = await generateText({
+      model: modelInstance,
+      prompt,
+      system,
+    });
+
+    const text = result?.text ?? "";
+    if (!text.trim()) {
+      throw new Error(
+        "The AI provider returned an empty response after fallback.",
+      );
+    }
+
+    const durationMs = Date.now() - fallbackStart;
+    await this.apiLogger.addAiCall({
+      provider: providerType,
+      model,
+      operation: "generateText-fallback",
+      status: "success",
+      prompt,
+      response: text,
+      durationMs,
+      metadata: {
+        fallbackReason:
+          cause instanceof Error ? (cause.name ?? "unknown") : "unknown",
+      },
+    });
+
+    logger.warn(
+      "Streamed response was empty; used buffered fallback instead.",
+      {
+        provider: providerType,
+        model,
+        fallbackDurationMs: durationMs,
+      },
+    );
+
+    return {
+      ...result,
+      text: Promise.resolve(text),
+      textStream: this.createBufferedTextStream(text),
     };
   }
 }

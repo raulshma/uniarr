@@ -1,16 +1,19 @@
 import React, { memo, useMemo } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
-import { Chip, Text, useTheme } from "react-native-paper";
+import { ScrollView, StyleSheet, View, Pressable } from "react-native";
+import { Text, useTheme } from "react-native-paper";
 import type { MD3Theme } from "react-native-paper/lib/typescript/types";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export type StarterQuestionsProps = {
   questions: string[];
   onSelectQuestion: (question: string) => void;
+  title?: string;
 };
 
 const StarterQuestionsComponent: React.FC<StarterQuestionsProps> = ({
   questions,
   onSelectQuestion,
+  title = "Media AI",
 }) => {
   const theme = useTheme<MD3Theme>();
 
@@ -25,29 +28,78 @@ const StarterQuestionsComponent: React.FC<StarterQuestionsProps> = ({
         },
         header: {
           alignItems: "center",
-          marginBottom: 24,
+          marginBottom: 32,
         },
         title: {
-          fontSize: 20,
-          fontWeight: "600",
-          color: theme.colors.onSurface,
+          fontSize: 24,
+          fontWeight: "700",
+          color: theme.colors.onBackground,
           marginBottom: 8,
+          letterSpacing: -0.5,
         },
         subtitle: {
           fontSize: 14,
           color: theme.colors.onSurfaceVariant,
           textAlign: "center",
+          lineHeight: 20,
         },
         list: {
           flexGrow: 0,
         },
-        chip: {
+        suggestionCard: {
+          marginHorizontal: 0,
           marginBottom: 12,
-          marginHorizontal: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 16,
+          borderRadius: 14,
+          backgroundColor: theme.colors.surfaceVariant,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 14,
+        },
+        iconContainer: {
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          backgroundColor: theme.colors.primary,
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        },
+        textContainer: {
+          flex: 1,
+          justifyContent: "center",
+        },
+        suggestionText: {
+          fontSize: 15,
+          fontWeight: "500",
+          color: theme.colors.onSurfaceVariant,
+          lineHeight: 20,
         },
       }),
-    [theme.colors.onSurface, theme.colors.onSurfaceVariant],
+    [
+      theme.colors.onBackground,
+      theme.colors.onSurfaceVariant,
+      theme.colors.surfaceVariant,
+      theme.colors.primary,
+    ],
   );
+
+  const getIconForQuestion = (
+    question: string,
+  ): keyof typeof MaterialCommunityIcons.glyphMap => {
+    const lowerQuestion = question.toLowerCase();
+    if (lowerQuestion.includes("trending")) return "trending-up";
+    if (lowerQuestion.includes("cast") || lowerQuestion.includes("actor"))
+      return "account-multiple";
+    if (lowerQuestion.includes("similar")) return "shape-plus";
+    if (lowerQuestion.includes("radarr") || lowerQuestion.includes("add"))
+      return "plus-circle";
+    if (lowerQuestion.includes("release")) return "calendar";
+    if (lowerQuestion.includes("popular")) return "fire";
+    if (lowerQuestion.includes("top")) return "crown";
+    return "chat-outline";
+  };
 
   if (!questions.length) {
     return null;
@@ -56,7 +108,7 @@ const StarterQuestionsComponent: React.FC<StarterQuestionsProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>UniArr Assistant</Text>
+        <Text style={styles.title}>{title}</Text>
         <Text style={styles.subtitle}>
           Ask me about your media infrastructure or get started with a
           suggestion below.
@@ -64,21 +116,39 @@ const StarterQuestionsComponent: React.FC<StarterQuestionsProps> = ({
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 0 }}
         style={styles.list}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {questions.map((question) => (
-          <Chip
+          <Pressable
             key={question}
-            mode="outlined"
+            style={({ pressed }) => [
+              styles.suggestionCard,
+              {
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
             onPress={() => onSelectQuestion(question)}
-            style={styles.chip}
-            icon="message-question"
+            accessibilityRole="button"
           >
-            {question}
-          </Chip>
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons
+                name={getIconForQuestion(question)}
+                size={20}
+                color={theme.colors.onPrimary}
+              />
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={styles.suggestionText}>{question}</Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={20}
+              color={theme.colors.onSurfaceVariant}
+            />
+          </Pressable>
         ))}
       </ScrollView>
     </View>

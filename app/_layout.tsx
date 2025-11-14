@@ -1,3 +1,4 @@
+import "./../pollyfills";
 import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
 import { QueryClientProvider, hydrate } from "@tanstack/react-query";
 import type { Persister } from "@tanstack/react-query-persist-client";

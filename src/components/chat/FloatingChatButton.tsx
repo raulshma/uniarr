@@ -4,6 +4,7 @@ import { useTheme, Badge } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { MD3Theme } from "react-native-paper/lib/typescript/types";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface FloatingChatButtonProps {
   onPress: () => void;
@@ -13,6 +14,7 @@ export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
   onPress,
 }) => {
   const theme = useTheme<MD3Theme>();
+  const insets = useSafeAreaInsets();
   const messages = useConversationalAIStore((state) => state.messages);
 
   // Count unread assistant messages as indicator
@@ -45,7 +47,7 @@ export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
       StyleSheet.create({
         container: {
           position: "absolute",
-          bottom: 72,
+          bottom: 85 + insets.bottom,
           right: 16,
           zIndex: 99,
           elevation: 12,
@@ -69,7 +71,7 @@ export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
           right: -4,
         },
       }),
-    [theme.colors.primary, theme.colors.shadow],
+    [insets.bottom, theme.colors.primary, theme.colors.shadow],
   );
 
   return (

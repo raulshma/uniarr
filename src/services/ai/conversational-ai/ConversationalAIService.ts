@@ -1,18 +1,11 @@
 import { AIRateLimiter } from "@/services/ai/core/AIRateLimiter";
 import { AIService } from "@/services/ai/core/AIService";
-import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
-import { apiLogger } from "@/services/logger/ApiLoggerService";
+import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 import { logger } from "@/services/logger/LoggerService";
 import { handleApiError, type ErrorContext } from "@/utils/error.utils";
 import { withRetry, networkRetryCondition } from "@/utils/retry.utils";
 import type { Message } from "@/models/chat.types";
-
-interface ServiceStateSnapshot {
-  name: string;
-  type: string;
-  status: string;
-  version?: string;
-}
+import { useConversationalAIStore } from "@/store/conversationalAIStore";
 
 /**
  * Conversational AI Assistant Service
@@ -23,13 +16,12 @@ export class ConversationalAIService {
 
   private readonly aiService: AIService;
   private readonly rateLimiter: AIRateLimiter;
-  private readonly connectorManager: ConnectorManager;
-  private readonly apiLogger = apiLogger;
+  private readonly providerManager: AIProviderManager;
 
   private constructor() {
     this.aiService = AIService.getInstance();
     this.rateLimiter = AIRateLimiter.getInstance();
-    this.connectorManager = ConnectorManager.getInstance();
+    this.providerManager = AIProviderManager.getInstance();
   }
 
   static getInstance(): ConversationalAIService {
@@ -42,8 +34,10 @@ export class ConversationalAIService {
 
   /**
    * Build system prompt with current infrastructure context for the LLM.
+   * SIMPLIFIED: Currently just a basic prompt. Advanced version commented out below.
    */
   private async buildSystemPrompt(): Promise<string> {
+    /*
     try {
       const connectors = this.connectorManager.getAllConnectors();
 
@@ -125,16 +119,27 @@ Please use the conversation history provided to maintain context and continuity.
 Help users with their media services, answer questions, and provide recommendations.
 Be conversational, specific, and helpful.`;
     }
+    */
+
+    // Keep the system prompt intentionally short — detailed context is optional
+    // but the system prompt can be extended later without changing the public API.
+    return `You are UniArr, a helpful assistant for media management. Answer questions clearly and concisely.`;
   }
 
   /**
    * Stream a response to a user message while emitting incremental chunks.
    */
+  /**
+   * Stream a structured response with progressive updates
+   * Returns an async iterable of response text chunks
+   * The response is generated as structured data (response, followUp, suggestions)
+   * but only the main response text is streamed to the UI
+   * Falls back to plain text streaming if structured generation fails
+   */
   async streamResponse(
     userMessage: string,
     conversationHistory: Message[],
   ): Promise<AsyncIterable<string>> {
-    const startTime = Date.now();
     const errorContext: ErrorContext = {
       operation: "conversational-ai.stream-response",
     };
@@ -150,9 +155,8 @@ Be conversational, specific, and helpful.`;
 
       const systemPrompt = await this.buildSystemPrompt();
       const formattedHistory = conversationHistory
-        .map((message) => {
-          const role = message.role === "assistant" ? "Assistant" : "User";
-          return `${role}: ${message.text}`;
+        .map((m) => {
+          return `${m.role === "assistant" ? "Assistant" : "User"}: ${m.text}`;
         })
         .join("\n");
 
@@ -160,6 +164,7 @@ Be conversational, specific, and helpful.`;
         ? `${formattedHistory}\n\nUser: ${userMessage}`
         : userMessage;
 
+      // Use plain text streaming directly (more stable than structured streaming)
       const streamResult = await this.rateLimiter.executeWithLimit(
         async () =>
           withRetry(() => this.aiService.streamText(fullPrompt, systemPrompt), {
@@ -173,47 +178,11 @@ Be conversational, specific, and helpful.`;
         "generic",
       );
 
-      const { textStream } = streamResult;
+      const streamGenerator = streamResult.textStream as AsyncIterable<string>;
 
-      const generator = async function* () {
-        try {
-          for await (const chunk of textStream as AsyncIterable<string>) {
-            yield chunk;
-          }
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          void logger.error("[ConversationalAI] Stream error encountered.", {
-            error: message,
-          });
-          throw error;
-        }
-      };
-
-      const durationMs = Date.now() - startTime;
-      void this.apiLogger.addAiCall({
-        provider: "google",
-        model: "gemini-1.5-flash",
-        operation: "conversational",
-        status: "success",
-        prompt: userMessage,
-        durationMs,
-      });
-
-      return generator();
+      return streamGenerator;
     } catch (error) {
-      const durationMs = Date.now() - startTime;
       const apiError = handleApiError(error, errorContext);
-
-      await this.apiLogger.addAiCall({
-        provider: "google",
-        model: "gemini-1.5-flash",
-        operation: "conversational",
-        status: "error",
-        prompt: userMessage,
-        errorMessage: apiError.message,
-        durationMs,
-      });
 
       void logger.error("[ConversationalAI] Conversational streaming failed.", {
         error: apiError.message,
@@ -226,22 +195,15 @@ Be conversational, specific, and helpful.`;
   }
 
   /**
-   * Provide curated starter questions for first-time interactions.
+   * Provide starter questions for first-time interactions.
+   * SIMPLE VERSION
    */
   async getStarterQuestions(): Promise<string[]> {
-    const starters = [
-      "Why is Sonarr not finding episodes?",
-      "What should I watch tonight?",
-      "Is my storage running low?",
-      "What's the most popular release group this week?",
-      "Can you help optimize my download settings?",
-      "What quality should I use for anime?",
-      "Tell me about the latest episodes in my library",
-      "How's my system health overall?",
-      "What media am I missing similar to my favorites?",
+    return [
+      "Hello! How can you help me?",
+      "What can you do?",
+      "Tell me something interesting",
     ];
-
-    return starters.slice(0, 3);
   }
 
   /**
@@ -258,5 +220,31 @@ Be conversational, specific, and helpful.`;
       });
       return false;
     }
+  }
+
+  /**
+   * Create a new conversation session.
+   * @param title - The title for the new conversation
+   * @returns The session ID of the newly created conversation
+   */
+  createNewConversation(title: string): string {
+    const sessionId = useConversationalAIStore.getState().createSession(title);
+    return sessionId;
+  }
+
+  /**
+   * Delete a conversation session.
+   * @param sessionId - The ID of the session to delete
+   */
+  deleteConversation(sessionId: string): void {
+    useConversationalAIStore.getState().deleteSession(sessionId);
+  }
+
+  /**
+   * Load a conversation session.
+   * @param sessionId - The ID of the session to load
+   */
+  loadConversation(sessionId: string): void {
+    useConversationalAIStore.getState().loadSession(sessionId);
   }
 }

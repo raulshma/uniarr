@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ConversationalAIService } from "@/services/ai/conversational-ai/ConversationalAIService";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
+import { useAiSdkConversational } from "@/hooks/useAiSdkConversational";
 import { logger } from "@/services/logger/LoggerService";
 import { ApiError, handleApiError } from "@/utils/error.utils";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
@@ -24,6 +24,9 @@ interface UseConversationalAIReturn {
   clearHistory: () => void;
   setError: (error: Error | null) => void;
   isReady: boolean;
+  createNewConversation: (title: string) => string;
+  deleteConversation: (sessionId: string) => void;
+  loadConversation: (sessionId: string) => void;
 }
 
 const createMessageId = (): string =>
@@ -34,29 +37,52 @@ const createMessageId = (): string =>
  * while handling streaming updates and initialization lifecycle.
  */
 export function useConversationalAI(): UseConversationalAIReturn {
-  const service = ConversationalAIService.getInstance();
+  // Conversational logic is handled entirely via @ai-sdk/react
 
   const messages = useConversationalAIStore(selectMessages);
   const isLoading = useConversationalAIStore(selectIsLoading);
   const isStreaming = useConversationalAIStore(selectIsStreaming);
   const error = useConversationalAIStore(selectError);
-  const addMessage = useConversationalAIStore((state) => state.addMessage);
-  const addStreamingChunk = useConversationalAIStore(
-    (state) => state.addStreamingChunk,
+
+  // Get action functions directly - don't use selectors for actions to avoid infinite loops
+  const addMessage = useCallback(
+    (msg: Message) => useConversationalAIStore.getState().addMessage(msg),
+    [],
   );
-  const completeStreamingMessage = useConversationalAIStore(
-    (state) => state.completeStreamingMessage,
+  const addStreamingChunk = useCallback(
+    (messageId: string, chunk: string) =>
+      useConversationalAIStore.getState().addStreamingChunk(messageId, chunk),
+    [],
   );
-  const setMessageError = useConversationalAIStore(
-    (state) => state.setMessageError,
+  const completeStreamingMessage = useCallback(
+    (messageId: string) =>
+      useConversationalAIStore.getState().completeStreamingMessage(messageId),
+    [],
   );
-  const clearHistoryState = useConversationalAIStore(
-    (state) => state.clearHistory,
+  const setMessageError = useCallback(
+    (messageId: string, errorMessage: string, fallbackText?: string) =>
+      useConversationalAIStore
+        .getState()
+        .setMessageError(messageId, errorMessage, fallbackText),
+    [],
   );
-  const setErrorState = useConversationalAIStore((state) => state.setError);
-  const setLoadingState = useConversationalAIStore((state) => state.setLoading);
-  const setStreamingState = useConversationalAIStore(
-    (state) => state.setStreaming,
+  const clearHistoryState = useCallback(
+    () => useConversationalAIStore.getState().clearHistory(),
+    [],
+  );
+  const setErrorState = useCallback(
+    (err: Error | null) => useConversationalAIStore.getState().setError(err),
+    [],
+  );
+  const setLoadingState = useCallback(
+    (loading: boolean) =>
+      useConversationalAIStore.getState().setLoading(loading),
+    [],
+  );
+  const setStreamingState = useCallback(
+    (streaming: boolean) =>
+      useConversationalAIStore.getState().setStreaming(streaming),
+    [],
   );
   const networkStatus = useNetworkStatus();
   const { isConnected, isInternetReachable, type: networkType } = networkStatus;
@@ -65,6 +91,7 @@ export function useConversationalAI(): UseConversationalAIReturn {
   const [isReady, setIsReady] = useState(false);
   const [providerVersion, setProviderVersion] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const assistantMessageIdRef = useRef<string>("");
   const providerManager = AIProviderManager.getInstance();
 
   const isOffline = useMemo(() => {
@@ -93,7 +120,16 @@ export function useConversationalAI(): UseConversationalAIReturn {
 
     const initializeAssistant = async () => {
       try {
-        const ready = await service.isReady();
+        const activeProvider = providerManager.getActiveProvider();
+        let ready = false;
+        if (activeProvider) {
+          const health = await providerManager.healthCheck(
+            activeProvider.provider,
+          );
+          ready =
+            health.isHealthy ||
+            (health.error ?? "").toLowerCase().includes("not implemented");
+        }
         if (!isMounted) {
           return;
         }
@@ -101,14 +137,22 @@ export function useConversationalAI(): UseConversationalAIReturn {
         setIsReady(ready);
 
         if (ready) {
-          const questions = await service.getStarterQuestions();
+          // Provide the same simple starter questions inline
+          const questions = [
+            "Hello! How can you help me?",
+            "What can you do?",
+            "Tell me something interesting",
+            "Show me trending movies",
+          ];
           if (isMounted) {
             setStarterQuestions(questions);
           }
-
-          const stateSnapshot = useConversationalAIStore.getState();
-          if (!stateSnapshot.currentSessionId) {
-            stateSnapshot.createSession("New Chat");
+          const persistApiLocal = useConversationalAIStore.persist;
+          if (persistApiLocal?.hasHydrated?.()) {
+            const stateSnapshot = useConversationalAIStore.getState();
+            if (!stateSnapshot.currentSessionId) {
+              stateSnapshot.createSession("New Chat");
+            }
           }
         }
       } catch (initializeError) {
@@ -128,9 +172,8 @@ export function useConversationalAI(): UseConversationalAIReturn {
     const persistApi = useConversationalAIStore.persist;
     let unsubscribeHydration: (() => void) | undefined;
 
-    if (persistApi?.hasHydrated?.()) {
-      void initializeAssistant();
-    } else {
+    void initializeAssistant();
+    if (!persistApi?.hasHydrated?.()) {
       unsubscribeHydration = persistApi?.onFinishHydration?.(() => {
         if (!isMounted) {
           return;
@@ -147,7 +190,37 @@ export function useConversationalAI(): UseConversationalAIReturn {
       }
       unsubscribeHydration?.();
     };
-  }, [providerVersion, service]);
+  }, [providerVersion, providerManager]);
+
+  const {
+    isAvailable: sdkAvailable,
+    sendMessage: sendWithSdk,
+    stopStreaming,
+  } = useAiSdkConversational({
+    onChunk: (chunk: string) => {
+      const id = assistantMessageIdRef.current;
+      if (id) {
+        addStreamingChunk(id, chunk);
+      }
+    },
+    onComplete: (finalText?: string) => {
+      const id = assistantMessageIdRef.current;
+      if (id) {
+        if (finalText) {
+          // Ensure the final text is appended if not already
+          addStreamingChunk(id, finalText);
+        }
+        completeStreamingMessage(id);
+      }
+    },
+    onError: (err) => {
+      const id = assistantMessageIdRef.current;
+      if (id) {
+        setMessageError(id, err.message);
+        completeStreamingMessage(id);
+      }
+    },
+  });
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -180,6 +253,7 @@ export function useConversationalAI(): UseConversationalAIReturn {
         text: "",
         role: "assistant",
         timestamp: new Date(),
+        isStreaming: true,
       };
 
       if (isOffline) {
@@ -225,21 +299,40 @@ export function useConversationalAI(): UseConversationalAIReturn {
       abortControllerRef.current = abortController;
 
       try {
-        const history = useConversationalAIStore
-          .getState()
-          .messages.filter((message) => message.id !== assistantMessageId);
-
-        const stream = await service.streamResponse(trimmed, history);
-
-        for await (const chunk of stream) {
-          if (abortController.signal.aborted) {
-            break;
-          }
-
-          addStreamingChunk(assistantMessageId, chunk);
+        // If the react SDK is available and has a provider, prefer it — it uses
+        // the user's configured API key directly and streams via React hooks.
+        if (sdkAvailable && typeof sendWithSdk === "function") {
+          assistantMessageIdRef.current = assistantMessageId;
+          // Build conversation history for context
+          const conversationHistory = messages
+            .filter(
+              (msg) =>
+                msg.id !== userMessage.id && msg.id !== assistantMessageId,
+            )
+            .map((msg) => ({
+              role: msg.role as "user" | "assistant",
+              content: msg.text,
+            }));
+          await sendWithSdk(trimmed, conversationHistory);
+          assistantMessageIdRef.current = "";
+          return;
         }
+        // If SDK is not available, show an error — we don't fallback to the
+        // older server-based streaming when using the React SDK exclusively.
+        const noProviderError = new ApiError({
+          message:
+            "No AI provider configured. Visit settings to add an API key for a provider.",
+          code: "NO_PROVIDER",
+        });
 
+        setErrorState(noProviderError);
+        setMessageError(
+          assistantMessageId,
+          noProviderError.message,
+          "Set up an AI provider to use real-time streaming.",
+        );
         completeStreamingMessage(assistantMessageId);
+        return;
       } catch (streamError) {
         const apiError = handleApiError(streamError, {
           operation: "conversational-ai.stream-response",
@@ -261,22 +354,31 @@ export function useConversationalAI(): UseConversationalAIReturn {
         setStreamingState(false);
         setLoadingState(false);
         abortControllerRef.current = null;
+        // Stop react sdk streaming if it was used
+        try {
+          stopStreaming && stopStreaming();
+        } catch {
+          // ignore
+        }
       }
     },
+    // eslint-disable-next-line react-compiler/react-compiler
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       addMessage,
-      addStreamingChunk,
       completeStreamingMessage,
       isOffline,
       isReady,
       isConnected,
       isInternetReachable,
       networkType,
-      service,
       setMessageError,
       setErrorState,
       setLoadingState,
       setStreamingState,
+      sdkAvailable,
+      sendWithSdk,
+      stopStreaming,
     ],
   );
 
@@ -292,6 +394,18 @@ export function useConversationalAI(): UseConversationalAIReturn {
     [setErrorState],
   );
 
+  const createNewConversation = useCallback((title: string) => {
+    return useConversationalAIStore.getState().createSession(title);
+  }, []);
+
+  const deleteConversation = useCallback((sessionId: string) => {
+    useConversationalAIStore.getState().deleteSession(sessionId);
+  }, []);
+
+  const loadConversation = useCallback((sessionId: string) => {
+    useConversationalAIStore.getState().loadSession(sessionId);
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -302,5 +416,8 @@ export function useConversationalAI(): UseConversationalAIReturn {
     clearHistory,
     setError,
     isReady,
+    createNewConversation,
+    deleteConversation,
+    loadConversation,
   };
 }

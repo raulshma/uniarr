@@ -1,4 +1,5 @@
-import React, { memo, useCallback, useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo, useRef, useState } from "react";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Pressable,
@@ -6,8 +7,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { IconButton, useTheme } from "react-native-paper";
-import type { MD3Theme } from "react-native-paper/lib/typescript/types";
+import { useTheme } from "@/hooks/useTheme";
 
 type ChatInputProps = {
   onSendMessage: (text: string) => void;
@@ -24,11 +24,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
   onSendMessage,
   isLoading = false,
   isStreaming = false,
-  placeholder = "Ask about your media infrastructure...",
+  placeholder = "Ask about movies, shows.",
   allowVoice = true,
   onVoicePress,
 }) => {
-  const theme = useTheme<MD3Theme>();
+  const theme = useTheme();
+  const inputRef = useRef<TextInput>(null);
   const [text, setText] = useState("");
 
   const isInteractionLocked = isLoading || isStreaming;
@@ -47,94 +48,135 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        wrapper: {
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          paddingBottom: 16,
+        },
         container: {
           flexDirection: "row",
-          alignItems: "flex-end",
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: theme.colors.outline,
-          backgroundColor: theme.colors.surface,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
         },
-        inputContainer: {
+        inputShell: {
           flex: 1,
           flexDirection: "row",
           alignItems: "center",
           borderRadius: 24,
           backgroundColor: theme.colors.surfaceVariant,
-          paddingHorizontal: 12,
-          paddingVertical: 2,
-          marginRight: 8,
+          paddingHorizontal: 4,
+          paddingVertical: 4,
+          borderWidth: 1,
+          borderColor: theme.colors.outline,
         },
         input: {
           flex: 1,
-          paddingVertical: 10,
-          paddingHorizontal: 4,
+          paddingVertical: 12,
+          paddingHorizontal: 12,
           color: theme.colors.onSurface,
-          fontSize: 15,
-          maxHeight: 120,
+          fontSize: 16,
+          minHeight: 44,
+        },
+        utilityButton: {
+          width: 34,
+          height: 34,
+          borderRadius: theme.custom.spacing.sm,
+          marginRight: theme.custom.spacing.xs,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: theme.colors.surface,
+          borderWidth: 1,
+          borderColor: theme.colors.outline,
         },
         sendButton: {
-          justifyContent: "center",
+          width: 44,
+          height: 44,
+          borderRadius: 22,
           alignItems: "center",
-          opacity: isSendDisabled ? 0.5 : 1,
+          justifyContent: "center",
+          backgroundColor: theme.colors.primary,
+          borderWidth: 0,
+        },
+        sendButtonDisabled: {
+          opacity: 0.5,
         },
       }),
     [
-      isSendDisabled,
-      theme.colors.onSurface,
-      theme.colors.outline,
-      theme.colors.surface,
       theme.colors.surfaceVariant,
+      theme.colors.outline,
+      theme.colors.onSurface,
+      theme.colors.surface,
+      theme.colors.primary,
+      theme.custom.spacing.sm,
+      theme.custom.spacing.xs,
     ],
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.onSurfaceVariant}
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={MAX_MESSAGE_LENGTH}
-          editable={!isInteractionLocked}
-          onSubmitEditing={handleSend}
-          blurOnSubmit={false}
-        />
-      </View>
-
-      {allowVoice ? (
-        <IconButton
-          icon="microphone"
-          iconColor={theme.colors.primary}
-          size={24}
-          disabled={isLoading || isStreaming}
-          onPress={onVoicePress}
-          accessibilityLabel="Start voice input"
-        />
-      ) : null}
-
-      <Pressable
-        style={styles.sendButton}
-        disabled={isSendDisabled}
-        onPress={handleSend}
-        accessibilityRole="button"
-        accessibilityLabel="Send message"
-      >
-        {isStreaming ? (
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        ) : (
-          <IconButton
-            icon="send"
-            iconColor={theme.colors.primary}
-            size={24}
-            disabled={isSendDisabled}
+    <View style={styles.wrapper}>
+      <View style={styles.container}>
+        <View style={styles.inputShell}>
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            placeholder={placeholder}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={MAX_MESSAGE_LENGTH}
+            editable={!isInteractionLocked}
+            onSubmitEditing={handleSend}
+            blurOnSubmit={false}
+            keyboardType="default"
+            returnKeyType="send"
+            returnKeyLabel="Send"
+            textAlignVertical="center"
+            underlineColorAndroid="transparent"
           />
-        )}
-      </Pressable>
+
+          {allowVoice ? (
+            <Pressable
+              style={styles.utilityButton}
+              onPress={onVoicePress}
+              disabled={isLoading || isStreaming}
+              accessibilityLabel="Start voice input"
+            >
+              <MaterialCommunityIcons
+                name="microphone"
+                size={20}
+                color={
+                  isLoading || isStreaming
+                    ? theme.colors.onSurfaceVariant
+                    : theme.colors.primary
+                }
+              />
+            </Pressable>
+          ) : null}
+        </View>
+
+        <Pressable
+          style={[
+            styles.sendButton,
+            isSendDisabled && styles.sendButtonDisabled,
+          ]}
+          disabled={isSendDisabled}
+          onPress={handleSend}
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
+        >
+          {isStreaming ? (
+            <ActivityIndicator size="small" color={theme.colors.onPrimary} />
+          ) : (
+            <MaterialCommunityIcons
+              name="send"
+              size={20}
+              color={theme.colors.onPrimary}
+            />
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 };

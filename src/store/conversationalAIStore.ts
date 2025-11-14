@@ -217,6 +217,7 @@ export const useConversationalAIStore = create<ConversationalAIState>()(
                 ? {
                     ...msg,
                     text: msg.text + chunk,
+                    isStreaming: true,
                   }
                 : msg,
             );

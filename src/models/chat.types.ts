@@ -12,6 +12,19 @@ export interface Message {
     tokens?: number;
     duration?: number;
     confidence?: number;
+    card?: {
+      // Optional rich card payload used by assistant messages when rendering
+      // media preview cards (poster, title, metadata and actions).
+      id?: string;
+      tmdbId?: number;
+      title?: string;
+      posterUrl?: string;
+      backdropUrl?: string;
+      year?: number;
+      genres?: string[];
+      overview?: string;
+      source?: string;
+    };
   };
 }
 
