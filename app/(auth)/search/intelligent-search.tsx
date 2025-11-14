@@ -60,7 +60,7 @@ const IntelligentSearchScreen = () => {
     isLoadingRecommendations,
     recommendationsError,
     interpretedQuery,
-    recommendedServiceIds,
+    recommendedServices,
     searchHistory,
     clearHistory,
     refreshRecommendations,
@@ -93,6 +93,28 @@ const IntelligentSearchScreen = () => {
   const [filtersCompletedOnly, setFiltersCompletedOnly] = useState(false);
   const [filtersMinRating, setFiltersMinRating] = useState("");
   const [filtersMinEpisodes, setFiltersMinEpisodes] = useState("");
+
+  const aiSuggestedServiceTypes = useMemo(() => {
+    if (interpretation?.recommendedServices?.length) {
+      return interpretation.recommendedServices;
+    }
+
+    return partialInterpretation?.recommendedServices ?? [];
+  }, [interpretation, partialInterpretation]);
+
+  const serviceChips = useMemo(() => {
+    if (recommendedServices.length > 0) {
+      return recommendedServices.map((service) => ({
+        key: service.serviceId,
+        label: service.serviceName ?? service.serviceType,
+      }));
+    }
+
+    return aiSuggestedServiceTypes.map((type) => ({
+      key: type,
+      label: type,
+    }));
+  }, [aiSuggestedServiceTypes, recommendedServices]);
 
   const styles = useMemo(
     () =>
@@ -189,6 +211,21 @@ const IntelligentSearchScreen = () => {
       void performSearch(candidate);
     }
   }, [interpretedQuery, performSearch, searchQuery]);
+
+  // Auto-trigger search once interpretation completes
+  React.useEffect(() => {
+    if (interpretation && !isInterpretingSearch && !hasPerformedSearch) {
+      console.warn(
+        "[IntelligentSearch] Auto-triggering search after interpretation complete",
+      );
+      runSearchIfPossible();
+    }
+  }, [
+    interpretation,
+    isInterpretingSearch,
+    hasPerformedSearch,
+    runSearchIfPossible,
+  ]);
 
   const handleMediaDialogOpen = useCallback(
     (mediaTypes?: string[]) => {
@@ -462,7 +499,6 @@ const IntelligentSearchScreen = () => {
           void performSearch();
         }}
         isStreaming={isInterpretingSearch}
-        interpretation={interpretationForDisplay}
         onClear={clearSearch}
       />
 
@@ -486,7 +522,7 @@ const IntelligentSearchScreen = () => {
         onEditFilters={handleFiltersDialogOpen}
       />
 
-      {recommendedServiceIds.length > 0 ? (
+      {serviceChips.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Suggested services</Text>
@@ -497,9 +533,9 @@ const IntelligentSearchScreen = () => {
             scrollEnabled={true}
           >
             <View style={styles.chipRow}>
-              {recommendedServiceIds.map((service) => (
-                <Chip key={service} mode="outlined" icon="server">
-                  {service}
+              {serviceChips.map((service) => (
+                <Chip key={service.key} mode="outlined" icon="server">
+                  {service.label}
                 </Chip>
               ))}
             </View>

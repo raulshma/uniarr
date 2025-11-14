@@ -1,4 +1,4 @@
-import React, { useMemo, type ReactNode } from "react";
+import React, { useEffect, useMemo, type ReactNode } from "react";
 import {
   Image,
   ScrollView,
@@ -15,7 +15,6 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import { FlashList } from "@shopify/flash-list";
 
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
@@ -78,6 +77,15 @@ export function SearchResultsView({
   footerContent,
 }: SearchResultsViewProps) {
   const theme = useTheme<AppTheme>();
+
+  useEffect(() => {
+    console.warn("[SearchResultsView] Results updated", {
+      resultsCount: results.length,
+      sampleTitle: results[0]?.title,
+      isLoading,
+      hasPerformedSearch,
+    });
+  }, [results, isLoading, hasPerformedSearch]);
 
   const styles = useMemo(
     () =>
@@ -240,57 +248,64 @@ export function SearchResultsView({
     return combined;
   }, [errors, primaryError]);
 
-  const renderListHeader = () => (
-    <>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Results</Text>
-        {hasPerformedSearch && interpretedQuery ? (
-          <Text style={styles.subHeaderText}>
-            Showing matches for "{interpretedQuery}" · {durationMs} ms
-          </Text>
-        ) : hasPerformedSearch ? (
-          <Text style={styles.subHeaderText}>{durationMs} ms</Text>
+  const renderListHeader = () => {
+    console.warn("[SearchResultsView] Rendering header:", {
+      resultsCount: results.length,
+      hasPerformedSearch,
+      isLoading,
+      errorCount: errorMessages.length,
+      interpretedQuery,
+      durationMs,
+    });
+    return (
+      <>
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Results</Text>
+          {hasPerformedSearch && interpretedQuery ? (
+            <Text style={styles.subHeaderText}>
+              Showing matches for "{interpretedQuery}" · {durationMs} ms
+            </Text>
+          ) : hasPerformedSearch ? (
+            <Text style={styles.subHeaderText}>{durationMs} ms</Text>
+          ) : null}
+        </View>
+
+        {errorMessages.length > 0 ? (
+          <HelperText type="error">{errorMessages.join(" • ")}</HelperText>
         ) : null}
-      </View>
 
-      {errorMessages.length > 0 ? (
-        <HelperText type="error">{errorMessages.join(" • ")}</HelperText>
-      ) : null}
+        {isLoading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator animating size="small" />
+          </View>
+        ) : null}
 
-      {isLoading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator animating size="small" />
-        </View>
-      ) : null}
-
-      {!isLoading && hasPerformedSearch && results.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>
-            No results yet. Try refining your filters or adjusting services.
-          </Text>
-        </View>
-      ) : null}
-    </>
-  );
+        {!isLoading && hasPerformedSearch && results.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>
+              No results yet. Try refining your filters or adjusting services.
+            </Text>
+          </View>
+        ) : null}
+      </>
+    );
+  };
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <FlashList
-        data={results}
-        renderItem={renderResult}
-        estimatedItemSize={120}
-        keyExtractor={(item: UnifiedSearchResult) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={renderListHeader}
-        ListFooterComponent={
-          footerContent
-            ? () => (
-                <View style={{ paddingTop: spacing.md }}>{footerContent}</View>
-              )
-            : undefined
-        }
-      />
+      {renderListHeader()}
+
+      <View style={styles.list}>
+        {results.map((item) => (
+          <React.Fragment key={item.id}>
+            {renderResult({ item })}
+          </React.Fragment>
+        ))}
+      </View>
+
+      {footerContent ? (
+        <View style={{ paddingTop: spacing.md }}>{footerContent}</View>
+      ) : null}
     </View>
   );
 }

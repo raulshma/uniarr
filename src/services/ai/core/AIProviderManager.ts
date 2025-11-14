@@ -29,6 +29,7 @@ export class AIProviderManager {
   private currentProvider: AIProviderInstance | null = null;
   private providers: Map<AIProviderType, AIProviderInstance> = new Map();
   private providerKeyMap: Map<AIProviderType, string[]> = new Map(); // Track all keys per provider
+  private listeners: Set<() => void> = new Set();
 
   private constructor() {
     this.keyManager = AIKeyManager.getInstance();
@@ -90,6 +91,8 @@ export class AIProviderManager {
         providersCount: this.providers.size,
         totalKeys: storedKeys.length,
       });
+
+      this.notifyListeners();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -138,6 +141,8 @@ export class AIProviderManager {
         keyId: actualKeyId,
         isDefault: this.currentProvider === providerInstance,
       });
+
+      this.notifyListeners();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -161,6 +166,7 @@ export class AIProviderManager {
 
     this.currentProvider = instance;
     logger.info("Active provider changed", { provider });
+    this.notifyListeners();
     return true;
   }
 
@@ -267,6 +273,8 @@ export class AIProviderManager {
         keyId,
         provider,
       });
+
+      this.notifyListeners();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -304,6 +312,8 @@ export class AIProviderManager {
         provider,
         removedKeys,
       });
+
+      this.notifyListeners();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -409,6 +419,8 @@ export class AIProviderManager {
       this.currentProvider = null;
       this.rotationManager.clearAll();
       logger.info("All providers cleared");
+
+      this.notifyListeners();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -452,6 +464,7 @@ export class AIProviderManager {
           newKeyId: nextKeyId,
         });
 
+        this.notifyListeners();
         return newInstance;
       }
 
@@ -500,5 +513,30 @@ export class AIProviderManager {
    */
   getUsedKeyCount(provider: AIProviderType): number {
     return this.rotationManager.getUsedKeyCount(provider as string);
+  }
+
+  /**
+   * Subscribe to provider state changes. Returns an unsubscribe function.
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notifyListeners(): void {
+    if (this.listeners.size === 0) {
+      return;
+    }
+
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn("AIProviderManager listener threw", { error: message });
+      }
+    }
   }
 }

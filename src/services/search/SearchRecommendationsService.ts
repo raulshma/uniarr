@@ -49,10 +49,6 @@ const RECOMMENDATION_SCHEMA = z.object({
         .number()
         .min(0)
         .max(100)
-        .transform((score) => {
-          // Normalize 0-1 range to 0-100 if needed
-          return score <= 1 ? Math.round(score * 100) : Math.round(score);
-        })
         .describe("Match score 0-100 based on user preferences"),
     }),
   ),
@@ -240,20 +236,22 @@ export class SearchRecommendationsService {
         RECOMMENDATION_SYSTEM_PROMPT,
       );
 
+      const normalizedObject = this.normalizeRecommendationResult(object);
+
       logger.debug("Recommendations generated", {
-        count: object.recommendations.length,
-        types: object.recommendations.map((r) => r.type),
+        count: normalizedObject.recommendations.length,
+        types: normalizedObject.recommendations.map((r) => r.type),
         forced: forceRefresh,
       });
 
       // Cache the result
-      this.cachedRecommendations = object;
+      this.cachedRecommendations = normalizedObject;
       this.cacheTimestamp = Date.now();
 
       // Persist cache to storage (fire and forget)
       void this.persistCache();
 
-      return object;
+      return normalizedObject;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -289,7 +287,7 @@ export class SearchRecommendationsService {
       );
 
       for await (const partial of partialObjectStream) {
-        yield partial;
+        yield this.normalizePartialRecommendations(partial);
       }
 
       logger.debug("Recommendation stream completed", {
@@ -324,12 +322,14 @@ export class SearchRecommendationsService {
         RECOMMENDATION_SYSTEM_PROMPT,
       );
 
+      const normalizedObject = this.normalizeRecommendationResult(object);
+
       logger.debug("Genre recommendations generated", {
         genre,
-        count: object.recommendations.length,
+        count: normalizedObject.recommendations.length,
       });
 
-      return object;
+      return normalizedObject;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -416,5 +416,50 @@ Generate 5-8 recommendations for ${genre} that:
 3. Include both classics and recent releases
 4. Have realistic match scores based on genre preferences
 5. Include diverse sub-genres within ${genre}`;
+  }
+
+  private normalizeRecommendationResult(
+    result: RecommendationResult,
+  ): RecommendationResult {
+    if (!result?.recommendations) {
+      return { recommendations: [] };
+    }
+
+    return {
+      recommendations: result.recommendations.map((recommendation) => ({
+        ...recommendation,
+        estimatedMatchScore: this.normalizeScore(
+          recommendation?.estimatedMatchScore,
+        ),
+      })),
+    };
+  }
+
+  private normalizePartialRecommendations(
+    partial: Partial<RecommendationResult>,
+  ): Partial<RecommendationResult> {
+    if (!partial.recommendations) {
+      return partial;
+    }
+
+    return {
+      ...partial,
+      recommendations: partial.recommendations.map((recommendation) => ({
+        ...recommendation,
+        estimatedMatchScore: this.normalizeScore(
+          recommendation?.estimatedMatchScore,
+        ),
+      })),
+    };
+  }
+
+  private normalizeScore(score?: number | null): number {
+    if (typeof score !== "number" || Number.isNaN(score)) {
+      return 0;
+    }
+
+    const normalized = score <= 1 ? score * 100 : score;
+    const clamped = Math.max(0, Math.min(100, normalized));
+    return Math.round(clamped);
   }
 }

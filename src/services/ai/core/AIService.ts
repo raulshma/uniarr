@@ -739,18 +739,40 @@ export class AIService {
 
   /**
    * Check if AI service is properly configured
+   * Returns true if there's an active provider and it passes health check
+   * Returns false if no provider is configured (not an error condition)
    */
   async isConfigured(): Promise<boolean> {
     try {
       const provider = this.providerManager.getActiveProvider();
       if (!provider) {
+        // No provider configured is not an error - just means not ready
         return false;
       }
 
       const health = await this.providerManager.healthCheck(provider.provider);
-      return health.isHealthy;
+      if (health.isHealthy) {
+        return true;
+      }
+
+      const errorMessage = health.error?.toLowerCase() ?? "";
+      const healthNotImplemented = errorMessage.includes("not implemented");
+
+      if (healthNotImplemented) {
+        return true;
+      }
+
+      logger.warn("AI provider health check returned unhealthy status", {
+        provider: provider.provider,
+        error: health.error,
+      });
+
+      return false;
     } catch (error) {
-      logger.error("Configuration check failed", { error });
+      // Configuration check errors should not crash - just indicate not configured
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.debug("Configuration check failed", { error: errorMessage });
       return false;
     }
   }

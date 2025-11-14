@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IntelligentSearchService } from "@/services/search/IntelligentSearchService";
 import {
   SearchHistoryService,
@@ -10,6 +10,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { logger } from "@/services/logger/LoggerService";
 import type { SearchInterpretation } from "@/utils/validation/searchSchemas";
 import type {
+  SearchableServiceSummary,
   UnifiedSearchError,
   UnifiedSearchMediaType,
   UnifiedSearchResult,
@@ -31,6 +32,7 @@ interface UseAISearchReturn {
   interpretationError: Error | null;
   interpretedQuery: string | null;
   recommendedServiceIds: string[];
+  recommendedServices: SearchableServiceSummary[];
   results: UnifiedSearchResult[];
   isSearching: boolean;
   searchError: Error | null;
@@ -49,46 +51,6 @@ interface UseAISearchReturn {
   bookmarkResult: (result: UnifiedSearchResult) => Promise<void>;
   clearSearch: () => void;
 }
-
-const mergeInterpretationPartial = (
-  previous: Partial<SearchInterpretation>,
-  update: Partial<SearchInterpretation>,
-): Partial<SearchInterpretation> => {
-  const next: Partial<SearchInterpretation> = { ...previous };
-
-  const target = next as Record<
-    keyof SearchInterpretation,
-    SearchInterpretation[keyof SearchInterpretation] | undefined
-  >;
-
-  (Object.keys(update) as (keyof SearchInterpretation)[]).forEach((key) => {
-    const value = update[key];
-
-    if (value === undefined) {
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      target[key] = [...value] as unknown as SearchInterpretation[typeof key];
-      return;
-    }
-
-    if (value && typeof value === "object") {
-      const existing = next[key];
-      const existingObject =
-        existing && typeof existing === "object" ? existing : {};
-      target[key] = {
-        ...(existingObject as Record<string, unknown>),
-        ...(value as Record<string, unknown>),
-      } as unknown as SearchInterpretation[typeof key];
-      return;
-    }
-
-    target[key] = value as unknown as SearchInterpretation[typeof key];
-  });
-
-  return next;
-};
 
 const mapInterpretationMediaTypes = (
   mediaTypes?: SearchInterpretation["mediaTypes"],
@@ -157,6 +119,17 @@ export function useAISearch(
   );
   const [lastHistoryEntry, setLastHistoryEntry] =
     useState<AISearchHistoryEntry | null>(null);
+  const [searchableServices, setSearchableServices] = useState<
+    SearchableServiceSummary[]
+  >([]);
+
+  useEffect(() => {
+    console.warn("[useAISearch] isSearching state updated", {
+      isSearching,
+      resultsCount: results.length,
+      hasPerformedSearch,
+    });
+  }, [isSearching, results.length, hasPerformedSearch]);
 
   const interpretationRef = useRef<SearchInterpretation | null>(null);
   const interpretedQueryRef = useRef<string | null>(null);
@@ -239,41 +212,25 @@ export function useAISearch(
       setInterpretationError(null);
       setPartialInterpretation({});
 
-      let latestSnapshot: Partial<SearchInterpretation> = {};
-
       try {
-        for await (const chunk of intelligentSearchService.streamInterpretation(
-          trimmed,
-        )) {
-          if (interpretationRequestIdRef.current !== requestId) {
-            return null;
-          }
+        const interpretationResult =
+          await intelligentSearchService.interpretQuery(trimmed);
 
-          if (chunk.type === "partial") {
-            latestSnapshot = mergeInterpretationPartial(
-              latestSnapshot,
-              chunk.data,
-            );
-            setPartialInterpretation((previous) =>
-              mergeInterpretationPartial(previous, chunk.data),
-            );
-            continue;
-          }
-
-          interpretationRef.current = chunk.data;
-          interpretedQueryRef.current = trimmed;
-          setInterpretation(chunk.data);
-          setPartialInterpretation(chunk.data);
-
-          logger.debug("Query interpretation completed", {
-            query: trimmed,
-            confidence: chunk.data.confidence,
-          });
-
-          return chunk.data;
+        if (interpretationRequestIdRef.current !== requestId) {
+          return null;
         }
 
-        return interpretationRef.current;
+        interpretationRef.current = interpretationResult;
+        interpretedQueryRef.current = trimmed;
+        setInterpretation(interpretationResult);
+        setPartialInterpretation(interpretationResult);
+
+        logger.debug("Query interpretation completed", {
+          query: trimmed,
+          confidence: interpretationResult.confidence,
+        });
+
+        return interpretationResult;
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
@@ -286,12 +243,6 @@ export function useAISearch(
       } finally {
         if (interpretationRequestIdRef.current === requestId) {
           setIsInterpretingSearch(false);
-          if (
-            !interpretationRef.current &&
-            Object.keys(latestSnapshot).length
-          ) {
-            setPartialInterpretation(latestSnapshot);
-          }
         }
       }
     },
@@ -322,26 +273,89 @@ export function useAISearch(
         }
 
         if (!currentInterpretation) {
+          console.warn(
+            "[useAISearch] No interpretation result, setting empty results",
+          );
           setResults([]);
           return;
         }
 
+        console.warn("[useAISearch] Current interpretation:", {
+          mediaTypes: currentInterpretation.mediaTypes,
+          genres: currentInterpretation.genres,
+          recommendedServices: currentInterpretation.recommendedServices,
+          yearRange: currentInterpretation.yearRange,
+        });
+
+        const mappedMediaTypes = mapInterpretationMediaTypes(
+          currentInterpretation.mediaTypes,
+        );
+        console.warn("[useAISearch] Mapped media types:", mappedMediaTypes);
+
+        const resolvedServices = mapRecommendedServices(
+          currentInterpretation.recommendedServices,
+        );
+        const resolvedServiceIds = resolvedServices.map(
+          (service) => service.serviceId,
+        );
+        if (resolvedServiceIds.length > 0) {
+          console.warn("[useAISearch] Mapped service IDs:", resolvedServiceIds);
+        } else if (currentInterpretation.recommendedServices?.length) {
+          console.warn(
+            "[useAISearch] No matching connectors for recommended services",
+            {
+              recommendedServices: currentInterpretation.recommendedServices,
+            },
+          );
+        }
+
         const response: UnifiedSearchResponse =
           await unifiedSearchService.search(queryToSearch, {
-            serviceIds: currentInterpretation.recommendedServices,
-            mediaTypes: mapInterpretationMediaTypes(
-              currentInterpretation.mediaTypes,
-            ),
+            serviceIds:
+              resolvedServiceIds.length > 0 ? resolvedServiceIds : undefined,
+            mediaTypes: mappedMediaTypes,
             genres: currentInterpretation.genres,
             releaseYearMin: currentInterpretation.yearRange?.start,
             releaseYearMax: currentInterpretation.yearRange?.end,
             aiInterpretation: currentInterpretation,
           });
 
-        setResults(response.results);
-        setSearchErrors(response.errors);
-        setLastSearchDurationMs(response.durationMs);
+        console.warn("[useAISearch] Search response:", {
+          resultCount: response.results.length,
+          errorCount: response.errors.length,
+          durationMs: response.durationMs,
+          firstResult: response.results[0],
+        });
+
+        let finalResults = response.results;
+        let finalErrors = response.errors;
+        let finalDuration = response.durationMs;
+
+        if (finalResults.length === 0 && resolvedServiceIds.length > 0) {
+          const fallback = await unifiedSearchService.search(queryToSearch, {
+            mediaTypes: mappedMediaTypes,
+            genres: currentInterpretation.genres,
+            releaseYearMin: currentInterpretation.yearRange?.start,
+            releaseYearMax: currentInterpretation.yearRange?.end,
+            aiInterpretation: currentInterpretation,
+          });
+
+          if (fallback.results.length > 0 || fallback.errors.length > 0) {
+            finalResults = fallback.results;
+            finalErrors = [...finalErrors, ...fallback.errors];
+            finalDuration += fallback.durationMs;
+          }
+        }
+
+        setResults(finalResults);
+        setSearchErrors(finalErrors);
+        setLastSearchDurationMs(finalDuration);
         setHasPerformedSearch(true);
+
+        const historyServices =
+          resolvedServiceIds.length > 0
+            ? resolvedServiceIds
+            : currentInterpretation.recommendedServices;
 
         await searchHistoryService.addSearch({
           query: queryToSearch,
@@ -349,7 +363,7 @@ export function useAISearch(
           genres: currentInterpretation.genres,
           confidence: currentInterpretation.confidence,
           resultsCount: response.results.length,
-          resultServices: currentInterpretation.recommendedServices,
+          resultServices: historyServices,
           resultMediaTypes: currentInterpretation.mediaTypes,
         });
 
@@ -369,6 +383,8 @@ export function useAISearch(
         setIsSearching(false);
       }
     },
+    // eslint-disable-next-line react-compiler/react-compiler
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       searchQuery,
       interpretQuery,
@@ -512,6 +528,63 @@ export function useAISearch(
   }, [searchHistoryService]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadSearchableServices = async () => {
+      try {
+        const services = await unifiedSearchService.getSearchableServices();
+        if (isMounted) {
+          setSearchableServices(services);
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error("Failed to load searchable services", {
+          error: errorMessage,
+        });
+      }
+    };
+
+    void loadSearchableServices();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [unifiedSearchService]);
+
+  const mapRecommendedServices = useCallback(
+    (serviceTypes?: SearchInterpretation["recommendedServices"]) => {
+      if (!serviceTypes?.length || searchableServices.length === 0) {
+        return [];
+      }
+
+      const typeSet = new Set<string>(serviceTypes);
+      return searchableServices.filter((service) =>
+        typeSet.has(service.serviceType),
+      );
+    },
+    [searchableServices],
+  );
+
+  const activeRecommendedServiceTypes = useMemo(() => {
+    if (interpretation?.recommendedServices?.length) {
+      return interpretation.recommendedServices;
+    }
+
+    return partialInterpretation?.recommendedServices ?? [];
+  }, [interpretation, partialInterpretation]);
+
+  const recommendedServices = useMemo(
+    () => mapRecommendedServices(activeRecommendedServiceTypes),
+    [activeRecommendedServiceTypes, mapRecommendedServices],
+  );
+
+  const recommendedServiceIds = useMemo(
+    () => recommendedServices.map((service) => service.serviceId),
+    [recommendedServices],
+  );
+
+  useEffect(() => {
     if (!autoSearch || !enableAISearch) {
       return;
     }
@@ -573,7 +646,8 @@ export function useAISearch(
     isLoadingRecommendations,
     recommendationsError,
     interpretedQuery: interpretedQueryRef.current,
-    recommendedServiceIds: interpretationRef.current?.recommendedServices ?? [],
+    recommendedServiceIds,
+    recommendedServices,
     searchHistory,
     lastHistoryEntry,
     clearHistory: clearHistoryCallback,

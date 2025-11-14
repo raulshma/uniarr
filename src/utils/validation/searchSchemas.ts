@@ -99,10 +99,6 @@ export const SearchRecommendationSchema = z.object({
         .number()
         .min(0)
         .max(100)
-        .transform((score) => {
-          // Normalize 0-1 range to 0-100 if needed
-          return score <= 1 ? Math.round(score * 100) : Math.round(score);
-        })
         .describe("Match score (0-100)"),
     }),
   ),
