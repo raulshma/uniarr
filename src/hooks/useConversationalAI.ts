@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 import { useAiSdkConversational } from "@/hooks/useAiSdkConversational";
+import { ConversationalAIService } from "@/services/ai/conversational-ai/ConversationalAIService";
 import { logger } from "@/services/logger/LoggerService";
 import { ApiError, handleApiError } from "@/utils/error.utils";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
@@ -91,6 +92,9 @@ export function useConversationalAI(): UseConversationalAIReturn {
   const abortControllerRef = useRef<AbortController | null>(null);
   const assistantMessageIdRef = useRef<string>("");
   const providerManager = AIProviderManager.getInstance();
+  const enableStreamingPref = useConversationalAIStore(
+    (s) => s.config.enableStreaming,
+  );
 
   const isOffline = useMemo(() => {
     if (isConnected === false) {
@@ -297,9 +301,13 @@ export function useConversationalAI(): UseConversationalAIReturn {
       abortControllerRef.current = abortController;
 
       try {
-        // If the react SDK is available and has a provider, prefer it — it uses
-        // the user's configured API key directly and streams via React hooks.
-        if (sdkAvailable && typeof sendWithSdk === "function") {
+        // If the react SDK is available and user wants streaming, prefer it —
+        // it uses the user's configured API key directly and streams via React hooks.
+        if (
+          enableStreamingPref &&
+          sdkAvailable &&
+          typeof sendWithSdk === "function"
+        ) {
           assistantMessageIdRef.current = assistantMessageId;
           // Build conversation history for context
           const conversationHistory = messages
@@ -315,8 +323,50 @@ export function useConversationalAI(): UseConversationalAIReturn {
           assistantMessageIdRef.current = "";
           return;
         }
-        // If SDK is not available, show an error — we don't fallback to the
-        // older server-based streaming when using the React SDK exclusively.
+        // If SDK is not available or streaming is disabled, try a buffered
+        // (non-streaming) generation using the server-side AI path.
+        if (!enableStreamingPref) {
+          try {
+            const service = ConversationalAIService.getInstance();
+            assistantMessageIdRef.current = assistantMessageId;
+            const historyForService = messages
+              .filter(
+                (msg) =>
+                  msg.id !== userMessage.id && msg.id !== assistantMessageId,
+              )
+              .map((m) => ({ ...m }));
+
+            const finalText = await service.generateResponse(
+              trimmed,
+              historyForService as any,
+            );
+            // Ensure final text appended and mark message as complete
+            addStreamingChunk(assistantMessageId, finalText);
+            completeStreamingMessage(assistantMessageId);
+            assistantMessageIdRef.current = "";
+            return;
+          } catch (serverError) {
+            const apiError = handleApiError(serverError, {
+              operation: "conversational-ai.generate-response",
+            });
+
+            setErrorState(apiError);
+            setMessageError(
+              assistantMessageId,
+              apiError.message,
+              `I ran into an issue: ${apiError.message}. Please try again in a moment.`,
+            );
+            completeStreamingMessage(assistantMessageId);
+            void logger.error("Conversational AI message failed (generate)", {
+              error: apiError.message,
+              code: apiError.code,
+              messageLength: trimmed.length,
+            });
+            return;
+          }
+        }
+
+        // If SDK is not available and streaming preference requested, show an error — we don't fallback to older server-based streaming when using the React SDK exclusively.
         const noProviderError = new ApiError({
           message:
             "No AI provider configured. Visit settings to add an API key for a provider.",

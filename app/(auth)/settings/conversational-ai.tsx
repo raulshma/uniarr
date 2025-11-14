@@ -13,6 +13,7 @@ import {
   Text,
   useTheme,
   Button,
+  Switch,
   Divider,
   Snackbar,
 } from "react-native-paper";
@@ -41,6 +42,10 @@ import {
   selectCurrentSessionId,
 } from "@/store/conversationalAISelectors";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
+import {
+  useConversationalAIConfigStore,
+  selectConversationalAIHasValidConfig,
+} from "@/store/conversationalAIConfigStore";
 
 const USER_ID = "user";
 const ASSISTANT_ID = "assistant";
@@ -52,6 +57,11 @@ const ConversationalAIScreen: React.FC = () => {
   const dialog = useDialog();
   const [hasAIProvider, setHasAIProvider] = useState(true);
   const [healthUnhealthy, setHealthUnhealthy] = useState(false);
+
+  // Check if conversational AI has valid config (provider, model, keyId)
+  const hasValidConversationalAIConfig = useConversationalAIConfigStore(
+    selectConversationalAIHasValidConfig,
+  );
 
   // Dialog states
   const [conversationDrawerVisible, setConversationDrawerVisible] =
@@ -109,6 +119,13 @@ const ConversationalAIScreen: React.FC = () => {
 
   const discover = useUnifiedDiscover();
   const addMessageToStore = useConversationalAIStore((s) => s.addMessage);
+  const enableStreamingPref = useConversationalAIStore(
+    (s) => s.config.enableStreaming,
+  );
+
+  const updateConversationalConfig = useConversationalAIStore(
+    (s) => s.updateConfig,
+  );
 
   useEffect(() => {
     if (isReady || !hasAIProvider) {
@@ -680,6 +697,40 @@ const ConversationalAIScreen: React.FC = () => {
     );
   }
 
+  // Show setup message if no conversational AI provider/model is selected
+  if (!hasValidConversationalAIConfig) {
+    return (
+      <ChatErrorBoundary>
+        <View style={styles.scaffold}>
+          <SafeAreaView
+            style={styles.safeArea}
+            edges={["left", "right", "top", "bottom"]}
+          >
+            <View style={styles.setupContainer}>
+              <View style={styles.setupCard}>
+                <Text style={styles.setupTitle}>Select a Model for Chat</Text>
+                <Text style={styles.setupText}>
+                  You have AI providers configured, but haven't selected which
+                  one to use for conversational AI. Choose your preferred
+                  provider and model.
+                </Text>
+                <Button
+                  mode="contained"
+                  onPress={() => {
+                    router.push("/(auth)/+modal/select-provider-model");
+                  }}
+                  style={styles.setupButton}
+                >
+                  Select Model for Chat
+                </Button>
+              </View>
+            </View>
+          </SafeAreaView>
+        </View>
+      </ChatErrorBoundary>
+    );
+  }
+
   if (!isReady) {
     if (healthUnhealthy) {
       return (
@@ -786,6 +837,19 @@ const ConversationalAIScreen: React.FC = () => {
                         ? "Thinking…"
                         : "Online"}
                   </Text>
+                  <View style={{ width: 12 }} />
+                  <Text style={[styles.statusText, { marginRight: 8 }]}>
+                    Stream
+                  </Text>
+                  <Switch
+                    value={Boolean(enableStreamingPref)}
+                    onValueChange={() =>
+                      updateConversationalConfig({
+                        enableStreaming: !enableStreamingPref,
+                      })
+                    }
+                    color={theme.colors.primary}
+                  />
                 </View>
               </View>
 

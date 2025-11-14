@@ -6,6 +6,7 @@ import { handleApiError, type ErrorContext } from "@/utils/error.utils";
 import { withRetry, networkRetryCondition } from "@/utils/retry.utils";
 import type { Message } from "@/models/chat.types";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
+import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
 
 /**
  * Conversational AI Assistant Service
@@ -30,6 +31,39 @@ export class ConversationalAIService {
     }
 
     return ConversationalAIService.instance;
+  }
+
+  /**
+   * Set the active provider for conversational AI based on config store.
+   * This ensures conversational AI uses its own isolated provider/model selection.
+   * Reads directly from store state (not using React hooks).
+   * @returns true if provider was set successfully, false if not configured
+   */
+  private setConversationalAIProvider(): boolean {
+    const state = useConversationalAIConfigStore.getState();
+    const provider = state.selectedProvider;
+    const keyId = state.selectedKeyId;
+
+    if (!provider || !keyId) {
+      return false;
+    }
+
+    try {
+      // Temporarily set the active provider to the conversational AI selection
+      this.providerManager.setActiveProvider(provider);
+      logger.debug(
+        `[ConversationalAI] Set provider for chat: ${provider} (keyId: ${keyId})`,
+      );
+      return true;
+    } catch (error) {
+      logger.error(
+        "[ConversationalAI] Failed to set conversational AI provider",
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return false;
+    }
   }
 
   /**
@@ -128,13 +162,7 @@ Be conversational, specific, and helpful.`;
 
   /**
    * Stream a response to a user message while emitting incremental chunks.
-   */
-  /**
-   * Stream a structured response with progressive updates
-   * Returns an async iterable of response text chunks
-   * The response is generated as structured data (response, followUp, suggestions)
-   * but only the main response text is streamed to the UI
-   * Falls back to plain text streaming if structured generation fails
+   * Uses the conversational AI specific provider/model configuration.
    */
   async streamResponse(
     userMessage: string,
@@ -145,6 +173,14 @@ Be conversational, specific, and helpful.`;
     };
 
     try {
+      // Set the conversational AI provider before streaming
+      const hasProvider = this.setConversationalAIProvider();
+      if (!hasProvider) {
+        throw new Error(
+          "No AI provider configured for conversational AI. Please select a provider and model in settings.",
+        );
+      }
+
       const historyCheck = this.rateLimiter.canMakeRequest("generic");
       if (!historyCheck.allowed) {
         throw new Error(
@@ -190,6 +226,67 @@ Be conversational, specific, and helpful.`;
         messageLength: userMessage.length,
       });
 
+      throw apiError;
+    }
+  }
+
+  /**
+   * Generate a buffered response (non-streaming) for a user message.
+   * Uses conversational AI provider selection, rate-limiting and logs the
+   * result to ApiLogger
+   */
+  async generateResponse(
+    userMessage: string,
+    conversationHistory: Message[],
+  ): Promise<string> {
+    const errorContext = {
+      operation: "conversational-ai.generate-response",
+    };
+
+    try {
+      const hasProvider = this.setConversationalAIProvider();
+      if (!hasProvider) {
+        throw new Error(
+          "No AI provider configured for conversational AI. Please select a provider and model in settings.",
+        );
+      }
+
+      const historyCheck = this.rateLimiter.canMakeRequest("generic");
+      if (!historyCheck.allowed) {
+        throw new Error(
+          historyCheck.message ??
+            "Rate limit exceeded, please try again later.",
+        );
+      }
+
+      const systemPrompt = await this.buildSystemPrompt();
+      let formattedHistory = "";
+      for (const m of conversationHistory) {
+        if (formattedHistory.length) {
+          formattedHistory += "\n";
+        }
+        formattedHistory += `${m.role === "assistant" ? "Assistant" : "User"}: ${m.text}`;
+      }
+
+      const fullPrompt = formattedHistory
+        ? `${formattedHistory}\n\nUser: ${userMessage}`
+        : userMessage;
+
+      const result = await this.aiService.generateText(
+        fullPrompt,
+        systemPrompt,
+      );
+      const text = (result?.text ?? "") as string;
+      if (!text.trim()) {
+        throw new Error("AI provider returned an empty response.");
+      }
+
+      return text;
+    } catch (err) {
+      const apiError = handleApiError(err, errorContext);
+      void logger.error("[ConversationalAI] Conversational generate failed.", {
+        error: apiError.message,
+      });
       throw apiError;
     }
   }

@@ -428,6 +428,78 @@ export class AIService {
   }
 
   /**
+   * Non-streaming text generation (buffered / final response)
+   * Wrapper around `generateText` from Vercel AI SDK. Returns full text.
+   */
+  async generateText(
+    prompt: string,
+    system?: string,
+  ): Promise<{ text: string }> {
+    const startTime = Date.now();
+    const provider = this.providerManager.getActiveProvider();
+    const providerType = provider?.provider || "unknown";
+    const model = provider?.model || "unknown";
+
+    try {
+      const modelInstance = this.providerManager.getModelInstance();
+      if (!modelInstance) {
+        throw new Error(
+          "No AI model configured. Please set up an AI provider first.",
+        );
+      }
+
+      const result = await generateText({
+        model: modelInstance,
+        prompt,
+        system,
+      });
+
+      const durationMs = Date.now() - startTime;
+      await this.apiLogger.addAiCall({
+        provider: providerType,
+        model,
+        operation: "generateText",
+        status: "success",
+        prompt,
+        response: String(result?.text ?? ""),
+        durationMs,
+      });
+
+      return result as { text: string };
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      const {
+        message: errorMessage,
+        statusCode,
+        metadata,
+      } = this.extractErrorDetails(error);
+
+      if (statusCode === 429 && this.isRateLimitError(error)) {
+        const rotated = await this.providerManager.rotateToNextKey(
+          providerType as any,
+        );
+        if (rotated) {
+          // Retry after rotation
+          return this.generateText(prompt, system);
+        }
+      }
+
+      await this.apiLogger.addAiCall({
+        provider: providerType,
+        model,
+        operation: "generateText",
+        status: "error",
+        prompt,
+        errorMessage,
+        durationMs,
+        metadata,
+      });
+
+      throw error;
+    }
+  }
+
+  /**
    * Generate structured output matching a Zod schema
    * Non-streaming, returns complete object when done
    * Best for: Fast, structured responses (classification, parsing, extraction)

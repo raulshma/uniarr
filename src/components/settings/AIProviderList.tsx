@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { View, StyleSheet, FlatList } from "react-native";
-import { Card, Text, Button, Divider } from "react-native-paper";
-import { useTheme } from "@/hooks/useTheme";
+import { Card, Text, Button, Divider, useTheme } from "react-native-paper";
+import { useRouter } from "expo-router";
 import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 import { AIProviderType, AI_PROVIDERS } from "@/types/ai/AIProvider";
 import { alert } from "@/services/dialogService";
+import {
+  useConversationalAIConfigStore,
+  selectConversationalAIProvider,
+  selectConversationalAIModel,
+} from "@/store/conversationalAIConfigStore";
 
 interface ProviderListItem {
   keyId: string;
@@ -22,6 +27,7 @@ interface ProviderListItem {
 interface AIProviderListProps {
   onProviderRemoved?: () => void;
   onProviderSelected?: (provider: AIProviderType) => void;
+  onOpenModelSelection?: (provider: AIProviderType, keyId: string) => void;
 }
 
 /**
@@ -30,8 +36,11 @@ interface AIProviderListProps {
 export function AIProviderList({
   onProviderRemoved,
   onProviderSelected,
+  onOpenModelSelection,
 }: AIProviderListProps) {
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const router = useRouter();
+  const { colors } = theme;
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [healthStatus, setHealthStatus] = useState<
@@ -51,6 +60,15 @@ export function AIProviderList({
       }
     >
   >({});
+  const conversationalProvider = useConversationalAIConfigStore(
+    selectConversationalAIProvider,
+  );
+  const conversationalModel = useConversationalAIConfigStore(
+    selectConversationalAIModel,
+  );
+  const conversationalKeyId = useConversationalAIConfigStore(
+    (s) => s.selectedKeyId,
+  );
 
   const keyManager = AIKeyManager.getInstance();
   const providerManager = AIProviderManager.getInstance();
@@ -222,6 +240,16 @@ export function AIProviderList({
     [providerManager, onProviderRemoved, loadProviders],
   );
 
+  const handleSetForConversationalAI = useCallback(
+    (keyId: string, provider: AIProviderType) => {
+      router.push({
+        pathname: "/(auth)/+modal/select-chat-model",
+        params: { provider, keyId },
+      });
+    },
+    [router],
+  );
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString("en-US", {
       month: "short",
@@ -235,6 +263,9 @@ export function AIProviderList({
     const health = healthStatus[item.provider];
     const checking = checkingHealth[item.provider];
     const stats = keyStats[item.provider];
+    const isConversationalAIProvider =
+      conversationalProvider === item.provider &&
+      item.keyId === conversationalKeyId;
 
     return (
       <Card
@@ -272,6 +303,16 @@ export function AIProviderList({
                     style={{ color: "#4CAF50", fontWeight: "600" }}
                   >
                     Active
+                  </Text>
+                </View>
+              )}
+              {isConversationalAIProvider && (
+                <View style={[styles.defaultChip, { marginLeft: 8 }]}>
+                  <Text
+                    variant="labelSmall"
+                    style={{ color: "#FF9800", fontWeight: "600" }}
+                  >
+                    💬 Chat
                   </Text>
                 </View>
               )}
@@ -357,6 +398,29 @@ export function AIProviderList({
             </Text>
           )}
 
+          {/* Conversational AI configuration display */}
+          {isConversationalAIProvider && conversationalModel && (
+            <View
+              style={[
+                styles.conversationalAISection,
+                {
+                  borderColor: "#FF9800",
+                  backgroundColor: "rgba(255, 152, 0, 0.1)",
+                },
+              ]}
+            >
+              <Text
+                variant="labelSmall"
+                style={{ color: "#FF9800", fontWeight: "600" }}
+              >
+                💬 Chat Configuration
+              </Text>
+              <Text variant="labelSmall" style={{ marginTop: 4 }}>
+                Model: {conversationalModel}
+              </Text>
+            </View>
+          )}
+
           {/* Provider info */}
           <View style={styles.infoSection}>
             <Text variant="bodySmall" numberOfLines={1}>
@@ -375,6 +439,18 @@ export function AIProviderList({
                 Set Default
               </Button>
             )}
+            <Button
+              mode="outlined"
+              textColor={
+                isConversationalAIProvider ? "#FF9800" : colors.primary
+              }
+              onPress={() =>
+                handleSetForConversationalAI(item.keyId, item.provider)
+              }
+              style={styles.actionButton}
+            >
+              {isConversationalAIProvider ? "✓ Chat" : "Set for Chat"}
+            </Button>
             <Button
               mode="outlined"
               onPress={() => handleEditProvider(item.provider)}
@@ -513,6 +589,13 @@ const styles = StyleSheet.create({
   modelInfo: {
     marginBottom: 8,
     opacity: 0.6,
+  },
+  conversationalAISection: {
+    marginVertical: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderLeftWidth: 2,
+    borderRadius: 4,
   },
   infoSection: {
     marginVertical: 8,
