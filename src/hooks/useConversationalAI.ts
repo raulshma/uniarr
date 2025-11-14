@@ -37,8 +37,6 @@ const createMessageId = (): string =>
  * while handling streaming updates and initialization lifecycle.
  */
 export function useConversationalAI(): UseConversationalAIReturn {
-  // Conversational logic is handled entirely via @ai-sdk/react
-
   const messages = useConversationalAIStore(selectMessages);
   const isLoading = useConversationalAIStore(selectIsLoading);
   const isStreaming = useConversationalAIStore(selectIsStreaming);

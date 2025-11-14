@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.31",
-    "@ai-sdk/react": "^2.0.93",
     "@clerk/clerk-expo": "^2.16.0",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",
