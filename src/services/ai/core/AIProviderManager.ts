@@ -520,6 +520,17 @@ export class AIProviderManager {
    */
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
+
+    try {
+      listener();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn("AIProviderManager listener threw", {
+        error: message,
+        phase: "subscribe",
+      });
+    }
+
     return () => {
       this.listeners.delete(listener);
     };

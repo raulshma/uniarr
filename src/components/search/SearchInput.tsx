@@ -90,8 +90,15 @@ export function SearchInput({
             backgroundColor: "transparent",
           }}
           underlineStyle={{ display: "none" }}
+          returnKeyType="search"
+          onSubmitEditing={onSubmitSearch}
           left={
-            <TextInput.Icon icon="magnify" size={20} onPress={onSubmitSearch} />
+            <TextInput.Icon
+              icon="magnify"
+              size={20}
+              onPress={onSubmitSearch}
+              accessibilityLabel="Search"
+            />
           }
           right={
             value.length > 0 ? (
@@ -99,6 +106,7 @@ export function SearchInput({
                 icon="close"
                 size={20}
                 onPress={handleClearInput}
+                accessibilityLabel="Clear"
               />
             ) : undefined
           }

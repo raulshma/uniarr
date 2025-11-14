@@ -276,7 +276,11 @@ export function SearchResultsView({
 
         {isLoading ? (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator animating size="small" />
+            <ActivityIndicator
+              animating
+              size="small"
+              color={theme.colors.primary}
+            />
           </View>
         ) : null}
 

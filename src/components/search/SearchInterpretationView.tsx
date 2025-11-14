@@ -62,7 +62,7 @@ export function SearchInterpretationView({
           marginBottom: spacing.sm,
         },
         sectionTitle: {
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: "600",
           color: theme.colors.onSurface,
         },
@@ -75,7 +75,7 @@ export function SearchInterpretationView({
           gap: spacing.sm,
         },
         chip: {
-          height: 32,
+          height: 28,
           justifyContent: "center",
         },
         chipText: {

@@ -6,6 +6,10 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Text, Chip, IconButton, useTheme } from "react-native-paper";
+import {
+  AnimatedCard,
+  AnimatedProgress,
+} from "@/components/common/AnimatedComponents";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
@@ -263,7 +267,10 @@ export function RecommendationsView({
               onPress={() => handleSelectRecommendation(rec)}
               activeOpacity={0.7}
             >
-              <View style={styles.recommendationCard}>
+              <AnimatedCard
+                style={styles.recommendationCard}
+                delay={index * 40}
+              >
                 {/* Title and Type */}
                 <View style={styles.cardHeader}>
                   <Text style={styles.cardTitle} numberOfLines={2}>
@@ -287,13 +294,15 @@ export function RecommendationsView({
                 <View style={styles.scoreContainer}>
                   <Text style={styles.scoreLabel}>Match:</Text>
                   <View style={styles.scoreBar}>
-                    <View
+                    <AnimatedProgress
                       style={{
                         width: `${normalizeMatchScore(rec.estimatedMatchScore)}%`,
                         height: "100%",
                         backgroundColor: getTypeColor(rec.type),
                       }}
-                    />
+                    >
+                      <View />
+                    </AnimatedProgress>
                   </View>
                   <Text style={styles.scoreValue}>
                     {normalizeMatchScore(rec.estimatedMatchScore)}%
@@ -312,7 +321,7 @@ export function RecommendationsView({
                     Search
                   </Chip>
                 </TouchableOpacity>
-              </View>
+              </AnimatedCard>
             </TouchableOpacity>
           ))}
         </View>

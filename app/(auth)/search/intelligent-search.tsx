@@ -1,6 +1,9 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import {
   Button,
   Chip,
@@ -16,6 +19,7 @@ import { useRouter } from "expo-router";
 
 import {
   AnimatedSection,
+  AnimatedHeader,
   PageTransition,
 } from "@/components/common/AnimatedComponents";
 import { TabHeader } from "@/components/common/TabHeader";
@@ -27,6 +31,7 @@ import { useAISearch } from "@/hooks/useAISearch";
 import { useDialog } from "@/components/common";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { borderRadius } from "@/constants/sizes";
 import type { SearchInterpretation } from "@/utils/validation/searchSchemas";
 import type { UnifiedSearchResult } from "@/models/search.types";
 
@@ -93,6 +98,7 @@ const IntelligentSearchScreen = () => {
   const [filtersCompletedOnly, setFiltersCompletedOnly] = useState(false);
   const [filtersMinRating, setFiltersMinRating] = useState("");
   const [filtersMinEpisodes, setFiltersMinEpisodes] = useState("");
+  const insets = useSafeAreaInsets();
 
   const aiSuggestedServiceTypes = useMemo(() => {
     if (interpretation?.recommendedServices?.length) {
@@ -127,8 +133,12 @@ const IntelligentSearchScreen = () => {
           flex: 1,
         },
         headerContainer: {
-          paddingHorizontal: spacing.sm,
-          paddingTop: spacing.sm,
+          paddingHorizontal: spacing.none,
+          paddingTop: insets.top,
+          paddingBottom: spacing.none,
+          backgroundColor: theme.colors.surface,
+          borderBottomLeftRadius: borderRadius.lg,
+          borderBottomRightRadius: borderRadius.lg,
         },
         content: {
           flex: 1,
@@ -194,7 +204,7 @@ const IntelligentSearchScreen = () => {
           backgroundColor: theme.colors.surfaceVariant,
           paddingHorizontal: spacing.sm,
           paddingVertical: spacing.xs,
-          borderRadius: 12,
+          borderRadius: borderRadius.md,
         },
         streamingText: {
           fontSize: 12,
@@ -202,7 +212,7 @@ const IntelligentSearchScreen = () => {
           fontStyle: "italic",
         },
       }),
-    [theme],
+    [theme, insets.top],
   );
 
   const runSearchIfPossible = useCallback(() => {
@@ -594,32 +604,36 @@ const IntelligentSearchScreen = () => {
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <PageTransition style={styles.page} transitionType="fade">
         <View style={styles.headerContainer}>
-          <AnimatedSection delay={0} animated>
+          <AnimatedHeader animated>
             <TabHeader
               title="AI Search"
               showTitle
               showBackButton
               onBackPress={() => router.back()}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderBottomWidth: 0,
+                borderBottomLeftRadius: borderRadius.lg,
+                borderBottomRightRadius: borderRadius.lg,
+              }}
             />
-          </AnimatedSection>
+          </AnimatedHeader>
         </View>
 
         <AnimatedSection style={{ flex: 1 }} delay={80} animated>
           <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={true}>
             {headerContent}
-            <View style={{ height: 450 }}>
-              <SearchResultsView
-                results={results}
-                isLoading={isSearching}
-                hasPerformedSearch={hasPerformedSearch}
-                errors={searchErrors}
-                primaryError={searchError}
-                durationMs={lastSearchDurationMs}
-                interpretedQuery={interpretedQuery}
-                onPressResult={handleResultPress}
-                onBookmarkResult={handleBookmark}
-              />
-            </View>
+            <SearchResultsView
+              results={results}
+              isLoading={isSearching}
+              hasPerformedSearch={hasPerformedSearch}
+              errors={searchErrors}
+              primaryError={searchError}
+              durationMs={lastSearchDurationMs}
+              interpretedQuery={interpretedQuery}
+              onPressResult={handleResultPress}
+              onBookmarkResult={handleBookmark}
+            />
           </ScrollView>
         </AnimatedSection>
       </PageTransition>
