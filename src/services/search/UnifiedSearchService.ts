@@ -34,8 +34,8 @@ const HISTORY_LIMIT = 12;
 
 // Mobile networks and VPN tunnels can introduce noticeable latency. Keep
 // per-connector search requests reasonably responsive without failing too fast.
-const DEFAULT_SEARCH_TIMEOUT_MS = 15_000;
-const MAX_SEARCH_TIMEOUT_MS = 20_000;
+const DEFAULT_SEARCH_TIMEOUT_MS = 30_000;
+const MAX_SEARCH_TIMEOUT_MS = 60_000;
 
 const normalizeTerm = (term: string): string => term.trim();
 
@@ -421,6 +421,26 @@ export class UnifiedSearchService {
     );
 
     try {
+      const timeoutMs = this.resolveSearchTimeout(connector);
+      const timeoutLabel =
+        connector.config.name ??
+        `${connector.config.type} (${connector.config.id})`;
+      try {
+        await this.withTimeout(
+          connector.initialize(),
+          timeoutMs,
+          `Initialization timed out after ${timeoutMs}ms for ${timeoutLabel}.`,
+        );
+      } catch (initError) {
+        await logger.warn("Connector initialization failed or timed out.", {
+          location: "UnifiedSearchService.searchConnector",
+          serviceId: connector.config.id,
+          serviceType: connector.config.type,
+          error:
+            initError instanceof Error ? initError.message : String(initError),
+        });
+      }
+
       // Create SearchOptions from UnifiedSearchOptions for the connector
       const searchOptions: SearchOptions = {
         ...(options.limitPerService && {
@@ -435,11 +455,6 @@ export class UnifiedSearchService {
             },
           }),
       };
-
-      const timeoutMs = this.resolveSearchTimeout(connector);
-      const timeoutLabel =
-        connector.config.name ??
-        `${connector.config.type} (${connector.config.id})`;
       const rawResults = await this.withTimeout(
         searchFn(
           term,
@@ -621,6 +636,15 @@ export class UnifiedSearchService {
         status: series.status,
         nextAiring: series.nextAiring,
         seasonCount: series.seasons?.length ?? 0,
+        episodeCount:
+          series.statistics?.episodeCount ?? series.episodeCount ?? undefined,
+        episodeFileCount:
+          series.statistics?.episodeFileCount ??
+          series.episodeFileCount ??
+          undefined,
+        genres: Array.isArray(series.genres)
+          ? series.genres.join(", ")
+          : undefined,
       },
     }));
   }
@@ -656,6 +680,9 @@ export class UnifiedSearchService {
         minimumAvailability: movie.minimumAvailability,
         runtime: movie.runtime,
         studio: movie.studio,
+        genres: Array.isArray(movie.genres)
+          ? movie.genres.join(", ")
+          : undefined,
       },
     }));
   }
@@ -914,6 +941,42 @@ export class UnifiedSearchService {
           ) {
             return false;
           }
+
+          // Completed series only
+          if (interp.filters.isCompleted && result.mediaType === "series") {
+            const status = String(result.extra?.status ?? "").toLowerCase();
+            const nextAiring = result.extra?.nextAiring as string | undefined;
+            const isEnded = status === "ended";
+            const hasUpcoming =
+              typeof nextAiring === "string" && nextAiring.trim().length > 0;
+            if (!isEnded && hasUpcoming) {
+              return false;
+            }
+          }
+
+          // Minimum episodes (best-effort, only when metadata is available)
+          if (interp.filters.minEpisodes && result.mediaType === "series") {
+            const epCountRaw = result.extra?.episodeCount as number | undefined;
+            const episodeCount =
+              typeof epCountRaw === "number" ? epCountRaw : undefined;
+            if (
+              episodeCount !== undefined &&
+              episodeCount < interp.filters.minEpisodes
+            ) {
+              return false;
+            }
+          }
+        }
+
+        // Filter by language preference (best-effort)
+        if (interp.languagePreference) {
+          const pref = interp.languagePreference.toLowerCase();
+          const languageField =
+            (result.extra?.language as string | undefined) ??
+            (result.extra?.originalLanguage as string | undefined);
+          if (languageField && !languageField.toLowerCase().includes(pref)) {
+            return false;
+          }
         }
       }
 
@@ -921,8 +984,13 @@ export class UnifiedSearchService {
       if (options.status && options.status !== "Any") {
         const status = options.status.toLowerCase();
 
-        if (status === "owned" || status === "available") {
+        if (status === "owned") {
           if (!result.isInLibrary) return false;
+        } else if (status === "available") {
+          const isAvailable =
+            result.isAvailable === true ||
+            (result.serviceType === "jellyfin" && result.isInLibrary === true);
+          if (!isAvailable) return false;
         } else if (status === "monitored") {
           // Monitored items exist in the system (sonarr/radarr metadata)
           if (!result.isInLibrary) return false;
