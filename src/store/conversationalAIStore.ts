@@ -19,6 +19,8 @@ const defaultConfig: AssistantConfig = {
   showTokenCount: false,
   allowVoiceInput: true,
   chatTextSize: "medium",
+  enableTools: false,
+  selectedTools: [],
 };
 
 export interface ConversationalAIState {

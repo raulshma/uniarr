@@ -230,6 +230,68 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
           {message.isStreaming ? (
             <Text style={styles.streaming}>Typing{indicatorDots}</Text>
           ) : null}
+
+          {/* Tool Invocations */}
+          {message.toolInvocations && message.toolInvocations.length > 0 ? (
+            <View style={{ marginTop: 8, gap: 4 }}>
+              {message.toolInvocations.map((invocation) => (
+                <View
+                  key={invocation.toolCallId}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingVertical: 4,
+                    paddingHorizontal: 8,
+                    borderRadius: 8,
+                    backgroundColor: isUser
+                      ? "rgba(255,255,255,0.1)"
+                      : theme.colors.surface,
+                  }}
+                >
+                  <MaterialCommunityIcons
+                    name={
+                      invocation.state === "completed"
+                        ? "check-circle"
+                        : invocation.state === "failed"
+                          ? "alert-circle"
+                          : invocation.state === "executing"
+                            ? "loading"
+                            : "clock-outline"
+                    }
+                    size={14}
+                    color={
+                      invocation.state === "completed"
+                        ? theme.colors.primary
+                        : invocation.state === "failed"
+                          ? theme.colors.error
+                          : isUser
+                            ? "rgba(255,255,255,0.7)"
+                            : theme.colors.onSurfaceVariant
+                    }
+                  />
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: isUser
+                        ? "rgba(255,255,255,0.8)"
+                        : theme.colors.onSurfaceVariant,
+                      fontWeight: "500",
+                    }}
+                  >
+                    {invocation.state === "executing"
+                      ? `🔧 ${invocation.toolName}...`
+                      : invocation.state === "completed"
+                        ? `✓ ${invocation.toolName}`
+                        : invocation.state === "failed"
+                          ? `✗ ${invocation.toolName}`
+                          : invocation.toolName}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <View
             style={{
               flexDirection: "row",

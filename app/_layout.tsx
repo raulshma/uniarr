@@ -40,6 +40,7 @@ import {
   performStorageMigration,
   cleanupAsyncStorage,
 } from "@/utils/storage.migration";
+import { registerAllTools } from "@/services/ai/tools";
 
 const RootLayout = () => {
   const theme = useTheme();
@@ -67,6 +68,15 @@ const RootLayout = () => {
 
         // Clean up old AsyncStorage data after successful migration
         await cleanupAsyncStorage();
+
+        // Initialize AI tools after storage is ready
+        try {
+          registerAllTools();
+          console.log("[RootLayout] AI tools registered successfully");
+        } catch (error) {
+          console.error("[RootLayout] Failed to register AI tools", error);
+          // Don't block app startup if tool registration fails
+        }
 
         if (mounted) setStorageReady(true);
       } catch (error) {

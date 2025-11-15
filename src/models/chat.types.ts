@@ -1,4 +1,16 @@
 /**
+ * Tool invocation state for tracking tool execution in messages.
+ */
+export interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  result?: unknown;
+  error?: string;
+  state: "pending" | "executing" | "completed" | "failed";
+}
+
+/**
  * Chat message types for conversational assistant.
  */
 export interface Message {
@@ -8,6 +20,7 @@ export interface Message {
   timestamp: Date;
   isStreaming?: boolean;
   error?: string;
+  toolInvocations?: ToolInvocation[];
   metadata?: {
     tokens?: number;
     duration?: number;
@@ -55,6 +68,10 @@ export interface AssistantConfig {
   allowVoiceInput: boolean;
   /** Preferred chat text size used for chat messages and markdown rendering */
   chatTextSize?: "extra-small" | "small" | "medium" | "large";
+  /** Enable AI tools for service interaction (experimental) */
+  enableTools?: boolean;
+  /** Selected tool names to be available to the AI (when enableTools is true) */
+  selectedTools?: string[];
 }
 
 export interface StreamingMessage {

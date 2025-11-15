@@ -297,7 +297,7 @@ const DashboardWidgets = React.memo(({ theme }: DashboardWidgetsProps) => (
   <AnimatedSection
     delay={100}
     style={{
-      paddingHorizontal: theme.custom.spacing.sm,
+      paddingHorizontal: theme.custom.spacing.xxs,
       marginTop: theme.custom.spacing.sm,
     }}
   >

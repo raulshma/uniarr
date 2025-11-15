@@ -29,9 +29,12 @@ import { StarterQuestions } from "@/components/chat/StarterQuestions";
 import { useDialog } from "@/components/common";
 import BottomDrawer, { DrawerItem } from "@/components/common/BottomDrawer";
 import { useConversationalAI } from "@/hooks/useConversationalAI";
+import { useAIChat } from "@/hooks/useAIChat";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
 import type { Message, AssistantConfig } from "@/models/chat.types";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
+import { getToolRegistry } from "@/services/ai/tools";
+import { logger } from "@/services/logger/LoggerService";
 import {
   useConnectorsStore,
   selectGetConnector,
@@ -68,6 +71,7 @@ const ConversationalAIScreen: React.FC = () => {
   // Dialog states
   const [conversationDrawerVisible, setConversationDrawerVisible] =
     useState(false);
+  const [toolsDrawerVisible, setToolsDrawerVisible] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
 
@@ -115,6 +119,16 @@ const ConversationalAIScreen: React.FC = () => {
     loadConversation,
   } = useConversationalAI();
 
+  // New AI chat hook with tool support
+  const aiChatWithTools = useAIChat({
+    onToolCall: (toolName, args) => {
+      void logger.info("Tool called from UI", { toolName, args });
+    },
+    onToolResult: (toolName, result) => {
+      void logger.info("Tool result from UI", { toolName, result });
+    },
+  });
+
   const getConnector = useConnectorsStore(selectGetConnector);
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
   // (radarr services will be looked up lazily when performing add operations)
@@ -133,9 +147,59 @@ const ConversationalAIScreen: React.FC = () => {
     (s) => s.config.chatTextSize,
   );
 
+  const enableToolsPref = useConversationalAIStore((s) => s.config.enableTools);
+
+  const selectedToolsPref = useConversationalAIStore(
+    (s) => s.config.selectedTools ?? [],
+  );
+
   const updateConversationalConfig = useConversationalAIStore(
     (s) => s.updateConfig,
   );
+
+  // Get available tools from registry
+  const availableTools = useMemo(() => {
+    const registry = getToolRegistry();
+    return registry.getAll().map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+    }));
+  }, []);
+
+  // Handler to toggle tool selection
+  const handleToggleTool = useCallback(
+    (toolName: string) => {
+      const currentSelected = selectedToolsPref;
+      const isSelected = currentSelected.includes(toolName);
+
+      const newSelected = isSelected
+        ? currentSelected.filter((name) => name !== toolName)
+        : [...currentSelected, toolName];
+
+      updateConversationalConfig({ selectedTools: newSelected });
+
+      setSnackbarMessage(
+        isSelected ? `${toolName} disabled` : `${toolName} enabled`,
+      );
+      setSnackbarVisible(true);
+    },
+    [selectedToolsPref, updateConversationalConfig],
+  );
+
+  // Handler to select all tools
+  const handleSelectAllTools = useCallback(() => {
+    const allToolNames = availableTools.map((tool) => tool.name);
+    updateConversationalConfig({ selectedTools: allToolNames });
+    setSnackbarMessage("All tools enabled");
+    setSnackbarVisible(true);
+  }, [availableTools, updateConversationalConfig]);
+
+  // Handler to deselect all tools
+  const handleDeselectAllTools = useCallback(() => {
+    updateConversationalConfig({ selectedTools: [] });
+    setSnackbarMessage("All tools disabled");
+    setSnackbarVisible(true);
+  }, [updateConversationalConfig]);
 
   useEffect(() => {
     if (isReady || !hasAIProvider) {
@@ -442,9 +506,15 @@ const ConversationalAIScreen: React.FC = () => {
       }
 
       setShowStarters(false);
-      await sendMessage(text);
+
+      // Use the new AI chat hook with tools if enabled, otherwise use the existing hook
+      if (enableToolsPref) {
+        await aiChatWithTools.sendMessage(text);
+      } else {
+        await sendMessage(text);
+      }
     },
-    [sendMessage],
+    [sendMessage, enableToolsPref, aiChatWithTools],
   );
 
   const handleSelectStarter = useCallback(
@@ -568,28 +638,32 @@ const ConversationalAIScreen: React.FC = () => {
             text: "Delete",
             style: "destructive",
             onPress: () => {
-              // Show confirmation for delete
-              dialog.present({
-                title: "Delete Conversation?",
-                message:
-                  "This will permanently delete the conversation and all its messages. This action cannot be undone.",
-                buttons: [
-                  {
-                    text: "Cancel",
-                    style: "cancel",
-                  },
-                  {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => {
-                      deleteConversation(sessionId);
-                      setSnackbarMessage("Conversation deleted");
-                      setSnackbarVisible(true);
-                      setConversationDrawerVisible(false);
+              // Close the drawer first before showing confirmation
+              setConversationDrawerVisible(false);
+
+              // Use setTimeout to ensure drawer closes before showing confirmation
+              setTimeout(() => {
+                dialog.present({
+                  title: "Delete Conversation?",
+                  message:
+                    "This will permanently delete the conversation and all its messages. This action cannot be undone.",
+                  buttons: [
+                    {
+                      text: "Cancel",
+                      style: "cancel",
                     },
-                  },
-                ],
-              });
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: () => {
+                        deleteConversation(sessionId);
+                        setSnackbarMessage("Conversation deleted");
+                        setSnackbarVisible(true);
+                      },
+                    },
+                  ],
+                });
+              }, 300);
             },
           },
           {
@@ -1029,6 +1103,45 @@ const ConversationalAIScreen: React.FC = () => {
                           />
                         </View>
                         <View style={styles.statusDivider} />
+                        <Pressable
+                          onPress={() => {
+                            if (enableToolsPref) {
+                              setToolsDrawerVisible(true);
+                            } else {
+                              updateConversationalConfig({
+                                enableTools: true,
+                              });
+                            }
+                          }}
+                          style={{ flexDirection: "row", alignItems: "center" }}
+                        >
+                          <MaterialCommunityIcons
+                            name="tools"
+                            size={16}
+                            color={theme.colors.onSurfaceVariant}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.statusLabel}>Tools</Text>
+                          <Switch
+                            style={styles.compactSwitch}
+                            value={Boolean(enableToolsPref)}
+                            onValueChange={() =>
+                              updateConversationalConfig({
+                                enableTools: !enableToolsPref,
+                              })
+                            }
+                            color={theme.colors.primary}
+                          />
+                          {enableToolsPref && (
+                            <MaterialCommunityIcons
+                              name="chevron-right"
+                              size={16}
+                              color={theme.colors.onSurfaceVariant}
+                              style={{ marginLeft: 4 }}
+                            />
+                          )}
+                        </Pressable>
+                        <View style={styles.statusDivider} />
                         <View
                           accessibilityRole="adjustable"
                           accessibilityLabel="Text Size"
@@ -1225,6 +1338,98 @@ const ConversationalAIScreen: React.FC = () => {
             }
           }}
         />
+      </BottomDrawer>
+
+      {/* Tools Management Drawer */}
+      <BottomDrawer
+        visible={toolsDrawerVisible}
+        onDismiss={() => setToolsDrawerVisible(false)}
+        title="Manage AI Tools"
+        maxHeight="70%"
+      >
+        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+          <Text
+            variant="bodyMedium"
+            style={{
+              color: theme.colors.onSurfaceVariant,
+              marginBottom: 12,
+            }}
+          >
+            Select which tools the AI can use to interact with your services.{" "}
+            {selectedToolsPref.length > 0
+              ? `${selectedToolsPref.length} of ${availableTools.length} enabled`
+              : "No tools enabled"}
+          </Text>
+        </View>
+
+        {availableTools.map((tool, index) => {
+          const isSelected = selectedToolsPref.includes(tool.name);
+          return (
+            <View key={tool.name}>
+              <Pressable
+                onPress={() => handleToggleTool(tool.name)}
+                style={({ pressed }) => [
+                  {
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    minHeight: 64,
+                  }}
+                >
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <Text
+                      variant="bodyLarge"
+                      style={{
+                        color: theme.colors.onSurface,
+                        fontWeight: isSelected ? "600" : "400",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {tool.name}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{
+                        color: theme.colors.onSurfaceVariant,
+                      }}
+                    >
+                      {tool.description}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={isSelected}
+                    onValueChange={() => handleToggleTool(tool.name)}
+                    color={theme.colors.primary}
+                  />
+                </View>
+              </Pressable>
+              {index < availableTools.length - 1 && <Divider />}
+            </View>
+          );
+        })}
+
+        {availableTools.length > 0 && (
+          <>
+            <Divider style={{ marginVertical: 8 }} />
+            <DrawerItem
+              icon="check-all"
+              label="Enable All Tools"
+              onPress={handleSelectAllTools}
+            />
+            <DrawerItem
+              icon="close-box-multiple"
+              label="Disable All Tools"
+              onPress={handleDeselectAllTools}
+            />
+          </>
+        )}
       </BottomDrawer>
     </ChatErrorBoundary>
   );
