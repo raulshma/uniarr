@@ -13,10 +13,16 @@ export function useAiSdkConversational({
   onChunk,
   onComplete,
   onError,
+  onThinking,
 }: {
   onChunk: (chunk: string) => void;
-  onComplete?: (finalText?: string) => void;
+  onComplete?: (
+    finalText?: string,
+    thinking?: string,
+    metadata?: { tokens?: number; thinking?: string },
+  ) => void;
   onError?: (err: Error) => void;
+  onThinking?: (thinking: string) => void;
 }) {
   const providerManager = AIProviderManager.getInstance();
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -69,12 +75,43 @@ export function useAiSdkConversational({
 
         // Stream the text chunks
         let fullText = "";
+        let thinkingText = "";
+        let responseMetadata: { tokens?: number; thinking?: string } = {};
+
         for await (const chunk of result.textStream) {
           fullText += chunk;
           onChunk(chunk);
         }
 
-        onComplete?.(fullText);
+        // After streaming is complete, try to access extended metadata from the result object
+        // The response object from streamText may contain thinking content and token counts for models that support it
+        try {
+          // @ts-expect-error - accessing extended metadata from response
+          const thinkingVal = result.response?.thinking;
+          if (thinkingVal) {
+            thinkingText = thinkingVal;
+            responseMetadata.thinking = thinkingText;
+            onThinking?.(thinkingText);
+          }
+
+          // Try to get token usage from response usage field
+          // @ts-expect-error - accessing usage from response
+          const usageVal = result.response?.usage;
+          if (usageVal) {
+            const usage = usageVal;
+            const totalTokens =
+              usage.totalTokens ??
+              (usage.completionTokens ?? 0) + (usage.promptTokens ?? 0);
+            if (totalTokens !== undefined && totalTokens > 0) {
+              responseMetadata.tokens = totalTokens;
+            }
+          }
+        } catch {
+          // Ignore errors accessing metadata
+        }
+
+        // Pass metadata to complete callback (tokens + thinking)
+        onComplete?.(fullText, thinkingText || undefined, responseMetadata);
         return fullText;
       } catch (err) {
         // Don't treat abort errors as real errors
@@ -93,7 +130,7 @@ export function useAiSdkConversational({
         abortControllerRef.current = null;
       }
     },
-    [providerManager, onChunk, onComplete, onError],
+    [providerManager, onChunk, onComplete, onError, onThinking],
   );
 
   // Provide an abort method

@@ -169,3 +169,11 @@ export const selectVoiceInputAllowed = (
  */
 export const selectAutoSaveEnabled = (state: ConversationalAIState): boolean =>
   state.config.autoSaveSessions;
+
+/**
+ * Select the preferred chat text size. This controls rendered font sizes in
+ * the chat surface (user messages + markdown rendering).
+ */
+export const selectChatTextSize = (
+  state: ConversationalAIState,
+): AssistantConfig["chatTextSize"] => state.config.chatTextSize;

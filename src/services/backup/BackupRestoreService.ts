@@ -14,6 +14,9 @@ import {
   getStoredTmdbKey,
   setStoredTmdbKey,
 } from "@/services/tmdb/TmdbCredentialService";
+import type { AssistantConfig } from "@/models/chat.types";
+import { useConversationalAIStore } from "@/store/conversationalAIStore";
+import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
 import type {
   FilterMetadata,
   LibraryFilters,
@@ -47,6 +50,8 @@ export interface BackupExportOptions {
   includeByokConfig: boolean;
   includeAiConfig: boolean;
   includeApiLoggingConfig: boolean;
+  includeConversationalAISettings: boolean;
+  includeConversationalAIProviderConfig: boolean;
   encryptSensitive: boolean;
   password?: string;
 }
@@ -112,6 +117,14 @@ export interface BackupSelectionConfig {
     sensitive: boolean;
   };
   apiLoggingConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  conversationalAISettings: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  conversationalAIProviderConfig: {
     enabled: boolean;
     sensitive: boolean;
   };
@@ -209,6 +222,17 @@ export interface EncryptedBackupData {
       apiLoggerAiCaptureMetadata: boolean;
       apiLoggerAiRetentionDays: number;
     };
+    conversationalAISettings?: {
+      config: AssistantConfig;
+    };
+    conversationalAIProviderConfig?: {
+      selectedProvider: any;
+      selectedModel: string | null;
+      selectedKeyId: string | null;
+      selectedTitleProvider: any;
+      selectedTitleModel: string | null;
+      selectedTitleKeyId: string | null;
+    };
   };
 }
 
@@ -303,6 +327,17 @@ export interface BackupData {
       apiLoggerAiCaptureResponse: boolean;
       apiLoggerAiCaptureMetadata: boolean;
       apiLoggerAiRetentionDays: number;
+    };
+    conversationalAISettings?: {
+      config: AssistantConfig;
+    };
+    conversationalAIProviderConfig?: {
+      selectedProvider: any;
+      selectedModel: string | null;
+      selectedKeyId: string | null;
+      selectedTitleProvider: any;
+      selectedTitleModel: string | null;
+      selectedTitleKeyId: string | null;
     };
   };
 }
@@ -864,6 +899,54 @@ class BackupRestoreService {
         });
       }
 
+      if (options.includeConversationalAISettings) {
+        const convAIKey = "conversational-ai-store";
+        const convAIData = await AsyncStorage.getItem(convAIKey);
+        if (convAIData) {
+          try {
+            const parsed = JSON.parse(convAIData);
+            const state = parsed.state || parsed;
+            if (state.config) {
+              backupData.appData.conversationalAISettings = {
+                config: state.config,
+              };
+            }
+          } catch (err) {
+            await logger.warn("Failed to parse conversational AI store", {
+              location: "BackupRestoreService.createSelectiveBackup",
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      }
+
+      if (options.includeConversationalAIProviderConfig) {
+        const convAIConfigKey = "conversational-ai-config-store";
+        const convAIConfigData = await AsyncStorage.getItem(convAIConfigKey);
+        if (convAIConfigData) {
+          try {
+            const parsed = JSON.parse(convAIConfigData);
+            const state = parsed.state || parsed;
+            backupData.appData.conversationalAIProviderConfig = {
+              selectedProvider: state.selectedProvider ?? null,
+              selectedModel: state.selectedModel ?? null,
+              selectedKeyId: state.selectedKeyId ?? null,
+              selectedTitleProvider: state.selectedTitleProvider ?? null,
+              selectedTitleModel: state.selectedTitleModel ?? null,
+              selectedTitleKeyId: state.selectedTitleKeyId ?? null,
+            };
+          } catch (err) {
+            await logger.warn(
+              "Failed to parse conversational AI config store",
+              {
+                location: "BackupRestoreService.createSelectiveBackup",
+                error: err instanceof Error ? err.message : String(err),
+              },
+            );
+          }
+        }
+      }
+
       // Collect widgets configuration
       if (options.includeWidgetsConfig) {
         const widgetsStorageKey = "WidgetService:widgets";
@@ -1293,6 +1376,45 @@ class BackupRestoreService {
           ...(byokConfig && { byokConfig }),
           ...(aiConfig && { aiConfig }),
           ...(apiLoggingConfig && { apiLoggingConfig }),
+          ...(await (async () => {
+            const convAIKey = "conversational-ai-store";
+            const data = await AsyncStorage.getItem(convAIKey);
+            if (data) {
+              try {
+                const parsed = JSON.parse(data);
+                const state = parsed.state || parsed;
+                if (state.config) {
+                  return {
+                    conversationalAISettings: {
+                      config: state.config as AssistantConfig,
+                    },
+                  };
+                }
+              } catch {}
+            }
+            return {} as Record<string, unknown>;
+          })()),
+          ...(await (async () => {
+            const convAIConfigKey = "conversational-ai-config-store";
+            const data = await AsyncStorage.getItem(convAIConfigKey);
+            if (data) {
+              try {
+                const parsed = JSON.parse(data);
+                const state = parsed.state || parsed;
+                return {
+                  conversationalAIProviderConfig: {
+                    selectedProvider: state.selectedProvider ?? null,
+                    selectedModel: state.selectedModel ?? null,
+                    selectedKeyId: state.selectedKeyId ?? null,
+                    selectedTitleProvider: state.selectedTitleProvider ?? null,
+                    selectedTitleModel: state.selectedTitleModel ?? null,
+                    selectedTitleKeyId: state.selectedTitleKeyId ?? null,
+                  },
+                } as Record<string, unknown>;
+              } catch {}
+            }
+            return {} as Record<string, unknown>;
+          })()),
         },
       };
 
@@ -1620,6 +1742,51 @@ class BackupRestoreService {
           sortKey: backupData.appData.servicesViewState.sortKey,
           sortDirection: backupData.appData.servicesViewState.sortDirection,
         });
+      }
+
+      if (backupData.appData.conversationalAISettings) {
+        try {
+          const store = useConversationalAIStore.getState();
+          store.updateConfig(
+            backupData.appData.conversationalAISettings.config,
+          );
+          await logger.info("Conversational AI settings restored", {
+            location: "BackupRestoreService.restoreBackup",
+          });
+        } catch (err) {
+          await logger.warn("Failed to restore conversational AI settings", {
+            location: "BackupRestoreService.restoreBackup",
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      if (backupData.appData.conversationalAIProviderConfig) {
+        try {
+          const cfg = backupData.appData.conversationalAIProviderConfig;
+          const configStore = useConversationalAIConfigStore.getState();
+          configStore.setConversationalAIConfig(
+            cfg.selectedProvider ?? null,
+            cfg.selectedModel ?? null,
+            cfg.selectedKeyId ?? null,
+          );
+          configStore.setTitleSummaryConfig(
+            cfg.selectedTitleProvider ?? null,
+            cfg.selectedTitleModel ?? null,
+            cfg.selectedTitleKeyId ?? null,
+          );
+          await logger.info("Conversational AI provider config restored", {
+            location: "BackupRestoreService.restoreBackup",
+          });
+        } catch (err) {
+          await logger.warn(
+            "Failed to restore conversational AI provider config",
+            {
+              location: "BackupRestoreService.restoreBackup",
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
+        }
       }
 
       // Restore library filters if available
@@ -2047,6 +2214,8 @@ class BackupRestoreService {
       includeByokConfig: true,
       includeAiConfig: true,
       includeApiLoggingConfig: true,
+      includeConversationalAISettings: true,
+      includeConversationalAIProviderConfig: true,
       encryptSensitive: false,
     };
   }
@@ -2116,6 +2285,14 @@ class BackupRestoreService {
         sensitive: false,
       },
       apiLoggingConfig: {
+        enabled: true,
+        sensitive: false,
+      },
+      conversationalAISettings: {
+        enabled: true,
+        sensitive: false,
+      },
+      conversationalAIProviderConfig: {
         enabled: true,
         sensitive: false,
       },

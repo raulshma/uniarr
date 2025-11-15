@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -13,6 +15,7 @@ import {
   Text,
   Button,
   Switch,
+  SegmentedButtons,
   Divider,
   Snackbar,
 } from "react-native-paper";
@@ -27,7 +30,7 @@ import { useDialog } from "@/components/common";
 import BottomDrawer, { DrawerItem } from "@/components/common/BottomDrawer";
 import { useConversationalAI } from "@/hooks/useConversationalAI";
 import { useUnifiedDiscover } from "@/hooks/useUnifiedDiscover";
-import type { Message } from "@/models/chat.types";
+import type { Message, AssistantConfig } from "@/models/chat.types";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 import {
   useConnectorsStore,
@@ -122,6 +125,14 @@ const ConversationalAIScreen: React.FC = () => {
     (s) => s.config.enableStreaming,
   );
 
+  const showTokenCountPref = useConversationalAIStore(
+    (s) => s.config.showTokenCount,
+  );
+
+  const chatTextSizePref = useConversationalAIStore(
+    (s) => s.config.chatTextSize,
+  );
+
   const updateConversationalConfig = useConversationalAIStore(
     (s) => s.updateConfig,
   );
@@ -168,11 +179,27 @@ const ConversationalAIScreen: React.FC = () => {
 
   const [showStarters, setShowStarters] = useState(() => messages.length === 0);
 
+  // Animation for header status pill. 1 = visible, 0 = hidden
+  const statusAnim = React.useRef(new Animated.Value(1)).current;
+  const [statusHeight, setStatusHeight] = useState<number>(0);
+  const lastScrollY = React.useRef<number>(0);
+
   useEffect(() => {
     if (messages.length === 0) {
       setShowStarters(true);
     }
   }, [messages.length]);
+
+  // Show status pill if there are no messages (force visible)
+  useEffect(() => {
+    if (messages.length === 0) {
+      Animated.timing(statusAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [messages.length, statusAnim]);
 
   const styles = useMemo(
     () =>
@@ -226,11 +253,26 @@ const ConversationalAIScreen: React.FC = () => {
           alignSelf: "flex-start",
           flexDirection: "row",
           alignItems: "center",
-          gap: 6,
+          gap: 4,
           paddingHorizontal: theme.custom.spacing.xxs,
-          paddingVertical: 6,
           borderRadius: 16,
           backgroundColor: theme.colors.surfaceVariant,
+        },
+        statusPillInner: {
+          flexDirection: "row",
+          flexShrink: 1,
+          alignItems: "center",
+        },
+        statusPillContainer: {
+          alignSelf: "flex-start",
+        },
+        statusPillScroll: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          paddingLeft: theme.custom.spacing.xxs,
+          paddingRight: theme.custom.spacing.xxs,
         },
         statusDot: {
           width: 6,
@@ -240,15 +282,44 @@ const ConversationalAIScreen: React.FC = () => {
         },
         statusText: {
           color: theme.colors.onSurfaceVariant,
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: "500",
+        },
+        statusDivider: {
+          width: StyleSheet.hairlineWidth,
+          height: 45,
+          backgroundColor:
+            // @ts-ignore
+            theme.colors.outlineVariant ?? theme.colors.onSurfaceVariant,
+          marginHorizontal: 6,
+        },
+        statusLabel: {
+          color: theme.colors.onSurfaceVariant,
+          fontSize: 11,
+          fontWeight: "500",
+          marginRight: 6,
+        },
+        compactSwitch: {
+          transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }],
+        },
+        segmentedCompact: {
+          height: 36,
+          // Allow a slightly larger tap target so medium/large labels don't get cut
+          alignSelf: "center",
+          borderRadius: 8,
+          paddingVertical: 2,
+        },
+        segmentButton: {
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: 28,
         },
         chatContainer: {
           flex: 1,
-          marginHorizontal: 16,
+          marginHorizontal: theme.custom.spacing.xs,
           marginTop: 12,
           marginBottom: 12,
-          borderRadius: 16,
+          borderRadius: theme.roundness,
           backgroundColor: theme.colors.surface,
           overflow: "hidden",
         },
@@ -259,9 +330,9 @@ const ConversationalAIScreen: React.FC = () => {
         errorBanner: {
           marginHorizontal: 16,
           marginBottom: 12,
-          paddingHorizontal: 16,
+          paddingHorizontal: theme.custom.spacing.xs,
           paddingVertical: 12,
-          borderRadius: 12,
+          borderRadius: theme.roundness,
           backgroundColor: theme.colors.errorContainer,
           flexDirection: "row",
           gap: 12,
@@ -335,7 +406,10 @@ const ConversationalAIScreen: React.FC = () => {
       theme.colors.surface,
       theme.colors.errorContainer,
       theme.colors.error,
+      theme.colors.outlineVariant,
       theme.custom.spacing.xxs,
+      theme.custom.spacing.xs,
+      theme.roundness,
     ],
   );
 
@@ -526,6 +600,42 @@ const ConversationalAIScreen: React.FC = () => {
       });
     },
     [dialog, handleLoadConversation, deleteConversation],
+  );
+
+  // Small helper to animate the header status pill
+  const animateStatus = React.useCallback(
+    (show: boolean) => {
+      Animated.timing(statusAnim, {
+        toValue: show ? 1 : 0,
+        duration: 280,
+        useNativeDriver: false,
+      }).start();
+    },
+    [statusAnim],
+  );
+
+  // Handle chat list scrolls: hide when scrolling down, show when at top or scrolling up
+  const onChatListScroll = React.useCallback(
+    (event: any) => {
+      const y = event?.nativeEvent?.contentOffset?.y ?? 0;
+      const delta = y - lastScrollY.current;
+
+      // Deadzone to avoid jitter
+      const threshold = 8;
+
+      if (y <= 40) {
+        animateStatus(true);
+      } else if (delta > threshold) {
+        // Scrolling down
+        animateStatus(false);
+      } else if (delta < -threshold) {
+        // Scrolling up
+        animateStatus(true);
+      }
+
+      lastScrollY.current = y;
+    },
+    [animateStatus],
   );
 
   const renderMessage = useCallback(
@@ -819,6 +929,16 @@ const ConversationalAIScreen: React.FC = () => {
                     ) : null}
 
                     <HeaderButton
+                      icon="format-title"
+                      onPress={() =>
+                        router.push(
+                          "/(auth)/+modal/select-provider-model?target=title",
+                        )
+                      }
+                      accessibilityLabel="Select model for title summaries"
+                    />
+
+                    <HeaderButton
                       icon="cog"
                       onPress={() =>
                         router.push("/(auth)/settings/byok/ai-settings")
@@ -828,29 +948,131 @@ const ConversationalAIScreen: React.FC = () => {
                   </View>
                 </View>
 
-                <View style={styles.statusPill}>
-                  <View style={styles.statusDot} />
-                  <Text style={styles.statusText}>
-                    {isStreaming
-                      ? "Responding…"
-                      : isLoading
-                        ? "Thinking…"
-                        : "Online"}
-                  </Text>
-                  <View style={{ width: 12 }} />
-                  <Text style={[styles.statusText, { marginRight: 8 }]}>
-                    Stream
-                  </Text>
-                  <Switch
-                    value={Boolean(enableStreamingPref)}
-                    onValueChange={() =>
-                      updateConversationalConfig({
-                        enableStreaming: !enableStreamingPref,
-                      })
-                    }
-                    color={theme.colors.primary}
-                  />
-                </View>
+                <Animated.View
+                  style={[
+                    styles.statusPillContainer,
+                    {
+                      opacity: statusAnim,
+                      height: statusAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, statusHeight || 48],
+                        extrapolate: "clamp",
+                      }),
+                      overflow: "hidden",
+                    },
+                  ]}
+                >
+                  <View
+                    style={styles.statusPill}
+                    onLayout={(e) => {
+                      const h = e.nativeEvent.layout.height;
+                      if (h && h !== statusHeight) setStatusHeight(h);
+                    }}
+                  >
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      nestedScrollEnabled
+                      contentContainerStyle={styles.statusPillScroll}
+                    >
+                      <View style={styles.statusPillInner}>
+                        <View style={styles.statusDot} />
+                        <Text style={styles.statusText}>
+                          {isStreaming
+                            ? "Responding…"
+                            : isLoading
+                              ? "Thinking…"
+                              : "Online"}
+                        </Text>
+                        <View style={styles.statusDivider} />
+                        <View
+                          style={{ flexDirection: "row", alignItems: "center" }}
+                        >
+                          <MaterialCommunityIcons
+                            name="waves"
+                            size={16}
+                            color={theme.colors.onSurfaceVariant}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.statusLabel}>Stream</Text>
+                          <Switch
+                            style={styles.compactSwitch}
+                            value={Boolean(enableStreamingPref)}
+                            onValueChange={() =>
+                              updateConversationalConfig({
+                                enableStreaming: !enableStreamingPref,
+                              })
+                            }
+                            color={theme.colors.primary}
+                          />
+                        </View>
+                        <View style={styles.statusDivider} />
+                        <View
+                          style={{ flexDirection: "row", alignItems: "center" }}
+                        >
+                          <MaterialCommunityIcons
+                            name="information-outline"
+                            size={16}
+                            color={theme.colors.onSurfaceVariant}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.statusLabel}>Meta</Text>
+                          <Switch
+                            style={styles.compactSwitch}
+                            value={Boolean(showTokenCountPref)}
+                            onValueChange={() =>
+                              updateConversationalConfig({
+                                showTokenCount: !showTokenCountPref,
+                              })
+                            }
+                            color={theme.colors.primary}
+                          />
+                        </View>
+                        <View style={styles.statusDivider} />
+                        <View
+                          accessibilityRole="adjustable"
+                          accessibilityLabel="Text Size"
+                          style={{ flexDirection: "row", alignItems: "center" }}
+                        >
+                          <MaterialCommunityIcons
+                            name="format-size"
+                            size={16}
+                            color={theme.colors.onSurfaceVariant}
+                            style={{ marginRight: 6 }}
+                          />
+                          <SegmentedButtons
+                            value={chatTextSizePref ?? "medium"}
+                            onValueChange={(next) =>
+                              updateConversationalConfig({
+                                chatTextSize:
+                                  next as AssistantConfig["chatTextSize"],
+                              })
+                            }
+                            buttons={[
+                              {
+                                value: "small",
+                                label: "S",
+                                style: styles.segmentButton,
+                              },
+                              {
+                                value: "medium",
+                                label: "M",
+                                style: styles.segmentButton,
+                              },
+                              {
+                                value: "large",
+                                label: "L",
+                                style: styles.segmentButton,
+                              },
+                            ]}
+                            style={styles.segmentedCompact}
+                            density="small"
+                          />
+                        </View>
+                      </View>
+                    </ScrollView>
+                  </View>
+                </Animated.View>
               </View>
 
               {/* Error Banner */}
@@ -901,6 +1123,8 @@ const ConversationalAIScreen: React.FC = () => {
                           paddingVertical: 8,
                           paddingBottom: 8,
                         },
+                        onScroll: onChatListScroll,
+                        scrollEventThrottle: 16,
                       }}
                     />
                   )}

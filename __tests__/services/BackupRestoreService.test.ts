@@ -171,6 +171,8 @@ describe("BackupRestoreService - Backup Options", () => {
     expect(defaults.includeLibraryFilters).toBe(true);
     expect(defaults.includeVoiceAssistantConfig).toBe(true);
     expect(defaults.includeBookmarkHealthChecks).toBe(true);
+    expect(defaults.includeConversationalAISettings).toBe(true);
+    expect(defaults.includeConversationalAIProviderConfig).toBe(true);
   });
 
   it("should include new backup options in selection config", () => {
@@ -195,6 +197,12 @@ describe("BackupRestoreService - Backup Options", () => {
     expect(config.bookmarkHealthChecks).toBeDefined();
     expect(config.bookmarkHealthChecks.enabled).toBe(true);
     expect(config.bookmarkHealthChecks.sensitive).toBe(false);
+    expect(config.conversationalAISettings).toBeDefined();
+    expect(config.conversationalAISettings.enabled).toBe(true);
+    expect(config.conversationalAISettings.sensitive).toBe(false);
+    expect(config.conversationalAIProviderConfig).toBeDefined();
+    expect(config.conversationalAIProviderConfig.enabled).toBe(true);
+    expect(config.conversationalAIProviderConfig.sensitive).toBe(false);
   });
 
   it("should validate export options correctly", () => {
@@ -215,6 +223,8 @@ describe("BackupRestoreService - Backup Options", () => {
       includeWidgetSecureCredentials: false,
       includeWidgetProfiles: false,
       includeWidgetProfileCredentials: false,
+      includeConversationalAISettings: true,
+      includeConversationalAIProviderConfig: true,
       encryptSensitive: false,
     };
 
@@ -242,6 +252,8 @@ describe("BackupRestoreService - Backup Options", () => {
       includeWidgetSecureCredentials: false,
       includeWidgetProfiles: false,
       includeWidgetProfileCredentials: false,
+      includeConversationalAISettings: false,
+      includeConversationalAIProviderConfig: false,
       encryptSensitive: true,
       password: "test", // Too short
     };

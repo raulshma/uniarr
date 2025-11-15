@@ -15,7 +15,7 @@ import {
   ActivityIndicator,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import type { AppTheme } from "@/constants/theme";
 import {
   AIProviderType,
@@ -39,6 +39,7 @@ const SelectProviderAndModelSheet: React.FC = () => {
   const [providers, setProviders] = useState<ProviderWithKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<ProviderWithKey | null>(null);
+  const { target } = useLocalSearchParams<{ target?: string }>();
 
   const keyManager = AIKeyManager.getInstance();
 
@@ -70,22 +71,34 @@ const SelectProviderAndModelSheet: React.FC = () => {
     (model: string) => {
       if (!selectedKey) return;
 
-      useConversationalAIConfigStore
-        .getState()
-        .setConversationalAIConfig(
+      const store = useConversationalAIConfigStore.getState();
+      const isTitleTarget = String(target || "chat").toLowerCase() === "title";
+
+      if (isTitleTarget) {
+        store.setTitleSummaryConfig(
           selectedKey.provider,
           model,
           selectedKey.keyId,
         );
-
-      alert(
-        "Success",
-        `${AI_PROVIDERS[selectedKey.provider].name} with model ${model} is now set for conversational AI`,
-      );
+        alert(
+          "Success",
+          `${AI_PROVIDERS[selectedKey.provider].name} with model ${model} is now set for conversation title summaries`,
+        );
+      } else {
+        store.setConversationalAIConfig(
+          selectedKey.provider,
+          model,
+          selectedKey.keyId,
+        );
+        alert(
+          "Success",
+          `${AI_PROVIDERS[selectedKey.provider].name} with model ${model} is now set for conversational AI`,
+        );
+      }
 
       router.back();
     },
-    [selectedKey, router],
+    [selectedKey, router, target],
   );
 
   const handleSelectProvider = useCallback((item: ProviderWithKey) => {

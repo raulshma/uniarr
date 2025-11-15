@@ -7,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useMemo, type ComponentType, useEffect, useState } from "react";
 import { Platform, View } from "react-native";
-import { PaperProvider } from "react-native-paper";
+import { PaperProvider, Portal } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -148,81 +148,85 @@ const RootLayout = () => {
                   persistOptions={{ persister }}
                 >
                   <PaperProvider theme={theme || defaultTheme}>
-                    <WidgetDrawerProvider>
-                      <DialogProvider>
-                        <DownloadManagerProvider
-                          managerOptions={{
-                            queueConfig: {
-                              maxConcurrentDownloads: 3,
-                              allowMobileData: false,
-                              allowBackgroundDownloads: true,
-                              maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
-                            },
-                            progressUpdateInterval: 1500,
-                            enablePersistence: true,
-                          }}
-                          indicatorPosition="floating"
-                          onInitialized={(success) => {
-                            console.log(
-                              "Download manager initialized:",
-                              success,
-                            );
-                          }}
-                          onError={(error) => {
-                            console.error(
-                              "Download manager initialization failed:",
-                              error,
-                            );
-                          }}
-                        >
-                          <StatusBar style={theme.dark ? "light" : "dark"} />
-                          <ErrorBoundary context={{ location: "RootLayout" }}>
-                            <AppContent />
-                          </ErrorBoundary>
-                          <QueryDevtools />
-                        </DownloadManagerProvider>
-                      </DialogProvider>
-                    </WidgetDrawerProvider>
+                    <Portal.Host>
+                      <WidgetDrawerProvider>
+                        <DialogProvider>
+                          <DownloadManagerProvider
+                            managerOptions={{
+                              queueConfig: {
+                                maxConcurrentDownloads: 3,
+                                allowMobileData: false,
+                                allowBackgroundDownloads: true,
+                                maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
+                              },
+                              progressUpdateInterval: 1500,
+                              enablePersistence: true,
+                            }}
+                            indicatorPosition="floating"
+                            onInitialized={(success) => {
+                              console.log(
+                                "Download manager initialized:",
+                                success,
+                              );
+                            }}
+                            onError={(error) => {
+                              console.error(
+                                "Download manager initialization failed:",
+                                error,
+                              );
+                            }}
+                          >
+                            <StatusBar style={theme.dark ? "light" : "dark"} />
+                            <ErrorBoundary context={{ location: "RootLayout" }}>
+                              <AppContent />
+                            </ErrorBoundary>
+                            <QueryDevtools />
+                          </DownloadManagerProvider>
+                        </DialogProvider>
+                      </WidgetDrawerProvider>
+                    </Portal.Host>
                   </PaperProvider>
                 </PersistQueryClientProvider>
               ) : (
                 <QueryClientProvider client={queryClient}>
                   <PaperProvider theme={theme || defaultTheme}>
-                    <WidgetDrawerProvider>
-                      <DialogProvider>
-                        <DownloadManagerProvider
-                          managerOptions={{
-                            queueConfig: {
-                              maxConcurrentDownloads: 3,
-                              allowMobileData: false,
-                              allowBackgroundDownloads: true,
-                              maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
-                            },
-                            progressUpdateInterval: 1500,
-                            enablePersistence: true,
-                          }}
-                          indicatorPosition="floating"
-                          onInitialized={(success) => {
-                            console.log(
-                              "Download manager initialized:",
-                              success,
-                            );
-                          }}
-                          onError={(error) => {
-                            console.error(
-                              "Download manager initialization failed:",
-                              error,
-                            );
-                          }}
-                        >
-                          <StatusBar style={theme.dark ? "light" : "dark"} />
-                          <ErrorBoundary context={{ location: "RootLayout" }}>
-                            <AppContent />
-                          </ErrorBoundary>
-                          <QueryDevtools />
-                        </DownloadManagerProvider>
-                      </DialogProvider>
-                    </WidgetDrawerProvider>
+                    <Portal.Host>
+                      <WidgetDrawerProvider>
+                        <DialogProvider>
+                          <DownloadManagerProvider
+                            managerOptions={{
+                              queueConfig: {
+                                maxConcurrentDownloads: 3,
+                                allowMobileData: false,
+                                allowBackgroundDownloads: true,
+                                maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
+                              },
+                              progressUpdateInterval: 1500,
+                              enablePersistence: true,
+                            }}
+                            indicatorPosition="floating"
+                            onInitialized={(success) => {
+                              console.log(
+                                "Download manager initialized:",
+                                success,
+                              );
+                            }}
+                            onError={(error) => {
+                              console.error(
+                                "Download manager initialization failed:",
+                                error,
+                              );
+                            }}
+                          >
+                            <StatusBar style={theme.dark ? "light" : "dark"} />
+                            <ErrorBoundary context={{ location: "RootLayout" }}>
+                              <AppContent />
+                            </ErrorBoundary>
+                            <QueryDevtools />
+                          </DownloadManagerProvider>
+                        </DialogProvider>
+                      </WidgetDrawerProvider>
+                    </Portal.Host>
                   </PaperProvider>
                 </QueryClientProvider>
               )}

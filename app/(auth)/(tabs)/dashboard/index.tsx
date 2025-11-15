@@ -17,7 +17,7 @@ import {
 import { AppState, type AppStateStatus } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { Text, IconButton, Portal } from "react-native-paper";
+import { Text, IconButton } from "react-native-paper";
 import { useHaptics } from "@/hooks/useHaptics";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -331,6 +331,7 @@ const DashboardScreen = () => {
   >(null);
 
   useEffect(() => {
+    const sub = AppState.addEventListener("change", setAppState);
     const loadWeatherSummary = async () => {
       try {
         await widgetService.initialize();
@@ -382,13 +383,8 @@ const DashboardScreen = () => {
     void loadWeatherSummary();
 
     return () => {
-      // Cleanup if needed
+      sub.remove();
     };
-  }, []);
-
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", setAppState);
-    return () => sub.remove();
   }, []);
 
   const handleRefresh = useCallback(async () => {
@@ -544,65 +540,63 @@ const DashboardScreen = () => {
   );
 
   return (
-    <Portal.Host>
-      <View style={styles.container}>
-        {/* Frosted Glass Overlay */}
-        {frostedEnabled && (
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: "rgba(255, 255, 255, 0.06)",
-              },
-            ]}
-          />
-        )}
-
-        {gradientBackground}
-        {!gradientEnabled && (
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: theme.colors.background },
-            ]}
-          />
-        )}
-
-        <DashboardHeader
-          animatedValues={animatedValues}
-          weatherSummary={weatherSummary}
-          theme={theme}
-          frostedEnabled={frostedEnabled}
-          gradientEnabled={gradientEnabled}
+    <View style={styles.container}>
+      {/* Frosted Glass Overlay */}
+      {frostedEnabled && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: "rgba(255, 255, 255, 0.06)",
+            },
+          ]}
         />
+      )}
 
-        {/* Content */}
-        {weatherEffectsEnabled &&
-          weatherForBackdrop &&
-          isFocused &&
-          appState === "active" && (
-            <WeatherBackdrop
-              {...mapWeatherToBackdrop({ weather: weatherForBackdrop })}
-              visible
-            />
-          )}
+      {gradientBackground}
+      {!gradientEnabled && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: theme.colors.background },
+          ]}
+        />
+      )}
 
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-        >
-          {/* Widgets Section */}
-          <DashboardWidgets theme={theme} />
-        </ScrollView>
-      </View>
-    </Portal.Host>
+      <DashboardHeader
+        animatedValues={animatedValues}
+        weatherSummary={weatherSummary}
+        theme={theme}
+        frostedEnabled={frostedEnabled}
+        gradientEnabled={gradientEnabled}
+      />
+
+      {/* Content */}
+      {weatherEffectsEnabled &&
+        weatherForBackdrop &&
+        isFocused &&
+        appState === "active" && (
+          <WeatherBackdrop
+            {...mapWeatherToBackdrop({ weather: weatherForBackdrop })}
+            visible
+          />
+        )}
+
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+        {/* Widgets Section */}
+        <DashboardWidgets theme={theme} />
+      </ScrollView>
+    </View>
   );
 };
 

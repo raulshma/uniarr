@@ -4,6 +4,7 @@ import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 import { useAiSdkConversational } from "@/hooks/useAiSdkConversational";
 import { ConversationalAIService } from "@/services/ai/conversational-ai/ConversationalAIService";
 import { logger } from "@/services/logger/LoggerService";
+import { apiLogger } from "@/services/logger/ApiLoggerService";
 import { ApiError, handleApiError } from "@/utils/error.utils";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import {
@@ -205,7 +206,11 @@ export function useConversationalAI(): UseConversationalAIReturn {
         addStreamingChunk(id, chunk);
       }
     },
-    onComplete: (finalText?: string) => {
+    onComplete: (
+      finalText?: string,
+      thinking?: string,
+      metadata?: { tokens?: number; thinking?: string },
+    ) => {
       const id = assistantMessageIdRef.current;
       if (id) {
         if (finalText) {
@@ -213,6 +218,45 @@ export function useConversationalAI(): UseConversationalAIReturn {
           addStreamingChunk(id, finalText);
         }
         completeStreamingMessage(id);
+        // Update metadata with tokens and/or thinking if available from SDK response
+        const metadataUpdate: Record<string, unknown> = {};
+        if (metadata?.tokens !== undefined) {
+          metadataUpdate.tokens = metadata.tokens;
+        }
+        if (thinking) {
+          metadataUpdate.thinking = thinking;
+        }
+        if (Object.keys(metadataUpdate).length > 0) {
+          useConversationalAIStore
+            .getState()
+            .updateMessageMetadata(id, metadataUpdate);
+        }
+
+        // After first assistant response completes, auto-generate a title
+        void (async () => {
+          try {
+            const store = useConversationalAIStore.getState();
+            const session = store.getCurrentSession();
+            if (!session) {
+              return;
+            }
+            const assistantCount = session.messages.filter(
+              (m) => m.role === "assistant",
+            ).length;
+            if (assistantCount !== 1) {
+              return;
+            }
+            const service = ConversationalAIService.getInstance();
+            const title = await service.generateConversationTitle(
+              session.messages,
+            );
+            if (title && title.length > 0) {
+              store.setCurrentSessionTitle(title);
+            }
+          } catch {
+            // ignore title generation errors
+          }
+        })();
       }
     },
     onError: (err) => {
@@ -301,6 +345,8 @@ export function useConversationalAI(): UseConversationalAIReturn {
       abortControllerRef.current = abortController;
 
       try {
+        const startTime = Date.now();
+
         // If the react SDK is available and user wants streaming, prefer it —
         // it uses the user's configured API key directly and streams via React hooks.
         if (
@@ -320,6 +366,50 @@ export function useConversationalAI(): UseConversationalAIReturn {
               content: msg.text,
             }));
           await sendWithSdk(trimmed, conversationHistory);
+          // Update message metadata with optional duration / token info
+          try {
+            const endTime = Date.now();
+            const durationSec = (endTime - startTime) / 1000;
+
+            // First, check if tokens were captured from SDK response
+            const currentMessage = useConversationalAIStore
+              .getState()
+              .messages.find((m) => m.id === assistantMessageId);
+            const sdkTokens = currentMessage?.metadata?.tokens;
+
+            // If SDK didn't provide tokens, try to get from API logger
+            let tokens = sdkTokens;
+            if (tokens === undefined) {
+              const entries = await apiLogger.getAiLogs({
+                startDate: new Date(startTime - 2000),
+                endDate: new Date(endTime + 2000),
+                operation: "conversational",
+              });
+
+              const match = entries
+                .reverse()
+                .find((e) => (e.prompt ?? "").trim() === trimmed.trim());
+
+              tokens =
+                match?.metadata?.tokenUsage?.totalTokens ??
+                match?.metadata?.tokenUsage?.completionTokens ??
+                match?.metadata?.tokenUsage?.promptTokens ??
+                undefined;
+            }
+
+            // Always update with duration; update tokens if we have them
+            const metadata: Record<string, unknown> = {
+              duration: durationSec,
+            };
+            if (tokens !== undefined) {
+              metadata.tokens = tokens;
+            }
+            useConversationalAIStore
+              .getState()
+              .updateMessageMetadata(assistantMessageId, metadata);
+          } catch {
+            // ignore metadata update errors
+          }
           assistantMessageIdRef.current = "";
           return;
         }
@@ -343,7 +433,72 @@ export function useConversationalAI(): UseConversationalAIReturn {
             // Ensure final text appended and mark message as complete
             addStreamingChunk(assistantMessageId, finalText);
             completeStreamingMessage(assistantMessageId);
+            // Attach metadata entry to the message (tokens + duration) if present in Ai logs
+            try {
+              const endTime = Date.now();
+              const durationSec = (endTime - startTime) / 1000;
+
+              // First, check if tokens were captured
+              const currentMessage = useConversationalAIStore
+                .getState()
+                .messages.find((m) => m.id === assistantMessageId);
+              let tokens = currentMessage?.metadata?.tokens;
+
+              // If not, try to get from API logger
+              if (tokens === undefined) {
+                const entries = await apiLogger.getAiLogs({
+                  startDate: new Date(startTime - 2000),
+                  endDate: new Date(endTime + 2000),
+                  operation: "conversational",
+                });
+
+                const match = entries
+                  .reverse()
+                  .find((e) => (e.prompt ?? "").trim() === trimmed.trim());
+
+                tokens =
+                  match?.metadata?.tokenUsage?.totalTokens ??
+                  match?.metadata?.tokenUsage?.completionTokens ??
+                  match?.metadata?.tokenUsage?.promptTokens ??
+                  undefined;
+              }
+
+              // Always update with duration; update tokens if we have them
+              const metadata: Record<string, unknown> = {
+                duration: durationSec,
+              };
+              if (tokens !== undefined) {
+                metadata.tokens = tokens;
+              }
+              useConversationalAIStore
+                .getState()
+                .updateMessageMetadata(assistantMessageId, metadata);
+            } catch {
+              // ignore metadata update errors
+            }
             assistantMessageIdRef.current = "";
+
+            // After first assistant response completes, auto-generate a title
+            try {
+              const store = useConversationalAIStore.getState();
+              const session = store.getCurrentSession();
+              if (session) {
+                const assistantCount = session.messages.filter(
+                  (m) => m.role === "assistant",
+                ).length;
+                if (assistantCount === 1) {
+                  const service = ConversationalAIService.getInstance();
+                  const title = await service.generateConversationTitle(
+                    session.messages,
+                  );
+                  if (title && title.length > 0) {
+                    store.setCurrentSessionTitle(title);
+                  }
+                }
+              }
+            } catch {
+              // ignore title generation errors
+            }
             return;
           } catch (serverError) {
             const apiError = handleApiError(serverError, {

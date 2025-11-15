@@ -18,6 +18,7 @@ import Marked, {
 } from "react-native-marked";
 
 import type { AppTheme } from "@/constants/theme";
+import { typography as defaultTypography } from "@/theme/typography";
 
 const MONO_FONT = Platform.select({
   ios: "Menlo",
@@ -25,15 +26,36 @@ const MONO_FONT = Platform.select({
   default: "Courier New",
 });
 
-type AppMarkdownProps = Omit<MarkdownProps, "renderer" | "styles">;
+type AppMarkdownProps = Omit<MarkdownProps, "renderer" | "styles"> & {
+  /** Optional scale applied to typography for chat messages (1 = default) */
+  fontScale?: number;
+};
 
 const AppMarkdown: React.FC<AppMarkdownProps> = ({
   value,
   flatListProps,
+  fontScale,
   ...rest
 }) => {
   const theme = useTheme<AppTheme>();
-  const renderer = useMemo(() => createRenderer(theme), [theme]);
+  // If the caller passed a numeric scale (chat uses this), prefer it.
+  // Otherwise, derive an app-wide scale from the theme config by comparing
+  // the current `bodyLarge` token against the default scale.
+  const derivedFontScale = useMemo(() => {
+    if (typeof fontScale === "number") {
+      return fontScale;
+    }
+    const themeScale =
+      (theme.custom?.typography?.bodyLarge?.fontSize ??
+        defaultTypography.bodyLarge.fontSize) /
+      defaultTypography.bodyLarge.fontSize;
+
+    return themeScale ?? 0.825;
+  }, [fontScale, theme.custom?.typography?.bodyLarge?.fontSize]);
+  const renderer = useMemo(
+    () => createRenderer(theme, derivedFontScale),
+    [theme, derivedFontScale],
+  );
 
   const mergedFlatListProps = useMemo(() => {
     const listStyle = StyleSheet.flatten(flatListProps?.style) as
@@ -48,14 +70,16 @@ const AppMarkdown: React.FC<AppMarkdownProps> = ({
     return {
       nestedScrollEnabled: true,
       scrollEnabled: false,
+      extraData: derivedFontScale,
       ...flatListProps,
       style: listStyle,
       contentContainerStyle,
     };
-  }, [flatListProps, theme.custom.spacing.md]);
+  }, [flatListProps, theme.custom.spacing.md, derivedFontScale]);
 
   return (
     <Marked
+      key={`md-${derivedFontScale}`}
       value={value}
       renderer={renderer}
       flatListProps={mergedFlatListProps}
@@ -67,7 +91,7 @@ const AppMarkdown: React.FC<AppMarkdownProps> = ({
 export default AppMarkdown;
 
 // Builds a renderer instance with UniArr theme tokens applied to each markdown node.
-const createRenderer = (theme: AppTheme): RendererInterface => {
+const createRenderer = (theme: AppTheme, fontScale = 1): RendererInterface => {
   const defaultRenderer = new DefaultRenderer();
   const spacing = theme.custom.spacing;
   const typography = theme.custom.typography;
@@ -82,6 +106,21 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
   const flattenText = (base?: TextStyle, override?: TextStyle) =>
     StyleSheet.flatten([base, override]) as TextStyle | undefined;
 
+  const scaleTextStyle = (
+    style?: TextStyle,
+    scale = 1,
+  ): TextStyle | undefined => {
+    if (!style || scale === 1) return style;
+    const copy = { ...style } as TextStyle;
+    if (typeof copy.fontSize === "number") {
+      copy.fontSize = (copy.fontSize ?? 14) * scale;
+    }
+    if (typeof copy.lineHeight === "number") {
+      copy.lineHeight = (copy.lineHeight ?? 20) * scale;
+    }
+    return copy;
+  };
+
   const flattenView = (base?: ViewStyle, override?: ViewStyle) =>
     StyleSheet.flatten([base, override]) as ViewStyle | undefined;
 
@@ -95,40 +134,58 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
 
   const headingStyles: Record<number, TextStyle> = {
     1: {
-      ...(typography.headlineLarge as TextStyle),
+      ...(scaleTextStyle(
+        typography.headlineLarge as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: theme.colors.primary,
       marginTop: spacing.xl,
       fontWeight: "700",
       marginBottom: spacing.sm,
     },
     2: {
-      ...(typography.headlineMedium as TextStyle),
+      ...(scaleTextStyle(
+        typography.headlineMedium as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: theme.colors.primary,
       marginTop: spacing.lg,
       fontWeight: "600",
       marginBottom: spacing.sm,
     },
     3: {
-      ...(typography.headlineSmall as TextStyle),
+      ...(scaleTextStyle(
+        typography.headlineSmall as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: theme.colors.primary,
       marginTop: spacing.lg,
       fontWeight: "600",
       marginBottom: spacing.xs,
     },
     4: {
-      ...(typography.titleLarge as TextStyle),
+      ...(scaleTextStyle(
+        typography.titleLarge as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: theme.colors.primary,
       marginTop: spacing.md,
       marginBottom: spacing.xs,
     },
     5: {
-      ...(typography.titleMedium as TextStyle),
+      ...(scaleTextStyle(
+        typography.titleMedium as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: theme.colors.primary,
       marginTop: spacing.md,
       marginBottom: spacing.xxs,
     },
     6: {
-      ...(typography.titleSmall as TextStyle),
+      ...(scaleTextStyle(
+        typography.titleSmall as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: theme.colors.primary,
       marginTop: spacing.md,
       marginBottom: spacing.xxs,
@@ -166,7 +223,10 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
       marginBottom: spacing.md,
     },
     paragraphText: {
-      ...(typography.bodyLarge as TextStyle),
+      ...(scaleTextStyle(
+        typography.bodyLarge as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: surfaceTextColor,
     },
     blockquoteContainer: {
@@ -179,7 +239,10 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
       marginBottom: spacing.md,
     },
     blockquoteText: {
-      ...(typography.bodyLarge as TextStyle),
+      ...(scaleTextStyle(
+        typography.bodyLarge as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: surfaceTextColor,
     },
     codeContainer: {
@@ -191,12 +254,15 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
     codeText: {
       color: surfaceTextColor,
       fontFamily: MONO_FONT,
-      fontSize: typography.bodyMedium.fontSize,
-      lineHeight: typography.bodyMedium.lineHeight,
+      fontSize: (typography.bodyMedium?.fontSize ?? 14) * fontScale,
+      lineHeight: (typography.bodyMedium?.lineHeight ?? 20) * fontScale,
       letterSpacing: typography.bodyMedium.letterSpacing,
     },
     inlineText: {
-      ...(typography.bodyLarge as TextStyle),
+      ...(scaleTextStyle(
+        typography.bodyLarge as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: surfaceTextColor,
     },
     inlineEmphasis: {
@@ -214,12 +280,16 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
       paddingHorizontal: spacing.xs,
       paddingVertical: spacing.xxxs,
       fontFamily: MONO_FONT,
-      fontSize: typography.bodyMedium.fontSize,
-      lineHeight: typography.bodyMedium.lineHeight,
+      fontSize: (typography.bodyMedium?.fontSize ?? 14) * fontScale,
+      lineHeight: (typography.bodyMedium?.lineHeight ?? 20) * fontScale,
       letterSpacing: typography.bodyMedium.letterSpacing,
       color: surfaceTextColor,
     },
     linkText: {
+      ...(scaleTextStyle(
+        typography.bodyLarge as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: theme.colors.primary,
       textDecorationLine: "underline",
     },
@@ -237,7 +307,10 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
       marginBottom: spacing.xs,
     },
     listMarker: {
-      ...(typography.bodyLarge as TextStyle),
+      ...(scaleTextStyle(
+        typography.bodyLarge as TextStyle,
+        fontScale,
+      ) as TextStyle),
       width: spacing.lg,
       color: surfaceTextColor,
     },
@@ -248,7 +321,10 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
       flexShrink: 1,
     },
     listItemText: {
-      ...(typography.bodyLarge as TextStyle),
+      ...(scaleTextStyle(
+        typography.bodyLarge as TextStyle,
+        fontScale,
+      ) as TextStyle),
       color: surfaceTextColor,
       fontWeight: "500",
     },
@@ -284,7 +360,11 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
     content: string | React.ReactNode | React.ReactNode[],
     override?: TextStyle,
   ) => (
-    <Text key={nextKey()} style={flattenText(styles.inlineText, override)}>
+    <Text
+      key={nextKey()}
+      style={flattenText(override, styles.inlineText)}
+      allowFontScaling={true}
+    >
       {content}
     </Text>
   );
@@ -296,7 +376,9 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
           key={nextKey()}
           style={flattenView(styles.paragraphContainer, viewStyle)}
         >
-          <Text style={styles.paragraphText}>{children}</Text>
+          <Text style={styles.paragraphText} allowFontScaling={true}>
+            {children}
+          </Text>
         </View>
       );
     },
@@ -306,7 +388,9 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
           key={nextKey()}
           style={flattenView(styles.blockquoteContainer, viewStyle)}
         >
-          <Text style={styles.blockquoteText}>{children}</Text>
+          <Text style={styles.blockquoteText} allowFontScaling={true}>
+            {children}
+          </Text>
         </View>
       );
     },
@@ -315,8 +399,9 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
       return (
         <Text
           key={nextKey()}
-          style={flattenText(headingStyles[fallbackDepth], textStyle)}
+          style={flattenText(textStyle, headingStyles[fallbackDepth])}
           accessibilityRole="header"
+          allowFontScaling={true}
         >
           {text}
         </Text>
@@ -330,7 +415,12 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
           showsHorizontalScrollIndicator={false}
         >
           <View style={flattenView(styles.codeContainer, containerStyle)}>
-            <Text style={flattenText(styles.codeText, textStyle)}>{text}</Text>
+            <Text
+              style={flattenText(textStyle, styles.codeText)}
+              allowFontScaling={true}
+            >
+              {text}
+            </Text>
           </View>
         </ScrollView>
       );
@@ -350,7 +440,9 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
           style={flattenView(styles.listItemInner, viewStyle)}
         >
           {typeof children === "string" ? (
-            <Text style={styles.listItemText}>{children}</Text>
+            <Text style={styles.listItemText} allowFontScaling={true}>
+              {children}
+            </Text>
           ) : (
             children
           )}
@@ -359,8 +451,8 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
     },
     list(ordered, li, listStyle, textStyle, startIndex) {
       const baseIndex = typeof startIndex === "number" ? startIndex : 1;
-      const markerStyle = flattenText(styles.listMarker, textStyle);
-      const itemTextStyle = flattenText(styles.listItemText, textStyle);
+      const markerStyle = flattenText(textStyle, styles.listMarker);
+      const itemTextStyle = flattenText(textStyle, styles.listItemText);
 
       return (
         <View
@@ -372,12 +464,16 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
             const content = React.isValidElement(item) ? (
               item
             ) : (
-              <Text style={itemTextStyle}>{item as string}</Text>
+              <Text style={itemTextStyle} allowFontScaling={true}>
+                {item as string}
+              </Text>
             );
 
             return (
               <View key={nextKey()} style={styles.listRow}>
-                <Text style={markerStyle}>{marker}</Text>
+                <Text style={markerStyle} allowFontScaling={true}>
+                  {marker}
+                </Text>
                 <View style={styles.listBody}>{content}</View>
               </View>
             );
@@ -392,9 +488,10 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
       return (
         <Text
           key={nextKey()}
-          style={flattenText(styles.linkText, textStyle)}
+          style={flattenText(textStyle, styles.linkText)}
           accessibilityRole="link"
           onPress={() => openLink(href)}
+          allowFontScaling={true}
         >
           {children}
         </Text>
@@ -421,14 +518,18 @@ const createRenderer = (theme: AppTheme): RendererInterface => {
     },
     codespan(text, textStyle) {
       return (
-        <Text key={nextKey()} style={flattenText(styles.inlineCode, textStyle)}>
+        <Text
+          key={nextKey()}
+          style={flattenText(textStyle, styles.inlineCode)}
+          allowFontScaling={true}
+        >
           {text}
         </Text>
       );
     },
     br() {
       return (
-        <Text key={nextKey()} style={styles.inlineText}>
+        <Text key={nextKey()} style={styles.inlineText} allowFontScaling={true}>
           {"\n"}
         </Text>
       );

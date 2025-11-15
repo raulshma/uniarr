@@ -12,6 +12,7 @@ export interface Message {
     tokens?: number;
     duration?: number;
     confidence?: number;
+    thinking?: string;
     card?: {
       // Optional rich card payload used by assistant messages when rendering
       // media preview cards (poster, title, metadata and actions).
@@ -52,6 +53,8 @@ export interface AssistantConfig {
   autoSaveSessions: boolean;
   showTokenCount: boolean;
   allowVoiceInput: boolean;
+  /** Preferred chat text size used for chat messages and markdown rendering */
+  chatTextSize?: "extra-small" | "small" | "medium" | "large";
 }
 
 export interface StreamingMessage {

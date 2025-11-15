@@ -1,12 +1,15 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AIMessageCard } from "./AIMessageCard";
-import { Text, useTheme } from "react-native-paper";
-import type { MD3Theme } from "react-native-paper/lib/typescript/types";
+import { Text, IconButton } from "react-native-paper";
+import { useConversationalAIStore } from "@/store/conversationalAIStore";
+import { formatResponseTime, formatTokens } from "@/utils/formatting.utils";
 import AppMarkdown from "@/components/markdown/AppMarkdown";
+import { useRouter } from "expo-router";
 
 import type { Message } from "@/models/chat.types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useTheme } from "@/hooks/useTheme";
 
 type ChatMessageProps = {
   message: Message;
@@ -23,9 +26,20 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   onAddToRadarr,
   onShowCast,
 }) => {
-  const theme = useTheme<MD3Theme>();
+  const theme = useTheme();
+  const router = useRouter();
   const isUser = message.role === "user";
   const [indicatorDots, setIndicatorDots] = useState(".");
+  const chatTextSize = useConversationalAIStore((s) => s.config.chatTextSize);
+
+  const handleShowThinking = () => {
+    if (message.metadata?.thinking) {
+      router.push({
+        pathname: "/(auth)/chat/thinking-modal",
+        params: { thinking: message.metadata.thinking },
+      });
+    }
+  };
 
   useEffect(() => {
     if (!message.isStreaming) {
@@ -95,7 +109,14 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
           color: isUser
             ? theme.colors.onPrimary
             : theme.colors.onSurfaceVariant,
-          fontSize: 15,
+          fontSize:
+            chatTextSize === "extra-small"
+              ? 10
+              : chatTextSize === "small"
+                ? 13
+                : chatTextSize === "large"
+                  ? 18
+                  : 15,
           lineHeight: 20,
           fontWeight: "400",
         },
@@ -107,6 +128,13 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
         },
         timestamp: {
           marginTop: 4,
+          fontSize: 12,
+          color: isUser
+            ? "rgba(255,255,255,0.6)"
+            : theme.colors.onSurfaceVariant,
+        },
+        metadataText: {
+          marginTop: 2,
           fontSize: 12,
           color: isUser
             ? "rgba(255,255,255,0.6)"
@@ -137,8 +165,32 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
       theme.colors.onPrimary,
       theme.colors.onSurfaceVariant,
       theme.colors.error,
+      chatTextSize,
     ],
   );
+
+  const showTokenCount = useConversationalAIStore(
+    (s) => s.config.showTokenCount,
+  );
+
+  // Use the app typography base to derive a relative scale so markdown
+  // text matches the message text size set in the chat settings.
+  const markdownFontScale = useMemo(() => {
+    const baseMarkdownFont =
+      // prefer bodyLarge as the base for general markdown body text
+      (theme.custom.typography.bodyLarge?.fontSize as number) ?? 16;
+
+    const messageFontSize =
+      chatTextSize === "extra-small"
+        ? 10
+        : chatTextSize === "small"
+          ? 13
+          : chatTextSize === "large"
+            ? 18
+            : 15;
+
+    return messageFontSize / baseMarkdownFont;
+  }, [chatTextSize, theme.custom.typography.bodyLarge?.fontSize]);
 
   return (
     <Pressable
@@ -169,6 +221,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                 scrollEnabled: false,
                 nestedScrollEnabled: false,
               }}
+              fontScale={markdownFontScale}
             />
           )}
           {message.error ? (
@@ -177,9 +230,39 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
           {message.isStreaming ? (
             <Text style={styles.streaming}>Typing{indicatorDots}</Text>
           ) : null}
-          {timestampLabel && !message.isStreaming ? (
-            <Text style={styles.timestamp}>{timestampLabel}</Text>
-          ) : null}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "flex-start",
+              alignItems: "center",
+              gap: theme.custom.spacing.xs,
+            }}
+          >
+            {timestampLabel && !message.isStreaming ? (
+              <Text style={styles.timestamp}>{timestampLabel}</Text>
+            ) : null}
+            {showTokenCount &&
+            !message.isStreaming &&
+            (message.metadata?.duration !== undefined ||
+              message.metadata?.tokens !== undefined) ? (
+              <Text style={styles.metadataText}>
+                {message.metadata?.duration !== undefined
+                  ? `${formatResponseTime(message.metadata?.duration)} `
+                  : ""}
+                {message.metadata?.tokens !== undefined
+                  ? ` • ${formatTokens(message.metadata?.tokens)} tokens`
+                  : ""}
+              </Text>
+            ) : null}
+            {!isUser && message.metadata?.thinking && !message.isStreaming ? (
+              <IconButton
+                icon="lightbulb-on"
+                size={16}
+                onPress={handleShowThinking}
+                style={{ margin: 0 }}
+              />
+            ) : null}
+          </View>
         </View>
 
         {/* Render optional rich card (templates like movie/article cards) */}

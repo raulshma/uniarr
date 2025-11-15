@@ -17,10 +17,20 @@ export interface ConversationalAIConfigState {
   selectedModel: string | null;
   selectedKeyId: string | null; // Reference to the API key being used
 
+  // Optional provider/model specifically for generating conversation title summaries
+  selectedTitleProvider: AIProviderType | null;
+  selectedTitleModel: string | null;
+  selectedTitleKeyId: string | null;
+
   // Actions to update configuration
   setSelectedProvider: (provider: AIProviderType | null) => void;
   setSelectedModel: (model: string | null) => void;
   setSelectedKeyId: (keyId: string | null) => void;
+
+  // Actions for title summary configuration
+  setSelectedTitleProvider: (provider: AIProviderType | null) => void;
+  setSelectedTitleModel: (model: string | null) => void;
+  setSelectedTitleKeyId: (keyId: string | null) => void;
 
   // Convenience action to set provider, model, and key all at once
   setConversationalAIConfig: (
@@ -29,8 +39,22 @@ export interface ConversationalAIConfigState {
     keyId: string | null,
   ) => void;
 
+  // Convenience to set title summary config
+  setTitleSummaryConfig: (
+    provider: AIProviderType | null,
+    model: string | null,
+    keyId: string | null,
+  ) => void;
+
   // Get current configuration as object
   getConfig: () => {
+    provider: AIProviderType | null;
+    model: string | null;
+    keyId: string | null;
+  };
+
+  // Get title summary configuration as object
+  getTitleSummaryConfig: () => {
     provider: AIProviderType | null;
     model: string | null;
     keyId: string | null;
@@ -47,6 +71,9 @@ const defaultConfig = {
   selectedProvider: null as AIProviderType | null,
   selectedModel: null as string | null,
   selectedKeyId: null as string | null,
+  selectedTitleProvider: null as AIProviderType | null,
+  selectedTitleModel: null as string | null,
+  selectedTitleKeyId: null as string | null,
 };
 
 export const useConversationalAIConfigStore =
@@ -76,6 +103,27 @@ export const useConversationalAIConfigStore =
           );
         },
 
+        setSelectedTitleProvider: (provider) => {
+          set({ selectedTitleProvider: provider });
+          logger.debug(
+            `[ConversationalAIConfig] Title Provider set to: ${provider || "null"}`,
+          );
+        },
+
+        setSelectedTitleModel: (model) => {
+          set({ selectedTitleModel: model });
+          logger.debug(
+            `[ConversationalAIConfig] Title Model set to: ${model || "null"}`,
+          );
+        },
+
+        setSelectedTitleKeyId: (keyId) => {
+          set({ selectedTitleKeyId: keyId });
+          logger.debug(
+            `[ConversationalAIConfig] Title Key ID set to: ${keyId || "null"}`,
+          );
+        },
+
         setConversationalAIConfig: (provider, model, keyId) => {
           set({
             selectedProvider: provider,
@@ -84,6 +132,17 @@ export const useConversationalAIConfigStore =
           });
           logger.debug(
             `[ConversationalAIConfig] Config updated - Provider: ${provider}, Model: ${model}, KeyId: ${keyId}`,
+          );
+        },
+
+        setTitleSummaryConfig: (provider, model, keyId) => {
+          set({
+            selectedTitleProvider: provider,
+            selectedTitleModel: model,
+            selectedTitleKeyId: keyId,
+          });
+          logger.debug(
+            `[ConversationalAIConfig] Title Config updated - Provider: ${provider}, Model: ${model}, KeyId: ${keyId}`,
           );
         },
 
@@ -96,11 +155,23 @@ export const useConversationalAIConfigStore =
           };
         },
 
+        getTitleSummaryConfig: () => {
+          const state = get();
+          return {
+            provider: state.selectedTitleProvider,
+            model: state.selectedTitleModel,
+            keyId: state.selectedTitleKeyId,
+          };
+        },
+
         clearConfig: () => {
           set({
             selectedProvider: null,
             selectedModel: null,
             selectedKeyId: null,
+            selectedTitleProvider: null,
+            selectedTitleModel: null,
+            selectedTitleKeyId: null,
           });
           logger.debug("[ConversationalAIConfig] Configuration cleared");
         },
@@ -121,6 +192,9 @@ export const useConversationalAIConfigStore =
           selectedProvider: state.selectedProvider,
           selectedModel: state.selectedModel,
           selectedKeyId: state.selectedKeyId,
+          selectedTitleProvider: state.selectedTitleProvider,
+          selectedTitleModel: state.selectedTitleModel,
+          selectedTitleKeyId: state.selectedTitleKeyId,
         }),
         onRehydrateStorage: () => (state, error) => {
           if (error) {
@@ -132,6 +206,9 @@ export const useConversationalAIConfigStore =
               provider: state.selectedProvider,
               model: state.selectedModel,
               keyId: state.selectedKeyId,
+              titleProvider: (state as any).selectedTitleProvider,
+              titleModel: (state as any).selectedTitleModel,
+              titleKeyId: (state as any).selectedTitleKeyId,
             });
           }
         },
@@ -158,3 +235,13 @@ export const selectConversationalAIConfig = (
 export const selectConversationalAIHasValidConfig = (
   state: ConversationalAIConfigState,
 ) => state.hasValidConfig();
+
+export const selectTitleSummaryProvider = (
+  state: ConversationalAIConfigState,
+) => state.selectedTitleProvider;
+export const selectTitleSummaryModel = (state: ConversationalAIConfigState) =>
+  state.selectedTitleModel;
+export const selectTitleSummaryKeyId = (state: ConversationalAIConfigState) =>
+  state.selectedTitleKeyId;
+export const selectTitleSummaryConfig = (state: ConversationalAIConfigState) =>
+  state.getTitleSummaryConfig();

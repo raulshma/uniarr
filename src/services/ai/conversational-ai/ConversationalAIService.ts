@@ -8,6 +8,7 @@ import { withRetry, networkRetryCondition } from "@/utils/retry.utils";
 import type { Message } from "@/models/chat.types";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
+import type { AIProviderType } from "@/types/ai/AIProvider";
 
 /**
  * Represents a snapshot of a connector's state for building the system prompt.
@@ -75,6 +76,40 @@ export class ConversationalAIService {
           error: error instanceof Error ? error.message : String(error),
         },
       );
+      return false;
+    }
+  }
+
+  /**
+   * Set the provider specifically for title summary generation.
+   * Falls back to conversational provider if title-specific config is not set.
+   */
+  private setTitleSummaryProvider(): boolean {
+    const state = useConversationalAIConfigStore.getState();
+    const provider = (state as any)
+      .selectedTitleProvider as AIProviderType | null;
+    const keyId = (state as any).selectedTitleKeyId as string | null;
+
+    const fallbackProvider = state.selectedProvider;
+    const fallbackKeyId = state.selectedKeyId;
+
+    const targetProvider = provider ?? fallbackProvider;
+    const targetKeyId = keyId ?? fallbackKeyId;
+
+    if (!targetProvider || !targetKeyId) {
+      return false;
+    }
+
+    try {
+      this.providerManager.setActiveProvider(targetProvider);
+      logger.debug(
+        `[ConversationalAI] Set provider for title summary: ${targetProvider} (keyId: ${targetKeyId})`,
+      );
+      return true;
+    } catch (error) {
+      logger.error("[ConversationalAI] Failed to set title summary provider", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
   }
@@ -295,6 +330,69 @@ Be conversational, specific, and helpful.`;
       });
       throw apiError;
     }
+  }
+
+  /**
+   * Generate a concise conversation title from the first user/assistant exchange.
+   * Returns a sanitized title (Title Case, 4–7 words, no quotes/punctuation).
+   */
+  async generateConversationTitle(history: Message[]): Promise<string | null> {
+    try {
+      const hasProvider = this.setTitleSummaryProvider();
+      if (!hasProvider) {
+        return null;
+      }
+
+      const firstUser = history.find((m) => m.role === "user");
+      const firstAssistant = history.find((m) => m.role === "assistant");
+
+      if (!firstUser || !firstAssistant) {
+        return null;
+      }
+
+      const prompt = `You are tasked with naming a chat conversation. Generate a short, human-friendly title summarizing the initial exchange. Follow rules:
+- 4 to 7 words
+- Title Case
+- No punctuation, emojis, quotes, or brackets
+- No leading/trailing whitespace
+- Avoid generic words like Chat, Conversation
+
+Context:
+User: ${firstUser.text}
+Assistant: ${firstAssistant.text}
+
+Return only the title.`;
+
+      const result = await this.aiService.generateText(prompt);
+      const raw = (result?.text ?? "").trim();
+      if (!raw) {
+        return null;
+      }
+
+      const sanitized = this.sanitizeTitle(raw);
+      return sanitized || null;
+    } catch (error) {
+      logger.warn("[ConversationalAI] Title generation failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  private sanitizeTitle(input: string): string {
+    const withoutQuotes = input.replace(/["'`]/g, "");
+    const withoutPunct = withoutQuotes.replace(/[\p{P}\p{S}]/gu, "");
+    const collapsed = withoutPunct.replace(/\s+/g, " ").trim();
+    const words = collapsed.split(" ");
+    const limited = words
+      .slice(0, Math.max(4, Math.min(7, words.length)))
+      .join(" ");
+    const titleCase = limited
+      .toLowerCase()
+      .split(" ")
+      .map((w) => (w ? w[0]?.toUpperCase() + w.slice(1) : w))
+      .join(" ");
+    return titleCase;
   }
 
   /**

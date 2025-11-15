@@ -18,6 +18,7 @@ const defaultConfig: AssistantConfig = {
   autoSaveSessions: true,
   showTokenCount: false,
   allowVoiceInput: true,
+  chatTextSize: "medium",
 };
 
 export interface ConversationalAIState {
@@ -45,8 +46,13 @@ export interface ConversationalAIState {
   deleteSession: (sessionId: string) => void;
   archiveSession: (sessionId: string) => void;
   updateConfig: (config: Partial<AssistantConfig>) => void;
+  updateMessageMetadata: (
+    messageId: string,
+    metadata: Partial<Message["metadata"]>,
+  ) => void;
   getSessions: () => ConversationSession[];
   getCurrentSession: () => ConversationSession | null;
+  setCurrentSessionTitle: (title: string) => void;
 }
 
 type SerializableMessage = Omit<Message, "timestamp"> & {
@@ -401,6 +407,29 @@ export const useConversationalAIStore = create<ConversationalAIState>()(
           });
         },
 
+        setCurrentSessionTitle: (title: string) => {
+          set((state) => {
+            const sessionId = state.currentSessionId;
+            if (!sessionId) {
+              return {};
+            }
+
+            const existingSession = state.sessions.get(sessionId);
+            if (!existingSession) {
+              return {};
+            }
+
+            const sessions = new Map(state.sessions);
+            sessions.set(sessionId, {
+              ...existingSession,
+              title,
+              updatedAt: new Date(),
+            });
+
+            return { sessions };
+          });
+        },
+
         updateConfig: (config: Partial<AssistantConfig>) => {
           set((state) => ({
             config: {
@@ -409,6 +438,42 @@ export const useConversationalAIStore = create<ConversationalAIState>()(
               ...config,
             },
           }));
+        },
+
+        updateMessageMetadata: (messageId: string, metadata) => {
+          set((state) => {
+            const idx = state.messages.findIndex((m) => m.id === messageId);
+            if (idx === -1) {
+              return {};
+            }
+
+            const updatedMessages = state.messages.map((m) =>
+              m.id === messageId
+                ? { ...m, metadata: { ...m.metadata, ...metadata } }
+                : m,
+            );
+
+            if (!state.currentSessionId) {
+              return { messages: updatedMessages };
+            }
+
+            const existingSession = state.sessions.get(state.currentSessionId);
+            if (!existingSession) {
+              return { messages: updatedMessages };
+            }
+
+            const sessions = new Map(state.sessions);
+            sessions.set(state.currentSessionId, {
+              ...existingSession,
+              messages: updatedMessages,
+              updatedAt: new Date(),
+            });
+
+            return {
+              messages: updatedMessages,
+              sessions,
+            };
+          });
         },
 
         getSessions: () => {

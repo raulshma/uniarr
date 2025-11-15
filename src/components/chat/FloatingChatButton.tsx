@@ -1,10 +1,10 @@
 import React, { useCallback, useMemo } from "react";
 import { StyleSheet, View, Pressable, Animated } from "react-native";
-import { useTheme, Badge } from "react-native-paper";
+import { Badge } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import type { MD3Theme } from "react-native-paper/lib/typescript/types";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/hooks/useTheme";
 
 interface FloatingChatButtonProps {
   onPress: () => void;
@@ -13,7 +13,7 @@ interface FloatingChatButtonProps {
 export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
   onPress,
 }) => {
-  const theme = useTheme<MD3Theme>();
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const messages = useConversationalAIStore((state) => state.messages);
 
@@ -47,8 +47,8 @@ export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
       StyleSheet.create({
         container: {
           position: "absolute",
-          bottom: 85 + insets.bottom,
-          right: 16,
+          bottom: 95 + insets.bottom,
+          left: 16,
           zIndex: 99,
           elevation: 12,
           shadowColor: theme.colors.shadow || "#000",
@@ -57,21 +57,30 @@ export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
           shadowRadius: 8,
         },
         button: {
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: theme.colors.primary,
+          width: 52,
+          height: 52,
+          borderRadius: theme.custom.spacing.lg,
+          backgroundColor: theme.colors.surface,
           justifyContent: "center",
           alignItems: "center",
-          overflow: "hidden",
+          /* Allow the badge to overflow outside the circular button so it isn't clipped */
+          overflow: "visible",
         },
         badge: {
           position: "absolute",
           top: -4,
           right: -4,
+          /* Ensure the badge has a higher zIndex on Android */
+          zIndex: 999,
+          elevation: 20,
         },
       }),
-    [insets.bottom, theme.colors.primary, theme.colors.shadow],
+    [
+      insets.bottom,
+      theme.colors.shadow,
+      theme.colors.surface,
+      theme.custom.spacing.lg,
+    ],
   );
 
   return (
