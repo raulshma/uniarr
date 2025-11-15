@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
-  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -243,27 +242,11 @@ const ConversationalAIScreen: React.FC = () => {
 
   const [showStarters, setShowStarters] = useState(() => messages.length === 0);
 
-  // Animation for header status pill. 1 = visible, 0 = hidden
-  const statusAnim = React.useRef(new Animated.Value(1)).current;
-  const [statusHeight, setStatusHeight] = useState<number>(0);
-  const lastScrollY = React.useRef<number>(0);
-
   useEffect(() => {
     if (messages.length === 0) {
       setShowStarters(true);
     }
   }, [messages.length]);
-
-  // Show status pill if there are no messages (force visible)
-  useEffect(() => {
-    if (messages.length === 0) {
-      Animated.timing(statusAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
-    }
-  }, [messages.length, statusAnim]);
 
   const styles = useMemo(
     () =>
@@ -676,42 +659,6 @@ const ConversationalAIScreen: React.FC = () => {
     [dialog, handleLoadConversation, deleteConversation],
   );
 
-  // Small helper to animate the header status pill
-  const animateStatus = React.useCallback(
-    (show: boolean) => {
-      Animated.timing(statusAnim, {
-        toValue: show ? 1 : 0,
-        duration: 280,
-        useNativeDriver: false,
-      }).start();
-    },
-    [statusAnim],
-  );
-
-  // Handle chat list scrolls: hide when scrolling down, show when at top or scrolling up
-  const onChatListScroll = React.useCallback(
-    (event: any) => {
-      const y = event?.nativeEvent?.contentOffset?.y ?? 0;
-      const delta = y - lastScrollY.current;
-
-      // Deadzone to avoid jitter
-      const threshold = 8;
-
-      if (y <= 40) {
-        animateStatus(true);
-      } else if (delta > threshold) {
-        // Scrolling down
-        animateStatus(false);
-      } else if (delta < -threshold) {
-        // Scrolling up
-        animateStatus(true);
-      }
-
-      lastScrollY.current = y;
-    },
-    [animateStatus],
-  );
-
   const renderMessage = useCallback(
     ({ currentMessage }: { currentMessage?: IMessage }) => {
       if (!currentMessage) {
@@ -1022,27 +969,8 @@ const ConversationalAIScreen: React.FC = () => {
                   </View>
                 </View>
 
-                <Animated.View
-                  style={[
-                    styles.statusPillContainer,
-                    {
-                      opacity: statusAnim,
-                      height: statusAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, statusHeight || 48],
-                        extrapolate: "clamp",
-                      }),
-                      overflow: "hidden",
-                    },
-                  ]}
-                >
-                  <View
-                    style={styles.statusPill}
-                    onLayout={(e) => {
-                      const h = e.nativeEvent.layout.height;
-                      if (h && h !== statusHeight) setStatusHeight(h);
-                    }}
-                  >
+                <View style={styles.statusPillContainer}>
+                  <View style={styles.statusPill}>
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
@@ -1185,7 +1113,7 @@ const ConversationalAIScreen: React.FC = () => {
                       </View>
                     </ScrollView>
                   </View>
-                </Animated.View>
+                </View>
               </View>
 
               {/* Error Banner */}
@@ -1236,8 +1164,6 @@ const ConversationalAIScreen: React.FC = () => {
                           paddingVertical: 8,
                           paddingBottom: 8,
                         },
-                        onScroll: onChatListScroll,
-                        scrollEventThrottle: 16,
                       }}
                     />
                   )}
