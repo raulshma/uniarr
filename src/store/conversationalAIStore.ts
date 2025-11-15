@@ -21,6 +21,8 @@ const defaultConfig: AssistantConfig = {
   chatTextSize: "medium",
   enableTools: false,
   selectedTools: [],
+  maxContextMessages: 20, // Limit conversation context to last 20 messages
+  includeDetailedMetadata: false, // Don't include full overviews/images by default
 };
 
 export interface ConversationalAIState {

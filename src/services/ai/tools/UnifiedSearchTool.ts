@@ -67,6 +67,48 @@ interface UnifiedSearchResultData {
 }
 
 /**
+ * Deduplicate search results by TMDB ID.
+ * When multiple services return the same media, prefer results from
+ * services where the item is already in the library.
+ *
+ * @param results - Array of search results
+ * @returns Deduplicated array with one result per unique TMDB ID
+ */
+function deduplicateSearchResults(
+  results: UnifiedSearchResult[],
+): UnifiedSearchResult[] {
+  const seenTmdbIds = new Map<number, UnifiedSearchResult>();
+
+  for (const result of results) {
+    const tmdbId = result.externalIds?.tmdbId;
+
+    // Skip results without TMDB ID or keep all results without IDs
+    if (!tmdbId) {
+      continue;
+    }
+
+    const existing = seenTmdbIds.get(tmdbId);
+
+    // If we haven't seen this TMDB ID, add it
+    if (!existing) {
+      seenTmdbIds.set(tmdbId, result);
+      continue;
+    }
+
+    // If we have seen it, prefer the one that's in the library
+    if (result.isInLibrary && !existing.isInLibrary) {
+      seenTmdbIds.set(tmdbId, result);
+    }
+  }
+
+  // Return deduplicated results plus any without TMDB IDs
+  const deduplicatedWithIds = Array.from(seenTmdbIds.values());
+  const withoutIds = results.filter((r) => !r.externalIds?.tmdbId);
+
+  return [...deduplicatedWithIds, ...withoutIds];
+}
+
+/**
  * Format a search result for LLM consumption.
  * Extracts relevant fields and indicates library/availability status.
  *
@@ -208,8 +250,11 @@ async function executeUnifiedSearch(
       };
     }
 
+    // Deduplicate results by TMDB ID (prefer results from primary services)
+    const deduplicatedResults = deduplicateSearchResults(response.results);
+
     // Limit results to the requested amount
-    const limitedResults = response.results.slice(0, params.limit);
+    const limitedResults = deduplicatedResults.slice(0, params.limit);
 
     // Format results for LLM consumption
     const formattedResults = limitedResults.map(formatSearchResult);

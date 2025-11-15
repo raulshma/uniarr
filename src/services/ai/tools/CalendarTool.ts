@@ -290,7 +290,12 @@ async function fetchCalendarEvents(
       seasonNumber: episode.seasonNumber,
       episodeNumber: episode.episodeNumber,
       episodeTitle: episode.title ?? undefined,
-      overview: episode.overview ?? undefined,
+      // Truncate overview to reduce token usage
+      overview: episode.overview
+        ? episode.overview.length > 150
+          ? `${episode.overview.substring(0, 150)}...`
+          : episode.overview
+        : undefined,
       posterUrl:
         episode.series?.images?.find((img) => img.coverType === "poster")
           ?.remoteUrl ?? undefined,
@@ -310,7 +315,12 @@ async function fetchCalendarEvents(
       releaseDate:
         movie.inCinemas ?? movie.digitalRelease ?? movie.physicalRelease ?? "",
       mediaType: "movie" as const,
-      overview: movie.overview ?? undefined,
+      // Truncate overview to reduce token usage
+      overview: movie.overview
+        ? movie.overview.length > 150
+          ? `${movie.overview.substring(0, 150)}...`
+          : movie.overview
+        : undefined,
       posterUrl:
         movie.images?.find((img) => img.coverType === "poster")?.remoteUrl ??
         undefined,

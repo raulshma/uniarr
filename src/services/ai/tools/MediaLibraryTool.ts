@@ -153,6 +153,9 @@ export const mediaLibraryTool: ToolDefinition<
       }
 
       // Query each connector
+      // NOTE: Currently fetches entire library then filters in-memory.
+      // For large libraries (1000+ items), this could be optimized with
+      // server-side pagination/filtering in future connector updates.
       await Promise.all(
         connectorsToQuery.map(async (connectorInfo) => {
           try {
@@ -396,7 +399,12 @@ function mapSeriesToMediaItem(
     hasFile: (series.episodeFileCount ?? 0) > 0,
     posterUrl: series.posterUrl,
     backdropUrl: series.backdropUrl,
-    overview: series.overview,
+    // Truncate overview to reduce token usage
+    overview: series.overview
+      ? series.overview.length > 200
+        ? `${series.overview.substring(0, 200)}...`
+        : series.overview
+      : undefined,
     added: series.added,
     releaseDate: series.nextAiring || series.previousAiring,
     serviceId,
@@ -424,7 +432,12 @@ function mapMovieToMediaItem(
     hasFile: movie.hasFile,
     posterUrl: movie.posterUrl,
     backdropUrl: movie.backdropUrl,
-    overview: movie.overview,
+    // Truncate overview to reduce token usage
+    overview: movie.overview
+      ? movie.overview.length > 200
+        ? `${movie.overview.substring(0, 200)}...`
+        : movie.overview
+      : undefined,
     added: movie.movieFile?.dateAdded,
     releaseDate: movie.releaseDate || movie.inCinemas || movie.digitalRelease,
     serviceId,

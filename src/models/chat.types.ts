@@ -78,6 +78,10 @@ export interface AssistantConfig {
   enableTools?: boolean;
   /** Selected tool names to be available to the AI (when enableTools is true) */
   selectedTools?: string[];
+  /** Maximum number of conversation messages to send as context (default: 20) */
+  maxContextMessages?: number;
+  /** Include detailed metadata in tool results like full overviews and images (default: false) */
+  includeDetailedMetadata?: boolean;
 }
 
 export interface StreamingMessage {

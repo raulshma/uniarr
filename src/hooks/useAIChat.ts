@@ -136,15 +136,25 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
       try {
         const chatService = AIChatService.getInstance();
 
-        // Build conversation history
+        // Build conversation history with windowing to limit context size
+        const store = useConversationalAIStore.getState();
+        const maxContextMessages = store.config.maxContextMessages ?? 20;
+
         const conversationHistory = messages
           .filter(
             (msg) => msg.id !== userMessage.id && msg.id !== assistantMessageId,
           )
+          .slice(-maxContextMessages) // Only keep last N messages for context
           .map((msg) => ({
             role: msg.role as "user" | "assistant",
             content: msg.text,
           }));
+
+        void logger.debug("Building conversation context", {
+          totalMessages: messages.length,
+          contextMessages: conversationHistory.length,
+          maxContextMessages,
+        });
 
         // Send message with tools
         await chatService.sendMessageWithTools(
