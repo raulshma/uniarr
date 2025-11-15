@@ -36,10 +36,9 @@ const AppMarkdown: React.FC<AppMarkdownProps> = ({
   const renderer = useMemo(() => createRenderer(theme), [theme]);
 
   const mergedFlatListProps = useMemo(() => {
-    const listStyle = StyleSheet.flatten([
-      { backgroundColor: theme.colors.surface },
-      flatListProps?.style,
-    ]) as ViewStyle | undefined;
+    const listStyle = StyleSheet.flatten(flatListProps?.style) as
+      | ViewStyle
+      | undefined;
 
     const contentContainerStyle = StyleSheet.flatten([
       { paddingBottom: theme.custom.spacing.md },
@@ -53,7 +52,7 @@ const AppMarkdown: React.FC<AppMarkdownProps> = ({
       style: listStyle,
       contentContainerStyle,
     };
-  }, [flatListProps, theme.colors.surface, theme.custom.spacing.md]);
+  }, [flatListProps, theme.custom.spacing.md]);
 
   return (
     <Marked

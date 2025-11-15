@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { AIMessageCard } from "./AIMessageCard";
 import { Text, useTheme } from "react-native-paper";
 import type { MD3Theme } from "react-native-paper/lib/typescript/types";
+import AppMarkdown from "@/components/markdown/AppMarkdown";
 
 import type { Message } from "@/models/chat.types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -82,7 +83,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             : theme.colors.surfaceVariant,
         },
         bubbleContainer: {
-          maxWidth: "75%",
+          maxWidth: "100%",
           paddingHorizontal: 16,
           paddingVertical: 10,
           borderRadius: 20,
@@ -159,7 +160,17 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
 
       <View style={styles.content}>
         <View style={styles.bubbleContainer}>
-          <Text style={styles.messageText}>{message.text}</Text>
+          {isUser ? (
+            <Text style={styles.messageText}>{message.text}</Text>
+          ) : (
+            <AppMarkdown
+              value={message.text}
+              flatListProps={{
+                scrollEnabled: false,
+                nestedScrollEnabled: false,
+              }}
+            />
+          )}
           {message.error ? (
             <Text style={styles.errorText}>Error: {message.error}</Text>
           ) : null}
