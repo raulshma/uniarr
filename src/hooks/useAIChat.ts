@@ -86,6 +86,12 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
         return;
       }
 
+      // Ensure a session exists before sending message
+      const store = useConversationalAIStore.getState();
+      if (!store.currentSessionId) {
+        store.createSession("New Chat");
+      }
+
       // Abort any in-flight request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -123,6 +129,9 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
 
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+
+      // Track response time
+      const startTime = Date.now();
 
       try {
         const chatService = AIChatService.getInstance();
@@ -187,58 +196,81 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
 
               void logger.info(`Tool result: ${toolName}`, { result });
             },
-            onComplete: () => {
-              // Update message with final tool invocations
+            onComplete: (
+              _fullText: string,
+              metadata?: {
+                reasoningText?: string;
+                usage?: {
+                  promptTokens: number;
+                  completionTokens: number;
+                  totalTokens: number;
+                };
+              },
+            ) => {
+              // Calculate response time
+              const duration = Date.now() - startTime;
+
+              // Update message with final tool invocations and metadata
               const finalInvocations = Array.from(
                 toolInvocationsRef.current.values(),
               );
 
-              if (finalInvocations.length > 0) {
-                const currentMessage = useConversationalAIStore
-                  .getState()
-                  .messages.find((m) => m.id === assistantMessageId);
+              const currentMessage = useConversationalAIStore
+                .getState()
+                .messages.find((m) => m.id === assistantMessageId);
 
-                if (currentMessage) {
-                  // Update the message in the store with tool invocations
-                  const updatedMessage: Message = {
-                    ...currentMessage,
-                    toolInvocations: finalInvocations,
-                    isStreaming: false,
-                  };
+              if (currentMessage) {
+                // Update the message in the store with tool invocations and metadata
+                const updatedMessage: Message = {
+                  ...currentMessage,
+                  toolInvocations:
+                    finalInvocations.length > 0
+                      ? finalInvocations
+                      : currentMessage.toolInvocations,
+                  isStreaming: false,
+                  metadata: {
+                    ...currentMessage.metadata,
+                    duration,
+                    ...(metadata?.reasoningText && {
+                      reasoningText: metadata.reasoningText,
+                    }),
+                    ...(metadata?.usage && {
+                      usage: metadata.usage,
+                      tokens: metadata.usage.totalTokens,
+                    }),
+                  },
+                };
 
-                  // Replace the message in the store
-                  const store = useConversationalAIStore.getState();
-                  const messageIndex = store.messages.findIndex(
-                    (m) => m.id === assistantMessageId,
-                  );
+                // Replace the message in the store
+                const store = useConversationalAIStore.getState();
+                const messageIndex = store.messages.findIndex(
+                  (m) => m.id === assistantMessageId,
+                );
 
-                  if (messageIndex !== -1) {
-                    const updatedMessages = [...store.messages];
-                    updatedMessages[messageIndex] = updatedMessage;
+                if (messageIndex !== -1) {
+                  const updatedMessages = [...store.messages];
+                  updatedMessages[messageIndex] = updatedMessage;
 
-                    // Update both messages and session
-                    if (store.currentSessionId) {
-                      const session = store.sessions.get(
-                        store.currentSessionId,
-                      );
-                      if (session) {
-                        const sessions = new Map(store.sessions);
-                        sessions.set(store.currentSessionId, {
-                          ...session,
-                          messages: updatedMessages,
-                          updatedAt: new Date(),
-                        });
+                  // Update both messages and session
+                  if (store.currentSessionId) {
+                    const session = store.sessions.get(store.currentSessionId);
+                    if (session) {
+                      const sessions = new Map(store.sessions);
+                      sessions.set(store.currentSessionId, {
+                        ...session,
+                        messages: updatedMessages,
+                        updatedAt: new Date(),
+                      });
 
-                        useConversationalAIStore.setState({
-                          messages: updatedMessages,
-                          sessions,
-                        });
-                      }
-                    } else {
                       useConversationalAIStore.setState({
                         messages: updatedMessages,
+                        sessions,
                       });
                     }
+                  } else {
+                    useConversationalAIStore.setState({
+                      messages: updatedMessages,
+                    });
                   }
                 }
               }
@@ -246,6 +278,40 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
               completeStreamingMessage(assistantMessageId);
               setStreamingState(false);
               setLoadingState(false);
+
+              // After first assistant response completes, auto-generate a title
+              void (async () => {
+                try {
+                  const store = useConversationalAIStore.getState();
+                  const session = store.getCurrentSession();
+                  if (!session) {
+                    return;
+                  }
+                  const assistantCount = session.messages.filter(
+                    (m) => m.role === "assistant",
+                  ).length;
+                  if (assistantCount !== 1) {
+                    return;
+                  }
+                  const { ConversationalAIService } = await import(
+                    "@/services/ai/conversational-ai/ConversationalAIService"
+                  );
+                  const service = ConversationalAIService.getInstance();
+                  const title = await service.generateConversationTitle(
+                    session.messages,
+                  );
+                  if (title && title.length > 0) {
+                    store.setCurrentSessionTitle(title);
+                  }
+                } catch (titleError) {
+                  void logger.error("Failed to generate conversation title", {
+                    error:
+                      titleError instanceof Error
+                        ? titleError.message
+                        : String(titleError),
+                  });
+                }
+              })();
             },
             onError: (err: Error) => {
               setErrorState(err);

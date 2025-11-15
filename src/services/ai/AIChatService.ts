@@ -43,7 +43,17 @@ export interface StreamOptions {
   /** Called when a tool execution completes */
   onToolResult?: (toolName: string, result: unknown) => void;
   /** Called when the stream completes successfully */
-  onComplete?: (fullText: string) => void;
+  onComplete?: (
+    fullText: string,
+    metadata?: {
+      reasoningText?: string;
+      usage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      };
+    },
+  ) => void;
   /** Called when an error occurs during streaming */
   onError?: (error: Error) => void;
 }
@@ -220,26 +230,56 @@ export class AIChatService {
       const formatError = this.formatError.bind(this);
       async function* streamGenerator() {
         let fullText = "";
+        let reasoningText: string | undefined;
+        let usage:
+          | {
+              promptTokens: number;
+              completionTokens: number;
+              totalTokens: number;
+            }
+          | undefined;
 
         try {
-          for await (const chunk of result.textStream) {
-            fullText += chunk;
+          // Process the full stream to capture usage data
+          for await (const chunk of result.fullStream) {
+            if (chunk.type === "text-delta") {
+              const text = chunk.text;
+              fullText += text;
 
-            // Call onChunk callback if provided
-            if (options?.onChunk) {
-              options.onChunk(chunk);
+              // Call onChunk callback if provided
+              if (options?.onChunk) {
+                options.onChunk(text);
+              }
+
+              yield text;
+            } else if (chunk.type === "finish") {
+              // Extract usage data from finish chunk
+              if (chunk.totalUsage) {
+                const inputTokens = chunk.totalUsage.inputTokens ?? 0;
+                const outputTokens = chunk.totalUsage.outputTokens ?? 0;
+                usage = {
+                  promptTokens: inputTokens,
+                  completionTokens: outputTokens,
+                  totalTokens: inputTokens + outputTokens,
+                };
+              }
+              if (chunk.finishReason) {
+                reasoningText = String(chunk.finishReason);
+              }
             }
-
-            yield chunk;
           }
 
-          // Call onComplete callback if provided
+          // Call onComplete callback with metadata if provided
           if (options?.onComplete) {
-            options.onComplete(fullText);
+            options.onComplete(fullText, {
+              reasoningText,
+              usage,
+            });
           }
 
           void logger.debug("Message streaming completed", {
             textLength: fullText.length,
+            hasUsage: !!usage,
           });
         } catch (error) {
           const errorObj =
@@ -427,6 +467,14 @@ Remember: You're here to make media management easier and more efficient for sel
         });
 
         let fullText = "";
+        let reasoningText: string | undefined;
+        let usage:
+          | {
+              promptTokens: number;
+              completionTokens: number;
+              totalTokens: number;
+            }
+          | undefined;
 
         try {
           // Process the stream
@@ -463,16 +511,35 @@ Remember: You're here to make media management easier and more efficient for sel
               if (options?.onToolResult) {
                 options.onToolResult(chunk.toolName, chunk.output);
               }
+            } else if (chunk.type === "finish") {
+              // Extract only usage data from finish chunk
+              if (chunk.totalUsage) {
+                const inputTokens = chunk.totalUsage.inputTokens ?? 0;
+                const outputTokens = chunk.totalUsage.outputTokens ?? 0;
+                usage = {
+                  promptTokens: inputTokens,
+                  completionTokens: outputTokens,
+                  totalTokens: inputTokens + outputTokens,
+                };
+              }
+              if (chunk.finishReason) {
+                reasoningText = String(chunk.finishReason);
+              }
             }
           }
 
-          // Call onComplete callback if provided
+          // Call onComplete callback with metadata if provided
           if (options?.onComplete) {
-            options.onComplete(fullText);
+            options.onComplete(fullText, {
+              reasoningText,
+              usage,
+            });
           }
 
           void logger.debug("Message with tools streaming completed", {
             textLength: fullText.length,
+            hasReasoning: !!reasoningText,
+            hasUsage: !!usage,
           });
         } catch (error) {
           const errorObj =
@@ -543,19 +610,38 @@ Remember: You're here to make media management easier and more efficient for sel
             }
           }
 
+          // Extract only usage data from result
+          const reasoningText = result.reasoning
+            ? String(result.reasoning)
+            : undefined;
+          const usage = result.usage
+            ? {
+                promptTokens: result.usage.inputTokens ?? 0,
+                completionTokens: result.usage.outputTokens ?? 0,
+                totalTokens:
+                  (result.usage.inputTokens ?? 0) +
+                  (result.usage.outputTokens ?? 0),
+              }
+            : undefined;
+
           // Deliver the complete text at once
           if (options?.onChunk) {
             options.onChunk(fullText);
           }
 
-          // Call onComplete callback if provided
+          // Call onComplete callback with metadata if provided
           if (options?.onComplete) {
-            options.onComplete(fullText);
+            options.onComplete(fullText, {
+              reasoningText,
+              usage,
+            });
           }
 
           void logger.debug("Message with tools (non-streaming) completed", {
             textLength: fullText.length,
             stepCount: result.steps?.length ?? 0,
+            hasReasoning: !!reasoningText,
+            hasUsage: !!usage,
           });
         } catch (error) {
           const errorObj =

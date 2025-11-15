@@ -294,35 +294,143 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
 
           <View
             style={{
-              flexDirection: "row",
-              justifyContent: "flex-start",
-              alignItems: "center",
-              gap: theme.custom.spacing.xs,
+              flexDirection: "column",
+              gap: 4,
             }}
           >
-            {timestampLabel && !message.isStreaming ? (
-              <Text style={styles.timestamp}>{timestampLabel}</Text>
-            ) : null}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "flex-start",
+                alignItems: "center",
+                gap: theme.custom.spacing.xs,
+              }}
+            >
+              {timestampLabel && !message.isStreaming ? (
+                <Text style={styles.timestamp}>{timestampLabel}</Text>
+              ) : null}
+              {showTokenCount &&
+              !message.isStreaming &&
+              (message.metadata?.duration !== undefined ||
+                message.metadata?.tokens !== undefined) ? (
+                <Text style={styles.metadataText}>
+                  {message.metadata?.duration !== undefined
+                    ? `${formatResponseTime(message.metadata?.duration)} `
+                    : ""}
+                  {message.metadata?.tokens !== undefined
+                    ? ` • ${formatTokens(message.metadata?.tokens)} tokens`
+                    : ""}
+                </Text>
+              ) : null}
+              {!isUser && message.metadata?.thinking && !message.isStreaming ? (
+                <IconButton
+                  icon="lightbulb-on"
+                  size={16}
+                  onPress={handleShowThinking}
+                  style={{ margin: 0 }}
+                />
+              ) : null}
+            </View>
+
+            {/* Display reasoning text if available and Meta toggle is on */}
             {showTokenCount &&
+            !isUser &&
             !message.isStreaming &&
-            (message.metadata?.duration !== undefined ||
-              message.metadata?.tokens !== undefined) ? (
-              <Text style={styles.metadataText}>
-                {message.metadata?.duration !== undefined
-                  ? `${formatResponseTime(message.metadata?.duration)} `
-                  : ""}
-                {message.metadata?.tokens !== undefined
-                  ? ` • ${formatTokens(message.metadata?.tokens)} tokens`
-                  : ""}
-              </Text>
+            message.metadata?.reasoningText ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 4,
+                  paddingTop: 2,
+                }}
+              >
+                <MaterialCommunityIcons
+                  name="brain"
+                  size={12}
+                  color={
+                    isUser
+                      ? "rgba(255,255,255,0.6)"
+                      : theme.colors.onSurfaceVariant
+                  }
+                  style={{ marginTop: 1 }}
+                />
+                <Text
+                  style={[
+                    styles.metadataText,
+                    { flex: 1, fontStyle: "italic" },
+                  ]}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {message.metadata.reasoningText}
+                </Text>
+              </View>
             ) : null}
-            {!isUser && message.metadata?.thinking && !message.isStreaming ? (
-              <IconButton
-                icon="lightbulb-on"
-                size={16}
-                onPress={handleShowThinking}
-                style={{ margin: 0 }}
-              />
+
+            {/* Display usage metadata if available and Meta toggle is on */}
+            {showTokenCount &&
+            !isUser &&
+            !message.isStreaming &&
+            message.metadata?.usage &&
+            typeof message.metadata.usage === "object" &&
+            message.metadata.usage !== null ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  paddingTop: 2,
+                }}
+              >
+                {Object.entries(
+                  message.metadata.usage as Record<string, unknown>,
+                ).map(([key, value]) => {
+                  // Map usage keys to appropriate icons
+                  const getIconForKey = (k: string) => {
+                    const lowerKey = k.toLowerCase();
+                    if (
+                      lowerKey.includes("prompt") ||
+                      lowerKey.includes("input")
+                    )
+                      return "message-text-outline" as const;
+                    if (
+                      lowerKey.includes("completion") ||
+                      lowerKey.includes("output")
+                    )
+                      return "message-reply-text-outline" as const;
+                    if (lowerKey.includes("total")) return "sigma" as const;
+                    if (lowerKey.includes("reasoning")) return "brain" as const;
+                    if (lowerKey.includes("cache")) return "cached" as const;
+                    return "circle-small" as const;
+                  };
+
+                  return (
+                    <View
+                      key={key}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 3,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name={getIconForKey(key)}
+                        size={12}
+                        color={
+                          isUser
+                            ? "rgba(255,255,255,0.6)"
+                            : theme.colors.onSurfaceVariant
+                        }
+                      />
+                      <Text style={[styles.metadataText, { flexShrink: 1 }]}>
+                        {String(value)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
             ) : null}
           </View>
         </View>

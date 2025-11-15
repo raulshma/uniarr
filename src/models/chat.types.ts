@@ -26,6 +26,12 @@ export interface Message {
     duration?: number;
     confidence?: number;
     thinking?: string;
+    reasoningText?: string;
+    usage?: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    };
     card?: {
       // Optional rich card payload used by assistant messages when rendering
       // media preview cards (poster, title, metadata and actions).
