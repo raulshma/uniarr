@@ -1,4 +1,5 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { logger } from "@/services/logger/LoggerService";
 import {
   AIProviderType,
@@ -353,6 +354,14 @@ export class AIProviderManager {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const modelInstance = googleProvider(instance.model);
         // Just instantiating validates the connection
+      } else if (provider === "openrouter") {
+        // Use OpenRouter SDK
+        const openRouterProvider = createOpenRouter({
+          apiKey: instance.apiKey,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const modelInstance = openRouterProvider(instance.model);
+        // Just instantiating validates the connection
       } else {
         // TODO: Add support for other providers
         return {
@@ -380,7 +389,7 @@ export class AIProviderManager {
 
   /**
    * Get the model instance for current provider (for streaming/generation)
-   * Uses createGoogleGenerativeAI to ensure the API key is properly configured
+   * Uses provider-specific SDKs to ensure the API key is properly configured
    */
   getModelInstance() {
     if (!this.currentProvider) {
@@ -395,6 +404,14 @@ export class AIProviderManager {
         apiKey: apiKey,
       });
       return googleProvider(model);
+    }
+
+    if (provider === "openrouter") {
+      // Create an OpenRouter provider using the official SDK
+      const openRouterProvider = createOpenRouter({
+        apiKey: apiKey,
+      });
+      return openRouterProvider(model);
     }
 
     // TODO: Add support for other providers

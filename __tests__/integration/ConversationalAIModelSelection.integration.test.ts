@@ -85,7 +85,12 @@ describe("ConversationalAI Model Selection and Persistence", () => {
     });
 
     it("should support all provider types", () => {
-      const providers: AIProviderType[] = ["google", "openai", "anthropic"];
+      const providers: AIProviderType[] = [
+        "google",
+        "openai",
+        "anthropic",
+        "openrouter",
+      ];
 
       for (const provider of providers) {
         const store = useConversationalAIConfigStore.getState();

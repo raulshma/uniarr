@@ -189,9 +189,11 @@ export default function AISettingsScreen() {
                   Get an API Key
                 </Text>
                 <Text variant="bodySmall">
-                  Sign up for free on{" "}
-                  <Text style={{ fontWeight: "600" }}>ai.google.dev</Text> and
-                  create an API key for Google Gemini.
+                  Sign up for{" "}
+                  <Text style={{ fontWeight: "600" }}>Google Gemini</Text> at
+                  ai.google.dev,{" "}
+                  <Text style={{ fontWeight: "600" }}>OpenRouter</Text> at
+                  openrouter.ai, or other supported providers.
                 </Text>
               </View>
             </View>

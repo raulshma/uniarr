@@ -1,7 +1,7 @@
 /**
  * Supported AI providers
  */
-export type AIProviderType = "google" | "openai" | "anthropic";
+export type AIProviderType = "google" | "openai" | "anthropic" | "openrouter";
 
 /**
  * Available models for each provider
@@ -39,6 +39,18 @@ export const AI_PROVIDER_MODELS: Record<AIProviderType, string[]> = {
     "claude-3-opus-20240229",
     "claude-3-sonnet-20240229",
     "claude-3-haiku-20240307",
+  ],
+  openrouter: [
+    // Popular models - will be dynamically fetched from API
+    "openai/gpt-4-turbo",
+    "openai/gpt-4",
+    "openai/gpt-3.5-turbo",
+    "anthropic/claude-3-opus",
+    "anthropic/claude-3-sonnet",
+    "anthropic/claude-3-haiku",
+    "google/gemini-pro",
+    "meta-llama/llama-3-70b-instruct",
+    "mistralai/mistral-large",
   ],
 };
 
@@ -111,6 +123,17 @@ export const AI_PROVIDERS: Record<AIProviderType, AIProviderInfo> = {
     costPerMillion: {
       input: 3,
       output: 15,
+    },
+  },
+  openrouter: {
+    type: "openrouter",
+    name: "OpenRouter",
+    description: "Access to multiple AI models through OpenRouter",
+    website: "https://openrouter.ai",
+    maxTokensPerRequest: 128000,
+    costPerMillion: {
+      input: 0,
+      output: 0,
     },
   },
 };

@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { logger } from "@/services/logger/LoggerService";
 
-export type AIProvider = "google" | "openai" | "anthropic";
+export type AIProvider = "google" | "openai" | "anthropic" | "openrouter";
 
 export interface AIKeyConfig {
   provider: AIProvider;
@@ -389,6 +389,16 @@ export class AIKeyManager {
           return {
             isValid: false,
             error: 'Anthropic key should start with "sk-ant-"',
+          };
+        }
+        break;
+
+      case "openrouter":
+        // OpenRouter keys start with 'sk-or-'
+        if (!apiKey.startsWith("sk-or-")) {
+          return {
+            isValid: false,
+            error: 'OpenRouter key should start with "sk-or-"',
           };
         }
         break;
