@@ -1,4 +1,4 @@
-import { streamText, type LanguageModel } from "ai";
+import { streamText, generateText, type LanguageModel } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { logger } from "@/services/logger/LoggerService";
@@ -417,85 +417,174 @@ Remember: You're here to make media management easier and more efficient for sel
         })),
       ];
 
-      // Start streaming with tools
-      const result = await streamText({
-        model,
-        messages: messagesWithSystem,
-        tools,
-      });
+      // Check if streaming is enabled
+      const enableStreaming = conversationalConfig.enableStreaming;
 
-      // Create an async generator to handle the stream and tool calls
-      const formatError = this.formatError.bind(this);
-      async function* streamGenerator() {
-        let fullText = "";
+      // Use streaming or non-streaming based on user preference
+      if (enableStreaming) {
+        // Start streaming with tools
+        const result = await streamText({
+          model,
+          messages: messagesWithSystem,
+          tools,
+        });
 
-        try {
-          // Process the stream
-          for await (const chunk of result.fullStream) {
-            // Handle different chunk types
-            if (chunk.type === "text-delta") {
-              // Text chunk from the LLM
-              const text = chunk.text;
-              fullText += text;
+        // Create an async generator to handle the stream and tool calls
+        const formatError = this.formatError.bind(this);
+        async function* streamGenerator() {
+          let fullText = "";
 
-              // Call onChunk callback if provided
-              if (options?.onChunk) {
-                options.onChunk(text);
-              }
+          try {
+            // Process the stream
+            for await (const chunk of result.fullStream) {
+              // Handle different chunk types
+              if (chunk.type === "text-delta") {
+                // Text chunk from the LLM
+                const text = chunk.text;
+                fullText += text;
 
-              yield text;
-            } else if (chunk.type === "tool-call") {
-              // LLM is invoking a tool
-              void logger.debug("Tool call initiated", {
-                toolName: chunk.toolName,
-                toolCallId: chunk.toolCallId,
-              });
+                // Call onChunk callback if provided
+                if (options?.onChunk) {
+                  options.onChunk(text);
+                }
 
-              // Call onToolCall callback if provided
-              if (options?.onToolCall) {
-                options.onToolCall(chunk.toolName, chunk.input);
-              }
-            } else if (chunk.type === "tool-result") {
-              // Tool execution completed
-              void logger.debug("Tool result received", {
-                toolName: chunk.toolName,
-                toolCallId: chunk.toolCallId,
-              });
+                yield text;
+              } else if (chunk.type === "tool-call") {
+                // LLM is invoking a tool
+                void logger.debug("Tool call initiated", {
+                  toolName: chunk.toolName,
+                  toolCallId: chunk.toolCallId,
+                });
 
-              // Call onToolResult callback if provided
-              if (options?.onToolResult) {
-                options.onToolResult(chunk.toolName, chunk.output);
+                // Call onToolCall callback if provided
+                if (options?.onToolCall) {
+                  options.onToolCall(chunk.toolName, chunk.input);
+                }
+              } else if (chunk.type === "tool-result") {
+                // Tool execution completed
+                void logger.debug("Tool result received", {
+                  toolName: chunk.toolName,
+                  toolCallId: chunk.toolCallId,
+                });
+
+                // Call onToolResult callback if provided
+                if (options?.onToolResult) {
+                  options.onToolResult(chunk.toolName, chunk.output);
+                }
               }
             }
+
+            // Call onComplete callback if provided
+            if (options?.onComplete) {
+              options.onComplete(fullText);
+            }
+
+            void logger.debug("Message with tools streaming completed", {
+              textLength: fullText.length,
+            });
+          } catch (error) {
+            const errorObj =
+              error instanceof Error ? error : new Error(String(error));
+
+            void logger.error("Error during message with tools streaming", {
+              error: errorObj.message,
+              formattedError: formatError(errorObj),
+            });
+
+            // Call onError callback if provided
+            if (options?.onError) {
+              options.onError(errorObj);
+            }
+
+            throw errorObj;
           }
-
-          // Call onComplete callback if provided
-          if (options?.onComplete) {
-            options.onComplete(fullText);
-          }
-
-          void logger.debug("Message with tools streaming completed", {
-            textLength: fullText.length,
-          });
-        } catch (error) {
-          const errorObj =
-            error instanceof Error ? error : new Error(String(error));
-
-          void logger.error("Error during message with tools streaming", {
-            error: errorObj.message,
-            formattedError: formatError(errorObj),
-          });
-
-          // Call onError callback if provided
-          if (options?.onError) {
-            options.onError(errorObj);
-          }
-
-          throw errorObj;
         }
-      }
 
-      return streamGenerator();
+        return streamGenerator();
+      } else {
+        // Non-streaming mode: generate complete response at once
+        const result = await generateText({
+          model,
+          messages: messagesWithSystem,
+          tools,
+        });
+
+        // Create an async generator that yields the complete text at once
+        const formatError = this.formatError.bind(this);
+        async function* nonStreamGenerator() {
+          try {
+            const fullText = result.text;
+
+            // Process tool calls if any
+            if (result.toolCalls && result.toolCalls.length > 0) {
+              for (const toolCall of result.toolCalls) {
+                void logger.debug("Tool call initiated (non-streaming)", {
+                  toolName: toolCall.toolName,
+                  toolCallId: toolCall.toolCallId,
+                });
+
+                // Call onToolCall callback if provided
+                if (options?.onToolCall) {
+                  options.onToolCall(
+                    toolCall.toolName,
+                    "args" in toolCall ? toolCall.args : {},
+                  );
+                }
+              }
+            }
+
+            // Process tool results if any
+            if (result.toolResults && result.toolResults.length > 0) {
+              for (const toolResult of result.toolResults) {
+                void logger.debug("Tool result received (non-streaming)", {
+                  toolName: toolResult.toolName,
+                  toolCallId: toolResult.toolCallId,
+                });
+
+                // Call onToolResult callback if provided
+                if (options?.onToolResult) {
+                  options.onToolResult(
+                    toolResult.toolName,
+                    "result" in toolResult ? toolResult.result : undefined,
+                  );
+                }
+              }
+            }
+
+            // Yield the complete text at once
+            yield fullText;
+
+            // Call onComplete callback if provided
+            if (options?.onComplete) {
+              options.onComplete(fullText);
+            }
+
+            void logger.debug("Message with tools (non-streaming) completed", {
+              textLength: fullText.length,
+            });
+          } catch (error) {
+            const errorObj =
+              error instanceof Error ? error : new Error(String(error));
+
+            void logger.error(
+              "Error during message with tools (non-streaming)",
+              {
+                error: errorObj.message,
+                formattedError: formatError(errorObj),
+              },
+            );
+
+            // Call onError callback if provided
+            if (options?.onError) {
+              options.onError(errorObj);
+            }
+
+            throw errorObj;
+          }
+        }
+
+        return nonStreamGenerator();
+      }
     } catch (error) {
       const errorObj =
         error instanceof Error ? error : new Error(String(error));
