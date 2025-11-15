@@ -13,7 +13,7 @@ import { logger } from "@/services/logger/LoggerService";
 const STORE_KEY = "conversational-ai-store";
 
 const defaultConfig: AssistantConfig = {
-  enableStreaming: true,
+  enableStreaming: false,
   maxHistoryLength: 50,
   autoSaveSessions: true,
   showTokenCount: false,

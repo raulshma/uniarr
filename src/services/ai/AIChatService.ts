@@ -1,4 +1,4 @@
-import { streamText, generateText, type LanguageModel } from "ai";
+import { streamText, generateText, stepCountIs, type LanguageModel } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { logger } from "@/services/logger/LoggerService";
@@ -337,7 +337,7 @@ Remember: You're here to make media management easier and more efficient for sel
    *
    * @param messages - Array of conversation messages
    * @param options - Optional streaming callbacks
-   * @returns AsyncIterable that yields text chunks and handles tool invocations
+   * @returns Promise that resolves when the message is complete
    * @throws {Error} If model configuration fails or streaming errors occur
    *
    * @example
@@ -346,21 +346,18 @@ Remember: You're here to make media management easier and more efficient for sel
    *   { role: 'user', content: 'What movies are in my library?' }
    * ];
    *
-   * const toolInvocations: ToolInvocation[] = [];
-   *
-   * for await (const chunk of await chatService.sendMessageWithTools(messages, {
+   * await chatService.sendMessageWithTools(messages, {
    *   onToolCall: (name, args) => console.log('Tool called:', name),
    *   onToolResult: (name, result) => console.log('Tool result:', result),
    *   onChunk: (text) => console.log(text),
-   * })) {
-   *   // Process each chunk
-   * }
+   *   onComplete: (fullText) => console.log('Done:', fullText),
+   * });
    * ```
    */
   async sendMessageWithTools(
     messages: ChatMessage[],
     options?: StreamOptions,
-  ): Promise<AsyncIterable<string>> {
+  ): Promise<void> {
     try {
       void logger.debug("Sending message with tools to LLM", {
         messageCount: messages.length,
@@ -429,161 +426,153 @@ Remember: You're here to make media management easier and more efficient for sel
           tools,
         });
 
-        // Create an async generator to handle the stream and tool calls
-        const formatError = this.formatError.bind(this);
-        async function* streamGenerator() {
-          let fullText = "";
+        let fullText = "";
 
-          try {
-            // Process the stream
-            for await (const chunk of result.fullStream) {
-              // Handle different chunk types
-              if (chunk.type === "text-delta") {
-                // Text chunk from the LLM
-                const text = chunk.text;
-                fullText += text;
+        try {
+          // Process the stream
+          for await (const chunk of result.fullStream) {
+            // Handle different chunk types
+            if (chunk.type === "text-delta") {
+              // Text chunk from the LLM
+              const text = chunk.text;
+              fullText += text;
 
-                // Call onChunk callback if provided
-                if (options?.onChunk) {
-                  options.onChunk(text);
-                }
+              // Call onChunk callback if provided
+              if (options?.onChunk) {
+                options.onChunk(text);
+              }
+            } else if (chunk.type === "tool-call") {
+              // LLM is invoking a tool
+              void logger.debug("Tool call initiated", {
+                toolName: chunk.toolName,
+                toolCallId: chunk.toolCallId,
+              });
 
-                yield text;
-              } else if (chunk.type === "tool-call") {
-                // LLM is invoking a tool
-                void logger.debug("Tool call initiated", {
-                  toolName: chunk.toolName,
-                  toolCallId: chunk.toolCallId,
-                });
+              // Call onToolCall callback if provided
+              if (options?.onToolCall) {
+                options.onToolCall(chunk.toolName, chunk.input);
+              }
+            } else if (chunk.type === "tool-result") {
+              // Tool execution completed
+              void logger.debug("Tool result received", {
+                toolName: chunk.toolName,
+                toolCallId: chunk.toolCallId,
+              });
 
-                // Call onToolCall callback if provided
-                if (options?.onToolCall) {
-                  options.onToolCall(chunk.toolName, chunk.input);
-                }
-              } else if (chunk.type === "tool-result") {
-                // Tool execution completed
-                void logger.debug("Tool result received", {
-                  toolName: chunk.toolName,
-                  toolCallId: chunk.toolCallId,
-                });
-
-                // Call onToolResult callback if provided
-                if (options?.onToolResult) {
-                  options.onToolResult(chunk.toolName, chunk.output);
-                }
+              // Call onToolResult callback if provided
+              if (options?.onToolResult) {
+                options.onToolResult(chunk.toolName, chunk.output);
               }
             }
-
-            // Call onComplete callback if provided
-            if (options?.onComplete) {
-              options.onComplete(fullText);
-            }
-
-            void logger.debug("Message with tools streaming completed", {
-              textLength: fullText.length,
-            });
-          } catch (error) {
-            const errorObj =
-              error instanceof Error ? error : new Error(String(error));
-
-            void logger.error("Error during message with tools streaming", {
-              error: errorObj.message,
-              formattedError: formatError(errorObj),
-            });
-
-            // Call onError callback if provided
-            if (options?.onError) {
-              options.onError(errorObj);
-            }
-
-            throw errorObj;
           }
-        }
 
-        return streamGenerator();
+          // Call onComplete callback if provided
+          if (options?.onComplete) {
+            options.onComplete(fullText);
+          }
+
+          void logger.debug("Message with tools streaming completed", {
+            textLength: fullText.length,
+          });
+        } catch (error) {
+          const errorObj =
+            error instanceof Error ? error : new Error(String(error));
+
+          void logger.error("Error during message with tools streaming", {
+            error: errorObj.message,
+            formattedError: this.formatError(errorObj),
+          });
+
+          // Call onError callback if provided
+          if (options?.onError) {
+            options.onError(errorObj);
+          }
+
+          throw errorObj;
+        }
       } else {
-        // Non-streaming mode: generate complete response at once
+        // Non-streaming mode: use generateText with multi-step tool execution
         const result = await generateText({
           model,
           messages: messagesWithSystem,
           tools,
+          stopWhen: stepCountIs(5), // Allow up to 5 steps for tool calls
         });
 
-        // Create an async generator that yields the complete text at once
-        const formatError = this.formatError.bind(this);
-        async function* nonStreamGenerator() {
-          try {
-            const fullText = result.text;
+        try {
+          const fullText = result.text;
 
-            // Process tool calls if any
-            if (result.toolCalls && result.toolCalls.length > 0) {
-              for (const toolCall of result.toolCalls) {
-                void logger.debug("Tool call initiated (non-streaming)", {
-                  toolName: toolCall.toolName,
-                  toolCallId: toolCall.toolCallId,
-                });
+          // Process all steps (tool calls and results)
+          if (result.steps) {
+            for (const step of result.steps) {
+              // Process tool calls in this step
+              if (step.toolCalls && step.toolCalls.length > 0) {
+                for (const toolCall of step.toolCalls) {
+                  void logger.debug("Tool call initiated (non-streaming)", {
+                    toolName: toolCall.toolName,
+                    toolCallId: toolCall.toolCallId,
+                  });
 
-                // Call onToolCall callback if provided
-                if (options?.onToolCall) {
-                  options.onToolCall(
-                    toolCall.toolName,
-                    "args" in toolCall ? toolCall.args : {},
-                  );
+                  // Call onToolCall callback if provided
+                  if (options?.onToolCall) {
+                    options.onToolCall(
+                      toolCall.toolName,
+                      "args" in toolCall ? toolCall.args : {},
+                    );
+                  }
+                }
+              }
+
+              // Process tool results in this step
+              if (step.toolResults && step.toolResults.length > 0) {
+                for (const toolResult of step.toolResults) {
+                  void logger.debug("Tool result received (non-streaming)", {
+                    toolName: toolResult.toolName,
+                    toolCallId: toolResult.toolCallId,
+                  });
+
+                  // Call onToolResult callback if provided
+                  if (options?.onToolResult) {
+                    options.onToolResult(
+                      toolResult.toolName,
+                      "result" in toolResult ? toolResult.result : undefined,
+                    );
+                  }
                 }
               }
             }
-
-            // Process tool results if any
-            if (result.toolResults && result.toolResults.length > 0) {
-              for (const toolResult of result.toolResults) {
-                void logger.debug("Tool result received (non-streaming)", {
-                  toolName: toolResult.toolName,
-                  toolCallId: toolResult.toolCallId,
-                });
-
-                // Call onToolResult callback if provided
-                if (options?.onToolResult) {
-                  options.onToolResult(
-                    toolResult.toolName,
-                    "result" in toolResult ? toolResult.result : undefined,
-                  );
-                }
-              }
-            }
-
-            // Yield the complete text at once
-            yield fullText;
-
-            // Call onComplete callback if provided
-            if (options?.onComplete) {
-              options.onComplete(fullText);
-            }
-
-            void logger.debug("Message with tools (non-streaming) completed", {
-              textLength: fullText.length,
-            });
-          } catch (error) {
-            const errorObj =
-              error instanceof Error ? error : new Error(String(error));
-
-            void logger.error(
-              "Error during message with tools (non-streaming)",
-              {
-                error: errorObj.message,
-                formattedError: formatError(errorObj),
-              },
-            );
-
-            // Call onError callback if provided
-            if (options?.onError) {
-              options.onError(errorObj);
-            }
-
-            throw errorObj;
           }
-        }
 
-        return nonStreamGenerator();
+          // Deliver the complete text at once
+          if (options?.onChunk) {
+            options.onChunk(fullText);
+          }
+
+          // Call onComplete callback if provided
+          if (options?.onComplete) {
+            options.onComplete(fullText);
+          }
+
+          void logger.debug("Message with tools (non-streaming) completed", {
+            textLength: fullText.length,
+            stepCount: result.steps?.length ?? 0,
+          });
+        } catch (error) {
+          const errorObj =
+            error instanceof Error ? error : new Error(String(error));
+
+          void logger.error("Error during message with tools (non-streaming)", {
+            error: errorObj.message,
+            formattedError: this.formatError(errorObj),
+          });
+
+          // Call onError callback if provided
+          if (options?.onError) {
+            options.onError(errorObj);
+          }
+
+          throw errorObj;
+        }
       }
     } catch (error) {
       const errorObj =
