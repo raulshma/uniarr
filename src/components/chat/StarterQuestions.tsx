@@ -55,7 +55,8 @@ const StarterQuestionsComponent: React.FC<StarterQuestionsProps> = ({
           backgroundColor: theme.colors.surfaceVariant,
           flexDirection: "row",
           alignItems: "center",
-          gap: 14,
+          alignSelf: "stretch",
+          width: "100%",
         },
         iconContainer: {
           width: 40,
@@ -65,10 +66,12 @@ const StarterQuestionsComponent: React.FC<StarterQuestionsProps> = ({
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
+          marginRight: 14,
         },
         textContainer: {
           flex: 1,
           justifyContent: "center",
+          flexShrink: 1,
         },
         suggestionText: {
           fontSize: 15,

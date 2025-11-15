@@ -11,13 +11,11 @@ import { GiftedChat, type IMessage } from "react-native-gifted-chat";
 import {
   ActivityIndicator,
   Text,
-  useTheme,
   Button,
   Switch,
   Divider,
   Snackbar,
 } from "react-native-paper";
-import type { MD3Theme } from "react-native-paper/lib/typescript/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
@@ -46,12 +44,13 @@ import {
   useConversationalAIConfigStore,
   selectConversationalAIHasValidConfig,
 } from "@/store/conversationalAIConfigStore";
+import { useTheme } from "@/hooks/useTheme";
 
 const USER_ID = "user";
 const ASSISTANT_ID = "assistant";
 
 const ConversationalAIScreen: React.FC = () => {
-  const theme = useTheme<MD3Theme>();
+  const theme = useTheme();
   const router = useRouter();
   const providerManager = AIProviderManager.getInstance();
   const dialog = useDialog();
@@ -228,7 +227,7 @@ const ConversationalAIScreen: React.FC = () => {
           flexDirection: "row",
           alignItems: "center",
           gap: 6,
-          paddingHorizontal: 12,
+          paddingHorizontal: theme.custom.spacing.xxs,
           paddingVertical: 6,
           borderRadius: 16,
           backgroundColor: theme.colors.surfaceVariant,
@@ -336,6 +335,7 @@ const ConversationalAIScreen: React.FC = () => {
       theme.colors.surface,
       theme.colors.errorContainer,
       theme.colors.error,
+      theme.custom.spacing.xxs,
     ],
   );
 

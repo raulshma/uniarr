@@ -118,6 +118,16 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             ? "rgba(255,255,255,0.8)"
             : theme.colors.onSurfaceVariant,
         },
+        content: {
+          flex: 1,
+          flexDirection: "column",
+          alignItems: isUser ? "flex-end" : "flex-start",
+        },
+        cardWrapper: {
+          marginTop: 6,
+          maxWidth: "75%",
+          alignSelf: isUser ? "flex-end" : "flex-start",
+        },
       }),
     [
       isUser,
@@ -147,32 +157,34 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
         />
       </View>
 
-      <View style={styles.bubbleContainer}>
-        <Text style={styles.messageText}>{message.text}</Text>
-        {message.error ? (
-          <Text style={styles.errorText}>Error: {message.error}</Text>
-        ) : null}
-        {message.isStreaming ? (
-          <Text style={styles.streaming}>Typing{indicatorDots}</Text>
-        ) : null}
-        {timestampLabel && !message.isStreaming ? (
-          <Text style={styles.timestamp}>{timestampLabel}</Text>
+      <View style={styles.content}>
+        <View style={styles.bubbleContainer}>
+          <Text style={styles.messageText}>{message.text}</Text>
+          {message.error ? (
+            <Text style={styles.errorText}>Error: {message.error}</Text>
+          ) : null}
+          {message.isStreaming ? (
+            <Text style={styles.streaming}>Typing{indicatorDots}</Text>
+          ) : null}
+          {timestampLabel && !message.isStreaming ? (
+            <Text style={styles.timestamp}>{timestampLabel}</Text>
+          ) : null}
+        </View>
+
+        {/* Render optional rich card (templates like movie/article cards) */}
+        {message.metadata?.card ? (
+          <View style={styles.cardWrapper}>
+            <AIMessageCard
+              message={message}
+              onAddToRadarr={() => {
+                onAddToRadarr?.(message);
+              }}
+              onShowCast={() => onShowCast?.(message)}
+              onFindSimilar={() => {}}
+            />
+          </View>
         ) : null}
       </View>
-
-      {/* Render optional rich card (templates like movie/article cards) */}
-      {message.metadata?.card ? (
-        <View style={{ flex: 1, marginTop: 6 }}>
-          <AIMessageCard
-            message={message}
-            onAddToRadarr={() => {
-              onAddToRadarr?.(message);
-            }}
-            onShowCast={() => onShowCast?.(message)}
-            onFindSimilar={() => {}}
-          />
-        </View>
-      ) : null}
     </Pressable>
   );
 };

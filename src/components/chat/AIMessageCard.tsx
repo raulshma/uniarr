@@ -109,7 +109,7 @@ export const AIMessageCard: React.FC<Props> = ({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="ai-message-card">
       <BlurView intensity={70} tint="dark" style={styles.glassCard}>
         {card.posterUrl ? (
           <View style={styles.posterWrapper}>

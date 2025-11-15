@@ -1,12 +1,23 @@
 import { AIRateLimiter } from "@/services/ai/core/AIRateLimiter";
 import { AIService } from "@/services/ai/core/AIService";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { logger } from "@/services/logger/LoggerService";
 import { handleApiError, type ErrorContext } from "@/utils/error.utils";
 import { withRetry, networkRetryCondition } from "@/utils/retry.utils";
 import type { Message } from "@/models/chat.types";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
+
+/**
+ * Represents a snapshot of a connector's state for building the system prompt.
+ */
+interface ServiceStateSnapshot {
+  name: string;
+  type: string;
+  status: string;
+  version?: string;
+}
 
 /**
  * Conversational AI Assistant Service
@@ -18,11 +29,13 @@ export class ConversationalAIService {
   private readonly aiService: AIService;
   private readonly rateLimiter: AIRateLimiter;
   private readonly providerManager: AIProviderManager;
+  private readonly connectorManager: ConnectorManager;
 
   private constructor() {
     this.aiService = AIService.getInstance();
     this.rateLimiter = AIRateLimiter.getInstance();
     this.providerManager = AIProviderManager.getInstance();
+    this.connectorManager = ConnectorManager.getInstance();
   }
 
   static getInstance(): ConversationalAIService {
@@ -68,10 +81,8 @@ export class ConversationalAIService {
 
   /**
    * Build system prompt with current infrastructure context for the LLM.
-   * SIMPLIFIED: Currently just a basic prompt. Advanced version commented out below.
    */
   private async buildSystemPrompt(): Promise<string> {
-    /*
     try {
       const connectors = this.connectorManager.getAllConnectors();
 
@@ -153,11 +164,6 @@ Please use the conversation history provided to maintain context and continuity.
 Help users with their media services, answer questions, and provide recommendations.
 Be conversational, specific, and helpful.`;
     }
-    */
-
-    // Keep the system prompt intentionally short — detailed context is optional
-    // but the system prompt can be extended later without changing the public API.
-    return `You are UniArr, a helpful assistant for media management. Answer questions clearly and concisely.`;
   }
 
   /**
@@ -293,14 +299,67 @@ Be conversational, specific, and helpful.`;
 
   /**
    * Provide starter questions for first-time interactions.
-   * SIMPLE VERSION
+   * Context-aware questions based on available services.
    */
   async getStarterQuestions(): Promise<string[]> {
-    return [
-      "Hello! How can you help me?",
-      "What can you do?",
-      "Tell me something interesting",
-    ];
+    try {
+      const connectors = this.connectorManager.getAllConnectors();
+      const hasServices = connectors.length > 0;
+
+      if (!hasServices) {
+        return [
+          "What services can I add to UniArr?",
+          "How do I get started with media management?",
+          "Tell me about UniArr features",
+        ];
+      }
+
+      const questions = [
+        "What's the current status of all my services?",
+        "Are there any issues with my media setup?",
+        "How can I optimize my download performance?",
+      ];
+
+      // Add service-specific questions based on available connectors
+      const hasMediaLibraries = connectors.some((c) =>
+        ["radarr", "sonarr", "lidarr", "readarr"].includes(c.config.type),
+      );
+      const hasDownloadClients = connectors.some((c) =>
+        ["qbittorrent", "transmission", "deluge", "sabnzbd"].includes(
+          c.config.type,
+        ),
+      );
+      const hasMediaServers = connectors.some((c) =>
+        ["jellyfin", "plex", "emby"].includes(c.config.type),
+      );
+
+      if (hasMediaLibraries) {
+        questions.push("What's upcoming in my media libraries?");
+      }
+
+      if (hasDownloadClients) {
+        questions.push("Are there any active downloads?");
+      }
+
+      if (hasMediaServers) {
+        questions.push("What can I watch right now?");
+      }
+
+      return questions.slice(0, 6); // Limit to 6 questions max
+    } catch (error) {
+      void logger.warn(
+        "[ConversationalAI] Failed to generate starter questions.",
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+
+      return [
+        "Hello! How can you help me manage my media?",
+        "What services do I have configured?",
+        "Can you check my system health?",
+      ];
+    }
   }
 
   /**
