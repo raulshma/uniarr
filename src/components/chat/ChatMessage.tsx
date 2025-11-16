@@ -1,11 +1,16 @@
 import React, { memo, useEffect, useMemo, useState, useRef } from "react";
 import { Pressable, StyleSheet, View, Animated } from "react-native";
 import { AIMessageCard } from "./AIMessageCard";
+import { ConfirmationPrompt } from "./ConfirmationPrompt";
+import { WorkflowProgress } from "./WorkflowProgress";
+import { WebSearchResults } from "./WebSearchResults";
+import { MediaDetailsCard } from "./MediaDetailsCard";
 import { Text, IconButton } from "react-native-paper";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import { formatResponseTime, formatTokens } from "@/utils/formatting.utils";
 import AppMarkdown from "@/components/markdown/AppMarkdown";
 import { useRouter } from "expo-router";
+import { useAIChat } from "@/hooks/useAIChat";
 
 import type { Message } from "@/models/chat.types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -30,7 +35,9 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   const router = useRouter();
   const isUser = message.role === "user";
   const [indicatorDots, setIndicatorDots] = useState(".");
+  const [isConfirming, setIsConfirming] = useState(false);
   const chatTextSize = useConversationalAIStore((s) => s.config.chatTextSize);
+  const aiChat = useAIChat();
 
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const translateXAnim = useRef(new Animated.Value(0)).current;
@@ -213,6 +220,38 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
 
     return messageFontSize / baseMarkdownFont;
   }, [chatTextSize, theme.custom.typography.bodyLarge?.fontSize]);
+
+  const handleConfirm = async () => {
+    if (!message.metadata?.confirmation) {
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      // Send confirmation message to AI
+      await aiChat.sendMessage(
+        `Yes, I confirm the action: ${message.metadata.confirmation.action}`,
+      );
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!message.metadata?.confirmation) {
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      // Send cancellation message to AI
+      await aiChat.sendMessage(
+        `No, I want to cancel the action: ${message.metadata.confirmation.action}`,
+      );
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   return (
     <Animated.View
@@ -477,6 +516,41 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                 onShowCast={() => onShowCast?.(message)}
                 onFindSimilar={() => {}}
               />
+            </View>
+          ) : null}
+
+          {/* Render confirmation prompt if present */}
+          {message.metadata?.confirmation && !isUser ? (
+            <View style={styles.cardWrapper}>
+              <ConfirmationPrompt
+                confirmation={message.metadata.confirmation}
+                onConfirm={handleConfirm}
+                onCancel={handleCancel}
+                isLoading={isConfirming}
+              />
+            </View>
+          ) : null}
+
+          {/* Render workflow progress if present */}
+          {message.metadata?.workflowProgress && !isUser ? (
+            <View style={styles.cardWrapper}>
+              <WorkflowProgress progress={message.metadata.workflowProgress} />
+            </View>
+          ) : null}
+
+          {/* Render web search results if present */}
+          {message.metadata?.webSearchResults &&
+          message.metadata.webSearchResults.length > 0 &&
+          !isUser ? (
+            <View style={styles.cardWrapper}>
+              <WebSearchResults results={message.metadata.webSearchResults} />
+            </View>
+          ) : null}
+
+          {/* Render media details if present */}
+          {message.metadata?.mediaDetails && !isUser ? (
+            <View style={styles.cardWrapper}>
+              <MediaDetailsCard details={message.metadata.mediaDetails} />
             </View>
           ) : null}
         </View>

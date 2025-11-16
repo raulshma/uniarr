@@ -4,6 +4,7 @@ import { AIChatService } from "@/services/ai/AIChatService";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import type { Message, ToolInvocation } from "@/models/chat.types";
 import { logger } from "@/services/logger/LoggerService";
+import { ConfirmationManager } from "@/services/ai/tools/ConfirmationManager";
 
 const createMessageId = (): string =>
   `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -11,6 +12,18 @@ const createMessageId = (): string =>
 interface UseAIChatOptions {
   onToolCall?: (toolName: string, args: unknown) => void;
   onToolResult?: (toolName: string, result: unknown) => void;
+  onConfirmationRequested?: (
+    confirmationId: string,
+    prompt: string,
+    severity: "low" | "medium" | "high",
+  ) => void;
+  onWorkflowProgress?: (
+    workflowId: string,
+    workflowName: string,
+    stepId: string,
+    stepIndex: number,
+    totalSteps: number,
+  ) => void;
 }
 
 interface UseAIChatReturn {
@@ -25,7 +38,12 @@ interface UseAIChatReturn {
  * Handles streaming responses, tool invocations, and state management.
  */
 export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
-  const { onToolCall, onToolResult } = options ?? {};
+  const {
+    onToolCall,
+    onToolResult,
+    onConfirmationRequested,
+    onWorkflowProgress,
+  } = options ?? {};
 
   const addMessage = useCallback(
     (msg: Message) => useConversationalAIStore.getState().addMessage(msg),
@@ -206,6 +224,167 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
 
               void logger.info(`Tool result: ${toolName}`, { result });
             },
+            onConfirmationRequested: (
+              confirmationId: string,
+              prompt: string,
+              severity: "low" | "medium" | "high",
+            ) => {
+              // Get the confirmation details from ConfirmationManager
+              const confirmationManager = ConfirmationManager.getInstance();
+              const pending = confirmationManager.getPending(confirmationId);
+
+              if (pending) {
+                // Update the assistant message with confirmation metadata
+                const currentMessage = useConversationalAIStore
+                  .getState()
+                  .messages.find((m) => m.id === assistantMessageId);
+
+                if (currentMessage) {
+                  const updatedMessage: Message = {
+                    ...currentMessage,
+                    metadata: {
+                      ...currentMessage.metadata,
+                      confirmation: {
+                        id: pending.id,
+                        action: pending.action,
+                        target: pending.target,
+                        severity: pending.severity,
+                        toolName: pending.toolName,
+                        params: pending.params,
+                        timestamp: pending.timestamp,
+                      },
+                    },
+                  };
+
+                  // Update the message in the store
+                  const store = useConversationalAIStore.getState();
+                  const messageIndex = store.messages.findIndex(
+                    (m) => m.id === assistantMessageId,
+                  );
+
+                  if (messageIndex !== -1) {
+                    const updatedMessages = [...store.messages];
+                    updatedMessages[messageIndex] = updatedMessage;
+
+                    // Update both messages and session
+                    if (store.currentSessionId) {
+                      const session = store.sessions.get(
+                        store.currentSessionId,
+                      );
+                      if (session) {
+                        const sessions = new Map(store.sessions);
+                        sessions.set(store.currentSessionId, {
+                          ...session,
+                          messages: updatedMessages,
+                          updatedAt: new Date(),
+                        });
+
+                        useConversationalAIStore.setState({
+                          messages: updatedMessages,
+                          sessions,
+                        });
+                      }
+                    } else {
+                      useConversationalAIStore.setState({
+                        messages: updatedMessages,
+                      });
+                    }
+                  }
+                }
+              }
+
+              // Notify callback
+              onConfirmationRequested?.(confirmationId, prompt, severity);
+
+              void logger.info("Confirmation requested", {
+                confirmationId,
+                prompt,
+                severity,
+              });
+            },
+            onWorkflowProgress: (
+              workflowId: string,
+              workflowName: string,
+              stepId: string,
+              stepIndex: number,
+              totalSteps: number,
+            ) => {
+              // Update the assistant message with workflow progress
+              const currentMessage = useConversationalAIStore
+                .getState()
+                .messages.find((m) => m.id === assistantMessageId);
+
+              if (currentMessage) {
+                const updatedMessage: Message = {
+                  ...currentMessage,
+                  metadata: {
+                    ...currentMessage.metadata,
+                    workflowProgress: {
+                      workflowId,
+                      workflowName,
+                      currentStepId: stepId,
+                      currentStepIndex: stepIndex,
+                      totalSteps,
+                      stepDescription: undefined, // Will be updated by workflow engine
+                      state: "executing",
+                      startTime:
+                        currentMessage.metadata?.workflowProgress?.startTime ??
+                        Date.now(),
+                    },
+                  },
+                };
+
+                // Update the message in the store
+                const store = useConversationalAIStore.getState();
+                const messageIndex = store.messages.findIndex(
+                  (m) => m.id === assistantMessageId,
+                );
+
+                if (messageIndex !== -1) {
+                  const updatedMessages = [...store.messages];
+                  updatedMessages[messageIndex] = updatedMessage;
+
+                  // Update both messages and session
+                  if (store.currentSessionId) {
+                    const session = store.sessions.get(store.currentSessionId);
+                    if (session) {
+                      const sessions = new Map(store.sessions);
+                      sessions.set(store.currentSessionId, {
+                        ...session,
+                        messages: updatedMessages,
+                        updatedAt: new Date(),
+                      });
+
+                      useConversationalAIStore.setState({
+                        messages: updatedMessages,
+                        sessions,
+                      });
+                    }
+                  } else {
+                    useConversationalAIStore.setState({
+                      messages: updatedMessages,
+                    });
+                  }
+                }
+              }
+
+              // Notify callback
+              onWorkflowProgress?.(
+                workflowId,
+                workflowName,
+                stepId,
+                stepIndex,
+                totalSteps,
+              );
+
+              void logger.info("Workflow progress", {
+                workflowId,
+                workflowName,
+                stepId,
+                stepIndex,
+                totalSteps,
+              });
+            },
             onComplete: (
               _fullText: string,
               metadata?: {
@@ -371,6 +550,8 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
       setErrorState,
       onToolCall,
       onToolResult,
+      onConfirmationRequested,
+      onWorkflowProgress,
     ],
   );
 

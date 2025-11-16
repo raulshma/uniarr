@@ -14,6 +14,11 @@ import { downloadManagementTool } from "./DownloadManagementTool";
 import { calendarTool } from "./CalendarTool";
 import { addMediaTool } from "./AddMediaTool";
 import { systemInfoTool } from "./SystemInfoTool";
+import { confirmActionTool } from "./ConfirmActionTool";
+import { executeWorkflowTool } from "./ExecuteWorkflowTool";
+import { webSearchTool } from "./WebSearchTool";
+import { mediaDetailsTool } from "./MediaDetailsTool";
+import { registerBuiltInWorkflows } from "./workflows";
 import { logger } from "@/services/logger/LoggerService";
 
 /**
@@ -66,10 +71,25 @@ export function registerAllTools(): void {
     // Register SystemInfoTool
     registry.register(systemInfoTool);
 
+    // Register ConfirmActionTool
+    registry.register(confirmActionTool);
+
+    // Register ExecuteWorkflowTool
+    registry.register(executeWorkflowTool);
+
+    // Register WebSearchTool (now works on all platforms with custom implementation)
+    registry.register(webSearchTool);
+
+    // Register MediaDetailsTool
+    registry.register(mediaDetailsTool);
+
     void logger.info("All AI tools registered successfully", {
       toolCount: registry.count(),
       toolNames: registry.getToolNames(),
     });
+
+    // Register built-in workflows
+    registerBuiltInWorkflows();
   } catch (error) {
     void logger.error("Failed to register AI tools", {
       error: error instanceof Error ? error.message : String(error),
@@ -91,6 +111,7 @@ export function getToolRegistry(): ToolRegistry {
 // Re-export commonly used types and classes
 export { ToolRegistry } from "./ToolRegistry";
 export { ToolContext } from "./ToolContext";
+export { WorkflowEngine } from "./WorkflowEngine";
 export type {
   ToolDefinition,
   ToolResult,
@@ -99,3 +120,4 @@ export type {
   ToolMediaType,
 } from "./types";
 export { ToolError, ToolErrorCategory } from "./types";
+export type { Workflow, WorkflowStep, WorkflowResult } from "./WorkflowEngine";

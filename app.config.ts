@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "uniarr",
   scheme: "uniarr",
   owner: "throwaway0acc",
-  version: "0.3.1",
+  version: "0.4.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
   newArchEnabled: true,
@@ -88,6 +88,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-build-properties",
       {
         android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          buildArchs: ["arm64-v8a"],
           usesCleartextTraffic: true,
           // Enable storage access for downloads
           enableRoomDependency: true,

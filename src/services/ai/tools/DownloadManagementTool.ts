@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ToolDefinition, ToolResult, ToolServiceType } from "./types";
 import { ToolError, ToolErrorCategory } from "./types";
 import { ToolContext } from "./ToolContext";
+import { ConfirmationManager } from "./ConfirmationManager";
 import { logger } from "@/services/logger/LoggerService";
 import type { QBittorrentConnector } from "@/connectors/implementations/QBittorrentConnector";
 import type {
@@ -17,8 +18,10 @@ import type { RadarrQueueItem } from "@/models/movie.types";
  */
 const downloadManagementParamsSchema = z.object({
   action: z
-    .enum(["list", "pause", "resume", "remove"])
-    .describe("Action to perform on downloads"),
+    .enum(["list", "pause", "resume", "remove", "pauseAll", "resumeAll"])
+    .describe(
+      "Action to perform on downloads: list, pause, resume, remove (single), pauseAll, resumeAll (bulk)",
+    ),
   downloadId: z
     .string()
     .optional()
@@ -41,6 +44,19 @@ const downloadManagementParamsSchema = z.object({
     .optional()
     .default("all")
     .describe("Filter downloads by status"),
+  sortBy: z
+    .enum(["progress", "speed", "eta", "size", "name"])
+    .optional()
+    .default("name")
+    .describe(
+      "Sort downloads by: progress (completion %), speed (download speed), eta (estimated time), size (total size), or name",
+    ),
+  confirmationId: z
+    .string()
+    .optional()
+    .describe(
+      "Confirmation ID for destructive actions (provided after user confirms)",
+    ),
 });
 
 type DownloadManagementParams = z.infer<typeof downloadManagementParamsSchema>;
@@ -81,6 +97,9 @@ interface DownloadManagementResult {
   totalCount?: number;
   message: string;
   serviceTypes?: string[];
+  requiresConfirmation?: boolean;
+  confirmationId?: string;
+  confirmationPrompt?: string;
 }
 
 /**
@@ -147,11 +166,15 @@ export const downloadManagementTool: ToolDefinition<
           return await resumeDownload(params, connectorManager, startTime);
         case "remove":
           return await removeDownload(params, connectorManager, startTime);
+        case "pauseAll":
+          return await pauseAllDownloads(params, connectorManager, startTime);
+        case "resumeAll":
+          return await resumeAllDownloads(params, connectorManager, startTime);
         default:
           throw new ToolError(
             `Unknown action: ${params.action}`,
             ToolErrorCategory.INVALID_PARAMETERS,
-            "Please use one of: list, pause, resume, remove",
+            "Please use one of: list, pause, resume, remove, pauseAll, resumeAll",
             { action: params.action },
           );
       }
@@ -237,8 +260,11 @@ async function listDownloads(
     filteredDownloads = filterDownloadsByStatus(allDownloads, params.status);
   }
 
+  // Sort downloads
+  const sortedDownloads = sortDownloads(filteredDownloads, params.sortBy);
+
   const message = generateListMessage(
-    filteredDownloads.length,
+    sortedDownloads.length,
     allDownloads.length,
     params,
   );
@@ -253,8 +279,8 @@ async function listDownloads(
     success: true,
     data: {
       action: "list",
-      downloads: filteredDownloads,
-      totalCount: filteredDownloads.length,
+      downloads: sortedDownloads,
+      totalCount: sortedDownloads.length,
       message,
       serviceTypes: Array.from(serviceTypes),
     },
@@ -433,7 +459,9 @@ async function removeDownload(
   >,
   startTime: number,
 ): Promise<ToolResult<DownloadManagementResult>> {
-  const { downloadId, serviceType } = params;
+  const { downloadId, serviceType, confirmationId } = params;
+  const context = ToolContext.getInstance();
+  const confirmationManager = ConfirmationManager.getInstance();
 
   if (!downloadId) {
     throw new ToolError(
@@ -459,6 +487,67 @@ async function removeDownload(
         : `No download found with ID ${downloadId}. Try specifying the serviceType parameter.`,
       { downloadId, serviceType },
     );
+  }
+
+  // Get download details for confirmation message
+  const downloads = await fetchDownloadsFromConnector(connector);
+  const download = downloads.find((d) => d.id === downloadId);
+  const downloadName = download?.name || downloadId;
+
+  // Check if this is a destructive action that requires confirmation
+  const destructiveCheck = context.isDestructiveAction("manage_downloads", {
+    action: "remove",
+  });
+
+  if (destructiveCheck && !confirmationId) {
+    // Request confirmation before proceeding
+    const newConfirmationId = confirmationManager.requestConfirmation({
+      action: "Remove download",
+      target: downloadName,
+      severity: destructiveCheck.severity,
+      toolName: "manage_downloads",
+      params: { downloadId, serviceType },
+    });
+
+    void logger.info("Confirmation requested for download removal", {
+      confirmationId: newConfirmationId,
+      downloadId,
+      downloadName,
+    });
+
+    return {
+      success: true,
+      data: {
+        action: "remove",
+        message: `Are you sure you want to remove "${downloadName}"?`,
+        requiresConfirmation: true,
+        confirmationId: newConfirmationId,
+        confirmationPrompt: `This will remove the download "${downloadName}" from ${connector.config.name}. Do you want to proceed?`,
+      },
+      metadata: {
+        executionTime: Date.now() - startTime,
+        serviceId: connector.config.id,
+        serviceType: connector.config.type,
+      },
+    };
+  }
+
+  // If confirmation ID is provided, verify it
+  if (confirmationId) {
+    const confirmed = confirmationManager.confirmAction(confirmationId);
+    if (!confirmed) {
+      throw new ToolError(
+        "Confirmation expired or invalid",
+        ToolErrorCategory.OPERATION_FAILED,
+        "The confirmation has expired or is invalid. Please request the action again.",
+        { confirmationId },
+      );
+    }
+
+    void logger.info("Confirmation verified for download removal", {
+      confirmationId,
+      downloadId,
+    });
   }
 
   // Remove the download based on connector type
@@ -487,7 +576,7 @@ async function removeDownload(
       success: true,
       data: {
         action: "remove",
-        message: `Download removed successfully.`,
+        message: `Download "${downloadName}" removed successfully.`,
       },
       metadata: {
         executionTime: Date.now() - startTime,
@@ -756,6 +845,272 @@ async function findConnectorForDownload(
   }
 
   return null;
+}
+
+/**
+ * Sort downloads based on the specified sort field
+ */
+function sortDownloads(
+  downloads: DownloadItem[],
+  sortBy: "progress" | "speed" | "eta" | "size" | "name" = "name",
+): DownloadItem[] {
+  return [...downloads].sort((a, b) => {
+    switch (sortBy) {
+      case "progress":
+        return b.progress - a.progress; // Highest progress first
+
+      case "speed":
+        return b.downloadSpeed - a.downloadSpeed; // Fastest first
+
+      case "eta": {
+        // Convert ETA to comparable numbers (handle "Unknown" and string ETAs)
+        const etaA =
+          typeof a.eta === "number" ? a.eta : Number.MAX_SAFE_INTEGER;
+        const etaB =
+          typeof b.eta === "number" ? b.eta : Number.MAX_SAFE_INTEGER;
+        return etaA - etaB; // Shortest ETA first
+      }
+
+      case "size":
+        return b.size - a.size; // Largest first
+
+      case "name":
+      default:
+        return a.name.localeCompare(b.name); // Alphabetical
+    }
+  });
+}
+
+/**
+ * Pause all downloads
+ */
+async function pauseAllDownloads(
+  params: DownloadManagementParams,
+  connectorManager: ReturnType<
+    typeof ToolContext.prototype.getConnectorManager
+  >,
+  startTime: number,
+): Promise<ToolResult<DownloadManagementResult>> {
+  const context = ToolContext.getInstance();
+  const confirmationManager = ConfirmationManager.getInstance();
+  const { serviceType, confirmationId } = params;
+
+  // Get download connectors based on serviceType filter
+  const downloadConnectors = serviceType
+    ? connectorManager.getConnectorsByType(serviceType)
+    : connectorManager
+        .getAllConnectors()
+        .filter((c) =>
+          ["qbittorrent", "transmission", "deluge"].includes(c.config.type),
+        );
+
+  if (downloadConnectors.length === 0) {
+    throw new ToolError(
+      "No download clients configured",
+      ToolErrorCategory.SERVICE_NOT_CONFIGURED,
+      "Please add a download client service in Settings > Services.",
+      { requestedServiceType: serviceType },
+    );
+  }
+
+  // Get all active downloads to count them
+  const allDownloads: DownloadItem[] = [];
+  await Promise.all(
+    downloadConnectors.map(async (connector) => {
+      try {
+        const downloads = await fetchDownloadsFromConnector(connector);
+        allDownloads.push(...downloads);
+      } catch {
+        // Continue with other connectors
+      }
+    }),
+  );
+
+  const activeDownloads = allDownloads.filter(
+    (d) => d.status === "downloading" || d.status === "stalled",
+  );
+
+  if (activeDownloads.length === 0) {
+    return {
+      success: true,
+      data: {
+        action: "pauseAll",
+        message: "No active downloads to pause.",
+      },
+      metadata: {
+        executionTime: Date.now() - startTime,
+      },
+    };
+  }
+
+  // Check if this requires confirmation
+  const destructiveCheck = context.isDestructiveAction("manage_downloads", {
+    action: "pauseAll",
+  });
+
+  if (destructiveCheck && !confirmationId) {
+    const newConfirmationId = confirmationManager.requestConfirmation({
+      action: "Pause all downloads",
+      target: `${activeDownloads.length} active download${activeDownloads.length === 1 ? "" : "s"}`,
+      severity: "low",
+      toolName: "manage_downloads",
+      params: { action: "pauseAll", serviceType },
+    });
+
+    return {
+      success: true,
+      data: {
+        action: "pauseAll",
+        message: `Are you sure you want to pause ${activeDownloads.length} active download${activeDownloads.length === 1 ? "" : "s"}?`,
+        requiresConfirmation: true,
+        confirmationId: newConfirmationId,
+        confirmationPrompt: `This will pause all ${activeDownloads.length} active downloads. Do you want to proceed?`,
+      },
+      metadata: {
+        executionTime: Date.now() - startTime,
+      },
+    };
+  }
+
+  // Verify confirmation if provided
+  if (confirmationId) {
+    const confirmed = confirmationManager.confirmAction(confirmationId);
+    if (!confirmed) {
+      throw new ToolError(
+        "Confirmation expired or invalid",
+        ToolErrorCategory.OPERATION_FAILED,
+        "The confirmation has expired or is invalid. Please request the action again.",
+        { confirmationId },
+      );
+    }
+  }
+
+  // Pause all downloads
+  let pausedCount = 0;
+  let failedCount = 0;
+
+  for (const connector of downloadConnectors) {
+    if (connector.config.type === "qbittorrent") {
+      try {
+        const qbConnector = connector as QBittorrentConnector;
+        const downloads = await fetchDownloadsFromConnector(connector);
+        const activeDownloadsForService = downloads.filter(
+          (d) => d.status === "downloading" || d.status === "stalled",
+        );
+
+        // Pause each active download
+        for (const download of activeDownloadsForService) {
+          try {
+            await qbConnector.pauseTorrent(download.id);
+          } catch {
+            // Continue with other downloads
+          }
+        }
+
+        pausedCount += activeDownloadsForService.length;
+      } catch (error) {
+        failedCount++;
+        void logger.warn("Failed to pause downloads on connector", {
+          serviceId: connector.config.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  void logger.info("Bulk pause completed", { pausedCount, failedCount });
+
+  return {
+    success: true,
+    data: {
+      action: "pauseAll",
+      message:
+        failedCount > 0
+          ? `Paused downloads on ${pausedCount} service${pausedCount === 1 ? "" : "s"}, but ${failedCount} service${failedCount === 1 ? "" : "s"} failed.`
+          : `Successfully paused all downloads.`,
+    },
+    metadata: {
+      executionTime: Date.now() - startTime,
+    },
+  };
+}
+
+/**
+ * Resume all downloads
+ */
+async function resumeAllDownloads(
+  params: DownloadManagementParams,
+  connectorManager: ReturnType<
+    typeof ToolContext.prototype.getConnectorManager
+  >,
+  startTime: number,
+): Promise<ToolResult<DownloadManagementResult>> {
+  const { serviceType } = params;
+
+  // Get download connectors based on serviceType filter
+  const downloadConnectors = serviceType
+    ? connectorManager.getConnectorsByType(serviceType)
+    : connectorManager
+        .getAllConnectors()
+        .filter((c) =>
+          ["qbittorrent", "transmission", "deluge"].includes(c.config.type),
+        );
+
+  if (downloadConnectors.length === 0) {
+    throw new ToolError(
+      "No download clients configured",
+      ToolErrorCategory.SERVICE_NOT_CONFIGURED,
+      "Please add a download client service in Settings > Services.",
+      { requestedServiceType: serviceType },
+    );
+  }
+
+  // Resume all downloads
+  let resumedCount = 0;
+  let failedCount = 0;
+
+  for (const connector of downloadConnectors) {
+    if (connector.config.type === "qbittorrent") {
+      try {
+        const qbConnector = connector as QBittorrentConnector;
+        const downloads = await fetchDownloadsFromConnector(connector);
+        const pausedDownloads = downloads.filter((d) => d.status === "paused");
+
+        // Resume each paused download
+        for (const download of pausedDownloads) {
+          try {
+            await qbConnector.resumeTorrent(download.id);
+          } catch {
+            // Continue with other downloads
+          }
+        }
+
+        resumedCount += pausedDownloads.length;
+      } catch (error) {
+        failedCount++;
+        void logger.warn("Failed to resume downloads on connector", {
+          serviceId: connector.config.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  void logger.info("Bulk resume completed", { resumedCount, failedCount });
+
+  return {
+    success: true,
+    data: {
+      action: "resumeAll",
+      message:
+        failedCount > 0
+          ? `Resumed downloads on ${resumedCount} service${resumedCount === 1 ? "" : "s"}, but ${failedCount} service${failedCount === 1 ? "" : "s"} failed.`
+          : `Successfully resumed all downloads.`,
+    },
+    metadata: {
+      executionTime: Date.now() - startTime,
+    },
+  };
 }
 
 /**

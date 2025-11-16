@@ -26,6 +26,22 @@ const calendarParamsSchema = z.object({
     .describe(
       "Filter by service type (sonarr for TV shows, radarr for movies)",
     ),
+  monitoredOnly: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Filter to show only monitored items (actively tracked)"),
+  qualityProfileId: z
+    .number()
+    .optional()
+    .describe("Filter by quality profile ID"),
+  groupBy: z
+    .enum(["none", "day", "week", "month"])
+    .optional()
+    .default("none")
+    .describe(
+      "Group calendar events by time period: none (chronological list), day, week, or month",
+    ),
 });
 
 type CalendarParams = z.infer<typeof calendarParamsSchema>;
@@ -48,13 +64,22 @@ interface CalendarEvent {
   serviceId: string;
   serviceName: string;
   serviceType: ToolServiceType;
+  qualityProfileId?: number;
+}
+
+/**
+ * Grouped calendar events by time period
+ */
+interface GroupedCalendarEvents {
+  [key: string]: CalendarEvent[];
 }
 
 /**
  * Result data structure for CalendarTool
  */
 interface CalendarResult {
-  events: CalendarEvent[];
+  events?: CalendarEvent[];
+  groupedEvents?: GroupedCalendarEvents;
   totalCount: number;
   dateRange: {
     start: string;
@@ -62,6 +87,7 @@ interface CalendarResult {
   };
   serviceTypes: string[];
   message: string;
+  groupBy?: string;
 }
 
 /**
@@ -172,8 +198,11 @@ export const calendarTool: ToolDefinition<CalendarParams, CalendarResult> = {
         );
       }
 
+      // Apply advanced filters
+      let filteredEvents = applyCalendarFilters(allEvents, params);
+
       // Sort events chronologically
-      const sortedEvents = allEvents.sort((a, b) => {
+      const sortedEvents = filteredEvents.sort((a, b) => {
         const dateA = new Date(a.releaseDate).getTime();
         const dateB = new Date(b.releaseDate).getTime();
         return dateA - dateB;
@@ -194,6 +223,30 @@ export const calendarTool: ToolDefinition<CalendarParams, CalendarResult> = {
           end: endDate.toISOString(),
         },
       });
+
+      // Group events if requested
+      if (params.groupBy && params.groupBy !== "none") {
+        const groupedEvents = groupCalendarEvents(sortedEvents, params.groupBy);
+
+        return {
+          success: true,
+          data: {
+            groupedEvents,
+            totalCount: sortedEvents.length,
+            dateRange: {
+              start: startDate.toISOString(),
+              end: endDate.toISOString(),
+            },
+            serviceTypes: Array.from(serviceTypes),
+            message,
+            groupBy: params.groupBy,
+          },
+          metadata: {
+            executionTime: Date.now() - startTime,
+            serviceTypes: Array.from(serviceTypes),
+          },
+        };
+      }
 
       return {
         success: true,
@@ -304,6 +357,7 @@ async function fetchCalendarEvents(
       serviceId,
       serviceName,
       serviceType,
+      qualityProfileId: episode.series?.qualityProfileId,
     }));
   } else if (serviceType === "radarr") {
     const radarrConnector = connector as RadarrConnector;
@@ -329,10 +383,96 @@ async function fetchCalendarEvents(
       serviceId,
       serviceName,
       serviceType,
+      qualityProfileId: movie.qualityProfileId,
     }));
   }
 
   return [];
+}
+
+/**
+ * Apply advanced filters to calendar events
+ */
+function applyCalendarFilters(
+  events: CalendarEvent[],
+  params: CalendarParams,
+): CalendarEvent[] {
+  let filtered = events;
+
+  // Filter by monitored status
+  if (params.monitoredOnly) {
+    filtered = filtered.filter((event) => event.monitored === true);
+  }
+
+  // Filter by quality profile ID
+  if (params.qualityProfileId !== undefined) {
+    filtered = filtered.filter(
+      (event) => event.qualityProfileId === params.qualityProfileId,
+    );
+  }
+
+  return filtered;
+}
+
+/**
+ * Group calendar events by time period
+ */
+function groupCalendarEvents(
+  events: CalendarEvent[],
+  groupBy: "day" | "week" | "month",
+): GroupedCalendarEvents {
+  const grouped: GroupedCalendarEvents = {};
+
+  for (const event of events) {
+    const date = new Date(event.releaseDate);
+    let key: string;
+
+    switch (groupBy) {
+      case "day":
+        key = date.toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        break;
+
+      case "week": {
+        // Get the start of the week (Sunday)
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay());
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+
+        key = `Week of ${weekStart.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })} - ${weekEnd.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}`;
+        break;
+      }
+
+      case "month":
+        key = date.toLocaleDateString("en-US", {
+          month: "long",
+          year: "numeric",
+        });
+        break;
+
+      default:
+        key = "Unknown";
+    }
+
+    if (!grouped[key]) {
+      grouped[key] = [];
+    }
+    grouped[key]!.push(event);
+  }
+
+  return grouped;
 }
 
 /**

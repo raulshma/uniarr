@@ -6,6 +6,7 @@ import type {
   AssistantConfig,
   ConversationSession,
   Message,
+  WorkflowProgress,
 } from "@/models/chat.types";
 import { storageAdapter } from "@/services/storage/StorageAdapter";
 import { logger } from "@/services/logger/LoggerService";
@@ -57,6 +58,11 @@ export interface ConversationalAIState {
   getSessions: () => ConversationSession[];
   getCurrentSession: () => ConversationSession | null;
   setCurrentSessionTitle: (title: string) => void;
+  updateWorkflowProgress: (
+    messageId: string,
+    progress: WorkflowProgress | undefined,
+  ) => void;
+  cancelWorkflow: (messageId: string) => void;
 }
 
 type SerializableMessage = Omit<Message, "timestamp"> & {
@@ -493,6 +499,101 @@ export const useConversationalAIStore = create<ConversationalAIState>()(
           }
 
           return state.sessions.get(state.currentSessionId) ?? null;
+        },
+
+        updateWorkflowProgress: (messageId: string, progress) => {
+          set((state) => {
+            const idx = state.messages.findIndex((m) => m.id === messageId);
+            if (idx === -1) {
+              return {};
+            }
+
+            const updatedMessages = state.messages.map((m) =>
+              m.id === messageId
+                ? {
+                    ...m,
+                    metadata: {
+                      ...m.metadata,
+                      workflowProgress: progress
+                        ? {
+                            ...m.metadata?.workflowProgress,
+                            ...progress,
+                          }
+                        : undefined,
+                    },
+                  }
+                : m,
+            );
+
+            if (!state.currentSessionId) {
+              return { messages: updatedMessages };
+            }
+
+            const existingSession = state.sessions.get(state.currentSessionId);
+            if (!existingSession) {
+              return { messages: updatedMessages };
+            }
+
+            const sessions = new Map(state.sessions);
+            sessions.set(state.currentSessionId, {
+              ...existingSession,
+              messages: updatedMessages,
+              updatedAt: new Date(),
+            });
+
+            return {
+              messages: updatedMessages,
+              sessions,
+            };
+          });
+        },
+
+        cancelWorkflow: (messageId: string) => {
+          set((state) => {
+            const idx = state.messages.findIndex((m) => m.id === messageId);
+            if (idx === -1) {
+              return {};
+            }
+
+            const updatedMessages = state.messages.map((m) =>
+              m.id === messageId
+                ? {
+                    ...m,
+                    metadata: {
+                      ...m.metadata,
+                      workflowProgress: m.metadata?.workflowProgress
+                        ? {
+                            ...m.metadata.workflowProgress,
+                            state: "cancelled" as const,
+                            endTime: Date.now(),
+                          }
+                        : undefined,
+                    },
+                  }
+                : m,
+            );
+
+            if (!state.currentSessionId) {
+              return { messages: updatedMessages };
+            }
+
+            const existingSession = state.sessions.get(state.currentSessionId);
+            if (!existingSession) {
+              return { messages: updatedMessages };
+            }
+
+            const sessions = new Map(state.sessions);
+            sessions.set(state.currentSessionId, {
+              ...existingSession,
+              messages: updatedMessages,
+              updatedAt: new Date(),
+            });
+
+            return {
+              messages: updatedMessages,
+              sessions,
+            };
+          });
         },
       };
     },

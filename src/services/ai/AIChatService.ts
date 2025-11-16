@@ -12,6 +12,9 @@ import {
   ToolErrorCategory,
   isToolError,
 } from "@/services/ai/tools/types";
+import { ConfirmationManager } from "@/services/ai/tools/ConfirmationManager";
+import { WorkflowEngine } from "@/services/ai/tools/WorkflowEngine";
+import type { WorkflowProgressCallback } from "@/services/ai/tools/WorkflowEngine";
 
 /**
  * Represents a message in the conversation history.
@@ -42,6 +45,12 @@ export interface StreamOptions {
   onToolCall?: (toolName: string, args: unknown) => void;
   /** Called when a tool execution completes */
   onToolResult?: (toolName: string, result: unknown) => void;
+  /** Called when a confirmation is requested */
+  onConfirmationRequested?: (
+    confirmationId: string,
+    prompt: string,
+    severity: "low" | "medium" | "high",
+  ) => void;
   /** Called when the stream completes successfully */
   onComplete?: (
     fullText: string,
@@ -56,6 +65,14 @@ export interface StreamOptions {
   ) => void;
   /** Called when an error occurs during streaming */
   onError?: (error: Error) => void;
+  /** Called when a workflow makes progress */
+  onWorkflowProgress?: (
+    workflowId: string,
+    workflowName: string,
+    stepId: string,
+    stepIndex: number,
+    totalSteps: number,
+  ) => void;
 }
 
 /**
@@ -82,11 +99,54 @@ export class AIChatService {
   private static instance: AIChatService | null = null;
   private readonly keyManager: AIKeyManager;
   private readonly toolRegistry: ToolRegistry;
+  private readonly workflowEngine: WorkflowEngine;
 
   private constructor() {
     this.keyManager = AIKeyManager.getInstance();
     this.toolRegistry = ToolRegistry.getInstance();
+    this.workflowEngine = WorkflowEngine.getInstance();
     void logger.info("AIChatService initialized");
+  }
+
+  /**
+   * Check if a tool result contains a confirmation request.
+   * Confirmation requests are indicated by requiresConfirmation flag in the result.
+   *
+   * @param result - The tool result to check
+   * @returns Confirmation details if present, null otherwise
+   */
+  private checkForConfirmationRequest(result: unknown): {
+    confirmationId: string;
+    prompt: string;
+    severity: "low" | "medium" | "high";
+  } | null {
+    if (
+      result &&
+      typeof result === "object" &&
+      "data" in result &&
+      result.data &&
+      typeof result.data === "object"
+    ) {
+      const data = result.data as Record<string, unknown>;
+
+      if (
+        data.requiresConfirmation === true &&
+        typeof data.confirmationId === "string" &&
+        typeof data.confirmationPrompt === "string"
+      ) {
+        // Extract severity from confirmation manager
+        const confirmationManager = ConfirmationManager.getInstance();
+        const pending = confirmationManager.getPending(data.confirmationId);
+
+        return {
+          confirmationId: data.confirmationId,
+          prompt: data.confirmationPrompt,
+          severity: pending?.severity || "medium",
+        };
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -507,6 +567,31 @@ Remember: You're here to make media management easier and more efficient for sel
                 toolCallId: chunk.toolCallId,
               });
 
+              // Check if the tool result contains a confirmation request
+              const confirmationRequest = this.checkForConfirmationRequest(
+                chunk.output,
+              );
+
+              if (confirmationRequest) {
+                void logger.info(
+                  "Confirmation requested during tool execution",
+                  {
+                    confirmationId: confirmationRequest.confirmationId,
+                    toolName: chunk.toolName,
+                    severity: confirmationRequest.severity,
+                  },
+                );
+
+                // Call onConfirmationRequested callback if provided
+                if (options?.onConfirmationRequested) {
+                  options.onConfirmationRequested(
+                    confirmationRequest.confirmationId,
+                    confirmationRequest.prompt,
+                    confirmationRequest.severity,
+                  );
+                }
+              }
+
               // Call onToolResult callback if provided
               if (options?.onToolResult) {
                 options.onToolResult(chunk.toolName, chunk.output);
@@ -598,12 +683,36 @@ Remember: You're here to make media management easier and more efficient for sel
                     toolCallId: toolResult.toolCallId,
                   });
 
+                  const result =
+                    "result" in toolResult ? toolResult.result : undefined;
+
+                  // Check if the tool result contains a confirmation request
+                  const confirmationRequest =
+                    this.checkForConfirmationRequest(result);
+
+                  if (confirmationRequest) {
+                    void logger.info(
+                      "Confirmation requested during tool execution (non-streaming)",
+                      {
+                        confirmationId: confirmationRequest.confirmationId,
+                        toolName: toolResult.toolName,
+                        severity: confirmationRequest.severity,
+                      },
+                    );
+
+                    // Call onConfirmationRequested callback if provided
+                    if (options?.onConfirmationRequested) {
+                      options.onConfirmationRequested(
+                        confirmationRequest.confirmationId,
+                        confirmationRequest.prompt,
+                        confirmationRequest.severity,
+                      );
+                    }
+                  }
+
                   // Call onToolResult callback if provided
                   if (options?.onToolResult) {
-                    options.onToolResult(
-                      toolResult.toolName,
-                      "result" in toolResult ? toolResult.result : undefined,
-                    );
+                    options.onToolResult(toolResult.toolName, result);
                   }
                 }
               }
@@ -873,6 +982,92 @@ Remember: You're here to make media management easier and more efficient for sel
     }
 
     return false;
+  }
+
+  /**
+   * Execute a workflow directly (not through LLM).
+   * This method can be used to run workflows programmatically with progress tracking.
+   *
+   * @param workflowId - ID of the workflow to execute
+   * @param params - Parameters to pass to the workflow
+   * @param onProgress - Optional callback for progress updates
+   * @returns Workflow execution result
+   * @throws {Error} If workflow execution fails
+   *
+   * @example
+   * ```typescript
+   * const result = await chatService.executeWorkflow(
+   *   'search-and-add',
+   *   { query: 'Breaking Bad', serviceType: 'sonarr' },
+   *   (stepId, index, total) => {
+   *     console.log(`Step ${index + 1}/${total}: ${stepId}`);
+   *   }
+   * );
+   * ```
+   */
+  async executeWorkflow(
+    workflowId: string,
+    params: Record<string, unknown>,
+    onProgress?: WorkflowProgressCallback,
+  ): Promise<{
+    success: boolean;
+    stepResults: Map<string, unknown>;
+    error?: string;
+    failedStepId?: string;
+    executionTime: number;
+  }> {
+    try {
+      void logger.info("Executing workflow", {
+        workflowId,
+        params,
+      });
+
+      const result = await this.workflowEngine.executeWorkflow(
+        workflowId,
+        params,
+        onProgress,
+      );
+
+      if (!result.success) {
+        void logger.error("Workflow execution failed", {
+          workflowId,
+          error: result.error,
+          failedStepId: result.failedStepId,
+        });
+      } else {
+        void logger.info("Workflow execution completed", {
+          workflowId,
+          executionTime: result.executionTime,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      const errorObj =
+        error instanceof Error ? error : new Error(String(error));
+
+      void logger.error("Failed to execute workflow", {
+        workflowId,
+        error: errorObj.message,
+      });
+
+      throw errorObj;
+    }
+  }
+
+  /**
+   * Get the WorkflowEngine instance for direct workflow management.
+   *
+   * @returns The WorkflowEngine singleton
+   *
+   * @example
+   * ```typescript
+   * const engine = chatService.getWorkflowEngine();
+   * const workflows = engine.getAllWorkflows();
+   * ```
+   */
+  getWorkflowEngine(): WorkflowEngine {
+    return this.workflowEngine;
   }
 
   /**

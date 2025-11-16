@@ -42,6 +42,21 @@ const mediaLibraryParamsSchema = z.object({
     .optional()
     .default("title")
     .describe("Sort results by title, added date, or release date"),
+  status: z
+    .enum(["monitored", "unmonitored", "missing", "available", "all"])
+    .optional()
+    .default("all")
+    .describe(
+      "Filter by status: monitored (actively tracked), unmonitored (not tracked), missing (no files), available (has files), or all",
+    ),
+  qualityProfileId: z
+    .number()
+    .optional()
+    .describe("Filter by quality profile ID"),
+  tagIds: z
+    .array(z.number())
+    .optional()
+    .describe("Filter by tag IDs (items must have at least one of these tags)"),
 });
 
 type MediaLibraryParams = z.infer<typeof mediaLibraryParamsSchema>;
@@ -65,6 +80,8 @@ interface MediaLibraryItem {
   serviceId: string;
   serviceName: string;
   serviceType: ToolServiceType;
+  qualityProfileId?: number;
+  tags?: number[];
 }
 
 /**
@@ -196,6 +213,9 @@ export const mediaLibraryTool: ToolDefinition<
           (item) => item.mediaType === params.mediaType,
         );
       }
+
+      // Apply advanced filters
+      filteredItems = applyAdvancedFilters(filteredItems, params);
 
       // Sort items
       const sortedItems = sortMediaItems(filteredItems, params.sortBy);
@@ -410,6 +430,8 @@ function mapSeriesToMediaItem(
     serviceId,
     serviceName,
     serviceType,
+    qualityProfileId: series.qualityProfileId,
+    tags: series.tags,
   };
 }
 
@@ -443,7 +465,57 @@ function mapMovieToMediaItem(
     serviceId,
     serviceName,
     serviceType,
+    qualityProfileId: movie.qualityProfileId,
+    tags: movie.tags,
   };
+}
+
+/**
+ * Apply advanced filters to media items
+ */
+function applyAdvancedFilters(
+  items: MediaLibraryItem[],
+  params: MediaLibraryParams,
+): MediaLibraryItem[] {
+  let filtered = items;
+
+  // Filter by status
+  if (params.status && params.status !== "all") {
+    filtered = filtered.filter((item) => {
+      switch (params.status) {
+        case "monitored":
+          return item.monitored === true;
+        case "unmonitored":
+          return item.monitored === false;
+        case "missing":
+          return item.hasFile === false;
+        case "available":
+          return item.hasFile === true;
+        default:
+          return true;
+      }
+    });
+  }
+
+  // Filter by quality profile ID
+  if (params.qualityProfileId !== undefined) {
+    filtered = filtered.filter(
+      (item) => item.qualityProfileId === params.qualityProfileId,
+    );
+  }
+
+  // Filter by tag IDs (item must have at least one of the specified tags)
+  if (params.tagIds && params.tagIds.length > 0) {
+    filtered = filtered.filter((item) => {
+      if (!item.tags || item.tags.length === 0) {
+        return false;
+      }
+      // Check if item has at least one of the specified tag IDs
+      return params.tagIds!.some((tagId) => item.tags!.includes(tagId));
+    });
+  }
+
+  return filtered;
 }
 
 /**

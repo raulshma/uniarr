@@ -1,6 +1,7 @@
 import { AIRateLimiter } from "@/services/ai/core/AIRateLimiter";
 import { AIService } from "@/services/ai/core/AIService";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
+import type { AIProviderInstance } from "@/services/ai/core/AIProviderManager";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { logger } from "@/services/logger/LoggerService";
 import { handleApiError, type ErrorContext } from "@/utils/error.utils";
@@ -84,7 +85,12 @@ export class ConversationalAIService {
    * Set the provider specifically for title summary generation.
    * Falls back to conversational provider if title-specific config is not set.
    */
-  private setTitleSummaryProvider(): boolean {
+  /**
+   * Set the provider specifically for title summary generation.
+   * Falls back to conversational provider if title-specific config is not set.
+   * Returns the previous active provider instance (or null) so callers can restore it.
+   */
+  private setTitleSummaryProvider(): AIProviderInstance | null {
     const state = useConversationalAIConfigStore.getState();
     const provider = (state as any)
       .selectedTitleProvider as AIProviderType | null;
@@ -94,23 +100,35 @@ export class ConversationalAIService {
     const fallbackKeyId = state.selectedKeyId;
 
     const targetProvider = provider ?? fallbackProvider;
-    const targetKeyId = keyId ?? fallbackKeyId;
 
-    if (!targetProvider || !targetKeyId) {
-      return false;
+    if (!targetProvider) {
+      return null;
     }
 
     try {
-      this.providerManager.setActiveProvider(targetProvider);
+      // Capture the previous active provider instance so callers can restore it
+      const previous = this.providerManager.getActiveProvider();
+      const success = this.providerManager.setActiveProvider(targetProvider);
+      if (!success) {
+        logger.warn(
+          "[ConversationalAI] Failed to set title summary provider (provider not registered)",
+          {
+            provider: targetProvider,
+            selectedTitleKeyId: keyId ?? fallbackKeyId,
+          },
+        );
+        return null;
+      }
       logger.debug(
-        `[ConversationalAI] Set provider for title summary: ${targetProvider} (keyId: ${targetKeyId})`,
+        `[ConversationalAI] Set provider for title summary: ${targetProvider} (keyId: ${keyId ?? fallbackKeyId})`,
       );
-      return true;
+
+      return previous ?? null;
     } catch (error) {
       logger.error("[ConversationalAI] Failed to set title summary provider", {
         error: error instanceof Error ? error.message : String(error),
       });
-      return false;
+      return null;
     }
   }
 
@@ -338,10 +356,8 @@ Be conversational, specific, and helpful.`;
    */
   async generateConversationTitle(history: Message[]): Promise<string | null> {
     try {
-      const hasProvider = this.setTitleSummaryProvider();
-      if (!hasProvider) {
-        return null;
-      }
+      // Switch to the (optional) title provider; store the previous provider so we can restore
+      const previousProvider = this.setTitleSummaryProvider();
 
       const firstUser = history.find((m) => m.role === "user");
       const firstAssistant = history.find((m) => m.role === "assistant");
@@ -363,14 +379,35 @@ Assistant: ${firstAssistant.text}
 
 Return only the title.`;
 
-      const result = await this.aiService.generateText(prompt);
-      const raw = (result?.text ?? "").trim();
-      if (!raw) {
-        return null;
-      }
+      try {
+        const result = await this.aiService.generateText(prompt);
+        const raw = (result?.text ?? "").trim();
+        if (!raw) {
+          return null;
+        }
 
-      const sanitized = this.sanitizeTitle(raw);
-      return sanitized || null;
+        const sanitized = this.sanitizeTitle(raw);
+        return sanitized || null;
+      } finally {
+        // Always restore previous provider state to avoid side effects
+        try {
+          if (previousProvider) {
+            // restore previous provider by provider name
+            this.providerManager.setActiveProvider(previousProvider.provider);
+          }
+        } catch (restoreError) {
+          // Don't throw on restore failure; just log
+          void logger.warn(
+            "[ConversationalAI] Failed to restore provider after title generation",
+            {
+              error:
+                restoreError instanceof Error
+                  ? restoreError.message
+                  : String(restoreError),
+            },
+          );
+        }
+      }
     } catch (error) {
       logger.warn("[ConversationalAI] Title generation failed", {
         error: error instanceof Error ? error.message : String(error),

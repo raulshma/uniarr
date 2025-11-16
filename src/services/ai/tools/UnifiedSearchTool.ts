@@ -28,6 +28,28 @@ const unifiedSearchParamsSchema = z.object({
     .max(25)
     .default(10)
     .describe("Maximum number of results to return"),
+  minRating: z
+    .number()
+    .min(0)
+    .max(10)
+    .optional()
+    .describe(
+      "Minimum rating filter (0-10 scale, e.g., 7.0 for highly rated content)",
+    ),
+  yearFrom: z
+    .number()
+    .int()
+    .min(1900)
+    .max(2100)
+    .optional()
+    .describe("Filter by release year starting from this year (e.g., 2020)"),
+  yearTo: z
+    .number()
+    .int()
+    .min(1900)
+    .max(2100)
+    .optional()
+    .describe("Filter by release year up to this year (e.g., 2024)"),
 });
 
 /**
@@ -144,6 +166,38 @@ function formatSearchResult(
 }
 
 /**
+ * Apply advanced filters to search results
+ */
+function applySearchFilters(
+  results: UnifiedSearchResult[],
+  params: UnifiedSearchParams,
+): UnifiedSearchResult[] {
+  let filtered = results;
+
+  // Filter by minimum rating
+  if (params.minRating !== undefined) {
+    filtered = filtered.filter((result) => {
+      if (!result.rating) return false;
+      return result.rating >= params.minRating!;
+    });
+  }
+
+  // Filter by year range
+  if (params.yearFrom !== undefined || params.yearTo !== undefined) {
+    filtered = filtered.filter((result) => {
+      if (!result.year) return false;
+
+      const yearFrom = params.yearFrom ?? 1900;
+      const yearTo = params.yearTo ?? 2100;
+
+      return result.year >= yearFrom && result.year <= yearTo;
+    });
+  }
+
+  return filtered;
+}
+
+/**
  * Execute the unified search operation.
  * Searches for media across configured services using the UnifiedSearchService.
  *
@@ -253,8 +307,11 @@ async function executeUnifiedSearch(
     // Deduplicate results by TMDB ID (prefer results from primary services)
     const deduplicatedResults = deduplicateSearchResults(response.results);
 
+    // Apply advanced filters
+    const filteredResults = applySearchFilters(deduplicatedResults, params);
+
     // Limit results to the requested amount
-    const limitedResults = deduplicatedResults.slice(0, params.limit);
+    const limitedResults = filteredResults.slice(0, params.limit);
 
     // Format results for LLM consumption
     const formattedResults = limitedResults.map(formatSearchResult);

@@ -372,6 +372,90 @@ export class ToolContext {
   }
 
   /**
+   * Check if a tool action is destructive and determine its severity level.
+   * Destructive actions include operations that delete, remove, or unmonitor content.
+   *
+   * @param toolName - The name of the tool being invoked
+   * @param params - The parameters passed to the tool
+   * @returns Object with isDestructive flag and severity level, or null if not destructive
+   *
+   * @example
+   * ```typescript
+   * const result = context.isDestructiveAction('manage_downloads', { action: 'remove' });
+   * if (result) {
+   *   console.log(`Destructive action detected: ${result.severity} severity`);
+   * }
+   * ```
+   */
+  isDestructiveAction(
+    toolName: string,
+    params: Record<string, unknown>,
+  ): { isDestructive: true; severity: "low" | "medium" | "high" } | null {
+    // Define destructive actions by tool name and parameters
+    const destructivePatterns: {
+      toolName: string;
+      paramCheck?: (params: Record<string, unknown>) => boolean;
+      severity: "low" | "medium" | "high";
+    }[] = [
+      // Download management - remove action
+      {
+        toolName: "manage_downloads",
+        paramCheck: (p) => p.action === "remove",
+        severity: "medium",
+      },
+      // Media management - delete or unmonitor
+      {
+        toolName: "manage_media",
+        paramCheck: (p) => p.action === "delete" || p.action === "unmonitor",
+        severity: "high",
+      },
+      // Bulk operations - typically high severity
+      {
+        toolName: "bulk_remove_downloads",
+        severity: "high",
+      },
+      {
+        toolName: "bulk_delete_media",
+        severity: "high",
+      },
+      // Service control - restart/shutdown
+      {
+        toolName: "control_service",
+        paramCheck: (p) => p.action === "restart" || p.action === "shutdown",
+        severity: "low",
+      },
+      // File operations
+      {
+        toolName: "delete_files",
+        severity: "high",
+      },
+      // Queue management - clear queue
+      {
+        toolName: "manage_queue",
+        paramCheck: (p) => p.action === "clear" || p.action === "remove",
+        severity: "medium",
+      },
+    ];
+
+    // Check if the tool and parameters match any destructive pattern
+    for (const pattern of destructivePatterns) {
+      if (pattern.toolName === toolName) {
+        // If no param check is defined, the tool is always destructive
+        if (!pattern.paramCheck) {
+          return { isDestructive: true, severity: pattern.severity };
+        }
+
+        // Check if parameters match the destructive pattern
+        if (pattern.paramCheck(params)) {
+          return { isDestructive: true, severity: pattern.severity };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Reset the singleton instance.
    * Primarily used for testing purposes.
    */

@@ -11,6 +11,35 @@ export interface ToolInvocation {
 }
 
 /**
+ * Workflow execution progress for tracking multi-step operations.
+ */
+export interface WorkflowProgress {
+  workflowId: string;
+  workflowName: string;
+  currentStepId: string;
+  currentStepIndex: number;
+  totalSteps: number;
+  stepDescription?: string;
+  state: "pending" | "executing" | "completed" | "failed" | "cancelled";
+  startTime: number;
+  endTime?: number;
+  error?: string;
+}
+
+/**
+ * Pending confirmation for destructive actions.
+ */
+export interface PendingConfirmation {
+  id: string;
+  action: string;
+  target: string;
+  severity: "low" | "medium" | "high";
+  toolName: string;
+  params: Record<string, unknown>;
+  timestamp: number;
+}
+
+/**
  * Chat message types for conversational assistant.
  */
 export interface Message {
@@ -44,6 +73,30 @@ export interface Message {
       genres?: string[];
       overview?: string;
       source?: string;
+    };
+    workflowProgress?: WorkflowProgress;
+    confirmation?: PendingConfirmation;
+    webSearchResults?: {
+      title: string;
+      snippet: string;
+      url: string;
+    }[];
+    mediaDetails?: {
+      title: string;
+      year?: number;
+      overview?: string;
+      posterUrl?: string;
+      backdropUrl?: string;
+      genres?: string[];
+      rating?: number;
+      runtime?: number;
+      cast?: string[];
+      director?: string;
+      availability?: {
+        service: string;
+        available: boolean;
+        quality?: string;
+      }[];
     };
   };
 }
