@@ -9,8 +9,8 @@ export const RecommendationMetadataSchema = z.object({
   popularity: z
     .number()
     .min(0)
-    .max(100)
-    .describe("Popularity score (0-100 scale)"),
+    .max(10000)
+    .describe("Popularity score (0-10000 scale, typically from TMDb)"),
   posterUrl: z
     .string()
     .url()
