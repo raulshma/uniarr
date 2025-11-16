@@ -194,6 +194,7 @@ class S3BackupService {
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
 
     // Ensure the key starts with the backup prefix for easy filtering
+    // Note: fileName already includes Date.now() timestamp from BackupRestoreService
     const key = `uniarr-backup-${sanitizedFileName}`;
 
     return key;

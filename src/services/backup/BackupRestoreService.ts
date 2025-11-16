@@ -1168,7 +1168,7 @@ class BackupRestoreService {
       }
 
       // Create backup file
-      const fileName = `uniarr-backup${options.encryptSensitive ? "-encrypted" : ""}.json`;
+      const fileName = `uniarr-backup${options.encryptSensitive ? "-encrypted" : ""}-${Date.now()}.json`;
       const filePath = `${FileSystemLegacy.documentDirectory}${fileName}`;
 
       await FileSystemLegacy.writeAsStringAsync(
@@ -1465,7 +1465,7 @@ class BackupRestoreService {
       };
 
       // Create backup file
-      const fileName = `uniarr-backup.json`;
+      const fileName = `uniarr-backup-${Date.now()}.json`;
       const filePath = `${FileSystemLegacy.documentDirectory}${fileName}`;
 
       await FileSystemLegacy.writeAsStringAsync(
