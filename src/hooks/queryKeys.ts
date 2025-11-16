@@ -506,6 +506,13 @@ export const queryKeys = {
         { query, options },
       ] as const,
   },
+  recommendations: {
+    base: ["recommendations"] as const,
+    list: (userId: string): QueryKeyBuilder =>
+      ["recommendations", userId] as const,
+    contentGaps: (userId: string): QueryKeyBuilder =>
+      ["recommendations", userId, "contentGaps"] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

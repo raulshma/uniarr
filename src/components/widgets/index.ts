@@ -15,6 +15,7 @@ export { default as HackerNewsWidget } from "./HackerNewsWidget/HackerNewsWidget
 export { default as WeatherWidget } from "./WeatherWidget/WeatherWidget";
 export { default as YouTubeWidget } from "./YouTubeWidget/YouTubeWidget";
 export { default as TwitchWidget } from "./TwitchWidget/TwitchWidget";
+export { default as RecommendationsWidget } from "./RecommendationsWidget/RecommendationsWidget";
 
 // Re-export widget types
 export type {

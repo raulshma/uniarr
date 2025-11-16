@@ -94,6 +94,7 @@ export class SearchRecommendationsService {
   private readonly CACHE_TIMESTAMP_KEY =
     "SearchRecommendationsService:cacheTimestamp";
   private cacheLoaded = false;
+  private originalProvider: string | null = null;
 
   private constructor() {
     // Load persisted cache on instantiation
@@ -230,11 +231,17 @@ export class SearchRecommendationsService {
 
       const context = await this.contextBuilder.buildContext();
 
+      // Use custom provider/model if configured for recommendations
+      await this.useRecommendationProvider();
+
       const { object } = await this.aiService.generateObject(
         RECOMMENDATION_SCHEMA,
         this.buildRecommendationPrompt(context),
         RECOMMENDATION_SYSTEM_PROMPT,
       );
+
+      // Restore default provider
+      await this.restoreDefaultProvider();
 
       const normalizedObject = this.normalizeRecommendationResult(object);
 
@@ -280,11 +287,17 @@ export class SearchRecommendationsService {
 
       const context = await this.contextBuilder.buildContext();
 
+      // Use custom provider/model if configured for recommendations
+      await this.useRecommendationProvider();
+
       const { partialObjectStream } = await this.aiService.streamObject(
         RECOMMENDATION_SCHEMA,
         this.buildRecommendationPrompt(context),
         RECOMMENDATION_SYSTEM_PROMPT,
       );
+
+      // Note: We don't restore here as the stream is still active
+      // The caller should handle provider restoration after consuming the stream
 
       for await (const partial of partialObjectStream) {
         yield this.normalizePartialRecommendations(partial);
@@ -316,11 +329,17 @@ export class SearchRecommendationsService {
 
       const context = await this.contextBuilder.buildContext();
 
+      // Use custom provider/model if configured for recommendations
+      await this.useRecommendationProvider();
+
       const { object } = await this.aiService.generateObject(
         RECOMMENDATION_SCHEMA,
         this.buildGenreRecommendationPrompt(genre, context),
         RECOMMENDATION_SYSTEM_PROMPT,
       );
+
+      // Restore default provider
+      await this.restoreDefaultProvider();
 
       const normalizedObject = this.normalizeRecommendationResult(object);
 
@@ -461,5 +480,73 @@ Generate 5-8 recommendations for ${genre} that:
     const normalized = score <= 1 ? score * 100 : score;
     const clamped = Math.max(0, Math.min(100, normalized));
     return Math.round(clamped);
+  }
+
+  /**
+   * Switch to the recommendation-specific provider if configured
+   */
+  private async useRecommendationProvider(): Promise<void> {
+    try {
+      const settings = useSettingsStore.getState();
+      const { recommendationProvider, recommendationModel } = settings;
+
+      if (!recommendationProvider || !recommendationModel) {
+        // No custom provider configured, use default
+        return;
+      }
+
+      // Import AIProviderManager dynamically to avoid circular dependencies
+      const { AIProviderManager } = await import(
+        "@/services/ai/core/AIProviderManager"
+      );
+      const providerManager = AIProviderManager.getInstance();
+
+      // Save current provider
+      const currentProvider = providerManager.getActiveProvider();
+      this.originalProvider = currentProvider?.provider || null;
+
+      // Switch to recommendation provider
+      const success = providerManager.setActiveProvider(
+        recommendationProvider as any,
+      );
+
+      if (success) {
+        logger.debug("Switched to recommendation provider", {
+          provider: recommendationProvider,
+          model: recommendationModel,
+        });
+      } else {
+        logger.warn("Failed to switch to recommendation provider", {
+          provider: recommendationProvider,
+        });
+      }
+    } catch (error) {
+      logger.error("Error switching to recommendation provider", { error });
+    }
+  }
+
+  /**
+   * Restore the default provider after recommendation generation
+   */
+  private async restoreDefaultProvider(): Promise<void> {
+    try {
+      if (!this.originalProvider) {
+        return;
+      }
+
+      const { AIProviderManager } = await import(
+        "@/services/ai/core/AIProviderManager"
+      );
+      const providerManager = AIProviderManager.getInstance();
+
+      providerManager.setActiveProvider(this.originalProvider as any);
+      logger.debug("Restored default provider", {
+        provider: this.originalProvider,
+      });
+
+      this.originalProvider = null;
+    } catch (error) {
+      logger.error("Error restoring default provider", { error });
+    }
   }
 }

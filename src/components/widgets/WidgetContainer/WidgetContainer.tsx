@@ -30,6 +30,7 @@ import HackerNewsWidget from "../HackerNewsWidget/HackerNewsWidget";
 import WeatherWidget from "../WeatherWidget/WeatherWidget";
 import YouTubeWidget from "../YouTubeWidget/YouTubeWidget";
 import TwitchWidget from "../TwitchWidget/TwitchWidget";
+import RecommendationsWidget from "../RecommendationsWidget/RecommendationsWidget";
 
 export interface WidgetContainerProps {
   /**
@@ -123,6 +124,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = React.memo(
           case "weather":
           case "youtube":
           case "twitch":
+          case "recommendations":
             pushWidgetConfig();
             break;
           default:
@@ -367,6 +369,15 @@ const WidgetContainer: React.FC<WidgetContainerProps> = React.memo(
                 onEdit={editHandler}
               />
             );
+          case "recommendations":
+            return (
+              <RecommendationsWidget
+                key={widget.id}
+                widget={widget}
+                onRefresh={handleWidgetRefresh}
+                onEdit={editHandler}
+              />
+            );
           default:
             return (
               <View key={widget.id} style={styles.placeholderWidget}>
@@ -414,6 +425,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = React.memo(
         weather: "weather-partly-cloudy",
         youtube: "youtube",
         twitch: "twitch",
+        recommendations: "lightbulb-on-outline",
       };
       return iconMap[type] || "widgets";
     }, []);

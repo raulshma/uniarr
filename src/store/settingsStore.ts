@@ -107,6 +107,17 @@ type SettingsData = {
   // AI Features toggles
   enableAISearch: boolean;
   enableAIRecommendations: boolean;
+  // Recommendation preferences
+  recommendationIncludeHiddenGems: boolean;
+  recommendationLimit: number; // 3-10
+  recommendationExcludedGenres: string[];
+  recommendationContentRatingLimit?: string;
+  recommendationCacheDurationHours: number; // 1-168 (1 week)
+  recommendationBackgroundUpdatesEnabled: boolean;
+  // Recommendation engine provider/model selection
+  recommendationProvider?: string; // AIProviderType
+  recommendationModel?: string;
+  recommendationKeyId?: string;
 };
 
 interface SettingsState extends SettingsData {
@@ -168,6 +179,15 @@ interface SettingsState extends SettingsData {
   setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) => void;
   setEnableAISearch: (enabled: boolean) => void;
   setEnableAIRecommendations: (enabled: boolean) => void;
+  setRecommendationIncludeHiddenGems: (enabled: boolean) => void;
+  setRecommendationLimit: (limit: number) => void;
+  setRecommendationExcludedGenres: (genres: string[]) => void;
+  setRecommendationContentRatingLimit: (limit: string | undefined) => void;
+  setRecommendationCacheDurationHours: (hours: number) => void;
+  setRecommendationBackgroundUpdatesEnabled: (enabled: boolean) => void;
+  setRecommendationProvider: (provider: string | undefined) => void;
+  setRecommendationModel: (model: string | undefined) => void;
+  setRecommendationKeyId: (keyId: string | undefined) => void;
 }
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
@@ -180,6 +200,14 @@ const DEFAULT_MAX_IMAGE_CACHE_SIZE = 100 * 1024 * 1024; // 100MB
 const MIN_MAX_IMAGE_CACHE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_MAX_IMAGE_CACHE_SIZE = 1024 * 1024 * 1024; // 1GB
 // thumbnail generation removed
+
+// Recommendation settings constants
+const DEFAULT_RECOMMENDATION_LIMIT = 5;
+const MIN_RECOMMENDATION_LIMIT = 3;
+const MAX_RECOMMENDATION_LIMIT = 10;
+const DEFAULT_RECOMMENDATION_CACHE_DURATION_HOURS = 24;
+const MIN_RECOMMENDATION_CACHE_DURATION_HOURS = 1;
+const MAX_RECOMMENDATION_CACHE_DURATION_HOURS = 168; // 1 week
 
 const clampRetryAttempts = (value: number): number => {
   if (Number.isNaN(value)) return DEFAULT_JELLYSEERR_RETRY_ATTEMPTS;
@@ -194,6 +222,22 @@ const clampMaxImageCacheSize = (value: number): number => {
   return Math.min(
     Math.max(Math.round(value), MIN_MAX_IMAGE_CACHE_SIZE),
     MAX_MAX_IMAGE_CACHE_SIZE,
+  );
+};
+
+const clampRecommendationLimit = (value: number): number => {
+  if (Number.isNaN(value)) return DEFAULT_RECOMMENDATION_LIMIT;
+  return Math.min(
+    Math.max(Math.round(value), MIN_RECOMMENDATION_LIMIT),
+    MAX_RECOMMENDATION_LIMIT,
+  );
+};
+
+const clampRecommendationCacheDuration = (value: number): number => {
+  if (Number.isNaN(value)) return DEFAULT_RECOMMENDATION_CACHE_DURATION_HOURS;
+  return Math.min(
+    Math.max(Math.round(value), MIN_RECOMMENDATION_CACHE_DURATION_HOURS),
+    MAX_RECOMMENDATION_CACHE_DURATION_HOURS,
   );
 };
 
@@ -276,6 +320,15 @@ const createDefaultSettings = (): SettingsData => ({
   byokGeocodeMapsCoApiKey: undefined,
   enableAISearch: false,
   enableAIRecommendations: false,
+  recommendationIncludeHiddenGems: true,
+  recommendationLimit: DEFAULT_RECOMMENDATION_LIMIT,
+  recommendationExcludedGenres: [],
+  recommendationContentRatingLimit: undefined,
+  recommendationCacheDurationHours: DEFAULT_RECOMMENDATION_CACHE_DURATION_HOURS,
+  recommendationBackgroundUpdatesEnabled: false,
+  recommendationProvider: undefined,
+  recommendationModel: undefined,
+  recommendationKeyId: undefined,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -383,6 +436,27 @@ export const useSettingsStore = create<SettingsState>()(
       setEnableAISearch: (enabled: boolean) => set({ enableAISearch: enabled }),
       setEnableAIRecommendations: (enabled: boolean) =>
         set({ enableAIRecommendations: enabled }),
+      setRecommendationIncludeHiddenGems: (enabled: boolean) =>
+        set({ recommendationIncludeHiddenGems: enabled }),
+      setRecommendationLimit: (limit: number) =>
+        set({ recommendationLimit: clampRecommendationLimit(limit) }),
+      setRecommendationExcludedGenres: (genres: string[]) =>
+        set({ recommendationExcludedGenres: genres }),
+      setRecommendationContentRatingLimit: (limit: string | undefined) =>
+        set({ recommendationContentRatingLimit: limit }),
+      setRecommendationCacheDurationHours: (hours: number) =>
+        set({
+          recommendationCacheDurationHours:
+            clampRecommendationCacheDuration(hours),
+        }),
+      setRecommendationBackgroundUpdatesEnabled: (enabled: boolean) =>
+        set({ recommendationBackgroundUpdatesEnabled: enabled }),
+      setRecommendationProvider: (provider: string | undefined) =>
+        set({ recommendationProvider: provider }),
+      setRecommendationModel: (model: string | undefined) =>
+        set({ recommendationModel: model }),
+      setRecommendationKeyId: (keyId: string | undefined) =>
+        set({ recommendationKeyId: keyId }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -446,9 +520,21 @@ export const useSettingsStore = create<SettingsState>()(
         byokGeocodeMapsCoApiKey: state.byokGeocodeMapsCoApiKey,
         enableAISearch: state.enableAISearch,
         enableAIRecommendations: state.enableAIRecommendations,
+        recommendationIncludeHiddenGems: state.recommendationIncludeHiddenGems,
+        recommendationLimit: state.recommendationLimit,
+        recommendationExcludedGenres: state.recommendationExcludedGenres,
+        recommendationContentRatingLimit:
+          state.recommendationContentRatingLimit,
+        recommendationCacheDurationHours:
+          state.recommendationCacheDurationHours,
+        recommendationBackgroundUpdatesEnabled:
+          state.recommendationBackgroundUpdatesEnabled,
+        recommendationProvider: state.recommendationProvider,
+        recommendationModel: state.recommendationModel,
+        recommendationKeyId: state.recommendationKeyId,
       }),
       // Bump version since we're adding new persisted fields
-      version: 16,
+      version: 17,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -555,6 +641,38 @@ export const useSettingsStore = create<SettingsState>()(
         // Ensure trailerFeatureEnabled is properly initialized
         if (typeof state.trailerFeatureEnabled !== "boolean") {
           state.trailerFeatureEnabled = false;
+        }
+
+        // Ensure recommendation preferences are properly initialized
+        if (typeof state.recommendationIncludeHiddenGems !== "boolean") {
+          state.recommendationIncludeHiddenGems = true;
+        }
+        if (typeof state.recommendationLimit !== "number") {
+          state.recommendationLimit = DEFAULT_RECOMMENDATION_LIMIT;
+        } else {
+          const normalizedLimit = clampRecommendationLimit(
+            state.recommendationLimit,
+          );
+          if (normalizedLimit !== state.recommendationLimit) {
+            state.recommendationLimit = normalizedLimit;
+          }
+        }
+        if (!Array.isArray(state.recommendationExcludedGenres)) {
+          state.recommendationExcludedGenres = [];
+        }
+        if (typeof state.recommendationCacheDurationHours !== "number") {
+          state.recommendationCacheDurationHours =
+            DEFAULT_RECOMMENDATION_CACHE_DURATION_HOURS;
+        } else {
+          const normalizedDuration = clampRecommendationCacheDuration(
+            state.recommendationCacheDurationHours,
+          );
+          if (normalizedDuration !== state.recommendationCacheDurationHours) {
+            state.recommendationCacheDurationHours = normalizedDuration;
+          }
+        }
+        if (typeof state.recommendationBackgroundUpdatesEnabled !== "boolean") {
+          state.recommendationBackgroundUpdatesEnabled = false;
         }
 
         if (state.lastCalendarRange) {
@@ -714,6 +832,34 @@ export const useSettingsStore = create<SettingsState>()(
             ),
           ),
           byokGeocodeMapsCoApiKey: partial.byokGeocodeMapsCoApiKey ?? undefined,
+          recommendationIncludeHiddenGems:
+            typeof partial.recommendationIncludeHiddenGems === "boolean"
+              ? partial.recommendationIncludeHiddenGems
+              : baseDefaults.recommendationIncludeHiddenGems,
+          recommendationLimit: clampRecommendationLimit(
+            typeof partial.recommendationLimit === "number"
+              ? partial.recommendationLimit
+              : baseDefaults.recommendationLimit,
+          ),
+          recommendationExcludedGenres: Array.isArray(
+            partial.recommendationExcludedGenres,
+          )
+            ? partial.recommendationExcludedGenres
+            : baseDefaults.recommendationExcludedGenres,
+          recommendationContentRatingLimit:
+            partial.recommendationContentRatingLimit ?? undefined,
+          recommendationCacheDurationHours: clampRecommendationCacheDuration(
+            typeof partial.recommendationCacheDurationHours === "number"
+              ? partial.recommendationCacheDurationHours
+              : baseDefaults.recommendationCacheDurationHours,
+          ),
+          recommendationBackgroundUpdatesEnabled:
+            typeof partial.recommendationBackgroundUpdatesEnabled === "boolean"
+              ? partial.recommendationBackgroundUpdatesEnabled
+              : baseDefaults.recommendationBackgroundUpdatesEnabled,
+          recommendationProvider: partial.recommendationProvider ?? undefined,
+          recommendationModel: partial.recommendationModel ?? undefined,
+          recommendationKeyId: partial.recommendationKeyId ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -783,3 +929,29 @@ export const selectExperimentalWeatherEffectsEnabled = (
 export const selectTrailerFeatureEnabled = (state: SettingsState): boolean =>
   state.trailerFeatureEnabled;
 export const selectLoaderConfig = (state: SettingsState) => state.loaderConfig;
+export const selectRecommendationIncludeHiddenGems = (
+  state: SettingsState,
+): boolean => state.recommendationIncludeHiddenGems;
+export const selectRecommendationLimit = (state: SettingsState): number =>
+  state.recommendationLimit;
+export const selectRecommendationExcludedGenres = (
+  state: SettingsState,
+): string[] => state.recommendationExcludedGenres;
+export const selectRecommendationContentRatingLimit = (
+  state: SettingsState,
+): string | undefined => state.recommendationContentRatingLimit;
+export const selectRecommendationCacheDurationHours = (
+  state: SettingsState,
+): number => state.recommendationCacheDurationHours;
+export const selectRecommendationBackgroundUpdatesEnabled = (
+  state: SettingsState,
+): boolean => state.recommendationBackgroundUpdatesEnabled;
+export const selectRecommendationProvider = (
+  state: SettingsState,
+): string | undefined => state.recommendationProvider;
+export const selectRecommendationModel = (
+  state: SettingsState,
+): string | undefined => state.recommendationModel;
+export const selectRecommendationKeyId = (
+  state: SettingsState,
+): string | undefined => state.recommendationKeyId;

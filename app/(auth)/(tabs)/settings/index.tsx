@@ -1122,6 +1122,49 @@ const SettingsScreen = () => {
           </SettingsGroup>
         </AnimatedSection>
 
+        {/* AI Features Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={225}
+          animated={animationsEnabled}
+        >
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            AI Features
+          </Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Conversational AI"
+                subtitle="Chat assistant with tool support"
+                left={{ iconName: "robot" }}
+                trailing={<ChevronTrailing />}
+                onPress={() =>
+                  router.push("/(auth)/settings/conversational-ai")
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Content Recommendations"
+                subtitle="AI-powered personalized suggestions"
+                left={{ iconName: "lightbulb-on" }}
+                trailing={<ChevronTrailing />}
+                onPress={() => router.push("/(auth)/settings/recommendations")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
         {/* Services Section */}
         <AnimatedSection
           style={styles.section}

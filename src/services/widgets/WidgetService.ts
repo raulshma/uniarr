@@ -14,7 +14,8 @@ export type WidgetType =
   | "hacker-news"
   | "weather"
   | "youtube"
-  | "twitch";
+  | "twitch"
+  | "recommendations";
 
 export interface Widget {
   id: string;
@@ -140,6 +141,20 @@ class WidgetService {
               label: "Calendar",
               icon: "calendar",
               route: "/calendar",
+              enabled: true,
+            },
+            {
+              id: "recently-added",
+              label: "Recently Added",
+              icon: "clock-outline",
+              route: "/(auth)/recently-added",
+              enabled: true,
+            },
+            {
+              id: "recommendations",
+              label: "For You",
+              icon: "lightbulb-on-outline",
+              route: "/(auth)/(tabs)/recommendations",
               enabled: true,
             },
             {
@@ -290,6 +305,18 @@ class WidgetService {
         config: {
           channelLogins: [],
           offlineMessage: "No channels are live right now.",
+        },
+      },
+      {
+        id: "recommendations",
+        type: "recommendations",
+        title: "For You",
+        enabled: false,
+        order: 13,
+        size: "large",
+        config: {
+          limit: 3,
+          includeHiddenGems: true,
         },
       },
     ];

@@ -21,6 +21,8 @@ import { logger } from "@/services/logger/LoggerService";
  * This function should be called during app initialization to make
  * all tools available to the AI chat service.
  *
+ * Safe to call multiple times - will skip registration if tools are already registered.
+ *
  * @example
  * ```typescript
  * // In app initialization (e.g., _layout.tsx or App.tsx)
@@ -31,6 +33,16 @@ import { logger } from "@/services/logger/LoggerService";
  */
 export function registerAllTools(): void {
   const registry = ToolRegistry.getInstance();
+
+  // Skip registration if tools are already registered
+  // This prevents duplicate registration errors during hot reloads or re-renders
+  if (registry.count() > 0) {
+    void logger.debug("Tools already registered, skipping registration", {
+      toolCount: registry.count(),
+      toolNames: registry.getToolNames(),
+    });
+    return;
+  }
 
   try {
     // Register MediaLibraryTool

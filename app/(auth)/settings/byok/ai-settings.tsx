@@ -1,12 +1,26 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Text, Card, Switch, Divider, useTheme } from "react-native-paper";
+import {
+  Text,
+  Card,
+  Switch,
+  Divider,
+  useTheme,
+  Portal,
+  Dialog,
+  Button,
+  RadioButton,
+} from "react-native-paper";
 import { AIKeyInputForm } from "@/components/settings/AIKeyInputForm";
 import { AIProviderList } from "@/components/settings/AIProviderList";
+import { AIModelSelector } from "@/components/settings/AIModelSelector";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
+import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
 import { useSettingsStore } from "@/store/settingsStore";
 import { spacing } from "@/theme/spacing";
+import { AI_PROVIDERS } from "@/types/ai/AIProvider";
+import type { AIProviderType } from "@/types/ai/AIProvider";
 
 /**
  * AI Settings Screen for managing BYOK (Bring Your Own Key) configuration
@@ -19,6 +33,16 @@ export default function AISettingsScreen() {
   const theme = useTheme();
   const [isAIConfigured, setIsAIConfigured] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [providerDialogVisible, setProviderDialogVisible] = useState(false);
+  const [modelDialogVisible, setModelDialogVisible] = useState(false);
+  const [providerKeys, setProviderKeys] = useState<
+    {
+      keyId: string;
+      provider: AIProviderType;
+      apiKeyPreview: string;
+      modelName?: string;
+    }[]
+  >([]);
 
   // Use settings store for toggles persistence
   const enableAISearch = useSettingsStore((s) => s.enableAISearch);
@@ -30,16 +54,50 @@ export default function AISettingsScreen() {
     (s) => s.setEnableAIRecommendations,
   );
 
-  const providerManager = AIProviderManager.getInstance();
+  // Recommendation provider/model settings
+  const recommendationProvider = useSettingsStore(
+    (s) => s.recommendationProvider,
+  );
+  const recommendationModel = useSettingsStore((s) => s.recommendationModel);
+  const recommendationKeyId = useSettingsStore((s) => s.recommendationKeyId);
+  const setRecommendationProvider = useSettingsStore(
+    (s) => s.setRecommendationProvider,
+  );
+  const setRecommendationModel = useSettingsStore(
+    (s) => s.setRecommendationModel,
+  );
+  const setRecommendationKeyId = useSettingsStore(
+    (s) => s.setRecommendationKeyId,
+  );
 
-  // Check if AI is configured
+  const providerManager = AIProviderManager.getInstance();
+  const keyManager = AIKeyManager.getInstance();
+
+  // Check if AI is configured and get provider keys
   useEffect(() => {
     const checkConfiguration = async () => {
       const activeProvider = providerManager.getActiveProvider();
       setIsAIConfigured(!!activeProvider);
+
+      // Get all keys with their details
+      const allKeys = await keyManager.listKeys();
+      const keysWithPreview = await Promise.all(
+        allKeys.map(async (key) => {
+          const fullKey = await keyManager.getKey(key.keyId);
+          return {
+            keyId: key.keyId,
+            provider: key.provider,
+            apiKeyPreview: fullKey?.apiKey
+              ? `...${fullKey.apiKey.slice(-4)}`
+              : "****",
+            modelName: key.modelName,
+          };
+        }),
+      );
+      setProviderKeys(keysWithPreview);
     };
     checkConfiguration();
-  }, [refreshKey, providerManager]);
+  }, [refreshKey, providerManager, keyManager]);
 
   const handleProviderAdded = () => {
     // Refresh the provider list and check configuration
@@ -58,6 +116,35 @@ export default function AISettingsScreen() {
     setRefreshKey((prev) => prev + 1);
     const activeProvider = providerManager.getActiveProvider();
     setIsAIConfigured(!!activeProvider);
+  };
+
+  const handleProviderSelect = async (keyId: string) => {
+    const key = providerKeys.find((k) => k.keyId === keyId);
+    if (!key) return;
+
+    setRecommendationProvider(key.provider);
+    setRecommendationKeyId(keyId);
+
+    // Set default model if not already set
+    if (!recommendationModel && key.modelName) {
+      setRecommendationModel(key.modelName);
+    }
+
+    setProviderDialogVisible(false);
+  };
+
+  const handleModelSelect = (model: string) => {
+    setRecommendationModel(model);
+  };
+
+  const getProviderKeyLabel = (key: {
+    keyId: string;
+    provider: AIProviderType;
+    apiKeyPreview: string;
+    modelName?: string;
+  }) => {
+    const providerName = AI_PROVIDERS[key.provider]?.name || key.provider;
+    return `${providerName} ${key.apiKeyPreview}${key.modelName ? ` (${key.modelName})` : ""}`;
   };
 
   return (
@@ -130,7 +217,75 @@ export default function AISettingsScreen() {
               </View>
             </Card.Content>
           </Card>
-        ) : (
+        ) : null}
+
+        {/* Recommendation Engine Configuration - Show if AI is configured */}
+        {isAIConfigured && (
+          <Card
+            style={[
+              styles.card,
+              { backgroundColor: theme.colors.elevation.level1 },
+            ]}
+          >
+            <Card.Content>
+              <Text variant="titleSmall" style={styles.sectionTitle}>
+                Recommendation Engine
+              </Text>
+              <Text variant="bodySmall" style={styles.toggleDescription}>
+                Select which AI provider and model to use for content
+                recommendations
+              </Text>
+
+              <Divider style={styles.divider} />
+
+              <View style={styles.configRow}>
+                <View style={styles.configLabel}>
+                  <Text variant="bodyMedium">Provider & API Key</Text>
+                  <Text variant="bodySmall" style={styles.configValue}>
+                    {recommendationProvider && recommendationKeyId
+                      ? getProviderKeyLabel(
+                          providerKeys.find(
+                            (k) => k.keyId === recommendationKeyId,
+                          ) || {
+                            keyId: recommendationKeyId,
+                            provider: recommendationProvider as AIProviderType,
+                            apiKeyPreview: "****",
+                          },
+                        )
+                      : "Not configured"}
+                  </Text>
+                </View>
+                <Button
+                  mode="outlined"
+                  onPress={() => setProviderDialogVisible(true)}
+                  disabled={providerKeys.length === 0}
+                >
+                  Select
+                </Button>
+              </View>
+
+              <Divider style={styles.divider} />
+
+              <View style={styles.configRow}>
+                <View style={styles.configLabel}>
+                  <Text variant="bodyMedium">Model</Text>
+                  <Text variant="bodySmall" style={styles.configValue}>
+                    {recommendationModel || "Not configured"}
+                  </Text>
+                </View>
+                <Button
+                  mode="outlined"
+                  onPress={() => setModelDialogVisible(true)}
+                  disabled={!recommendationProvider}
+                >
+                  Select
+                </Button>
+              </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {!isAIConfigured && (
           <Card
             style={[
               styles.card,
@@ -237,6 +392,49 @@ export default function AISettingsScreen() {
         {/* Spacing */}
         <View style={styles.spacer} />
       </ScrollView>
+
+      {/* Provider & Key Selection Dialog */}
+      <Portal>
+        <Dialog
+          visible={providerDialogVisible}
+          onDismiss={() => setProviderDialogVisible(false)}
+        >
+          <Dialog.Title>Select Provider & API Key</Dialog.Title>
+          <Dialog.ScrollArea>
+            <ScrollView>
+              <RadioButton.Group
+                onValueChange={handleProviderSelect}
+                value={recommendationKeyId || ""}
+              >
+                {providerKeys.map((key) => (
+                  <RadioButton.Item
+                    key={key.keyId}
+                    label={getProviderKeyLabel(key)}
+                    value={key.keyId}
+                  />
+                ))}
+              </RadioButton.Group>
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={() => setProviderDialogVisible(false)}>
+              Cancel
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      {/* Model Selection Dialog - Using AIModelSelector */}
+      {recommendationProvider && (
+        <AIModelSelector
+          visible={modelDialogVisible}
+          onDismiss={() => setModelDialogVisible(false)}
+          onSelectModel={handleModelSelect}
+          selectedModel={recommendationModel || undefined}
+          provider={recommendationProvider as AIProviderType}
+          keyId={recommendationKeyId}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -287,6 +485,19 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: 8,
+  },
+  configRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  configLabel: {
+    flex: 1,
+  },
+  configValue: {
+    opacity: 0.6,
+    marginTop: 4,
   },
   infoBox: {
     backgroundColor: "rgba(25, 103, 210, 0.1)",

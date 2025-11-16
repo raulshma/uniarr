@@ -47,16 +47,16 @@ export default function TabsLayout() {
           />
           <Label>Services</Label>
         </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="recently-added">
+        <NativeTabs.Trigger name="recommendations/index">
           <Icon
             src={
               <VectorIcon
                 family={MaterialCommunityIcons}
-                name="clock-outline"
+                name="lightbulb-on-outline"
               />
             }
           />
-          <Label>Recently Added</Label>
+          <Label>For You</Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="downloads/index">
           <Icon
