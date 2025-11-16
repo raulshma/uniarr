@@ -44,6 +44,7 @@ const S3BackupsScreen = () => {
   );
   const [passwordDialogVisible, setPasswordDialogVisible] = useState(false);
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [operationProgress, setOperationProgress] =
     useState<S3UploadProgress | null>(null);
   const [isOperationInProgress, setIsOperationInProgress] = useState(false);
@@ -221,6 +222,7 @@ const S3BackupsScreen = () => {
     setPasswordDialogVisible(false);
     setSelectedBackup(null);
     setPassword("");
+    setPasswordVisible(false);
   }, [selectedBackup, password, restoreMutation]);
 
   // Cancel restore
@@ -228,6 +230,7 @@ const S3BackupsScreen = () => {
     setPasswordDialogVisible(false);
     setSelectedBackup(null);
     setPassword("");
+    setPasswordVisible(false);
   }, []);
 
   // Handle upload new backup
@@ -253,14 +256,10 @@ const S3BackupsScreen = () => {
 
   // Format date for display
   const formatDate = useCallback((dateInput: any): string => {
-    if (
-      !dateInput ||
-      !(dateInput instanceof Date) ||
-      isNaN(dateInput.getTime())
-    ) {
-      return "Unknown date";
-    }
-    const date = dateInput as Date;
+    // Accept string or number and coerce to Date safely
+    if (!dateInput) return "Unknown date";
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (!(date instanceof Date) || isNaN(date.getTime())) return "Unknown date";
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -319,6 +318,7 @@ const S3BackupsScreen = () => {
     },
     backupCard: {
       backgroundColor: theme.colors.elevation.level1,
+      elevation: 2,
       borderRadius: borderRadius.lg,
       marginVertical: spacing.xs,
     },
@@ -347,6 +347,7 @@ const S3BackupsScreen = () => {
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.sm,
+      flexWrap: "wrap",
       marginTop: spacing.xxs,
     },
     backupMetadataText: {
@@ -357,6 +358,7 @@ const S3BackupsScreen = () => {
     backupActions: {
       flexDirection: "row",
       gap: spacing.xxs,
+      alignItems: "center",
     },
     emptyStateContainer: {
       alignItems: "center",
@@ -452,6 +454,7 @@ const S3BackupsScreen = () => {
         <TabHeader title="S3 Backups" />
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -470,6 +473,7 @@ const S3BackupsScreen = () => {
             mode="contained"
             icon="refresh"
             onPress={handleRefresh}
+            accessibilityLabel="Retry loading backups"
             style={{ marginTop: spacing.md }}
           >
             Retry
@@ -494,6 +498,7 @@ const S3BackupsScreen = () => {
         <TabHeader title="S3 Backups" />
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -533,6 +538,7 @@ const S3BackupsScreen = () => {
             <Button
               mode="outlined"
               icon="cog"
+              accessibilityLabel="Open S3 Settings"
               onPress={handleNavigateToSettings}
               style={{ marginTop: spacing.sm }}
             >
@@ -551,6 +557,7 @@ const S3BackupsScreen = () => {
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -628,6 +635,8 @@ const S3BackupsScreen = () => {
                         iconColor={theme.colors.primary}
                         onPress={() => handleRestoreBackup(backup)}
                         disabled={isOperationInProgress}
+                        accessibilityLabel={`Download ${backup.fileName}`}
+                        accessibilityHint="Download and restore this backup"
                       />
                       <IconButton
                         icon="delete"
@@ -635,9 +644,25 @@ const S3BackupsScreen = () => {
                         iconColor={theme.colors.error}
                         onPress={() => handleDeleteBackup(backup)}
                         disabled={isOperationInProgress}
+                        accessibilityLabel={`Delete ${backup.fileName}`}
+                        accessibilityHint="Delete this backup from S3"
                       />
                     </View>
                   </View>
+                  {/* Inline progress indicator for the selected backup */}
+                  {isOperationInProgress &&
+                    selectedBackup?.key === backup.key &&
+                    operationProgress && (
+                      <View style={styles.progressContainer}>
+                        <ProgressBar
+                          progress={operationProgress.percentage / 100}
+                          color={theme.colors.primary}
+                        />
+                        <Text style={styles.progressText}>
+                          {operationProgress.percentage}%
+                        </Text>
+                      </View>
+                    )}
                 </Card.Content>
               </Card>
             </AnimatedListItem>
@@ -664,12 +689,14 @@ const S3BackupsScreen = () => {
                 }}
                 disabled={isOperationInProgress}
                 style={{ marginBottom: spacing.sm }}
+                accessibilityLabel="Upload a new backup to S3"
               >
                 Upload New Backup
               </Button>
               <Button
                 mode="outlined"
                 icon="cog"
+                accessibilityLabel="Open S3 Settings"
                 onPress={handleNavigateToSettings}
               >
                 S3 Settings
@@ -733,10 +760,17 @@ const S3BackupsScreen = () => {
               label="Password"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
+              secureTextEntry={!passwordVisible}
               autoFocus
               disabled={restoreMutation.isPending}
               style={styles.passwordInput}
+              right={
+                <TextInput.Icon
+                  icon={passwordVisible ? "eye-off" : "eye"}
+                  onPress={() => setPasswordVisible((v) => !v)}
+                  forceTextInputFocus={false}
+                />
+              }
             />
             {restoreMutation.isPending && operationProgress && (
               <View style={styles.progressContainer}>

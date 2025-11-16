@@ -31,21 +31,21 @@ export const DEFAULT_SHORTCUTS: Shortcut[] = [
     id: "discover",
     label: "Discover",
     icon: "compass",
-    route: "/discover",
+    route: "/(auth)/discover",
     enabled: true,
   },
   {
     id: "search",
     label: "Search",
     icon: "magnify",
-    route: "/dashboard/search",
+    route: "/(auth)/dashboard/search",
     enabled: true,
   },
   {
     id: "calendar",
     label: "Calendar",
     icon: "calendar",
-    route: "/calendar",
+    route: "/(auth)/calendar",
     enabled: true,
   },
   {
@@ -66,7 +66,7 @@ export const DEFAULT_SHORTCUTS: Shortcut[] = [
     id: "anime",
     label: "Anime Hub",
     icon: "play-circle",
-    route: "/anime-hub",
+    route: "/(auth)/anime-hub",
     enabled: true,
   },
 ];
