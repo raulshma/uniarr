@@ -1398,22 +1398,101 @@ export class ContentRecommendationService {
   }
 
   /**
-   * Enrich recommendations with availability information
+   * Enrich recommendations with availability information and poster URLs
    */
   private async enrichWithAvailability(
     recommendations: RecommendationResponseData["recommendations"],
   ): Promise<RecommendationResponseData["recommendations"]> {
     const enriched = await Promise.all(
       recommendations.map(async (rec) => {
-        const availability = await this.checkAvailability(rec);
+        const [availability, posterUrl] = await Promise.all([
+          this.checkAvailability(rec),
+          this.fetchPosterUrl(rec),
+        ]);
+
         return {
           ...rec,
+          metadata: {
+            ...rec.metadata,
+            posterUrl: posterUrl || rec.metadata.posterUrl,
+          },
           availability,
         };
       }),
     );
 
     return enriched;
+  }
+
+  /**
+   * Fetch poster URL from TMDb
+   */
+  private async fetchPosterUrl(
+    recommendation: Recommendation,
+  ): Promise<string | undefined> {
+    try {
+      const connectorManager = ConnectorManager.getInstance();
+      const tmdbConnectors = connectorManager.getConnectorsByType(
+        "tmdb" as any,
+      );
+
+      if (tmdbConnectors.length === 0) {
+        void logger.debug("No TMDb connector configured", {
+          title: recommendation.title,
+        });
+        return undefined;
+      }
+
+      const connector = tmdbConnectors[0] as any; // TmdbConnector
+
+      // Search for the content
+      const searchQuery = recommendation.year
+        ? `${recommendation.title} ${recommendation.year}`
+        : recommendation.title;
+
+      const timeout = new Promise<undefined>((resolve) =>
+        setTimeout(() => resolve(undefined), 3000),
+      );
+
+      const searchPromise = connector.search(searchQuery);
+      const results = await Promise.race([searchPromise, timeout]);
+
+      if (!results || !Array.isArray(results) || results.length === 0) {
+        return undefined;
+      }
+
+      // Find best match
+      const match =
+        results.find((item: any) => {
+          const itemTitle = item.title || item.name || "";
+          const itemYear = item.release_date
+            ? parseInt(item.release_date.slice(0, 4), 10)
+            : item.first_air_date
+              ? parseInt(item.first_air_date.slice(0, 4), 10)
+              : null;
+
+          const titleMatch =
+            itemTitle.toLowerCase() === recommendation.title.toLowerCase();
+          const yearMatch =
+            !recommendation.year || itemYear === recommendation.year;
+
+          return titleMatch && yearMatch;
+        }) || results[0];
+
+      // Build poster URL
+      const posterPath = match.poster_path;
+      if (posterPath) {
+        return `https://image.tmdb.org/t/p/w500${posterPath}`;
+      }
+
+      return undefined;
+    } catch (error) {
+      void logger.debug("Failed to fetch poster URL", {
+        title: recommendation.title,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
   }
 
   /**

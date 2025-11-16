@@ -64,6 +64,7 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
 
   const [serviceMenuVisible, setServiceMenuVisible] = useState(false);
   const [rejectDialogVisible, setRejectDialogVisible] = useState(false);
+  const [infoDialogVisible, setInfoDialogVisible] = useState(false);
   const [selectedRejectionReason, setSelectedRejectionReason] = useState<
     string | null
   >(null);
@@ -215,15 +216,13 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
 
   // Handle more info
   const handleMoreInfo = useCallback(() => {
-    // Navigate to appropriate detail screen based on type
-    // This is a placeholder - actual navigation depends on your routing setup
     void logger.info("Viewing more info for recommendation", {
       recommendationId: recommendation.id,
       type: recommendation.type,
+      title: recommendation.title,
     });
 
-    // TODO: Implement navigation to detail screen
-    // Example: router.push(`/discover/${recommendation.tmdbId}`);
+    setInfoDialogVisible(true);
   }, [recommendation]);
 
   const styles = useMemo(
@@ -393,6 +392,68 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
           Not Interested
         </Button>
       </View>
+
+      {/* Info dialog */}
+      <Portal>
+        <Dialog
+          visible={infoDialogVisible}
+          onDismiss={() => setInfoDialogVisible(false)}
+        >
+          <Dialog.Title style={styles.dialogTitle}>
+            {recommendation.title}
+          </Dialog.Title>
+          <Dialog.Content style={styles.dialogContent}>
+            <Text variant="bodyMedium">
+              {recommendation.metadata.overview ||
+                "No description available for this content."}
+            </Text>
+
+            {recommendation.metadata.genres.length > 0 && (
+              <View>
+                <Text
+                  variant="labelMedium"
+                  style={{ marginBottom: spacing.xs }}
+                >
+                  Genres
+                </Text>
+                <Text variant="bodySmall">
+                  {recommendation.metadata.genres.join(", ")}
+                </Text>
+              </View>
+            )}
+
+            {recommendation.year && (
+              <View>
+                <Text
+                  variant="labelMedium"
+                  style={{ marginBottom: spacing.xs }}
+                >
+                  Release Year
+                </Text>
+                <Text variant="bodySmall">{recommendation.year}</Text>
+              </View>
+            )}
+
+            {recommendation.metadata.rating > 0 && (
+              <View>
+                <Text
+                  variant="labelMedium"
+                  style={{ marginBottom: spacing.xs }}
+                >
+                  Rating
+                </Text>
+                <Text variant="bodySmall">
+                  ⭐ {recommendation.metadata.rating.toFixed(1)} / 10
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.dialogActions}>
+              <Button onPress={() => setInfoDialogVisible(false)}>Close</Button>
+            </View>
+          </Dialog.Content>
+        </Dialog>
+      </Portal>
 
       {/* Rejection dialog */}
       <Portal>
