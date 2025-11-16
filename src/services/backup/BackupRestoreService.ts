@@ -21,6 +21,8 @@ import type {
   FilterMetadata,
   LibraryFilters,
 } from "@/store/libraryFilterStore";
+import { queryClient } from "@/config/queryClient";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 type LibraryFiltersBackupPayload = Record<
   string,
@@ -2160,6 +2162,19 @@ class BackupRestoreService {
           });
         }
       }
+
+      // Post-restore: clear caches and reload services from restored configs
+      const manager = ConnectorManager.getInstance();
+      manager.dispose();
+      await manager.loadSavedServices();
+      queryClient.clear();
+
+      await logger.info(
+        "Post-restore cleanup complete: connectors reloaded and query cache cleared",
+        {
+          location: "BackupRestoreService.restoreBackup",
+        },
+      );
 
       await logger.info("Backup restore completed successfully", {
         location: "BackupRestoreService.restoreBackup",

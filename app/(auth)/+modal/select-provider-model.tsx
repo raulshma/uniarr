@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -17,16 +17,11 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import type { AppTheme } from "@/constants/theme";
-import {
-  AIProviderType,
-  AI_PROVIDERS,
-  AI_PROVIDER_MODELS,
-} from "@/types/ai/AIProvider";
+import { AIProviderType, AI_PROVIDERS } from "@/types/ai/AIProvider";
 import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
 import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
 import { alert } from "@/services/dialogService";
-import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
-import type { OpenRouterModel } from "@/services/ai/providers/OpenRouterService";
+import { AIModelSelector } from "@/components/settings/AIModelSelector";
 
 interface ProviderWithKey {
   provider: AIProviderType;
@@ -41,17 +36,10 @@ const SelectProviderAndModelSheet: React.FC = () => {
   const [providers, setProviders] = useState<ProviderWithKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<ProviderWithKey | null>(null);
-  const [apiKey, setApiKey] = useState<string | undefined>(undefined);
+  const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
   const { target } = useLocalSearchParams<{ target?: string }>();
 
   const keyManager = AIKeyManager.getInstance();
-
-  // Use the reusable OpenRouter models hook
-  const { models: openRouterModels, loading: loadingOpenRouterModels } =
-    useOpenRouterModels({
-      apiKey,
-      autoFetch: selectedKey?.provider === "openrouter",
-    });
 
   useEffect(() => {
     const loadProviders = async () => {
@@ -76,19 +64,6 @@ const SelectProviderAndModelSheet: React.FC = () => {
 
     void loadProviders();
   }, [keyManager]);
-
-  // Fetch API key when selected provider changes
-  useEffect(() => {
-    const fetchApiKey = async () => {
-      if (selectedKey?.keyId) {
-        const key = await keyManager.getKey(selectedKey.keyId);
-        setApiKey(key?.apiKey);
-      } else {
-        setApiKey(undefined);
-      }
-    };
-    void fetchApiKey();
-  }, [selectedKey?.keyId, keyManager]);
 
   const handleSelectModel = useCallback(
     (model: string) => {
@@ -126,6 +101,7 @@ const SelectProviderAndModelSheet: React.FC = () => {
 
   const handleSelectProvider = useCallback((item: ProviderWithKey) => {
     setSelectedKey(item);
+    setModelSelectorVisible(true);
   }, []);
 
   const renderProviderItem = useCallback(
@@ -174,123 +150,6 @@ const SelectProviderAndModelSheet: React.FC = () => {
       </Pressable>
     ),
     [theme, selectedKey, handleSelectProvider],
-  );
-
-  // Get available models based on provider
-  const availableModels = useMemo(() => {
-    if (!selectedKey) return [];
-
-    if (
-      selectedKey.provider === "openrouter" &&
-      (openRouterModels.free.length > 0 || openRouterModels.paid.length > 0)
-    ) {
-      return [
-        ...openRouterModels.free.map((m) => ({
-          id: m.id,
-          model: m,
-          isFree: true,
-        })),
-        ...openRouterModels.paid.map((m) => ({
-          id: m.id,
-          model: m,
-          isFree: false,
-        })),
-      ];
-    }
-
-    // For other providers, use static list
-    return AI_PROVIDER_MODELS[selectedKey.provider].map((id) => ({
-      id,
-      model: null,
-      isFree: false,
-    }));
-  }, [selectedKey, openRouterModels]);
-
-  const renderModelItem = useCallback(
-    ({
-      item,
-      index,
-    }: {
-      item: { id: string; model: OpenRouterModel | null; isFree: boolean };
-      index: number;
-    }) => {
-      const { id, model, isFree } = item;
-
-      return (
-        <>
-          <Pressable
-            onPress={() => handleSelectModel(id)}
-            style={({ pressed }) => [
-              styles.modelItem,
-              {
-                backgroundColor: pressed
-                  ? theme.colors.surfaceVariant
-                  : theme.colors.surface,
-              },
-            ]}
-          >
-            <View style={styles.modelItemContent}>
-              <View style={styles.modelItemHeader}>
-                <Text
-                  variant="bodyLarge"
-                  style={{ color: theme.colors.onSurface, fontWeight: "500" }}
-                >
-                  {model?.name || id}
-                </Text>
-                {isFree && (
-                  <View style={styles.freeBadge}>
-                    <Text variant="labelSmall" style={styles.freeBadgeText}>
-                      FREE
-                    </Text>
-                  </View>
-                )}
-              </View>
-              {model && (
-                <>
-                  <Text
-                    variant="bodySmall"
-                    style={{
-                      color: theme.colors.onSurfaceVariant,
-                      marginTop: 2,
-                    }}
-                  >
-                    {model.id}
-                  </Text>
-                  <View style={styles.modelMetadata}>
-                    <Text variant="bodySmall" style={styles.modelMetadataText}>
-                      {model.context_length.toLocaleString()} tokens
-                    </Text>
-                    {model.architecture?.modality && (
-                      <Text
-                        variant="bodySmall"
-                        style={styles.modelMetadataText}
-                      >
-                        • {model.architecture.modality}
-                      </Text>
-                    )}
-                    {!isFree && (
-                      <Text
-                        variant="bodySmall"
-                        style={styles.modelMetadataText}
-                      >
-                        • ${model.pricing.prompt}/${model.pricing.completion}
-                      </Text>
-                    )}
-                  </View>
-                </>
-              )}
-            </View>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={24}
-              color={theme.colors.onSurfaceVariant}
-            />
-          </Pressable>
-          {index < availableModels.length - 1 && <Divider />}
-        </>
-      );
-    },
-    [theme, handleSelectModel, availableModels.length],
   );
 
   if (loading) {
@@ -390,7 +249,7 @@ const SelectProviderAndModelSheet: React.FC = () => {
               marginBottom: 12,
             }}
           >
-            1. Choose Provider
+            Choose Provider & API Key
           </Text>
           <FlatList
             data={providers}
@@ -402,51 +261,19 @@ const SelectProviderAndModelSheet: React.FC = () => {
             ItemSeparatorComponent={() => <Divider />}
           />
         </View>
-
-        {/* Models Section */}
-        {selectedKey && (
-          <View style={styles.section}>
-            <Text
-              variant="titleSmall"
-              style={{
-                color: theme.colors.onSurface,
-                fontWeight: "600",
-                paddingHorizontal: 16,
-                marginBottom: 12,
-              }}
-            >
-              2. Choose Model
-            </Text>
-            {loadingOpenRouterModels &&
-            selectedKey.provider === "openrouter" ? (
-              <View style={styles.loadingModels}>
-                <ActivityIndicator size="small" color={theme.colors.primary} />
-                <Text
-                  variant="bodySmall"
-                  style={{ marginTop: 8, color: theme.colors.onSurfaceVariant }}
-                >
-                  Loading models...
-                </Text>
-              </View>
-            ) : availableModels.length > 0 ? (
-              <FlatList
-                data={availableModels}
-                renderItem={renderModelItem}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingHorizontal: 0 }}
-              />
-            ) : (
-              <View style={styles.emptyModels}>
-                <Text variant="bodyMedium" style={styles.emptyText}>
-                  No models available for this provider
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
       </ScrollView>
+
+      {/* AI Model Selector Modal */}
+      {selectedKey && (
+        <AIModelSelector
+          visible={modelSelectorVisible}
+          onDismiss={() => setModelSelectorVisible(false)}
+          onSelectModel={handleSelectModel}
+          selectedModel={undefined}
+          provider={selectedKey.provider}
+          keyId={selectedKey.keyId}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -489,53 +316,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
-  modelItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    minHeight: 60,
-  },
-  modelItemContent: {
-    flex: 1,
-    marginRight: 12,
-  },
-  modelItemHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  freeBadge: {
-    backgroundColor: "#4CAF50",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  freeBadgeText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 10,
-  },
-  modelMetadata: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 4,
-    gap: 4,
-  },
-  modelMetadataText: {
-    opacity: 0.5,
-    fontSize: 11,
-  },
   loadingContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  loadingModels: {
-    paddingHorizontal: 16,
-    paddingVertical: 32,
-    alignItems: "center",
   },
   emptyState: {
     flex: 1,
@@ -543,15 +327,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 32,
     paddingHorizontal: 16,
-  },
-  emptyModels: {
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-    alignItems: "center",
-  },
-  emptyText: {
-    color: "#999",
-    textAlign: "center",
   },
 });
 

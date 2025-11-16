@@ -243,8 +243,8 @@ export function AIProviderList({
   const handleSetForConversationalAI = useCallback(
     (keyId: string, provider: AIProviderType) => {
       router.push({
-        pathname: "/(auth)/+modal/select-chat-model",
-        params: { provider, keyId },
+        pathname: "/(auth)/+modal/select-provider-model",
+        params: { target: "chat" },
       });
     },
     [router],

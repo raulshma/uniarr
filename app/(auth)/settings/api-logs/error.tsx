@@ -6,7 +6,6 @@ import {
   View,
   TextInput as RNTextInput,
   TouchableOpacity,
-  ScrollView,
   Dimensions,
   Modal,
   Platform,
@@ -555,7 +554,7 @@ const ApiErrorLogsScreen = () => {
     },
     content: {
       flex: 1,
-      padding: spacing.md,
+      paddingHorizontal: spacing.md,
     },
     searchContainer: {
       marginBottom: spacing.md,
@@ -887,203 +886,145 @@ const ApiErrorLogsScreen = () => {
   const screenWidth = Dimensions.get("window").width;
   const chartWidth = screenWidth - spacing.md * 2 - spacing.md;
 
-  return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <TabHeader
-        title="API Error Logs"
-        showBackButton
-        onBackPress={router.back}
-      />
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Summary Stats */}
-        {stats && (
-          <AnimatedSection>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsText}>Total Errors</Text>
-              <Text style={styles.statsNumber}>{stats.total}</Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  gap: spacing.md,
-                  marginTop: spacing.md,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Server 5xx</Text>
-                  <Text
-                    style={{
-                      ...styles.statsNumber,
-                      color: theme.colors.error,
-                    }}
-                  >
-                    {stats.byErrorType.server}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Client 4xx</Text>
-                  <Text
-                    style={{
-                      ...styles.statsNumber,
-                      color: theme.colors.tertiary,
-                    }}
-                  >
-                    {stats.byErrorType.client}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Network</Text>
-                  <Text
-                    style={{
-                      ...styles.statsNumber,
-                      color: theme.colors.secondary,
-                    }}
-                  >
-                    {stats.byErrorType.network}
-                  </Text>
-                </View>
+  const renderListHeader = () => (
+    <View>
+      {/* Summary Stats */}
+      {stats && (
+        <AnimatedSection>
+          <View style={styles.statsCard}>
+            <Text style={styles.statsText}>Total Errors</Text>
+            <Text style={styles.statsNumber}>{stats.total}</Text>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: spacing.md,
+                marginTop: spacing.md,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Server 5xx</Text>
+                <Text
+                  style={{
+                    ...styles.statsNumber,
+                    color: theme.colors.error,
+                  }}
+                >
+                  {stats.byErrorType.server}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Client 4xx</Text>
+                <Text
+                  style={{
+                    ...styles.statsNumber,
+                    color: theme.colors.tertiary,
+                  }}
+                >
+                  {stats.byErrorType.client}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Network</Text>
+                <Text
+                  style={{
+                    ...styles.statsNumber,
+                    color: theme.colors.secondary,
+                  }}
+                >
+                  {stats.byErrorType.network}
+                </Text>
               </View>
             </View>
-          </AnimatedSection>
-        )}
+          </View>
+        </AnimatedSection>
+      )}
 
-        {/* Insights Toggle */}
+      {/* Insights Toggle */}
+      <Button
+        mode="outlined"
+        onPress={() => setShowInsights(!showInsights)}
+        icon={showInsights ? "chevron-up" : "chevron-down"}
+        style={{ marginBottom: spacing.md }}
+      >
+        {showInsights ? "Hide Insights" : "Show Insights"}
+      </Button>
+
+      {/* Refresh Controls */}
+      <View style={styles.refreshContainer}>
         <Button
           mode="outlined"
-          onPress={() => setShowInsights(!showInsights)}
-          icon={showInsights ? "chevron-up" : "chevron-down"}
-          style={{ marginBottom: spacing.md }}
+          onPress={handleRefresh}
+          icon="refresh"
+          loading={isLoading}
         >
-          {showInsights ? "Hide Insights" : "Show Insights"}
+          Refresh
         </Button>
-
-        {/* Refresh Controls */}
-        <View style={styles.refreshContainer}>
-          <Button
-            mode="outlined"
-            onPress={handleRefresh}
-            icon="refresh"
-            loading={isLoading}
-          >
-            Refresh
-          </Button>
-          <View
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.sm,
+          }}
+        >
+          <Text style={styles.lastRefreshText}>
+            Last updated: {lastRefresh.toLocaleTimeString()}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setAutoRefresh(!autoRefresh)}
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: spacing.sm,
+              gap: spacing.xs,
             }}
           >
-            <Text style={styles.lastRefreshText}>
-              Last updated: {lastRefresh.toLocaleTimeString()}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setAutoRefresh(!autoRefresh)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.xs,
-              }}
+            <Icon
+              source={autoRefresh ? "timer" : "timer-off"}
+              size={16}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text
+              style={{ fontSize: 12, color: theme.colors.onSurfaceVariant }}
             >
-              <Icon
-                source={autoRefresh ? "timer" : "timer-off"}
-                size={16}
-                color={theme.colors.onSurfaceVariant}
-              />
-              <Text
-                style={{ fontSize: 12, color: theme.colors.onSurfaceVariant }}
-              >
-                Auto
-              </Text>
-            </TouchableOpacity>
-          </View>
+              Auto
+            </Text>
+          </TouchableOpacity>
         </View>
+      </View>
 
-        {/* Charts */}
-        {showInsights && (
-          <>
-            {/* Pie Chart - Error Type Distribution */}
-            {pieData.length > 0 && (
+      {/* Charts */}
+      {showInsights && (
+        <>
+          {/* Pie Chart - Error Type Distribution */}
+          {pieData.length > 0 && (
+            <AnimatedSection>
+              <View style={styles.chartContainer}>
+                <Text style={styles.chartTitle}>Error Type Distribution</Text>
+                <PieChart
+                  data={pieData}
+                  width={chartWidth}
+                  height={220}
+                  chartConfig={chartConfig}
+                  accessor="value"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                />
+              </View>
+            </AnimatedSection>
+          )}
+
+          {/* Bar Chart - Errors by Service */}
+          {barData.datasets?.[0]?.data &&
+            barData.datasets[0].data.length > 0 && (
               <AnimatedSection>
                 <View style={styles.chartContainer}>
-                  <Text style={styles.chartTitle}>Error Type Distribution</Text>
-                  <PieChart
-                    data={pieData}
+                  <Text style={styles.chartTitle}>Top Services by Errors</Text>
+                  <BarChart
+                    data={barData}
                     width={chartWidth}
                     height={220}
                     chartConfig={chartConfig}
-                    accessor="value"
-                    backgroundColor="transparent"
-                    paddingLeft="15"
-                    absolute
-                  />
-                </View>
-              </AnimatedSection>
-            )}
-
-            {/* Bar Chart - Errors by Service */}
-            {barData.datasets?.[0]?.data &&
-              barData.datasets[0].data.length > 0 && (
-                <AnimatedSection>
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      Top Services by Errors
-                    </Text>
-                    <BarChart
-                      data={barData}
-                      width={chartWidth}
-                      height={220}
-                      chartConfig={chartConfig}
-                      verticalLabelRotation={30}
-                      fromZero
-                      yAxisLabel=""
-                      yAxisSuffix=""
-                    />
-                  </View>
-                </AnimatedSection>
-              )}
-
-            {/* Trends Toggle */}
-            <Button
-              mode="outlined"
-              onPress={() => setShowTrends(!showTrends)}
-              icon={showTrends ? "chart-line-variant" : "chart-line"}
-              style={{ marginTop: spacing.sm, marginBottom: spacing.md }}
-            >
-              {showTrends ? "Hide Trends" : "Show Error Trends"}
-            </Button>
-
-            {/* Error Trends Chart */}
-            {showTrends && trendData.length > 0 && (
-              <AnimatedSection>
-                <View style={styles.trendChartContainer}>
-                  <Text style={styles.chartTitle}>
-                    Error Trends (Last 7 Days)
-                  </Text>
-                  <LineChart
-                    data={{
-                      labels: trendData.slice(-7).map((item, index) => {
-                        const date = new Date();
-                        date.setDate(date.getDate() - (6 - index));
-                        return date.toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        });
-                      }),
-                      datasets: [
-                        {
-                          data: trendData.slice(-7).map((item) => item.value),
-                          color: () => theme.colors.primary,
-                          strokeWidth: 2,
-                        },
-                      ],
-                    }}
-                    width={chartWidth}
-                    height={220}
-                    chartConfig={{
-                      ...chartConfig,
-                      color: () => theme.colors.primary,
-                    }}
-                    bezier
+                    verticalLabelRotation={30}
                     fromZero
                     yAxisLabel=""
                     yAxisSuffix=""
@@ -1091,331 +1032,392 @@ const ApiErrorLogsScreen = () => {
                 </View>
               </AnimatedSection>
             )}
-          </>
-        )}
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <RNTextInput
-            style={styles.searchInput}
-            placeholder="Search errors..."
-            placeholderTextColor={theme.colors.onSurfaceVariant}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
-        {/* Date Range Filter */}
-        <View style={styles.controlRow}>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: theme.colors.onSurfaceVariant,
-                marginBottom: spacing.xs,
-              }}
-            >
-              Date Range
-            </Text>
-            <SegmentedButtons
-              value={dateRange}
-              onValueChange={(value) => setDateRange(value as typeof dateRange)}
-              buttons={[
-                { value: "all", label: "All" },
-                { value: "today", label: "Today" },
-                { value: "7days", label: "7 Days" },
-                { value: "30days", label: "30 Days" },
-              ]}
-              style={{ marginBottom: spacing.xs }}
-            />
-            {dateRange === "custom" && (
-              <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                <Button
-                  mode="outlined"
-                  onPress={() => setShowDatePicker("start")}
-                  style={{ flex: 1 }}
-                >
-                  {customStartDate
-                    ? customStartDate.toLocaleDateString()
-                    : "Start Date"}
-                </Button>
-                <Button
-                  mode="outlined"
-                  onPress={() => setShowDatePicker("end")}
-                  style={{ flex: 1 }}
-                >
-                  {customEndDate
-                    ? customEndDate.toLocaleDateString()
-                    : "End Date"}
-                </Button>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Advanced Filters Toggle */}
-        <View style={styles.controlRow}>
+          {/* Trends Toggle */}
           <Button
             mode="outlined"
-            onPress={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            icon={showAdvancedFilters ? "chevron-up" : "chevron-down"}
-            style={{ flex: 1 }}
+            onPress={() => setShowTrends(!showTrends)}
+            icon={showTrends ? "chart-line-variant" : "chart-line"}
+            style={{ marginTop: spacing.sm, marginBottom: spacing.md }}
           >
-            Advanced Filters{" "}
-            {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+            {showTrends ? "Hide Trends" : "Show Error Trends"}
           </Button>
-          {activeFiltersCount > 0 && (
-            <Button
-              mode="text"
-              onPress={handleClearFilters}
-              textColor={theme.colors.primary}
-            >
-              Clear
-            </Button>
-          )}
-        </View>
 
-        {/* Advanced Filters */}
-        {showAdvancedFilters && (
-          <AnimatedSection>
-            <View style={styles.advancedFiltersContainer}>
-              <View style={styles.filterRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.filterLabel}>Error Type</Text>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      flexWrap: "wrap",
-                      gap: spacing.xs,
-                    }}
-                  >
-                    {[
-                      { value: "all", label: "All" },
-                      { value: "network", label: "Network" },
-                      { value: "server", label: "Server" },
-                      { value: "client", label: "Client" },
-                      { value: "other", label: "Other" },
-                    ].map((button) => (
-                      <Chip
-                        key={button.value}
-                        selected={errorTypeFilter === button.value}
-                        onPress={() =>
-                          setErrorTypeFilter(
-                            button.value as typeof errorTypeFilter,
-                          )
-                        }
-                        style={{ margin: 0 }}
-                        compact
-                      >
-                        {button.label}
-                      </Chip>
-                    ))}
-                  </View>
-                </View>
+          {/* Error Trends Chart */}
+          {showTrends && trendData.length > 0 && (
+            <AnimatedSection>
+              <View style={styles.trendChartContainer}>
+                <Text style={styles.chartTitle}>
+                  Error Trends (Last 7 Days)
+                </Text>
+                <LineChart
+                  data={{
+                    labels: trendData.slice(-7).map((item, index) => {
+                      const date = new Date();
+                      date.setDate(date.getDate() - (6 - index));
+                      return date.toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      });
+                    }),
+                    datasets: [
+                      {
+                        data: trendData.slice(-7).map((item) => item.value),
+                        color: () => theme.colors.primary,
+                        strokeWidth: 2,
+                      },
+                    ],
+                  }}
+                  width={chartWidth}
+                  height={220}
+                  chartConfig={{
+                    ...chartConfig,
+                    color: () => theme.colors.primary,
+                  }}
+                  bezier
+                  fromZero
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                />
               </View>
-
-              <View style={styles.filterRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.filterLabel}>Status Code</Text>
-                  <RNTextInput
-                    style={styles.filterInput}
-                    placeholder="e.g., 500"
-                    placeholderTextColor={theme.colors.onSurfaceVariant}
-                    value={statusCodeFilter?.toString() || ""}
-                    onChangeText={(text) => {
-                      if (!text) {
-                        setStatusCodeFilter(null);
-                        return;
-                      }
-                      const parsed = Number(text);
-                      setStatusCodeFilter(Number.isNaN(parsed) ? null : parsed);
-                    }}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.filterLabel}>Service Type</Text>
-                  <RNTextInput
-                    style={styles.filterInput}
-                    placeholder="e.g., sonarr"
-                    placeholderTextColor={theme.colors.onSurfaceVariant}
-                    value={serviceTypeFilter || ""}
-                    onChangeText={setServiceTypeFilter}
-                  />
-                </View>
-              </View>
-            </View>
-          </AnimatedSection>
-        )}
-
-        {/* Filters & Controls */}
-        <View style={styles.controlRow}>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: theme.colors.onSurfaceVariant,
-                marginBottom: spacing.xs,
-              }}
-            >
-              Sort
-            </Text>
-            <Button
-              mode="outlined"
-              onPress={() => setShowSortDialog(true)}
-              icon="sort"
-            >
-              {sortBy === "newest"
-                ? "Newest"
-                : sortBy === "oldest"
-                  ? "Oldest"
-                  : "By Status"}
-            </Button>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                color: theme.colors.onSurfaceVariant,
-                marginBottom: spacing.xs,
-              }}
-            >
-              Group
-            </Text>
-            <Button
-              mode="outlined"
-              onPress={() => setShowGroupDialog(true)}
-              icon="folder-multiple"
-            >
-              {groupBy === "none"
-                ? "None"
-                : groupBy === "service"
-                  ? "Service"
-                  : groupBy === "serviceType"
-                    ? "Type"
-                    : "Endpoint"}
-            </Button>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtonContainer}>
-          {isSelectingMultiple && (
-            <>
-              <Button mode="text" onPress={handleSelectAll}>
-                {selectedErrorIds.size === filteredErrors.length
-                  ? "Deselect All"
-                  : "Select All"}
-              </Button>
-              {selectedErrorIds.size > 0 && (
-                <>
-                  <Menu
-                    visible={showExportMenu}
-                    onDismiss={() => setShowExportMenu(false)}
-                    anchor={
-                      <Button
-                        mode="outlined"
-                        onPress={() => setShowExportMenu(true)}
-                        icon="download"
-                      >
-                        Export
-                      </Button>
-                    }
-                  >
-                    <Menu.Item
-                      onPress={() => {
-                        setShowExportMenu(false);
-                        void handleExportSelected();
-                      }}
-                      title="Export as JSON"
-                      leadingIcon="code-json"
-                    />
-                    <Menu.Item
-                      onPress={() => {
-                        setShowExportMenu(false);
-                        void handleExportCSV();
-                      }}
-                      title="Export as CSV"
-                      leadingIcon="file-delimited"
-                    />
-                  </Menu>
-                  <Button
-                    mode="contained"
-                    buttonColor={theme.colors.error}
-                    onPress={() => setShowDeleteDialog(true)}
-                    icon="trash-can"
-                  >
-                    Delete
-                  </Button>
-                </>
-              )}
-            </>
+            </AnimatedSection>
           )}
-          {!isSelectingMultiple && (
-            <>
+        </>
+      )}
+
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <RNTextInput
+          style={styles.searchInput}
+          placeholder="Search errors..."
+          placeholderTextColor={theme.colors.onSurfaceVariant}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+
+      {/* Date Range Filter */}
+      <View style={styles.controlRow}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.colors.onSurfaceVariant,
+              marginBottom: spacing.xs,
+            }}
+          >
+            Date Range
+          </Text>
+          <SegmentedButtons
+            value={dateRange}
+            onValueChange={(value) => setDateRange(value as typeof dateRange)}
+            buttons={[
+              { value: "all", label: "All" },
+              { value: "today", label: "Today" },
+              { value: "7days", label: "7 Days" },
+              { value: "30days", label: "30 Days" },
+            ]}
+            style={{ marginBottom: spacing.xs }}
+          />
+          {dateRange === "custom" && (
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
               <Button
-                mode="text"
-                onPress={() => setIsSelectingMultiple(true)}
-                icon="checkbox-multiple-marked-outline"
+                mode="outlined"
+                onPress={() => setShowDatePicker("start")}
+                style={{ flex: 1 }}
               >
-                Select
+                {customStartDate
+                  ? customStartDate.toLocaleDateString()
+                  : "Start Date"}
               </Button>
               <Button
                 mode="outlined"
-                onPress={handleClearAll}
-                icon="trash-can-outline"
+                onPress={() => setShowDatePicker("end")}
+                style={{ flex: 1 }}
               >
-                Clear All
+                {customEndDate
+                  ? customEndDate.toLocaleDateString()
+                  : "End Date"}
               </Button>
-            </>
+            </View>
           )}
         </View>
+      </View>
 
-        {/* Error List */}
-        {filteredErrors.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Icon
-              source="inbox"
-              size={48}
-              color={theme.colors.onSurfaceVariant}
-            />
-            <Text style={styles.emptyText}>No error logs found</Text>
-          </View>
-        ) : (
-          <View style={styles.errorListContainer}>
-            {groupBy === "none" ? (
-              <FlashList
-                data={filteredErrors}
-                renderItem={({ item }: { item: ApiErrorLogEntry }) =>
-                  renderErrorItem(item)
-                }
-                keyExtractor={(item: ApiErrorLogEntry) => item.id}
-                estimatedItemSize={100}
-                scrollEnabled={false}
-              />
-            ) : (
-              <View>
-                {groupedErrors.map((group, idx) => (
-                  <View key={`group-${idx}`}>
-                    {group.header && (
-                      <Text style={styles.groupHeader}>{group.header}</Text>
-                    )}
-                    <FlashList
-                      data={group.items}
-                      renderItem={({ item }: { item: ApiErrorLogEntry }) =>
-                        renderErrorItem(item)
+      {/* Advanced Filters Toggle */}
+      <View style={styles.controlRow}>
+        <Button
+          mode="outlined"
+          onPress={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          icon={showAdvancedFilters ? "chevron-up" : "chevron-down"}
+          style={{ flex: 1 }}
+        >
+          Advanced Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+        </Button>
+        {activeFiltersCount > 0 && (
+          <Button
+            mode="text"
+            onPress={handleClearFilters}
+            textColor={theme.colors.primary}
+          >
+            Clear
+          </Button>
+        )}
+      </View>
+
+      {/* Advanced Filters */}
+      {showAdvancedFilters && (
+        <AnimatedSection>
+          <View style={styles.advancedFiltersContainer}>
+            <View style={styles.filterRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.filterLabel}>Error Type</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: spacing.xs,
+                  }}
+                >
+                  {[
+                    { value: "all", label: "All" },
+                    { value: "network", label: "Network" },
+                    { value: "server", label: "Server" },
+                    { value: "client", label: "Client" },
+                    { value: "other", label: "Other" },
+                  ].map((button) => (
+                    <Chip
+                      key={button.value}
+                      selected={errorTypeFilter === button.value}
+                      onPress={() =>
+                        setErrorTypeFilter(
+                          button.value as typeof errorTypeFilter,
+                        )
                       }
-                      keyExtractor={(item: ApiErrorLogEntry) => item.id}
-                      estimatedItemSize={100}
-                      scrollEnabled={false}
-                    />
-                  </View>
-                ))}
+                      style={{ margin: 0 }}
+                      compact
+                    >
+                      {button.label}
+                    </Chip>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.filterRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.filterLabel}>Status Code</Text>
+                <RNTextInput
+                  style={styles.filterInput}
+                  placeholder="e.g., 500"
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
+                  value={statusCodeFilter?.toString() || ""}
+                  onChangeText={(text) => {
+                    if (!text) {
+                      setStatusCodeFilter(null);
+                      return;
+                    }
+                    const parsed = Number(text);
+                    setStatusCodeFilter(Number.isNaN(parsed) ? null : parsed);
+                  }}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.filterLabel}>Service Type</Text>
+                <RNTextInput
+                  style={styles.filterInput}
+                  placeholder="e.g., sonarr"
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
+                  value={serviceTypeFilter || ""}
+                  onChangeText={setServiceTypeFilter}
+                />
+              </View>
+            </View>
+          </View>
+        </AnimatedSection>
+      )}
+
+      {/* Filters & Controls */}
+      <View style={styles.controlRow}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.colors.onSurfaceVariant,
+              marginBottom: spacing.xs,
+            }}
+          >
+            Sort
+          </Text>
+          <Button
+            mode="outlined"
+            onPress={() => setShowSortDialog(true)}
+            icon="sort"
+          >
+            {sortBy === "newest"
+              ? "Newest"
+              : sortBy === "oldest"
+                ? "Oldest"
+                : "By Status"}
+          </Button>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.colors.onSurfaceVariant,
+              marginBottom: spacing.xs,
+            }}
+          >
+            Group
+          </Text>
+          <Button
+            mode="outlined"
+            onPress={() => setShowGroupDialog(true)}
+            icon="folder-multiple"
+          >
+            {groupBy === "none"
+              ? "None"
+              : groupBy === "service"
+                ? "Service"
+                : groupBy === "serviceType"
+                  ? "Type"
+                  : "Endpoint"}
+          </Button>
+        </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtonContainer}>
+        {isSelectingMultiple && (
+          <>
+            <Button mode="text" onPress={handleSelectAll}>
+              {selectedErrorIds.size === filteredErrors.length
+                ? "Deselect All"
+                : "Select All"}
+            </Button>
+            {selectedErrorIds.size > 0 && (
+              <>
+                <Menu
+                  visible={showExportMenu}
+                  onDismiss={() => setShowExportMenu(false)}
+                  anchor={
+                    <Button
+                      mode="outlined"
+                      onPress={() => setShowExportMenu(true)}
+                      icon="download"
+                    >
+                      Export
+                    </Button>
+                  }
+                >
+                  <Menu.Item
+                    onPress={() => {
+                      setShowExportMenu(false);
+                      void handleExportSelected();
+                    }}
+                    title="Export as JSON"
+                    leadingIcon="code-json"
+                  />
+                  <Menu.Item
+                    onPress={() => {
+                      setShowExportMenu(false);
+                      void handleExportCSV();
+                    }}
+                    title="Export as CSV"
+                    leadingIcon="file-delimited"
+                  />
+                </Menu>
+                <Button
+                  mode="contained"
+                  buttonColor={theme.colors.error}
+                  onPress={() => setShowDeleteDialog(true)}
+                  icon="trash-can"
+                >
+                  Delete
+                </Button>
+              </>
+            )}
+          </>
+        )}
+        {!isSelectingMultiple && (
+          <>
+            <Button
+              mode="text"
+              onPress={() => setIsSelectingMultiple(true)}
+              icon="checkbox-multiple-marked-outline"
+            >
+              Select
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={handleClearAll}
+              icon="trash-can-outline"
+            >
+              Clear All
+            </Button>
+          </>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderEmptyComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Icon source="inbox" size={48} color={theme.colors.onSurfaceVariant} />
+      <Text style={styles.emptyText}>No error logs found</Text>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <TabHeader
+        title="API Error Logs"
+        showBackButton
+        onBackPress={router.back}
+      />
+      <View style={styles.content}>
+        {groupBy === "none" ? (
+          <FlashList
+            data={filteredErrors}
+            renderItem={({ item }: { item: ApiErrorLogEntry }) =>
+              renderErrorItem(item)
+            }
+            keyExtractor={(item: ApiErrorLogEntry) => item.id}
+            estimatedItemSize={100}
+            ListHeaderComponent={renderListHeader}
+            ListEmptyComponent={renderEmptyComponent}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <FlashList
+            data={groupedErrors}
+            renderItem={({
+              item: group,
+              index,
+            }: {
+              item: { header: string | null; items: ApiErrorLogEntry[] };
+              index: number;
+            }) => (
+              <View key={`group-${index}`}>
+                {group.header && (
+                  <Text style={styles.groupHeader}>{group.header}</Text>
+                )}
+                {group.items.map((item) => renderErrorItem(item))}
               </View>
             )}
-          </View>
+            keyExtractor={(
+              item: { header: string | null; items: ApiErrorLogEntry[] },
+              index: number,
+            ) => `group-${index}`}
+            estimatedItemSize={200}
+            ListHeaderComponent={renderListHeader}
+            ListEmptyComponent={renderEmptyComponent}
+            showsVerticalScrollIndicator={false}
+          />
         )}
-      </ScrollView>
+      </View>
 
       {/* Dialogs */}
       <Portal>

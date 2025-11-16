@@ -6,7 +6,6 @@ import {
   View,
   TextInput as RNTextInput,
   TouchableOpacity,
-  ScrollView,
   Dimensions,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
@@ -304,7 +303,6 @@ const AiApiLogsScreen = () => {
     },
     content: {
       flex: 1,
-      paddingHorizontal: spacing.md,
     },
     searchContainer: {
       flexDirection: "row",
@@ -564,345 +562,341 @@ const AiApiLogsScreen = () => {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <TabHeader title="AI API Logs" showBackButton onBackPress={router.back} />
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Summary Stats */}
-        {stats && (
-          <AnimatedSection>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsText}>Total Calls</Text>
-              <Text style={styles.statsNumber}>{stats.total}</Text>
-              <View style={styles.statsRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Success</Text>
-                  <Text
-                    style={{
-                      ...styles.statsNumber,
-                      color: theme.colors.primary,
-                      fontSize: 18,
-                    }}
-                  >
-                    {stats.success}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Failed</Text>
-                  <Text
-                    style={{
-                      ...styles.statsNumber,
-                      color: theme.colors.error,
-                      fontSize: 18,
-                    }}
-                  >
-                    {stats.failure}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Success Rate</Text>
-                  <Text
-                    style={{
-                      ...styles.statsNumber,
-                      color: theme.colors.secondary,
-                      fontSize: 18,
-                    }}
-                  >
-                    {stats.total > 0
-                      ? Math.round((stats.success / stats.total) * 100)
-                      : 0}
-                    %
-                  </Text>
-                </View>
+  const renderListHeader = () => (
+    <View style={{ paddingHorizontal: spacing.md }}>
+      {/* Summary Stats */}
+      {stats && (
+        <AnimatedSection>
+          <View style={styles.statsCard}>
+            <Text style={styles.statsText}>Total Calls</Text>
+            <Text style={styles.statsNumber}>{stats.total}</Text>
+            <View style={styles.statsRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Success</Text>
+                <Text
+                  style={{
+                    ...styles.statsNumber,
+                    color: theme.colors.primary,
+                    fontSize: 18,
+                  }}
+                >
+                  {stats.success}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Failed</Text>
+                <Text
+                  style={{
+                    ...styles.statsNumber,
+                    color: theme.colors.error,
+                    fontSize: 18,
+                  }}
+                >
+                  {stats.failure}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Success Rate</Text>
+                <Text
+                  style={{
+                    ...styles.statsNumber,
+                    color: theme.colors.secondary,
+                    fontSize: 18,
+                  }}
+                >
+                  {stats.total > 0
+                    ? Math.round((stats.success / stats.total) * 100)
+                    : 0}
+                  %
+                </Text>
               </View>
             </View>
-          </AnimatedSection>
-        )}
+          </View>
+        </AnimatedSection>
+      )}
 
-        {/* Token Usage */}
-        {stats && stats.tokenUsage.total > 0 && (
-          <AnimatedSection>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsText}>Token Usage</Text>
-              <View style={styles.statsRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Prompt</Text>
-                  <Text style={styles.statsNumber}>
-                    {stats.tokenUsage.prompt}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Completion</Text>
-                  <Text style={styles.statsNumber}>
-                    {stats.tokenUsage.completion}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.statsText}>Total</Text>
-                  <Text style={styles.statsNumber}>
-                    {stats.tokenUsage.total}
-                  </Text>
-                </View>
+      {/* Token Usage */}
+      {stats && stats.tokenUsage.total > 0 && (
+        <AnimatedSection>
+          <View style={styles.statsCard}>
+            <Text style={styles.statsText}>Token Usage</Text>
+            <View style={styles.statsRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Prompt</Text>
+                <Text style={styles.statsNumber}>
+                  {stats.tokenUsage.prompt}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Completion</Text>
+                <Text style={styles.statsNumber}>
+                  {stats.tokenUsage.completion}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statsText}>Total</Text>
+                <Text style={styles.statsNumber}>{stats.tokenUsage.total}</Text>
               </View>
             </View>
-          </AnimatedSection>
-        )}
+          </View>
+        </AnimatedSection>
+      )}
 
-        {/* Insights Toggle */}
-        <Button
-          mode="outlined"
-          onPress={() => setShowInsights(!showInsights)}
-          icon={showInsights ? "chevron-up" : "chevron-down"}
-          style={{ marginBottom: spacing.md }}
-        >
-          {showInsights ? "Hide Insights" : "Show Insights"}
-        </Button>
+      {/* Insights Toggle */}
+      <Button
+        mode="outlined"
+        onPress={() => setShowInsights(!showInsights)}
+        icon={showInsights ? "chevron-up" : "chevron-down"}
+        style={{ marginBottom: spacing.md }}
+      >
+        {showInsights ? "Hide Insights" : "Show Insights"}
+      </Button>
 
-        {/* Charts */}
-        {showInsights && (
-          <>
-            {/* Pie Chart - Provider Distribution */}
-            {pieData.length > 0 && (
+      {/* Charts */}
+      {showInsights && (
+        <>
+          {/* Pie Chart - Provider Distribution */}
+          {pieData.length > 0 && (
+            <AnimatedSection>
+              <View style={styles.chartContainer}>
+                <Text style={styles.chartTitle}>Calls by Provider</Text>
+                <PieChart
+                  data={pieData}
+                  width={chartWidth}
+                  height={220}
+                  chartConfig={chartConfig}
+                  accessor="value"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                />
+              </View>
+            </AnimatedSection>
+          )}
+
+          {/* Bar Chart - Calls by Provider */}
+          {barData.datasets?.[0]?.data &&
+            barData.datasets[0].data.length > 0 && (
               <AnimatedSection>
                 <View style={styles.chartContainer}>
-                  <Text style={styles.chartTitle}>Calls by Provider</Text>
-                  <PieChart
-                    data={pieData}
+                  <Text style={styles.chartTitle}>Top Providers by Calls</Text>
+                  <BarChart
+                    data={barData}
                     width={chartWidth}
                     height={220}
                     chartConfig={chartConfig}
-                    accessor="value"
-                    backgroundColor="transparent"
-                    paddingLeft="15"
-                    absolute
+                    verticalLabelRotation={30}
+                    fromZero
+                    yAxisLabel=""
+                    yAxisSuffix=""
                   />
                 </View>
               </AnimatedSection>
             )}
+        </>
+      )}
 
-            {/* Bar Chart - Calls by Provider */}
-            {barData.datasets?.[0]?.data &&
-              barData.datasets[0].data.length > 0 && (
-                <AnimatedSection>
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      Top Providers by Calls
-                    </Text>
-                    <BarChart
-                      data={barData}
-                      width={chartWidth}
-                      height={220}
-                      chartConfig={chartConfig}
-                      verticalLabelRotation={30}
-                      fromZero
-                      yAxisLabel=""
-                      yAxisSuffix=""
-                    />
-                  </View>
-                </AnimatedSection>
-              )}
-          </>
-        )}
-
-        {/* Refresh Controls */}
-        <View style={styles.refreshContainer}>
-          <Button
-            mode="outlined"
-            onPress={handleRefresh}
-            icon="refresh"
-            loading={isLoading}
-          >
-            Refresh
-          </Button>
-          <View
+      {/* Refresh Controls */}
+      <View style={styles.refreshContainer}>
+        <Button
+          mode="outlined"
+          onPress={handleRefresh}
+          icon="refresh"
+          loading={isLoading}
+        >
+          Refresh
+        </Button>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.sm,
+          }}
+        >
+          <Text style={styles.lastRefreshText}>
+            Last updated: {lastRefresh.toLocaleTimeString()}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setAutoRefresh(!autoRefresh)}
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: spacing.sm,
+              gap: spacing.xs,
             }}
           >
-            <Text style={styles.lastRefreshText}>
-              Last updated: {lastRefresh.toLocaleTimeString()}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setAutoRefresh(!autoRefresh)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.xs,
-              }}
-            >
-              <Icon
-                source={autoRefresh ? "timer" : "timer-off"}
-                size={16}
-                color={theme.colors.onSurfaceVariant}
-              />
-              <Text
-                style={{ fontSize: 12, color: theme.colors.onSurfaceVariant }}
-              >
-                Auto
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Search and Filters */}
-        <View style={styles.searchContainer}>
-          <RNTextInput
-            style={styles.searchInput}
-            placeholder="Search logs..."
-            placeholderTextColor={theme.colors.onSurfaceVariant}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <TouchableOpacity onPress={() => setShowFilterDialog(true)}>
             <Icon
-              source="filter-variant"
-              size={24}
-              color={theme.colors.primary}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Filter chips */}
-        {(statusFilter !== "all" || providerFilter || sortBy !== "newest") && (
-          <View style={styles.filterChipContainer}>
-            {statusFilter !== "all" && (
-              <Chip icon="close" onClose={() => setStatusFilter("all")}>
-                Status: {statusFilter}
-              </Chip>
-            )}
-            {providerFilter && (
-              <Chip icon="close" onClose={() => setProviderFilter(null)}>
-                Provider: {providerFilter}
-              </Chip>
-            )}
-            {sortBy !== "newest" && (
-              <Chip icon="close" onClose={() => setSortBy("newest")}>
-                Sort: {sortBy}
-              </Chip>
-            )}
-          </View>
-        )}
-
-        {/* Sort & Filter Controls */}
-        {!isSelectingMultiple && (
-          <View
-            style={{
-              flexDirection: "row",
-              gap: spacing.sm,
-              marginBottom: spacing.md,
-            }}
-          >
-            <Button
-              mode="outlined"
-              onPress={() => setShowSortDialog(true)}
-              icon="sort"
-            >
-              Sort
-            </Button>
-            <Menu
-              visible={showExportMenu}
-              onDismiss={() => setShowExportMenu(false)}
-              anchor={
-                <Button
-                  mode="outlined"
-                  onPress={() => setShowExportMenu(true)}
-                  icon="export"
-                >
-                  Export
-                </Button>
-              }
-            >
-              <Menu.Item
-                onPress={() => {
-                  void handleExportAsJson();
-                  setShowExportMenu(false);
-                }}
-                title="Export as JSON"
-              />
-            </Menu>
-          </View>
-        )}
-
-        {/* Multiple Selection Actions */}
-        {isSelectingMultiple && (
-          <View
-            style={{
-              flexDirection: "row",
-              gap: spacing.sm,
-              marginBottom: spacing.md,
-            }}
-          >
-            <Button
-              mode="outlined"
-              onPress={() => setIsSelectingMultiple(false)}
-              icon="close"
-              style={{ flex: 1 }}
-            >
-              Cancel
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={handleClearSelected}
-              icon="trash-can-outline"
-              style={{ flex: 1 }}
-            >
-              Delete
-            </Button>
-          </View>
-        )}
-
-        {/* Clear All Button */}
-        {!isSelectingMultiple && logs.length > 0 && (
-          <View
-            style={{
-              flexDirection: "row",
-              gap: spacing.sm,
-              marginBottom: spacing.md,
-            }}
-          >
-            <Button
-              mode="text"
-              onPress={() => setIsSelectingMultiple(true)}
-              icon="checkbox-multiple-marked-outline"
-            >
-              Select
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={handleClearAll}
-              icon="trash-can-outline"
-            >
-              Clear All
-            </Button>
-          </View>
-        )}
-
-        {/* Log List */}
-        {filteredLogs.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Icon
-              source="inbox"
-              size={48}
+              source={autoRefresh ? "timer" : "timer-off"}
+              size={16}
               color={theme.colors.onSurfaceVariant}
             />
-            <Text style={styles.emptyText}>No AI logs found</Text>
-          </View>
-        ) : (
-          <View style={styles.logListContainer}>
-            <FlashList
-              data={filteredLogs}
-              renderItem={({ item }: { item: AiApiLogEntry }) =>
-                renderLogItem(item)
-              }
-              keyExtractor={(item: AiApiLogEntry) => item.id}
-              estimatedItemSize={100}
-              scrollEnabled={false}
+            <Text
+              style={{ fontSize: 12, color: theme.colors.onSurfaceVariant }}
+            >
+              Auto
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Search and Filters */}
+      <View style={styles.searchContainer}>
+        <RNTextInput
+          style={styles.searchInput}
+          placeholder="Search logs..."
+          placeholderTextColor={theme.colors.onSurfaceVariant}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        <TouchableOpacity onPress={() => setShowFilterDialog(true)}>
+          <Icon
+            source="filter-variant"
+            size={24}
+            color={theme.colors.primary}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Filter chips */}
+      {(statusFilter !== "all" || providerFilter || sortBy !== "newest") && (
+        <View style={styles.filterChipContainer}>
+          {statusFilter !== "all" && (
+            <Chip icon="close" onClose={() => setStatusFilter("all")}>
+              Status: {statusFilter}
+            </Chip>
+          )}
+          {providerFilter && (
+            <Chip icon="close" onClose={() => setProviderFilter(null)}>
+              Provider: {providerFilter}
+            </Chip>
+          )}
+          {sortBy !== "newest" && (
+            <Chip icon="close" onClose={() => setSortBy("newest")}>
+              Sort: {sortBy}
+            </Chip>
+          )}
+        </View>
+      )}
+
+      {/* Sort & Filter Controls */}
+      {!isSelectingMultiple && (
+        <View
+          style={{
+            flexDirection: "row",
+            gap: spacing.sm,
+            marginBottom: spacing.md,
+          }}
+        >
+          <Button
+            mode="outlined"
+            onPress={() => setShowSortDialog(true)}
+            icon="sort"
+          >
+            Sort
+          </Button>
+          <Menu
+            visible={showExportMenu}
+            onDismiss={() => setShowExportMenu(false)}
+            anchor={
+              <Button
+                mode="outlined"
+                onPress={() => setShowExportMenu(true)}
+                icon="export"
+              >
+                Export
+              </Button>
+            }
+          >
+            <Menu.Item
+              onPress={() => {
+                void handleExportAsJson();
+                setShowExportMenu(false);
+              }}
+              title="Export as JSON"
             />
-          </View>
-        )}
-      </ScrollView>
+          </Menu>
+        </View>
+      )}
+
+      {/* Multiple Selection Actions */}
+      {isSelectingMultiple && (
+        <View
+          style={{
+            flexDirection: "row",
+            gap: spacing.sm,
+            marginBottom: spacing.md,
+          }}
+        >
+          <Button
+            mode="outlined"
+            onPress={() => setIsSelectingMultiple(false)}
+            icon="close"
+            style={{ flex: 1 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={handleClearSelected}
+            icon="trash-can-outline"
+            style={{ flex: 1 }}
+          >
+            Delete
+          </Button>
+        </View>
+      )}
+
+      {/* Clear All Button */}
+      {!isSelectingMultiple && logs.length > 0 && (
+        <View
+          style={{
+            flexDirection: "row",
+            gap: spacing.sm,
+            marginBottom: spacing.md,
+          }}
+        >
+          <Button
+            mode="text"
+            onPress={() => setIsSelectingMultiple(true)}
+            icon="checkbox-multiple-marked-outline"
+          >
+            Select
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={handleClearAll}
+            icon="trash-can-outline"
+          >
+            Clear All
+          </Button>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderEmptyComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Icon source="inbox" size={48} color={theme.colors.onSurfaceVariant} />
+      <Text style={styles.emptyText}>No AI logs found</Text>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <TabHeader title="AI API Logs" showBackButton onBackPress={router.back} />
+      <View style={styles.content}>
+        <FlashList
+          data={filteredLogs}
+          renderItem={({ item }: { item: AiApiLogEntry }) =>
+            renderLogItem(item)
+          }
+          keyExtractor={(item: AiApiLogEntry) => item.id}
+          estimatedItemSize={100}
+          ListHeaderComponent={renderListHeader}
+          ListEmptyComponent={renderEmptyComponent}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: spacing.md }}
+        />
+      </View>
 
       {/* Sort Dialog */}
       <Portal>
