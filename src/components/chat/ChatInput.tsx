@@ -77,6 +77,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
       StyleSheet.create({
         wrapper: {
           paddingHorizontal: 16,
+          paddingTop: 8,
           paddingVertical: 12,
           paddingBottom: 16,
         },

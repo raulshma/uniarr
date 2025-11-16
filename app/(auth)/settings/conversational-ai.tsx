@@ -33,6 +33,7 @@ import { ChatErrorBoundary } from "@/components/chat/ChatErrorBoundary";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { StarterQuestions } from "@/components/chat/StarterQuestions";
+import { ProviderModelDisplay } from "@/components/chat/ProviderModelDisplay";
 import { useDialog } from "@/components/common";
 import BottomDrawer, { DrawerItem } from "@/components/common/BottomDrawer";
 import { useConversationalAI } from "@/hooks/useConversationalAI";
@@ -56,6 +57,8 @@ import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import {
   useConversationalAIConfigStore,
   selectConversationalAIHasValidConfig,
+  selectConversationalAIProvider,
+  selectConversationalAIModel,
 } from "@/store/conversationalAIConfigStore";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -73,6 +76,14 @@ const ConversationalAIScreen: React.FC = () => {
   // Check if conversational AI has valid config (provider, model, keyId)
   const hasValidConversationalAIConfig = useConversationalAIConfigStore(
     selectConversationalAIHasValidConfig,
+  );
+
+  // Get selected provider and model for display
+  const selectedProvider = useConversationalAIConfigStore(
+    selectConversationalAIProvider,
+  );
+  const selectedModel = useConversationalAIConfigStore(
+    selectConversationalAIModel,
   );
 
   // Dialog states
@@ -1224,6 +1235,12 @@ const ConversationalAIScreen: React.FC = () => {
                   )}
                 </View>
               </View>
+
+              {/* Provider-Model Display */}
+              <ProviderModelDisplay
+                provider={selectedProvider}
+                model={selectedModel}
+              />
 
               {/* Chat Input */}
               <ChatInput
