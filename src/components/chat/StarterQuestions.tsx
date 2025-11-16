@@ -1,5 +1,11 @@
-import React, { memo, useMemo } from "react";
-import { ScrollView, StyleSheet, View, Pressable } from "react-native";
+import React, { memo, useMemo, useEffect, useRef } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Pressable,
+  Animated,
+} from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import type { MD3Theme } from "react-native-paper/lib/typescript/types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -88,6 +94,46 @@ const StarterQuestionsComponent: React.FC<StarterQuestionsProps> = ({
     ],
   );
 
+  const animations = useRef<
+    { opacity: Animated.Value; scale: Animated.Value }[]
+  >([]);
+
+  useEffect(() => {
+    animations.current = questions.map(() => ({
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0.95),
+    }));
+
+    questions.forEach((_, index) => {
+      if (index < animations.current.length) {
+        const timeoutId = setTimeout(() => {
+          Animated.parallel([
+            Animated.spring(animations.current[index]!.scale, {
+              toValue: 1,
+              tension: 300,
+              friction: 6,
+              useNativeDriver: true,
+            }),
+            Animated.timing(animations.current[index]!.opacity, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }, index * 80);
+
+        return () => clearTimeout(timeoutId);
+      }
+    });
+
+    return () => {
+      animations.current.forEach(({ opacity, scale }) => {
+        opacity.resetAnimation();
+        scale.resetAnimation();
+      });
+    };
+  }, [questions]);
+
   const getIconForQuestion = (
     question: string,
   ): keyof typeof MaterialCommunityIcons.glyphMap => {
@@ -124,35 +170,85 @@ const StarterQuestionsComponent: React.FC<StarterQuestionsProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {questions.map((question) => (
-          <Pressable
-            key={question}
-            style={({ pressed }) => [
-              styles.suggestionCard,
-              {
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-            onPress={() => onSelectQuestion(question)}
-            accessibilityRole="button"
-          >
-            <View style={styles.iconContainer}>
+        {questions.map((question, index) =>
+          index < animations.current.length ? (
+            <Pressable
+              key={question}
+              onPress={() => onSelectQuestion(question)}
+              accessibilityRole="button"
+              accessible={true}
+              testID={`starter-question-${index}`}
+              accessibilityLabel={question}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={({ pressed }) => [
+                styles.suggestionCard,
+                {
+                  width: "100%",
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Animated.View
+                style={{
+                  opacity: animations.current[index]!.opacity,
+                  transform: [{ scale: animations.current[index]!.scale }],
+                  flexDirection: "row",
+                  alignItems: "center",
+                  width: "100%",
+                }}
+              >
+                <View style={styles.iconContainer}>
+                  <MaterialCommunityIcons
+                    name={getIconForQuestion(question)}
+                    size={20}
+                    color={theme.colors.onPrimary}
+                  />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.suggestionText}>{question}</Text>
+                </View>
+                <MaterialCommunityIcons
+                  name="chevron-right"
+                  size={20}
+                  color={theme.colors.onSurfaceVariant}
+                />
+              </Animated.View>
+            </Pressable>
+          ) : (
+            <Pressable
+              key={question}
+              onPress={() => onSelectQuestion(question)}
+              accessibilityRole="button"
+              accessible={true}
+              testID={`starter-question-${index}`}
+              accessibilityLabel={question}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={({ pressed }) => [
+                styles.suggestionCard,
+                {
+                  width: "100%",
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <View style={styles.iconContainer}>
+                <MaterialCommunityIcons
+                  name={getIconForQuestion(question)}
+                  size={20}
+                  color={theme.colors.onPrimary}
+                />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={styles.suggestionText}>{question}</Text>
+              </View>
               <MaterialCommunityIcons
-                name={getIconForQuestion(question)}
+                name="chevron-right"
                 size={20}
-                color={theme.colors.onPrimary}
+                color={theme.colors.onSurfaceVariant}
               />
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.suggestionText}>{question}</Text>
-            </View>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={20}
-              color={theme.colors.onSurfaceVariant}
-            />
-          </Pressable>
-        ))}
+            </Pressable>
+          ),
+        )}
       </ScrollView>
     </View>
   );

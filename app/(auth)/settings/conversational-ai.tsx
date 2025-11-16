@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   KeyboardAvoidingView,
@@ -7,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  Animated,
 } from "react-native";
 import { GiftedChat, type IMessage } from "react-native-gifted-chat";
 import {
@@ -538,30 +545,25 @@ const ConversationalAIScreen: React.FC = () => {
     [sendMessage, addMessageToStore, discover.sections],
   );
 
-  type HeaderButtonProps = {
-    icon: keyof typeof MaterialCommunityIcons.glyphMap;
-    onPress: () => void;
-    accessibilityLabel?: string;
-  };
+  const headerButtonScale = useRef(new Animated.Value(1)).current;
 
-  const HeaderButton: React.FC<HeaderButtonProps> = ({
-    icon,
-    onPress,
-    accessibilityLabel,
-  }) => (
-    <Pressable
-      style={styles.headerButton}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-    >
-      <MaterialCommunityIcons
-        name={icon}
-        size={20}
-        color={theme.colors.onBackground}
-      />
-    </Pressable>
-  );
+  const handleHeaderPressIn = useCallback(() => {
+    Animated.spring(headerButtonScale, {
+      toValue: 0.95,
+      tension: 200,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  }, [headerButtonScale]);
+
+  const handleHeaderPressOut = useCallback(() => {
+    Animated.spring(headerButtonScale, {
+      toValue: 1,
+      tension: 200,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  }, [headerButtonScale]);
 
   const handleNewConversation = useCallback(() => {
     const timestamp = new Date().toLocaleString();
@@ -795,6 +797,197 @@ const ConversationalAIScreen: React.FC = () => {
     ],
   );
 
+  const streamScale = useRef(new Animated.Value(1)).current;
+  const metaScale = useRef(new Animated.Value(1)).current;
+  const toolsScale = useRef(new Animated.Value(1)).current;
+  const textSizeScale = useRef(new Animated.Value(1)).current;
+  const pulseScale = useRef(new Animated.Value(1)).current;
+  const errorTranslateY = useRef(new Animated.Value(-20)).current;
+  const errorOpacity = useRef(new Animated.Value(0)).current;
+  // Conversation and tools item animation refs for drawer entrance animations
+  const conversationItemAnims = useRef<
+    { opacity: Animated.Value; scale: Animated.Value }[]
+  >([]);
+  const toolsItemAnims = useRef<
+    { opacity: Animated.Value; scale: Animated.Value }[]
+  >([]);
+
+  // Animate scales on pref changes
+  useEffect(() => {
+    Animated.spring(streamScale, {
+      toValue: 0.95,
+      tension: 300,
+      friction: 5,
+      useNativeDriver: true,
+    }).start(() => {
+      Animated.spring(streamScale, {
+        toValue: 1,
+        tension: 300,
+        friction: 5,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [enableStreamingPref, streamScale]);
+
+  useEffect(() => {
+    Animated.spring(metaScale, {
+      toValue: 0.95,
+      tension: 300,
+      friction: 5,
+      useNativeDriver: true,
+    }).start(() => {
+      Animated.spring(metaScale, {
+        toValue: 1,
+        tension: 300,
+        friction: 5,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [showTokenCountPref, metaScale]);
+
+  useEffect(() => {
+    Animated.spring(toolsScale, {
+      toValue: 0.95,
+      tension: 300,
+      friction: 5,
+      useNativeDriver: true,
+    }).start(() => {
+      Animated.spring(toolsScale, {
+        toValue: 1,
+        tension: 300,
+        friction: 5,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [enableToolsPref, toolsScale]);
+
+  useEffect(() => {
+    Animated.spring(textSizeScale, {
+      toValue: 0.95,
+      tension: 300,
+      friction: 5,
+      useNativeDriver: true,
+    }).start(() => {
+      Animated.spring(textSizeScale, {
+        toValue: 1,
+        tension: 300,
+        friction: 5,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [chatTextSizePref, textSizeScale]);
+
+  // Pulse animation for loading indicator
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseScale, {
+          toValue: 1.1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseScale, {
+          toValue: 0.95,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseScale, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [pulseScale]);
+
+  // Error banner animation
+  useEffect(() => {
+    if (error) {
+      errorTranslateY.setValue(-20);
+      errorOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.spring(errorTranslateY, {
+          toValue: 0,
+          tension: 300,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+        Animated.timing(errorOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [error, errorTranslateY, errorOpacity]);
+
+  // Drawer animations
+  useEffect(() => {
+    if (conversationDrawerVisible && activeSessions.length > 0) {
+      conversationItemAnims.current = activeSessions.map(() => ({
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(0.95),
+      }));
+
+      conversationItemAnims.current.forEach((anim, index) => {
+        Animated.sequence([
+          Animated.delay(index * 60),
+          Animated.parallel([
+            Animated.spring(anim.scale, {
+              toValue: 1,
+              tension: 300,
+              friction: 6,
+              useNativeDriver: true,
+            }),
+            Animated.timing(anim.opacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]).start();
+      });
+    } else {
+      conversationItemAnims.current = [];
+    }
+  }, [conversationDrawerVisible, activeSessions]); // activeSessions now safe
+
+  useEffect(() => {
+    if (toolsDrawerVisible && availableTools.length > 0) {
+      toolsItemAnims.current = availableTools.map(() => ({
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(0.95),
+      }));
+
+      toolsItemAnims.current.forEach((anim, index) => {
+        Animated.sequence([
+          Animated.delay(index * 60),
+          Animated.parallel([
+            Animated.spring(anim.scale, {
+              toValue: 1,
+              tension: 300,
+              friction: 6,
+              useNativeDriver: true,
+            }),
+            Animated.timing(anim.opacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]).start();
+      });
+    } else {
+      toolsItemAnims.current = [];
+    }
+  }, [toolsDrawerVisible, availableTools]); // availableTools now safe
+
   // Show setup message if no AI provider is configured
   if (!hasAIProvider) {
     return (
@@ -903,7 +1096,9 @@ const ConversationalAIScreen: React.FC = () => {
             edges={["left", "right", "top", "bottom"]}
           >
             <View style={styles.loadingState}>
-              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Animated.View style={{ transform: [{ scale: pulseScale }] }}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+              </Animated.View>
               <Text style={styles.loadingText}>Preparing Media AI…</Text>
               <Text style={styles.loadingSubtext}>
                 Checking provider health and restoring your latest conversation.
@@ -935,37 +1130,97 @@ const ConversationalAIScreen: React.FC = () => {
                     </Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: 8 }}>
-                    <HeaderButton
-                      icon="plus"
-                      onPress={handleNewConversation}
-                      accessibilityLabel="Start new conversation"
-                    />
+                    <Animated.View
+                      style={{
+                        transform: [{ scale: headerButtonScale }],
+                      }}
+                    >
+                      <Pressable
+                        style={styles.headerButton}
+                        onPress={handleNewConversation}
+                        onPressIn={handleHeaderPressIn}
+                        onPressOut={handleHeaderPressOut}
+                        accessibilityRole="button"
+                        accessibilityLabel="Start new conversation"
+                      >
+                        <MaterialCommunityIcons
+                          name="plus"
+                          size={20}
+                          color={theme.colors.onBackground}
+                        />
+                      </Pressable>
+                    </Animated.View>
 
                     {activeSessions.length > 0 ? (
-                      <HeaderButton
-                        icon="history"
-                        onPress={() => setConversationDrawerVisible(true)}
-                        accessibilityLabel="Open conversation history"
-                      />
+                      <Animated.View
+                        style={{
+                          transform: [{ scale: headerButtonScale }],
+                        }}
+                      >
+                        <Pressable
+                          style={styles.headerButton}
+                          onPress={() => setConversationDrawerVisible(true)}
+                          onPressIn={handleHeaderPressIn}
+                          onPressOut={handleHeaderPressOut}
+                          accessibilityRole="button"
+                          accessibilityLabel="Open conversation history"
+                        >
+                          <MaterialCommunityIcons
+                            name="history"
+                            size={20}
+                            color={theme.colors.onBackground}
+                          />
+                        </Pressable>
+                      </Animated.View>
                     ) : null}
 
-                    <HeaderButton
-                      icon="format-title"
-                      onPress={() =>
-                        router.push(
-                          "/(auth)/+modal/select-provider-model?target=title",
-                        )
-                      }
-                      accessibilityLabel="Select model for title summaries"
-                    />
+                    <Animated.View
+                      style={{
+                        transform: [{ scale: headerButtonScale }],
+                      }}
+                    >
+                      <Pressable
+                        style={styles.headerButton}
+                        onPress={() =>
+                          router.push(
+                            "/(auth)/+modal/select-provider-model?target=title",
+                          )
+                        }
+                        onPressIn={handleHeaderPressIn}
+                        onPressOut={handleHeaderPressOut}
+                        accessibilityRole="button"
+                        accessibilityLabel="Select model for title summaries"
+                      >
+                        <MaterialCommunityIcons
+                          name="format-title"
+                          size={20}
+                          color={theme.colors.onBackground}
+                        />
+                      </Pressable>
+                    </Animated.View>
 
-                    <HeaderButton
-                      icon="cog"
-                      onPress={() =>
-                        router.push("/(auth)/settings/byok/ai-settings")
-                      }
-                      accessibilityLabel="Configure AI provider"
-                    />
+                    <Animated.View
+                      style={{
+                        transform: [{ scale: headerButtonScale }],
+                      }}
+                    >
+                      <Pressable
+                        style={styles.headerButton}
+                        onPress={() =>
+                          router.push("/(auth)/settings/byok/ai-settings")
+                        }
+                        onPressIn={handleHeaderPressIn}
+                        onPressOut={handleHeaderPressOut}
+                        accessibilityRole="button"
+                        accessibilityLabel="Configure AI provider"
+                      >
+                        <MaterialCommunityIcons
+                          name="cog"
+                          size={20}
+                          color={theme.colors.onBackground}
+                        />
+                      </Pressable>
+                    </Animated.View>
                   </View>
                 </View>
 
@@ -997,16 +1252,20 @@ const ConversationalAIScreen: React.FC = () => {
                             style={{ marginRight: 6 }}
                           />
                           <Text style={styles.statusLabel}>Stream</Text>
-                          <Switch
-                            style={styles.compactSwitch}
-                            value={Boolean(enableStreamingPref)}
-                            onValueChange={() =>
-                              updateConversationalConfig({
-                                enableStreaming: !enableStreamingPref,
-                              })
-                            }
-                            color={theme.colors.primary}
-                          />
+                          <Animated.View
+                            style={{ transform: [{ scale: streamScale }] }}
+                          >
+                            <Switch
+                              style={styles.compactSwitch}
+                              value={Boolean(enableStreamingPref)}
+                              onValueChange={() =>
+                                updateConversationalConfig({
+                                  enableStreaming: !enableStreamingPref,
+                                })
+                              }
+                              color={theme.colors.primary}
+                            />
+                          </Animated.View>
                         </View>
                         <View style={styles.statusDivider} />
                         <View
@@ -1019,16 +1278,20 @@ const ConversationalAIScreen: React.FC = () => {
                             style={{ marginRight: 6 }}
                           />
                           <Text style={styles.statusLabel}>Meta</Text>
-                          <Switch
-                            style={styles.compactSwitch}
-                            value={Boolean(showTokenCountPref)}
-                            onValueChange={() =>
-                              updateConversationalConfig({
-                                showTokenCount: !showTokenCountPref,
-                              })
-                            }
-                            color={theme.colors.primary}
-                          />
+                          <Animated.View
+                            style={{ transform: [{ scale: metaScale }] }}
+                          >
+                            <Switch
+                              style={styles.compactSwitch}
+                              value={Boolean(showTokenCountPref)}
+                              onValueChange={() =>
+                                updateConversationalConfig({
+                                  showTokenCount: !showTokenCountPref,
+                                })
+                              }
+                              color={theme.colors.primary}
+                            />
+                          </Animated.View>
                         </View>
                         <View style={styles.statusDivider} />
                         <Pressable
@@ -1050,16 +1313,20 @@ const ConversationalAIScreen: React.FC = () => {
                             style={{ marginRight: 6 }}
                           />
                           <Text style={styles.statusLabel}>Tools</Text>
-                          <Switch
-                            style={styles.compactSwitch}
-                            value={Boolean(enableToolsPref)}
-                            onValueChange={() =>
-                              updateConversationalConfig({
-                                enableTools: !enableToolsPref,
-                              })
-                            }
-                            color={theme.colors.primary}
-                          />
+                          <Animated.View
+                            style={{ transform: [{ scale: toolsScale }] }}
+                          >
+                            <Switch
+                              style={styles.compactSwitch}
+                              value={Boolean(enableToolsPref)}
+                              onValueChange={() =>
+                                updateConversationalConfig({
+                                  enableTools: !enableToolsPref,
+                                })
+                              }
+                              color={theme.colors.primary}
+                            />
+                          </Animated.View>
                           {enableToolsPref && (
                             <MaterialCommunityIcons
                               name="chevron-right"
@@ -1081,34 +1348,38 @@ const ConversationalAIScreen: React.FC = () => {
                             color={theme.colors.onSurfaceVariant}
                             style={{ marginRight: 6 }}
                           />
-                          <SegmentedButtons
-                            value={chatTextSizePref ?? "medium"}
-                            onValueChange={(next) =>
-                              updateConversationalConfig({
-                                chatTextSize:
-                                  next as AssistantConfig["chatTextSize"],
-                              })
-                            }
-                            buttons={[
-                              {
-                                value: "small",
-                                label: "S",
-                                style: styles.segmentButton,
-                              },
-                              {
-                                value: "medium",
-                                label: "M",
-                                style: styles.segmentButton,
-                              },
-                              {
-                                value: "large",
-                                label: "L",
-                                style: styles.segmentButton,
-                              },
-                            ]}
-                            style={styles.segmentedCompact}
-                            density="small"
-                          />
+                          <Animated.View
+                            style={{ transform: [{ scale: textSizeScale }] }}
+                          >
+                            <SegmentedButtons
+                              value={chatTextSizePref ?? "medium"}
+                              onValueChange={(next) =>
+                                updateConversationalConfig({
+                                  chatTextSize:
+                                    next as AssistantConfig["chatTextSize"],
+                                })
+                              }
+                              buttons={[
+                                {
+                                  value: "small",
+                                  label: "S",
+                                  style: styles.segmentButton,
+                                },
+                                {
+                                  value: "medium",
+                                  label: "M",
+                                  style: styles.segmentButton,
+                                },
+                                {
+                                  value: "large",
+                                  label: "L",
+                                  style: styles.segmentButton,
+                                },
+                              ]}
+                              style={styles.segmentedCompact}
+                              density="small"
+                            />
+                          </Animated.View>
                         </View>
                       </View>
                     </ScrollView>
@@ -1118,14 +1389,22 @@ const ConversationalAIScreen: React.FC = () => {
 
               {/* Error Banner */}
               {error ? (
-                <View style={styles.errorBanner}>
+                <Animated.View
+                  style={[
+                    styles.errorBanner,
+                    {
+                      opacity: errorOpacity,
+                      transform: [{ translateY: errorTranslateY }],
+                    },
+                  ]}
+                >
                   <MaterialCommunityIcons
                     name="alert-circle"
                     size={20}
                     color={theme.colors.error}
                   />
                   <Text style={styles.errorText}>{error.message}</Text>
-                </View>
+                </Animated.View>
               ) : null}
 
               {/* Chat Container */}
@@ -1200,7 +1479,15 @@ const ConversationalAIScreen: React.FC = () => {
         maxHeight="70%"
       >
         {activeSessions.map((session, index) => (
-          <View key={session.id}>
+          <Animated.View
+            key={session.id}
+            style={{
+              opacity: conversationItemAnims.current[index]?.opacity ?? 1,
+              transform: [
+                { scale: conversationItemAnims.current[index]?.scale ?? 1 },
+              ],
+            }}
+          >
             <Pressable
               onPress={() => handleLoadConversation(session.id)}
               onLongPress={() =>
@@ -1248,7 +1535,7 @@ const ConversationalAIScreen: React.FC = () => {
               </View>
             </Pressable>
             {index < activeSessions.length - 1 && <Divider />}
-          </View>
+          </Animated.View>
         ))}
         {activeSessions.length > 0 && <Divider style={{ marginVertical: 8 }} />}
         <DrawerItem
@@ -1291,7 +1578,15 @@ const ConversationalAIScreen: React.FC = () => {
         {availableTools.map((tool, index) => {
           const isSelected = selectedToolsPref.includes(tool.name);
           return (
-            <View key={tool.name}>
+            <Animated.View
+              key={tool.name}
+              style={{
+                opacity: toolsItemAnims.current[index]?.opacity ?? 1,
+                transform: [
+                  { scale: toolsItemAnims.current[index]?.scale ?? 1 },
+                ],
+              }}
+            >
               <Pressable
                 onPress={() => handleToggleTool(tool.name)}
                 style={({ pressed }) => [
@@ -1337,7 +1632,7 @@ const ConversationalAIScreen: React.FC = () => {
                 </View>
               </Pressable>
               {index < availableTools.length - 1 && <Divider />}
-            </View>
+            </Animated.View>
           );
         })}
 

@@ -1,5 +1,5 @@
-import React, { memo, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import React, { memo, useEffect, useMemo, useState, useRef } from "react";
+import { Pressable, StyleSheet, View, Animated } from "react-native";
 import { AIMessageCard } from "./AIMessageCard";
 import { Text, IconButton } from "react-native-paper";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
@@ -31,6 +31,9 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   const isUser = message.role === "user";
   const [indicatorDots, setIndicatorDots] = useState(".");
   const chatTextSize = useConversationalAIStore((s) => s.config.chatTextSize);
+
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const translateXAnim = useRef(new Animated.Value(0)).current;
 
   const handleShowThinking = () => {
     if (message.metadata?.thinking) {
@@ -64,6 +67,25 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
       clearInterval(intervalId);
     };
   }, [message.isStreaming]);
+
+  useEffect(() => {
+    const startX = isUser ? 40 : -40;
+    translateXAnim.setValue(startX);
+
+    Animated.parallel([
+      Animated.spring(translateXAnim, {
+        toValue: 0,
+        tension: 280,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [isUser, opacityAnim, translateXAnim]);
 
   const timestampLabel = useMemo(() => {
     try {
@@ -193,263 +215,273 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   }, [chatTextSize, theme.custom.typography.bodyLarge?.fontSize]);
 
   return (
-    <Pressable
-      accessibilityRole="text"
-      style={styles.container}
-      onLongPress={onLongPress}
-      delayLongPress={500}
+    <Animated.View
+      style={{
+        opacity: opacityAnim,
+        transform: [{ translateX: translateXAnim }],
+      }}
     >
-      {/* Avatar */}
-      <View style={styles.avatarContainer}>
-        <MaterialCommunityIcons
-          name={isUser ? "account" : "robot-happy"}
-          size={18}
-          color={
-            isUser ? theme.colors.onPrimary : theme.colors.onSurfaceVariant
-          }
-        />
-      </View>
+      <Pressable
+        accessibilityRole="text"
+        style={styles.container}
+        onLongPress={onLongPress}
+        delayLongPress={500}
+      >
+        {/* Avatar */}
+        <View style={styles.avatarContainer}>
+          <MaterialCommunityIcons
+            name={isUser ? "account" : "robot-happy"}
+            size={18}
+            color={
+              isUser ? theme.colors.onPrimary : theme.colors.onSurfaceVariant
+            }
+          />
+        </View>
 
-      <View style={styles.content}>
-        <View style={styles.bubbleContainer}>
-          {isUser ? (
-            <Text style={styles.messageText}>{message.text}</Text>
-          ) : (
-            <AppMarkdown
-              value={message.text}
-              flatListProps={{
-                scrollEnabled: false,
-                nestedScrollEnabled: false,
+        <View style={styles.content}>
+          <View style={styles.bubbleContainer}>
+            {isUser ? (
+              <Text style={styles.messageText}>{message.text}</Text>
+            ) : (
+              <AppMarkdown
+                value={message.text}
+                flatListProps={{
+                  scrollEnabled: false,
+                  nestedScrollEnabled: false,
+                }}
+                fontScale={markdownFontScale}
+              />
+            )}
+            {message.error ? (
+              <Text style={styles.errorText}>Error: {message.error}</Text>
+            ) : null}
+            {message.isStreaming ? (
+              <Text style={styles.streaming}>Typing{indicatorDots}</Text>
+            ) : null}
+
+            {/* Tool Invocations */}
+            {message.toolInvocations && message.toolInvocations.length > 0 ? (
+              <View style={{ marginTop: 8, gap: 4 }}>
+                {message.toolInvocations.map((invocation) => (
+                  <View
+                    key={invocation.toolCallId}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                      paddingVertical: 4,
+                      paddingHorizontal: 8,
+                      borderRadius: 8,
+                      backgroundColor: isUser
+                        ? "rgba(255,255,255,0.1)"
+                        : theme.colors.surface,
+                    }}
+                  >
+                    <MaterialCommunityIcons
+                      name={
+                        invocation.state === "completed"
+                          ? "check-circle"
+                          : invocation.state === "failed"
+                            ? "alert-circle"
+                            : invocation.state === "executing"
+                              ? "loading"
+                              : "clock-outline"
+                      }
+                      size={14}
+                      color={
+                        invocation.state === "completed"
+                          ? theme.colors.primary
+                          : invocation.state === "failed"
+                            ? theme.colors.error
+                            : isUser
+                              ? "rgba(255,255,255,0.7)"
+                              : theme.colors.onSurfaceVariant
+                      }
+                    />
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: isUser
+                          ? "rgba(255,255,255,0.8)"
+                          : theme.colors.onSurfaceVariant,
+                        fontWeight: "500",
+                      }}
+                    >
+                      {invocation.state === "executing"
+                        ? `🔧 ${invocation.toolName}...`
+                        : invocation.state === "completed"
+                          ? `✓ ${invocation.toolName}`
+                          : invocation.state === "failed"
+                            ? `✗ ${invocation.toolName}`
+                            : invocation.toolName}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View
+              style={{
+                flexDirection: "column",
+                gap: 4,
               }}
-              fontScale={markdownFontScale}
-            />
-          )}
-          {message.error ? (
-            <Text style={styles.errorText}>Error: {message.error}</Text>
-          ) : null}
-          {message.isStreaming ? (
-            <Text style={styles.streaming}>Typing{indicatorDots}</Text>
-          ) : null}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                  gap: theme.custom.spacing.xs,
+                }}
+              >
+                {timestampLabel && !message.isStreaming ? (
+                  <Text style={styles.timestamp}>{timestampLabel}</Text>
+                ) : null}
+                {showTokenCount &&
+                !message.isStreaming &&
+                (message.metadata?.duration !== undefined ||
+                  message.metadata?.tokens !== undefined) ? (
+                  <Text style={styles.metadataText}>
+                    {message.metadata?.duration !== undefined
+                      ? `${formatResponseTime(message.metadata?.duration)} `
+                      : ""}
+                    {message.metadata?.tokens !== undefined
+                      ? ` • ${formatTokens(message.metadata?.tokens)} tokens`
+                      : ""}
+                  </Text>
+                ) : null}
+                {!isUser &&
+                message.metadata?.thinking &&
+                !message.isStreaming ? (
+                  <IconButton
+                    icon="lightbulb-on"
+                    size={16}
+                    onPress={handleShowThinking}
+                    style={{ margin: 0 }}
+                  />
+                ) : null}
+              </View>
 
-          {/* Tool Invocations */}
-          {message.toolInvocations && message.toolInvocations.length > 0 ? (
-            <View style={{ marginTop: 8, gap: 4 }}>
-              {message.toolInvocations.map((invocation) => (
+              {/* Display reasoning text if available and Meta toggle is on */}
+              {showTokenCount &&
+              !isUser &&
+              !message.isStreaming &&
+              message.metadata?.reasoningText ? (
                 <View
-                  key={invocation.toolCallId}
                   style={{
                     flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                    paddingVertical: 4,
-                    paddingHorizontal: 8,
-                    borderRadius: 8,
-                    backgroundColor: isUser
-                      ? "rgba(255,255,255,0.1)"
-                      : theme.colors.surface,
+                    alignItems: "flex-start",
+                    gap: 4,
+                    paddingTop: 2,
                   }}
                 >
                   <MaterialCommunityIcons
-                    name={
-                      invocation.state === "completed"
-                        ? "check-circle"
-                        : invocation.state === "failed"
-                          ? "alert-circle"
-                          : invocation.state === "executing"
-                            ? "loading"
-                            : "clock-outline"
-                    }
-                    size={14}
+                    name="brain"
+                    size={12}
                     color={
-                      invocation.state === "completed"
-                        ? theme.colors.primary
-                        : invocation.state === "failed"
-                          ? theme.colors.error
-                          : isUser
-                            ? "rgba(255,255,255,0.7)"
-                            : theme.colors.onSurfaceVariant
+                      isUser
+                        ? "rgba(255,255,255,0.6)"
+                        : theme.colors.onSurfaceVariant
                     }
+                    style={{ marginTop: 1 }}
                   />
                   <Text
-                    style={{
-                      fontSize: 11,
-                      color: isUser
-                        ? "rgba(255,255,255,0.8)"
-                        : theme.colors.onSurfaceVariant,
-                      fontWeight: "500",
-                    }}
+                    style={[
+                      styles.metadataText,
+                      { flex: 1, fontStyle: "italic" },
+                    ]}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
                   >
-                    {invocation.state === "executing"
-                      ? `🔧 ${invocation.toolName}...`
-                      : invocation.state === "completed"
-                        ? `✓ ${invocation.toolName}`
-                        : invocation.state === "failed"
-                          ? `✗ ${invocation.toolName}`
-                          : invocation.toolName}
+                    {message.metadata.reasoningText}
                   </Text>
                 </View>
-              ))}
+              ) : null}
+
+              {/* Display usage metadata if available and Meta toggle is on */}
+              {showTokenCount &&
+              !isUser &&
+              !message.isStreaming &&
+              message.metadata?.usage &&
+              typeof message.metadata.usage === "object" &&
+              message.metadata.usage !== null ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    paddingTop: 2,
+                  }}
+                >
+                  {Object.entries(
+                    message.metadata.usage as Record<string, unknown>,
+                  ).map(([key, value]) => {
+                    // Map usage keys to appropriate icons
+                    const getIconForKey = (k: string) => {
+                      const lowerKey = k.toLowerCase();
+                      if (
+                        lowerKey.includes("prompt") ||
+                        lowerKey.includes("input")
+                      )
+                        return "message-text-outline" as const;
+                      if (
+                        lowerKey.includes("completion") ||
+                        lowerKey.includes("output")
+                      )
+                        return "message-reply-text-outline" as const;
+                      if (lowerKey.includes("total")) return "sigma" as const;
+                      if (lowerKey.includes("reasoning"))
+                        return "brain" as const;
+                      if (lowerKey.includes("cache")) return "cached" as const;
+                      return "circle-small" as const;
+                    };
+
+                    return (
+                      <View
+                        key={key}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 3,
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name={getIconForKey(key)}
+                          size={12}
+                          color={
+                            isUser
+                              ? "rgba(255,255,255,0.6)"
+                              : theme.colors.onSurfaceVariant
+                          }
+                        />
+                        <Text style={[styles.metadataText, { flexShrink: 1 }]}>
+                          {String(value)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          </View>
+
+          {/* Render optional rich card (templates like movie/article cards) */}
+          {message.metadata?.card ? (
+            <View style={styles.cardWrapper}>
+              <AIMessageCard
+                message={message}
+                onAddToRadarr={() => {
+                  onAddToRadarr?.(message);
+                }}
+                onShowCast={() => onShowCast?.(message)}
+                onFindSimilar={() => {}}
+              />
             </View>
           ) : null}
-
-          <View
-            style={{
-              flexDirection: "column",
-              gap: 4,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-start",
-                alignItems: "center",
-                gap: theme.custom.spacing.xs,
-              }}
-            >
-              {timestampLabel && !message.isStreaming ? (
-                <Text style={styles.timestamp}>{timestampLabel}</Text>
-              ) : null}
-              {showTokenCount &&
-              !message.isStreaming &&
-              (message.metadata?.duration !== undefined ||
-                message.metadata?.tokens !== undefined) ? (
-                <Text style={styles.metadataText}>
-                  {message.metadata?.duration !== undefined
-                    ? `${formatResponseTime(message.metadata?.duration)} `
-                    : ""}
-                  {message.metadata?.tokens !== undefined
-                    ? ` • ${formatTokens(message.metadata?.tokens)} tokens`
-                    : ""}
-                </Text>
-              ) : null}
-              {!isUser && message.metadata?.thinking && !message.isStreaming ? (
-                <IconButton
-                  icon="lightbulb-on"
-                  size={16}
-                  onPress={handleShowThinking}
-                  style={{ margin: 0 }}
-                />
-              ) : null}
-            </View>
-
-            {/* Display reasoning text if available and Meta toggle is on */}
-            {showTokenCount &&
-            !isUser &&
-            !message.isStreaming &&
-            message.metadata?.reasoningText ? (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "flex-start",
-                  gap: 4,
-                  paddingTop: 2,
-                }}
-              >
-                <MaterialCommunityIcons
-                  name="brain"
-                  size={12}
-                  color={
-                    isUser
-                      ? "rgba(255,255,255,0.6)"
-                      : theme.colors.onSurfaceVariant
-                  }
-                  style={{ marginTop: 1 }}
-                />
-                <Text
-                  style={[
-                    styles.metadataText,
-                    { flex: 1, fontStyle: "italic" },
-                  ]}
-                  numberOfLines={2}
-                  ellipsizeMode="tail"
-                >
-                  {message.metadata.reasoningText}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Display usage metadata if available and Meta toggle is on */}
-            {showTokenCount &&
-            !isUser &&
-            !message.isStreaming &&
-            message.metadata?.usage &&
-            typeof message.metadata.usage === "object" &&
-            message.metadata.usage !== null ? (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  paddingTop: 2,
-                }}
-              >
-                {Object.entries(
-                  message.metadata.usage as Record<string, unknown>,
-                ).map(([key, value]) => {
-                  // Map usage keys to appropriate icons
-                  const getIconForKey = (k: string) => {
-                    const lowerKey = k.toLowerCase();
-                    if (
-                      lowerKey.includes("prompt") ||
-                      lowerKey.includes("input")
-                    )
-                      return "message-text-outline" as const;
-                    if (
-                      lowerKey.includes("completion") ||
-                      lowerKey.includes("output")
-                    )
-                      return "message-reply-text-outline" as const;
-                    if (lowerKey.includes("total")) return "sigma" as const;
-                    if (lowerKey.includes("reasoning")) return "brain" as const;
-                    if (lowerKey.includes("cache")) return "cached" as const;
-                    return "circle-small" as const;
-                  };
-
-                  return (
-                    <View
-                      key={key}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 3,
-                      }}
-                    >
-                      <MaterialCommunityIcons
-                        name={getIconForKey(key)}
-                        size={12}
-                        color={
-                          isUser
-                            ? "rgba(255,255,255,0.6)"
-                            : theme.colors.onSurfaceVariant
-                        }
-                      />
-                      <Text style={[styles.metadataText, { flexShrink: 1 }]}>
-                        {String(value)}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
         </View>
-
-        {/* Render optional rich card (templates like movie/article cards) */}
-        {message.metadata?.card ? (
-          <View style={styles.cardWrapper}>
-            <AIMessageCard
-              message={message}
-              onAddToRadarr={() => {
-                onAddToRadarr?.(message);
-              }}
-              onShowCast={() => onShowCast?.(message)}
-              onFindSimilar={() => {}}
-            />
-          </View>
-        ) : null}
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 };
 

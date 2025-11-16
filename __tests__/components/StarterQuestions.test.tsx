@@ -11,12 +11,13 @@ describe("<StarterQuestions>", () => {
 
     const onSelect = jest.fn();
 
-    const { getByText, getAllByA11yRole } = render(
+    const utils = render(
       <StarterQuestions questions={questions} onSelectQuestion={onSelect} />,
     );
 
     // buttons count
-    const buttons = getAllByA11yRole("button");
+    const buttons = (utils as any).getAllByA11yRole("button");
+    const getByText = (utils as any).getByText as (text: string) => any;
     expect(buttons.length).toBe(2);
 
     // full-width style applied so the chevron aligns to the right

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -11,11 +11,11 @@ import { Button, TextInput, Text, ActivityIndicator } from "react-native-paper";
 import { useTheme } from "@/hooks/useTheme";
 import { AIProviderType, AI_PROVIDER_MODELS } from "@/types/ai/AIProvider";
 import {
-  OpenRouterService,
   OpenRouterModel,
   ModelFilters,
 } from "@/services/ai/providers/OpenRouterService";
 import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
+import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
 
 interface AIModelSelectorProps {
   visible: boolean;
@@ -43,20 +43,10 @@ export function AIModelSelector({
   keyId,
 }: AIModelSelectorProps) {
   const { colors } = useTheme();
-  const [openRouterModels, setOpenRouterModels] = useState<{
-    free: OpenRouterModel[];
-    paid: OpenRouterModel[];
-  }>({ free: [], paid: [] });
-  const [fetchingModels, setFetchingModels] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<ModelFilters>({});
-  const [availableModalities, setAvailableModalities] = useState<string[]>([]);
-  const [availableInstructTypes, setAvailableInstructTypes] = useState<
-    string[]
-  >([]);
   const [apiKey, setApiKey] = useState<string | undefined>(undefined);
 
-  const openRouterService = OpenRouterService.getInstance();
   const keyManager = AIKeyManager.getInstance();
 
   // Fetch API key when keyId changes
@@ -72,52 +62,18 @@ export function AIModelSelector({
     void fetchApiKey();
   }, [keyId, keyManager]);
 
-  // Fetch OpenRouter models when provider is OpenRouter
-  const fetchOpenRouterModels = useCallback(async () => {
-    if (provider !== "openrouter") {
-      return;
-    }
-
-    setFetchingModels(true);
-    try {
-      const grouped = await openRouterService.getFilteredGroupedModels(
-        filters,
-        apiKey || undefined,
-      );
-      setOpenRouterModels(grouped);
-
-      // Fetch all models to get available filter options
-      const allModels = await openRouterService.fetchModels(
-        apiKey || undefined,
-      );
-      setAvailableModalities(
-        openRouterService.getAvailableModalities(allModels),
-      );
-      setAvailableInstructTypes(
-        openRouterService.getAvailableInstructTypes(allModels),
-      );
-    } catch {
-      // If fetch fails, use default models (all as paid)
-      setOpenRouterModels({
-        free: [],
-        paid: AI_PROVIDER_MODELS.openrouter.map((id) => ({
-          id,
-          name: id,
-          context_length: 0,
-          pricing: { prompt: "0", completion: "0" },
-        })),
-      });
-    } finally {
-      setFetchingModels(false);
-    }
-  }, [provider, apiKey, filters, openRouterService]);
-
-  // Fetch models when modal opens and provider is OpenRouter
-  useEffect(() => {
-    if (visible && provider === "openrouter") {
-      void fetchOpenRouterModels();
-    }
-  }, [visible, provider, fetchOpenRouterModels]);
+  // Use the reusable OpenRouter models hook
+  const {
+    models: openRouterModels,
+    loading: fetchingModels,
+    availableModalities,
+    availableInstructTypes,
+    fetchModels: refetchModels,
+  } = useOpenRouterModels({
+    apiKey,
+    autoFetch: visible && provider === "openrouter",
+    filters,
+  });
 
   // Get available models for the current provider
   const availableModels = React.useMemo(() => {
@@ -486,7 +442,7 @@ export function AIModelSelector({
                 <Button
                   mode="contained"
                   onPress={() => {
-                    void fetchOpenRouterModels();
+                    void refetchModels(filters);
                     setShowFilters(false);
                   }}
                   style={styles.applyFiltersButton}

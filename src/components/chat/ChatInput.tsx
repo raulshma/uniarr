@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  Animated,
 } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -30,6 +31,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 }) => {
   const theme = useTheme();
   const inputRef = useRef<TextInput>(null);
+  const sendScale = useRef(new Animated.Value(1)).current;
   const [text, setText] = useState("");
 
   const isInteractionLocked = isLoading || isStreaming;
@@ -44,6 +46,31 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     onSendMessage(trimmed);
     setText("");
   }, [isSendDisabled, onSendMessage, text]);
+
+  const handlePressIn = useCallback(() => {
+    Animated.spring(sendScale, {
+      toValue: 0.9,
+      tension: 250,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+  }, [sendScale]);
+
+  const handlePressOut = useCallback(() => {
+    Animated.spring(sendScale, {
+      toValue: 1.05,
+      tension: 300,
+      friction: 4,
+      useNativeDriver: true,
+    }).start(() => {
+      Animated.spring(sendScale, {
+        toValue: 1,
+        tension: 200,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [sendScale]);
 
   const styles = useMemo(
     () =>
@@ -156,26 +183,30 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
           ) : null}
         </View>
 
-        <Pressable
-          style={[
-            styles.sendButton,
-            isSendDisabled && styles.sendButtonDisabled,
-          ]}
-          disabled={isSendDisabled}
-          onPress={handleSend}
-          accessibilityRole="button"
-          accessibilityLabel="Send message"
-        >
-          {isStreaming ? (
-            <ActivityIndicator size="small" color={theme.colors.onPrimary} />
-          ) : (
-            <MaterialCommunityIcons
-              name="send"
-              size={20}
-              color={theme.colors.onPrimary}
-            />
-          )}
-        </Pressable>
+        <Animated.View style={{ transform: [{ scale: sendScale }] }}>
+          <Pressable
+            style={[
+              styles.sendButton,
+              isSendDisabled && styles.sendButtonDisabled,
+            ]}
+            disabled={isSendDisabled}
+            onPress={handleSend}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+          >
+            {isStreaming ? (
+              <ActivityIndicator size="small" color={theme.colors.onPrimary} />
+            ) : (
+              <MaterialCommunityIcons
+                name="send"
+                size={20}
+                color={theme.colors.onPrimary}
+              />
+            )}
+          </Pressable>
+        </Animated.View>
       </View>
     </View>
   );
