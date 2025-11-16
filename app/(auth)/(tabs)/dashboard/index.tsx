@@ -1,11 +1,5 @@
 import { useRouter } from "expo-router";
-import React, {
-  useCallback,
-  useMemo,
-  useRef,
-  useEffect,
-  useState,
-} from "react";
+import React, { useCallback, useMemo, useRef, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -14,13 +8,12 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
-import { AppState, type AppStateStatus } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Text, IconButton } from "react-native-paper";
 import { useHaptics } from "@/hooks/useHaptics";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useIsFocused } from "@react-navigation/native";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -31,11 +24,8 @@ import { widgetService } from "@/services/widgets/WidgetService";
 import LottieWeatherIcon from "@/components/widgets/WeatherWidget/LottieWeatherIcon";
 import { WeatherBackdrop } from "@/components/weather/WeatherBackdrop";
 import { mapWeatherToBackdrop } from "@/services/weather/weatherMapping";
-import { useIsFocused } from "@react-navigation/native";
 
-const headerMinHeight = 80; // Minimum collapsed height
-
-// Helper function to calculate progress percentage
+const headerMinHeight = 80;
 
 interface AnimatedValues {
   headerHeight: Animated.AnimatedInterpolation<string | number>;
@@ -318,9 +308,6 @@ const DashboardScreen = () => {
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
   const isFocused = useIsFocused();
-  const [appState, setAppState] = useState<AppStateStatus>(
-    AppState.currentState,
-  );
 
   const [weatherSummary, setWeatherSummary] = React.useState<{
     condition: string;
@@ -330,187 +317,133 @@ const DashboardScreen = () => {
     any | null
   >(null);
 
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", setAppState);
-    const loadWeatherSummary = async () => {
-      try {
-        await widgetService.initialize();
-        const widgets = await widgetService.getWeatherWidgets();
-        const headerWidget = widgets.find((w) =>
-          Boolean(w.config?.showInDashboardHeader),
-        );
+  const loadWeatherSummary = useCallback(async () => {
+    try {
+      await widgetService.initialize();
+      const widgets = await widgetService.getWeatherWidgets();
+      const headerWidget = widgets.find((w) =>
+        Boolean(w.config?.showInDashboardHeader),
+      );
 
-        if (!headerWidget) {
-          setWeatherSummary(null);
-          setWeatherForBackdrop(null);
-          return;
-        }
-
-        const cached = await widgetService.getWidgetData<any>(headerWidget.id);
-        const payload = cached?.payload;
-        if (!payload || typeof payload !== "object") {
-          setWeatherSummary(null);
-          setWeatherForBackdrop(null);
-          return;
-        }
-
-        const firstKey = Object.keys(payload)[0];
-        const first = firstKey ? payload[firstKey] : null;
-        const weather = first ?? null;
-
-        if (
-          !weather ||
-          !weather.current ||
-          typeof weather.current.temperature !== "number"
-        ) {
-          setWeatherSummary(null);
-          setWeatherForBackdrop(null);
-          return;
-        }
-
-        setWeatherSummary({
-          condition: weather.current.condition.text,
-          temperature: `${Math.round(weather.current.temperature)}°`,
-        });
-        setWeatherForBackdrop(weather);
-      } catch (error) {
-        console.log("[Dashboard] Failed to load weather summary", error);
+      if (!headerWidget) {
         setWeatherSummary(null);
         setWeatherForBackdrop(null);
+        return;
       }
-    };
 
-    void loadWeatherSummary();
+      const cached = await widgetService.getWidgetData<any>(headerWidget.id);
+      const payload = cached?.payload;
+      if (!payload || typeof payload !== "object") {
+        setWeatherSummary(null);
+        setWeatherForBackdrop(null);
+        return;
+      }
 
-    return () => {
-      sub.remove();
-    };
+      const firstKey = Object.keys(payload)[0];
+      const first = firstKey ? payload[firstKey] : null;
+      const weather = first ?? null;
+
+      if (
+        !weather ||
+        !weather.current ||
+        typeof weather.current.temperature !== "number"
+      ) {
+        setWeatherSummary(null);
+        setWeatherForBackdrop(null);
+        return;
+      }
+
+      setWeatherSummary({
+        condition: weather.current.condition.text,
+        temperature: `${Math.round(weather.current.temperature)}°`,
+      });
+      setWeatherForBackdrop(weather);
+    } catch (error) {
+      console.log("[Dashboard] Failed to load weather summary", error);
+      setWeatherSummary(null);
+      setWeatherForBackdrop(null);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadWeatherSummary();
+  }, [loadWeatherSummary]);
 
   const handleRefresh = useCallback(async () => {
     onPress();
     setRefreshing(true);
-    // Simulate refresh delay
+    await loadWeatherSummary();
     setTimeout(() => {
       setRefreshing(false);
     }, 1000);
-  }, [onPress]);
+  }, [onPress, loadWeatherSummary]);
 
-  const screenHeight = Dimensions.get("window").height;
-  const headerMaxHeight = screenHeight * 0.4; // 40% screen height
-  const collapseRange = headerMaxHeight - headerMinHeight;
+  const { headerMaxHeight, collapseRange } = useMemo(() => {
+    const height = Dimensions.get("window").height;
+    const maxHeight = height * 0.4;
+    return {
+      headerMaxHeight: maxHeight,
+      collapseRange: maxHeight - headerMinHeight,
+    };
+  }, []);
 
-  // Memoize animated styles to prevent recalculation on every render
   const animatedValues = useMemo(
     () => ({
-      // Animated styles with ease-out-cubic Bezier curve for smooth deceleration
       headerHeight: easeOutCubic(
         scrollY,
         [0, collapseRange],
         [headerMaxHeight, headerMinHeight],
       ),
-
-      // Title fades out as user scrolls up, then fades back in via sticky title
-      // This creates a smooth fade out effect with the main title
       titleOpacity: easeOutCubic(scrollY, [0, collapseRange * 0.6], [1, 0]),
-
       titleTranslateY: easeOutCubic(scrollY, [0, collapseRange], [0, -20]),
-
       buttonsTranslateY: easeOutCubic(
         scrollY,
         [0, collapseRange],
         [headerMaxHeight - 70, -20],
       ),
-
       buttonsPosition: scrollY.interpolate({
         inputRange: [0, collapseRange],
         outputRange: [1, 1],
         extrapolate: "clamp",
       }),
-
       stickyTitleOpacity: easeOutCubic(
         scrollY,
         [collapseRange * 0.6, collapseRange],
         [0, 1],
       ),
-
-      // Header background fades in only when reaching the top (fully collapsed)
       headerBackgroundOpacity: scrollY.interpolate({
         inputRange: [0, collapseRange - 10, collapseRange],
         outputRange: [0, 0, 1],
         extrapolate: "clamp",
       }),
-
-      // Sync gradient animation to scroll position for responsive feel
-      gradient1Opacity: scrollY.interpolate({
+      gradientOpacity: scrollY.interpolate({
         inputRange: [0, collapseRange],
-        outputRange: [0.7, 0.21],
-        extrapolate: "clamp",
-      }),
-      gradient2Opacity: scrollY.interpolate({
-        inputRange: [0, collapseRange],
-        outputRange: [0.21, 0.7],
-        extrapolate: "clamp",
-      }),
-      gradient3Opacity: scrollY.interpolate({
-        inputRange: [0, collapseRange],
-        outputRange: [0.21, 0.21],
+        outputRange: [0.7, 0.3],
         extrapolate: "clamp",
       }),
     }),
     [scrollY, headerMaxHeight, collapseRange],
   );
 
-  // Memoize gradient background to prevent unnecessary re-renders
   const gradientBackground = useMemo(() => {
     if (!gradientEnabled) return null;
 
     return (
-      <>
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { opacity: animatedValues.gradient1Opacity },
-          ]}
-        >
-          <LinearGradient
-            colors={["#0f0f23", "#1a1a2e", "#16213e"]}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          />
-        </Animated.View>
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { opacity: animatedValues.gradient2Opacity },
-          ]}
-        >
-          <LinearGradient
-            colors={["#1a1a2e", "#16213e", "#0f0f23"]}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
-        </Animated.View>
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { opacity: animatedValues.gradient3Opacity },
-          ]}
-        >
-          <LinearGradient
-            colors={["#16213e", "#0f0f23", "#1a1a2e"]}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-          />
-        </Animated.View>
-      </>
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          { opacity: animatedValues.gradientOpacity },
+        ]}
+      >
+        <LinearGradient
+          colors={["#0f0f23", "#1a1a2e", "#16213e"]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      </Animated.View>
     );
-  }, [gradientEnabled, animatedValues]);
-
-  // These styles are defined in DashboardHeader component
+  }, [gradientEnabled, animatedValues.gradientOpacity]);
 
   const styles = useMemo(
     () =>
@@ -531,37 +464,17 @@ const DashboardScreen = () => {
     [theme, insets.top, headerMaxHeight],
   );
 
-  // Summary metrics are currently unused in this component; keep calculation
-  // in case they are needed later. If not required, we can remove this.
-
-  const onScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false },
+  const onScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: false,
+      }),
+    [scrollY],
   );
 
   return (
     <View style={styles.container}>
-      {/* Frosted Glass Overlay */}
-      {frostedEnabled && (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: "rgba(255, 255, 255, 0.06)",
-            },
-          ]}
-        />
-      )}
-
       {gradientBackground}
-      {!gradientEnabled && (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: theme.colors.background },
-          ]}
-        />
-      )}
 
       <DashboardHeader
         animatedValues={animatedValues}
@@ -571,16 +484,12 @@ const DashboardScreen = () => {
         gradientEnabled={gradientEnabled}
       />
 
-      {/* Content */}
-      {weatherEffectsEnabled &&
-        weatherForBackdrop &&
-        isFocused &&
-        appState === "active" && (
-          <WeatherBackdrop
-            {...mapWeatherToBackdrop({ weather: weatherForBackdrop })}
-            visible
-          />
-        )}
+      {weatherEffectsEnabled && weatherForBackdrop && isFocused && (
+        <WeatherBackdrop
+          {...mapWeatherToBackdrop({ weather: weatherForBackdrop })}
+          visible
+        />
+      )}
 
       <ScrollView
         ref={scrollViewRef}
@@ -593,7 +502,6 @@ const DashboardScreen = () => {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {/* Widgets Section */}
         <DashboardWidgets theme={theme} />
       </ScrollView>
     </View>

@@ -52,7 +52,7 @@ export const DEFAULT_SHORTCUTS: Shortcut[] = [
     id: "recently-added",
     label: "Recently Added",
     icon: "clock-outline",
-    route: "/(auth)/recently-added",
+    route: "/recently-added",
     enabled: true,
   },
   {

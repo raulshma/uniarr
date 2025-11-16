@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import { logger } from "@/services/logger/LoggerService";
 import { type ServiceConfig } from "@/models/service.types";
 import { type S3Credentials } from "@/models/s3.types";
+import { storageAdapter } from "./StorageAdapter";
 
 const INDEX_KEY = "SecureStorage_index";
 const SERVICE_KEY_PREFIX = "SecureStorage_service_";
@@ -10,11 +11,6 @@ const SCAN_HISTORY_KEY = "SecureStorage_scan_history";
 const RECENT_IPS_KEY = "SecureStorage_recent_ips";
 const S3_ACCESS_KEY_ID = "SecureStorage_s3_access_key_id";
 const S3_SECRET_ACCESS_KEY = "SecureStorage_s3_secret_access_key";
-
-type StoredServiceConfig = Omit<ServiceConfig, "createdAt" | "updatedAt"> & {
-  createdAt: string;
-  updatedAt: string;
-};
 
 export interface NetworkScanHistoryType {
   id: string;
@@ -90,7 +86,12 @@ class SecureStorage {
     await this.ensureInitialized();
 
     this.cache.delete(id);
-    await SecureStore.deleteItemAsync(this.getServiceKey(id));
+    const configKey = `${this.getServiceKey(id)}_config`;
+    const credsKey = `${this.getServiceKey(id)}_creds`;
+    await Promise.all([
+      storageAdapter.removeItem(configKey),
+      SecureStore.deleteItemAsync(credsKey).catch(() => {}), // Ignore if not exists
+    ]);
     await this.persistIndex();
   }
 
@@ -99,7 +100,12 @@ class SecureStorage {
 
     const ids = Array.from(this.cache.keys());
     await Promise.all(
-      ids.map((id) => SecureStore.deleteItemAsync(this.getServiceKey(id))),
+      ids.flatMap((id) => [
+        storageAdapter.removeItem(`${this.getServiceKey(id)}_config`),
+        SecureStore.deleteItemAsync(`${this.getServiceKey(id)}_creds`).catch(
+          () => {},
+        ),
+      ]),
     );
     await SecureStore.deleteItemAsync(INDEX_KEY);
     this.cache.clear();
@@ -374,8 +380,48 @@ class SecureStorage {
 
   private async persistConfig(config: ServiceConfig): Promise<void> {
     try {
-      const serialized = JSON.stringify(this.serializeConfig(config));
-      await SecureStore.setItemAsync(this.getServiceKey(config.id), serialized);
+      // Non-sensitive config parts (large, non-secret)
+      const nonSensitive: Omit<
+        ServiceConfig,
+        "apiKey" | "username" | "password" | "createdAt" | "updatedAt"
+      > & {
+        createdAt: string;
+        updatedAt: string;
+      } = {
+        id: config.id,
+        type: config.type,
+        name: config.name,
+        url: config.url,
+        enabled: config.enabled,
+        proxyUrl: config.proxyUrl,
+        timeout: config.timeout,
+        createdAt: config.createdAt.toISOString(),
+        updatedAt: config.updatedAt.toISOString(),
+      };
+      const nonSensitiveKey = `${this.getServiceKey(config.id)}_config`;
+      await storageAdapter.setItem(
+        nonSensitiveKey,
+        JSON.stringify(nonSensitive),
+      );
+
+      // Sensitive fields only (small, secret-protected)
+      const sensitive: Partial<
+        Pick<ServiceConfig, "apiKey" | "username" | "password">
+      > = {};
+      if (config.apiKey !== undefined) sensitive.apiKey = config.apiKey;
+      if (config.username !== undefined) sensitive.username = config.username;
+      if (config.password !== undefined) sensitive.password = config.password;
+      const sensitiveSerialized = JSON.stringify(sensitive);
+      const sensitiveKey = `${this.getServiceKey(config.id)}_creds`;
+      await SecureStore.setItemAsync(sensitiveKey, sensitiveSerialized);
+
+      if (sensitiveSerialized.length > 1800) {
+        await logger.warn("Large sensitive config stored in SecureStore", {
+          location: "SecureStorage.persistConfig",
+          serviceId: config.id,
+          size: sensitiveSerialized.length,
+        });
+      }
     } catch (error) {
       await logger.error("Failed to persist service config.", {
         location: "SecureStorage.persistConfig",
@@ -388,37 +434,52 @@ class SecureStorage {
 
   private async readConfig(id: string): Promise<ServiceConfig | null> {
     try {
-      const serialized = await SecureStore.getItemAsync(this.getServiceKey(id));
-      if (!serialized) {
+      const configKey = `${this.getServiceKey(id)}_config`;
+      const credsKey = `${this.getServiceKey(id)}_creds`;
+
+      const configStr = await storageAdapter.getItem(configKey);
+      if (!configStr) {
         return null;
       }
 
-      const parsed = JSON.parse(serialized) as StoredServiceConfig;
-      return this.deserializeConfig(parsed);
+      const nonSensitive = JSON.parse(configStr) as Omit<
+        ServiceConfig,
+        "apiKey" | "username" | "password" | "createdAt" | "updatedAt"
+      > & {
+        createdAt: string;
+        updatedAt: string;
+      };
+
+      const credsStr = await SecureStore.getItemAsync(credsKey);
+      const sensitive: Partial<
+        Pick<ServiceConfig, "apiKey" | "username" | "password">
+      > = {};
+      if (credsStr) {
+        const parsed = JSON.parse(credsStr);
+        if (parsed.apiKey !== undefined && parsed.apiKey !== null)
+          sensitive.apiKey = parsed.apiKey;
+        if (parsed.username !== undefined && parsed.username !== null)
+          sensitive.username = parsed.username;
+        if (parsed.password !== undefined && parsed.password !== null)
+          sensitive.password = parsed.password;
+      }
+
+      const config: ServiceConfig = {
+        ...nonSensitive,
+        ...sensitive,
+        createdAt: new Date(nonSensitive.createdAt),
+        updatedAt: new Date(nonSensitive.updatedAt),
+      };
+
+      return config;
     } catch (error) {
-      await logger.warn("Failed to read service config from secure storage.", {
+      await logger.warn("Failed to read service config from storage.", {
         location: "SecureStorage.readConfig",
         serviceId: id,
         error: error instanceof Error ? error.message : String(error),
       });
       return null;
     }
-  }
-
-  private serializeConfig(config: ServiceConfig): StoredServiceConfig {
-    return {
-      ...config,
-      createdAt: config.createdAt.toISOString(),
-      updatedAt: config.updatedAt.toISOString(),
-    };
-  }
-
-  private deserializeConfig(config: StoredServiceConfig): ServiceConfig {
-    return {
-      ...config,
-      createdAt: new Date(config.createdAt),
-      updatedAt: new Date(config.updatedAt),
-    };
   }
 
   private getServiceKey(id: string): string {
