@@ -96,12 +96,16 @@ export const OAuthCallbackLoader = ({
   const theme = useTheme();
   const mountTimeRef = useRef(Date.now());
   const hasTriggeredExitRef = useRef(false);
-  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
+
+  // Initialize with a random quote
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(() =>
+    Math.floor(Math.random() * DEVELOPER_QUOTES.length),
+  );
 
   // Animated shared values for quote transitions
   const quoteOpacity = useSharedValue(1);
 
-  // Cycle through quotes every 3 seconds during loading
+  // Cycle through quotes randomly every 3 seconds during loading
   useEffect(() => {
     if (status !== "loading") return;
 
@@ -115,9 +119,9 @@ export const OAuthCallbackLoader = ({
             easing: Easing.inOut(Easing.ease),
           },
           () => {
-            // Change quote after fade out
-            setCurrentQuoteIndex(
-              (prev) => (prev + 1) % DEVELOPER_QUOTES.length,
+            // Change to a random quote after fade out
+            setCurrentQuoteIndex(() =>
+              Math.floor(Math.random() * DEVELOPER_QUOTES.length),
             );
             // Fade in new quote
             quoteOpacity.value = withTiming(1, {
@@ -127,8 +131,10 @@ export const OAuthCallbackLoader = ({
           },
         );
       } else {
-        // No animation, just change quote
-        setCurrentQuoteIndex((prev) => (prev + 1) % DEVELOPER_QUOTES.length);
+        // No animation, just change to random quote
+        setCurrentQuoteIndex(() =>
+          Math.floor(Math.random() * DEVELOPER_QUOTES.length),
+        );
       }
     }, 3000);
 

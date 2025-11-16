@@ -8,6 +8,7 @@ import type {
   CalendarDay,
   CalendarWeek,
   CalendarMonth,
+  CalendarRange,
   CalendarStats,
   CalendarNavigation,
   MediaType,
@@ -15,6 +16,7 @@ import type {
 } from "@/models/calendar.types";
 
 import { queryKeys } from "@/hooks/queryKeys";
+import { QUERY_CONFIG } from "@/hooks/queryConfig";
 import {
   useSettingsStore,
   selectLastCalendarView,
@@ -25,7 +27,7 @@ import { CalendarService } from "@/services/calendar/CalendarService";
 
 export interface UseCalendarReturn {
   state: CalendarState & { isLoading: boolean; error?: string };
-  calendarData: CalendarMonth | CalendarWeek | CalendarDay;
+  calendarData: CalendarMonth | CalendarWeek | CalendarDay | CalendarRange;
   stats: CalendarStats;
   navigation: CalendarNavigation;
   releases: MediaRelease[];
@@ -100,10 +102,7 @@ export const useCalendar = (): UseCalendarReturn => {
       const calendarService = CalendarService.getInstance();
       return calendarService.getReleases(state.filters);
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: false,
-    retry: 2,
-    retryDelay: 1000,
+    ...QUERY_CONFIG.CALENDAR,
   });
 
   const updateState = useCallback((updates: Partial<CalendarState>) => {
@@ -228,8 +227,13 @@ export const useCalendar = (): UseCalendarReturn => {
 
   // Calendar data computation
   const calendarData = useMemo(() => {
-    return generateCalendarData(state.currentDate, state.view, releases);
-  }, [state.currentDate, state.view, releases]);
+    return generateCalendarData(
+      state.currentDate,
+      state.view,
+      releases,
+      state.filters.dateRange,
+    );
+  }, [state.currentDate, state.view, releases, state.filters.dateRange]);
 
   // Statistics computation
   const stats = useMemo((): CalendarStats => {
@@ -365,7 +369,8 @@ function generateCalendarData(
   currentDate: string,
   view: CalendarView,
   releases: MediaRelease[],
-): CalendarMonth | CalendarWeek | CalendarDay {
+  dateRange?: { start: string; end: string },
+): CalendarMonth | CalendarWeek | CalendarDay | CalendarRange {
   const current = new Date(currentDate);
 
   switch (view) {
@@ -376,11 +381,32 @@ function generateCalendarData(
     case "day":
       return generateDayData(current, releases);
     case "custom":
-      // For custom, return a dummy month data, but releasesForView will handle it specially
+      if (dateRange) {
+        return generateRangeData(dateRange.start, dateRange.end, releases);
+      }
       return generateMonthData(current, releases);
     default:
       return generateMonthData(current, releases);
   }
+}
+
+function generateRangeData(
+  startDate: string,
+  endDate: string,
+  releases: MediaRelease[],
+): CalendarRange {
+  const rangeReleases = releases.filter((release) => {
+    return release.releaseDate >= startDate && release.releaseDate <= endDate;
+  });
+
+  return {
+    startDate,
+    endDate,
+    releases: rangeReleases.sort(
+      (a, b) =>
+        new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime(),
+    ),
+  };
 }
 
 function generateMonthData(

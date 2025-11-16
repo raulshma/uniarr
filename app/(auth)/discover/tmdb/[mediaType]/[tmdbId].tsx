@@ -228,7 +228,7 @@ const buildTvDiscoverItem = (
 
 const CAST_LIMIT = 12;
 
-const TmdbDetailPage = () => {
+const TmdbDetailPage: React.FC = () => {
   const params = useLocalSearchParams<{
     mediaType?: string;
     tmdbId?: string;
@@ -244,7 +244,7 @@ const TmdbDetailPage = () => {
   const tmdbId = Number.isFinite(tmdbIdParam) ? tmdbIdParam : null;
 
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
-  const { apiKey } = useTmdbKey();
+  const { apiKey, isLoading: keyLoading } = useTmdbKey();
   const hasCredentials = Boolean(apiKey);
 
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
@@ -272,7 +272,9 @@ const TmdbDetailPage = () => {
   );
 
   const detailsQuery = useTmdbDetails(mediaTypeParam ?? "movie", tmdbId, {
-    enabled: Boolean(mediaTypeParam && tmdbId && tmdbEnabled && hasCredentials),
+    enabled: Boolean(
+      mediaTypeParam && tmdbId && tmdbEnabled && hasCredentials && !keyLoading,
+    ),
   });
 
   const [servicePickerVisible, setServicePickerVisible] = useState(false);
@@ -1209,26 +1211,65 @@ const TmdbDetailPage = () => {
       .filter((item) => typeof item.tmdbId === "number" && item.tmdbId > 0);
   }, [detailsQuery.data, mediaTypeParam]);
 
-  const title =
-    movieDetails?.title ??
-    tvDetails?.name ??
-    movieDetails?.original_title ??
-    tvDetails?.original_name ??
-    "TMDB title";
-  const tagline = movieDetails?.tagline ?? tvDetails?.tagline;
-  const overview = movieDetails?.overview ?? tvDetails?.overview;
-  const releaseLabel =
-    movieDetails?.release_date ?? tvDetails?.first_air_date ?? "Unknown";
-  const runtimeLabel =
-    mediaTypeParam === "movie"
-      ? formatRuntime(movieDetails?.runtime)
-      : formatRuntime(
-          Array.isArray(tvDetails?.episode_run_time)
-            ? tvDetails?.episode_run_time[0]
-            : undefined,
-        );
-  const ratingValue = movieDetails?.vote_average ?? tvDetails?.vote_average;
-  const statusLabel = movieDetails?.status ?? tvDetails?.status;
+  const {
+    title,
+    tagline,
+    overview,
+    releaseLabel,
+    runtimeLabel,
+    ratingValue,
+    statusLabel,
+  } = useMemo(() => {
+    const t =
+      movieDetails?.title ??
+      tvDetails?.name ??
+      movieDetails?.original_title ??
+      tvDetails?.original_name ??
+      "TMDB title";
+
+    const tg = movieDetails?.tagline ?? tvDetails?.tagline;
+    const ov = movieDetails?.overview ?? tvDetails?.overview;
+    const rl =
+      movieDetails?.release_date ?? tvDetails?.first_air_date ?? "Unknown";
+    const rt =
+      mediaTypeParam === "movie"
+        ? formatRuntime(movieDetails?.runtime)
+        : formatRuntime(
+            Array.isArray(tvDetails?.episode_run_time)
+              ? tvDetails?.episode_run_time[0]
+              : undefined,
+          );
+    const rv = movieDetails?.vote_average ?? tvDetails?.vote_average;
+    const sl = movieDetails?.status ?? tvDetails?.status;
+
+    return {
+      title: t,
+      tagline: tg,
+      overview: ov,
+      releaseLabel: rl,
+      runtimeLabel: rt,
+      ratingValue: rv,
+      statusLabel: sl,
+    };
+  }, [
+    mediaTypeParam,
+    movieDetails?.overview,
+    movieDetails?.original_title,
+    movieDetails?.release_date,
+    movieDetails?.runtime,
+    movieDetails?.status,
+    movieDetails?.tagline,
+    movieDetails?.title,
+    movieDetails?.vote_average,
+    tvDetails?.first_air_date,
+    tvDetails?.name,
+    tvDetails?.original_name,
+    tvDetails?.overview,
+    tvDetails?.status,
+    tvDetails?.tagline,
+    tvDetails?.vote_average,
+    tvDetails?.episode_run_time,
+  ]);
   const genresList = useMemo(
     () =>
       ((mediaTypeParam === "movie"
@@ -1281,6 +1322,19 @@ const TmdbDetailPage = () => {
     },
     [router],
   );
+
+  if (keyLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <DetailHero
+          posterUri={undefined}
+          backdropUri={undefined}
+          onBack={() => router.back()}
+          isFetching={true}
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (!tmdbEnabled) {
     return (

@@ -90,6 +90,7 @@ const serviceDisplayNames: Record<ServiceType, string> = {
   prowlarr: "Indexer",
   bazarr: "Subtitle Manager",
   adguard: "DNS Protection",
+  homarr: "Dashboard",
 };
 
 const serviceTypeLabels: Record<ServiceType, string> = {
@@ -107,6 +108,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
   adguard: "AdGuard Home",
+  homarr: "Homarr",
 };
 
 const serviceIcons: Record<ServiceType, string> = {
@@ -124,12 +126,15 @@ const serviceIcons: Record<ServiceType, string> = {
   prowlarr: "radar",
   bazarr: "subtitles",
   adguard: "shield-check",
+  homarr: "view-dashboard",
 };
 
 const fetchServiceConfigs = async (): Promise<ServiceConfig[]> => {
   const configs = await secureStorage.getServiceConfigs();
   return configs;
 };
+
+const getItemType = () => "service";
 
 // Component that collects health data from all services for overview metrics
 // Handles up to 10 services with individual queries (covers most realistic use cases)
@@ -795,7 +800,6 @@ const ServicesScreen = () => {
       isDarkTheme,
       styles,
       handleServicePress,
-      setSelectedService,
       handleEditService,
       handleDeleteService,
       handleSettingsPress,
@@ -806,8 +810,6 @@ const ServicesScreen = () => {
     (item: ServiceConfig) => `service-${item.id}`,
     [],
   );
-
-  const getItemType = useCallback(() => "service", []);
 
   const listEmptyComponent = useMemo(() => {
     if (isError) {

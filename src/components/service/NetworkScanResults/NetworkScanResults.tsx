@@ -183,6 +183,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
       prowlarr: "search-web",
       bazarr: "subtitles",
       adguard: "shield-check",
+      homarr: "view-dashboard",
     }),
     [],
   );
@@ -203,6 +204,7 @@ const NetworkScanResults: React.FC<NetworkScanResultsProps> = ({
       prowlarr: theme.colors.surfaceVariant,
       bazarr: theme.colors.inverseSurface,
       adguard: theme.colors.tertiaryContainer,
+      homarr: theme.colors.primary,
     }),
     [theme],
   );

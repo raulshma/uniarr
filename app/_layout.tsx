@@ -1,3 +1,4 @@
+import "./../pollyfills";
 import { ClerkLoaded, ClerkProvider } from "@clerk/clerk-expo";
 import { QueryClientProvider, hydrate } from "@tanstack/react-query";
 import type { Persister } from "@tanstack/react-query-persist-client";
@@ -6,7 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useMemo, type ComponentType, useEffect, useState } from "react";
 import { Platform, View } from "react-native";
-import { PaperProvider } from "react-native-paper";
+import { PaperProvider, Portal } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -27,7 +28,7 @@ import { useOfflineAwareActions } from "@/hooks/useOfflineAwareActions";
 import { useNotificationRegistration } from "@/hooks/useNotificationRegistration";
 import { useNotificationResponseHandler } from "@/hooks/useNotificationResponseHandler";
 import { useQuietHoursManager } from "@/hooks/useQuietHoursManager";
-import { useApiErrorLoggerLifecycle } from "@/hooks/useApiErrorLoggerLifecycle";
+import { useApiLoggerLifecycle } from "@/hooks/useApiLoggerLifecycle";
 import { useVoiceCommandHandler } from "@/hooks/useVoiceCommandHandler";
 import { useServiceLifecycleCoordination } from "@/hooks/useServiceLifecycleCoordination";
 import { useJellyfinSettingsSync } from "@/hooks/useJellyfinSettingsSync";
@@ -39,6 +40,7 @@ import {
   performStorageMigration,
   cleanupAsyncStorage,
 } from "@/utils/storage.migration";
+import { registerAllTools } from "@/services/ai/tools";
 
 const RootLayout = () => {
   const theme = useTheme();
@@ -66,6 +68,15 @@ const RootLayout = () => {
 
         // Clean up old AsyncStorage data after successful migration
         await cleanupAsyncStorage();
+
+        // Initialize AI tools after storage is ready
+        try {
+          registerAllTools();
+          console.log("[RootLayout] AI tools registered successfully");
+        } catch (error) {
+          console.error("[RootLayout] Failed to register AI tools", error);
+          // Don't block app startup if tool registration fails
+        }
 
         if (mounted) setStorageReady(true);
       } catch (error) {
@@ -147,81 +158,85 @@ const RootLayout = () => {
                   persistOptions={{ persister }}
                 >
                   <PaperProvider theme={theme || defaultTheme}>
-                    <WidgetDrawerProvider>
-                      <DialogProvider>
-                        <DownloadManagerProvider
-                          managerOptions={{
-                            queueConfig: {
-                              maxConcurrentDownloads: 3,
-                              allowMobileData: false,
-                              allowBackgroundDownloads: true,
-                              maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
-                            },
-                            progressUpdateInterval: 1500,
-                            enablePersistence: true,
-                          }}
-                          indicatorPosition="floating"
-                          onInitialized={(success) => {
-                            console.log(
-                              "Download manager initialized:",
-                              success,
-                            );
-                          }}
-                          onError={(error) => {
-                            console.error(
-                              "Download manager initialization failed:",
-                              error,
-                            );
-                          }}
-                        >
-                          <StatusBar style={theme.dark ? "light" : "dark"} />
-                          <ErrorBoundary context={{ location: "RootLayout" }}>
-                            <AppContent />
-                          </ErrorBoundary>
-                          <QueryDevtools />
-                        </DownloadManagerProvider>
-                      </DialogProvider>
-                    </WidgetDrawerProvider>
+                    <Portal.Host>
+                      <WidgetDrawerProvider>
+                        <DialogProvider>
+                          <DownloadManagerProvider
+                            managerOptions={{
+                              queueConfig: {
+                                maxConcurrentDownloads: 3,
+                                allowMobileData: false,
+                                allowBackgroundDownloads: true,
+                                maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
+                              },
+                              progressUpdateInterval: 1500,
+                              enablePersistence: true,
+                            }}
+                            indicatorPosition="floating"
+                            onInitialized={(success) => {
+                              console.log(
+                                "Download manager initialized:",
+                                success,
+                              );
+                            }}
+                            onError={(error) => {
+                              console.error(
+                                "Download manager initialization failed:",
+                                error,
+                              );
+                            }}
+                          >
+                            <StatusBar style={theme.dark ? "light" : "dark"} />
+                            <ErrorBoundary context={{ location: "RootLayout" }}>
+                              <AppContent />
+                            </ErrorBoundary>
+                            <QueryDevtools />
+                          </DownloadManagerProvider>
+                        </DialogProvider>
+                      </WidgetDrawerProvider>
+                    </Portal.Host>
                   </PaperProvider>
                 </PersistQueryClientProvider>
               ) : (
                 <QueryClientProvider client={queryClient}>
                   <PaperProvider theme={theme || defaultTheme}>
-                    <WidgetDrawerProvider>
-                      <DialogProvider>
-                        <DownloadManagerProvider
-                          managerOptions={{
-                            queueConfig: {
-                              maxConcurrentDownloads: 3,
-                              allowMobileData: false,
-                              allowBackgroundDownloads: true,
-                              maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
-                            },
-                            progressUpdateInterval: 1500,
-                            enablePersistence: true,
-                          }}
-                          indicatorPosition="floating"
-                          onInitialized={(success) => {
-                            console.log(
-                              "Download manager initialized:",
-                              success,
-                            );
-                          }}
-                          onError={(error) => {
-                            console.error(
-                              "Download manager initialization failed:",
-                              error,
-                            );
-                          }}
-                        >
-                          <StatusBar style={theme.dark ? "light" : "dark"} />
-                          <ErrorBoundary context={{ location: "RootLayout" }}>
-                            <AppContent />
-                          </ErrorBoundary>
-                          <QueryDevtools />
-                        </DownloadManagerProvider>
-                      </DialogProvider>
-                    </WidgetDrawerProvider>
+                    <Portal.Host>
+                      <WidgetDrawerProvider>
+                        <DialogProvider>
+                          <DownloadManagerProvider
+                            managerOptions={{
+                              queueConfig: {
+                                maxConcurrentDownloads: 3,
+                                allowMobileData: false,
+                                allowBackgroundDownloads: true,
+                                maxStorageUsage: 5 * 1024 * 1024 * 1024, // 5GB
+                              },
+                              progressUpdateInterval: 1500,
+                              enablePersistence: true,
+                            }}
+                            indicatorPosition="floating"
+                            onInitialized={(success) => {
+                              console.log(
+                                "Download manager initialized:",
+                                success,
+                              );
+                            }}
+                            onError={(error) => {
+                              console.error(
+                                "Download manager initialization failed:",
+                                error,
+                              );
+                            }}
+                          >
+                            <StatusBar style={theme.dark ? "light" : "dark"} />
+                            <ErrorBoundary context={{ location: "RootLayout" }}>
+                              <AppContent />
+                            </ErrorBoundary>
+                            <QueryDevtools />
+                          </DownloadManagerProvider>
+                        </DialogProvider>
+                      </WidgetDrawerProvider>
+                    </Portal.Host>
                   </PaperProvider>
                 </QueryClientProvider>
               )}
@@ -269,7 +284,7 @@ const AppContent = () => {
   useNotificationRegistration();
   useNotificationResponseHandler();
   useQuietHoursManager();
-  useApiErrorLoggerLifecycle();
+  useApiLoggerLifecycle();
   useVoiceCommandHandler();
   useServiceLifecycleCoordination();
   useJellyfinSettingsSync();

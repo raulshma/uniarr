@@ -23,6 +23,7 @@ import StatisticsWidgetConfigForm from "@/components/widgets/StatisticsWidget/St
 import CalendarPreviewWidgetConfigForm from "@/components/widgets/CalendarPreviewWidget/CalendarPreviewWidgetConfigForm";
 import DownloadProgressWidgetConfigForm from "@/components/widgets/DownloadProgressWidget/DownloadProgressWidgetConfigForm";
 import HackerNewsWidgetConfigForm from "@/components/widgets/HackerNewsWidget/HackerNewsWidgetConfigForm";
+import RecommendationsWidgetConfigForm from "@/components/widgets/RecommendationsWidget/RecommendationsWidgetConfigForm";
 
 const WidgetConfigureScreen: React.FC = () => {
   const params = useLocalSearchParams<{ widgetId?: string }>();
@@ -126,6 +127,13 @@ const WidgetConfigureScreen: React.FC = () => {
       case "hacker-news":
         return (
           <HackerNewsWidgetConfigForm widget={widget} onSaved={handleSaved} />
+        );
+      case "recommendations":
+        return (
+          <RecommendationsWidgetConfigForm
+            widget={widget}
+            onConfigChange={handleSaved}
+          />
         );
       default:
         return (

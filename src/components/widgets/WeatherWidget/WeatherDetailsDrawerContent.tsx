@@ -13,7 +13,7 @@ import type {
   WeatherUnits,
   WeatherHourlyForecast,
 } from "@/services/widgets/dataProviders";
-import { WeatherIllustration } from "./WeatherIllustrations";
+import LottieWeatherIcon from "./LottieWeatherIcon";
 
 interface WeatherDetailsDrawerContentProps {
   weatherData: Record<string, WeatherPayload | null>;
@@ -98,7 +98,9 @@ const HourlyForecastRail = ({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      nestedScrollEnabled
       contentContainerStyle={styles.hourlyScrollContent}
+      scrollEventThrottle={16}
     >
       {items.map((hour) => (
         <View
@@ -117,15 +119,16 @@ const HourlyForecastRail = ({
           >
             {formatHourLabel(hour.time)}
           </Text>
-          <WeatherIllustration condition={hour.condition.text} size={72} />
+          <LottieWeatherIcon condition={hour.condition.text} size={72} />
           <Text variant="titleLarge" style={{ color: theme.colors.onSurface }}>
             {Math.round(hour.temperature)}°
           </Text>
           <View style={styles.hourMetaRow}>
-            <MaterialCommunityIcons
-              name="umbrella-outline"
+            <LottieWeatherIcon
+              condition="umbrella.json"
               size={18}
-              color={theme.colors.primary}
+              autoPlay={true}
+              loop={true}
             />
             <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
               {Math.round(hour.chanceOfRain)}%
@@ -186,7 +189,7 @@ const DailyForecastList = ({
             </Text>
           </View>
           <View style={styles.dailyIconColumn}>
-            <WeatherIllustration condition={day.condition.text} size={68} />
+            <LottieWeatherIcon condition={day.condition.text} size={68} />
           </View>
           <View style={styles.dailyMetaColumn}>
             <Text
@@ -199,10 +202,11 @@ const DailyForecastList = ({
               {Math.round(day.maxTemp)}° / {Math.round(day.minTemp)}°
             </Text>
             <View style={styles.dailyRainRow}>
-              <MaterialCommunityIcons
-                name="umbrella"
+              <LottieWeatherIcon
+                condition="umbrella.json"
                 size={18}
-                color={theme.colors.primary}
+                autoPlay={true}
+                loop={true}
               />
               <Text
                 variant="labelMedium"
@@ -268,9 +272,10 @@ export const WeatherDetailsDrawerContent: React.FC<
     if (!activeWeather) {
       return [];
     }
+    const uvIndex = Math.round(activeWeather.current.uvIndex);
     return [
       {
-        icon: "weather-windy" as const,
+        lottieIcon: "wind.json",
         label: "Wind speed",
         value:
           units === "imperial"
@@ -278,12 +283,12 @@ export const WeatherDetailsDrawerContent: React.FC<
             : `${Math.round(activeWeather.current.windKph)} km/h`,
       },
       {
-        icon: "umbrella-outline" as const,
+        lottieIcon: "umbrella.json",
         label: "Rain chance",
         value: `${Math.round(dailyItems[0]?.chanceOfRain ?? 0)}%`,
       },
       {
-        icon: "water-percent" as const,
+        lottieIcon: "umbrella-wind.json",
         label: "Humidity",
         value: `${Math.round(activeWeather.current.humidity)}%`,
       },
@@ -296,12 +301,12 @@ export const WeatherDetailsDrawerContent: React.FC<
             : `${Math.round(activeWeather.current.pressureMb)} hPa`,
       },
       {
-        icon: "weather-sunny-alert" as const,
+        lottieIcon: `uv-index-${Math.min(uvIndex, 11)}.json`,
         label: "UV index",
-        value: `${Math.round(activeWeather.current.uvIndex)}`,
+        value: `${uvIndex}`,
       },
       {
-        icon: "weather-cloudy-alert" as const,
+        lottieIcon: "time-afternoon.json",
         label: "Cloud cover",
         value: `${Math.round(activeWeather.current.cloudCover)}%`,
       },
@@ -317,10 +322,11 @@ export const WeatherDetailsDrawerContent: React.FC<
   if (!activeWeather) {
     return (
       <View style={styles.emptyState}>
-        <MaterialCommunityIcons
-          name="cloud-off-outline"
-          size={36}
-          color={theme.colors.onSurfaceVariant}
+        <LottieWeatherIcon
+          condition="time-afternoon.json"
+          size={60}
+          autoPlay={true}
+          loop={true}
         />
         <Text
           variant="bodyMedium"
@@ -412,7 +418,7 @@ export const WeatherDetailsDrawerContent: React.FC<
                 Feels like {Math.round(activeWeather.current.feelsLike)}°
               </Text>
             </View>
-            <WeatherIllustration
+            <LottieWeatherIcon
               condition={activeWeather.current.condition.text}
               size={180}
             />
@@ -421,10 +427,11 @@ export const WeatherDetailsDrawerContent: React.FC<
           {astronomy?.sunrise && astronomy?.sunset ? (
             <View style={styles.sunTimesRow}>
               <View style={styles.sunTimesItem}>
-                <MaterialCommunityIcons
-                  name="weather-sunset-up"
-                  size={20}
-                  color={theme.colors.onPrimary}
+                <LottieWeatherIcon
+                  condition="time-morning.json"
+                  size={24}
+                  autoPlay={true}
+                  loop={true}
                 />
                 <View>
                   <Text
@@ -442,10 +449,11 @@ export const WeatherDetailsDrawerContent: React.FC<
                 </View>
               </View>
               <View style={styles.sunTimesItem}>
-                <MaterialCommunityIcons
-                  name="weather-sunset"
-                  size={20}
-                  color={theme.colors.onPrimary}
+                <LottieWeatherIcon
+                  condition="time-evening.json"
+                  size={24}
+                  autoPlay={true}
+                  loop={true}
                 />
                 <View>
                   <Text
@@ -519,11 +527,20 @@ export const WeatherDetailsDrawerContent: React.FC<
               ]}
             >
               <View style={styles.metricIconWrapper}>
-                <MaterialCommunityIcons
-                  name={metric.icon}
-                  size={24}
-                  color={theme.colors.primary}
-                />
+                {"lottieIcon" in metric ? (
+                  <LottieWeatherIcon
+                    condition={metric.lottieIcon}
+                    size={24}
+                    autoPlay={true}
+                    loop={true}
+                  />
+                ) : (
+                  <MaterialCommunityIcons
+                    name={metric.icon}
+                    size={24}
+                    color={theme.colors.primary}
+                  />
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text
@@ -604,8 +621,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   hourlyScrollContent: {
+    flexDirection: "row",
+    alignItems: "stretch",
     gap: spacing.md,
-    paddingRight: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   hourCard: {
     width: 140,

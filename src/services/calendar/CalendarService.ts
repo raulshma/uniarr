@@ -31,54 +31,53 @@ export class CalendarService {
       await this.connectorManager.loadSavedServices();
       const configs = await secureStorage.getServiceConfigs();
 
-      const releases: MediaRelease[] = [];
-
       const allowedTypes = new Set(filters.serviceTypes ?? []);
       const fetchAllTypes = allowedTypes.size === 0;
 
-      // Fetch from Sonarr services when allowed
+      // Prepare parallel fetch tasks for all allowed service types
+      const fetchTasks: Promise<MediaRelease[]>[] = [];
+
+      // Fetch from Sonarr services when allowed (in parallel)
       if (fetchAllTypes || allowedTypes.has("sonarr")) {
         const sonarrConfigs = configs.filter(
           (config) => config.type === "sonarr" && config.enabled,
         );
 
-        for (const config of sonarrConfigs) {
-          try {
-            const sonarrReleases = await this.getSonarrReleases(
-              config.id,
-              filters,
-            );
-            releases.push(...sonarrReleases);
-          } catch (error) {
-            console.warn(
-              `Failed to fetch releases from Sonarr ${config.name}:`,
-              error,
-            );
-          }
-        }
+        sonarrConfigs.forEach((config) => {
+          fetchTasks.push(
+            this.getSonarrReleases(config.id, filters).catch((error) => {
+              console.warn(
+                `Failed to fetch releases from Sonarr ${config.name}:`,
+                error,
+              );
+              return [];
+            }),
+          );
+        });
       }
 
-      // Fetch from Radarr services when allowed
+      // Fetch from Radarr services when allowed (in parallel)
       if (fetchAllTypes || allowedTypes.has("radarr")) {
         const radarrConfigs = configs.filter(
           (config) => config.type === "radarr" && config.enabled,
         );
 
-        for (const config of radarrConfigs) {
-          try {
-            const radarrReleases = await this.getRadarrReleases(
-              config.id,
-              filters,
-            );
-            releases.push(...radarrReleases);
-          } catch (error) {
-            console.warn(
-              `Failed to fetch releases from Radarr ${config.name}:`,
-              error,
-            );
-          }
-        }
+        radarrConfigs.forEach((config) => {
+          fetchTasks.push(
+            this.getRadarrReleases(config.id, filters).catch((error) => {
+              console.warn(
+                `Failed to fetch releases from Radarr ${config.name}:`,
+                error,
+              );
+              return [];
+            }),
+          );
+        });
       }
+
+      // Execute all fetch tasks in parallel and combine results
+      const results = await Promise.all(fetchTasks);
+      const releases = results.flat();
 
       return releases;
     } catch (error) {

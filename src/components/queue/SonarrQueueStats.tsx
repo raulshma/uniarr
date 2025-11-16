@@ -142,8 +142,6 @@ export const SonarrQueueStats = React.memo(SonarrQueueStatsComponent);
 
 const styles = StyleSheet.create({
   container: {
-    margin: 16,
-    marginVertical: 8,
     borderRadius: 12,
     padding: 12,
   },

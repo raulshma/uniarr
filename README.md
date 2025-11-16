@@ -9,15 +9,15 @@ UniArr consolidates your media tooling into a single mobile app. Using connector
 
 ## Overview
 
-UniArr provides a comprehensive, unified interface for managing all your media automation and management services from a single mobile application. With support for 15+ different services including Sonarr, Radarr, Jellyseerr, qBittorrent, Jellyfin, and more, it offers advanced features like multi-service data aggregation, intelligent caching, offline support, and a sophisticated widget system.
+UniArr provides a comprehensive, unified interface for managing all your media automation and management services from a single mobile application. With support for 12+ implemented connectors (and a few planned/referenced services), including Sonarr, Radarr, Jellyseerr, qBittorrent, Jellyfin, and more, it offers advanced features like multi-service data aggregation, intelligent caching, offline support, and a sophisticated widget system.
 
-## 🚀 Core Features
+## Core Features
 
-### 📺 Media Management Hub
+### Media Management Hub
 
 - **Multi-Service Integration**: Native support for 15+ media services:
   - **Media Managers**: Sonarr (TV), Radarr (Movies), Lidarr (Music), Jellyseerr (Requests)
-  - **Download Clients**: qBittorrent, Transmission, Deluge, rTorrent, SABnzbd, NZBGet
+  - **Download Clients**: qBittorrent, Transmission, Deluge, SABnzbd
   - **Supporting Services**: Prowlarr (Indexer), Bazarr (Subtitles), Jellyfin (Media Server), AdGuard Home (DNS/Ad-blocking)
   - **External APIs**: The Movie Database (TMDb) integration for movie/TV discovery and metadata
 - **Unified Search**: Cross-service search with intelligent deduplication and filtering
@@ -27,7 +27,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Media Editor**: Advanced media metadata editing with multi-source ratings
 - **Content Ranking**: Intelligent release quality scoring and ranking system
 
-### 🎨 Advanced User Interface
+### Advanced User Interface
 
 - **Dynamic Widget System**: 15+ customizable widgets including:
   - **Bookmarks Widget**: Custom navigation shortcuts with health monitoring and icon picker
@@ -47,7 +47,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Custom Navigation**: Curved tab bar with advanced navigation patterns
 - **Modal System**: Advanced modal management with contextual interactions
 
-### 🌐 Network & Connectivity
+### Network & Connectivity
 
 - **VPN Diagnostics**: Advanced VPN detection and troubleshooting with connection testing
 - **Network Scanner**: Auto-discovery of services on local network with intelligent detection
@@ -57,7 +57,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **AdGuard Home Integration**: Advanced DNS blocking with query log management, protection status monitoring, and filter refresh capabilities
 - **Network History**: Recent IP addresses and connection history tracking
 
-### 🔧 Technical Excellence
+### Technical Excellence
 
 - **TypeScript Strict Mode**: Complete type safety with comprehensive coverage
 - **Performance Optimized**: React Compiler integration, FlashList for high-performance scrolling, and aggressive caching
@@ -69,7 +69,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Mutation Queue Service**: Offline mutation queuing with intelligent synchronization and retry mechanisms
 - **Thumbhash Integration**: Blur hash placeholders for better user experience during image loading
 
-### 🔐 Authentication & Security
+### Authentication & Security
 
 - **Clerk Authentication**: Complete end-user authentication with social providers and secure token management
 - **Multi-Provider Service Auth**: Support for API keys, basic authentication, session-based authentication, and OAuth
@@ -78,7 +78,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Permission Management**: Fine-grained permission control for app features and services
 - **Authentication Providers**: Specialized providers for different service types (Jellyfin, API Key, Basic Auth, Session-based)
 
-### 🎤 Voice Assistant & AI Integration
+### Voice Assistant & AI Integration
 
 - **Siri & Google Assistant Integration**: Native voice shortcuts with iOS Siri and Android Google Assistant support
 - **Natural Language Processing**: Advanced voice command recognition for media search, service status, and download management
@@ -86,7 +86,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Platform-Specific Voice Features**: Siri shortcuts on iOS, App Actions on Android with cross-platform compatibility
 - **Voice Feedback System**: Optional voice responses for accessibility and hands-free operation
 
-### 🔔 Advanced Notification System
+### Advanced Notification System
 
 - **Webhook Integration**: Full webhook processing with signature verification, event queuing, and notification management
 - **Smart Notification Management**: Type-based notification filtering with quiet hours and do-not-disturb modes
@@ -94,7 +94,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Notification History**: Persistent notification history with read/unread tracking and search capabilities
 - **Push Notification Support**: Local and remote notification handling with delivery tracking
 
-### 💾 Advanced Backup & Recovery
+### Advanced Backup & Recovery
 
 - **Comprehensive Backup System**: Full application state backup/restore with granular selection options
 - **Encrypted Backups**: AES-256 encryption with password protection for sensitive data
@@ -103,7 +103,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Backup Profiles**: Save multiple backup configurations for different use cases
 - **Cloud Integration**: Export backups to cloud storage with automatic scheduling
 
-### 📊 Analytics & Monitoring
+### Analytics & Monitoring
 
 - **Comprehensive Analytics Dashboard**: Detailed statistics for library growth, download performance, and usage patterns
 - **Service Health Monitoring**: Real-time service status tracking with automatic failure detection and recovery
@@ -117,7 +117,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Indexer Performance**: Prowlarr indexer effectiveness and performance metrics
 - **Activity Time Analysis**: Usage pattern analysis with peak activity time tracking
 
-### 🛠️ App Management & Utilities
+### App Management & Utilities
 
 - **App Update Service**: Automatic update checking with GitHub integration and version tracking
 - **Widget Drawer System**: Global widget management with profile-based configurations
@@ -128,7 +128,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 - **Homarr Icons Integration**: Icon management with CDN caching and extensive icon library
 - **Video Player**: Native video playback support for media content
 
-### 🧪 Experimental Features & Debug Tools
+### Experimental Features & Debug Tools
 
 - **Feature Flag System**: Controlled rollout of experimental features with user opt-in options
 - **Debug Panel**: Comprehensive debugging interface with network logs, cache statistics, and system diagnostics
@@ -154,7 +154,6 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 <img width="300" height="520" alt="Screenshot_20251023-011906" src="https://github.com/user-attachments/assets/37c5d2b7-032b-41f3-a322-79d99beee6ea" />
 <img width="300" height="520" alt="Screenshot_20251023-011851" src="https://github.com/user-attachments/assets/a500be6a-b7bd-4274-aca7-524b9ce0cc09" />
 <img width="300" height="520" alt="Screenshot_20251023-011832" src="https://github.com/user-attachments/assets/ff554f6b-8ca6-499f-ba3c-0ff7e1e7a047" />
-
 
 ## Requirements
 
@@ -201,7 +200,7 @@ npm run android
 npm run web
 ```
 
-## 🚀 Development
+## Development
 
 ### Prerequisites
 
@@ -344,7 +343,7 @@ npm run android
 npm run web
 ```
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ### System Architecture
 
@@ -526,12 +525,12 @@ abstract class BaseConnector {
 
 #### **Supported Services**
 
-| Service Type            | Services                                    | Capabilities                           |
-| ----------------------- | ------------------------------------------- | -------------------------------------- |
-| **Media Managers**      | Sonarr, Radarr, Lidarr, Jellyseerr          | Search, Metadata, Monitoring           |
-| **Download Clients**    | qBittorrent, Transmission, Deluge, rTorrent | Download Management, Remote Control    |
-| **NZB Clients**         | SABnzbd, NZBGet                             | NZB Download Management                |
-| **Supporting Services** | Prowlarr, Bazarr, Jellyfin, AdGuard Home    | Indexing, Subtitles, Media Server, DNS |
+| Service Type            | Services                                 | Capabilities                           |
+| ----------------------- | ---------------------------------------- | -------------------------------------- |
+| **Media Managers**      | Sonarr, Radarr, Lidarr, Jellyseerr       | Search, Metadata, Monitoring           |
+| **Download Clients**    | qBittorrent, Transmission, Deluge        | Download Management, Remote Control    |
+| **NZB Clients**         | SABnzbd                                  | NZB Download Management                |
+| **Supporting Services** | Prowlarr, Bazarr, Jellyfin, AdGuard Home | Indexing, Subtitles, Media Server, DNS |
 
 #### **Key Features**
 
@@ -599,7 +598,7 @@ interface WidgetConfig {
 - **Component Memoization** - Strategic use of React.memo and useMemo
 - **Lazy Loading** - Progressive loading of images and components
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions from the community! UniArr is a complex project with many moving parts, and we appreciate any help improving it.
 
@@ -683,9 +682,10 @@ npm run generate:client-schemas  # Generate OpenAPI types if needed
 
 ### Areas for Contribution
 
-#### **🔧 High Priority**
+#### High Priority
 
 - **Additional Service Connectors**: Expand support for more media management tools (currently 15+ supported)
+- **Additional Service Connectors**: Expand support for more media management tools (currently 12+ implemented; additional connectors such as NZBGet and rTorrent are referenced in the codebase but not registered in `ConnectorFactory` yet)
 - **Enhanced Error Handling**: Improve error reporting and user feedback with better diagnostics
 - **Performance Optimizations**: Battery life improvements and memory usage optimization
 - **Test Coverage**: Expand test suites for better reliability (currently comprehensive unit + integration tests)
@@ -693,7 +693,7 @@ npm run generate:client-schemas  # Generate OpenAPI types if needed
 - **Backup System Enhancement**: Cloud integration and automated backup scheduling
 - **Analytics Dashboard**: Expand analytics capabilities with custom metrics and reporting
 
-#### **🎨 UI/UX Improvements**
+#### UI/UX Improvements
 
 - **Widget Development**: Create new widget types and configurations (currently 13 types available)
 - **Theme Enhancements**: Develop additional theme presets (currently 6+ presets including Netflix, Disney+, Max)
@@ -702,7 +702,7 @@ npm run generate:client-schemas  # Generate OpenAPI types if needed
 - **Frosted Glass Effects**: Enhance glassmorphism effects and blur implementations
 - **Accessibility**: Enhanced screen reader support and accessibility features
 
-#### **🌐 Platform Features**
+#### Platform Features
 
 - **Voice Assistant Integration**: Expand Siri/Google Assistant command recognition and NLP capabilities
 - **Webhook System**: Enhanced webhook processing with more event types and integrations
@@ -711,7 +711,7 @@ npm run generate:client-schemas  # Generate OpenAPI types if needed
 - **Analytics Dashboard**: Expand analytics capabilities with custom metrics and reporting
 - **Localization**: Multi-language support implementation with RTL support
 
-#### **📱 Platform Support**
+#### Platform Support
 
 - **Desktop Applications**: Electron or Tauri desktop versions with full feature parity
 - **Watch Integration**: Wear OS or watchOS companion apps with glanceable widgets
@@ -719,7 +719,7 @@ npm run generate:client-schemas  # Generate OpenAPI types if needed
 - **Web Enhancements**: PWA features, offline web support, and desktop web optimizations
 - **Cross-Platform Sync**: Real-time synchronization across all platforms
 
-#### **🔧 Advanced Integrations**
+#### Advanced Integrations
 
 - **Additional Service Connectors**: Expand support for more media management tools (currently 15+ services)
 - **Smart Home Integration**: Integration with HomeKit, Google Home, and Alexa
@@ -727,7 +727,7 @@ npm run generate:client-schemas  # Generate OpenAPI types if needed
 - **Network Tools**: Advanced network monitoring and diagnostic capabilities
 - **API Extensions**: Public API for third-party integrations and automation
 
-#### **🧪 Experimental Features**
+#### Experimental Features
 
 - **AI-Powered Recommendations**: Machine learning for media recommendations and automation
 - **Advanced Analytics**: Predictive analytics for storage planning and usage patterns
@@ -779,13 +779,13 @@ Contributors are recognized in:
 - **Commit Messages**: Proper attribution for all contributions
 - **Community**: Recognition in Discord/Slack communities
 
-Thank you for contributing to UniArr! 🎉
+Thank you for contributing to UniArr!
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support & Getting Help
+## Support & Getting Help
 
 ### **Troubleshooting**
 
@@ -823,7 +823,7 @@ We love feature requests! Please include:
 - **Alternatives**: Any alternative solutions you've considered
 - **Priority**: How important this feature is to you
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 ### **Core Technologies & Frameworks**
 
@@ -874,4 +874,4 @@ Special thanks to all the open-source media management projects that make this a
 
 **Built with ❤️ for the media management community**
 
-_UniArr © 2024 - Unify your media automation experience_
+_UniArr © 2025 - Unify your media automation experience_

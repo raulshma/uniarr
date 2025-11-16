@@ -22,6 +22,7 @@ interface SonarrQueueItemProps {
   onRemove?: () => void;
   onBlock?: () => void;
   onRetry?: () => void;
+  onLongPress?: () => void; // For opening drawer when item is in import pending state
   showActions?: boolean;
 }
 
@@ -32,6 +33,7 @@ const SonarrQueueItemComponent = ({
   onRemove,
   onBlock,
   onRetry,
+  onLongPress,
   showActions = true,
 }: SonarrQueueItemProps) => {
   const theme = useTheme<AppTheme>();
@@ -239,6 +241,11 @@ const SonarrQueueItemComponent = ({
       <TouchableOpacity
         style={styles.touchable}
         onPress={onSelect}
+        onLongPress={
+          item.trackedDownloadState === "importPending"
+            ? onLongPress
+            : undefined
+        }
         disabled={!onSelect}
       >
         <View style={styles.container}>

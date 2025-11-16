@@ -2,7 +2,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet, View } from "react-native";
-import { Text, useTheme, Button, Icon } from "react-native-paper";
+import { Text, useTheme, Button, Icon, Badge } from "react-native-paper";
 import * as Sharing from "expo-sharing";
 
 import { TabHeader } from "@/components/common/TabHeader";
@@ -20,6 +20,7 @@ import { backupRestoreService } from "@/services/backup/BackupRestoreService";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const BackupRestoreScreen = () => {
   const router = useRouter();
@@ -31,6 +32,12 @@ const BackupRestoreScreen = () => {
     { name: string; path: string; modificationTime: number }[]
   >([]);
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+
+  // Get S3 configuration status
+  const s3BackupEnabled = useSettingsStore((state) => state.s3BackupEnabled);
+  const s3BucketName = useSettingsStore((state) => state.s3BucketName);
+  const s3Region = useSettingsStore((state) => state.s3Region);
+  const isS3Configured = !!(s3BucketName && s3Region);
 
   // Load recent backups on mount
   useEffect(() => {
@@ -422,6 +429,117 @@ const BackupRestoreScreen = () => {
                   </Button>
                 </View>
               </View>
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* S3 Cloud Backup Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={75}
+          animated={animationsEnabled}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>S3 Cloud Backup</Text>
+            {isS3Configured && (
+              <Badge
+                size={20}
+                style={{
+                  backgroundColor: s3BackupEnabled
+                    ? theme.colors.primary
+                    : theme.colors.surfaceVariant,
+                }}
+              >
+                {s3BackupEnabled ? "Active" : "Inactive"}
+              </Badge>
+            )}
+          </View>
+          <Text style={styles.sectionDescription}>
+            {isS3Configured
+              ? `Backup to your AWS S3 bucket (${s3BucketName} in ${s3Region}). Configure automatic backups and manage cloud storage.`
+              : "Store your backups securely in your own AWS S3 bucket. Configure your credentials to get started."}
+          </Text>
+
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="S3 Settings"
+                subtitle={
+                  isS3Configured
+                    ? `Connected to ${s3BucketName}`
+                    : "Configure AWS credentials and bucket"
+                }
+                left={{ iconName: "cloud-cog" }}
+                trailing={
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    {!isS3Configured && (
+                      <Badge
+                        size={20}
+                        style={{
+                          backgroundColor: theme.colors.error,
+                          marginRight: spacing.sm,
+                        }}
+                      >
+                        Setup Required
+                      </Badge>
+                    )}
+                    <Icon
+                      source="chevron-right"
+                      size={24}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                  </View>
+                }
+                onPress={() => router.push("/(auth)/s3-backup/s3-settings")}
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="S3 Backups"
+                subtitle={
+                  isS3Configured
+                    ? "View and manage cloud backups"
+                    : "Configure S3 settings first"
+                }
+                left={{ iconName: "cloud-upload" }}
+                trailing={
+                  <Icon
+                    source="chevron-right"
+                    size={24}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                }
+                onPress={() => {
+                  if (isS3Configured) {
+                    router.push("/(auth)/s3-backup/s3-backups");
+                  } else {
+                    alert(
+                      "S3 Not Configured",
+                      "Please configure your S3 settings first before managing backups.",
+                      [
+                        {
+                          text: "Configure Now",
+                          onPress: () =>
+                            router.push("/(auth)/s3-backup/s3-settings"),
+                        },
+                        { text: "Cancel", style: "cancel" },
+                      ],
+                    );
+                  }
+                }}
+                groupPosition="bottom"
+                disabled={!isS3Configured}
+              />
             </AnimatedListItem>
           </SettingsGroup>
         </AnimatedSection>

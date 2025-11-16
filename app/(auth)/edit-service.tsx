@@ -53,6 +53,7 @@ const allServiceTypes: ServiceType[] = [
   "prowlarr",
   "bazarr",
   "adguard",
+  "homarr",
 ];
 const apiKeyServiceTypes = [
   "sonarr",
@@ -83,6 +84,7 @@ const serviceTypeLabels: Record<ServiceType, string> = {
   prowlarr: "Prowlarr",
   bazarr: "Bazarr",
   adguard: "AdGuard Home",
+  homarr: "Homarr",
 };
 
 const normalizeSensitiveValue = (value?: string): string | undefined => {

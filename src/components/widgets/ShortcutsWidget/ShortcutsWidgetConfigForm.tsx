@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, View, ScrollView, Alert } from "react-native";
+import { StyleSheet, View, ScrollView } from "react-native";
 import {
   Text,
   TextInput,
@@ -18,6 +18,7 @@ import { DEFAULT_SHORTCUTS, OPTIONAL_SHORTCUTS } from "./ShortcutsWidget.types";
 import { NAVIGATION_ROUTES } from "@/utils/navigation.utils";
 import { spacing } from "@/theme/spacing";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
+import { alert } from "@/services/dialogService";
 
 type ShortcutsWidgetConfigFormProps = {
   widget: Widget;
@@ -168,7 +169,7 @@ const ShortcutsWidgetConfigForm: React.FC<ShortcutsWidgetConfigFormProps> = ({
       onSaved();
     } catch (error) {
       console.error("Failed to save shortcuts:", error);
-      Alert.alert("Error", "Failed to save shortcuts configuration.");
+      alert("Error", "Failed to save shortcuts configuration.");
     } finally {
       setSaving(false);
     }
@@ -192,20 +193,16 @@ const ShortcutsWidgetConfigForm: React.FC<ShortcutsWidgetConfigFormProps> = ({
   };
 
   const deleteShortcut = (shortcutId: string) => {
-    Alert.alert(
-      "Delete Shortcut",
-      "Are you sure you want to delete this shortcut?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            setShortcuts(shortcuts.filter((s) => s.id !== shortcutId));
-          },
+    alert("Delete Shortcut", "Are you sure you want to delete this shortcut?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          setShortcuts(shortcuts.filter((s) => s.id !== shortcutId));
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const toggleShortcutEnabled = (shortcutId: string) => {
@@ -221,17 +218,17 @@ const ShortcutsWidgetConfigForm: React.FC<ShortcutsWidgetConfigFormProps> = ({
 
     // Validate required fields
     if (!editingShortcut.label.trim()) {
-      Alert.alert("Error", "Shortcut label is required.");
+      alert("Error", "Shortcut label is required.");
       return;
     }
 
     if (!editingShortcut.route.trim()) {
-      Alert.alert("Error", "Shortcut route is required.");
+      alert("Error", "Shortcut route is required.");
       return;
     }
 
     if (!validateRoute(editingShortcut.route)) {
-      Alert.alert(
+      alert(
         "Error",
         "Invalid route format. Routes should start with '/' and include '(auth)' for protected routes.",
       );
@@ -336,15 +333,40 @@ const ShortcutsWidgetConfigForm: React.FC<ShortcutsWidgetConfigFormProps> = ({
         Configure shortcuts for quick navigation to different app sections.
       </Text>
 
-      {/* Add New Shortcut Button */}
-      <Button
-        mode="outlined"
-        onPress={addShortcut}
-        icon="plus"
-        style={styles.addButton}
-      >
-        Add Shortcut
-      </Button>
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <Button
+          mode="outlined"
+          onPress={addShortcut}
+          icon="plus"
+          style={styles.actionButton}
+        >
+          Add Shortcut
+        </Button>
+        <Button
+          mode="outlined"
+          onPress={() => {
+            alert(
+              "Reset Shortcuts",
+              "This will reset all shortcuts to their default configuration. Are you sure?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Reset",
+                  style: "destructive",
+                  onPress: () => {
+                    setShortcuts([...DEFAULT_SHORTCUTS, ...OPTIONAL_SHORTCUTS]);
+                  },
+                },
+              ],
+            );
+          }}
+          icon="restore"
+          style={styles.actionButton}
+        >
+          Reset to Default
+        </Button>
+      </View>
 
       {/* Shortcuts List */}
       <View style={styles.shortcutsList}>
@@ -537,6 +559,14 @@ const styles = StyleSheet.create({
   },
   description: {
     opacity: 0.8,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
   },
   addButton: {
     marginTop: spacing.sm,

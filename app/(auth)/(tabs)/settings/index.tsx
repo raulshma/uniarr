@@ -1,7 +1,20 @@
 import { useRouter } from "expo-router";
-import { StyleSheet, View, useColorScheme } from "react-native";
+import {
+  StyleSheet,
+  View,
+  useColorScheme,
+  ScrollView,
+  Dimensions,
+  Animated,
+} from "react-native";
 import { alert, showCustomDialog } from "@/services/dialogService";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import Constants from "expo-constants";
 
 import {
@@ -18,12 +31,14 @@ import {
 import {
   CustomConfirm,
   AnimatedListItem,
-  AnimatedScrollView,
   AnimatedSection,
   SettingsListItem,
   SettingsGroup,
 } from "@/components/common";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import type { AppTheme } from "@/constants/theme";
 import { useAuth } from "@/services/auth/AuthProvider";
@@ -32,15 +47,167 @@ import {
   type ImageCacheUsage,
 } from "@/services/image/ImageCacheService";
 import { logger } from "@/services/logger/LoggerService";
-import { apiErrorLogger } from "@/services/logger/ApiErrorLoggerService";
+import { apiLogger } from "@/services/logger/ApiLoggerService";
 import { spacing } from "@/theme/spacing";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useAppUpdateCheck } from "@/hooks/useAppUpdateCheck";
 import type { NotificationCategory } from "@/models/notification.types";
 import { getCategoryFriendlyName } from "@/utils/quietHours.utils";
 import { borderRadius } from "@/constants/sizes";
-import { shouldAnimateLayout } from "@/utils/animations.utils";
+import { shouldAnimateLayout, easeOutCubic } from "@/utils/animations.utils";
 // Backup & restore moved to its own settings screen
+
+const headerMinHeight = 60; // Minimum collapsed height
+
+const ChevronTrailing = ({ onPress }: { onPress?: () => void }) => (
+  <IconButton
+    icon="chevron-right"
+    size={16}
+    iconColor={useTheme<AppTheme>().colors.outline}
+    onPress={onPress}
+  />
+);
+
+// Header component matching the dashboard style
+interface AnimatedValues {
+  headerHeight: Animated.AnimatedInterpolation<string | number>;
+  titleOpacity: Animated.AnimatedInterpolation<string | number>;
+  stickyTitleOpacity: Animated.AnimatedInterpolation<string | number>;
+  headerBackgroundOpacity: Animated.AnimatedInterpolation<string | number>;
+}
+
+interface SettingsHeaderProps {
+  animatedValues: AnimatedValues;
+  theme: any;
+}
+
+const SettingsHeader = React.memo(
+  ({ animatedValues, theme }: SettingsHeaderProps) => {
+    const insets = useSafeAreaInsets();
+
+    const styles = useMemo(
+      () =>
+        StyleSheet.create({
+          headerContainer: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+          },
+          headerBackground: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: "transparent",
+          },
+          headerContent: {
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: theme.custom.spacing.lg,
+          },
+          titleContainer: {
+            alignItems: "center",
+          },
+          stickyButtonsContainer: {
+            position: "absolute",
+            top: 0,
+            right: 0,
+            left: 0,
+            zIndex: 15,
+            paddingHorizontal: theme.custom.spacing.lg,
+            // paddingTop: insets.top,
+          },
+          stickyHeader: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            minHeight: headerMinHeight,
+          },
+          stickyTitleContainer: {
+            flex: 1,
+            flexDirection: "row",
+            gap: theme.custom.spacing.xs,
+            alignItems: "center",
+          },
+          title: {
+            fontSize: theme.custom.typography.titleLarge.fontSize,
+            fontWeight: "800",
+            color: theme.colors.onBackground,
+            letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
+          },
+          stickyTitle: {
+            fontSize: theme.custom.typography.titleMedium.fontSize,
+            fontWeight: "600",
+            color: theme.colors.onBackground,
+            letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          },
+        }),
+      [theme],
+    );
+
+    return (
+      <>
+        <Animated.View
+          style={[
+            styles.headerContainer,
+            { height: animatedValues.headerHeight },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.headerBackground,
+              {
+                height: animatedValues.headerHeight,
+                opacity: animatedValues.headerBackgroundOpacity,
+                backgroundColor: theme.colors.background,
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.headerContent,
+              { height: animatedValues.headerHeight },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.titleContainer,
+                {
+                  opacity: animatedValues.titleOpacity,
+                },
+              ]}
+            >
+              <Text style={styles.title}>Settings</Text>
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
+
+        <Animated.View style={[styles.stickyButtonsContainer]}>
+          <View
+            style={[
+              styles.stickyHeader,
+              { paddingTop: insets.top, height: headerMinHeight },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.stickyTitleContainer,
+                {
+                  opacity: animatedValues.stickyTitleOpacity,
+                },
+              ]}
+            >
+              <Text style={styles.stickyTitle}>Settings</Text>
+            </Animated.View>
+          </View>
+        </Animated.View>
+      </>
+    );
+  },
+);
 
 // Helper function to format bytes
 const formatBytes = (bytes: number): string => {
@@ -63,13 +230,16 @@ const formatBytes = (bytes: number): string => {
 const SettingsScreen = () => {
   const router = useRouter();
   const { signOut } = useAuth();
+  const theme = useTheme<AppTheme>();
+  const insets = useSafeAreaInsets();
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [refreshIntervalVisible, setRefreshIntervalVisible] = useState(false);
   const [cacheLimitVisible, setCacheLimitVisible] = useState(false);
   const [errorLogCount, setErrorLogCount] = useState(0);
   const [cleanupLogCount, setCleanupLogCount] = useState(0);
   const [hasTriggeredUpdateCheck, setHasTriggeredUpdateCheck] = useState(false);
-  const theme = useTheme<AppTheme>();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Get dynamic app version from Expo Constants
   const appVersion = Constants.expoConfig?.version || "Unknown";
@@ -145,14 +315,49 @@ const SettingsScreen = () => {
 
   // Overview removed — metrics moved or omitted
 
+  const sectionTitleColor = theme.colors.onBackground;
+  const signOutButtonColor = theme.colors.error;
+  const signOutTextColor = theme.colors.onError;
+
+  const screenHeight = Dimensions.get("window").height;
+  const headerMaxHeight = screenHeight * 0.4; // 25% screen height
+  const collapseRange = headerMaxHeight - headerMinHeight;
+
+  // Memoize animated styles
+  const animatedValues = useMemo(
+    () => ({
+      headerHeight: easeOutCubic(
+        scrollY,
+        [0, collapseRange],
+        [headerMaxHeight, headerMinHeight],
+      ),
+      titleOpacity: easeOutCubic(scrollY, [0, collapseRange * 0.6], [1, 0]),
+      stickyTitleOpacity: easeOutCubic(
+        scrollY,
+        [collapseRange * 0.6, collapseRange],
+        [0, 1],
+      ),
+      headerBackgroundOpacity: scrollY.interpolate({
+        inputRange: [0, collapseRange - 10, collapseRange],
+        outputRange: [0, 0, 1],
+        extrapolate: "clamp",
+      }),
+    }),
+    [scrollY, headerMaxHeight, collapseRange],
+  );
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    scrollContainer: {
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
       paddingHorizontal: spacing.xs,
       paddingBottom: spacing.xxxxl,
+      paddingTop: headerMaxHeight + insets.top,
     },
     // Overview styles removed
     listSpacer: {
@@ -302,7 +507,7 @@ const SettingsScreen = () => {
   useEffect(() => {
     const loadErrorCount = async () => {
       try {
-        const errors = await apiErrorLogger.getErrors({});
+        const errors = await apiLogger.getErrors({});
         setErrorLogCount(errors.length);
       } catch {
         // Silently fail - not critical
@@ -396,15 +601,11 @@ const SettingsScreen = () => {
     setCacheLimitVisible(true);
   };
 
-  const handleCacheLimitSelect = (size: number) => {
-    setMaxImageCacheSize(size);
-    setCacheLimitVisible(false);
-
-    // Enforce the new cache limit after setting it (fire-and-forget)
-    void (async () => {
+  const enforceCacheLimit = useCallback(
+    async (size: number) => {
       try {
         await imageCacheService.enforceCacheLimit(size);
-        await loadImageCacheUsage(); // Refresh the usage display
+        await loadImageCacheUsage();
       } catch (error) {
         const message = getReadableErrorMessage(error);
         void logger.error(
@@ -414,7 +615,14 @@ const SettingsScreen = () => {
           },
         );
       }
-    })();
+    },
+    [loadImageCacheUsage],
+  );
+
+  const handleCacheLimitSelect = (size: number) => {
+    setMaxImageCacheSize(size);
+    setCacheLimitVisible(false);
+    void enforceCacheLimit(size);
   };
 
   const getThemeChipColor = (chipTheme: "light" | "dark" | "system") => {
@@ -448,10 +656,19 @@ const SettingsScreen = () => {
   }, [quietHours]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AnimatedScrollView
-        contentContainerStyle={styles.scrollContainer}
-        animated={animationsEnabled}
+    <SafeAreaView style={styles.container} edges={["left", "right"]}>
+      <SettingsHeader animatedValues={animatedValues} theme={theme} />
+
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false },
+        )}
+        scrollEventThrottle={16}
       >
         {/* Overview removed */}
 
@@ -461,7 +678,9 @@ const SettingsScreen = () => {
           delay={50}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Appearance</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Appearance
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -561,13 +780,7 @@ const SettingsScreen = () => {
                 title="Customize Theme"
                 subtitle="Colors, fonts & more"
                 left={{ iconName: "palette-swatch" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={18}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/theme-editor")}
                 groupPosition="bottom"
               />
@@ -591,13 +804,7 @@ const SettingsScreen = () => {
                 title="Experimental Features"
                 subtitle="Advanced settings and experimental options"
                 left={{ iconName: "beaker" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={18}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() =>
                   router.push("/(auth)/settings/experimental-features")
                 }
@@ -613,13 +820,7 @@ const SettingsScreen = () => {
                 title="Elements Configuration"
                 subtitle="Configure UI elements and animations"
                 left={{ iconName: "palette-swatch-variant" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/elements")}
                 groupPosition="bottom"
               />
@@ -633,7 +834,9 @@ const SettingsScreen = () => {
           delay={100}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Notifications</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Notifications
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -788,10 +991,7 @@ const SettingsScreen = () => {
                   ),
                 }}
                 trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
+                  <ChevronTrailing
                     onPress={() => router.push("/(auth)/settings/quiet-hours")}
                   />
                 }
@@ -807,7 +1007,9 @@ const SettingsScreen = () => {
           delay={150}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Quick Actions
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -819,11 +1021,7 @@ const SettingsScreen = () => {
                 subtitle={`${refreshIntervalMinutes} minutes`}
                 left={{ iconName: "refresh" }}
                 trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
+                  <ChevronTrailing onPress={handleRefreshIntervalPress} />
                 }
                 onPress={handleRefreshIntervalPress}
                 groupPosition="top"
@@ -838,13 +1036,7 @@ const SettingsScreen = () => {
                 title="Voice Assistant"
                 subtitle="Siri & Google Assistant"
                 left={{ iconName: "microphone" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/voice-assistant")}
                 groupPosition="bottom"
               />
@@ -858,11 +1050,13 @@ const SettingsScreen = () => {
           delay={200}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Storage</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Storage
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
-              totalItems={3}
+              totalItems={2}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -906,8 +1100,8 @@ const SettingsScreen = () => {
               />
             </AnimatedListItem>
             <AnimatedListItem
-              index={0}
-              totalItems={1}
+              index={1}
+              totalItems={2}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -928,13 +1122,58 @@ const SettingsScreen = () => {
           </SettingsGroup>
         </AnimatedSection>
 
+        {/* AI Features Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={225}
+          animated={animationsEnabled}
+        >
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            AI Features
+          </Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Conversational AI"
+                subtitle="Chat assistant with tool support"
+                left={{ iconName: "robot" }}
+                trailing={<ChevronTrailing />}
+                onPress={() =>
+                  router.push("/(auth)/settings/conversational-ai")
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Content Recommendations"
+                subtitle="AI-powered personalized suggestions"
+                left={{ iconName: "lightbulb-on" }}
+                trailing={<ChevronTrailing />}
+                onPress={() => router.push("/(auth)/settings/recommendations")}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
         {/* Services Section */}
         <AnimatedSection
           style={styles.section}
           delay={250}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Services</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Services
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -945,13 +1184,7 @@ const SettingsScreen = () => {
                 title="Manage Services"
                 subtitle="Configure connected services"
                 left={{ iconName: "server" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/(tabs)/services")}
                 groupPosition="top"
               />
@@ -965,13 +1198,7 @@ const SettingsScreen = () => {
                 title="Service Health & Configuration"
                 subtitle="Monitor and manage service health"
                 left={{ iconName: "server-network" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/services-health")}
                 groupPosition="middle"
               />
@@ -985,13 +1212,7 @@ const SettingsScreen = () => {
                 title="TMDB Integration"
                 subtitle={tmdbEnabled ? "Enabled" : "Disabled"}
                 left={{ iconName: "movie-open" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/tmdb")}
                 groupPosition="middle"
               />
@@ -1005,13 +1226,7 @@ const SettingsScreen = () => {
                 title="Widget Settings"
                 subtitle="Configure dashboard widgets"
                 left={{ iconName: "widgets" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/widgets")}
                 groupPosition="middle"
               />
@@ -1059,14 +1274,35 @@ const SettingsScreen = () => {
                 title="Bring Your Own Keys (BYOK)"
                 subtitle="Configure your own API keys"
                 left={{ iconName: "key-variant" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/byok")}
+                groupPosition="single"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
+        {/* Resources Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Learning & Support
+          </Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={1}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Resources & Documentation"
+                subtitle="Guides, troubleshooting, and API reference"
+                left={{ iconName: "book-open-variant" }}
+                trailing={<ChevronTrailing />}
+                onPress={() => router.push("/(auth)/resources")}
                 groupPosition="single"
               />
             </AnimatedListItem>
@@ -1079,7 +1315,9 @@ const SettingsScreen = () => {
           delay={300}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>System</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            System
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -1090,20 +1328,14 @@ const SettingsScreen = () => {
                 title="Backup & Restore"
                 subtitle="Export, import & cloud backups"
                 left={{ iconName: "backup-restore" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/settings/backup-restore")}
                 groupPosition="top"
               />
             </AnimatedListItem>
             <AnimatedListItem
               index={1}
-              totalItems={4}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1126,7 +1358,7 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={2}
-              totalItems={4}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1147,20 +1379,14 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={3}
-              totalItems={4}
+              totalItems={5}
               animated={animationsEnabled}
             >
               <SettingsListItem
                 title="Debugging"
                 subtitle="Logs & diagnostics"
                 left={{ iconName: "bug-outline" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() => router.push("/(auth)/dev")}
                 groupPosition="bottom"
               />
@@ -1173,7 +1399,9 @@ const SettingsScreen = () => {
           delay={250}
           animated={animationsEnabled}
         >
-          <Text style={styles.sectionTitle}>Logging & Diagnostics</Text>
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Logging & Diagnostics
+          </Text>
           <SettingsGroup>
             <AnimatedListItem
               index={0}
@@ -1181,18 +1409,12 @@ const SettingsScreen = () => {
               animated={animationsEnabled}
             >
               <SettingsListItem
-                title="API Error Logger"
-                subtitle="Configure error capture settings"
+                title="API Logger"
+                subtitle="Configure error and AI logging"
                 left={{ iconName: "cog" }}
-                trailing={
-                  <IconButton
-                    icon="chevron-right"
-                    size={16}
-                    iconColor={theme.colors.outline}
-                  />
-                }
+                trailing={<ChevronTrailing />}
                 onPress={() =>
-                  router.push("/(auth)/settings/api-error-logs/configure")
+                  router.push("/(auth)/settings/api-logs/configure")
                 }
                 groupPosition="top"
               />
@@ -1203,7 +1425,7 @@ const SettingsScreen = () => {
               animated={animationsEnabled}
             >
               <SettingsListItem
-                title="API Error Logs"
+                title="API Logs"
                 subtitle={
                   errorLogCount > 0
                     ? `${errorLogCount} errors logged`
@@ -1214,14 +1436,10 @@ const SettingsScreen = () => {
                   errorLogCount > 0 ? (
                     <Chip>{errorLogCount}</Chip>
                   ) : (
-                    <IconButton
-                      icon="chevron-right"
-                      size={16}
-                      iconColor={theme.colors.outline}
-                    />
+                    <ChevronTrailing />
                   )
                 }
-                onPress={() => router.push("/(auth)/settings/api-error-logs")}
+                onPress={() => router.push("/(auth)/settings/api-logs")}
                 groupPosition="middle"
               />
             </AnimatedListItem>
@@ -1242,11 +1460,7 @@ const SettingsScreen = () => {
                   cleanupLogCount > 0 ? (
                     <Chip>{cleanupLogCount}</Chip>
                   ) : (
-                    <IconButton
-                      icon="chevron-right"
-                      size={16}
-                      iconColor={theme.colors.outline}
-                    />
+                    <ChevronTrailing />
                   )
                 }
                 onPress={() => router.push("/(auth)/settings/cleanup-history")}
@@ -1267,8 +1481,8 @@ const SettingsScreen = () => {
             mode="contained"
             onPress={confirmSignOut}
             style={[styles.signOutButton, { height: 44 }]}
-            buttonColor={theme.colors.error}
-            textColor={theme.colors.onError}
+            buttonColor={signOutButtonColor}
+            textColor={signOutTextColor}
             icon="logout"
           >
             Sign out
@@ -1299,7 +1513,9 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
               Refresh Interval
             </Dialog.Title>
             <Dialog.Content>
@@ -1345,7 +1561,9 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
               Jellyseerr Retries
             </Dialog.Title>
             <Dialog.Content>
@@ -1395,7 +1613,11 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>Log Level</Dialog.Title>
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
+              Log Level
+            </Dialog.Title>
             <Dialog.Content>
               <Text
                 style={{ ...styles.settingValue, marginBottom: spacing.md }}
@@ -1444,7 +1666,11 @@ const SettingsScreen = () => {
               backgroundColor: theme.colors.elevation.level1,
             }}
           >
-            <Dialog.Title style={styles.sectionTitle}>Cache Limit</Dialog.Title>
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
+              Cache Limit
+            </Dialog.Title>
             <Dialog.Content>
               <Text
                 style={{ ...styles.settingValue, marginBottom: spacing.md }}
@@ -1487,7 +1713,7 @@ const SettingsScreen = () => {
             </Dialog.Actions>
           </Dialog>
         </Portal>
-      </AnimatedScrollView>
+      </ScrollView>
     </SafeAreaView>
   );
 };

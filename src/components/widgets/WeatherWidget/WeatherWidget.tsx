@@ -38,6 +38,7 @@ interface WeatherWidgetConfig {
   locations?: string[];
   units?: WeatherUnits;
   forecastDays?: number;
+  showInDashboardHeader?: boolean;
 }
 
 interface WeatherCacheEntry {
@@ -70,11 +71,17 @@ const normalizeConfig = (config: Widget["config"]): WeatherWidgetConfig => {
   const forecastDays =
     typeof config.forecastDays === "number" ? config.forecastDays : undefined;
 
+  const showInDashboardHeader =
+    typeof config.showInDashboardHeader === "boolean"
+      ? config.showInDashboardHeader
+      : false;
+
   return {
     mode,
     locations,
     units,
     forecastDays,
+    showInDashboardHeader,
   } satisfies WeatherWidgetConfig;
 };
 

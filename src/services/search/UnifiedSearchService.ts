@@ -18,6 +18,7 @@ import type {
   UnifiedSearchResponse,
   UnifiedSearchResult,
 } from "@/models/search.types";
+import type { SearchInterpretation } from "@/utils/validation/searchSchemas";
 import { logger } from "@/services/logger/LoggerService";
 import { isApiError, type ApiError } from "@/utils/error.utils";
 import {
@@ -33,8 +34,8 @@ const HISTORY_LIMIT = 12;
 
 // Mobile networks and VPN tunnels can introduce noticeable latency. Keep
 // per-connector search requests reasonably responsive without failing too fast.
-const DEFAULT_SEARCH_TIMEOUT_MS = 10_000;
-const MAX_SEARCH_TIMEOUT_MS = 20_000;
+const DEFAULT_SEARCH_TIMEOUT_MS = 30_000;
+const MAX_SEARCH_TIMEOUT_MS = 60_000;
 
 const normalizeTerm = (term: string): string => term.trim();
 
@@ -46,6 +47,30 @@ const sortIdentifiers = <T extends string>(
         first.localeCompare(second),
       )
     : undefined;
+
+const normalizeInterpretationMediaTypes = (
+  mediaTypes?: SearchInterpretation["mediaTypes"],
+): UnifiedSearchMediaType[] | undefined => {
+  if (!mediaTypes?.length) {
+    return undefined;
+  }
+
+  const mapped = new Set<UnifiedSearchMediaType>();
+
+  mediaTypes.forEach((type) => {
+    if (type === "anime") {
+      mapped.add("series");
+      mapped.add("movie");
+      return;
+    }
+
+    if (type === "series" || type === "movie") {
+      mapped.add(type);
+    }
+  });
+
+  return mapped.size ? Array.from(mapped) : undefined;
+};
 
 export const createUnifiedSearchHistoryKey = (
   term: string,
@@ -94,19 +119,68 @@ export class UnifiedSearchService {
       };
     }
 
+    console.warn("[UnifiedSearchService.search] Starting search:", {
+      term: normalizedTerm,
+      options: {
+        serviceIds: options.serviceIds,
+        mediaTypes: options.mediaTypes,
+        genres: options.genres,
+      },
+    });
+
     await this.manager.loadSavedServices();
 
     const connectors = this.manager
       .getAllConnectors()
       .filter((connector) => typeof connector.search === "function");
 
-    const filteredConnectors = options.serviceIds?.length
-      ? connectors.filter((connector) =>
-          options.serviceIds!.includes(connector.config.id),
-        )
-      : connectors;
+    console.warn("[UnifiedSearchService.search] Found connectors:", {
+      count: connectors.length,
+      ids: connectors.map((c) => c.config.id),
+    });
+
+    const explicitServiceIds = options.serviceIds?.filter(
+      (id) => id.trim().length > 0,
+    );
+
+    let targetServiceIds = explicitServiceIds;
+    let filteredConnectors = connectors;
+    let limitedByInterpretation = false;
+
+    if (!targetServiceIds?.length) {
+      const recommendedTypes = options.aiInterpretation?.recommendedServices;
+      if (recommendedTypes?.length) {
+        const recommendedTypeSet = new Set<string>(
+          recommendedTypes as string[],
+        );
+        const matchedIds = connectors
+          .filter((connector) => recommendedTypeSet.has(connector.config.type))
+          .map((connector) => connector.config.id);
+
+        if (matchedIds.length) {
+          targetServiceIds = matchedIds;
+          limitedByInterpretation = true;
+        }
+      }
+    }
+
+    if (targetServiceIds?.length) {
+      filteredConnectors = connectors.filter((connector) =>
+        targetServiceIds!.includes(connector.config.id),
+      );
+
+      if (limitedByInterpretation && filteredConnectors.length === 0) {
+        filteredConnectors = connectors;
+      }
+    }
 
     const start = Date.now();
+
+    console.warn("[UnifiedSearchService.search] About to search connectors:", {
+      connectorCount: filteredConnectors.length,
+      connectorIds: filteredConnectors.map((c) => c.config.id),
+      connectorNames: filteredConnectors.map((c) => c.config.name),
+    });
 
     const settled = await Promise.all(
       filteredConnectors.map((connector) =>
@@ -118,14 +192,34 @@ export class UnifiedSearchService {
     const aggErrors: UnifiedSearchError[] = [];
 
     for (const item of settled) {
+      console.warn("[UnifiedSearchService.search] Connector result:", {
+        resultCount: item.results.length,
+        hasError: !!item.error,
+        error: item.error?.message,
+      });
       aggregateResults.push(...item.results);
       if (item.error) {
         aggErrors.push(item.error);
       }
     }
 
+    console.warn(
+      "[UnifiedSearchService.search] Aggregate results before dedup:",
+      {
+        count: aggregateResults.length,
+      },
+    );
+
     const results = this.deduplicateAndSort(aggregateResults);
+    console.warn("[UnifiedSearchService.search] Results after dedup:", {
+      count: results.length,
+    });
+
     const filtered = this.applyAdvancedFilters(results, options);
+    console.warn("[UnifiedSearchService.search] Results after filter:", {
+      count: filtered.length,
+      filteredOut: results.length - filtered.length,
+    });
 
     return {
       results: filtered,
@@ -311,10 +405,42 @@ export class UnifiedSearchService {
     const searchFn = connector.search?.bind(connector);
 
     if (!searchFn) {
+      console.warn(
+        `[UnifiedSearchService.searchConnector] No search function for ${connector.config.id}`,
+      );
       return { results: [] };
     }
 
+    console.warn(
+      `[UnifiedSearchService.searchConnector] Starting search on ${connector.config.name}:`,
+      {
+        term,
+        serviceType: connector.config.type,
+        serviceId: connector.config.id,
+      },
+    );
+
     try {
+      const timeoutMs = this.resolveSearchTimeout(connector);
+      const timeoutLabel =
+        connector.config.name ??
+        `${connector.config.type} (${connector.config.id})`;
+      try {
+        await this.withTimeout(
+          connector.initialize(),
+          timeoutMs,
+          `Initialization timed out after ${timeoutMs}ms for ${timeoutLabel}.`,
+        );
+      } catch (initError) {
+        await logger.warn("Connector initialization failed or timed out.", {
+          location: "UnifiedSearchService.searchConnector",
+          serviceId: connector.config.id,
+          serviceType: connector.config.type,
+          error:
+            initError instanceof Error ? initError.message : String(initError),
+        });
+      }
+
       // Create SearchOptions from UnifiedSearchOptions for the connector
       const searchOptions: SearchOptions = {
         ...(options.limitPerService && {
@@ -329,11 +455,6 @@ export class UnifiedSearchService {
             },
           }),
       };
-
-      const timeoutMs = this.resolveSearchTimeout(connector);
-      const timeoutLabel =
-        connector.config.name ??
-        `${connector.config.type} (${connector.config.id})`;
       const rawResults = await this.withTimeout(
         searchFn(
           term,
@@ -342,6 +463,12 @@ export class UnifiedSearchService {
         timeoutMs,
         `Search timed out after ${timeoutMs}ms for ${timeoutLabel}.`,
       );
+
+      console.warn(
+        `[UnifiedSearchService.searchConnector] Raw results from ${connector.config.name}:`,
+        { count: Array.isArray(rawResults) ? rawResults.length : 0 },
+      );
+
       const mapped = this.mapResults(rawResults, connector, options.mediaTypes);
       const limit = options.limitPerService ?? 25;
       return { results: mapped.slice(0, limit) };
@@ -509,6 +636,15 @@ export class UnifiedSearchService {
         status: series.status,
         nextAiring: series.nextAiring,
         seasonCount: series.seasons?.length ?? 0,
+        episodeCount:
+          series.statistics?.episodeCount ?? series.episodeCount ?? undefined,
+        episodeFileCount:
+          series.statistics?.episodeFileCount ??
+          series.episodeFileCount ??
+          undefined,
+        genres: Array.isArray(series.genres)
+          ? series.genres.join(", ")
+          : undefined,
       },
     }));
   }
@@ -544,6 +680,9 @@ export class UnifiedSearchService {
         minimumAvailability: movie.minimumAvailability,
         runtime: movie.runtime,
         studio: movie.studio,
+        genres: Array.isArray(movie.genres)
+          ? movie.genres.join(", ")
+          : undefined,
       },
     }));
   }
@@ -757,12 +896,101 @@ export class UnifiedSearchService {
     options: UnifiedSearchOptions,
   ): UnifiedSearchResult[] {
     return results.filter((result) => {
+      // Apply AI interpretation filters if provided
+      if (options.aiInterpretation) {
+        const interp = options.aiInterpretation;
+
+        // Filter by media types from AI interpretation
+        const aiMediaTypes = normalizeInterpretationMediaTypes(
+          interp.mediaTypes,
+        );
+        if (aiMediaTypes?.length && !aiMediaTypes.includes(result.mediaType)) {
+          return false;
+        }
+
+        // Filter by year range from AI interpretation
+        if (interp.yearRange && result.year) {
+          if (result.year < interp.yearRange.start) {
+            return false;
+          }
+          if (result.year > interp.yearRange.end) {
+            return false;
+          }
+        }
+
+        // Filter by quality preference
+        if (interp.qualityPreference && result.rating !== undefined) {
+          const qualityMap: Record<string, number> = {
+            "1080p": 6.0,
+            "720p": 5.5,
+            "480p": 5.0,
+            "4k": 7.0,
+            "8k": 8.0,
+          };
+          const threshold = qualityMap[interp.qualityPreference] ?? 6.0;
+          if (result.rating < threshold) {
+            return false;
+          }
+        }
+
+        // Filter by AI-interpreted filters
+        if (interp.filters) {
+          if (
+            interp.filters.minRating &&
+            (result.rating ?? 0) < interp.filters.minRating
+          ) {
+            return false;
+          }
+
+          // Completed series only
+          if (interp.filters.isCompleted && result.mediaType === "series") {
+            const status = String(result.extra?.status ?? "").toLowerCase();
+            const nextAiring = result.extra?.nextAiring as string | undefined;
+            const isEnded = status === "ended";
+            const hasUpcoming =
+              typeof nextAiring === "string" && nextAiring.trim().length > 0;
+            if (!isEnded && hasUpcoming) {
+              return false;
+            }
+          }
+
+          // Minimum episodes (best-effort, only when metadata is available)
+          if (interp.filters.minEpisodes && result.mediaType === "series") {
+            const epCountRaw = result.extra?.episodeCount as number | undefined;
+            const episodeCount =
+              typeof epCountRaw === "number" ? epCountRaw : undefined;
+            if (
+              episodeCount !== undefined &&
+              episodeCount < interp.filters.minEpisodes
+            ) {
+              return false;
+            }
+          }
+        }
+
+        // Filter by language preference (best-effort)
+        if (interp.languagePreference) {
+          const pref = interp.languagePreference.toLowerCase();
+          const languageField =
+            (result.extra?.language as string | undefined) ??
+            (result.extra?.originalLanguage as string | undefined);
+          if (languageField && !languageField.toLowerCase().includes(pref)) {
+            return false;
+          }
+        }
+      }
+
       // Filter by status
       if (options.status && options.status !== "Any") {
         const status = options.status.toLowerCase();
 
-        if (status === "owned" || status === "available") {
+        if (status === "owned") {
           if (!result.isInLibrary) return false;
+        } else if (status === "available") {
+          const isAvailable =
+            result.isAvailable === true ||
+            (result.serviceType === "jellyfin" && result.isInLibrary === true);
+          if (!isAvailable) return false;
         } else if (status === "monitored") {
           // Monitored items exist in the system (sonarr/radarr metadata)
           if (!result.isInLibrary) return false;
@@ -821,10 +1049,8 @@ export class UnifiedSearchService {
           if (!hasMatchingGenre) {
             return false;
           }
-        } else {
-          // If genres filter is applied but item has no genres, exclude it
-          return false;
         }
+        // When the connector does not provide genre metadata, skip enforcement.
       }
 
       return true;

@@ -40,6 +40,7 @@ export interface SonarrQueueItem {
   readonly size?: number;
   readonly sizeleft?: number;
   readonly timeleft?: string;
+  readonly statusMessages?: components["schemas"]["TrackedDownloadStatusMessage"][];
 }
 
 // A number of small local helper interfaces were previously defined here to
@@ -1302,6 +1303,7 @@ export class SonarrConnector extends BaseConnector<Series, AddSeriesRequest> {
       size: record.size as unknown as number | undefined,
       sizeleft: record.sizeleft as unknown as number | undefined,
       timeleft: record.timeleft ?? undefined,
+      statusMessages: record.statusMessages || undefined,
     };
   }
 

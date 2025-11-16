@@ -14,7 +14,8 @@ export type WidgetType =
   | "hacker-news"
   | "weather"
   | "youtube"
-  | "twitch";
+  | "twitch"
+  | "recommendations";
 
 export interface Widget {
   id: string;
@@ -125,28 +126,42 @@ class WidgetService {
               id: "discover",
               label: "Discover",
               icon: "compass",
-              route: "/discover",
+              route: "/(auth)/discover",
               enabled: true,
             },
             {
               id: "search",
               label: "Search",
               icon: "magnify",
-              route: "/dashboard/search",
+              route: "/(auth)/dashboard/search",
               enabled: true,
             },
             {
               id: "calendar",
               label: "Calendar",
               icon: "calendar",
-              route: "/calendar",
+              route: "/(auth)/calendar",
+              enabled: true,
+            },
+            {
+              id: "recently-added",
+              label: "Recently Added",
+              icon: "clock-outline",
+              route: "/recently-added",
+              enabled: true,
+            },
+            {
+              id: "recommendations",
+              label: "For You",
+              icon: "lightbulb-on-outline",
+              route: "/(auth)/(tabs)/recommendations",
               enabled: true,
             },
             {
               id: "anime",
               label: "Anime Hub",
               icon: "play-circle",
-              route: "/anime-hub",
+              route: "/(auth)/anime-hub",
               enabled: true,
             },
           ],
@@ -290,6 +305,18 @@ class WidgetService {
         config: {
           channelLogins: [],
           offlineMessage: "No channels are live right now.",
+        },
+      },
+      {
+        id: "recommendations",
+        type: "recommendations",
+        title: "For You",
+        enabled: false,
+        order: 13,
+        size: "large",
+        config: {
+          limit: 3,
+          includeHiddenGems: true,
         },
       },
     ];
@@ -542,6 +569,12 @@ class WidgetService {
   getBookmarksWidgets(): Widget[] {
     return Array.from(this.widgets.values()).filter(
       (widget) => widget.type === "bookmarks" && widget.enabled,
+    );
+  }
+
+  getWeatherWidgets(): Widget[] {
+    return Array.from(this.widgets.values()).filter(
+      (widget) => widget.type === "weather" && widget.enabled,
     );
   }
 }

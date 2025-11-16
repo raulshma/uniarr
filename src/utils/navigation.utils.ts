@@ -132,7 +132,10 @@ export const NAVIGATION_ROUTES = {
 
   // Downloads
   DOWNLOADS: "/(auth)/(tabs)/downloads",
-  RECENTLY_ADDED: "/(auth)/(tabs)/recently-added",
+  RECENTLY_ADDED: "/(auth)/recently-added",
+
+  // Recommendations
+  RECOMMENDATIONS: "/(auth)/(tabs)/recommendations",
 
   // Media detail routes
   SONARR_SERIES: (serviceId: string, id: number) =>

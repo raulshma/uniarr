@@ -8,15 +8,21 @@ import * as Crypto from "expo-crypto";
 import { logger } from "@/services/logger/LoggerService";
 import { base64Encode, base64Decode } from "@/utils/base64";
 import { secureStorage } from "@/services/storage/SecureStorage";
+import { useSettingsStore } from "@/store/settingsStore";
 import { type ServiceConfig, type ServiceType } from "@/models/service.types";
 import {
   getStoredTmdbKey,
   setStoredTmdbKey,
 } from "@/services/tmdb/TmdbCredentialService";
+import type { AssistantConfig } from "@/models/chat.types";
+import { useConversationalAIStore } from "@/store/conversationalAIStore";
+import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
 import type {
   FilterMetadata,
   LibraryFilters,
 } from "@/store/libraryFilterStore";
+import { queryClient } from "@/config/queryClient";
+import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 
 type LibraryFiltersBackupPayload = Record<
   string,
@@ -43,6 +49,11 @@ export interface BackupExportOptions {
   includeWidgetProfileCredentials: boolean;
   includeVoiceAssistantConfig: boolean;
   includeBookmarkHealthChecks: boolean;
+  includeByokConfig: boolean;
+  includeAiConfig: boolean;
+  includeApiLoggingConfig: boolean;
+  includeConversationalAISettings: boolean;
+  includeConversationalAIProviderConfig: boolean;
   encryptSensitive: boolean;
   password?: string;
 }
@@ -98,6 +109,26 @@ export interface BackupSelectionConfig {
     enabled: boolean;
     sensitive: boolean;
     includeCredentials: boolean;
+  };
+  byokConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  aiConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  apiLoggingConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  conversationalAISettings: {
+    enabled: boolean;
+    sensitive: boolean;
+  };
+  conversationalAIProviderConfig: {
+    enabled: boolean;
+    sensitive: boolean;
   };
 }
 
@@ -172,6 +203,38 @@ export interface EncryptedBackupData {
     widgetsCredentials?: Record<string, any>;
     widgetSecureCredentials?: Record<string, any>;
     widgetProfiles?: any[];
+    byokConfig?: {
+      byokGeocodeMapsCoApiKey?: string;
+    };
+    aiConfig?: {
+      enableAISearch: boolean;
+      enableAIRecommendations: boolean;
+    };
+    apiLoggingConfig?: {
+      apiLoggerEnabled: boolean;
+      apiLoggerActivePreset: string;
+      apiLoggerCustomCodes: (number | string)[];
+      apiLoggerRetentionDays: number;
+      apiLoggerCaptureRequestBody: boolean;
+      apiLoggerCaptureResponseBody: boolean;
+      apiLoggerCaptureRequestHeaders: boolean;
+      apiLoggerAiLoggingEnabled: boolean;
+      apiLoggerAiCapturePrompt: boolean;
+      apiLoggerAiCaptureResponse: boolean;
+      apiLoggerAiCaptureMetadata: boolean;
+      apiLoggerAiRetentionDays: number;
+    };
+    conversationalAISettings?: {
+      config: AssistantConfig;
+    };
+    conversationalAIProviderConfig?: {
+      selectedProvider: any;
+      selectedModel: string | null;
+      selectedKeyId: string | null;
+      selectedTitleProvider: any;
+      selectedTitleModel: string | null;
+      selectedTitleKeyId: string | null;
+    };
   };
 }
 
@@ -246,6 +309,38 @@ export interface BackupData {
     widgetsCredentials?: Record<string, any>;
     widgetSecureCredentials?: Record<string, any>;
     widgetProfiles?: any[];
+    byokConfig?: {
+      byokGeocodeMapsCoApiKey?: string;
+    };
+    aiConfig?: {
+      enableAISearch: boolean;
+      enableAIRecommendations: boolean;
+    };
+    apiLoggingConfig?: {
+      apiLoggerEnabled: boolean;
+      apiLoggerActivePreset: string;
+      apiLoggerCustomCodes: (number | string)[];
+      apiLoggerRetentionDays: number;
+      apiLoggerCaptureRequestBody: boolean;
+      apiLoggerCaptureResponseBody: boolean;
+      apiLoggerCaptureRequestHeaders: boolean;
+      apiLoggerAiLoggingEnabled: boolean;
+      apiLoggerAiCapturePrompt: boolean;
+      apiLoggerAiCaptureResponse: boolean;
+      apiLoggerAiCaptureMetadata: boolean;
+      apiLoggerAiRetentionDays: number;
+    };
+    conversationalAISettings?: {
+      config: AssistantConfig;
+    };
+    conversationalAIProviderConfig?: {
+      selectedProvider: any;
+      selectedModel: string | null;
+      selectedKeyId: string | null;
+      selectedTitleProvider: any;
+      selectedTitleModel: string | null;
+      selectedTitleKeyId: string | null;
+    };
   };
 }
 
@@ -282,10 +377,40 @@ class BackupRestoreService {
   }
 
   /**
-   * Derive encryption key from password and salt using simple hash
+   * Derive encryption key from password and salt using Expo Crypto SHA-256
+   * Implements PBKDF2-like key derivation with multiple iterations
    */
-  private deriveKey(password: string, salt: string): string {
-    // Simple key derivation using multiple rounds of hashing
+  private async deriveKey(password: string, salt: string): Promise<string> {
+    try {
+      // Use Expo Crypto's digest function for secure key derivation
+      const iterations = 10000;
+      let key = password + salt;
+
+      // Perform multiple rounds of SHA-256 hashing
+      for (let i = 0; i < iterations; i++) {
+        const digest = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          key + i.toString(),
+        );
+        key = digest;
+      }
+
+      return key;
+    } catch (error) {
+      // Fallback to simple hash if Crypto.digestStringAsync fails
+      await logger.warn("Crypto digest failed, using fallback key derivation", {
+        location: "BackupRestoreService.deriveKey",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.deriveKeyFallback(password, salt);
+    }
+  }
+
+  /**
+   * Fallback key derivation using simple hash (for compatibility)
+   * Returns a fixed-length hex string to ensure consistent key derivation
+   */
+  private deriveKeyFallback(password: string, salt: string): string {
     let key = password + salt;
     for (let i = 0; i < 10000; i++) {
       key = this.simpleHash(key + i.toString());
@@ -294,7 +419,7 @@ class BackupRestoreService {
   }
 
   /**
-   * Simple hash function for key derivation
+   * Simple hash function for fallback key derivation
    * Returns a fixed-length hex string (8 chars) to ensure consistent key derivation
    */
   private simpleHash(str: string): string {
@@ -350,7 +475,8 @@ class BackupRestoreService {
   }
 
   /**
-   * Encrypt sensitive data using simple XOR encryption with password
+   * Encrypt sensitive data using XOR encryption with password-derived key
+   * Uses Expo Crypto for secure random generation and SHA-256 key derivation
    */
   private async encryptSensitiveData(
     data: any,
@@ -361,16 +487,26 @@ class BackupRestoreService {
     iv: string;
   }> {
     try {
-      // Generate salt using secure random values
+      await logger.info("Starting sensitive data encryption", {
+        location: "BackupRestoreService.encryptSensitiveData",
+      });
+
+      // Generate salt using secure random values from Expo Crypto
       const salt = await this.generateSecureRandomHex(32);
       const iv = await this.generateSecureRandomHex(16); // IV for future AES compatibility
 
-      // Derive encryption key
-      const key = this.deriveKey(password, salt);
+      // Derive encryption key using SHA-256
+      const key = await this.deriveKey(password, salt);
 
       // Encrypt the data
       const jsonString = JSON.stringify(data);
       const encryptedData = this.xorEncrypt(jsonString, key);
+
+      await logger.info("Sensitive data encrypted successfully", {
+        location: "BackupRestoreService.encryptSensitiveData",
+        dataSize: jsonString.length,
+        encryptedSize: encryptedData.length,
+      });
 
       return {
         encryptedData,
@@ -378,6 +514,10 @@ class BackupRestoreService {
         iv,
       };
     } catch (error) {
+      await logger.error("Encryption failed", {
+        location: "BackupRestoreService.encryptSensitiveData",
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new Error(
         `Encryption failed: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -386,6 +526,7 @@ class BackupRestoreService {
 
   /**
    * Decrypt sensitive data using password
+   * Uses Expo Crypto SHA-256 for key derivation
    */
   async decryptSensitiveData(
     encryptedData: string,
@@ -401,8 +542,8 @@ class BackupRestoreService {
         ivLength: iv.length,
       });
 
-      // Derive the same key used for encryption
-      const key = this.deriveKey(password, salt);
+      // Derive the same key used for encryption using SHA-256
+      const key = await this.deriveKey(password, salt);
 
       // Decrypt the data
       let decryptedText = this.xorDecrypt(encryptedData, key);
@@ -740,6 +881,120 @@ class BackupRestoreService {
         }
       }
 
+      // Collect BYOK configuration
+      if (options.includeByokConfig) {
+        const settings = useSettingsStore.getState();
+        if (settings.byokGeocodeMapsCoApiKey) {
+          const byokConfigToBackup = {
+            byokGeocodeMapsCoApiKey: settings.byokGeocodeMapsCoApiKey,
+          };
+
+          if (options.encryptSensitive) {
+            sensitiveData.byokConfig = byokConfigToBackup;
+          } else {
+            backupData.appData.byokConfig = byokConfigToBackup;
+          }
+
+          await logger.info("BYOK configuration collected for backup", {
+            location: "BackupRestoreService.createSelectiveBackup",
+            hasGeocodeMapsCoApiKey: !!settings.byokGeocodeMapsCoApiKey,
+          });
+        }
+      }
+
+      // Collect AI configuration
+      if (options.includeAiConfig) {
+        const settings = useSettingsStore.getState();
+        const aiConfig = {
+          enableAISearch: settings.enableAISearch,
+          enableAIRecommendations: settings.enableAIRecommendations,
+        };
+
+        backupData.appData.aiConfig = aiConfig;
+
+        await logger.info("AI configuration collected for backup", {
+          location: "BackupRestoreService.createSelectiveBackup",
+          enableAISearch: settings.enableAISearch,
+          enableAIRecommendations: settings.enableAIRecommendations,
+        });
+      }
+
+      // Collect API logging configuration
+      if (options.includeApiLoggingConfig) {
+        const settings = useSettingsStore.getState();
+        const apiLoggingConfig = {
+          apiLoggerEnabled: settings.apiLoggerEnabled,
+          apiLoggerActivePreset: settings.apiLoggerActivePreset,
+          apiLoggerCustomCodes: settings.apiLoggerCustomCodes,
+          apiLoggerRetentionDays: settings.apiLoggerRetentionDays,
+          apiLoggerCaptureRequestBody: settings.apiLoggerCaptureRequestBody,
+          apiLoggerCaptureResponseBody: settings.apiLoggerCaptureResponseBody,
+          apiLoggerCaptureRequestHeaders:
+            settings.apiLoggerCaptureRequestHeaders,
+          apiLoggerAiLoggingEnabled: settings.apiLoggerAiLoggingEnabled,
+          apiLoggerAiCapturePrompt: settings.apiLoggerAiCapturePrompt,
+          apiLoggerAiCaptureResponse: settings.apiLoggerAiCaptureResponse,
+          apiLoggerAiCaptureMetadata: settings.apiLoggerAiCaptureMetadata,
+          apiLoggerAiRetentionDays: settings.apiLoggerAiRetentionDays,
+        };
+
+        backupData.appData.apiLoggingConfig = apiLoggingConfig;
+
+        await logger.info("API logging configuration collected for backup", {
+          location: "BackupRestoreService.createSelectiveBackup",
+          apiLoggerEnabled: settings.apiLoggerEnabled,
+          apiLoggerAiLoggingEnabled: settings.apiLoggerAiLoggingEnabled,
+        });
+      }
+
+      if (options.includeConversationalAISettings) {
+        const convAIKey = "conversational-ai-store";
+        const convAIData = await AsyncStorage.getItem(convAIKey);
+        if (convAIData) {
+          try {
+            const parsed = JSON.parse(convAIData);
+            const state = parsed.state || parsed;
+            if (state.config) {
+              backupData.appData.conversationalAISettings = {
+                config: state.config,
+              };
+            }
+          } catch (err) {
+            await logger.warn("Failed to parse conversational AI store", {
+              location: "BackupRestoreService.createSelectiveBackup",
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      }
+
+      if (options.includeConversationalAIProviderConfig) {
+        const convAIConfigKey = "conversational-ai-config-store";
+        const convAIConfigData = await AsyncStorage.getItem(convAIConfigKey);
+        if (convAIConfigData) {
+          try {
+            const parsed = JSON.parse(convAIConfigData);
+            const state = parsed.state || parsed;
+            backupData.appData.conversationalAIProviderConfig = {
+              selectedProvider: state.selectedProvider ?? null,
+              selectedModel: state.selectedModel ?? null,
+              selectedKeyId: state.selectedKeyId ?? null,
+              selectedTitleProvider: state.selectedTitleProvider ?? null,
+              selectedTitleModel: state.selectedTitleModel ?? null,
+              selectedTitleKeyId: state.selectedTitleKeyId ?? null,
+            };
+          } catch (err) {
+            await logger.warn(
+              "Failed to parse conversational AI config store",
+              {
+                location: "BackupRestoreService.createSelectiveBackup",
+                error: err instanceof Error ? err.message : String(err),
+              },
+            );
+          }
+        }
+      }
+
       // Collect widgets configuration
       if (options.includeWidgetsConfig) {
         const widgetsStorageKey = "WidgetService:widgets";
@@ -915,7 +1170,7 @@ class BackupRestoreService {
       }
 
       // Create backup file
-      const fileName = `uniarr-backup-${new Date().toISOString().split("T")[0]}${options.encryptSensitive ? "-encrypted" : ""}.json`;
+      const fileName = `uniarr-backup${options.encryptSensitive ? "-encrypted" : ""}-${Date.now()}.json`;
       const filePath = `${FileSystemLegacy.documentDirectory}${fileName}`;
 
       await FileSystemLegacy.writeAsStringAsync(
@@ -1095,6 +1350,40 @@ class BackupRestoreService {
         }
       }
 
+      // Fetch BYOK configuration
+      const settingsStore = useSettingsStore.getState();
+      const byokConfig = settingsStore.byokGeocodeMapsCoApiKey
+        ? { byokGeocodeMapsCoApiKey: settingsStore.byokGeocodeMapsCoApiKey }
+        : undefined;
+
+      // Fetch AI configuration
+      const aiConfig = {
+        enableAISearch: settingsStore.enableAISearch,
+        enableAIRecommendations: settingsStore.enableAIRecommendations,
+      };
+
+      // Fetch API logging configuration
+      const settingsForLogging = useSettingsStore.getState();
+      const apiLoggingConfig = {
+        apiLoggerEnabled: settingsForLogging.apiLoggerEnabled,
+        apiLoggerActivePreset: settingsForLogging.apiLoggerActivePreset,
+        apiLoggerCustomCodes: settingsForLogging.apiLoggerCustomCodes,
+        apiLoggerRetentionDays: settingsForLogging.apiLoggerRetentionDays,
+        apiLoggerCaptureRequestBody:
+          settingsForLogging.apiLoggerCaptureRequestBody,
+        apiLoggerCaptureResponseBody:
+          settingsForLogging.apiLoggerCaptureResponseBody,
+        apiLoggerCaptureRequestHeaders:
+          settingsForLogging.apiLoggerCaptureRequestHeaders,
+        apiLoggerAiLoggingEnabled: settingsForLogging.apiLoggerAiLoggingEnabled,
+        apiLoggerAiCapturePrompt: settingsForLogging.apiLoggerAiCapturePrompt,
+        apiLoggerAiCaptureResponse:
+          settingsForLogging.apiLoggerAiCaptureResponse,
+        apiLoggerAiCaptureMetadata:
+          settingsForLogging.apiLoggerAiCaptureMetadata,
+        apiLoggerAiRetentionDays: settingsForLogging.apiLoggerAiRetentionDays,
+      };
+
       // Prepare backup data structure
       const backupData: BackupData = {
         version: "1.1",
@@ -1132,11 +1421,53 @@ class BackupRestoreService {
           ...(voiceAssistantConfig && { voiceAssistantConfig }),
           ...(bookmarkHealthChecks && { bookmarkHealthChecks }),
           ...(widgetsConfig && { widgetsConfig }),
+          ...(byokConfig && { byokConfig }),
+          ...(aiConfig && { aiConfig }),
+          ...(apiLoggingConfig && { apiLoggingConfig }),
+          ...(await (async () => {
+            const convAIKey = "conversational-ai-store";
+            const data = await AsyncStorage.getItem(convAIKey);
+            if (data) {
+              try {
+                const parsed = JSON.parse(data);
+                const state = parsed.state || parsed;
+                if (state.config) {
+                  return {
+                    conversationalAISettings: {
+                      config: state.config as AssistantConfig,
+                    },
+                  };
+                }
+              } catch {}
+            }
+            return {} as Record<string, unknown>;
+          })()),
+          ...(await (async () => {
+            const convAIConfigKey = "conversational-ai-config-store";
+            const data = await AsyncStorage.getItem(convAIConfigKey);
+            if (data) {
+              try {
+                const parsed = JSON.parse(data);
+                const state = parsed.state || parsed;
+                return {
+                  conversationalAIProviderConfig: {
+                    selectedProvider: state.selectedProvider ?? null,
+                    selectedModel: state.selectedModel ?? null,
+                    selectedKeyId: state.selectedKeyId ?? null,
+                    selectedTitleProvider: state.selectedTitleProvider ?? null,
+                    selectedTitleModel: state.selectedTitleModel ?? null,
+                    selectedTitleKeyId: state.selectedTitleKeyId ?? null,
+                  },
+                } as Record<string, unknown>;
+              } catch {}
+            }
+            return {} as Record<string, unknown>;
+          })()),
         },
       };
 
       // Create backup file
-      const fileName = `uniarr-backup-${new Date().toISOString().split("T")[0]}.json`;
+      const fileName = `uniarr-backup-${Date.now()}.json`;
       const filePath = `${FileSystemLegacy.documentDirectory}${fileName}`;
 
       await FileSystemLegacy.writeAsStringAsync(
@@ -1157,6 +1488,9 @@ class BackupRestoreService {
         hasVoiceAssistantConfig: !!voiceAssistantConfig,
         hasBookmarkHealthChecks: !!bookmarkHealthChecks,
         hasWidgetsConfig: !!widgetsConfig,
+        hasByokConfig: !!byokConfig,
+        hasAiConfig: !!aiConfig,
+        hasApiLoggingConfig: !!apiLoggingConfig,
       });
 
       return filePath;
@@ -1458,6 +1792,51 @@ class BackupRestoreService {
         });
       }
 
+      if (backupData.appData.conversationalAISettings) {
+        try {
+          const store = useConversationalAIStore.getState();
+          store.updateConfig(
+            backupData.appData.conversationalAISettings.config,
+          );
+          await logger.info("Conversational AI settings restored", {
+            location: "BackupRestoreService.restoreBackup",
+          });
+        } catch (err) {
+          await logger.warn("Failed to restore conversational AI settings", {
+            location: "BackupRestoreService.restoreBackup",
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      if (backupData.appData.conversationalAIProviderConfig) {
+        try {
+          const cfg = backupData.appData.conversationalAIProviderConfig;
+          const configStore = useConversationalAIConfigStore.getState();
+          configStore.setConversationalAIConfig(
+            cfg.selectedProvider ?? null,
+            cfg.selectedModel ?? null,
+            cfg.selectedKeyId ?? null,
+          );
+          configStore.setTitleSummaryConfig(
+            cfg.selectedTitleProvider ?? null,
+            cfg.selectedTitleModel ?? null,
+            cfg.selectedTitleKeyId ?? null,
+          );
+          await logger.info("Conversational AI provider config restored", {
+            location: "BackupRestoreService.restoreBackup",
+          });
+        } catch (err) {
+          await logger.warn(
+            "Failed to restore conversational AI provider config",
+            {
+              location: "BackupRestoreService.restoreBackup",
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
+        }
+      }
+
       // Restore library filters if available
       if (backupData.appData.libraryFilters) {
         const libraryFiltersKey = "LibraryFilterStore:v1";
@@ -1538,6 +1917,111 @@ class BackupRestoreService {
               healthError instanceof Error
                 ? healthError.message
                 : String(healthError),
+          });
+        }
+      }
+
+      // Restore BYOK configuration if available
+      if (backupData.appData.byokConfig) {
+        try {
+          const settingsStore = useSettingsStore.getState();
+          if (backupData.appData.byokConfig.byokGeocodeMapsCoApiKey) {
+            settingsStore.setByokGeocodeMapsCoApiKey(
+              backupData.appData.byokConfig.byokGeocodeMapsCoApiKey,
+            );
+          }
+
+          await logger.info("BYOK configuration restored", {
+            location: "BackupRestoreService.restoreBackup",
+            hasGeocodeMapsCoApiKey:
+              !!backupData.appData.byokConfig.byokGeocodeMapsCoApiKey,
+          });
+        } catch (byokError) {
+          await logger.warn("Failed to restore BYOK configuration", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              byokError instanceof Error
+                ? byokError.message
+                : String(byokError),
+          });
+        }
+      }
+
+      // Restore AI configuration if available
+      if (backupData.appData.aiConfig) {
+        try {
+          const settingsStore = useSettingsStore.getState();
+          settingsStore.setEnableAISearch(
+            backupData.appData.aiConfig.enableAISearch,
+          );
+          settingsStore.setEnableAIRecommendations(
+            backupData.appData.aiConfig.enableAIRecommendations,
+          );
+
+          await logger.info("AI configuration restored", {
+            location: "BackupRestoreService.restoreBackup",
+            enableAISearch: backupData.appData.aiConfig.enableAISearch,
+            enableAIRecommendations:
+              backupData.appData.aiConfig.enableAIRecommendations,
+          });
+        } catch (aiError) {
+          await logger.warn("Failed to restore AI configuration", {
+            location: "BackupRestoreService.restoreBackup",
+            error: aiError instanceof Error ? aiError.message : String(aiError),
+          });
+        }
+      }
+
+      // Restore API logging configuration if available
+      if (backupData.appData.apiLoggingConfig) {
+        try {
+          const settingsStore = useSettingsStore.getState();
+          const config = backupData.appData.apiLoggingConfig;
+
+          settingsStore.setApiLoggerEnabled(config.apiLoggerEnabled);
+          settingsStore.setApiLoggerActivePreset(config.apiLoggerActivePreset);
+          settingsStore.setApiLoggerCustomCodes(config.apiLoggerCustomCodes);
+          settingsStore.setApiLoggerRetentionDays(
+            config.apiLoggerRetentionDays,
+          );
+          settingsStore.setApiLoggerCaptureRequestBody(
+            config.apiLoggerCaptureRequestBody,
+          );
+          settingsStore.setApiLoggerCaptureResponseBody(
+            config.apiLoggerCaptureResponseBody,
+          );
+          settingsStore.setApiLoggerCaptureRequestHeaders(
+            config.apiLoggerCaptureRequestHeaders,
+          );
+          settingsStore.setApiLoggerAiLoggingEnabled(
+            config.apiLoggerAiLoggingEnabled,
+          );
+          settingsStore.setApiLoggerAiCapturePrompt(
+            config.apiLoggerAiCapturePrompt,
+          );
+          settingsStore.setApiLoggerAiCaptureResponse(
+            config.apiLoggerAiCaptureResponse,
+          );
+          settingsStore.setApiLoggerAiCaptureMetadata(
+            config.apiLoggerAiCaptureMetadata,
+          );
+          settingsStore.setApiLoggerAiRetentionDays(
+            config.apiLoggerAiRetentionDays,
+          );
+
+          await logger.info("API logging configuration restored", {
+            location: "BackupRestoreService.restoreBackup",
+            apiLoggerEnabled: config.apiLoggerEnabled,
+            apiLoggerAiLoggingEnabled: config.apiLoggerAiLoggingEnabled,
+            activePreset: config.apiLoggerActivePreset,
+          });
+        } catch (apiLoggingError) {
+          await logger.warn("Failed to restore API logging configuration", {
+            location: "BackupRestoreService.restoreBackup",
+            error:
+              apiLoggingError instanceof Error
+                ? apiLoggingError.message
+                : String(apiLoggingError),
           });
         }
       }
@@ -1679,6 +2163,19 @@ class BackupRestoreService {
         }
       }
 
+      // Post-restore: clear caches and reload services from restored configs
+      const manager = ConnectorManager.getInstance();
+      manager.dispose();
+      await manager.loadSavedServices();
+      queryClient.clear();
+
+      await logger.info(
+        "Post-restore cleanup complete: connectors reloaded and query cache cleared",
+        {
+          location: "BackupRestoreService.restoreBackup",
+        },
+      );
+
       await logger.info("Backup restore completed successfully", {
         location: "BackupRestoreService.restoreBackup",
       });
@@ -1775,6 +2272,11 @@ class BackupRestoreService {
       includeWidgetProfileCredentials: true,
       includeVoiceAssistantConfig: true,
       includeBookmarkHealthChecks: true,
+      includeByokConfig: true,
+      includeAiConfig: true,
+      includeApiLoggingConfig: true,
+      includeConversationalAISettings: true,
+      includeConversationalAIProviderConfig: true,
       encryptSensitive: false,
     };
   }
@@ -1834,6 +2336,26 @@ class BackupRestoreService {
         enabled: true,
         sensitive: false,
         includeCredentials: true,
+      },
+      byokConfig: {
+        enabled: true,
+        sensitive: true,
+      },
+      aiConfig: {
+        enabled: true,
+        sensitive: false,
+      },
+      apiLoggingConfig: {
+        enabled: true,
+        sensitive: false,
+      },
+      conversationalAISettings: {
+        enabled: true,
+        sensitive: false,
+      },
+      conversationalAIProviderConfig: {
+        enabled: true,
+        sensitive: false,
       },
     };
   }
@@ -2050,6 +2572,343 @@ class BackupRestoreService {
           error,
         },
       );
+      throw error;
+    }
+  }
+
+  /**
+   * Create backup and optionally upload to S3
+   * Integrates local backup creation with S3 upload functionality
+   *
+   * @param {BackupExportOptions} options - Backup export options
+   * @param {boolean} uploadToS3 - Whether to upload the backup to S3
+   * @param {Function} onProgress - Optional progress callback for S3 upload
+   * @returns {Promise<{ localPath: string; s3Key?: string }>} Local path and optional S3 key
+   * @throws {Error} If backup creation or S3 upload fails
+   */
+  async createBackupWithS3Upload(
+    options: BackupExportOptions,
+    uploadToS3: boolean = false,
+    onProgress?: (progress: {
+      loaded: number;
+      total: number;
+      percentage: number;
+    }) => void,
+  ): Promise<{ localPath: string; s3Key?: string }> {
+    try {
+      await logger.info("Starting backup creation with optional S3 upload", {
+        location: "BackupRestoreService.createBackupWithS3Upload",
+        uploadToS3,
+        encryptSensitive: options.encryptSensitive,
+      });
+
+      // Step 1: Create local backup using existing createSelectiveBackup method
+      const localPath = await this.createSelectiveBackup(options);
+
+      await logger.info("Local backup created successfully", {
+        location: "BackupRestoreService.createBackupWithS3Upload",
+        localPath,
+      });
+
+      // Step 2: Conditionally upload to S3 based on uploadToS3 parameter
+      let s3Key: string | undefined;
+
+      if (uploadToS3) {
+        try {
+          await logger.info("Uploading backup to S3", {
+            location: "BackupRestoreService.createBackupWithS3Upload",
+            localPath,
+          });
+
+          // Import S3BackupService dynamically to avoid circular dependencies
+          const { s3BackupService } = await import(
+            "@/services/backup/S3BackupService"
+          );
+
+          // Upload to S3 with progress tracking
+          s3Key = await s3BackupService.uploadBackup(localPath, onProgress);
+
+          await logger.info("Backup uploaded to S3 successfully", {
+            location: "BackupRestoreService.createBackupWithS3Upload",
+            s3Key,
+          });
+
+          // Step 3: Handle optional local file deletion after upload
+          const { s3DeleteLocalAfterUpload } = useSettingsStore.getState();
+
+          if (s3DeleteLocalAfterUpload) {
+            try {
+              await logger.info("Deleting local backup file after S3 upload", {
+                location: "BackupRestoreService.createBackupWithS3Upload",
+                localPath,
+              });
+
+              // Delete the local file
+              await FileSystemLegacy.deleteAsync(localPath, {
+                idempotent: true,
+              });
+
+              await logger.info("Local backup file deleted successfully", {
+                location: "BackupRestoreService.createBackupWithS3Upload",
+                localPath,
+              });
+            } catch (deleteError) {
+              // Log warning but don't fail the operation if deletion fails
+              await logger.warn("Failed to delete local backup file", {
+                location: "BackupRestoreService.createBackupWithS3Upload",
+                localPath,
+                error:
+                  deleteError instanceof Error
+                    ? deleteError.message
+                    : String(deleteError),
+              });
+            }
+          }
+        } catch (s3Error) {
+          // Log S3 upload error but don't fail the entire operation
+          // The local backup was created successfully
+          await logger.error("Failed to upload backup to S3", {
+            location: "BackupRestoreService.createBackupWithS3Upload",
+            error: s3Error instanceof Error ? s3Error.message : String(s3Error),
+          });
+
+          // Re-throw the error so the caller knows the S3 upload failed
+          throw s3Error;
+        }
+      }
+
+      // Step 4: Return both local path and S3 key in result
+      const result = {
+        localPath,
+        ...(s3Key && { s3Key }),
+      };
+
+      await logger.info("Backup creation with S3 upload completed", {
+        location: "BackupRestoreService.createBackupWithS3Upload",
+        hasLocalPath: !!result.localPath,
+        hasS3Key: !!result.s3Key,
+        uploadedToS3: uploadToS3 && !!s3Key,
+      });
+
+      return result;
+    } catch (error) {
+      await logger.error("Failed to create backup with S3 upload", {
+        location: "BackupRestoreService.createBackupWithS3Upload",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Download backup from S3 and restore
+   * Integrates S3 download with local restore functionality
+   *
+   * @param {string} s3Key - S3 object key of the backup to restore
+   * @param {string} password - Optional password for encrypted backups
+   * @param {Function} onProgress - Optional progress callback for S3 download
+   * @returns {Promise<void>}
+   * @throws {Error} If download, validation, or restore fails
+   */
+  async restoreFromS3(
+    s3Key: string,
+    password?: string,
+    onProgress?: (progress: {
+      loaded: number;
+      total: number;
+      percentage: number;
+    }) => void,
+  ): Promise<void> {
+    let tempFilePath: string | null = null;
+
+    try {
+      await logger.info("Starting S3 backup restore", {
+        location: "BackupRestoreService.restoreFromS3",
+        s3Key,
+        hasPassword: !!password,
+      });
+
+      // Step 1: Download backup from S3 using S3BackupService
+      await logger.info("Downloading backup from S3", {
+        location: "BackupRestoreService.restoreFromS3",
+        s3Key,
+      });
+
+      // Import S3BackupService dynamically to avoid circular dependencies
+      const { s3BackupService } = await import(
+        "@/services/backup/S3BackupService"
+      );
+
+      // Download the backup file to temporary directory
+      tempFilePath = await s3BackupService.downloadBackup(s3Key, onProgress);
+
+      await logger.info("Backup downloaded from S3 successfully", {
+        location: "BackupRestoreService.restoreFromS3",
+        tempFilePath,
+      });
+
+      // Step 2: Validate downloaded backup structure
+      await logger.info("Validating downloaded backup file", {
+        location: "BackupRestoreService.restoreFromS3",
+        tempFilePath,
+      });
+
+      // Read the downloaded file
+      const fileContent =
+        await FileSystemLegacy.readAsStringAsync(tempFilePath);
+
+      // Parse and validate JSON structure
+      let backupData: AnyBackupData;
+      try {
+        backupData = JSON.parse(fileContent);
+      } catch {
+        throw new Error(
+          "Downloaded file is not valid JSON. The backup may be corrupted.",
+        );
+      }
+
+      // Validate backup structure
+      if (!backupData.version || !backupData.timestamp || !backupData.appData) {
+        throw new Error(
+          "Invalid backup file format. Required fields are missing.",
+        );
+      }
+
+      // Check version compatibility
+      const supportedVersions = ["1.0", "1.1", "1.2"];
+      if (!supportedVersions.includes(backupData.version)) {
+        throw new Error(`Unsupported backup version: ${backupData.version}`);
+      }
+
+      await logger.info("Backup file validated successfully", {
+        location: "BackupRestoreService.restoreFromS3",
+        version: backupData.version,
+        encrypted: backupData.encrypted || false,
+        timestamp: backupData.timestamp,
+      });
+
+      // Step 3: Handle encrypted backups
+      if (backupData.encrypted && backupData.appData.encryptedData) {
+        if (!password) {
+          throw new Error(
+            "This backup is encrypted. Please provide the decryption password.",
+          );
+        }
+
+        if (!backupData.encryptionInfo) {
+          throw new Error(
+            "Backup is marked as encrypted but missing encryption metadata.",
+          );
+        }
+
+        await logger.info("Decrypting backup data", {
+          location: "BackupRestoreService.restoreFromS3",
+        });
+
+        // Decrypt sensitive data
+        const decryptedData = await this.decryptSensitiveData(
+          backupData.appData.encryptedData,
+          password,
+          backupData.encryptionInfo.salt,
+          backupData.encryptionInfo.iv,
+        );
+
+        // Merge decrypted data with backup data
+        backupData = {
+          ...backupData,
+          appData: {
+            ...backupData.appData,
+            ...decryptedData,
+            // Keep non-encrypted data as is
+            serviceConfigs:
+              decryptedData.serviceConfigs || backupData.appData.serviceConfigs,
+            networkScanHistory: backupData.appData.networkScanHistory,
+            recentIPs: backupData.appData.recentIPs,
+          },
+        };
+
+        // Remove encrypted data after decryption
+        delete backupData.appData.encryptedData;
+
+        await logger.info("Backup data decrypted successfully", {
+          location: "BackupRestoreService.restoreFromS3",
+        });
+      }
+
+      // Step 4: Call existing restoreBackup method with downloaded file
+      await logger.info("Restoring backup data", {
+        location: "BackupRestoreService.restoreFromS3",
+      });
+
+      await this.restoreBackup(backupData);
+
+      await logger.info("Backup restored successfully from S3", {
+        location: "BackupRestoreService.restoreFromS3",
+        s3Key,
+      });
+
+      // Step 5: Clean up temporary files after restore
+      if (tempFilePath) {
+        try {
+          await logger.info("Cleaning up temporary backup file", {
+            location: "BackupRestoreService.restoreFromS3",
+            tempFilePath,
+          });
+
+          await FileSystemLegacy.deleteAsync(tempFilePath, {
+            idempotent: true,
+          });
+
+          await logger.info("Temporary backup file deleted successfully", {
+            location: "BackupRestoreService.restoreFromS3",
+            tempFilePath,
+          });
+        } catch (cleanupError) {
+          // Log warning but don't fail the operation if cleanup fails
+          await logger.warn("Failed to delete temporary backup file", {
+            location: "BackupRestoreService.restoreFromS3",
+            tempFilePath,
+            error:
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError),
+          });
+        }
+      }
+    } catch (error) {
+      await logger.error("Failed to restore backup from S3", {
+        location: "BackupRestoreService.restoreFromS3",
+        s3Key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Clean up temporary files on error
+      if (tempFilePath) {
+        try {
+          await FileSystemLegacy.deleteAsync(tempFilePath, {
+            idempotent: true,
+          });
+
+          await logger.info("Cleaned up temporary file after error", {
+            location: "BackupRestoreService.restoreFromS3",
+            tempFilePath,
+          });
+        } catch (cleanupError) {
+          // Ignore cleanup errors during error handling
+          await logger.warn(
+            "Failed to clean up temporary file during error handling",
+            {
+              location: "BackupRestoreService.restoreFromS3",
+              tempFilePath,
+              error:
+                cleanupError instanceof Error
+                  ? cleanupError.message
+                  : String(cleanupError),
+            },
+          );
+        }
+      }
+
       throw error;
     }
   }

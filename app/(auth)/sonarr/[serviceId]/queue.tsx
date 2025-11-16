@@ -19,13 +19,15 @@ import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SonarrQueueItem } from "@/components/queue/SonarrQueueItem";
 import { SonarrQueueStats } from "@/components/queue/SonarrQueueStats";
 import { SonarrQueueFilter } from "@/components/queue/SonarrQueueFilter";
-import { SonarrNavbar } from "@/components/sonarr/SonarrNavbar";
+import { SonarrHeader } from "@/components/sonarr/SonarrHeader";
+import SonarrQueueDrawer from "@/components/queue/SonarrQueueDrawer";
 import { useSonarrQueue, useSonarrQueueActions } from "@/hooks/useSonarrQueue";
 import type {
   DetailedSonarrQueueItem,
   QueueFilters,
   QueueStatus,
 } from "@/models/queue.types";
+import type { components } from "@/connectors/client-schemas/sonarr-openapi";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { logger } from "@/services/logger/LoggerService";
 import { spacing } from "@/theme/spacing";
@@ -60,8 +62,55 @@ const SonarrQueueScreen = () => {
     useSonarrQueue(effectiveServiceId, filters);
 
   // Queue actions
-  const { removeFromQueue, isRemoving } =
+  const { removeFromQueue, manualImportItem, isRemoving, isManualImporting } =
     useSonarrQueueActions(effectiveServiceId);
+
+  // Drawer state
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [selectedQueueItem, setSelectedQueueItem] =
+    useState<DetailedSonarrQueueItem | null>(null);
+
+  // Handle long press on import pending items
+  const handleLongPress = (item: DetailedSonarrQueueItem) => {
+    if (item.trackedDownloadState === "importPending") {
+      setSelectedQueueItem(item);
+      setDrawerVisible(true);
+    }
+  };
+
+  // Handle drawer actions
+  const handleManualImport = async (
+    item: DetailedSonarrQueueItem,
+    importItem: components["schemas"]["ManualImportResource"],
+  ) => {
+    try {
+      await manualImportItem(item, importItem);
+    } catch {
+      Alert.alert(
+        "Import Failed",
+        "Failed to manually import item. Please check your service configuration.",
+      );
+    }
+  };
+
+  const handleRemoveItemFromDrawer = async (
+    item: DetailedSonarrQueueItem,
+    options: {
+      blocklist?: boolean;
+      removeFromClient?: boolean;
+      skipRedownload?: boolean;
+      changeCategory?: boolean;
+    },
+  ) => {
+    try {
+      await removeFromQueue([item.id], options);
+    } catch {
+      Alert.alert(
+        "Removal Failed",
+        "Failed to remove the item. Please try again.",
+      );
+    }
+  };
 
   // Filter items based on search query and status filter
   const filteredItems = useMemo(() => {
@@ -345,6 +394,7 @@ const SonarrQueueScreen = () => {
       onRemove={() => handleRemoveItem(item)}
       onBlock={() => handleBlockItem(item)}
       onRetry={() => handleRetryItem(item)}
+      onLongPress={() => handleLongPress(item)}
       showActions={selectedItems.size > 0}
     />
   );
@@ -478,7 +528,7 @@ const SonarrQueueScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <SonarrNavbar
+      <SonarrHeader
         serviceName={serviceName}
         activeTab="queue"
         onBackPress={() => router.back()}
@@ -578,6 +628,17 @@ const SonarrQueueScreen = () => {
           </View>
         </Portal>
       )}
+
+      {/* Queue Actions Drawer */}
+      <SonarrQueueDrawer
+        visible={drawerVisible}
+        onDismiss={() => setDrawerVisible(false)}
+        selectedItem={selectedQueueItem}
+        serviceId={effectiveServiceId}
+        onManualImport={handleManualImport}
+        onRemoveItem={handleRemoveItemFromDrawer}
+        isRemoving={isRemoving || isManualImporting}
+      />
     </SafeAreaView>
   );
 };

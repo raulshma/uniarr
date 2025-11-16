@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useTheme } from "react-native-paper";
 import { useRouter } from "expo-router";
 
@@ -27,6 +27,10 @@ const UnifiedSearchScreen = () => {
         page: {
           flex: 1,
         },
+        headerContainer: {
+          paddingHorizontal: spacing.sm,
+          paddingTop: spacing.sm,
+        },
         content: {
           flex: 1,
           marginTop: spacing.xs,
@@ -37,16 +41,18 @@ const UnifiedSearchScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <PageTransition style={styles.page} transitionType="fade">
-        <AnimatedSection delay={0} animated>
-          <TabHeader
-            title="Search"
-            showTitle
-            showBackButton
-            onBackPress={() => router.back()}
-          />
-        </AnimatedSection>
+        <View style={styles.headerContainer}>
+          <AnimatedSection delay={0} animated>
+            <TabHeader
+              title="Search"
+              showTitle
+              showBackButton
+              onBackPress={() => router.back()}
+            />
+          </AnimatedSection>
+        </View>
 
         <AnimatedSection style={styles.content} delay={80} animated>
           <UnifiedSearchPanel />

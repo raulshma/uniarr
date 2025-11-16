@@ -40,6 +40,7 @@ export interface DetailedSonarrQueueItem {
   episodeTitle?: string;
   episodeAirDate?: string;
   episodeNumber?: number;
+  statusMessages?: components["schemas"]["TrackedDownloadStatusMessage"][];
 }
 
 // Queue status options

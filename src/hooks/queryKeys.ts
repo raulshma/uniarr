@@ -11,6 +11,15 @@ type QueryKeyBuilder = readonly QueryKeySegment[];
 
 /** Centralised query key factories for TanStack Query resources. */
 export const queryKeys = {
+  search: {
+    base: ["search"] as const,
+    interpreted: (query: string): QueryKeyBuilder =>
+      ["search", "interpreted", query.trim()] as const,
+    results: (query: string): QueryKeyBuilder =>
+      ["search", "results", query.trim()] as const,
+    recommendations: ["search", "recommendations"] as const,
+    history: ["search", "history"] as const,
+  },
   unifiedSearch: {
     base: ["unifiedSearch"] as const,
     results: (
@@ -85,6 +94,12 @@ export const queryKeys = {
       options?: Record<string, unknown>,
     ): QueryKeyBuilder =>
       [...queryKeys.sonarr.service(serviceId), "queue", options ?? {}] as const,
+    manualImport: (serviceId: string, downloadId?: string): QueryKeyBuilder =>
+      [
+        ...queryKeys.sonarr.service(serviceId),
+        "manualImport",
+        downloadId,
+      ] as const,
   },
   radarr: {
     base: ["radarr"] as const,
@@ -330,13 +345,33 @@ export const queryKeys = {
     releases: (
       currentDate: string,
       filters?: Record<string, unknown>,
-    ): QueryKeyBuilder =>
-      ["calendar", "releases", currentDate, filters ?? {}] as const,
+    ): QueryKeyBuilder => {
+      // Normalize filters to prevent cache misses due to property ordering
+      const normalizedFilters = filters
+        ? Object.keys(filters)
+            .sort()
+            .reduce((acc: Record<string, unknown>, key) => {
+              acc[key] = filters[key];
+              return acc;
+            }, {})
+        : {};
+      return ["calendar", "releases", currentDate, normalizedFilters] as const;
+    },
     stats: (
       currentDate: string,
       filters?: Record<string, unknown>,
-    ): QueryKeyBuilder =>
-      ["calendar", "stats", currentDate, filters ?? {}] as const,
+    ): QueryKeyBuilder => {
+      // Normalize filters to prevent cache misses due to property ordering
+      const normalizedFilters = filters
+        ? Object.keys(filters)
+            .sort()
+            .reduce((acc: Record<string, unknown>, key) => {
+              acc[key] = filters[key];
+              return acc;
+            }, {})
+        : {};
+      return ["calendar", "stats", currentDate, normalizedFilters] as const;
+    },
   },
   discover: {
     base: ["discover"] as const,
@@ -470,6 +505,13 @@ export const queryKeys = {
         "search",
         { query, options },
       ] as const,
+  },
+  recommendations: {
+    base: ["recommendations"] as const,
+    list: (userId: string): QueryKeyBuilder =>
+      ["recommendations", userId] as const,
+    contentGaps: (userId: string): QueryKeyBuilder =>
+      ["recommendations", userId, "contentGaps"] as const,
   },
 } as const;
 

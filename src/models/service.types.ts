@@ -12,7 +12,8 @@ export type ServiceType =
   | "rtorrent"
   | "prowlarr"
   | "bazarr"
-  | "adguard";
+  | "adguard"
+  | "homarr";
 
 /**
  * Service capability flags
@@ -160,6 +161,16 @@ export const SERVICE_CAPABILITIES: Record<ServiceType, ServiceCapabilities> = {
     managesDownloads: false,
     providesNotifications: false,
     supportsRemoteControl: true,
+  },
+
+  // Dashboard services
+  homarr: {
+    supportsDownloads: false,
+    supportsSearch: false,
+    providesMetadata: false,
+    managesDownloads: false,
+    providesNotifications: false,
+    supportsRemoteControl: false,
   },
 };
 
