@@ -114,11 +114,13 @@ export class AIProviderManager {
       const actualKeyId = keyId || `${provider}_${config.createdAt}`;
 
       // Validate that model is available for provider
-      const availableModels = AI_PROVIDER_MODELS[provider] || [];
-      if (!availableModels.includes(modelName)) {
-        throw new Error(
-          `Model ${modelName} not available for ${provider}. Available: ${availableModels.join(", ")}`,
-        );
+      if (provider !== "openrouter") {
+        const availableModels = AI_PROVIDER_MODELS[provider] || [];
+        if (!availableModels.includes(modelName)) {
+          throw new Error(
+            `Model ${modelName} not available for ${provider}. Available: ${availableModels.join(", ")}`,
+          );
+        }
       }
 
       const providerInstance: AIProviderInstance = {
