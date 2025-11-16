@@ -2,11 +2,14 @@ import * as SecureStore from "expo-secure-store";
 
 import { logger } from "@/services/logger/LoggerService";
 import { type ServiceConfig } from "@/models/service.types";
+import { type S3Credentials } from "@/models/s3.types";
 
 const INDEX_KEY = "SecureStorage_index";
 const SERVICE_KEY_PREFIX = "SecureStorage_service_";
 const SCAN_HISTORY_KEY = "SecureStorage_scan_history";
 const RECENT_IPS_KEY = "SecureStorage_recent_ips";
+const S3_ACCESS_KEY_ID = "SecureStorage_s3_access_key_id";
+const S3_SECRET_ACCESS_KEY = "SecureStorage_s3_secret_access_key";
 
 type StoredServiceConfig = Omit<ServiceConfig, "createdAt" | "updatedAt"> & {
   createdAt: string;
@@ -209,6 +212,77 @@ class SecureStorage {
         location: "SecureStorage.clearRecentIPs",
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  /**
+   * Save S3 credentials to secure storage
+   * @param credentials - AWS S3 credentials (Access Key ID and Secret Access Key)
+   */
+  async saveS3Credentials(credentials: S3Credentials): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(S3_ACCESS_KEY_ID, credentials.accessKeyId);
+      await SecureStore.setItemAsync(
+        S3_SECRET_ACCESS_KEY,
+        credentials.secretAccessKey,
+      );
+
+      await logger.info("S3 credentials saved successfully.", {
+        location: "SecureStorage.saveS3Credentials",
+      });
+    } catch (error) {
+      await logger.error("Failed to save S3 credentials.", {
+        location: "SecureStorage.saveS3Credentials",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieve S3 credentials from secure storage
+   * @returns S3 credentials or null if not found
+   */
+  async getS3Credentials(): Promise<S3Credentials | null> {
+    try {
+      const accessKeyId = await SecureStore.getItemAsync(S3_ACCESS_KEY_ID);
+      const secretAccessKey =
+        await SecureStore.getItemAsync(S3_SECRET_ACCESS_KEY);
+
+      if (!accessKeyId || !secretAccessKey) {
+        return null;
+      }
+
+      return {
+        accessKeyId,
+        secretAccessKey,
+      };
+    } catch (error) {
+      await logger.error("Failed to retrieve S3 credentials.", {
+        location: "SecureStorage.getS3Credentials",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Delete S3 credentials from secure storage
+   */
+  async deleteS3Credentials(): Promise<void> {
+    try {
+      await SecureStore.deleteItemAsync(S3_ACCESS_KEY_ID);
+      await SecureStore.deleteItemAsync(S3_SECRET_ACCESS_KEY);
+
+      await logger.info("S3 credentials deleted successfully.", {
+        location: "SecureStorage.deleteS3Credentials",
+      });
+    } catch (error) {
+      await logger.error("Failed to delete S3 credentials.", {
+        location: "SecureStorage.deleteS3Credentials",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
     }
   }
 

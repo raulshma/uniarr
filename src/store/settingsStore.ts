@@ -104,6 +104,16 @@ type SettingsData = {
   animeHubBannerDismissed: boolean;
   // BYOK (Bring Your Own Keys) - API key configurations
   byokGeocodeMapsCoApiKey?: string;
+  // S3 Backup Configuration
+  s3BackupEnabled: boolean;
+  s3BucketName?: string;
+  s3Region?: string;
+  s3CustomEndpoint?: string; // Custom S3-compatible endpoint (e.g., MinIO, Wasabi)
+  s3ForcePathStyle?: boolean; // Use path-style URLs for S3-compatible services
+  s3AutoBackupEnabled: boolean;
+  s3AutoBackupFrequency?: "daily" | "weekly" | "monthly";
+  s3LastAutoBackupTimestamp?: string; // ISO timestamp of last automatic backup
+  s3DeleteLocalAfterUpload: boolean;
   // AI Features toggles
   enableAISearch: boolean;
   enableAIRecommendations: boolean;
@@ -177,6 +187,17 @@ interface SettingsState extends SettingsData {
   setDiscoverBannerDismissed: (dismissed: boolean) => void;
   setAnimeHubBannerDismissed: (dismissed: boolean) => void;
   setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) => void;
+  setS3BackupEnabled: (enabled: boolean) => void;
+  setS3BucketName: (bucketName: string | undefined) => void;
+  setS3Region: (region: string | undefined) => void;
+  setS3CustomEndpoint: (endpoint: string | undefined) => void;
+  setS3ForcePathStyle: (enabled: boolean) => void;
+  setS3AutoBackupEnabled: (enabled: boolean) => void;
+  setS3AutoBackupFrequency: (
+    frequency: "daily" | "weekly" | "monthly" | undefined,
+  ) => void;
+  setS3LastAutoBackupTimestamp: (timestamp: string | undefined) => void;
+  setS3DeleteLocalAfterUpload: (enabled: boolean) => void;
   setEnableAISearch: (enabled: boolean) => void;
   setEnableAIRecommendations: (enabled: boolean) => void;
   setRecommendationIncludeHiddenGems: (enabled: boolean) => void;
@@ -318,6 +339,15 @@ const createDefaultSettings = (): SettingsData => ({
   discoverBannerDismissed: false,
   animeHubBannerDismissed: false,
   byokGeocodeMapsCoApiKey: undefined,
+  s3BackupEnabled: false,
+  s3BucketName: undefined,
+  s3Region: undefined,
+  s3CustomEndpoint: undefined,
+  s3ForcePathStyle: false,
+  s3AutoBackupEnabled: false,
+  s3AutoBackupFrequency: undefined,
+  s3LastAutoBackupTimestamp: undefined,
+  s3DeleteLocalAfterUpload: false,
   enableAISearch: false,
   enableAIRecommendations: false,
   recommendationIncludeHiddenGems: true,
@@ -433,6 +463,24 @@ export const useSettingsStore = create<SettingsState>()(
         set({ animeHubBannerDismissed: dismissed }),
       setByokGeocodeMapsCoApiKey: (apiKey: string | undefined) =>
         set({ byokGeocodeMapsCoApiKey: apiKey }),
+      setS3BackupEnabled: (enabled: boolean) =>
+        set({ s3BackupEnabled: enabled }),
+      setS3BucketName: (bucketName: string | undefined) =>
+        set({ s3BucketName: bucketName }),
+      setS3Region: (region: string | undefined) => set({ s3Region: region }),
+      setS3CustomEndpoint: (endpoint: string | undefined) =>
+        set({ s3CustomEndpoint: endpoint }),
+      setS3ForcePathStyle: (enabled: boolean) =>
+        set({ s3ForcePathStyle: enabled }),
+      setS3AutoBackupEnabled: (enabled: boolean) =>
+        set({ s3AutoBackupEnabled: enabled }),
+      setS3AutoBackupFrequency: (
+        frequency: "daily" | "weekly" | "monthly" | undefined,
+      ) => set({ s3AutoBackupFrequency: frequency }),
+      setS3LastAutoBackupTimestamp: (timestamp: string | undefined) =>
+        set({ s3LastAutoBackupTimestamp: timestamp }),
+      setS3DeleteLocalAfterUpload: (enabled: boolean) =>
+        set({ s3DeleteLocalAfterUpload: enabled }),
       setEnableAISearch: (enabled: boolean) => set({ enableAISearch: enabled }),
       setEnableAIRecommendations: (enabled: boolean) =>
         set({ enableAIRecommendations: enabled }),
@@ -518,6 +566,15 @@ export const useSettingsStore = create<SettingsState>()(
         discoverBannerDismissed: state.discoverBannerDismissed,
         animeHubBannerDismissed: state.animeHubBannerDismissed,
         byokGeocodeMapsCoApiKey: state.byokGeocodeMapsCoApiKey,
+        s3BackupEnabled: state.s3BackupEnabled,
+        s3BucketName: state.s3BucketName,
+        s3Region: state.s3Region,
+        s3CustomEndpoint: state.s3CustomEndpoint,
+        s3ForcePathStyle: state.s3ForcePathStyle,
+        s3AutoBackupEnabled: state.s3AutoBackupEnabled,
+        s3AutoBackupFrequency: state.s3AutoBackupFrequency,
+        s3LastAutoBackupTimestamp: state.s3LastAutoBackupTimestamp,
+        s3DeleteLocalAfterUpload: state.s3DeleteLocalAfterUpload,
         enableAISearch: state.enableAISearch,
         enableAIRecommendations: state.enableAIRecommendations,
         recommendationIncludeHiddenGems: state.recommendationIncludeHiddenGems,
@@ -534,7 +591,7 @@ export const useSettingsStore = create<SettingsState>()(
         recommendationKeyId: state.recommendationKeyId,
       }),
       // Bump version since we're adding new persisted fields
-      version: 17,
+      version: 19,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -832,6 +889,18 @@ export const useSettingsStore = create<SettingsState>()(
             ),
           ),
           byokGeocodeMapsCoApiKey: partial.byokGeocodeMapsCoApiKey ?? undefined,
+          s3BackupEnabled:
+            partial.s3BackupEnabled ?? baseDefaults.s3BackupEnabled,
+          s3BucketName: partial.s3BucketName ?? undefined,
+          s3Region: partial.s3Region ?? undefined,
+          s3AutoBackupEnabled:
+            partial.s3AutoBackupEnabled ?? baseDefaults.s3AutoBackupEnabled,
+          s3AutoBackupFrequency: partial.s3AutoBackupFrequency ?? undefined,
+          s3LastAutoBackupTimestamp:
+            partial.s3LastAutoBackupTimestamp ?? undefined,
+          s3DeleteLocalAfterUpload:
+            partial.s3DeleteLocalAfterUpload ??
+            baseDefaults.s3DeleteLocalAfterUpload,
           recommendationIncludeHiddenGems:
             typeof partial.recommendationIncludeHiddenGems === "boolean"
               ? partial.recommendationIncludeHiddenGems
