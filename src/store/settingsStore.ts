@@ -124,10 +124,6 @@ type SettingsData = {
   recommendationContentRatingLimit?: string;
   recommendationCacheDurationHours: number; // 1-168 (1 week)
   recommendationBackgroundUpdatesEnabled: boolean;
-  // Recommendation engine provider/model selection
-  recommendationProvider?: string; // AIProviderType
-  recommendationModel?: string;
-  recommendationKeyId?: string;
 };
 
 interface SettingsState extends SettingsData {
@@ -206,9 +202,6 @@ interface SettingsState extends SettingsData {
   setRecommendationContentRatingLimit: (limit: string | undefined) => void;
   setRecommendationCacheDurationHours: (hours: number) => void;
   setRecommendationBackgroundUpdatesEnabled: (enabled: boolean) => void;
-  setRecommendationProvider: (provider: string | undefined) => void;
-  setRecommendationModel: (model: string | undefined) => void;
-  setRecommendationKeyId: (keyId: string | undefined) => void;
 }
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
@@ -356,9 +349,6 @@ const createDefaultSettings = (): SettingsData => ({
   recommendationContentRatingLimit: undefined,
   recommendationCacheDurationHours: DEFAULT_RECOMMENDATION_CACHE_DURATION_HOURS,
   recommendationBackgroundUpdatesEnabled: false,
-  recommendationProvider: undefined,
-  recommendationModel: undefined,
-  recommendationKeyId: undefined,
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -499,12 +489,6 @@ export const useSettingsStore = create<SettingsState>()(
         }),
       setRecommendationBackgroundUpdatesEnabled: (enabled: boolean) =>
         set({ recommendationBackgroundUpdatesEnabled: enabled }),
-      setRecommendationProvider: (provider: string | undefined) =>
-        set({ recommendationProvider: provider }),
-      setRecommendationModel: (model: string | undefined) =>
-        set({ recommendationModel: model }),
-      setRecommendationKeyId: (keyId: string | undefined) =>
-        set({ recommendationKeyId: keyId }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -586,9 +570,6 @@ export const useSettingsStore = create<SettingsState>()(
           state.recommendationCacheDurationHours,
         recommendationBackgroundUpdatesEnabled:
           state.recommendationBackgroundUpdatesEnabled,
-        recommendationProvider: state.recommendationProvider,
-        recommendationModel: state.recommendationModel,
-        recommendationKeyId: state.recommendationKeyId,
       }),
       // Bump version since we're adding new persisted fields
       version: 19,
@@ -926,9 +907,6 @@ export const useSettingsStore = create<SettingsState>()(
             typeof partial.recommendationBackgroundUpdatesEnabled === "boolean"
               ? partial.recommendationBackgroundUpdatesEnabled
               : baseDefaults.recommendationBackgroundUpdatesEnabled,
-          recommendationProvider: partial.recommendationProvider ?? undefined,
-          recommendationModel: partial.recommendationModel ?? undefined,
-          recommendationKeyId: partial.recommendationKeyId ?? undefined,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -1015,12 +993,3 @@ export const selectRecommendationCacheDurationHours = (
 export const selectRecommendationBackgroundUpdatesEnabled = (
   state: SettingsState,
 ): boolean => state.recommendationBackgroundUpdatesEnabled;
-export const selectRecommendationProvider = (
-  state: SettingsState,
-): string | undefined => state.recommendationProvider;
-export const selectRecommendationModel = (
-  state: SettingsState,
-): string | undefined => state.recommendationModel;
-export const selectRecommendationKeyId = (
-  state: SettingsState,
-): string | undefined => state.recommendationKeyId;
