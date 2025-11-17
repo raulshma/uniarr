@@ -309,7 +309,9 @@ const RecommendationSettingsScreen = () => {
               left={{ iconName: "brain" }}
               trailing={
                 <ChevronTrailing
-                  onPress={() => router.push("/(auth)/settings/conversational-ai")}
+                  onPress={() =>
+                    router.push("/(auth)/settings/conversational-ai")
+                  }
                 />
               }
               onPress={() => router.push("/(auth)/settings/conversational-ai")}

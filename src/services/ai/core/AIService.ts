@@ -226,18 +226,10 @@ export class AIService {
       let streamEncounteredError = false;
       let streamError: Error | null = null;
 
-      const messages: {
-        role: "system" | "user" | "assistant";
-        content: string;
-      }[] = [];
-      if (system) {
-        messages.push({ role: "system", content: system });
-      }
-      messages.push({ role: "user", content: prompt });
-
       const result = await streamText({
         model: modelInstance,
-        messages: messages,
+        prompt,
+        system,
         onChunk: ({ chunk }) => {
           // Optional: Custom chunk processing
           logger.debug("Text stream chunk", { chunkType: chunk.type });
@@ -456,18 +448,10 @@ export class AIService {
         );
       }
 
-      const messages: {
-        role: "system" | "user" | "assistant";
-        content: string;
-      }[] = [];
-      if (system) {
-        messages.push({ role: "system", content: system });
-      }
-      messages.push({ role: "user", content: prompt });
-
       const result = await generateText({
         model: modelInstance,
-        messages: messages,
+        prompt,
+        system,
       });
 
       const durationMs = Date.now() - startTime;
@@ -540,38 +524,25 @@ export class AIService {
     schema: z.ZodType<T>,
     prompt: string,
     system?: string,
-    provider?: string,
-    model?: string,
   ): Promise<{ object: T }> {
     const startTime = Date.now();
-    const activeProvider = this.providerManager.getActiveProvider();
-    const providerType = provider || activeProvider?.provider || "unknown";
-    const modelName = model || activeProvider?.model || "unknown";
+    const provider = this.providerManager.getActiveProvider();
+    const providerType = provider?.provider || "unknown";
+    const model = provider?.model || "unknown";
 
     try {
-      const modelInstance = this.providerManager.getModelInstance(
-        provider,
-        model,
-      );
+      const modelInstance = this.providerManager.getModelInstance();
       if (!modelInstance) {
         throw new Error(
           "No AI model configured. Please set up an AI provider first.",
         );
       }
 
-      const messages: {
-        role: "system" | "user" | "assistant";
-        content: string;
-      }[] = [];
-      if (system) {
-        messages.push({ role: "system", content: system });
-      }
-      messages.push({ role: "user", content: prompt });
-
       const result = await generateObject({
         model: modelInstance,
         schema,
-        messages: messages,
+        prompt,
+        system,
       });
 
       // Log successful call
@@ -579,7 +550,7 @@ export class AIService {
       const responseText = JSON.stringify(result.object);
       await this.apiLogger.addAiCall({
         provider: providerType,
-        model: modelName,
+        model,
         operation: "generateObject",
         status: "success",
         prompt,
@@ -686,19 +657,11 @@ export class AIService {
       let streamEncounteredError = false;
       let streamError: Error | null = null;
 
-      const messages: {
-        role: "system" | "user" | "assistant";
-        content: string;
-      }[] = [];
-      if (system) {
-        messages.push({ role: "system", content: system });
-      }
-      messages.push({ role: "user", content: prompt });
-
       const result = await streamObject({
         model: modelInstance,
         schema,
-        messages: messages,
+        prompt,
+        system,
         onChunk: ({ chunk }: { chunk: unknown }) => {
           logger.debug("Object stream chunk", { chunkType: typeof chunk });
         },
@@ -893,34 +856,18 @@ export class AIService {
         );
       }
 
-      const textMessages: {
-        role: "system" | "user" | "assistant";
-        content: string;
-      }[] = [];
-      if (system) {
-        textMessages.push({ role: "system", content: system });
-      }
-      textMessages.push({ role: "user", content: explainPrompt });
-
-      const objectMessages: {
-        role: "system" | "user" | "assistant";
-        content: string;
-      }[] = [];
-      if (system) {
-        objectMessages.push({ role: "system", content: system });
-      }
-      objectMessages.push({ role: "user", content: structuredPrompt });
-
       // Start both streams concurrently
       const textPromise = streamText({
         model: modelInstance,
-        messages: textMessages,
+        prompt: explainPrompt,
+        system,
       });
 
       const objectPromise = streamObject({
         model: modelInstance,
         schema,
-        messages: objectMessages,
+        prompt: structuredPrompt,
+        system,
       });
 
       const [textResult, objectResult] = await Promise.all([
@@ -1019,27 +966,20 @@ export class AIService {
         );
       }
 
-      const messages: {
-        role: "system" | "user" | "assistant";
-        content: string;
-      }[] = [];
-      if (system) {
-        messages.push({ role: "system", content: system });
-      }
-      messages.push({ role: "user", content: prompt });
-
       // 1. Get quick result using faster model
       const basicResult = await generateObject({
         model: modelInstance,
         schema: basicSchema,
-        messages: messages,
+        prompt,
+        system,
       });
 
       // 2. Start detailed generation asynchronously (don't await)
       const detailedPromise = streamObject({
         model: modelInstance,
         schema: detailedSchema,
-        messages: messages,
+        prompt,
+        system,
       });
 
       // Log successful call
@@ -1385,18 +1325,10 @@ export class AIService {
     cause: unknown;
   }): Promise<any> {
     const fallbackStart = Date.now();
-    const messages: {
-      role: "system" | "user" | "assistant";
-      content: string;
-    }[] = [];
-    if (system) {
-      messages.push({ role: "system", content: system });
-    }
-    messages.push({ role: "user", content: prompt });
-
     const result = await generateText({
       model: modelInstance,
-      messages: messages,
+      prompt,
+      system,
     });
 
     const text = result?.text ?? "";

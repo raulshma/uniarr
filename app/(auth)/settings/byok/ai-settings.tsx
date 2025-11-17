@@ -18,6 +18,12 @@ import { AIModelSelector } from "@/components/settings/AIModelSelector";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
 import { useSettingsStore } from "@/store/settingsStore";
+import {
+  useConversationalAIConfigStore,
+  selectConversationalAIProvider,
+  selectConversationalAIModel,
+  selectConversationalAIKeyId,
+} from "@/store/conversationalAIConfigStore";
 import { spacing } from "@/theme/spacing";
 import { AI_PROVIDERS } from "@/types/ai/AIProvider";
 import type { AIProviderType } from "@/types/ai/AIProvider";
@@ -55,19 +61,23 @@ export default function AISettingsScreen() {
   );
 
   // Recommendation provider/model settings
-  const recommendationProvider = useSettingsStore(
-    (s) => s.recommendationProvider,
+  const recommendationProvider = useConversationalAIConfigStore(
+    selectConversationalAIProvider,
   );
-  const recommendationModel = useSettingsStore((s) => s.recommendationModel);
-  const recommendationKeyId = useSettingsStore((s) => s.recommendationKeyId);
-  const setRecommendationProvider = useSettingsStore(
-    (s) => s.setRecommendationProvider,
+  const recommendationModel = useConversationalAIConfigStore(
+    selectConversationalAIModel,
   );
-  const setRecommendationModel = useSettingsStore(
-    (s) => s.setRecommendationModel,
+  const recommendationKeyId = useConversationalAIConfigStore(
+    selectConversationalAIKeyId,
   );
-  const setRecommendationKeyId = useSettingsStore(
-    (s) => s.setRecommendationKeyId,
+  const setRecommendationProvider = useConversationalAIConfigStore(
+    (s) => s.setSelectedProvider,
+  );
+  const setRecommendationModel = useConversationalAIConfigStore(
+    (s) => s.setSelectedModel,
+  );
+  const setRecommendationKeyId = useConversationalAIConfigStore(
+    (s) => s.setSelectedKeyId,
   );
 
   const providerManager = AIProviderManager.getInstance();
@@ -430,9 +440,9 @@ export default function AISettingsScreen() {
           visible={modelDialogVisible}
           onDismiss={() => setModelDialogVisible(false)}
           onSelectModel={handleModelSelect}
-          selectedModel={recommendationModel || undefined}
+          selectedModel={recommendationModel ?? undefined}
           provider={recommendationProvider as AIProviderType}
-          keyId={recommendationKeyId}
+          keyId={recommendationKeyId ?? undefined}
         />
       )}
     </SafeAreaView>

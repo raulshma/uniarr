@@ -117,6 +117,37 @@ export function useConversationalAI(): UseConversationalAIReturn {
     return unsubscribe;
   }, [providerManager]);
 
+
+  useEffect(() => {
+    const unsubscribe = useConversationalAIStore.subscribe(
+      (state, prevState) => {
+        if (state.messages.length > prevState.messages.length) {
+          const newMessage = state.messages[state.messages.length - 1];
+          const prevMessage = prevState.messages[prevState.messages.length - 1];
+          if (
+            newMessage?.role === "assistant" &&
+            !newMessage.isStreaming &&
+            prevMessage
+          ) {
+            const provider = providerManager.getActiveProvider();
+            apiLogger.addAiCall({
+              provider: provider?.provider || "unknown",
+              model: provider?.model || "unknown",
+              operation: "conversational",
+              status: "success",
+              prompt: prevMessage.text,
+              response: newMessage.text,
+              durationMs:
+                new Date(newMessage.timestamp).getTime() -
+                new Date(prevMessage.timestamp).getTime(),
+            });
+          }
+        }
+      },
+    );
+    return unsubscribe;
+  }, [providerManager]);
+
   // Initialize assistant readiness and starter questions.
   useEffect(() => {
     let isMounted = true;

@@ -21,12 +21,6 @@ import { PerformanceMonitor } from "./PerformanceMonitor";
 import { logger } from "@/services/logger/LoggerService";
 import { useSettingsStore } from "@/store/settingsStore";
 import {
-  useConversationalAIConfigStore,
-  selectConversationalAIProvider,
-  selectConversationalAIModel,
-  selectConversationalAIKeyId,
-} from "@/store/conversationalAIConfigStore";
-import {
   RecommendationResponseSchema,
   type Recommendation,
 } from "@/models/recommendation.schemas";
@@ -1275,9 +1269,6 @@ export class ContentRecommendationService {
 
       const systemPrompt = this.buildSystemPrompt();
 
-      const provider = useConversationalAIConfigStore.getState().selectedProvider;
-      const model = useConversationalAIConfigStore.getState().selectedModel;
-
       // Call AI service with retry logic
       void logger.debug("Calling AI service for recommendations");
       const result = await this.callAIWithRetry(
@@ -1285,9 +1276,6 @@ export class ContentRecommendationService {
         RecommendationResponseSchema,
         prompt,
         systemPrompt,
-        0,
-        provider,
-        model,
       );
 
       // Add IDs to recommendations
@@ -1327,19 +1315,11 @@ export class ContentRecommendationService {
     prompt: string,
     systemPrompt: string,
     attempt: number = 0,
-    provider?: string,
-    model?: string,
   ): Promise<any> {
     const maxAttempts = 3;
 
     try {
-      return await this.aiService.generateObject(
-        schema,
-        prompt,
-        systemPrompt,
-        provider,
-        model,
-      );
+      return await this.aiService.generateObject(schema, prompt, systemPrompt);
     } catch (error) {
       if (attempt < maxAttempts - 1) {
         const backoffDelay = this.rateLimiter.getBackoffDelay(userId);
@@ -1386,17 +1366,11 @@ export class ContentRecommendationService {
       const prompt = this.buildContentGapPrompt(contextPrompt, context);
       const systemPrompt = this.buildSystemPrompt();
 
-      const provider = useConversationalAIConfigStore.getState().selectedProvider;
-      const model = useConversationalAIConfigStore.getState().selectedModel;
-
       const result = await this.callAIWithRetry(
         userId,
         RecommendationResponseSchema,
         prompt,
         systemPrompt,
-        0,
-        provider,
-        model,
       );
 
       // Add IDs to recommendations
