@@ -312,7 +312,7 @@ const createDefaultSettings = (): SettingsData => ({
   apiLoggerCaptureRequestBody: false,
   apiLoggerCaptureResponseBody: false,
   apiLoggerCaptureRequestHeaders: false,
-  apiLoggerAiLoggingEnabled: false,
+  apiLoggerAiLoggingEnabled: true,
   apiLoggerAiCapturePrompt: false,
   apiLoggerAiCaptureResponse: false,
   apiLoggerAiCaptureMetadata: true,
