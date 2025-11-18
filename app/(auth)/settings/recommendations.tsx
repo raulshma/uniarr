@@ -23,6 +23,11 @@ import {
   AnimatedSection,
 } from "@/components/common";
 import { useSettingsStore } from "@/store/settingsStore";
+import {
+  useConversationalAIConfigStore,
+  selectConversationalAIProvider,
+  selectConversationalAIModel,
+} from "@/store/conversationalAIConfigStore";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 // Common genre list for exclusion
@@ -85,6 +90,13 @@ const RecommendationSettingsScreen = () => {
     setRecommendationCacheDurationHours,
     setRecommendationBackgroundUpdatesEnabled,
   } = useSettingsStore();
+
+  const recommendationProvider = useConversationalAIConfigStore(
+    selectConversationalAIProvider,
+  );
+  const recommendationModel = useConversationalAIConfigStore(
+    selectConversationalAIModel,
+  );
 
   // Dialog states
   const [limitDialogVisible, setLimitDialogVisible] = useState(false);
@@ -279,6 +291,47 @@ const RecommendationSettingsScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* AI Engine */}
+        <AnimatedSection
+          style={styles.section}
+          delay={0}
+          animated={animationsEnabled}
+        >
+          <Text style={styles.sectionTitle}>AI Engine</Text>
+          <SettingsGroup>
+            <SettingsListItem
+              title="Provider & Model"
+              subtitle={
+                recommendationProvider && recommendationModel
+                  ? `${recommendationProvider} / ${recommendationModel}`
+                  : "Not configured"
+              }
+              left={{ iconName: "brain" }}
+              trailing={
+                <ChevronTrailing
+                  onPress={() =>
+                    router.push("/(auth)/settings/conversational-ai")
+                  }
+                />
+              }
+              onPress={() => router.push("/(auth)/settings/conversational-ai")}
+              groupPosition="single"
+            />
+          </SettingsGroup>
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.colors.onSurfaceVariant,
+              marginTop: spacing.sm,
+              paddingHorizontal: spacing.xs,
+            }}
+          >
+            The recommendation engine uses the same provider and model as the
+            Conversational AI feature. Configure it on the Conversational AI
+            settings page.
+          </Text>
+        </AnimatedSection>
+
         {/* General Settings */}
         <AnimatedSection
           style={styles.section}

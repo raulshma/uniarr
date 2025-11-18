@@ -393,31 +393,35 @@ export class AIProviderManager {
    * Get the model instance for current provider (for streaming/generation)
    * Uses provider-specific SDKs to ensure the API key is properly configured
    */
-  getModelInstance() {
-    if (!this.currentProvider) {
+  getModelInstance(provider?: string, model?: string) {
+    const targetProvider = provider || this.currentProvider?.provider;
+    const targetModel = model || this.currentProvider?.model;
+    const apiKey =
+      this.providers.get(targetProvider as AIProviderType)?.apiKey ||
+      this.currentProvider?.apiKey;
+
+    if (!targetProvider || !targetModel || !apiKey) {
       throw new Error("No active AI provider configured");
     }
 
-    const { provider, model, apiKey } = this.currentProvider;
-
-    if (provider === "google") {
+    if (targetProvider === "google") {
       // Create a provider instance with the configured API key
       const googleProvider = createGoogleGenerativeAI({
         apiKey: apiKey,
       });
-      return googleProvider(model);
+      return googleProvider(targetModel);
     }
 
-    if (provider === "openrouter") {
+    if (targetProvider === "openrouter") {
       // Create an OpenRouter provider using the official SDK
       const openRouterProvider = createOpenRouter({
         apiKey: apiKey,
       });
-      return openRouterProvider(model);
+      return openRouterProvider(targetModel);
     }
 
     // TODO: Add support for other providers
-    throw new Error(`Provider ${provider} not yet implemented`);
+    throw new Error(`Provider ${targetProvider} not yet implemented`);
   }
 
   /**

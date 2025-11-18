@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { AIService } from "@/services/ai/core/AIService";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
 import { logger } from "@/services/logger/LoggerService";
 import { storageAdapter } from "@/services/storage/StorageAdapter";
 import {
@@ -487,10 +488,10 @@ Generate 5-8 recommendations for ${genre} that:
    */
   private async useRecommendationProvider(): Promise<void> {
     try {
-      const settings = useSettingsStore.getState();
-      const { recommendationProvider, recommendationModel } = settings;
+      const { selectedProvider, selectedModel } =
+        useConversationalAIConfigStore.getState();
 
-      if (!recommendationProvider || !recommendationModel) {
+      if (!selectedProvider || !selectedModel) {
         // No custom provider configured, use default
         return;
       }
@@ -507,17 +508,17 @@ Generate 5-8 recommendations for ${genre} that:
 
       // Switch to recommendation provider
       const success = providerManager.setActiveProvider(
-        recommendationProvider as any,
+        selectedProvider as any,
       );
 
       if (success) {
         logger.debug("Switched to recommendation provider", {
-          provider: recommendationProvider,
-          model: recommendationModel,
+          provider: selectedProvider,
+          model: selectedModel,
         });
       } else {
         logger.warn("Failed to switch to recommendation provider", {
-          provider: recommendationProvider,
+          provider: selectedProvider,
         });
       }
     } catch (error) {

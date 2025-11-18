@@ -18,6 +18,15 @@ import { AIModelSelector } from "@/components/settings/AIModelSelector";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
 import { useSettingsStore } from "@/store/settingsStore";
+import {
+  useConversationalAIConfigStore,
+  selectConversationalAIProvider,
+  selectConversationalAIModel,
+  selectConversationalAIKeyId,
+  selectTitleSummaryProvider,
+  selectTitleSummaryModel,
+  selectTitleSummaryKeyId,
+} from "@/store/conversationalAIConfigStore";
 import { spacing } from "@/theme/spacing";
 import { AI_PROVIDERS } from "@/types/ai/AIProvider";
 import type { AIProviderType } from "@/types/ai/AIProvider";
@@ -35,6 +44,9 @@ export default function AISettingsScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [providerDialogVisible, setProviderDialogVisible] = useState(false);
   const [modelDialogVisible, setModelDialogVisible] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<"recommendation" | "title">(
+    "recommendation",
+  );
   const [providerKeys, setProviderKeys] = useState<
     {
       keyId: string;
@@ -55,19 +67,43 @@ export default function AISettingsScreen() {
   );
 
   // Recommendation provider/model settings
-  const recommendationProvider = useSettingsStore(
-    (s) => s.recommendationProvider,
+  const recommendationProvider = useConversationalAIConfigStore(
+    selectConversationalAIProvider,
   );
-  const recommendationModel = useSettingsStore((s) => s.recommendationModel);
-  const recommendationKeyId = useSettingsStore((s) => s.recommendationKeyId);
-  const setRecommendationProvider = useSettingsStore(
-    (s) => s.setRecommendationProvider,
+  const recommendationModel = useConversationalAIConfigStore(
+    selectConversationalAIModel,
   );
-  const setRecommendationModel = useSettingsStore(
-    (s) => s.setRecommendationModel,
+  const recommendationKeyId = useConversationalAIConfigStore(
+    selectConversationalAIKeyId,
   );
-  const setRecommendationKeyId = useSettingsStore(
-    (s) => s.setRecommendationKeyId,
+  const setRecommendationProvider = useConversationalAIConfigStore(
+    (s) => s.setSelectedProvider,
+  );
+  const setRecommendationModel = useConversationalAIConfigStore(
+    (s) => s.setSelectedModel,
+  );
+  const setRecommendationKeyId = useConversationalAIConfigStore(
+    (s) => s.setSelectedKeyId,
+  );
+
+  // Title summary provider/model settings
+  const titleSummaryProvider = useConversationalAIConfigStore(
+    selectTitleSummaryProvider,
+  );
+  const titleSummaryModel = useConversationalAIConfigStore(
+    selectTitleSummaryModel,
+  );
+  const titleSummaryKeyId = useConversationalAIConfigStore(
+    selectTitleSummaryKeyId,
+  );
+  const setTitleSummaryProvider = useConversationalAIConfigStore(
+    (s) => s.setSelectedTitleProvider,
+  );
+  const setTitleSummaryModel = useConversationalAIConfigStore(
+    (s) => s.setSelectedTitleModel,
+  );
+  const setTitleSummaryKeyId = useConversationalAIConfigStore(
+    (s) => s.setSelectedTitleKeyId,
   );
 
   const providerManager = AIProviderManager.getInstance();
@@ -122,19 +158,33 @@ export default function AISettingsScreen() {
     const key = providerKeys.find((k) => k.keyId === keyId);
     if (!key) return;
 
-    setRecommendationProvider(key.provider);
-    setRecommendationKeyId(keyId);
+    if (editingGroup === "recommendation") {
+      setRecommendationProvider(key.provider);
+      setRecommendationKeyId(keyId);
 
-    // Set default model if not already set
-    if (!recommendationModel && key.modelName) {
-      setRecommendationModel(key.modelName);
+      // Set default model if not already set
+      if (!recommendationModel && key.modelName) {
+        setRecommendationModel(key.modelName);
+      }
+    } else {
+      setTitleSummaryProvider(key.provider);
+      setTitleSummaryKeyId(keyId);
+
+      // Set default model if not already set
+      if (!titleSummaryModel && key.modelName) {
+        setTitleSummaryModel(key.modelName);
+      }
     }
 
     setProviderDialogVisible(false);
   };
 
   const handleModelSelect = (model: string) => {
-    setRecommendationModel(model);
+    if (editingGroup === "recommendation") {
+      setRecommendationModel(model);
+    } else {
+      setTitleSummaryModel(model);
+    }
   };
 
   const getProviderKeyLabel = (key: {
@@ -257,7 +307,10 @@ export default function AISettingsScreen() {
                 </View>
                 <Button
                   mode="outlined"
-                  onPress={() => setProviderDialogVisible(true)}
+                  onPress={() => {
+                    setEditingGroup("recommendation");
+                    setProviderDialogVisible(true);
+                  }}
                   disabled={providerKeys.length === 0}
                 >
                   Select
@@ -275,8 +328,83 @@ export default function AISettingsScreen() {
                 </View>
                 <Button
                   mode="outlined"
-                  onPress={() => setModelDialogVisible(true)}
+                  onPress={() => {
+                    setEditingGroup("recommendation");
+                    setModelDialogVisible(true);
+                  }}
                   disabled={!recommendationProvider}
+                >
+                  Select
+                </Button>
+              </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Conversational AI Title Summary Configuration - Show if AI is configured */}
+        {isAIConfigured && (
+          <Card
+            style={[
+              styles.card,
+              { backgroundColor: theme.colors.elevation.level1 },
+            ]}
+          >
+            <Card.Content>
+              <Text variant="titleSmall" style={styles.sectionTitle}>
+                Conversational AI Title Summary
+              </Text>
+              <Text variant="bodySmall" style={styles.toggleDescription}>
+                Select which AI provider and model to use for generating chat
+                titles
+              </Text>
+
+              <Divider style={styles.divider} />
+
+              <View style={styles.configRow}>
+                <View style={styles.configLabel}>
+                  <Text variant="bodyMedium">Provider & API Key</Text>
+                  <Text variant="bodySmall" style={styles.configValue}>
+                    {titleSummaryProvider && titleSummaryKeyId
+                      ? getProviderKeyLabel(
+                          providerKeys.find(
+                            (k) => k.keyId === titleSummaryKeyId,
+                          ) || {
+                            keyId: titleSummaryKeyId,
+                            provider: titleSummaryProvider as AIProviderType,
+                            apiKeyPreview: "****",
+                          },
+                        )
+                      : "Not configured"}
+                  </Text>
+                </View>
+                <Button
+                  mode="outlined"
+                  onPress={() => {
+                    setEditingGroup("title");
+                    setProviderDialogVisible(true);
+                  }}
+                  disabled={providerKeys.length === 0}
+                >
+                  Select
+                </Button>
+              </View>
+
+              <Divider style={styles.divider} />
+
+              <View style={styles.configRow}>
+                <View style={styles.configLabel}>
+                  <Text variant="bodyMedium">Model</Text>
+                  <Text variant="bodySmall" style={styles.configValue}>
+                    {titleSummaryModel || "Not configured"}
+                  </Text>
+                </View>
+                <Button
+                  mode="outlined"
+                  onPress={() => {
+                    setEditingGroup("title");
+                    setModelDialogVisible(true);
+                  }}
+                  disabled={!titleSummaryProvider}
                 >
                   Select
                 </Button>
@@ -404,7 +532,11 @@ export default function AISettingsScreen() {
             <ScrollView>
               <RadioButton.Group
                 onValueChange={handleProviderSelect}
-                value={recommendationKeyId || ""}
+                value={
+                  editingGroup === "recommendation"
+                    ? recommendationKeyId || ""
+                    : titleSummaryKeyId || ""
+                }
               >
                 {providerKeys.map((key) => (
                   <RadioButton.Item
@@ -425,14 +557,26 @@ export default function AISettingsScreen() {
       </Portal>
 
       {/* Model Selection Dialog - Using AIModelSelector */}
-      {recommendationProvider && (
+      {(recommendationProvider || titleSummaryProvider) && (
         <AIModelSelector
           visible={modelDialogVisible}
           onDismiss={() => setModelDialogVisible(false)}
           onSelectModel={handleModelSelect}
-          selectedModel={recommendationModel || undefined}
-          provider={recommendationProvider as AIProviderType}
-          keyId={recommendationKeyId}
+          selectedModel={
+            editingGroup === "recommendation"
+              ? recommendationModel ?? undefined
+              : titleSummaryModel ?? undefined
+          }
+          provider={
+            (editingGroup === "recommendation"
+              ? recommendationProvider
+              : titleSummaryProvider) as AIProviderType
+          }
+          keyId={
+            editingGroup === "recommendation"
+              ? recommendationKeyId ?? undefined
+              : titleSummaryKeyId ?? undefined
+          }
         />
       )}
     </SafeAreaView>
