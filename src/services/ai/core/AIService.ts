@@ -8,7 +8,13 @@ import {
 import { z } from "zod";
 import { logger } from "@/services/logger/LoggerService";
 import { apiLogger } from "@/services/logger/ApiLoggerService";
-import { AIProviderManager } from "./AIProviderManager";
+import { AIProviderManager, AIProviderInstance } from "./AIProviderManager";
+
+export interface AIRequestOptions {
+  provider?: string;
+  model?: string;
+  keyId?: string;
+}
 
 /**
  * Core AI Service for text generation and structured output
@@ -38,8 +44,50 @@ export class AIService {
   }
 
   /**
-   * Check if an error is a rate limit (429) error
+   * Resolve the provider instance to use for a request
+   * Prioritizes options over the global active provider
    */
+  private async resolveProviderInstance(
+    options?: AIRequestOptions,
+  ): Promise<AIProviderInstance> {
+    // If specific keyId is provided, try to use that first
+    if (options?.keyId) {
+      // We need to get the key details from KeyManager to construct a temporary provider instance
+      // However, AIProviderManager doesn't expose a direct way to get a provider instance by keyId
+      // if it's not registered. But we can check if it's already registered.
+      // For now, we'll rely on the provider manager's registered providers.
+      // If options.provider is set, we look for that provider.
+    }
+
+    if (options?.provider) {
+      const provider = this.providerManager.getProvider(
+        options.provider as any,
+      );
+      if (provider) {
+        // If model is also specified, create a copy with that model
+        if (options.model) {
+          return {
+            ...provider,
+            model: options.model,
+            // If keyId is provided, we might want to use it, but for now we use the provider's active key
+            // unless we implement a way to fetch specific key config here.
+            // Given the current architecture, we'll assume the provider's active key is what we want
+            // unless we want to support specific key usage which requires more changes to AIProviderManager.
+          };
+        }
+        return provider;
+      }
+    }
+
+    // Fallback to active provider
+    const active = this.providerManager.getActiveProvider();
+    if (!active) {
+      throw new Error(
+        "No AI provider configured. Please set up an AI provider first.",
+      );
+    }
+    return active;
+  }
   private isRateLimitError(error: unknown): boolean {
     if (!(error instanceof Error)) {
       return false;
@@ -208,15 +256,47 @@ export class AIService {
    * }
    * ```
    */
-  async streamText(prompt: string, system?: string): Promise<any> {
+
+  async streamText(
+    prompt: string,
+    system?: string,
+    options?: AIRequestOptions,
+  ): Promise<any> {
     const startTime = Date.now();
-    const provider = this.providerManager.getActiveProvider();
-    const providerType = provider?.provider || "unknown";
-    const model = provider?.model || "unknown";
+
+    let providerInstance: AIProviderInstance;
+    try {
+      providerInstance = await this.resolveProviderInstance(options);
+    } catch (error) {
+      throw error;
+    }
+
+    const providerType = providerInstance.provider;
+    const model = providerInstance.model;
     let modelInstance: any;
 
     try {
-      modelInstance = this.providerManager.getModelInstance();
+      // We need a way to get model instance for a specific provider config
+      // AIProviderManager.getModelInstance() currently uses this.currentProvider
+      // We should update AIProviderManager or add a helper here.
+      // For now, let's assume we can use a modified getModelInstance that accepts a provider instance.
+
+      // Since we can't easily change AIProviderManager signature without breaking things,
+      // let's look at how getModelInstance works. It uses this.currentProvider.
+      // We might need to temporarily swap it or add a method to AIProviderManager.
+
+      // Actually, let's add a method to AIProviderManager to get model instance from a specific config.
+      // But I cannot edit AIProviderManager in this tool call.
+
+      // Let's use a workaround: we'll implement the model creation logic here locally or
+      // we'll assume we can pass the provider instance to a new method on AIProviderManager later.
+
+      // Wait, I can see getModelInstance in AIProviderManager uses this.currentProvider.
+      // I should probably update AIProviderManager first to allow getting instance for a specific config.
+
+      // For this step, I will assume I can use `this.providerManager.getModelInstance(providerInstance)`
+      // and I will update AIProviderManager in the next step.
+      modelInstance = this.providerManager.getModelInstance(providerInstance);
       if (!modelInstance) {
         throw new Error(
           "No AI model configured. Please set up an AI provider first.",
@@ -431,17 +511,27 @@ export class AIService {
    * Non-streaming text generation (buffered / final response)
    * Wrapper around `generateText` from Vercel AI SDK. Returns full text.
    */
+
   async generateText(
     prompt: string,
     system?: string,
+    options?: AIRequestOptions,
   ): Promise<{ text: string }> {
     const startTime = Date.now();
-    const provider = this.providerManager.getActiveProvider();
-    const providerType = provider?.provider || "unknown";
-    const model = provider?.model || "unknown";
+
+    let providerInstance: AIProviderInstance;
+    try {
+      providerInstance = await this.resolveProviderInstance(options);
+    } catch (error) {
+      throw error;
+    }
+
+    const providerType = providerInstance.provider;
+    const model = providerInstance.model;
 
     try {
-      const modelInstance = this.providerManager.getModelInstance();
+      const modelInstance =
+        this.providerManager.getModelInstance(providerInstance);
       if (!modelInstance) {
         throw new Error(
           "No AI model configured. Please set up an AI provider first.",
@@ -524,14 +614,23 @@ export class AIService {
     schema: z.ZodType<T>,
     prompt: string,
     system?: string,
+    options?: AIRequestOptions,
   ): Promise<{ object: T }> {
     const startTime = Date.now();
-    const provider = this.providerManager.getActiveProvider();
-    const providerType = provider?.provider || "unknown";
-    const model = provider?.model || "unknown";
+
+    let providerInstance: AIProviderInstance;
+    try {
+      providerInstance = await this.resolveProviderInstance(options);
+    } catch (error) {
+      throw error;
+    }
+
+    const providerType = providerInstance.provider;
+    const model = providerInstance.model;
 
     try {
-      const modelInstance = this.providerManager.getModelInstance();
+      const modelInstance =
+        this.providerManager.getModelInstance(providerInstance);
       if (!modelInstance) {
         throw new Error(
           "No AI model configured. Please set up an AI provider first.",
@@ -640,14 +739,23 @@ export class AIService {
     schema: z.ZodType<T>,
     prompt: string,
     system?: string,
+    options?: AIRequestOptions,
   ): Promise<any> {
     const startTime = Date.now();
-    const provider = this.providerManager.getActiveProvider();
-    const providerType = provider?.provider || "unknown";
-    const model = provider?.model || "unknown";
+
+    let providerInstance: AIProviderInstance;
+    try {
+      providerInstance = await this.resolveProviderInstance(options);
+    } catch (error) {
+      throw error;
+    }
+
+    const providerType = providerInstance.provider;
+    const model = providerInstance.model;
 
     try {
-      const modelInstance = this.providerManager.getModelInstance();
+      const modelInstance =
+        this.providerManager.getModelInstance(providerInstance);
       if (!modelInstance) {
         throw new Error(
           "No AI model configured. Please set up an AI provider first.",

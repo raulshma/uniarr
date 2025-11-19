@@ -1,7 +1,6 @@
 import { AIRateLimiter } from "@/services/ai/core/AIRateLimiter";
 import { AIService } from "@/services/ai/core/AIService";
 import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
-import type { AIProviderInstance } from "@/services/ai/core/AIProviderManager";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { logger } from "@/services/logger/LoggerService";
 import { handleApiError, type ErrorContext } from "@/utils/error.utils";
@@ -9,7 +8,6 @@ import { withRetry, networkRetryCondition } from "@/utils/retry.utils";
 import type { Message } from "@/models/chat.types";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
-import type { AIProviderType } from "@/types/ai/AIProvider";
 
 /**
  * Represents a snapshot of a connector's state for building the system prompt.
@@ -46,90 +44,6 @@ export class ConversationalAIService {
     }
 
     return ConversationalAIService.instance;
-  }
-
-  /**
-   * Set the active provider for conversational AI based on config store.
-   * This ensures conversational AI uses its own isolated provider/model selection.
-   * Reads directly from store state (not using React hooks).
-   * @returns true if provider was set successfully, false if not configured
-   */
-  private setConversationalAIProvider(): boolean {
-    const state = useConversationalAIConfigStore.getState();
-    const provider = state.selectedProvider;
-    const keyId = state.selectedKeyId;
-
-    if (!provider || !keyId) {
-      return false;
-    }
-
-    try {
-      // Temporarily set the active provider to the conversational AI selection
-      this.providerManager.setActiveProvider(provider);
-      logger.debug(
-        `[ConversationalAI] Set provider for chat: ${provider} (keyId: ${keyId})`,
-      );
-      return true;
-    } catch (error) {
-      logger.error(
-        "[ConversationalAI] Failed to set conversational AI provider",
-        {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
-      return false;
-    }
-  }
-
-  /**
-   * Set the provider specifically for title summary generation.
-   * Falls back to conversational provider if title-specific config is not set.
-   */
-  /**
-   * Set the provider specifically for title summary generation.
-   * Falls back to conversational provider if title-specific config is not set.
-   * Returns the previous active provider instance (or null) so callers can restore it.
-   */
-  private setTitleSummaryProvider(): AIProviderInstance | null {
-    const state = useConversationalAIConfigStore.getState();
-    const provider = (state as any)
-      .selectedTitleProvider as AIProviderType | null;
-    const keyId = (state as any).selectedTitleKeyId as string | null;
-
-    const fallbackProvider = state.selectedProvider;
-    const fallbackKeyId = state.selectedKeyId;
-
-    const targetProvider = provider ?? fallbackProvider;
-
-    if (!targetProvider) {
-      return null;
-    }
-
-    try {
-      // Capture the previous active provider instance so callers can restore it
-      const previous = this.providerManager.getActiveProvider();
-      const success = this.providerManager.setActiveProvider(targetProvider);
-      if (!success) {
-        logger.warn(
-          "[ConversationalAI] Failed to set title summary provider (provider not registered)",
-          {
-            provider: targetProvider,
-            selectedTitleKeyId: keyId ?? fallbackKeyId,
-          },
-        );
-        return null;
-      }
-      logger.debug(
-        `[ConversationalAI] Set provider for title summary: ${targetProvider} (keyId: ${keyId ?? fallbackKeyId})`,
-      );
-
-      return previous ?? null;
-    } catch (error) {
-      logger.error("[ConversationalAI] Failed to set title summary provider", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    }
   }
 
   /**
@@ -232,9 +146,13 @@ Be conversational, specific, and helpful.`;
     };
 
     try {
-      // Set the conversational AI provider before streaming
-      const hasProvider = this.setConversationalAIProvider();
-      if (!hasProvider) {
+      // Get configuration from store
+      const state = useConversationalAIConfigStore.getState();
+      const provider = state.selectedProvider;
+      const model = state.selectedModel;
+      const keyId = state.selectedKeyId;
+
+      if (!provider || !model || !keyId) {
         throw new Error(
           "No AI provider configured for conversational AI. Please select a provider and model in settings.",
         );
@@ -262,14 +180,22 @@ Be conversational, specific, and helpful.`;
       // Use plain text streaming directly (more stable than structured streaming)
       const streamResult = await this.rateLimiter.executeWithLimit(
         async () =>
-          withRetry(() => this.aiService.streamText(fullPrompt, systemPrompt), {
-            maxRetries: 2,
-            baseDelay: 750,
-            maxDelay: 5000,
-            backoffFactor: 2,
-            retryCondition: networkRetryCondition,
-            context: errorContext,
-          }),
+          withRetry(
+            () =>
+              this.aiService.streamText(fullPrompt, systemPrompt, {
+                provider,
+                model,
+                keyId,
+              }),
+            {
+              maxRetries: 2,
+              baseDelay: 750,
+              maxDelay: 5000,
+              backoffFactor: 2,
+              retryCondition: networkRetryCondition,
+              context: errorContext,
+            },
+          ),
         "generic",
       );
 
@@ -303,8 +229,13 @@ Be conversational, specific, and helpful.`;
     };
 
     try {
-      const hasProvider = this.setConversationalAIProvider();
-      if (!hasProvider) {
+      // Get configuration from store
+      const state = useConversationalAIConfigStore.getState();
+      const provider = state.selectedProvider;
+      const model = state.selectedModel;
+      const keyId = state.selectedKeyId;
+
+      if (!provider || !model || !keyId) {
         throw new Error(
           "No AI provider configured for conversational AI. Please select a provider and model in settings.",
         );
@@ -334,6 +265,11 @@ Be conversational, specific, and helpful.`;
       const result = await this.aiService.generateText(
         fullPrompt,
         systemPrompt,
+        {
+          provider,
+          model,
+          keyId,
+        },
       );
       const text = (result?.text ?? "") as string;
       if (!text.trim()) {
@@ -356,8 +292,17 @@ Be conversational, specific, and helpful.`;
    */
   async generateConversationTitle(history: Message[]): Promise<string | null> {
     try {
-      // Switch to the (optional) title provider; store the previous provider so we can restore
-      const previousProvider = this.setTitleSummaryProvider();
+      // Get configuration from store
+      const state = useConversationalAIConfigStore.getState();
+
+      // Use title specific config if available, otherwise fallback to chat config
+      const provider = state.selectedTitleProvider || state.selectedProvider;
+      const model = state.selectedTitleModel || state.selectedModel;
+      const keyId = state.selectedTitleKeyId || state.selectedKeyId;
+
+      if (!provider || !model || !keyId) {
+        return null;
+      }
 
       const firstUser = history.find((m) => m.role === "user");
       const firstAssistant = history.find((m) => m.role === "assistant");
@@ -380,7 +325,11 @@ Assistant: ${firstAssistant.text}
 Return only the title.`;
 
       try {
-        const result = await this.aiService.generateText(prompt);
+        const result = await this.aiService.generateText(prompt, undefined, {
+          provider,
+          model,
+          keyId,
+        });
         const raw = (result?.text ?? "").trim();
         if (!raw) {
           return null;
@@ -388,25 +337,11 @@ Return only the title.`;
 
         const sanitized = this.sanitizeTitle(raw);
         return sanitized || null;
-      } finally {
-        // Always restore previous provider state to avoid side effects
-        try {
-          if (previousProvider) {
-            // restore previous provider by provider name
-            this.providerManager.setActiveProvider(previousProvider.provider);
-          }
-        } catch (restoreError) {
-          // Don't throw on restore failure; just log
-          void logger.warn(
-            "[ConversationalAI] Failed to restore provider after title generation",
-            {
-              error:
-                restoreError instanceof Error
-                  ? restoreError.message
-                  : String(restoreError),
-            },
-          );
-        }
+      } catch (error) {
+        logger.warn("[ConversationalAI] Title generation failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
       }
     } catch (error) {
       logger.warn("[ConversationalAI] Title generation failed", {

@@ -1269,13 +1269,29 @@ export class ContentRecommendationService {
 
       const systemPrompt = this.buildSystemPrompt();
 
+      // Get AI settings
+      const settingsStore = useSettingsStore.getState();
+      const {
+        recommendationProvider,
+        recommendationModel,
+        recommendationKeyId,
+      } = settingsStore;
+
       // Call AI service with retry logic
-      void logger.debug("Calling AI service for recommendations");
+      void logger.debug("Calling AI service for recommendations", {
+        provider: recommendationProvider,
+        model: recommendationModel,
+      });
       const result = await this.callAIWithRetry(
         userId,
         RecommendationResponseSchema,
         prompt,
         systemPrompt,
+        {
+          provider: recommendationProvider,
+          model: recommendationModel,
+          keyId: recommendationKeyId,
+        },
       );
 
       // Add IDs to recommendations
@@ -1314,12 +1330,22 @@ export class ContentRecommendationService {
     schema: any,
     prompt: string,
     systemPrompt: string,
+    options?: {
+      provider?: string;
+      model?: string;
+      keyId?: string;
+    },
     attempt: number = 0,
   ): Promise<any> {
     const maxAttempts = 3;
 
     try {
-      return await this.aiService.generateObject(schema, prompt, systemPrompt);
+      return await this.aiService.generateObject(
+        schema,
+        prompt,
+        systemPrompt,
+        options,
+      );
     } catch (error) {
       if (attempt < maxAttempts - 1) {
         const backoffDelay = this.rateLimiter.getBackoffDelay(userId);
@@ -1341,6 +1367,7 @@ export class ContentRecommendationService {
           schema,
           prompt,
           systemPrompt,
+          options,
           attempt + 1,
         );
       }
@@ -1366,11 +1393,24 @@ export class ContentRecommendationService {
       const prompt = this.buildContentGapPrompt(contextPrompt, context);
       const systemPrompt = this.buildSystemPrompt();
 
+      // Get AI settings
+      const settingsStore = useSettingsStore.getState();
+      const {
+        recommendationProvider,
+        recommendationModel,
+        recommendationKeyId,
+      } = settingsStore;
+
       const result = await this.callAIWithRetry(
         userId,
         RecommendationResponseSchema,
         prompt,
         systemPrompt,
+        {
+          provider: recommendationProvider,
+          model: recommendationModel,
+          keyId: recommendationKeyId,
+        },
       );
 
       // Add IDs to recommendations

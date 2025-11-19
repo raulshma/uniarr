@@ -2,6 +2,7 @@ import { streamText, generateText, stepCountIs, type LanguageModel } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { logger } from "@/services/logger/LoggerService";
+import { apiLogger } from "@/services/logger/ApiLoggerService";
 import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
@@ -268,7 +269,22 @@ export class AIChatService {
     messages: ChatMessage[],
     options?: StreamOptions,
   ): Promise<AsyncIterable<string>> {
+    const startTime = Date.now();
+    let providerType = "unknown";
+    let modelName = "unknown";
+    let lastUserMessage = "";
+
     try {
+      // Extract info early for logging
+      const config = useConversationalAIConfigStore.getState().getConfig();
+      providerType = config.provider || "unknown";
+      modelName = config.model || "unknown";
+      lastUserMessage =
+        messages
+          .slice()
+          .reverse()
+          .find((m) => m.role === "user")?.content || "";
+
       void logger.debug("Sending message to LLM", {
         messageCount: messages.length,
         hasOptions: !!options,
@@ -341,6 +357,22 @@ export class AIChatService {
             textLength: fullText.length,
             hasUsage: !!usage,
           });
+
+          // Log successful AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat",
+            status: "success",
+            prompt: lastUserMessage,
+            response: fullText,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+              usage,
+            },
+          });
         } catch (error) {
           const errorObj =
             error instanceof Error ? error : new Error(String(error));
@@ -354,6 +386,21 @@ export class AIChatService {
           if (options?.onError) {
             options.onError(errorObj);
           }
+
+          // Log failed AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat",
+            status: "error",
+            prompt: lastUserMessage,
+            errorMessage: errorObj.message,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+            },
+          });
 
           throw errorObj;
         }
@@ -373,6 +420,22 @@ export class AIChatService {
       if (options?.onError) {
         options.onError(errorObj);
       }
+
+      // Log failed AI call (outer catch)
+      const durationMs = Date.now() - startTime;
+      void apiLogger.addAiCall({
+        provider: providerType,
+        model: modelName,
+        operation: "chat",
+        status: "error",
+        prompt: lastUserMessage,
+        errorMessage: errorObj.message,
+        durationMs,
+        metadata: {
+          messageCount: messages.length,
+          errorLocation: "outer-catch",
+        },
+      });
 
       throw errorObj;
     }
@@ -458,7 +521,22 @@ Remember: You're here to make media management easier and more efficient for sel
     messages: ChatMessage[],
     options?: StreamOptions,
   ): Promise<void> {
+    const startTime = Date.now();
+    let providerType = "unknown";
+    let modelName = "unknown";
+    let lastUserMessage = "";
+
     try {
+      // Extract info early for logging
+      const config = useConversationalAIConfigStore.getState().getConfig();
+      providerType = config.provider || "unknown";
+      modelName = config.model || "unknown";
+      lastUserMessage =
+        messages
+          .slice()
+          .reverse()
+          .find((m) => m.role === "user")?.content || "";
+
       void logger.debug("Sending message with tools to LLM", {
         messageCount: messages.length,
         toolCount: this.toolRegistry.count(),
@@ -626,6 +704,23 @@ Remember: You're here to make media management easier and more efficient for sel
             hasReasoning: !!reasoningText,
             hasUsage: !!usage,
           });
+
+          // Log successful AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat-with-tools",
+            status: "success",
+            prompt: lastUserMessage,
+            response: fullText,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+              toolCount: Object.keys(tools).length,
+              usage,
+            },
+          });
         } catch (error) {
           const errorObj =
             error instanceof Error ? error : new Error(String(error));
@@ -639,6 +734,22 @@ Remember: You're here to make media management easier and more efficient for sel
           if (options?.onError) {
             options.onError(errorObj);
           }
+
+          // Log failed AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat-with-tools",
+            status: "error",
+            prompt: lastUserMessage,
+            errorMessage: errorObj.message,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+              toolCount: Object.keys(tools).length,
+            },
+          });
 
           throw errorObj;
         }
@@ -752,6 +863,23 @@ Remember: You're here to make media management easier and more efficient for sel
             hasReasoning: !!reasoningText,
             hasUsage: !!usage,
           });
+
+          // Log successful AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat-with-tools",
+            status: "success",
+            prompt: lastUserMessage,
+            response: fullText,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+              toolCount: Object.keys(tools).length,
+              usage,
+            },
+          });
         } catch (error) {
           const errorObj =
             error instanceof Error ? error : new Error(String(error));
@@ -765,6 +893,22 @@ Remember: You're here to make media management easier and more efficient for sel
           if (options?.onError) {
             options.onError(errorObj);
           }
+
+          // Log failed AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat-with-tools",
+            status: "error",
+            prompt: lastUserMessage,
+            errorMessage: errorObj.message,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+              toolCount: Object.keys(tools).length,
+            },
+          });
 
           throw errorObj;
         }
@@ -782,6 +926,22 @@ Remember: You're here to make media management easier and more efficient for sel
       if (options?.onError) {
         options.onError(errorObj);
       }
+
+      // Log failed AI call (outer catch)
+      const durationMs = Date.now() - startTime;
+      void apiLogger.addAiCall({
+        provider: providerType,
+        model: modelName,
+        operation: "chat-with-tools",
+        status: "error",
+        prompt: lastUserMessage,
+        errorMessage: errorObj.message,
+        durationMs,
+        metadata: {
+          messageCount: messages.length,
+          errorLocation: "outer-catch",
+        },
+      });
 
       throw errorObj;
     }

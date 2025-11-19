@@ -36,6 +36,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   const isUser = message.role === "user";
   const [indicatorDots, setIndicatorDots] = useState(".");
   const [isConfirming, setIsConfirming] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const chatTextSize = useConversationalAIStore((s) => s.config.chatTextSize);
   const aiChat = useAIChat();
 
@@ -104,6 +105,28 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
       return "";
     }
   }, [message.timestamp]);
+
+  const metadata = useMemo(() => {
+    if (!message.metadata) return null;
+
+    const durationMs = message.metadata.duration ?? 0;
+    const totalTokens =
+      message.metadata.tokens ?? message.metadata.usage?.totalTokens ?? 0;
+
+    // Calculate throughput (tokens/sec)
+    // Avoid division by zero
+    const throughput =
+      durationMs > 0 && totalTokens > 0
+        ? (totalTokens / (durationMs / 1000)).toFixed(1)
+        : null;
+
+    return {
+      duration: durationMs,
+      tokens: totalTokens,
+      throughput,
+      usage: message.metadata.usage,
+    };
+  }, [message.metadata]);
 
   const styles = useMemo(
     () =>
@@ -365,143 +388,82 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                 gap: 4,
               }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-start",
-                  alignItems: "center",
-                  gap: theme.custom.spacing.xs,
-                }}
+              <Pressable
+                onLongPress={() => setShowDetails(!showDetails)}
+                delayLongPress={200}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.7 : 1,
+                })}
               >
-                {timestampLabel && !message.isStreaming ? (
-                  <Text style={styles.timestamp}>{timestampLabel}</Text>
-                ) : null}
-                {showTokenCount &&
-                !message.isStreaming &&
-                (message.metadata?.duration !== undefined ||
-                  message.metadata?.tokens !== undefined) ? (
-                  <Text style={styles.metadataText}>
-                    {message.metadata?.duration !== undefined
-                      ? `${formatResponseTime(message.metadata?.duration)} `
-                      : ""}
-                    {message.metadata?.tokens !== undefined
-                      ? ` • ${formatTokens(message.metadata?.tokens)} tokens`
-                      : ""}
-                  </Text>
-                ) : null}
-                {!isUser &&
-                message.metadata?.thinking &&
-                !message.isStreaming ? (
-                  <IconButton
-                    icon="lightbulb-on"
-                    size={16}
-                    onPress={handleShowThinking}
-                    style={{ margin: 0 }}
-                  />
-                ) : null}
-              </View>
-
-              {/* Display reasoning text if available and Meta toggle is on */}
-              {showTokenCount &&
-              !isUser &&
-              !message.isStreaming &&
-              message.metadata?.reasoningText ? (
                 <View
                   style={{
                     flexDirection: "row",
-                    alignItems: "flex-start",
-                    gap: 4,
-                    paddingTop: 2,
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name="brain"
-                    size={12}
-                    color={
-                      isUser
-                        ? "rgba(255,255,255,0.6)"
-                        : theme.colors.onSurfaceVariant
-                    }
-                    style={{ marginTop: 1 }}
-                  />
-                  <Text
-                    style={[
-                      styles.metadataText,
-                      { flex: 1, fontStyle: "italic" },
-                    ]}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                  >
-                    {message.metadata.reasoningText}
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Display usage metadata if available and Meta toggle is on */}
-              {showTokenCount &&
-              !isUser &&
-              !message.isStreaming &&
-              message.metadata?.usage &&
-              typeof message.metadata.usage === "object" &&
-              message.metadata.usage !== null ? (
-                <View
-                  style={{
-                    flexDirection: "row",
+                    justifyContent: "flex-start",
                     alignItems: "center",
                     flexWrap: "wrap",
-                    gap: 8,
-                    paddingTop: 2,
+                    gap: theme.custom.spacing.xs,
                   }}
                 >
-                  {Object.entries(
-                    message.metadata.usage as Record<string, unknown>,
-                  ).map(([key, value]) => {
-                    // Map usage keys to appropriate icons
-                    const getIconForKey = (k: string) => {
-                      const lowerKey = k.toLowerCase();
-                      if (
-                        lowerKey.includes("prompt") ||
-                        lowerKey.includes("input")
-                      )
-                        return "message-text-outline" as const;
-                      if (
-                        lowerKey.includes("completion") ||
-                        lowerKey.includes("output")
-                      )
-                        return "message-reply-text-outline" as const;
-                      if (lowerKey.includes("total")) return "sigma" as const;
-                      if (lowerKey.includes("reasoning"))
-                        return "brain" as const;
-                      if (lowerKey.includes("cache")) return "cached" as const;
-                      return "circle-small" as const;
-                    };
+                  {timestampLabel ? (
+                    <Text style={styles.timestamp}>{timestampLabel}</Text>
+                  ) : null}
 
-                    return (
-                      <View
-                        key={key}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 3,
-                        }}
-                      >
-                        <MaterialCommunityIcons
-                          name={getIconForKey(key)}
-                          size={12}
-                          color={
-                            isUser
-                              ? "rgba(255,255,255,0.6)"
-                              : theme.colors.onSurfaceVariant
-                          }
-                        />
-                        <Text style={[styles.metadataText, { flexShrink: 1 }]}>
-                          {String(value)}
+                  {showTokenCount && !message.isStreaming && metadata ? (
+                    <>
+                      {metadata.duration > 0 && (
+                        <Text style={styles.metadataText}>
+                          • {formatResponseTime(metadata.duration / 1000)}
                         </Text>
-                      </View>
-                    );
-                  })}
+                      )}
+
+                      {metadata.tokens > 0 && (
+                        <Text style={styles.metadataText}>
+                          • {formatTokens(metadata.tokens)} tokens
+                        </Text>
+                      )}
+
+                      {metadata.throughput && (
+                        <Text style={styles.metadataText}>
+                          • {metadata.throughput} t/s
+                        </Text>
+                      )}
+                    </>
+                  ) : null}
+
+                  {!isUser &&
+                  message.metadata?.thinking &&
+                  !message.isStreaming ? (
+                    <IconButton
+                      icon="lightbulb-on"
+                      size={16}
+                      onPress={handleShowThinking}
+                      style={{ margin: 0, width: 20, height: 20 }}
+                      iconColor={theme.colors.primary}
+                    />
+                  ) : null}
                 </View>
-              ) : null}
+
+                {/* Detailed Token Usage on Long Press */}
+                {showDetails && metadata?.usage && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 12,
+                      marginTop: 4,
+                      paddingTop: 4,
+                      borderTopWidth: 1,
+                      borderTopColor: "rgba(128,128,128,0.2)",
+                    }}
+                  >
+                    <Text style={[styles.metadataText, { fontSize: 11 }]}>
+                      Input: {formatTokens(metadata.usage.promptTokens)}
+                    </Text>
+                    <Text style={[styles.metadataText, { fontSize: 11 }]}>
+                      Output: {formatTokens(metadata.usage.completionTokens)}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
             </View>
           </View>
 
