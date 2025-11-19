@@ -13,6 +13,7 @@ interface FeedbackVariables {
   userId: string;
   /** Recommendation ID */
   recommendationId: string;
+  recommendation?: Recommendation;
   /** Feedback type */
   feedback: "accepted" | "rejected";
   /** Optional reason for feedback */
@@ -26,13 +27,13 @@ export interface UseRecommendationFeedbackReturn {
   /** Record acceptance of a recommendation */
   acceptRecommendation: (
     userId: string,
-    recommendationId: string,
+    recommendationIdOrRecommendation: string | Recommendation,
     reason?: string,
   ) => Promise<void>;
   /** Record rejection of a recommendation */
   rejectRecommendation: (
     userId: string,
-    recommendationId: string,
+    recommendationIdOrRecommendation: string | Recommendation,
     reason?: string,
   ) => Promise<void>;
   /** Whether feedback is being submitted */
@@ -80,7 +81,8 @@ export function useRecommendationFeedback(): UseRecommendationFeedbackReturn {
     reset,
   } = useMutation({
     mutationFn: async (variables: FeedbackVariables) => {
-      const { userId, recommendationId, feedback, reason } = variables;
+      const { userId, recommendationId, feedback, reason, recommendation } =
+        variables;
 
       void logger.info("Recording recommendation feedback", {
         userId,
@@ -93,6 +95,7 @@ export function useRecommendationFeedback(): UseRecommendationFeedbackReturn {
         recommendationId,
         feedback,
         reason,
+        recommendation,
       );
     },
     onMutate: async (variables: FeedbackVariables) => {
@@ -116,16 +119,21 @@ export function useRecommendationFeedback(): UseRecommendationFeedbackReturn {
 
           return {
             ...old,
-            recommendations: old.recommendations.map((rec: Recommendation) => {
-              if (rec.id === recommendationId) {
-                return {
-                  ...rec,
-                  // Add a temporary flag to indicate feedback was recorded
-                  _feedbackRecorded: feedback,
-                };
-              }
-              return rec;
-            }),
+            recommendations:
+              feedback === "rejected"
+                ? old.recommendations.filter(
+                    (rec: Recommendation) => rec.id !== recommendationId,
+                  )
+                : old.recommendations.map((rec: Recommendation) => {
+                    if (rec.id === recommendationId) {
+                      return {
+                        ...rec,
+                        // Add a temporary flag to indicate feedback was recorded
+                        _feedbackRecorded: feedback,
+                      };
+                    }
+                    return rec;
+                  }),
           };
         },
       );
@@ -161,21 +169,9 @@ export function useRecommendationFeedback(): UseRecommendationFeedbackReturn {
         recommendationId: variables.recommendationId,
       });
 
-      // Invalidate recommendations cache to trigger refetch
-      // This ensures the cache is refreshed if feedback patterns changed significantly
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.recommendations.list(userId),
-      });
-
-      void logger.debug("Invalidated recommendations cache after feedback", {
-        userId,
-      });
-    },
-    onSettled: (data, error, variables) => {
-      // Always refetch after mutation settles (success or error)
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.recommendations.list(variables.userId),
-      });
+      // Note: We do NOT invalidate the cache here to avoid triggering automatic refresh
+      // The optimistic update already removed the card from the UI
+      // The preference will be applied on the next manual refresh or cache expiration
     },
   });
 
@@ -183,13 +179,30 @@ export function useRecommendationFeedback(): UseRecommendationFeedbackReturn {
    * Record acceptance of a recommendation
    */
   const acceptRecommendation = useCallback(
-    async (userId: string, recommendationId: string, reason?: string) => {
+    async (
+      userId: string,
+      recommendationIdOrRecommendation: string | Recommendation,
+      reason?: string,
+    ) => {
+      const recommendation =
+        typeof recommendationIdOrRecommendation === "string"
+          ? undefined
+          : (recommendationIdOrRecommendation as Recommendation);
+      const recommendationId =
+        typeof recommendationIdOrRecommendation === "string"
+          ? recommendationIdOrRecommendation
+          : (recommendation as Recommendation).id;
+
+      if (!recommendationId) {
+        throw new Error("Recommendation ID is required to record feedback");
+      }
       try {
         await mutateAsync({
           userId,
           recommendationId,
           feedback: "accepted",
           reason,
+          recommendation,
         });
       } catch (error) {
         void logger.error("Failed to accept recommendation", {
@@ -207,13 +220,30 @@ export function useRecommendationFeedback(): UseRecommendationFeedbackReturn {
    * Record rejection of a recommendation
    */
   const rejectRecommendation = useCallback(
-    async (userId: string, recommendationId: string, reason?: string) => {
+    async (
+      userId: string,
+      recommendationIdOrRecommendation: string | Recommendation,
+      reason?: string,
+    ) => {
+      const recommendation =
+        typeof recommendationIdOrRecommendation === "string"
+          ? undefined
+          : (recommendationIdOrRecommendation as Recommendation);
+      const recommendationId =
+        typeof recommendationIdOrRecommendation === "string"
+          ? recommendationIdOrRecommendation
+          : (recommendation as Recommendation).id;
+
+      if (!recommendationId) {
+        throw new Error("Recommendation ID is required to record feedback");
+      }
       try {
         await mutateAsync({
           userId,
           recommendationId,
           feedback: "rejected",
           reason,
+          recommendation,
         });
       } catch (error) {
         void logger.error("Failed to reject recommendation", {

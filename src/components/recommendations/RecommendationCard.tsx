@@ -1,28 +1,33 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View, Pressable } from "react-native";
-import { Text, useTheme, Chip, ProgressBar, Badge } from "react-native-paper";
+import { Text, Chip, ProgressBar, Badge } from "react-native-paper";
 import { Image } from "expo-image";
 import Animated, { FadeIn } from "react-native-reanimated";
 
 import { Card } from "@/components/common/Card";
 import { RecommendationActions } from "./RecommendationActions";
-import type { AppTheme } from "@/constants/theme";
 import type { Recommendation } from "@/models/recommendation.schemas";
 import { spacing } from "@/theme/spacing";
+import { useTheme } from "@/hooks/useTheme";
 
 export interface RecommendationCardProps {
   /** The recommendation to display */
   recommendation: Recommendation;
   /** Callback when user accepts the recommendation */
-  onAccept: (recommendationId: string) => Promise<void>;
+  onAccept: (recommendationOrId: Recommendation | string) => Promise<void>;
   /** Callback when user rejects the recommendation */
-  onReject: (recommendationId: string, reason?: string) => Promise<void>;
+  onReject: (
+    recommendationOrId: Recommendation | string,
+    reason?: string,
+  ) => Promise<void>;
   /** Whether the app is offline */
   isOffline: boolean;
   /** Whether feedback is being submitted */
   isSubmitting: boolean;
   /** Optional callback when card is pressed */
   onPress?: (recommendation: Recommendation) => void;
+  /** User ID of current user */
+  userId?: string;
 }
 
 /**
@@ -45,8 +50,9 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   isOffline,
   isSubmitting,
   onPress,
+  userId,
 }) => {
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
 
   // Get match score color based on value
   const matchScoreColor = useMemo(() => {
@@ -398,6 +404,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
               onReject={onReject}
               isOffline={isOffline}
               isSubmitting={isSubmitting}
+              userId={userId ?? ""}
             />
           </View>
         </Pressable>

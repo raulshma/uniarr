@@ -512,6 +512,8 @@ export const queryKeys = {
       ["recommendations", userId] as const,
     contentGaps: (userId: string): QueryKeyBuilder =>
       ["recommendations", userId, "contentGaps"] as const,
+    notInterested: (userId: string): QueryKeyBuilder =>
+      ["recommendations", userId, "notInterested"] as const,
   },
 } as const;
 

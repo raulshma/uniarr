@@ -253,6 +253,19 @@ export class ContentRecommendationService {
         }
       }
 
+      // Get list of items the user explicitly rejected (not interested)
+      let notInterestedTitles: string[] = [];
+      try {
+        const rejected =
+          await this.learningService.getRejectedRecommendations(userId);
+        notInterestedTitles = rejected.map((r) => r.recommendation.title);
+      } catch (error) {
+        void logger.debug("Failed to fetch rejected recommendations", {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       // Generate fresh recommendations with error handling
       let recommendations: RecommendationResponseData["recommendations"];
 
@@ -265,6 +278,7 @@ export class ContentRecommendationService {
           context,
           limit,
           includeHiddenGems,
+          notInterestedTitles,
         );
         await this.performanceMonitor.stopTimer(
           genTimerId,
@@ -441,8 +455,27 @@ export class ContentRecommendationService {
 
       const cacheAge = await this.cache.getAge(userId);
 
+      // Filter cached recommendations against user 'not interested' entries
+      let filteredRecommendations = cached.recommendations;
+      try {
+        const rejected =
+          await this.learningService.getRejectedRecommendations(userId);
+        const rejectedTitles = rejected.map((r) => r.recommendation.title);
+        filteredRecommendations = filteredRecommendations.filter(
+          (r) => !rejectedTitles.includes(r.title),
+        );
+      } catch (error) {
+        void logger.debug(
+          "Failed to fetch rejected recommendations for offline filter",
+          {
+            userId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
+      }
+
       return {
-        recommendations: cached.recommendations,
+        recommendations: filteredRecommendations,
         generatedAt: cached.generatedAt,
         cacheAge: cacheAge || undefined,
         context: {
@@ -525,6 +558,8 @@ export class ContentRecommendationService {
     recommendationId: string,
     feedback: "accepted" | "rejected",
     reason?: string,
+    // Optional full recommendation object to avoid requiring cache
+    recommendationObj?: Recommendation,
   ): Promise<void> {
     try {
       void logger.info("Recording recommendation feedback", {
@@ -533,23 +568,26 @@ export class ContentRecommendationService {
         feedback,
       });
 
-      // Get the recommendation from cache
-      const cached = await this.cache.get(userId);
-      if (!cached) {
-        throw new RecommendationError(
-          "Cannot record feedback: no cached recommendations found",
-          "NO_CACHE",
-        );
-      }
-
-      const recommendation = cached.recommendations.find(
-        (r) => r.id === recommendationId,
-      );
+      // Use the provided recommendation object or lookup in cache
+      let recommendation: Recommendation | undefined = recommendationObj;
       if (!recommendation) {
-        throw new RecommendationError(
-          "Cannot record feedback: recommendation not found",
-          "NOT_FOUND",
+        const cached = await this.cache.get(userId);
+        if (!cached) {
+          throw new RecommendationError(
+            "Cannot record feedback: no cached recommendations found",
+            "NO_CACHE",
+          );
+        }
+
+        recommendation = cached.recommendations.find(
+          (r) => r.id === recommendationId,
         );
+        if (!recommendation) {
+          throw new RecommendationError(
+            "Cannot record feedback: recommendation not found",
+            "NOT_FOUND",
+          );
+        }
       }
 
       // Build current context
@@ -1245,6 +1283,7 @@ export class ContentRecommendationService {
     context: UserContext,
     limit: number,
     includeHiddenGems: boolean,
+    notInterestedTitles: string[] = [],
   ): Promise<RecommendationResponseData["recommendations"]> {
     const userId = context.watchHistory[0]?.title || "user";
 
@@ -1265,6 +1304,7 @@ export class ContentRecommendationService {
         includeHiddenGems,
         context,
         weights,
+        notInterestedTitles,
       );
 
       const systemPrompt = this.buildSystemPrompt();
@@ -1306,7 +1346,22 @@ export class ContentRecommendationService {
         count: recommendations.length,
       });
 
-      return recommendations;
+      // Filter out any items the user explicitly marked not interested
+      const filtered = recommendations.filter(
+        (r: Recommendation) =>
+          !notInterestedTitles.some(
+            (title) => title.toLowerCase() === r.title.toLowerCase(),
+          ),
+      );
+
+      if (filtered.length !== recommendations.length) {
+        void logger.info("Filtered out not-interested recommendations", {
+          userId,
+          removed: recommendations.length - filtered.length,
+        });
+      }
+
+      return filtered;
     } catch (error) {
       // If rate limited, throw specific error
       if (isRateLimitError(error)) {
@@ -1663,6 +1718,7 @@ export class ContentRecommendationService {
     includeHiddenGems: boolean,
     context: UserContext,
     weights: any,
+    notInterestedTitles: string[] = [],
   ): string {
     const libraryTitles = context.watchHistory
       .map((item) => item.title)
@@ -1693,6 +1749,11 @@ EXCLUSIONS:
 - Do not recommend content already in library: ${libraryTitles || "None"}
 - Avoid disliked genres: ${dislikedGenres || "None"}
 - Respect content rating limit: ${contentRatingLimit}
+${
+  notInterestedTitles.length > 0
+    ? `- Do not recommend items the user marked not interested: ${notInterestedTitles.join(", ")}`
+    : ""
+}
 
 Provide recommendations in the specified JSON schema.`;
   }

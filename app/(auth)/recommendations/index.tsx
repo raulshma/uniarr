@@ -9,18 +9,21 @@ import { LoadingState } from "@/components/common/LoadingState";
 import { RecommendationCard } from "@/components/recommendations/RecommendationCard";
 import { ContentGapsSection } from "@/components/recommendations/ContentGapsSection";
 import type { AppTheme } from "@/constants/theme";
+import type { Recommendation } from "@/models/recommendation.schemas";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useContentGaps } from "@/hooks/useContentGaps";
 import { useRecommendationFeedback } from "@/hooks/useRecommendationFeedback";
+import { useAuth } from "@/services/auth/AuthProvider";
 import { spacing } from "@/theme/spacing";
 import { logger } from "@/services/logger/LoggerService";
 
-// TODO: Replace with actual user ID from auth context
-const MOCK_USER_ID = "user_123";
+// Get user ID from auth provider
 
 const RecommendationsScreen = () => {
   const theme = useTheme<AppTheme>();
   const [showContentGaps, setShowContentGaps] = useState(false);
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const userId = user?.id ?? "guest";
 
   // Fetch recommendations
   const {
@@ -34,7 +37,7 @@ const RecommendationsScreen = () => {
     refetch,
     refresh,
   } = useRecommendations({
-    userId: MOCK_USER_ID,
+    userId,
     limit: 5,
     includeHiddenGems: true,
   });
@@ -46,7 +49,7 @@ const RecommendationsScreen = () => {
     error: gapsError,
     refetch: refetchGaps,
   } = useContentGaps({
-    userId: MOCK_USER_ID,
+    userId,
     enabled: showContentGaps,
   });
 
@@ -86,9 +89,13 @@ const RecommendationsScreen = () => {
 
   // Handle recommendation acceptance
   const handleAccept = useCallback(
-    async (recommendationId: string) => {
+    async (recommendationIdOrObject: string | Recommendation) => {
+      const recommendationId =
+        typeof recommendationIdOrObject === "string"
+          ? recommendationIdOrObject
+          : recommendationIdOrObject.id;
       try {
-        await acceptRecommendation(MOCK_USER_ID, recommendationId);
+        await acceptRecommendation(userId, recommendationIdOrObject);
       } catch (error) {
         void logger.error("Failed to accept recommendation", {
           recommendationId,
@@ -96,14 +103,21 @@ const RecommendationsScreen = () => {
         });
       }
     },
-    [acceptRecommendation],
+    [acceptRecommendation, userId],
   );
 
   // Handle recommendation rejection
   const handleReject = useCallback(
-    async (recommendationId: string, reason?: string) => {
+    async (
+      recommendationIdOrObject: string | Recommendation,
+      reason?: string,
+    ) => {
+      const recommendationId =
+        typeof recommendationIdOrObject === "string"
+          ? recommendationIdOrObject
+          : recommendationIdOrObject.id;
       try {
-        await rejectRecommendation(MOCK_USER_ID, recommendationId, reason);
+        await rejectRecommendation(userId, recommendationIdOrObject, reason);
       } catch (error) {
         void logger.error("Failed to reject recommendation", {
           recommendationId,
@@ -111,7 +125,7 @@ const RecommendationsScreen = () => {
         });
       }
     },
-    [rejectRecommendation],
+    [rejectRecommendation, userId],
   );
 
   // Toggle content gaps
@@ -179,7 +193,7 @@ const RecommendationsScreen = () => {
   );
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || isAuthLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.emptyContainer}>
@@ -297,6 +311,7 @@ const RecommendationsScreen = () => {
               onReject={handleReject}
               isOffline={isOffline}
               isSubmitting={isSubmitting}
+              userId={userId}
             />
           ))}
         </Animated.View>

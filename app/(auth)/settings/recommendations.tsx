@@ -16,12 +16,15 @@ import Slider from "@react-native-community/slider";
 
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
+import { useAuth } from "@/services/auth/AuthProvider";
 import {
   SettingsListItem,
   SettingsGroup,
   AnimatedListItem,
   AnimatedSection,
 } from "@/components/common";
+import { NotInterestedManager } from "@/components/recommendations/NotInterestedManager";
+import { useNotInterestedItems } from "@/hooks/useNotInterestedItems";
 import { useSettingsStore } from "@/store/settingsStore";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
 
@@ -92,6 +95,7 @@ const RecommendationSettingsScreen = () => {
   const [ratingDialogVisible, setRatingDialogVisible] = useState(false);
   const [cacheDurationDialogVisible, setCacheDurationDialogVisible] =
     useState(false);
+  const [notInterestedVisible, setNotInterestedVisible] = useState(false);
 
   // Temporary states for dialogs
   const [tempLimit, setTempLimit] = useState(recommendationLimit);
@@ -103,6 +107,11 @@ const RecommendationSettingsScreen = () => {
   );
 
   const animationsEnabled = shouldAnimateLayout(false, false);
+
+  // Not interested items
+  const { user } = useAuth();
+  const userId = user?.id ?? "guest";
+  const notInterested = useNotInterestedItems(userId);
 
   const styles = StyleSheet.create({
     container: {
@@ -359,6 +368,28 @@ const RecommendationSettingsScreen = () => {
                 groupPosition="bottom"
               />
             </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Not Interested"
+                subtitle={
+                  notInterested.items.length === 0
+                    ? "None"
+                    : `${notInterested.items.length} item(s)`
+                }
+                left={{ iconName: "close" }}
+                trailing={
+                  <ChevronTrailing
+                    onPress={() => setNotInterestedVisible(true)}
+                  />
+                }
+                onPress={() => setNotInterestedVisible(true)}
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
           </SettingsGroup>
         </AnimatedSection>
 
@@ -553,6 +584,12 @@ const RecommendationSettingsScreen = () => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+      {/* Not Interested Manager */}
+      <NotInterestedManager
+        userId={userId}
+        visible={notInterestedVisible}
+        onDismiss={() => setNotInterestedVisible(false)}
+      />
     </SafeAreaView>
   );
 };

@@ -16,18 +16,24 @@ import type { Recommendation } from "@/models/recommendation.schemas";
 import { spacing } from "@/theme/spacing";
 import { logger } from "@/services/logger/LoggerService";
 import { ContentRecommendationService } from "@/services/ai/recommendations/ContentRecommendationService";
+import { useNotInterestedItems } from "@/hooks/useNotInterestedItems";
 
 export interface RecommendationActionsProps {
   /** The recommendation */
   recommendation: Recommendation;
   /** Callback when user accepts the recommendation */
-  onAccept: (recommendationId: string) => Promise<void>;
+  onAccept: (recommendationOrId: Recommendation | string) => Promise<void>;
   /** Callback when user rejects the recommendation */
-  onReject: (recommendationId: string, reason?: string) => Promise<void>;
+  onReject: (
+    recommendationOrId: Recommendation | string,
+    reason?: string,
+  ) => Promise<void>;
   /** Whether the app is offline */
   isOffline: boolean;
   /** Whether feedback is being submitted */
   isSubmitting: boolean;
+  /** User ID of the current user */
+  userId: string;
 }
 
 type ServiceType = "sonarr" | "radarr" | "jellyseerr";
@@ -58,9 +64,11 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
   onReject,
   isOffline,
   isSubmitting,
+  userId,
 }) => {
   const theme = useTheme<AppTheme>();
   const recommendationService = ContentRecommendationService.getInstance();
+  const notInterestedHook = useNotInterestedItems(userId);
 
   const [serviceMenuVisible, setServiceMenuVisible] = useState(false);
   const [rejectDialogVisible, setRejectDialogVisible] = useState(false);
@@ -72,6 +80,7 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
   const [actionFeedback, setActionFeedback] = useState<{
     type: "success" | "error";
     message: string;
+    undo?: () => void;
   } | null>(null);
 
   const isInLibrary = recommendation.availability?.inLibrary ?? false;
@@ -113,9 +122,8 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
             type: "success",
             message: result.message,
           });
-
           // Record acceptance
-          await onAccept(recommendation.id!);
+          await onAccept(recommendation);
 
           void logger.info("Successfully added recommendation to service", {
             recommendationId: recommendation.id,
@@ -157,7 +165,7 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
 
       if (result.success) {
         // Record acceptance
-        await onAccept(recommendation.id!);
+        await onAccept(recommendation);
       } else {
         setActionFeedback({
           type: "error",
@@ -188,11 +196,15 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
         REJECTION_REASONS.find((r) => r.value === selectedRejectionReason)
           ?.label ?? "Not interested";
 
-      await onReject(recommendation.id!, reasonLabel);
+      await onReject(recommendation, reasonLabel);
 
       setActionFeedback({
         type: "success",
         message: "Feedback recorded. We'll improve future recommendations.",
+        undo: () => {
+          void notInterestedHook.remove(recommendation.id!);
+          setActionFeedback(null);
+        },
       });
 
       void logger.info("Recommendation rejected", {
@@ -212,7 +224,7 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
     } finally {
       setSelectedRejectionReason(null);
     }
-  }, [recommendation, selectedRejectionReason, onReject]);
+  }, [recommendation, selectedRejectionReason, onReject, notInterestedHook]);
 
   // Handle more info
   const handleMoreInfo = useCallback(() => {
@@ -293,6 +305,17 @@ export const RecommendationActions: React.FC<RecommendationActionsProps> = ({
       {actionFeedback && (
         <View style={styles.feedbackContainer}>
           <Text style={styles.feedbackText}>{actionFeedback.message}</Text>
+          {actionFeedback.undo && (
+            <Button
+              onPress={() => {
+                actionFeedback.undo!();
+              }}
+              compact
+              mode="text"
+            >
+              Undo
+            </Button>
+          )}
         </View>
       )}
 
