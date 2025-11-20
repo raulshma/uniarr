@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
+import { useTheme } from "@/hooks/useTheme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -10,7 +11,6 @@ import {
   UniArrLoader,
 } from "@/components/common";
 import { TabHeader } from "@/components/common/TabHeader";
-import type { AppTheme } from "@/constants/theme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import RssWidgetConfigForm from "@/components/widgets/RssWidget/RssWidgetConfigForm";
 import RedditWidgetConfigForm from "@/components/widgets/RedditWidget/RedditWidgetConfigForm";
@@ -27,7 +27,7 @@ import RecommendationsWidgetConfigForm from "@/components/widgets/Recommendation
 
 const WidgetConfigureScreen: React.FC = () => {
   const params = useLocalSearchParams<{ widgetId?: string }>();
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const [widget, setWidget] = useState<Widget | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

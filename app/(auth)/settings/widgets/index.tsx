@@ -3,13 +3,13 @@ import { StyleSheet, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   Text,
-  useTheme,
   Switch,
   Button,
   IconButton,
   Portal,
   Dialog,
 } from "react-native-paper";
+import { useTheme } from "@/hooks/useTheme";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -24,12 +24,11 @@ import {
 } from "@/components/common";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
-import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
 
 const WidgetSettingsScreen = () => {
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const { onPress } = useHaptics();
   const animationsEnabled = shouldAnimateLayout(false, false);
   const [widgets, setWidgets] = useState<Widget[]>([]);

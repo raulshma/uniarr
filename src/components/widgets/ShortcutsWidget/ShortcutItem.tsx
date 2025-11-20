@@ -13,6 +13,8 @@ const ShortcutItem: React.FC<ShortcutItemProps> = ({
   onPress,
   disabled = false,
   size = "medium",
+  compact = false,
+  columns = 2,
 }) => {
   const theme = useTheme<AppTheme>();
   const { onPress: hapticPress } = useHaptics();
@@ -25,6 +27,33 @@ const ShortcutItem: React.FC<ShortcutItemProps> = ({
   };
 
   const getSizeStyles = () => {
+    if (compact) {
+      switch (size) {
+        case "small":
+          return {
+            container: styles.compactSmallContainer,
+            icon: columns === 4 ? iconSizes.md : iconSizes.xl, // 20 or 28
+            textVariant: "labelSmall" as const,
+          };
+        case "large":
+          return {
+            container: styles.compactLargeContainer,
+            icon: columns === 4 ? iconSizes.xl : iconSizes.xxxl, // 28 or 32
+            textVariant:
+              columns === 4
+                ? ("labelSmall" as const)
+                : ("labelMedium" as const),
+          };
+        default: // medium
+          return {
+            container: styles.compactMediumContainer,
+            icon: columns === 4 ? iconSizes.lg : iconSizes.xxl, // 24 or 30
+            textVariant: "labelSmall" as const,
+          };
+      }
+    }
+
+    // Regular 2-column layout with labels
     switch (size) {
       case "small":
         return {
@@ -49,6 +78,56 @@ const ShortcutItem: React.FC<ShortcutItemProps> = ({
 
   const sizeStyles = getSizeStyles();
 
+  // Calculate width based on columns
+  const getCompactWidth = () => {
+    if (columns === 4) return "22.5%"; // 4 columns with gaps
+    if (columns === 3) return "31%"; // 3 columns with gaps
+    return "47%"; // 2 columns
+  };
+
+  if (compact) {
+    // Compact icon-only layout
+    return (
+      <TouchableOpacity
+        style={[
+          styles.compactContainer,
+          sizeStyles.container,
+          {
+            backgroundColor: theme.colors.surfaceVariant,
+            width: getCompactWidth(),
+          },
+          disabled && styles.disabled,
+        ]}
+        onPress={handlePress}
+        disabled={disabled}
+        activeOpacity={0.7}
+      >
+        <MaterialCommunityIcons
+          name={shortcut.icon as any}
+          size={sizeStyles.icon}
+          color={
+            disabled ? theme.colors.onSurfaceDisabled : theme.colors.primary
+          }
+        />
+        <Text
+          variant={sizeStyles.textVariant}
+          style={[
+            styles.compactLabel,
+            {
+              color: disabled
+                ? theme.colors.onSurfaceDisabled
+                : theme.colors.onSurfaceVariant,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {shortcut.label}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  // Regular horizontal pill layout
   return (
     <TouchableOpacity
       style={[
@@ -116,6 +195,34 @@ const useThemeAwareStyles = (theme: AppTheme) =>
       textAlign: "left",
       fontWeight: "500",
       flex: 1,
+    },
+    // Compact icon-based layout styles (3 or 4 columns)
+    compactContainer: {
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: borderRadius.lg,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      backgroundColor: "rgba(255, 255, 255, 0.05)",
+    },
+    compactSmallContainer: {
+      minHeight: 64,
+      paddingVertical: spacing.sm,
+    },
+    compactMediumContainer: {
+      minHeight: 72,
+      paddingVertical: spacing.md,
+    },
+    compactLargeContainer: {
+      minHeight: 80,
+      paddingVertical: spacing.md,
+    },
+    compactLabel: {
+      marginTop: spacing.xs,
+      textAlign: "center",
+      fontWeight: "500",
+      width: "100%",
     },
     disabled: {
       opacity: 0.5,

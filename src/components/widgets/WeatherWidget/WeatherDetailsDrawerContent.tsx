@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { ScrollView, StyleSheet, View, Pressable } from "react-native";
 import { Chip, IconButton, Text, useTheme } from "react-native-paper";
-import { LinearGradient } from "expo-linear-gradient";
 import { format } from "date-fns";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -14,6 +13,7 @@ import type {
   WeatherHourlyForecast,
 } from "@/services/widgets/dataProviders";
 import LottieWeatherIcon from "./LottieWeatherIcon";
+import WeatherGradientBackground from "./WeatherGradientBackground";
 
 interface WeatherDetailsDrawerContentProps {
   weatherData: Record<string, WeatherPayload | null>;
@@ -352,36 +352,39 @@ export const WeatherDetailsDrawerContent: React.FC<
       showsVerticalScrollIndicator={false}
     >
       <View style={{ gap: spacing.md }}>
-        <LinearGradient
-          colors={[theme.colors.primary, theme.colors.tertiary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <View
           style={[
             styles.heroCard,
             {
               shadowColor: theme.colors.primary,
+              overflow: "hidden",
+              backgroundColor: theme.colors.primary, // Fallback
             },
           ]}
         >
+          <WeatherGradientBackground
+            temperature={activeWeather.current.temperature}
+            style={StyleSheet.absoluteFill}
+          />
           <View style={styles.heroHeader}>
             <View style={{ flex: 1 }}>
               <Text
                 variant="headlineMedium"
-                style={{ color: theme.colors.onPrimary, fontWeight: "700" }}
+                style={{ color: theme.colors.onSurface, fontWeight: "700" }}
               >
                 {locationName}
               </Text>
               {locationRegion ? (
                 <Text
                   variant="bodyMedium"
-                  style={{ color: theme.colors.onPrimary, opacity: 0.85 }}
+                  style={{ color: theme.colors.onSurface, opacity: 0.85 }}
                 >
                   {locationRegion}
                 </Text>
               ) : null}
               <Text
                 variant="bodySmall"
-                style={{ color: theme.colors.onPrimary, opacity: 0.7 }}
+                style={{ color: theme.colors.onSurface, opacity: 0.7 }}
               >
                 Updated {format(new Date(activeWeather.current.updatedAt), "p")}
               </Text>
@@ -393,6 +396,8 @@ export const WeatherDetailsDrawerContent: React.FC<
                 size={22}
                 onPress={onAddLocation}
                 accessibilityLabel="Add location"
+                containerColor={theme.colors.surfaceVariant}
+                iconColor={theme.colors.onSurfaceVariant}
               />
             ) : null}
           </View>
@@ -401,19 +406,19 @@ export const WeatherDetailsDrawerContent: React.FC<
             <View style={styles.heroTemperatureBlock}>
               <Text
                 variant="displayLarge"
-                style={{ color: theme.colors.onPrimary, fontWeight: "700" }}
+                style={{ color: theme.colors.onSurface, fontWeight: "700" }}
               >
                 {Math.round(activeWeather.current.temperature)}°
               </Text>
               <Text
                 variant="titleMedium"
-                style={{ color: theme.colors.onPrimary, opacity: 0.9 }}
+                style={{ color: theme.colors.onSurface, opacity: 0.9 }}
               >
                 {activeWeather.current.condition.text}
               </Text>
               <Text
                 variant="bodyMedium"
-                style={{ color: theme.colors.onPrimary, opacity: 0.8 }}
+                style={{ color: theme.colors.onSurface, opacity: 0.8 }}
               >
                 Feels like {Math.round(activeWeather.current.feelsLike)}°
               </Text>
@@ -436,13 +441,13 @@ export const WeatherDetailsDrawerContent: React.FC<
                 <View>
                   <Text
                     variant="labelLarge"
-                    style={{ color: theme.colors.onPrimary }}
+                    style={{ color: theme.colors.onSurface }}
                   >
                     Sunrise
                   </Text>
                   <Text
                     variant="titleMedium"
-                    style={{ color: theme.colors.onPrimary, fontWeight: "600" }}
+                    style={{ color: theme.colors.onSurface, fontWeight: "600" }}
                   >
                     {astronomy.sunrise}
                   </Text>
@@ -458,13 +463,13 @@ export const WeatherDetailsDrawerContent: React.FC<
                 <View>
                   <Text
                     variant="labelLarge"
-                    style={{ color: theme.colors.onPrimary }}
+                    style={{ color: theme.colors.onSurface }}
                   >
                     Sunset
                   </Text>
                   <Text
                     variant="titleMedium"
-                    style={{ color: theme.colors.onPrimary, fontWeight: "600" }}
+                    style={{ color: theme.colors.onSurface, fontWeight: "600" }}
                   >
                     {astronomy.sunset}
                   </Text>
@@ -472,7 +477,7 @@ export const WeatherDetailsDrawerContent: React.FC<
               </View>
             </View>
           ) : null}
-        </LinearGradient>
+        </View>
 
         {locationKeys.length > 1 ? (
           <ScrollView

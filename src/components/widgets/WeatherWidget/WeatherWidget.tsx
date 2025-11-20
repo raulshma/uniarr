@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
 
 import { Card } from "@/components/common/Card";
 import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import WidgetConfigPlaceholder from "@/components/widgets/common/WidgetConfigPlaceholder";
+import AnimatedWeatherIcon from "./AnimatedWeatherIcon";
+import WeatherGradientBackground from "./WeatherGradientBackground";
 import type { AppTheme } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
 import { borderRadius } from "@/constants/sizes";
 import { useHaptics } from "@/hooks/useHaptics";
 import { logger } from "@/services/logger/LoggerService";
@@ -24,6 +27,7 @@ import { WeatherDetailsDrawerContent } from "./WeatherDetailsDrawerContent";
 import { useWidgetDrawer } from "@/services/widgetDrawerService";
 import { useSettingsStore } from "@/store/settingsStore";
 import { createWidgetConfigSignature } from "@/utils/widget.utils";
+import { parseColor } from "@/utils/color.utils";
 
 const CACHE_TTL_MS = 45 * 60 * 1000;
 
@@ -90,7 +94,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   onEdit,
   onRefresh,
 }) => {
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const { onLongPress: onWidgetLongPress } = useHaptics();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -109,12 +113,16 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
 
   const config = useMemo(() => normalizeConfig(widget.config), [widget.config]);
   const units: WeatherUnits = config.units ?? "metric";
-  const unitsLabel = units === "imperial" ? "imperial" : "metric";
   const styles = useMemo(() => createStyles(theme), [theme]);
   const configSignature = useMemo(
     () => createWidgetConfigSignature(config),
     [config],
   );
+
+  const overlayColor = useMemo(() => {
+    const { r, g, b } = parseColor(theme.colors.onSurface);
+    return `rgba(${r}, ${g}, ${b}, 0.08)`;
+  }, [theme.colors.onSurface]);
 
   const loadCredentials = useCallback(async () => {
     const credentials = await widgetCredentialService.getCredentials(widget.id);
@@ -276,15 +284,9 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
   }, [apiKey, loadWeather]);
 
   const handleOpenDetails = useCallback(() => {
-    console.log("[WeatherWidget] handleOpenDetails called", {
-      weather: !!weather,
-      resolvedLocations: resolvedLocations.length,
-    });
     if (!weather || resolvedLocations.length === 0) {
-      console.log("[WeatherWidget] Early return - no weather or locations");
       return;
     }
-    console.log("[WeatherWidget] Opening drawer");
     void onWidgetLongPress();
     openDrawer({
       title: `${weather.location.name}${weather.location.region ? ", " + weather.location.region : ""}`,
@@ -312,9 +314,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
     onEdit,
   ]);
 
-  // Now define press handlers after handleOpenDetails
   const handleLongPress = useCallback(async () => {
-    console.log("[WeatherWidget] Long press detected");
     await onHapticLongPress();
     handleOpenDetails();
   }, [handleOpenDetails, onHapticLongPress]);
@@ -364,16 +364,24 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
 
   return (
     <Card
-      contentPadding="sm"
-      variant={frostedEnabled ? "frosted" : "custom"}
-      style={styles.card}
+      contentPadding={0}
+      variant="custom"
+      style={[styles.card, { backgroundColor: "transparent" }]}
       onLongPress={handleLongPress}
       delayLongPress={500}
       accessibilityHint="Long press to view detailed weather information"
     >
+      {weather && (
+        <WeatherGradientBackground
+          temperature={weather.current.temperature}
+          style={StyleSheet.absoluteFillObject}
+        />
+      )}
+
       <View style={styles.cardContent}>
         <WidgetHeader
           title={widget.title}
+          icon="weather-partly-cloudy"
           onEdit={onEdit}
           onRefresh={handleRefresh}
           refreshing={refreshing}
@@ -394,130 +402,112 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({
           </View>
         ) : (
           <View style={styles.content}>
-            {weather?.location?.name ? (
-              <View style={styles.locationInfo}>
-                <View style={styles.iconWrapper}>
-                  <MaterialCommunityIcons
-                    name={mapConditionToIcon(weather?.current.condition.text)}
-                    size={24}
-                    color={theme.colors.primary}
-                  />
-                </View>
-                <View>
-                  <Text
-                    variant="bodySmall"
-                    style={{ color: theme.colors.onSurfaceVariant }}
-                    numberOfLines={1}
-                  >
-                    {weather.location.name}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-            <View style={styles.currentRow}>
-              <Text
-                variant="displaySmall"
-                style={{ color: theme.colors.onSurface }}
-              >
-                {Math.round(weather.current.temperature)}°
-              </Text>
-              <View style={styles.currentMeta}>
+            {/* Main Weather Display */}
+            <View style={styles.mainSection}>
+              <View style={styles.locationContainer}>
                 <Text
-                  variant="titleSmall"
-                  style={{ color: theme.colors.onSurfaceVariant }}
+                  variant="titleLarge"
+                  style={styles.locationText}
+                  numberOfLines={1}
                 >
+                  {weather.location.name}
+                </Text>
+                <Text variant="bodyMedium" style={styles.conditionText}>
                   {weather.current.condition.text}
                 </Text>
-                <Text
-                  variant="bodySmall"
-                  style={{ color: theme.colors.onSurfaceVariant }}
-                >
-                  Feels like {Math.round(weather.current.feelsLike)}°
+              </View>
+
+              <View style={styles.tempContainer}>
+                <Text style={styles.tempText}>
+                  {Math.round(weather.current.temperature)}°
                 </Text>
-                <View style={styles.metaRow}>
-                  <MaterialCommunityIcons
-                    name="water-percent"
-                    size={16}
-                    color={theme.colors.onSurfaceVariant}
+                <View style={styles.iconWrapper}>
+                  <AnimatedWeatherIcon
+                    condition={weather.current.condition.text}
+                    size={100}
+                    useLottie={true}
                   />
-                  <Text
-                    variant="bodySmall"
-                    style={{ color: theme.colors.onSurfaceVariant }}
-                  >
-                    {weather.current.humidity}% humidity
-                  </Text>
-                </View>
-                <View style={styles.metaRow}>
-                  <MaterialCommunityIcons
-                    name="weather-windy"
-                    size={16}
-                    color={theme.colors.onSurfaceVariant}
-                  />
-                  <Text
-                    variant="bodySmall"
-                    style={{ color: theme.colors.onSurfaceVariant }}
-                  >
-                    Wind
-                    {units === "imperial"
-                      ? ` ${Math.round(weather.current.windMph)} mph`
-                      : ` ${Math.round(weather.current.windKph)} kph`}
-                  </Text>
                 </View>
               </View>
             </View>
 
+            {/* Quick Stats */}
+            <View style={[styles.statsRow, { backgroundColor: overlayColor }]}>
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons
+                  name="water-percent"
+                  size={16}
+                  color={theme.colors.onSurface}
+                  style={{ opacity: 0.7 }}
+                />
+                <Text variant="labelMedium" style={styles.statText}>
+                  {weather.current.humidity}%
+                </Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons
+                  name="weather-windy"
+                  size={16}
+                  color={theme.colors.onSurface}
+                  style={{ opacity: 0.7 }}
+                />
+                <Text variant="labelMedium" style={styles.statText}>
+                  {units === "imperial"
+                    ? `${Math.round(weather.current.windMph)} mph`
+                    : `${Math.round(weather.current.windKph)} km/h`}
+                </Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons
+                  name="thermometer"
+                  size={16}
+                  color={theme.colors.onSurface}
+                  style={{ opacity: 0.7 }}
+                />
+                <Text variant="labelMedium" style={styles.statText}>
+                  Feels {Math.round(weather.current.feelsLike)}°
+                </Text>
+              </View>
+            </View>
+
+            {/* Minimal Forecast */}
             <View style={styles.forecastRow}>
-              {weather.forecast.map((day) => {
+              {weather.forecast.slice(0, 3).map((day, index) => {
                 const forecastDate = new Date(day.date);
+                const isToday = index === 0;
                 return (
-                  <View key={day.date} style={styles.forecastItem}>
-                    <Text
-                      variant="bodySmall"
-                      style={{
-                        color: theme.colors.onSurfaceVariant,
-                      }}
-                    >
-                      {forecastDate.toLocaleDateString(undefined, {
-                        weekday: "short",
-                      })}
+                  <View
+                    key={day.date}
+                    style={[
+                      styles.forecastItem,
+                      { backgroundColor: overlayColor },
+                    ]}
+                  >
+                    <Text variant="labelSmall" style={styles.forecastDayText}>
+                      {isToday
+                        ? "Today"
+                        : forecastDate.toLocaleDateString(undefined, {
+                            weekday: "short",
+                          })}
                     </Text>
                     <MaterialCommunityIcons
                       name={mapConditionToIcon(day.condition.text)}
-                      size={20}
-                      color={theme.colors.primary}
+                      size={24}
+                      color={theme.colors.onSurface}
                     />
-                    <Text
-                      variant="titleMedium"
-                      style={{ color: theme.colors.onSurface }}
-                    >
-                      {Math.round(day.maxTemp)}° / {Math.round(day.minTemp)}°
-                    </Text>
-                    <Text
-                      variant="bodySmall"
-                      style={{ color: theme.colors.onSurfaceVariant }}
-                      numberOfLines={2}
-                    >
-                      {day.condition.text}
-                    </Text>
+                    <View style={styles.forecastTemp}>
+                      <Text variant="labelMedium" style={styles.forecastHigh}>
+                        {Math.round(day.maxTemp)}°
+                      </Text>
+                      <Text variant="labelSmall" style={styles.forecastLow}>
+                        {Math.round(day.minTemp)}°
+                      </Text>
+                    </View>
                   </View>
                 );
               })}
-            </View>
-
-            <View style={styles.updateRow}>
-              <MaterialCommunityIcons
-                name="clock-outline"
-                size={16}
-                color={theme.colors.onSurfaceVariant}
-              />
-              <Text
-                variant="bodySmall"
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                {"Updated "}
-                {new Date(weather.current.updatedAt).toLocaleTimeString()} (
-                {unitsLabel})
-              </Text>
             </View>
           </View>
         )}
@@ -536,46 +526,11 @@ const createStyles = (theme: AppTheme) =>
   StyleSheet.create({
     card: {
       borderRadius: borderRadius.xxl,
+      overflow: "hidden",
     },
     cardContent: {
-      paddingHorizontal: theme.custom.spacing.md,
-      paddingVertical: theme.custom.spacing.md,
+      padding: theme.custom.spacing.md,
       gap: theme.custom.spacing.md,
-    },
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: theme.custom.spacing.md,
-    },
-    headerLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.custom.spacing.md,
-      flex: 1,
-    },
-    titleGroup: {
-      flex: 1,
-      gap: theme.custom.spacing.xs,
-    },
-    locationInfo: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.custom.spacing.md,
-      marginBottom: theme.custom.spacing.md,
-    },
-    iconWrapper: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.surfaceVariant,
-    },
-    actions: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.custom.spacing.xs,
     },
     loadingContainer: {
       gap: theme.custom.spacing.sm,
@@ -587,19 +542,60 @@ const createStyles = (theme: AppTheme) =>
     content: {
       gap: theme.custom.spacing.lg,
     },
-    currentRow: {
+    mainSection: {
+      marginTop: theme.custom.spacing.xs,
+    },
+    locationContainer: {
+      marginBottom: theme.custom.spacing.sm,
+    },
+    locationText: {
+      fontWeight: "700",
+      color: theme.colors.onSurface,
+    },
+    conditionText: {
+      color: theme.colors.onSurface,
+      opacity: 0.8,
+    },
+    tempContainer: {
       flexDirection: "row",
       alignItems: "center",
-      gap: theme.custom.spacing.lg,
+      justifyContent: "space-between",
+      marginTop: theme.custom.spacing.xs,
     },
-    currentMeta: {
-      flex: 1,
-      gap: theme.custom.spacing.xs,
+    tempText: {
+      fontSize: 64,
+      fontWeight: "200",
+      color: theme.colors.onSurface,
+      includeFontPadding: false,
+      lineHeight: 70,
     },
-    metaRow: {
+    iconWrapper: {
+      width: 100,
+      height: 100,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    statsRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: theme.custom.spacing.xs,
+      justifyContent: "space-between",
+      borderRadius: borderRadius.lg,
+      padding: theme.custom.spacing.sm,
+    },
+    statItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    statDivider: {
+      width: 1,
+      height: 16,
+      backgroundColor: theme.colors.onSurface,
+      opacity: 0.2,
+    },
+    statText: {
+      color: theme.colors.onSurface,
+      fontWeight: "600",
     },
     forecastRow: {
       flexDirection: "row",
@@ -608,15 +604,28 @@ const createStyles = (theme: AppTheme) =>
     },
     forecastItem: {
       flex: 1,
-      gap: theme.custom.spacing.xs,
+      alignItems: "center",
+      gap: 4,
       padding: theme.custom.spacing.sm,
-      backgroundColor: theme.colors.surfaceVariant,
       borderRadius: borderRadius.lg,
     },
-    updateRow: {
+    forecastDayText: {
+      color: theme.colors.onSurface,
+      opacity: 0.9,
+      fontWeight: "600",
+    },
+    forecastTemp: {
       flexDirection: "row",
-      alignItems: "center",
-      gap: theme.custom.spacing.xs,
+      alignItems: "flex-end",
+      gap: 4,
+    },
+    forecastHigh: {
+      color: theme.colors.onSurface,
+      fontWeight: "700",
+    },
+    forecastLow: {
+      color: theme.colors.onSurface,
+      opacity: 0.7,
     },
   });
 

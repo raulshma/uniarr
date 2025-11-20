@@ -32,6 +32,7 @@ import { useRouter } from "expo-router";
 import { ChatErrorBoundary } from "@/components/chat/ChatErrorBoundary";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatMessage } from "@/components/chat/ChatMessage";
+import { ChatBackground } from "@/components/chat/ChatBackground";
 import { StarterQuestions } from "@/components/chat/StarterQuestions";
 import { ProviderModelDisplay } from "@/components/chat/ProviderModelDisplay";
 import { useDialog } from "@/components/common";
@@ -272,7 +273,6 @@ const ConversationalAIScreen: React.FC = () => {
       StyleSheet.create({
         scaffold: {
           flex: 1,
-          backgroundColor: theme.colors.background,
         },
         safeArea: {
           flex: 1,
@@ -385,7 +385,7 @@ const ConversationalAIScreen: React.FC = () => {
           marginTop: 12,
           marginBottom: 12,
           borderRadius: theme.roundness,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: "transparent",
           overflow: "hidden",
         },
         chatContent: {
@@ -933,7 +933,7 @@ const ConversationalAIScreen: React.FC = () => {
 
   return (
     <ChatErrorBoundary>
-      <View style={styles.scaffold}>
+      <ChatBackground style={styles.scaffold}>
         <SafeAreaView style={styles.safeArea} edges={["left", "right", "top"]}>
           <KeyboardAvoidingView
             style={{ flex: 1 }}
@@ -1262,7 +1262,7 @@ const ConversationalAIScreen: React.FC = () => {
             </View>
           </KeyboardAvoidingView>
         </SafeAreaView>
-      </View>
+      </ChatBackground>
 
       {/* Conversation History Drawer */}
       <BottomDrawer

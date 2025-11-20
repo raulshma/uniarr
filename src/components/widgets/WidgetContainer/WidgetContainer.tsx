@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { View, StyleSheet, Modal } from "react-native";
-import { Text, FAB, useTheme, Button } from "react-native-paper";
+import { Text, FAB, Button } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 
 import { useHaptics } from "@/hooks/useHaptics";
-import type { AppTheme } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 
 import { gapSizes } from "@/constants/sizes";
@@ -47,7 +48,7 @@ export interface WidgetContainerProps {
 const WidgetContainer: React.FC<WidgetContainerProps> = React.memo(
   ({ editable = false, style }) => {
     const router = useRouter();
-    const theme = useTheme<AppTheme>();
+    const theme = useTheme();
     const { onPress } = useHaptics();
     const [widgets, setWidgets] = useState<Widget[]>([]);
     const [editing, setEditing] = useState(false);
@@ -148,6 +149,7 @@ const WidgetContainer: React.FC<WidgetContainerProps> = React.memo(
           },
           widgetWrapper: {
             // Each widget handles its own styling
+            marginBottom: theme.custom.spacing.sm,
           },
           emptyState: {
             flex: 1,
@@ -432,10 +434,15 @@ const WidgetContainer: React.FC<WidgetContainerProps> = React.memo(
 
     // Memoize rendered widgets to prevent unnecessary re-renders
     const renderedWidgets = useMemo(() => {
-      return widgets.map((widget) => (
-        <View key={widget.id} style={styles.widgetWrapper}>
+      return widgets.map((widget, index) => (
+        <Animated.View
+          key={widget.id}
+          entering={FadeInDown.delay(index * 100).springify()}
+          layout={Layout.springify()}
+          style={styles.widgetWrapper}
+        >
           {renderWidget(widget)}
-        </View>
+        </Animated.View>
       ));
     }, [widgets, renderWidget, styles.widgetWrapper]);
 

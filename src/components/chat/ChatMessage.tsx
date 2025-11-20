@@ -150,12 +150,17 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
         },
         bubbleContainer: {
           maxWidth: "100%",
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          borderRadius: 20,
-          backgroundColor: isUser
-            ? theme.colors.primary
-            : theme.colors.surfaceVariant,
+          paddingHorizontal: 18,
+          paddingVertical: 12,
+          borderRadius: 26,
+          borderBottomRightRadius: isUser ? 4 : 26,
+          borderBottomLeftRadius: isUser ? 26 : 4,
+          backgroundColor: isUser ? theme.colors.primary : theme.colors.surface,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.08,
+          shadowRadius: 3,
+          elevation: 2,
         },
         messageText: {
           color: isUser
@@ -210,15 +215,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
           alignSelf: isUser ? "flex-end" : "flex-start",
         },
       }),
-    [
-      isUser,
-      theme.colors.primary,
-      theme.colors.surfaceVariant,
-      theme.colors.onPrimary,
-      theme.colors.onSurfaceVariant,
-      theme.colors.error,
-      chatTextSize,
-    ],
+    [isUser, theme, chatTextSize],
   );
 
   const showTokenCount = useConversationalAIStore(
@@ -331,12 +328,12 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                       flexDirection: "row",
                       alignItems: "center",
                       gap: 6,
-                      paddingVertical: 4,
-                      paddingHorizontal: 8,
-                      borderRadius: 8,
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 16,
                       backgroundColor: isUser
-                        ? "rgba(255,255,255,0.1)"
-                        : theme.colors.surface,
+                        ? "rgba(255,255,255,0.15)"
+                        : theme.colors.surfaceVariant,
                     }}
                   >
                     <MaterialCommunityIcons

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import Animated from "react-native-reanimated";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
+import { useTheme } from "@/hooks/useTheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
 import { widgetService } from "@/services/widgets/WidgetService";
@@ -36,7 +36,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
   isEditing,
 }) => {
   const router = useRouter();
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const { onPress: hapticPress } = useHaptics();
 
@@ -191,6 +191,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
         >
           <WidgetHeader
             title={widget.title}
+            icon="bookmark"
             onEdit={isEditMode ? onEdit : handleOpenConfig}
           />
           <View style={styles.loadingSkeleton}>
@@ -229,6 +230,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
         <View style={[styles.container, gridLayout.container]}>
           <WidgetHeader
             title={widget.title}
+            icon="bookmark"
             onEdit={isEditMode ? onEdit : handleOpenConfig}
           />
           <View style={styles.emptyContainer}>
@@ -255,6 +257,7 @@ const BookmarksWidget: React.FC<BookmarksWidgetProps> = ({
       <View style={[styles.container, gridLayout.container]}>
         <WidgetHeader
           title={widget.title}
+          icon="bookmark"
           onEdit={isEditMode ? onEdit : handleOpenConfig}
           onRefresh={handleRefresh}
           refreshing={refreshing}

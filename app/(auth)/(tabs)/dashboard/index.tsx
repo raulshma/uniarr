@@ -258,11 +258,13 @@ const DashboardHeader = React.memo(
               }}
             >
               <IconButton
-                icon="download"
+                icon="robot"
                 size={20}
                 iconColor={theme.colors.onSurfaceVariant}
                 style={{ backgroundColor: theme.colors.surfaceVariant }}
-                onPress={() => router.push("/(auth)/jellyfin-downloads")}
+                onPress={() =>
+                  router.push("/(auth)/settings/conversational-ai")
+                }
               />
               <IconButton
                 icon="cog"

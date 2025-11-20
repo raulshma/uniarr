@@ -48,9 +48,7 @@ export type DetailHeroProps = {
   children?: React.ReactNode;
 };
 
-const AnimatedScrollView = Animated.createAnimatedComponent(
-  Animated.ScrollView,
-);
+const AnimatedScrollView = Animated.ScrollView;
 
 const DetailHero: React.FC<DetailHeroProps> = ({
   posterUri,

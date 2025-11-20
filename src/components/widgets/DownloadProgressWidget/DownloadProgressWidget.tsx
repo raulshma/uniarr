@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
-import { Text, useTheme, ProgressBar, Badge } from "react-native-paper";
+import { Text, ProgressBar, Badge } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { useHaptics } from "@/hooks/useHaptics";
-import type { AppTheme } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
 import { Card } from "@/components/common";
 import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import type { Widget } from "@/services/widgets/WidgetService";
@@ -74,7 +74,7 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
   onRefresh,
   onEdit,
 }) => {
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const { spacing } = useResponsiveLayout();
   const { onPress } = useHaptics();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
@@ -242,6 +242,7 @@ const DownloadProgressWidget: React.FC<DownloadProgressWidgetProps> = ({
     >
       <WidgetHeader
         title={widget.title}
+        icon="download"
         onRefresh={handleRefresh}
         onEdit={onEdit}
         refreshing={refreshing}
