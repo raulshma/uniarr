@@ -282,11 +282,16 @@ const SettingsScreen = () => {
     logLevel,
     setLogLevel,
     setLastReleaseNotesCheckedAt,
+    jellyfinPlayerAutoPlay,
+    setJellyfinPlayerAutoPlay,
+    jellyfinPlayerDefaultSubtitleLanguage,
+    setJellyfinPlayerDefaultSubtitleLanguage,
     // image thumbnailing controls removed
   } = useSettingsStore();
   const [logLevelVisible, setLogLevelVisible] = useState(false);
   const [jellyseerrRetriesVisible, setJellyseerrRetriesVisible] =
     useState(false);
+  const [subtitleLanguageVisible, setSubtitleLanguageVisible] = useState(false);
   const [imageCacheUsage, setImageCacheUsage] = useState<ImageCacheUsage>({
     size: 0,
     fileCount: 0,
@@ -1325,6 +1330,59 @@ const SettingsScreen = () => {
           </SettingsGroup>
         </AnimatedSection>
 
+        {/* Jellyfin Player Section */}
+        <AnimatedSection
+          style={styles.section}
+          delay={250}
+          animated={animationsEnabled}
+        >
+          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+            Jellyfin Player
+          </Text>
+          <SettingsGroup>
+            <AnimatedListItem
+              index={0}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Auto Play"
+                subtitle="Automatically play media when opened"
+                left={{ iconName: "play-circle" }}
+                trailing={
+                  <Switch
+                    value={jellyfinPlayerAutoPlay}
+                    onValueChange={setJellyfinPlayerAutoPlay}
+                    color={theme.colors.primary}
+                  />
+                }
+                groupPosition="top"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={1}
+              totalItems={2}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Default Subtitle Language"
+                subtitle={jellyfinPlayerDefaultSubtitleLanguage || "Not set"}
+                left={{ iconName: "subtitles" }}
+                trailing={
+                  <Button
+                    mode="contained-tonal"
+                    onPress={() => setSubtitleLanguageVisible(true)}
+                    style={{ height: 36 }}
+                  >
+                    Set
+                  </Button>
+                }
+                groupPosition="bottom"
+              />
+            </AnimatedListItem>
+          </SettingsGroup>
+        </AnimatedSection>
+
         {/* BYOK Section */}
         <AnimatedSection
           style={styles.section}
@@ -1775,6 +1833,70 @@ const SettingsScreen = () => {
               <Button
                 mode="outlined"
                 onPress={() => setCacheLimitVisible(false)}
+              >
+                Cancel
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        </Portal>
+
+        {/* Subtitle Language Selection Dialog */}
+        <Portal>
+          <Dialog
+            visible={subtitleLanguageVisible}
+            onDismiss={() => setSubtitleLanguageVisible(false)}
+            style={{
+              borderRadius: 12,
+              backgroundColor: theme.colors.elevation.level1,
+            }}
+          >
+            <Dialog.Title
+              style={[styles.sectionTitle, { color: sectionTitleColor }]}
+            >
+              Default Subtitle Language
+            </Dialog.Title>
+            <Dialog.Content>
+              <Text
+                style={{ ...styles.settingValue, marginBottom: spacing.md }}
+              >
+                Select your preferred subtitle language for Jellyfin playback:
+              </Text>
+              <View style={{ gap: spacing.xs }}>
+                {[
+                  { code: undefined, label: "None" },
+                  { code: "eng", label: "English" },
+                  { code: "spa", label: "Spanish" },
+                  { code: "fra", label: "French" },
+                  { code: "deu", label: "German" },
+                  { code: "ita", label: "Italian" },
+                  { code: "por", label: "Portuguese" },
+                  { code: "jpn", label: "Japanese" },
+                  { code: "kor", label: "Korean" },
+                  { code: "chi", label: "Chinese" },
+                  { code: "ara", label: "Arabic" },
+                ].map((option) => (
+                  <Button
+                    key={option.code || "none"}
+                    mode={
+                      jellyfinPlayerDefaultSubtitleLanguage === option.code
+                        ? "contained"
+                        : "outlined"
+                    }
+                    onPress={() => {
+                      setJellyfinPlayerDefaultSubtitleLanguage(option.code);
+                      setSubtitleLanguageVisible(false);
+                    }}
+                    style={{ marginVertical: 0 }}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </View>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button
+                mode="outlined"
+                onPress={() => setSubtitleLanguageVisible(false)}
               >
                 Cancel
               </Button>

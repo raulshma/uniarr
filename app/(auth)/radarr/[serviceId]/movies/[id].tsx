@@ -4,6 +4,15 @@ import { StyleSheet, View, ScrollView } from "react-native";
 import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  findJellyfinItemByExternalIds,
+  getFirstJellyfinServiceId,
+} from "@/utils/jellyfin.utils";
+import {
+  showLoadingSnackbar,
+  dismissSnackbar,
+  showErrorSnackbar,
+} from "@/services/snackbarService";
 
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -163,6 +172,57 @@ const RadarrMovieDetailsScreen = () => {
     );
   }, [deleteMovieAsync, router]);
 
+  const handlePosterPress = useCallback(async () => {
+    if (!movie) return;
+
+    // Get Jellyfin service ID
+    const jellyfinServiceId = getFirstJellyfinServiceId();
+    if (!jellyfinServiceId) {
+      alert(
+        "Jellyfin Not Configured",
+        "Please add a Jellyfin service to play movies.",
+      );
+      return;
+    }
+
+    // Show loading snackbar
+    showLoadingSnackbar("Searching Jellyfin...");
+
+    try {
+      // Find the Jellyfin item
+      const jellyfinItem = await findJellyfinItemByExternalIds(
+        jellyfinServiceId,
+        {
+          tmdbId: movie.tmdbId,
+          imdbId: movie.imdbId,
+          type: "Movie",
+        },
+      );
+
+      // Dismiss loading snackbar
+      dismissSnackbar();
+
+      if (!jellyfinItem?.Id) {
+        showErrorSnackbar(`Movie not found in Jellyfin: ${movie.title}`);
+        return;
+      }
+
+      // Navigate to Jellyfin item details
+      router.push({
+        pathname: `/jellyfin/[serviceId]/details/[itemId]`,
+        params: {
+          serviceId: jellyfinServiceId,
+          itemId: jellyfinItem.Id,
+        },
+      });
+    } catch (error) {
+      dismissSnackbar();
+      showErrorSnackbar(
+        `Failed to search Jellyfin: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  }, [router, movie]);
+
   // Handle error states outside of sheet for immediate feedback
   if (!serviceId || !isMovieIdValid) {
     return (
@@ -300,6 +360,7 @@ const RadarrMovieDetailsScreen = () => {
                 isDeleting={isDeleting}
                 showPoster={false}
                 disableScroll={true}
+                onPosterPress={handlePosterPress}
               />
             </DetailHero>
           </AnimatedSection>

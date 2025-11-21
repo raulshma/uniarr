@@ -1526,21 +1526,20 @@ export class ContentRecommendationService {
     recommendation: Recommendation,
   ): Promise<string | undefined> {
     try {
-      const connectorManager = ConnectorManager.getInstance();
-      const tmdbConnectors = connectorManager.getConnectorsByType(
-        "tmdb" as any,
+      // Import getTmdbConnector dynamically to avoid circular dependencies
+      const { getTmdbConnector } = await import(
+        "@/services/tmdb/TmdbConnectorProvider"
       );
+      const connector = await getTmdbConnector();
 
-      if (tmdbConnectors.length === 0) {
+      if (!connector) {
         void logger.debug("No TMDb connector configured", {
           title: recommendation.title,
         });
         return undefined;
       }
 
-      const connector = tmdbConnectors[0] as any; // TmdbConnector
-
-      // Search for the content
+      // Search for the content using searchMulti
       const searchQuery = recommendation.year
         ? `${recommendation.title} ${recommendation.year}`
         : recommendation.title;
@@ -1549,16 +1548,31 @@ export class ContentRecommendationService {
         setTimeout(() => resolve(undefined), 3000),
       );
 
-      const searchPromise = connector.search(searchQuery);
-      const results = await Promise.race([searchPromise, timeout]);
+      const searchPromise = connector.searchMulti({
+        query: searchQuery,
+        page: 1,
+      });
+      const searchResponse = await Promise.race([searchPromise, timeout]);
 
-      if (!results || !Array.isArray(results) || results.length === 0) {
+      if (
+        !searchResponse ||
+        !searchResponse.results ||
+        searchResponse.results.length === 0
+      ) {
         return undefined;
       }
 
-      // Find best match
+      // Find best match - filter by media type first
+      const mediaTypeFilter = recommendation.type === "movie" ? "movie" : "tv";
+      const filteredResults = searchResponse.results.filter(
+        (item: any) => item.media_type === mediaTypeFilter,
+      );
+
+      const resultsToSearch =
+        filteredResults.length > 0 ? filteredResults : searchResponse.results;
+
       const match =
-        results.find((item: any) => {
+        resultsToSearch.find((item: any) => {
           const itemTitle = item.title || item.name || "";
           const itemYear = item.release_date
             ? parseInt(item.release_date.slice(0, 4), 10)
@@ -1572,10 +1586,10 @@ export class ContentRecommendationService {
             !recommendation.year || itemYear === recommendation.year;
 
           return titleMatch && yearMatch;
-        }) || results[0];
+        }) || resultsToSearch[0];
 
       // Build poster URL
-      const posterPath = match.poster_path;
+      const posterPath = match?.poster_path;
       if (posterPath) {
         return `https://image.tmdb.org/t/p/w500${posterPath}`;
       }

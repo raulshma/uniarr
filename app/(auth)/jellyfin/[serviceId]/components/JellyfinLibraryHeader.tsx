@@ -143,8 +143,8 @@ export const JellyfinLibraryHeader: React.FC<JellyfinLibraryHeaderProps> = ({
 const createStyles = (theme: AppTheme) =>
   StyleSheet.create({
     headerContainer: {
-      gap: spacing.lg,
-      paddingBottom: spacing.lg,
+      gap: spacing.md,
+      paddingBottom: spacing.sm,
     },
     toolbar: {
       flexDirection: "row",
@@ -181,7 +181,6 @@ const createStyles = (theme: AppTheme) =>
     segmentRow: {
       flexDirection: "row",
       gap: spacing.md,
-      marginTop: spacing.sm,
       alignItems: "center",
     },
     segmentItem: {

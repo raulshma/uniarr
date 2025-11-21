@@ -347,8 +347,22 @@ export abstract class BaseConnector<
    * Ensure the service is authenticated before making requests
    */
   protected async ensureAuthenticated(): Promise<void> {
-    if (this.isAuthenticated) {
+    // Check if we have a valid session in AuthManager, not just the local flag
+    const hasValidSession = ServiceAuthHelper.isServiceAuthenticated(
+      this.config,
+    );
+
+    if (this.isAuthenticated && hasValidSession) {
       return;
+    }
+
+    // Session is missing or invalid, re-authenticate
+    if (this.isAuthenticated && !hasValidSession) {
+      void logger.debug("Session missing in AuthManager, re-authenticating.", {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+      });
+      this.isAuthenticated = false;
     }
 
     try {

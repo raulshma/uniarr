@@ -19,7 +19,11 @@ import {
 import { AuthProvider, useAuth } from "@/services/auth/AuthProvider";
 import { useTheme } from "@/hooks/useTheme";
 import { defaultTheme } from "@/constants/theme";
-import { ErrorBoundary, DialogProvider } from "@/components/common";
+import {
+  ErrorBoundary,
+  DialogProvider,
+  GlobalSnackbar,
+} from "@/components/common";
 import { OfflineIndicator } from "@/components/common/OfflineIndicator";
 import { DownloadManagerProvider } from "@/providers/DownloadManagerProvider";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
@@ -191,6 +195,7 @@ const RootLayout = () => {
                               <AppContent />
                             </ErrorBoundary>
                             <QueryDevtools />
+                            <GlobalSnackbar />
                           </DownloadManagerProvider>
                         </DialogProvider>
                       </WidgetDrawerProvider>
@@ -233,6 +238,7 @@ const RootLayout = () => {
                               <AppContent />
                             </ErrorBoundary>
                             <QueryDevtools />
+                            <GlobalSnackbar />
                           </DownloadManagerProvider>
                         </DialogProvider>
                       </WidgetDrawerProvider>

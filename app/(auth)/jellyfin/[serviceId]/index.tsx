@@ -661,8 +661,8 @@ const createStyles = (theme: AppTheme) =>
       paddingHorizontal: spacing.lg,
     },
     headerContainer: {
-      gap: spacing.lg,
-      paddingBottom: spacing.lg,
+      gap: spacing.sm,
+      paddingBottom: 0,
     },
     toolbar: {
       flexDirection: "row",

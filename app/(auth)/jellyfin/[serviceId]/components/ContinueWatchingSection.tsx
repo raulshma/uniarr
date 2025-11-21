@@ -38,8 +38,21 @@ export const ContinueWatchingSection: React.FC<
 
   const renderResumeItem = useCallback(
     ({ item, index }: { item: JellyfinResumeItem; index: number }) => {
+      const isEpisode = item.Type === "Episode";
       const title = item.SeriesName ?? item.Name ?? "Untitled";
       const posterUri = buildPosterUri(connector, item, 420);
+
+      // Format episode info (e.g., "S01E05" or "Episode 5")
+      let episodeInfo = "";
+      if (isEpisode) {
+        const season = item.ParentIndexNumber;
+        const episode = item.IndexNumber;
+        if (season !== undefined && episode !== undefined) {
+          episodeInfo = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+        } else if (episode !== undefined) {
+          episodeInfo = `Episode ${episode}`;
+        }
+      }
 
       const posterSize = Math.max(
         120,
@@ -50,7 +63,12 @@ export const ContinueWatchingSection: React.FC<
       );
 
       return (
-        <View style={{ width: posterSize }}>
+        <View
+          style={[
+            { width: posterSize },
+            index > 0 && { marginLeft: spacing.md },
+          ]}
+        >
           <Pressable
             style={({ pressed }) => [
               styles.resumePosterWrap,
@@ -112,6 +130,15 @@ export const ContinueWatchingSection: React.FC<
           >
             {title}
           </Text>
+          {episodeInfo && (
+            <Text
+              numberOfLines={1}
+              variant="bodySmall"
+              style={styles.episodeInfo}
+            >
+              {episodeInfo}
+            </Text>
+          )}
         </View>
       );
     },
@@ -156,7 +183,7 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginTop: spacing.md,
+      marginTop: spacing.xs,
     },
     sectionTitle: {
       color: theme.colors.onSurface,
@@ -164,8 +191,7 @@ const createStyles = (theme: AppTheme) =>
     },
     resumeList: {
       marginTop: spacing.sm,
-      gap: spacing.lg,
-      paddingHorizontal: spacing.md,
+      paddingRight: spacing.md,
     },
     resumePosterWrap: {
       alignItems: "center",
@@ -194,6 +220,11 @@ const createStyles = (theme: AppTheme) =>
       marginTop: spacing.xs,
       color: theme.colors.onSurface,
       fontWeight: "600",
+    },
+    episodeInfo: {
+      marginTop: 2,
+      color: theme.colors.onSurfaceVariant,
+      fontSize: 11,
     },
     cardPressed: {
       opacity: 0.9,

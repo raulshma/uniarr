@@ -56,3 +56,5 @@ export {
 
 export { UniArrLoader } from "./UniArrLoader";
 export type { UniArrLoaderProps } from "./UniArrLoader";
+
+export { GlobalSnackbar } from "./GlobalSnackbar";

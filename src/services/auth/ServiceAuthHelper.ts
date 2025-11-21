@@ -73,6 +73,16 @@ export class ServiceAuthHelper {
   }
 
   /**
+   * Update session for a service
+   */
+  static updateServiceSession(
+    serviceConfig: ServiceConfig,
+    session: AuthSession,
+  ): void {
+    authManager.updateSession(serviceConfig.id, session);
+  }
+
+  /**
    * Clear authentication session for a service
    */
   static clearServiceSession(serviceConfig: ServiceConfig): void {

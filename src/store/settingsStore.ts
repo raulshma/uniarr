@@ -64,6 +64,9 @@ type SettingsData = {
   // Jellyfin server addresses for deep linking
   jellyfinLocalAddress?: string;
   jellyfinPublicAddress?: string;
+  // Jellyfin player configuration
+  jellyfinPlayerAutoPlay: boolean;
+  jellyfinPlayerDefaultSubtitleLanguage?: string;
   // Preferred Jellyseerr service for TMDB -> Sonarr mappings
   preferredJellyseerrServiceId?: string;
   // Service IDs to include in Recent Activity (if undefined, include all enabled services)
@@ -162,6 +165,10 @@ interface SettingsState extends SettingsData {
   setHapticFeedback: (enabled: boolean) => void;
   setJellyfinLocalAddress: (address: string | undefined) => void;
   setJellyfinPublicAddress: (address: string | undefined) => void;
+  setJellyfinPlayerAutoPlay: (enabled: boolean) => void;
+  setJellyfinPlayerDefaultSubtitleLanguage: (
+    language: string | undefined,
+  ) => void;
   setPreferredJellyseerrServiceId: (serviceId: string | undefined) => void;
   setRecentActivitySourceServiceIds: (ids: string[] | undefined) => void;
   setPreferredRecentActivityServiceId: (serviceId: string | undefined) => void;
@@ -308,6 +315,8 @@ const createDefaultSettings = (): SettingsData => ({
   hapticFeedback: true,
   jellyfinLocalAddress: undefined,
   jellyfinPublicAddress: undefined,
+  jellyfinPlayerAutoPlay: false,
+  jellyfinPlayerDefaultSubtitleLanguage: undefined,
   preferredJellyseerrServiceId: undefined,
   recentActivitySourceServiceIds: undefined,
   preferredRecentActivityServiceId: undefined,
@@ -418,6 +427,11 @@ export const useSettingsStore = create<SettingsState>()(
         set({ jellyfinLocalAddress: address }),
       setJellyfinPublicAddress: (address: string | undefined) =>
         set({ jellyfinPublicAddress: address }),
+      setJellyfinPlayerAutoPlay: (enabled: boolean) =>
+        set({ jellyfinPlayerAutoPlay: enabled }),
+      setJellyfinPlayerDefaultSubtitleLanguage: (
+        language: string | undefined,
+      ) => set({ jellyfinPlayerDefaultSubtitleLanguage: language }),
       setPreferredJellyseerrServiceId: (serviceId: string | undefined) =>
         set({ preferredJellyseerrServiceId: serviceId }),
       setRecentActivitySourceServiceIds: (ids: string[] | undefined) =>
@@ -544,6 +558,9 @@ export const useSettingsStore = create<SettingsState>()(
         hapticFeedback: state.hapticFeedback,
         jellyfinLocalAddress: state.jellyfinLocalAddress,
         jellyfinPublicAddress: state.jellyfinPublicAddress,
+        jellyfinPlayerAutoPlay: state.jellyfinPlayerAutoPlay,
+        jellyfinPlayerDefaultSubtitleLanguage:
+          state.jellyfinPlayerDefaultSubtitleLanguage,
         preferredJellyseerrServiceId: state.preferredJellyseerrServiceId,
         recentActivitySourceServiceIds: state.recentActivitySourceServiceIds,
         preferredRecentActivityServiceId:
@@ -598,7 +615,7 @@ export const useSettingsStore = create<SettingsState>()(
         defaultDashboard: state.defaultDashboard,
       }),
       // Bump version since we're adding new persisted fields
-      version: 20,
+      version: 21,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -990,6 +1007,11 @@ export const selectJellyfinLocalAddress = (state: SettingsState) =>
   state.jellyfinLocalAddress;
 export const selectJellyfinPublicAddress = (state: SettingsState) =>
   state.jellyfinPublicAddress;
+export const selectJellyfinPlayerAutoPlay = (state: SettingsState): boolean =>
+  state.jellyfinPlayerAutoPlay;
+export const selectJellyfinPlayerDefaultSubtitleLanguage = (
+  state: SettingsState,
+): string | undefined => state.jellyfinPlayerDefaultSubtitleLanguage;
 export const selectPreferredJellyseerrServiceId = (state: SettingsState) =>
   state.preferredJellyseerrServiceId;
 export const selectRecentActivitySourceServiceIds = (state: SettingsState) =>

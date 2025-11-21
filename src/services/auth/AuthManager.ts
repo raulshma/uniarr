@@ -80,13 +80,15 @@ export class AuthManager implements IAuthManager {
 
         this.sessions.set(serviceId, session);
 
-        void logger.debug("Authentication successful.", {
+        void logger.debug("Authentication successful - session stored.", {
           serviceId,
           serviceType,
           authMethod: config.method,
           hasToken: Boolean(result.token),
           hasRefreshToken: Boolean(result.refreshToken),
           expiresAt: result.expiresAt,
+          sessionContext: result.context,
+          totalSessions: this.sessions.size,
         });
       } else {
         void logger.warn("Authentication failed.", {
@@ -144,11 +146,36 @@ export class AuthManager implements IAuthManager {
       this.determineServiceTypeFromId(serviceId);
     const provider = this.getProvider(serviceType);
 
+    void logger.debug("AuthManager.getAuthHeaders called", {
+      serviceId,
+      serviceType,
+      hasSession: !!session,
+      isAuthenticated: session?.isAuthenticated,
+      hasProvider: !!provider,
+      sessionContext: session?.context,
+    });
+
     if (!session || !session.isAuthenticated || !provider) {
+      void logger.warn(
+        "Cannot get auth headers - missing session or provider",
+        {
+          serviceId,
+          serviceType,
+          hasSession: !!session,
+          isAuthenticated: session?.isAuthenticated,
+          hasProvider: !!provider,
+        },
+      );
       return {};
     }
 
-    return provider.getAuthHeaders(session);
+    const headers = provider.getAuthHeaders(session);
+    void logger.debug("Auth headers generated", {
+      serviceId,
+      headerKeys: Object.keys(headers),
+    });
+
+    return headers;
   }
 
   /**

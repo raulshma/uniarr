@@ -25,6 +25,7 @@ import type {
   DownloadInfo,
 } from "@/connectors/base/IDownloadConnector";
 import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
+import { authManager } from "@/services/auth/AuthManager";
 import { logger } from "@/services/logger/LoggerService";
 
 const DEFAULT_RESUME_TYPES = ["Movie", "Episode"];
@@ -83,13 +84,23 @@ export class JellyfinConnector
 
     this.client.interceptors.request.use((requestConfig) => {
       const authHeaders = ServiceAuthHelper.getServiceAuthHeaders(this.config);
-      const headers = requestConfig.headers ?? {};
+
+      void logger.debug("Jellyfin request interceptor - auth headers", {
+        serviceId: this.config.id,
+        endpoint: requestConfig.url,
+        hasAuthHeaders: Object.keys(authHeaders).length > 0,
+        authHeaderKeys: Object.keys(authHeaders),
+        userId: this.userId,
+        userName: this.userName,
+      });
+
+      // Merge auth headers with existing headers
       Object.entries(authHeaders).forEach(([key, value]) => {
-        if (value !== undefined) {
-          (headers as Record<string, unknown>)[key] = value;
+        if (value !== undefined && requestConfig.headers) {
+          requestConfig.headers[key] = value;
         }
       });
-      requestConfig.headers = headers;
+
       return requestConfig;
     });
   }
@@ -376,23 +387,96 @@ export class JellyfinConnector
     }
   }
 
+  async reportPlaybackStart(options: {
+    readonly itemId: string;
+    readonly mediaSourceId: string;
+    readonly playSessionId?: string;
+    readonly canSeek?: boolean;
+    readonly audioStreamIndex?: number;
+    readonly subtitleStreamIndex?: number;
+  }): Promise<void> {
+    try {
+      await this.ensureAuthenticated();
+
+      const payload = {
+        ItemId: options.itemId,
+        MediaSourceId: options.mediaSourceId,
+        PlaySessionId: options.playSessionId ?? null,
+        CanSeek: options.canSeek ?? true,
+        AudioStreamIndex: options.audioStreamIndex ?? null,
+        SubtitleStreamIndex: options.subtitleStreamIndex ?? null,
+      };
+
+      await this.client.post("/Sessions/Playing", payload);
+    } catch (error) {
+      await logger.warn("Failed to report Jellyfin playback start.", {
+        serviceId: this.config.id,
+        itemId: options.itemId,
+        error,
+      });
+      // Don't throw - playback reporting is non-critical
+    }
+  }
+
+  async reportPlaybackProgress(options: {
+    readonly itemId: string;
+    readonly mediaSourceId: string;
+    readonly playSessionId?: string;
+    readonly positionTicks: number;
+    readonly isPaused?: boolean;
+    readonly isMuted?: boolean;
+    readonly volumeLevel?: number;
+    readonly audioStreamIndex?: number;
+    readonly subtitleStreamIndex?: number;
+    readonly playbackRate?: number;
+  }): Promise<void> {
+    try {
+      await this.ensureAuthenticated();
+
+      const payload = {
+        ItemId: options.itemId,
+        MediaSourceId: options.mediaSourceId,
+        PlaySessionId: options.playSessionId ?? null,
+        PositionTicks: options.positionTicks,
+        IsPaused: options.isPaused ?? false,
+        IsMuted: options.isMuted ?? false,
+        VolumeLevel:
+          options.volumeLevel !== undefined
+            ? Math.round(options.volumeLevel * 100)
+            : null,
+        AudioStreamIndex: options.audioStreamIndex ?? null,
+        SubtitleStreamIndex: options.subtitleStreamIndex ?? null,
+        PlaybackRate: options.playbackRate ?? null,
+      };
+
+      await this.client.post("/Sessions/Playing/Progress", payload);
+    } catch (error) {
+      await logger.warn("Failed to report Jellyfin playback progress.", {
+        serviceId: this.config.id,
+        itemId: options.itemId,
+        error,
+      });
+      // Don't throw - playback reporting is non-critical
+    }
+  }
+
   async reportPlaybackStopped(options: {
     readonly itemId: string;
     readonly mediaSourceId: string;
     readonly playSessionId?: string;
     readonly positionTicks?: number;
   }): Promise<void> {
-    await this.ensureAuthenticated();
-
-    const payload: JellyfinPlaybackStopInfo = {
-      ItemId: options.itemId,
-      MediaSourceId: options.mediaSourceId,
-      PositionTicks: options.positionTicks ?? 0,
-      PlaySessionId: options.playSessionId ?? null,
-      Failed: false,
-    };
-
     try {
+      await this.ensureAuthenticated();
+
+      const payload: JellyfinPlaybackStopInfo = {
+        ItemId: options.itemId,
+        MediaSourceId: options.mediaSourceId,
+        PositionTicks: options.positionTicks ?? 0,
+        PlaySessionId: options.playSessionId ?? null,
+        Failed: false,
+      };
+
       await this.client.post("/Sessions/Playing/Stopped", payload);
     } catch (error) {
       await logger.warn("Failed to report Jellyfin playback stop.", {
@@ -401,6 +485,7 @@ export class JellyfinConnector
         mediaSourceId: options.mediaSourceId,
         error,
       });
+      // Don't throw - playback reporting is non-critical
     }
   }
 
@@ -660,6 +745,7 @@ export class JellyfinConnector
           error: error instanceof Error ? error.message : String(error),
         });
       }
+      this.updateSessionContext();
       return;
     }
 
@@ -684,6 +770,28 @@ export class JellyfinConnector
           this.userName = profile.Name;
         }
       }
+    }
+
+    // Update the session with the resolved user context
+    this.updateSessionContext();
+  }
+
+  /**
+   * Update the AuthManager session with current user context
+   * This ensures auth headers include userId and userName
+   */
+  private updateSessionContext(): void {
+    const session = ServiceAuthHelper.getServiceSession(this.config);
+    if (session && session.isAuthenticated) {
+      const updatedSession = {
+        ...session,
+        context: {
+          ...session.context,
+          userId: this.userId,
+          userName: this.userName,
+        },
+      };
+      authManager.updateSession(this.config.id, updatedSession);
     }
   }
 
