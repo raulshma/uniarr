@@ -264,6 +264,7 @@ const SettingsScreen = () => {
     serviceHealthNotificationsEnabled,
     refreshIntervalMinutes,
     quietHours,
+    defaultDashboard,
     setTheme,
     setOledEnabled,
     setNotificationsEnabled,
@@ -272,6 +273,7 @@ const SettingsScreen = () => {
     setRequestNotificationsEnabled,
     setServiceHealthNotificationsEnabled,
     setRefreshIntervalMinutes,
+    setDefaultDashboard,
     jellyseerrRetryAttempts,
     setJellyseerrRetryAttempts,
     tmdbEnabled,
@@ -304,7 +306,7 @@ const SettingsScreen = () => {
   }, [themePreference, colorScheme]);
 
   const appearanceItemsCount = useMemo(
-    () => (isCurrentThemeDark ? 3 : 2),
+    () => (isCurrentThemeDark ? 4 : 3),
     [isCurrentThemeDark],
   );
 
@@ -773,6 +775,72 @@ const SettingsScreen = () => {
             )}
             <AnimatedListItem
               index={isCurrentThemeDark ? 2 : 1}
+              totalItems={appearanceItemsCount}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Default Dashboard"
+                subtitle={
+                  defaultDashboard === "main"
+                    ? "Main Dashboard"
+                    : "Widgets Dashboard"
+                }
+                left={{ iconName: "view-dashboard" }}
+                trailing={
+                  <View style={styles.themeOptions}>
+                    <Chip
+                      mode={defaultDashboard === "main" ? "flat" : "outlined"}
+                      style={[
+                        styles.themeChip,
+                        {
+                          backgroundColor:
+                            defaultDashboard === "main"
+                              ? theme.colors.primaryContainer
+                              : theme.colors.surfaceVariant,
+                        },
+                      ]}
+                      textStyle={{
+                        color:
+                          defaultDashboard === "main"
+                            ? theme.colors.onPrimaryContainer
+                            : theme.colors.onSurfaceVariant,
+                        fontSize: 12,
+                      }}
+                      onPress={() => setDefaultDashboard("main")}
+                    >
+                      Main
+                    </Chip>
+                    <Chip
+                      mode={
+                        defaultDashboard === "widgets" ? "flat" : "outlined"
+                      }
+                      style={[
+                        styles.themeChip,
+                        {
+                          backgroundColor:
+                            defaultDashboard === "widgets"
+                              ? theme.colors.primaryContainer
+                              : theme.colors.surfaceVariant,
+                        },
+                      ]}
+                      textStyle={{
+                        color:
+                          defaultDashboard === "widgets"
+                            ? theme.colors.onPrimaryContainer
+                            : theme.colors.onSurfaceVariant,
+                        fontSize: 12,
+                      }}
+                      onPress={() => setDefaultDashboard("widgets")}
+                    >
+                      Widgets
+                    </Chip>
+                  </View>
+                }
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={isCurrentThemeDark ? 3 : 2}
               totalItems={appearanceItemsCount}
               animated={animationsEnabled}
             >

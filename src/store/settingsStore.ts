@@ -128,6 +128,8 @@ type SettingsData = {
   recommendationProvider?: string; // AIProviderType
   recommendationModel?: string;
   recommendationKeyId?: string;
+  // Default dashboard preference
+  defaultDashboard: "main" | "widgets";
 };
 
 interface SettingsState extends SettingsData {
@@ -209,6 +211,7 @@ interface SettingsState extends SettingsData {
   setRecommendationProvider: (provider: string | undefined) => void;
   setRecommendationModel: (model: string | undefined) => void;
   setRecommendationKeyId: (keyId: string | undefined) => void;
+  setDefaultDashboard: (dashboard: "main" | "widgets") => void;
 }
 const STORAGE_KEY = "SettingsStore:v1";
 const MIN_REFRESH_INTERVAL = 5;
@@ -359,6 +362,7 @@ const createDefaultSettings = (): SettingsData => ({
   recommendationProvider: undefined,
   recommendationModel: undefined,
   recommendationKeyId: undefined,
+  defaultDashboard: "main",
 });
 
 export const useSettingsStore = create<SettingsState>()(
@@ -505,6 +509,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ recommendationModel: model }),
       setRecommendationKeyId: (keyId: string | undefined) =>
         set({ recommendationKeyId: keyId }),
+      setDefaultDashboard: (dashboard: "main" | "widgets") =>
+        set({ defaultDashboard: dashboard }),
       reset: () => set(createDefaultSettings()),
     }),
     {
@@ -589,9 +595,10 @@ export const useSettingsStore = create<SettingsState>()(
         recommendationProvider: state.recommendationProvider,
         recommendationModel: state.recommendationModel,
         recommendationKeyId: state.recommendationKeyId,
+        defaultDashboard: state.defaultDashboard,
       }),
       // Bump version since we're adding new persisted fields
-      version: 19,
+      version: 20,
       storage: createJSONStorage(() => storageAdapter),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -929,6 +936,8 @@ export const useSettingsStore = create<SettingsState>()(
           recommendationProvider: partial.recommendationProvider ?? undefined,
           recommendationModel: partial.recommendationModel ?? undefined,
           recommendationKeyId: partial.recommendationKeyId ?? undefined,
+          defaultDashboard:
+            partial.defaultDashboard ?? baseDefaults.defaultDashboard,
           _hasHydrated: true,
         } satisfies SettingsData;
       },
@@ -1024,3 +1033,6 @@ export const selectRecommendationModel = (
 export const selectRecommendationKeyId = (
   state: SettingsState,
 ): string | undefined => state.recommendationKeyId;
+export const selectDefaultDashboard = (
+  state: SettingsState,
+): "main" | "widgets" => state.defaultDashboard;
