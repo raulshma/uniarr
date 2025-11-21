@@ -13,7 +13,7 @@ import { Text, useTheme, IconButton } from "react-native-paper";
 import { FlashList } from "@shopify/flash-list";
 import { useQueries } from "@tanstack/react-query";
 
-import MediaPoster from "@/components/media/MediaPoster/MediaPoster";
+import { MediaPoster } from "@/components/media/MediaPoster";
 import type {
   JellyfinLatestItem,
   JellyfinLibraryView,
