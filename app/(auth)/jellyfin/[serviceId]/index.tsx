@@ -31,6 +31,7 @@ import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import { useJellyfinLibraries } from "@/hooks/useJellyfinLibraries";
+import LatestMediaSection from "@/components/jellyfin/LatestMediaSection";
 import { useQueries, useInfiniteQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/queryKeys";
 import { useJellyfinNowPlaying } from "@/hooks/useJellyfinNowPlaying";
@@ -409,31 +410,6 @@ const JellyfinLibraryScreen = () => {
           return connector.getResumeItems(12);
         },
       },
-      // Latest items (contextual content)
-      {
-        queryKey:
-          serviceId && libraryState.selectedLibraryId
-            ? [
-                ...queryKeys.jellyfin.latest(
-                  serviceId,
-                  libraryState.selectedLibraryId,
-                  { limit: 16 },
-                ),
-                "consolidated",
-              ]
-            : [...queryKeys.jellyfin.base, "latest"],
-        enabled: Boolean(serviceId && libraryState.selectedLibraryId),
-        staleTime: 5 * 60_000, // 5 minutes - latest items are relatively stable
-        refetchOnWindowFocus: false,
-        queryFn: async () => {
-          if (!serviceId || !libraryState.selectedLibraryId) return [];
-          const connector = manager.getConnector(serviceId) as
-            | JellyfinConnector
-            | undefined;
-          if (!connector) return [];
-          return connector.getLatestItems(libraryState.selectedLibraryId, 16);
-        },
-      },
     ],
   });
 
@@ -520,7 +496,7 @@ const JellyfinLibraryScreen = () => {
   });
 
   // Extract query results for cleaner usage
-  const [resumeQuery, latestQuery] = consolidatedQueries;
+  const [resumeQuery] = consolidatedQueries;
 
   // Keep now playing separate due to real-time polling requirement
   const nowPlayingQuery = useJellyfinNowPlaying({
@@ -537,12 +513,10 @@ const JellyfinLibraryScreen = () => {
     librariesQuery.isLoading ||
     libraryItemsInfiniteQuery.isLoading ||
     resumeQuery.isLoading ||
-    nowPlayingQuery.isLoading ||
-    latestQuery.isLoading;
+    nowPlayingQuery.isLoading;
   const isRefreshing =
     (libraryItemsInfiniteQuery.isFetching ||
       resumeQuery.isFetching ||
-      latestQuery.isFetching ||
       librariesQuery.isFetching ||
       nowPlayingQuery.isFetching) &&
     !isInitialLoad;
@@ -566,8 +540,7 @@ const JellyfinLibraryScreen = () => {
     librariesQuery.error ??
     libraryItemsInfiniteQuery.error ??
     resumeQuery.error ??
-    nowPlayingQuery.error ??
-    latestQuery.error;
+    nowPlayingQuery.error;
   const errorMessage =
     aggregatedError instanceof Error
       ? aggregatedError.message
@@ -842,15 +815,8 @@ const JellyfinLibraryScreen = () => {
       libraryItemsInfiniteQuery.refetch(),
       resumeQuery.refetch(),
       nowPlayingQuery.refetch(),
-      latestQuery.refetch(),
     ]);
-  }, [
-    latestQuery,
-    librariesQuery,
-    libraryItemsInfiniteQuery,
-    resumeQuery,
-    nowPlayingQuery,
-  ]);
+  }, [librariesQuery, libraryItemsInfiniteQuery, resumeQuery, nowPlayingQuery]);
 
   // Filter sessions to only those that actually have a NowPlayingItem. Some
   // connectors may return sessions without an active NowPlayingItem; avoid
@@ -1304,6 +1270,12 @@ const JellyfinLibraryScreen = () => {
           </View>
         ) : null}
 
+        <LatestMediaSection
+          serviceId={serviceId!}
+          libraries={librariesQuery.data ?? []}
+          onOpenItem={handleOpenItem}
+        />
+
         {/* Searchbar and Tabs placed here per design */}
         <View>
           <Searchbar
@@ -1357,9 +1329,11 @@ const JellyfinLibraryScreen = () => {
   }, [
     libraryState.activeSegment,
     handleNavigateBack,
+    handleOpenItem,
+    librariesQuery.data,
+    serviceId,
     handleOpenNowPlaying,
     handleOpenSettings,
-
     renderResumeItem,
     continueWatchingItems,
     resumeQuery,
