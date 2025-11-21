@@ -33,7 +33,7 @@ export type JellyfinLibraryView = NonNullable<
   _JellyfinLibraryViewResponse["Items"]
 >[number];
 
-export type JellyfinUserData = components["schemas"]["UserItemDataDto"];
+export type JellyfinUserData = components["schemas"]["UserItemDataDto"] | null;
 
 export type JellyfinItem = components["schemas"]["BaseItemDto"];
 

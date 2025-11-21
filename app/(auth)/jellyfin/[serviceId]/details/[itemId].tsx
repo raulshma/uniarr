@@ -32,6 +32,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import DownloadButton from "@/components/downloads/DownloadButton";
+import { ResumePlaybackDialog } from "@/components/jellyfin/ResumePlaybackDialog";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
@@ -292,7 +293,10 @@ const JellyfinItemDetailsScreen = () => {
     enabled: isSeries,
   });
 
-  const episodes = episodesQuery.data ?? [];
+  const episodes = useMemo(
+    () => episodesQuery.data ?? [],
+    [episodesQuery.data],
+  );
   const isLoading = isBootstrapping || detailsQuery.isLoading;
   const errorMessage =
     detailsQuery.error instanceof Error
@@ -413,40 +417,87 @@ const JellyfinItemDetailsScreen = () => {
         episodes.find((ep) => !ep.UserData?.Played) ?? episodes[0];
 
       if (firstUnwatched?.Id) {
-        const params: Record<string, string> = {
-          serviceId,
-          itemId: firstUnwatched.Id,
-        };
-
         const resumeTicks = firstUnwatched.UserData?.PlaybackPositionTicks;
-        if (typeof resumeTicks === "number" && resumeTicks > 0) {
-          params.startTicks = String(Math.floor(resumeTicks));
-        }
+        const hasProgress = resumeTicks && resumeTicks > 600_000_000;
 
-        router.push({
-          pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
-          params,
-        });
+        if (hasProgress) {
+          setResumeDialogState({
+            visible: true,
+            item: firstUnwatched,
+            resumeTicks,
+          });
+        } else {
+          router.push({
+            pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+            params: {
+              serviceId,
+              itemId: firstUnwatched.Id,
+            },
+          });
+        }
       }
       return;
     }
 
     // For movies and other playable items
-    const params: Record<string, string> = {
-      serviceId,
-      itemId: item.Id,
-    };
-
     const resumeTicks = item.UserData?.PlaybackPositionTicks;
-    if (typeof resumeTicks === "number" && resumeTicks > 0) {
-      params.startTicks = String(Math.floor(resumeTicks));
-    }
+    const hasProgress = resumeTicks && resumeTicks > 600_000_000; // More than 1 minute
 
-    router.push({
-      pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
-      params,
-    });
+    if (hasProgress) {
+      setResumeDialogState({
+        visible: true,
+        item,
+        resumeTicks,
+      });
+    } else {
+      router.push({
+        pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+        params: {
+          serviceId,
+          itemId: item.Id,
+        },
+      });
+    }
   }, [router, serviceId, item, isSeries, episodes]);
+
+  // Resume playback dialog state
+  const [resumeDialogState, setResumeDialogState] = useState<{
+    visible: boolean;
+    item: JellyfinItem | null;
+    resumeTicks: number | null;
+  }>({
+    visible: false,
+    item: null,
+    resumeTicks: null,
+  });
+
+  const handleEpisodePlay = useCallback(
+    (episode: JellyfinItem) => {
+      if (!serviceId || !episode.Id) {
+        return;
+      }
+
+      const resumeTicks = episode.UserData?.PlaybackPositionTicks;
+      const hasProgress = resumeTicks && resumeTicks > 600_000_000; // More than 1 minute
+
+      if (hasProgress) {
+        setResumeDialogState({
+          visible: true,
+          item: episode,
+          resumeTicks,
+        });
+      } else {
+        router.push({
+          pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+          params: {
+            serviceId,
+            itemId: episode.Id,
+          },
+        });
+      }
+    },
+    [router, serviceId],
+  );
 
   const handleSyncMetadata = useCallback(async () => {
     if (!connector || !item) {
@@ -486,30 +537,6 @@ const JellyfinItemDetailsScreen = () => {
           serviceId,
           itemId: episode.Id,
         },
-      });
-    },
-    [router, serviceId],
-  );
-
-  const handleEpisodePlay = useCallback(
-    (episode: JellyfinItem) => {
-      if (!serviceId || !episode.Id) {
-        return;
-      }
-
-      const params: Record<string, string> = {
-        serviceId,
-        itemId: episode.Id,
-      };
-
-      const resumeTicks = episode.UserData?.PlaybackPositionTicks;
-      if (typeof resumeTicks === "number" && resumeTicks > 0) {
-        params.startTicks = String(Math.floor(resumeTicks));
-      }
-
-      router.push({
-        pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
-        params,
       });
     },
     [router, serviceId],
@@ -859,6 +886,59 @@ const JellyfinItemDetailsScreen = () => {
           <View style={{ height: spacing.xxl }} />
         </AnimatedScrollView>
       </View>
+
+      {/* Resume playback dialog */}
+      <ResumePlaybackDialog
+        visible={resumeDialogState.visible}
+        onDismiss={() =>
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          })
+        }
+        onResume={() => {
+          if (resumeDialogState.item?.Id && serviceId) {
+            const params: Record<string, string> = {
+              serviceId,
+              itemId: resumeDialogState.item.Id,
+            };
+            if (resumeDialogState.resumeTicks) {
+              params.startTicks = String(
+                Math.floor(resumeDialogState.resumeTicks),
+              );
+            }
+            router.push({
+              pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+              params,
+            });
+          }
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          });
+        }}
+        onStartFromBeginning={() => {
+          if (resumeDialogState.item?.Id && serviceId) {
+            router.push({
+              pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+              params: {
+                serviceId,
+                itemId: resumeDialogState.item.Id,
+              },
+            });
+          }
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          });
+        }}
+        itemTitle={resumeDialogState.item?.Name}
+        playedPercentage={resumeDialogState.item?.UserData?.PlayedPercentage}
+        positionTicks={resumeDialogState.resumeTicks ?? undefined}
+      />
     </>
   );
 };

@@ -103,28 +103,31 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   // URI resolution: use Image component's native caching
   // Track when URI changes to reset state
   const prevUriRef = useRef<string | undefined>(uri);
-  const isUriChanged = prevUriRef.current !== uri;
 
-  if (isUriChanged) {
-    prevUriRef.current = uri;
-    if (!uri) {
-      setImageState({
-        loaded: false,
-        loading: false,
-        error: false,
-        resolvedUri: undefined,
-      });
-      fadeAnim.setValue(0);
-    } else {
-      // Mark as loading to show thumbhash placeholder if available
-      setImageState((prev) => ({
-        ...prev,
-        loading: true,
-        error: false,
-        resolvedUri: uri,
-      }));
+  // Use useEffect to handle URI changes to avoid state updates during render
+  // This prevents Glide errors on Android when images are loaded/cleared in callbacks
+  React.useEffect(() => {
+    if (prevUriRef.current !== uri) {
+      prevUriRef.current = uri;
+      if (!uri) {
+        setImageState({
+          loaded: false,
+          loading: false,
+          error: false,
+          resolvedUri: undefined,
+        });
+        fadeAnim.setValue(0);
+      } else {
+        // Mark as loading to show thumbhash placeholder if available
+        setImageState((prev) => ({
+          ...prev,
+          loading: true,
+          error: false,
+          resolvedUri: uri,
+        }));
+      }
     }
-  }
+  }, [uri, fadeAnim]);
 
   // Use the thumbhash hook with reduced delay for better UX
   // Called after URI tracking to ensure state consistency

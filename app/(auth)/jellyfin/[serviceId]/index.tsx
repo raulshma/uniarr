@@ -1,6 +1,6 @@
 import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useReducer } from "react";
+import React, { useCallback, useEffect, useMemo, useReducer } from "react";
 import {
   Pressable,
   ScrollView,
@@ -27,6 +27,8 @@ import { SeriesListItemSkeleton } from "@/components/media/skeletons";
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import DownloadButton from "@/components/downloads/DownloadButton";
+import { WatchStatusBadge } from "@/components/jellyfin/WatchStatusBadge";
+import { ResumePlaybackDialog } from "@/components/jellyfin/ResumePlaybackDialog";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
@@ -270,6 +272,17 @@ const JellyfinLibraryScreen = () => {
     debouncedSearch: "",
     showSkeletonLayer: true,
     contentInteractive: false,
+  });
+
+  // Resume playback dialog state
+  const [resumeDialogState, setResumeDialogState] = React.useState<{
+    visible: boolean;
+    item: JellyfinItem | null;
+    resumeTicks: number | null;
+  }>({
+    visible: false,
+    item: null,
+    resumeTicks: null,
   });
 
   const connector = useMemo(() => {
@@ -843,7 +856,18 @@ const JellyfinLibraryScreen = () => {
       const ticksCandidate =
         resumeTicks ?? item.UserData?.PlaybackPositionTicks ?? null;
 
-      openPlayer(item.Id, ticksCandidate);
+      // Show resume dialog if there's playback progress (more than 1 minute)
+      const hasProgress = ticksCandidate && ticksCandidate > 600_000_000; // 1 minute in ticks
+
+      if (hasProgress) {
+        setResumeDialogState({
+          visible: true,
+          item,
+          resumeTicks: ticksCandidate,
+        });
+      } else {
+        openPlayer(item.Id, null);
+      }
     },
     [openPlayer],
   );
@@ -961,17 +985,6 @@ const JellyfinLibraryScreen = () => {
       const title = item.SeriesName ?? item.Name ?? "Untitled";
       const posterUri = buildPosterUri(connector, item, 420);
 
-      // Optimized progress calculation with early returns
-      let progress: number | undefined;
-      if (
-        typeof item.UserData?.PlaybackPositionTicks === "number" &&
-        typeof item.RunTimeTicks === "number"
-      ) {
-        const rawProgress =
-          item.UserData.PlaybackPositionTicks / item.RunTimeTicks;
-        progress = Math.min(Math.max(rawProgress, 0), 1);
-      }
-
       // Responsive poster sizing - memoized calculation
       const posterSize = Math.max(
         120,
@@ -997,42 +1010,45 @@ const JellyfinLibraryScreen = () => {
                 size={posterSize - 8}
                 borderRadius={12}
                 accessibilityLabel={`Continue watching ${title}`}
-              />
-              <Pressable
-                style={styles.playOverlay}
-                hitSlop={10}
-                onPress={() =>
-                  handlePlayItem(
-                    item as JellyfinItem,
-                    item.UserData?.PlaybackPositionTicks ?? null,
-                  )
+                overlay={
+                  <>
+                    <WatchStatusBadge
+                      userData={item.UserData}
+                      position="top-left"
+                      showProgressBar={true}
+                    />
+                    <Pressable
+                      style={styles.playOverlay}
+                      hitSlop={10}
+                      onPress={() =>
+                        handlePlayItem(
+                          item as JellyfinItem,
+                          item.UserData?.PlaybackPositionTicks ?? null,
+                        )
+                      }
+                    >
+                      <Icon
+                        source="play"
+                        size={28}
+                        color={theme.colors.onPrimary}
+                      />
+                    </Pressable>
+                    {/* Download button for resume items */}
+                    {connector && serviceId && item.Id && (
+                      <View style={styles.resumeDownloadOverlay}>
+                        <DownloadButton
+                          serviceConfig={connector.config}
+                          contentId={item.Id}
+                          size="small"
+                          variant="icon"
+                          onDownloadStart={() => {}}
+                          onDownloadError={() => {}}
+                        />
+                      </View>
+                    )}
+                  </>
                 }
-              >
-                <Icon source="play" size={28} color={theme.colors.onPrimary} />
-              </Pressable>
-              {typeof progress === "number" ? (
-                <View style={styles.resumePosterProgressRail}>
-                  <View
-                    style={[
-                      styles.resumePosterProgressFill,
-                      { width: `${Math.round(progress * 100)}%` },
-                    ]}
-                  />
-                </View>
-              ) : null}
-              {/* Download button for resume items */}
-              {connector && serviceId && item.Id && (
-                <View style={styles.resumeDownloadOverlay}>
-                  <DownloadButton
-                    serviceConfig={connector.config}
-                    contentId={item.Id}
-                    size="small"
-                    variant="icon"
-                    onDownloadStart={() => {}}
-                    onDownloadError={() => {}}
-                  />
-                </View>
-              )}
+              />
             </View>
           </Pressable>
           <Text
@@ -1056,8 +1072,6 @@ const JellyfinLibraryScreen = () => {
       styles.resumePosterWrap,
       styles.resumePosterContainer,
       styles.playOverlay,
-      styles.resumePosterProgressRail,
-      styles.resumePosterProgressFill,
       styles.resumeDownloadOverlay,
       styles.resumePosterTitle,
     ],
@@ -1115,42 +1129,51 @@ const JellyfinLibraryScreen = () => {
                   uri={posterUri}
                   size={posterSize}
                   borderRadius={12}
-                />
-                {isPlayable ? (
-                  <Pressable
-                    style={styles.gridPlayOverlay}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Play ${item.Name ?? "item"}`}
-                    onPress={(event) => {
-                      event.stopPropagation?.();
-                      handlePlayItem(
-                        item,
-                        item.UserData?.PlaybackPositionTicks ?? null,
-                      );
-                    }}
-                  >
-                    <View style={styles.gridPlayButton}>
-                      <Icon
-                        source="play"
-                        size={20}
-                        color={theme.colors.onPrimary}
+                  overlay={
+                    <>
+                      <WatchStatusBadge
+                        userData={item.UserData}
+                        position="top-right"
+                        showProgressBar={true}
                       />
-                    </View>
-                  </Pressable>
-                ) : null}
-                {/* Download button overlay on poster */}
-                {connector && serviceId && item.Id && (
-                  <View style={styles.downloadOverlay}>
-                    <DownloadButton
-                      serviceConfig={connector.config}
-                      contentId={item.Id}
-                      size="small"
-                      variant="icon"
-                      onDownloadStart={() => {}}
-                      onDownloadError={() => {}}
-                    />
-                  </View>
-                )}
+                      {isPlayable ? (
+                        <Pressable
+                          style={styles.gridPlayOverlay}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Play ${item.Name ?? "item"}`}
+                          onPress={(event) => {
+                            event.stopPropagation?.();
+                            handlePlayItem(
+                              item,
+                              item.UserData?.PlaybackPositionTicks ?? null,
+                            );
+                          }}
+                        >
+                          <View style={styles.gridPlayButton}>
+                            <Icon
+                              source="play"
+                              size={20}
+                              color={theme.colors.onPrimary}
+                            />
+                          </View>
+                        </Pressable>
+                      ) : null}
+                      {/* Download button overlay on poster */}
+                      {connector && serviceId && item.Id && (
+                        <View style={styles.downloadOverlay}>
+                          <DownloadButton
+                            serviceConfig={connector.config}
+                            contentId={item.Id}
+                            size="small"
+                            variant="icon"
+                            onDownloadStart={() => {}}
+                            onDownloadError={() => {}}
+                          />
+                        </View>
+                      )}
+                    </>
+                  }
+                />
               </View>
               <Text
                 variant="bodyMedium"
@@ -1543,6 +1566,44 @@ const JellyfinLibraryScreen = () => {
           {errorMessage}
         </HelperText>
       ) : null}
+
+      {/* Resume playback dialog */}
+      <ResumePlaybackDialog
+        visible={resumeDialogState.visible}
+        onDismiss={() =>
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          })
+        }
+        onResume={() => {
+          if (resumeDialogState.item?.Id) {
+            openPlayer(
+              resumeDialogState.item.Id,
+              resumeDialogState.resumeTicks,
+            );
+          }
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          });
+        }}
+        onStartFromBeginning={() => {
+          if (resumeDialogState.item?.Id) {
+            openPlayer(resumeDialogState.item.Id, null);
+          }
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          });
+        }}
+        itemTitle={resumeDialogState.item?.Name}
+        playedPercentage={resumeDialogState.item?.UserData?.PlayedPercentage}
+        positionTicks={resumeDialogState.resumeTicks ?? undefined}
+      />
     </SafeAreaView>
   );
 };

@@ -395,6 +395,10 @@ class SecureStorage {
         enabled: config.enabled,
         proxyUrl: config.proxyUrl,
         timeout: config.timeout,
+        defaultProfileId: config.defaultProfileId,
+        defaultRootFolderPath: config.defaultRootFolderPath,
+        jellyfinUserId: config.jellyfinUserId,
+        jellyseerrTargetDefaults: config.jellyseerrTargetDefaults,
         createdAt: config.createdAt.toISOString(),
         updatedAt: config.updatedAt.toISOString(),
       };

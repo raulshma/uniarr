@@ -143,6 +143,7 @@ export class JellyfinConnector
         "PrimaryImageAspectRatio,MediaSources,Overview,ParentId,SeriesInfo",
       IncludeItemTypes: includeTypes.join(","),
       EnableImages: true,
+      enableUserData: true,
       MediaTypes: "Video",
     };
 
@@ -173,6 +174,7 @@ export class JellyfinConnector
       Fields: "PrimaryImageAspectRatio,Overview,ParentId,ProviderIds",
       IncludeItemTypes: DEFAULT_RESUME_TYPES.join(","),
       EnableImages: true,
+      enableUserData: true,
       UserId: userId,
     };
 
@@ -214,6 +216,7 @@ export class JellyfinConnector
       ParentId: libraryId,
       Recursive: true,
       EnableImages: true,
+      enableUserData: true,
       // Use minimal fields by default for better performance; opt-in to full fields if needed
       Fields: options.includeFullDetails
         ? DEFAULT_ITEM_FIELDS
@@ -263,6 +266,7 @@ export class JellyfinConnector
           params: {
             Fields: DEFAULT_ITEM_FIELDS,
             EnableImages: true,
+            enableUserData: true,
           },
         },
       );
@@ -550,6 +554,7 @@ export class JellyfinConnector
           params: {
             ActiveWithinSeconds: 600,
             EnableImages: true,
+            enableUserData: true,
             Fields: DEFAULT_ITEM_FIELDS,
           },
         },
@@ -1287,6 +1292,7 @@ export class JellyfinConnector
               userId,
               fields: DEFAULT_ITEM_FIELDS.split(","),
               enableImages: true,
+              enableUserData: true,
               sortBy: "ParentIndexNumber,IndexNumber",
               sortOrder: "Ascending",
               startIndex,

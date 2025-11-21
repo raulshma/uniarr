@@ -41,7 +41,24 @@ const EpisodeCard: React.FC<{
   const seasonNumber = episode.ParentIndexNumber ?? 0;
   const runtime = formatRuntime(episode.RunTimeTicks ?? undefined);
   const hasWatched = episode.UserData?.Played ?? false;
-  const playbackProgress = episode.UserData?.PlayedPercentage ?? 0;
+
+  // Calculate playback progress - Jellyfin may not always return PlayedPercentage
+  const playbackProgress = (() => {
+    // Use PlayedPercentage if available
+    if (episode.UserData?.PlayedPercentage != null) {
+      return episode.UserData.PlayedPercentage;
+    }
+
+    // Otherwise calculate from PlaybackPositionTicks and RunTimeTicks
+    const positionTicks = episode.UserData?.PlaybackPositionTicks ?? 0;
+    const runtimeTicks = episode.RunTimeTicks ?? 0;
+
+    if (runtimeTicks > 0 && positionTicks > 0) {
+      return (positionTicks / runtimeTicks) * 100;
+    }
+
+    return 0;
+  })();
 
   // Show progress bar if there's any progress and not fully watched
   const showProgressBar =
