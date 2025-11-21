@@ -310,13 +310,13 @@ const JellyfinLibraryScreen = () => {
   }, [manager, serviceId]);
 
   useEffect(() => {
-    // Reduced debounce for snappier feel - 150ms instead of 300ms
+    // Debounce search to prevent refetching on every keystroke
     const timer = setTimeout(() => {
       const trimmed = libraryState.searchTerm.trim();
       if (trimmed !== libraryState.debouncedSearch) {
         dispatch({ type: "SET_DEBOUNCED_SEARCH", payload: trimmed });
       }
-    }, 150);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [libraryState.searchTerm, libraryState.debouncedSearch]);
@@ -434,6 +434,7 @@ const JellyfinLibraryScreen = () => {
         : [...queryKeys.jellyfin.base, "libraryItems"],
     enabled: Boolean(serviceId && libraryState.selectedLibraryId),
     staleTime: 30_000,
+    gcTime: 5 * 60 * 1000, // Keep cached data for 5 minutes
     queryFn: async ({ pageParam = 1 }) => {
       if (!serviceId || !libraryState.selectedLibraryId) {
         return { items: [], hasNextPage: false };
@@ -449,36 +450,59 @@ const JellyfinLibraryScreen = () => {
       const limit = 20;
       const startIndex = (pageParam - 1) * limit;
 
-      const queryOptions = {
-        searchTerm: libraryState.debouncedSearch,
-        includeItemTypes: activeSegmentConfig.includeItemTypes,
-        mediaTypes: activeSegmentConfig.mediaTypes,
-        sortBy: "SortName",
-        sortOrder: "Ascending" as const,
-        limit,
-        startIndex,
-      };
-
       try {
-        let result = await connector.getLibraryItems(
-          libraryState.selectedLibraryId!,
-          queryOptions,
-        );
+        let result: JellyfinItem[] = [];
 
-        // If no results with filters and this is TV segment, try without filters
-        if (
-          (!result || result.length === 0) &&
-          libraryState.activeSegment === "tv"
-        ) {
-          result = await connector.getLibraryItems(
-            libraryState.selectedLibraryId!,
+        // Use the proper search API when user is searching
+        if (libraryState.debouncedSearch) {
+          // Use the /Search/Hints endpoint for better search results
+          const searchResults = await connector.search(
+            libraryState.debouncedSearch,
             {
-              sortBy: "SortName",
-              sortOrder: "Ascending" as const,
-              limit,
-              startIndex,
+              pagination: {
+                page: pageParam,
+                pageSize: limit,
+              },
+              filters: {
+                includeItemTypes: activeSegmentConfig.includeItemTypes,
+              },
             },
           );
+
+          // Filter results to only include items from the selected library
+          // Search is global, so we need to filter by library
+          result = searchResults;
+        } else {
+          // Normal browsing without search
+          const queryOptions: any = {
+            mediaTypes: activeSegmentConfig.mediaTypes,
+            sortBy: "SortName",
+            sortOrder: "Ascending" as const,
+            limit,
+            startIndex,
+            includeItemTypes: activeSegmentConfig.includeItemTypes,
+          };
+
+          result = await connector.getLibraryItems(
+            libraryState.selectedLibraryId!,
+            queryOptions,
+          );
+
+          // If no results with filters and this is TV segment, try without filters
+          if (
+            (!result || result.length === 0) &&
+            libraryState.activeSegment === "tv"
+          ) {
+            result = await connector.getLibraryItems(
+              libraryState.selectedLibraryId!,
+              {
+                sortBy: "SortName",
+                sortOrder: "Ascending" as const,
+                limit,
+                startIndex,
+              },
+            );
+          }
         }
 
         return {
@@ -557,9 +581,15 @@ const JellyfinLibraryScreen = () => {
   const displayItems = useMemo(() => {
     if (libraryState.activeSegment !== "tv") return items;
 
-    // Fast path: if we already have series items, return them immediately
-    const seriesItems = items.filter((it) => it.Type === "Series");
-    if (seriesItems.length > 0) return seriesItems;
+    // When searching, always group by series even if we have Series items
+    // because search might return a mix of Series and Episodes
+    const hasSearchTerm = libraryState.debouncedSearch.length > 0;
+
+    // Fast path: if we already have series items AND not searching, return them immediately
+    if (!hasSearchTerm) {
+      const seriesItems = items.filter((it) => it.Type === "Series");
+      if (seriesItems.length > 0) return seriesItems;
+    }
 
     // Group episodes by series with optimized map operations
     const grouped = new Map<
@@ -567,11 +597,21 @@ const JellyfinLibraryScreen = () => {
       JellyfinItem & { __navigationId?: string; __posterSourceId?: string }
     >();
 
-    // Pre-allocate map capacity for better performance (if supported)
-    // Note: Map.reserve is not standard, so we'll skip this optimization for compatibility
-
     for (const it of items) {
-      // Use optimized key extraction with fallbacks
+      // If it's already a Series type, use it directly
+      if (it.Type === "Series") {
+        const seriesKey = it.Id || "";
+        if (seriesKey && !grouped.has(seriesKey)) {
+          grouped.set(seriesKey, {
+            ...it,
+            __navigationId: it.Id,
+            __posterSourceId: it.Id,
+          });
+        }
+        continue;
+      }
+
+      // For episodes, group by series
       const seriesKey =
         it.SeriesId || it.ParentId || it.SeriesName || it.Id || "";
       if (!seriesKey) continue;
@@ -601,7 +641,7 @@ const JellyfinLibraryScreen = () => {
 
     const result = Array.from(grouped.values());
     return result;
-  }, [items, libraryState.activeSegment]);
+  }, [items, libraryState.activeSegment, libraryState.debouncedSearch]);
 
   // Optimized series metadata fetching - batch fetch with better caching and concurrency limiting
   // Limit to 20 items to avoid overwhelming the network with too many concurrent requests

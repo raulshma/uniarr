@@ -35,8 +35,10 @@ import DownloadButton from "@/components/downloads/DownloadButton";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
-import type { JellyfinPerson } from "@/models/jellyfin.types";
+import type { JellyfinPerson, JellyfinItem } from "@/models/jellyfin.types";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
+import { useJellyfinSeriesEpisodes } from "@/hooks/useJellyfinSeriesEpisodes";
+import { EpisodeList } from "@/components/jellyfin/EpisodeList";
 import { spacing } from "@/theme/spacing";
 import { posterSizes } from "@/constants/sizes";
 
@@ -281,6 +283,16 @@ const JellyfinItemDetailsScreen = () => {
   const detailsQuery = useJellyfinItemDetails({ serviceId, itemId });
 
   const item = detailsQuery.data;
+  const isSeries = item?.Type === "Series";
+
+  // Fetch episodes if this is a series
+  const episodesQuery = useJellyfinSeriesEpisodes({
+    serviceId,
+    seriesId: itemId,
+    enabled: isSeries,
+  });
+
+  const episodes = episodesQuery.data ?? [];
   const isLoading = isBootstrapping || detailsQuery.isLoading;
   const errorMessage =
     detailsQuery.error instanceof Error
@@ -395,6 +407,31 @@ const JellyfinItemDetailsScreen = () => {
       return;
     }
 
+    // For series, play the first unwatched episode or the first episode
+    if (isSeries && episodes.length > 0) {
+      const firstUnwatched =
+        episodes.find((ep) => !ep.UserData?.Played) ?? episodes[0];
+
+      if (firstUnwatched?.Id) {
+        const params: Record<string, string> = {
+          serviceId,
+          itemId: firstUnwatched.Id,
+        };
+
+        const resumeTicks = firstUnwatched.UserData?.PlaybackPositionTicks;
+        if (typeof resumeTicks === "number" && resumeTicks > 0) {
+          params.startTicks = String(Math.floor(resumeTicks));
+        }
+
+        router.push({
+          pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+          params,
+        });
+      }
+      return;
+    }
+
+    // For movies and other playable items
     const params: Record<string, string> = {
       serviceId,
       itemId: item.Id,
@@ -409,7 +446,7 @@ const JellyfinItemDetailsScreen = () => {
       pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
       params,
     });
-  }, [router, serviceId, item]);
+  }, [router, serviceId, item, isSeries, episodes]);
 
   const handleSyncMetadata = useCallback(async () => {
     if (!connector || !item) {
@@ -435,6 +472,48 @@ const JellyfinItemDetailsScreen = () => {
       setIsSyncing(false);
     }
   }, [connector, detailsQuery, item]);
+
+  const handleEpisodePress = useCallback(
+    (episode: JellyfinItem) => {
+      if (!serviceId || !episode.Id) {
+        return;
+      }
+
+      // Navigate to episode detail screen
+      router.push({
+        pathname: "/(auth)/jellyfin/[serviceId]/details/[itemId]",
+        params: {
+          serviceId,
+          itemId: episode.Id,
+        },
+      });
+    },
+    [router, serviceId],
+  );
+
+  const handleEpisodePlay = useCallback(
+    (episode: JellyfinItem) => {
+      if (!serviceId || !episode.Id) {
+        return;
+      }
+
+      const params: Record<string, string> = {
+        serviceId,
+        itemId: episode.Id,
+      };
+
+      const resumeTicks = episode.UserData?.PlaybackPositionTicks;
+      if (typeof resumeTicks === "number" && resumeTicks > 0) {
+        params.startTicks = String(Math.floor(resumeTicks));
+      }
+
+      router.push({
+        pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+        params,
+      });
+    },
+    [router, serviceId],
+  );
 
   const renderCastMember = useCallback(
     ({ item: person }: { item: (typeof cast)[number] }) => {
@@ -700,16 +779,52 @@ const JellyfinItemDetailsScreen = () => {
             )}
 
             {/* Prominent full-width play button per design */}
-            <Button
-              mode="contained"
-              icon="play"
-              onPress={handlePlay}
-              style={styles.playButton}
-              contentStyle={styles.playButtonContent}
-              labelStyle={styles.playButtonLabel}
-            >
-              Play
-            </Button>
+            {!isSeries && (
+              <Button
+                mode="contained"
+                icon="play"
+                onPress={handlePlay}
+                style={styles.playButton}
+                contentStyle={styles.playButtonContent}
+                labelStyle={styles.playButtonLabel}
+              >
+                Play
+              </Button>
+            )}
+
+            {/* Episodes section for series */}
+            {isSeries && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>
+                    Episodes
+                  </Text>
+                  {episodes.length > 0 && (
+                    <Button
+                      mode="contained"
+                      icon="play"
+                      onPress={handlePlay}
+                      compact
+                      style={styles.playSeriesButton}
+                    >
+                      Play
+                    </Button>
+                  )}
+                </View>
+                {episodesQuery.isLoading ? (
+                  <View style={styles.episodesLoading}>
+                    <UniArrLoader size={40} centered />
+                  </View>
+                ) : connector ? (
+                  <EpisodeList
+                    episodes={episodes}
+                    connector={connector}
+                    onEpisodePress={handleEpisodePress}
+                    onEpisodePlay={handleEpisodePlay}
+                  />
+                ) : null}
+              </>
+            )}
 
             {/* Sync card with inline Update button on the right */}
             <Surface style={styles.syncCard} elevation={1}>
@@ -970,6 +1085,14 @@ const createStyles = (theme: AppTheme) =>
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
+    },
+    episodesLoading: {
+      padding: spacing.lg,
+      alignItems: "center",
+    },
+    playSeriesButton: {
+      borderRadius: 16,
+      height: 36,
     },
   });
 

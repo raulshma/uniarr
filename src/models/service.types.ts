@@ -222,6 +222,11 @@ export interface ServiceConfig {
   defaultProfileId?: number;
   defaultRootFolderPath?: string;
   /**
+   * Jellyfin-specific user ID for user-specific API calls
+   * When set, this user's watch history and preferences will be used
+   */
+  jellyfinUserId?: string;
+  /**
    * Jellyseerr-specific mapping of downstream target server id -> defaults
    * The keys are downstream server ids (stringified), values hold optional
    * profileId and rootFolderPath to apply when creating requests for that

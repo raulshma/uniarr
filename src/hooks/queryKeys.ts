@@ -291,6 +291,12 @@ export const queryKeys = {
         "search",
         { term, options },
       ] as const,
+    seriesEpisodes: (serviceId: string, seriesId: string): QueryKeyBuilder =>
+      [
+        ...queryKeys.jellyfin.service(serviceId),
+        "seriesEpisodes",
+        seriesId,
+      ] as const,
   },
   qbittorrent: {
     base: ["qbittorrent"] as const,

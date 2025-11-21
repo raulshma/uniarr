@@ -14,6 +14,7 @@ import {
   Divider,
   IconButton,
   Switch,
+  ActivityIndicator,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Controller, useForm } from "react-hook-form";
@@ -26,10 +27,12 @@ import { ConnectorFactory } from "@/connectors/factory/ConnectorFactory";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { AppTheme } from "@/constants/theme";
 import type { ServiceConfig, ServiceType } from "@/models/service.types";
+import type { JellyfinUserProfile } from "@/models/jellyfin.types";
 import { queryKeys } from "@/hooks/queryKeys";
 import { logger } from "@/services/logger/LoggerService";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { spacing } from "@/theme/spacing";
+import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import {
   serviceConfigSchema,
   type ServiceConfigInput,
@@ -109,6 +112,7 @@ const normalizeSensitiveValue = (value?: string): string | undefined => {
 const buildServiceConfig = (
   values: ServiceConfigInput,
   id: string,
+  jellyfinUserId?: string,
 ): ServiceConfig => {
   const now = new Date();
   const cleanedUrl = values.url.trim().replace(/\/+$/, "");
@@ -130,6 +134,7 @@ const buildServiceConfig = (
     username,
     password,
     enabled: true,
+    jellyfinUserId: values.type === "jellyfin" ? jellyfinUserId : undefined,
     createdAt: now,
     updatedAt: now,
   };
@@ -191,6 +196,16 @@ const AddServiceScreen = () => {
   const [debugSteps, setDebugSteps] = useState<DebugStep[]>([]);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
+
+  // Jellyfin user selection state
+  const [jellyfinUsers, setJellyfinUsers] = useState<JellyfinUserProfile[]>([]);
+  const [selectedJellyfinUserId, setSelectedJellyfinUserId] = useState<
+    string | undefined
+  >();
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [userSelectionModalVisible, setUserSelectionModalVisible] =
+    useState(false);
+  const [usersFetchError, setUsersFetchError] = useState<string | null>(null);
 
   // Subscribe to debug logger
   useEffect(() => {
@@ -271,6 +286,13 @@ const AddServiceScreen = () => {
           backgroundColor: theme.colors.surface,
           borderRadius: theme.custom.sizes.borderRadius.lg,
           paddingVertical: spacing.sm,
+        },
+        modalTitle: {
+          paddingHorizontal: spacing.md,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.xs,
+          color: theme.colors.onSurface,
+          fontWeight: "600",
         },
         optionItem: {
           paddingHorizontal: spacing.md,
@@ -423,6 +445,43 @@ const AddServiceScreen = () => {
     [],
   );
 
+  const fetchJellyfinUsers = useCallback(async (values: ServiceConfigInput) => {
+    if (values.type !== "jellyfin" || !values.apiKey || !values.url) {
+      return;
+    }
+
+    setIsLoadingUsers(true);
+    setUsersFetchError(null);
+
+    try {
+      const tempConfig: ServiceConfig = {
+        id: "temp",
+        name: values.name || "Temp",
+        type: "jellyfin",
+        url: values.url.trim().replace(/\/+$/, ""),
+        apiKey: values.apiKey,
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const connector = ConnectorFactory.create(
+        tempConfig,
+      ) as JellyfinConnector;
+      await connector.initialize();
+      const users = await connector.getUsers();
+      setJellyfinUsers(users);
+      setUserSelectionModalVisible(true);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch users";
+      setUsersFetchError(message);
+      alert("Error", `Unable to fetch Jellyfin users: ${message}`);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }, []);
+
   const handleTestConnection = useCallback(
     async (values: ServiceConfigInput): Promise<void> => {
       resetDiagnostics();
@@ -441,7 +500,11 @@ const AddServiceScreen = () => {
       setIsTesting(true);
 
       try {
-        const config = buildServiceConfig(values, generateServiceId());
+        const config = buildServiceConfig(
+          values,
+          generateServiceId(),
+          selectedJellyfinUserId,
+        );
 
         // Validate API key format first (skip for download clients that use username/password)
         if (values.apiKey && isApiKeyService(values.type)) {
@@ -488,7 +551,12 @@ const AddServiceScreen = () => {
         setIsTesting(false);
       }
     },
-    [resetDiagnostics, runConnectionTest, supportedTypeSet],
+    [
+      resetDiagnostics,
+      runConnectionTest,
+      supportedTypeSet,
+      selectedJellyfinUserId,
+    ],
   );
 
   const handleSave = useCallback(
@@ -500,7 +568,11 @@ const AddServiceScreen = () => {
         return;
       }
 
-      const config = buildServiceConfig(values, generateServiceId());
+      const config = buildServiceConfig(
+        values,
+        generateServiceId(),
+        selectedJellyfinUserId,
+      );
 
       try {
         const existingServices = await secureStorage.getServiceConfigs();
@@ -596,6 +668,7 @@ const AddServiceScreen = () => {
       supportedTypeSet,
       setJellyfinLocalAddress,
       setJellyfinPublicAddress,
+      selectedJellyfinUserId,
     ],
   );
 
@@ -1010,50 +1083,160 @@ const AddServiceScreen = () => {
               }
 
               return (
-                <View style={styles.formField}>
-                  <Text variant="labelLarge" style={styles.sectionLabel}>
-                    API Key
-                  </Text>
-                  <Controller
-                    name="apiKey"
-                    control={control}
-                    render={({
-                      field: { value, onChange, onBlur },
-                    }: {
-                      field: {
-                        value: string | undefined;
-                        onChange: (value: string) => void;
-                        onBlur: () => void;
-                      };
-                    }) => (
-                      <TextInput
-                        value={value}
-                        onChangeText={(text: string) => {
-                          resetDiagnostics();
-                          onChange(text);
+                <>
+                  <View style={styles.formField}>
+                    <Text variant="labelLarge" style={styles.sectionLabel}>
+                      API Key
+                    </Text>
+                    <Controller
+                      name="apiKey"
+                      control={control}
+                      render={({
+                        field: { value, onChange, onBlur },
+                      }: {
+                        field: {
+                          value: string | undefined;
+                          onChange: (value: string) => void;
+                          onBlur: () => void;
+                        };
+                      }) => (
+                        <TextInput
+                          value={value}
+                          onChangeText={(text: string) => {
+                            resetDiagnostics();
+                            onChange(text);
+                          }}
+                          onBlur={onBlur}
+                          mode="outlined"
+                          autoCapitalize="none"
+                          secureTextEntry
+                          style={styles.input}
+                          outlineStyle={styles.outline}
+                          theme={inputTheme}
+                          accessibilityLabel="Service API key"
+                          placeholder="Enter your API key"
+                          placeholderTextColor={placeholderColor}
+                        />
+                      )}
+                    />
+                    {errors.apiKey ? (
+                      <HelperText
+                        type="error"
+                        visible
+                        style={styles.helperText}
+                      >
+                        {errors.apiKey.message}
+                      </HelperText>
+                    ) : null}
+                  </View>
+
+                  {/* Jellyfin User Selection */}
+                  {serviceType === "jellyfin" && (
+                    <View style={styles.formField}>
+                      <Text variant="labelLarge" style={styles.sectionLabel}>
+                        Jellyfin User (Optional)
+                      </Text>
+                      <Pressable
+                        onPress={() => {
+                          const values =
+                            control._formValues as ServiceConfigInput;
+                          void fetchJellyfinUsers(values);
                         }}
-                        onBlur={onBlur}
-                        mode="outlined"
-                        autoCapitalize="none"
-                        secureTextEntry
-                        style={styles.input}
-                        outlineStyle={styles.outline}
-                        theme={inputTheme}
-                        accessibilityLabel="Service API key"
-                        placeholder="Enter your API key"
-                        placeholderTextColor={placeholderColor}
-                      />
-                    )}
-                  />
-                  {errors.apiKey ? (
-                    <HelperText type="error" visible style={styles.helperText}>
-                      {errors.apiKey.message}
-                    </HelperText>
-                  ) : null}
-                </View>
+                        disabled={isLoadingUsers}
+                      >
+                        <TextInput
+                          value={
+                            selectedJellyfinUserId
+                              ? jellyfinUsers.find(
+                                  (u) => u.Id === selectedJellyfinUserId,
+                                )?.Name || selectedJellyfinUserId
+                              : "Auto-detect from API key"
+                          }
+                          mode="outlined"
+                          editable={false}
+                          style={styles.input}
+                          outlineStyle={styles.outline}
+                          theme={inputTheme}
+                          right={
+                            isLoadingUsers ? (
+                              <TextInput.Icon
+                                icon={() => <ActivityIndicator size={20} />}
+                              />
+                            ) : (
+                              <TextInput.Icon icon="account" />
+                            )
+                          }
+                        />
+                      </Pressable>
+                      <HelperText type="info" visible style={styles.helperText}>
+                        Select a specific user for watch history and
+                        preferences. Leave as auto-detect to use the API key's
+                        user.
+                      </HelperText>
+                      {usersFetchError && (
+                        <HelperText
+                          type="error"
+                          visible
+                          style={styles.helperText}
+                        >
+                          {usersFetchError}
+                        </HelperText>
+                      )}
+                    </View>
+                  )}
+                </>
               );
             }}
           />
+
+          {/* Jellyfin User Selection Modal */}
+          <Portal>
+            <Modal
+              visible={userSelectionModalVisible}
+              onDismiss={() => setUserSelectionModalVisible(false)}
+              contentContainerStyle={styles.modalContent}
+            >
+              <Text variant="titleMedium" style={styles.modalTitle}>
+                Select Jellyfin User
+              </Text>
+              <Divider style={{ marginBottom: spacing.sm }} />
+
+              {/* Auto-detect option */}
+              <Pressable
+                onPress={() => {
+                  setSelectedJellyfinUserId(undefined);
+                  setUserSelectionModalVisible(false);
+                }}
+                style={({ pressed }) => [
+                  styles.optionItem,
+                  pressed ? { opacity: 0.7 } : null,
+                ]}
+              >
+                <Text style={styles.optionText}>Auto-detect from API key</Text>
+              </Pressable>
+              <Divider />
+
+              {jellyfinUsers.map((user, index) => (
+                <View key={user.Id}>
+                  <Pressable
+                    onPress={() => {
+                      setSelectedJellyfinUserId(user.Id);
+                      setUserSelectionModalVisible(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.optionItem,
+                      pressed ? { opacity: 0.7 } : null,
+                    ]}
+                  >
+                    <Text style={styles.optionText}>
+                      {user.Name || user.Id}
+                    </Text>
+                  </Pressable>
+                  {index < jellyfinUsers.length - 1 && <Divider />}
+                </View>
+              ))}
+            </Modal>
+          </Portal>
 
           {formError ? (
             <View style={[styles.diagnosticsCard, styles.diagnosticsError]}>

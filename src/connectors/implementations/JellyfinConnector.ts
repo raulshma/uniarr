@@ -639,8 +639,27 @@ export class JellyfinConnector
   }
 
   private async bootstrapUserContext(): Promise<void> {
-    const session = ServiceAuthHelper.getServiceSession(this.config);
+    // First, check if a specific user is configured in the service config
+    if (this.config.jellyfinUserId) {
+      this.userId = this.config.jellyfinUserId;
+      // Fetch the user's name for display purposes
+      try {
+        const user = await this.getUserById(this.config.jellyfinUserId);
+        if (user?.Name) {
+          this.userName = user.Name;
+        }
+      } catch (error) {
+        void logger.warn("Failed to fetch configured Jellyfin user details", {
+          serviceId: this.config.id,
+          userId: this.config.jellyfinUserId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
 
+    // Fall back to session-based user context
+    const session = ServiceAuthHelper.getServiceSession(this.config);
     const context = session?.context ?? {};
 
     if (typeof context.userId === "string" && context.userId.length > 0) {
@@ -651,6 +670,7 @@ export class JellyfinConnector
       this.userName = context.userName;
     }
 
+    // If still no user, fetch from /Users/Me
     if (!this.userId) {
       const profile = await this.fetchCurrentUser();
       if (profile?.Id) {
@@ -696,6 +716,42 @@ export class JellyfinConnector
     } catch (error) {
       void logger.debug("Failed to fetch Jellyfin user profile.", {
         serviceId: this.config.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
+  /**
+   * Fetch all users from the Jellyfin server
+   * Requires admin API key
+   */
+  async getUsers(): Promise<JellyfinUserProfile[]> {
+    await this.ensureAuthenticated();
+
+    try {
+      const response = await this.client.get<JellyfinUserProfile[]>("/Users");
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  /**
+   * Fetch a specific user by ID
+   */
+  private async getUserById(
+    userId: string,
+  ): Promise<JellyfinUserProfile | undefined> {
+    try {
+      const response = await this.client.get<JellyfinUserProfile>(
+        `/Users/${userId}`,
+      );
+      return response.data;
+    } catch (error) {
+      void logger.debug("Failed to fetch Jellyfin user by ID.", {
+        serviceId: this.config.id,
+        userId,
         error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
