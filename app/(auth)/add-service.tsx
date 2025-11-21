@@ -39,7 +39,7 @@ import {
 } from "@/utils/validation.utils";
 import { testApiKeyFormat } from "@/utils/api-key-validator";
 import { debugLogger } from "@/utils/debug-logger";
-import { extractJellyfinAddress } from "@/utils/jellyfin.utils";
+
 import { useSettingsStore } from "@/store/settingsStore";
 
 const allServiceTypes: ServiceType[] = [
@@ -614,7 +614,7 @@ const AddServiceScreen = () => {
 
         // Auto-populate Jellyfin addresses in settings store
         if (config.type === "jellyfin") {
-          const jellyfinAddress = extractJellyfinAddress(config);
+          const jellyfinAddress = config.url;
           if (jellyfinAddress) {
             setJellyfinLocalAddress(jellyfinAddress);
             setJellyfinPublicAddress(jellyfinAddress);

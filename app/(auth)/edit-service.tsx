@@ -38,7 +38,6 @@ import {
 } from "@/utils/validation.utils";
 import { testApiKeyFormat } from "@/utils/api-key-validator";
 import { debugLogger } from "@/utils/debug-logger";
-import { extractJellyfinAddress } from "@/utils/jellyfin.utils";
 import { useSettingsStore } from "@/store/settingsStore";
 
 const allServiceTypes: ServiceType[] = [
@@ -610,7 +609,7 @@ const EditServiceScreen = () => {
 
         // Auto-populate Jellyfin addresses in settings store when updating a Jellyfin service
         if (config.type === "jellyfin") {
-          const jellyfinAddress = extractJellyfinAddress(config);
+          const jellyfinAddress = config.url;
           if (jellyfinAddress) {
             setJellyfinLocalAddress(jellyfinAddress);
             setJellyfinPublicAddress(jellyfinAddress);

@@ -513,10 +513,13 @@ const JellyfinPlayerScreen = () => {
     availableAudioTracksEvent?.availableAudioTracks ??
     player.availableAudioTracks ??
     [];
-  const subtitleTracks =
-    availableSubtitleTracksEvent?.availableSubtitleTracks ??
-    player.availableSubtitleTracks ??
-    [];
+  const subtitleTracks = useMemo(
+    () =>
+      availableSubtitleTracksEvent?.availableSubtitleTracks ??
+      player.availableSubtitleTracks ??
+      [],
+    [availableSubtitleTracksEvent, player],
+  );
 
   // Auto-select default subtitle language when tracks become available
   useEffect(() => {

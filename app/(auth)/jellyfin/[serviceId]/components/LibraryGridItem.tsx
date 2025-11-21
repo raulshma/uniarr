@@ -11,11 +11,7 @@ import { spacing } from "@/theme/spacing";
 import type { JellyfinItem } from "@/models/jellyfin.types";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import type { CollectionSegmentKey } from "../hooks/useJellyfinLibraryState";
-import {
-  buildPosterUri,
-  deriveSubtitle,
-  getInternalStringField,
-} from "../utils/jellyfinHelpers";
+import { buildPosterUri, deriveSubtitle } from "../utils/jellyfinHelpers";
 
 interface LibraryGridItemProps {
   item: JellyfinItem;

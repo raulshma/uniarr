@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useSettingsStore } from "@/store/settingsStore";
 import { secureStorage } from "@/services/storage/SecureStorage";
-import { extractJellyfinAddress } from "@/utils/jellyfin.utils";
 import { logger } from "@/services/logger/LoggerService";
 
 /**
@@ -33,7 +32,7 @@ export const useJellyfinSettingsSync = (): void => {
         );
 
         if (jellyfinConfig) {
-          const address = extractJellyfinAddress(jellyfinConfig);
+          const address = jellyfinConfig.url;
           if (address) {
             setJellyfinLocalAddress(address);
             setJellyfinPublicAddress(address);
