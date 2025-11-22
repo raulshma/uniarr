@@ -159,8 +159,7 @@ const BottomDrawer: React.FC<Props> = ({
           backgroundColor: theme.colors.surface,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
-          borderColor: theme.colors.outlineVariant,
-          borderWidth: 1,
+          marginHorizontal: 16, // Add horizontal margins to drawer
         }}
         handleStyle={{
           paddingTop: 8,
@@ -209,7 +208,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: 36, // Increased from 20 to add more left padding
     paddingTop: 8,
     paddingBottom: 16,
   },
@@ -217,7 +216,7 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   content: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 36, // Increased from 20 to match header padding
     paddingBottom: 32,
   },
   drawerItemRipple: {

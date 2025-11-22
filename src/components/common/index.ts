@@ -58,3 +58,10 @@ export { UniArrLoader } from "./UniArrLoader";
 export type { UniArrLoaderProps } from "./UniArrLoader";
 
 export { GlobalSnackbar } from "./GlobalSnackbar";
+
+export { default as BottomDrawer, DrawerItem } from "./BottomDrawer";
+
+export {
+  WithBottomSheetMargins,
+  withBottomSheetMargins,
+} from "./withBottomSheetMargins";

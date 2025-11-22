@@ -1,12 +1,7 @@
 import React, { useState } from "react";
-import {
-  Modal,
-  StyleSheet,
-  View,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native";
-import { Button, Text, TextInput, useTheme } from "react-native-paper";
+import { StyleSheet, View, TouchableOpacity } from "react-native";
+import { Button, Text, TextInput, useTheme, Portal } from "react-native-paper";
+import { BottomDrawer } from "@/components/common";
 
 interface ColorPickerProps {
   visible: boolean;
@@ -64,26 +59,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
-      onDismiss={onDismiss}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <View
-        style={[styles.container, { backgroundColor: theme.colors.background }]}
+    <Portal>
+      <BottomDrawer
+        visible={visible}
+        onDismiss={onDismiss}
+        title="Choose Color"
+        maxHeight="75%"
       >
-        <View
-          style={[
-            styles.header,
-            { borderBottomColor: theme.colors.outlineVariant },
-          ]}
-        >
-          <Text variant="headlineSmall">Choose Color</Text>
-          <Button onPress={onDismiss}>Cancel</Button>
-        </View>
-
-        <ScrollView style={styles.content}>
+        <View style={styles.content}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
             Preset Colors
           </Text>
@@ -141,41 +124,25 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               Use Color
             </Button>
           </View>
-        </ScrollView>
 
-        <View
-          style={[
-            styles.footer,
-            { borderTopColor: theme.colors.outlineVariant },
-          ]}
-        >
-          <Button
-            mode="contained"
-            onPress={onDismiss}
-            style={styles.doneButton}
-          >
-            Done
-          </Button>
+          <View style={styles.footer}>
+            <Button
+              mode="contained"
+              onPress={onDismiss}
+              style={styles.doneButton}
+            >
+              Done
+            </Button>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </BottomDrawer>
+    </Portal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-  },
   content: {
-    flex: 1,
-    padding: 16,
+    gap: 8,
   },
   sectionTitle: {
     marginBottom: 16,
@@ -220,8 +187,7 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
   },
   footer: {
-    padding: 16,
-    borderTopWidth: 1,
+    marginTop: 24,
   },
   doneButton: {
     width: "100%",
