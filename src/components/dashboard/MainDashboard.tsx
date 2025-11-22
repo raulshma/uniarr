@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   RefreshControl,
   Animated,
+  Dimensions,
 } from "react-native";
-import { Text, Surface } from "react-native-paper";
+import { Text, Surface, IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useServicesHealth } from "@/hooks/useServicesHealth";
@@ -23,6 +23,9 @@ import { widgetService } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useAggregatedHealth } from "@/hooks/useAggregatedHealth";
 import { useSettingsStore } from "@/store/settingsStore";
+import { easeOutCubic } from "@/utils/animations.utils";
+
+const headerMinHeight = 60;
 
 const MainDashboard = () => {
   const theme = useTheme();
@@ -48,41 +51,12 @@ const MainDashboard = () => {
   } | null>(null);
 
   // Animation values
-  const pulseAnim = React.useRef(new Animated.Value(1)).current;
-  const glowAnim = React.useRef(new Animated.Value(0)).current;
+  const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Pulse animation for status indicators
-  React.useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-  }, [pulseAnim, glowAnim]);
+  // Header animation calculations
+  const screenHeight = Dimensions.get("window").height;
+  const headerMaxHeight = screenHeight * 0.35;
+  const collapseRange = headerMaxHeight - headerMinHeight;
 
   const loadWeatherSummary = React.useCallback(async () => {
     try {
@@ -154,6 +128,29 @@ const MainDashboard = () => {
     });
   }, []);
 
+  // Animated header values
+  const animatedValues = useMemo(
+    () => ({
+      headerHeight: easeOutCubic(
+        scrollY,
+        [0, collapseRange],
+        [headerMaxHeight, headerMinHeight],
+      ),
+      titleOpacity: easeOutCubic(scrollY, [0, collapseRange * 0.6], [1, 0]),
+      stickyTitleOpacity: easeOutCubic(
+        scrollY,
+        [collapseRange * 0.6, collapseRange],
+        [0, 1],
+      ),
+      headerBackgroundOpacity: scrollY.interpolate({
+        inputRange: [0, collapseRange - 10, collapseRange],
+        outputRange: [0, 0, 1],
+        extrapolate: "clamp",
+      }),
+    }),
+    [scrollY, headerMaxHeight, collapseRange],
+  );
+
   const nextRelease = useMemo(() => {
     const now = new Date();
     const todayStr = now.toISOString().split("T")[0] ?? "";
@@ -179,10 +176,48 @@ const MainDashboard = () => {
           bottom: 0,
           opacity: theme.dark ? 0.4 : 0.2,
         },
-        header: {
+        headerContainer: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+        },
+        headerBackground: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: "transparent",
+        },
+        headerContent: {
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
           paddingHorizontal: theme.custom.spacing.lg,
-          paddingBottom: theme.custom.spacing.sm,
-          paddingTop: insets.top + theme.custom.spacing.md,
+        },
+        titleContainer: {
+          alignItems: "center",
+        },
+        stickyButtonsContainer: {
+          position: "absolute",
+          top: 0,
+          right: 0,
+          left: 0,
+          zIndex: 15,
+          paddingHorizontal: theme.custom.spacing.lg,
+        },
+        stickyHeader: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          minHeight: headerMinHeight,
+        },
+        stickyTitleContainer: {
+          flex: 1,
+          flexDirection: "row",
+          gap: theme.custom.spacing.xs,
+          alignItems: "center",
         },
         greeting: {
           fontSize: theme.custom.typography.displaySmall.fontSize,
@@ -191,6 +226,12 @@ const MainDashboard = () => {
           letterSpacing: theme.custom.typography.displaySmall.letterSpacing,
           marginBottom: theme.custom.spacing.xxxs,
         },
+        stickyTitle: {
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontWeight: "600",
+          color: theme.colors.onBackground,
+          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+        },
         date: {
           fontSize: theme.custom.typography.bodyMedium.fontSize,
           color: theme.colors.onSurfaceVariant,
@@ -198,69 +239,58 @@ const MainDashboard = () => {
           opacity: 0.8,
         },
         section: {
-          paddingHorizontal: theme.custom.spacing.lg,
-          marginBottom: theme.custom.spacing.sm,
-        },
-        sectionTitle: {
-          fontSize: theme.custom.typography.labelMedium.fontSize,
-          fontWeight: "800",
-          marginBottom: theme.custom.spacing.xs,
-          color: theme.colors.onSurfaceVariant,
-          textTransform: "uppercase",
-          letterSpacing: theme.custom.typography.labelMedium.letterSpacing,
-          opacity: 0.6,
-        },
-        headerTop: {
-          flexDirection: "row",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
+          paddingHorizontal: theme.custom.spacing.xs,
           marginBottom: theme.custom.spacing.md,
         },
-        greetingBlock: {
-          flex: 1,
-          marginRight: theme.custom.spacing.sm,
+        sectionTitle: {
+          fontSize: theme.custom.typography.titleMedium.fontSize,
+          fontWeight: "600",
+          marginBottom: theme.custom.spacing.sm,
+          color: theme.colors.onBackground,
+          paddingHorizontal: theme.custom.spacing.xs,
         },
-        weatherTouch: {
+        scrollContent: {
+          paddingBottom: 100,
+          paddingTop: headerMaxHeight + insets.top,
+        },
+        weatherContainer: {
           flexDirection: "row",
           alignItems: "center",
-          paddingHorizontal: theme.custom.spacing.md,
-          paddingVertical: theme.custom.spacing.xs,
-          borderRadius: theme.custom.sizes.borderRadius.xl,
           gap: theme.custom.spacing.xs,
-          overflow: "hidden",
+          marginTop: theme.custom.spacing.sm,
         },
         weatherTemp: {
-          fontSize: theme.custom.typography.bodyLarge.fontSize,
-          color: theme.colors.onSurface,
+          fontSize: theme.custom.typography.headlineMedium.fontSize,
+          color: theme.colors.onBackground,
           fontWeight: "700",
         },
         quickActions: {
           flexDirection: "row",
           gap: theme.custom.spacing.sm,
-          marginBottom: theme.custom.spacing.lg,
+          paddingHorizontal: theme.custom.spacing.xs,
         },
         quickActionCard: {
           minWidth: 85,
-          borderRadius: theme.custom.sizes.borderRadius.lg,
+          borderRadius: theme.custom.sizes.borderRadius.xl,
           overflow: "hidden",
-          marginRight: theme.custom.spacing.xxs,
+          backgroundColor: theme.colors.elevation.level1,
         },
         quickActionContent: {
-          paddingVertical: theme.custom.spacing.xs,
+          paddingVertical: theme.custom.spacing.md,
           paddingHorizontal: theme.custom.spacing.sm,
           alignItems: "center",
-          gap: theme.custom.spacing.xxs,
+          gap: theme.custom.spacing.xs,
         },
         quickActionIcon: {
-          width: 36,
-          height: 36,
-          borderRadius: theme.custom.sizes.borderRadius.md,
+          width: 40,
+          height: 40,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           justifyContent: "center",
           alignItems: "center",
           backgroundColor: theme.colors.primaryContainer,
         },
         quickActionLabel: {
-          fontSize: theme.custom.typography.labelMedium.fontSize,
+          fontSize: theme.custom.typography.labelSmall.fontSize,
           fontWeight: "600",
           color: theme.colors.onSurface,
           textAlign: "center",
@@ -284,17 +314,11 @@ const MainDashboard = () => {
         },
         card: {
           marginBottom: theme.custom.spacing.xs,
-          borderRadius: theme.custom.sizes.borderRadius.xl,
+          marginHorizontal: theme.custom.spacing.xs,
+          borderRadius: theme.custom.sizes.borderRadius.xxl,
           overflow: "hidden",
           elevation: 0,
-        },
-        cardGradient: {
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          opacity: 0.1,
+          backgroundColor: theme.colors.elevation.level1,
         },
         cardContent: {
           flexDirection: "row",
@@ -302,109 +326,103 @@ const MainDashboard = () => {
           padding: theme.custom.spacing.md,
         },
         cardIcon: {
-          width: theme.custom.sizes.iconSizes.xxl,
-          height: theme.custom.sizes.iconSizes.xxl,
-          borderRadius: theme.custom.sizes.borderRadius.md,
+          width: 48,
+          height: 48,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
           justifyContent: "center",
           alignItems: "center",
-          marginRight: theme.custom.spacing.sm,
-        },
-        cardIconGradient: {
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          borderRadius: theme.custom.sizes.borderRadius.md,
+          marginRight: theme.custom.spacing.md,
+          backgroundColor: theme.colors.surfaceVariant,
         },
         cardText: {
           flex: 1,
         },
         cardTitle: {
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontWeight: "700",
+          fontSize: theme.custom.typography.bodyLarge.fontSize,
+          fontWeight: "600",
           color: theme.colors.onSurface,
-          marginBottom: theme.custom.spacing.xxxs,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          marginBottom: 2,
         },
         cardSubtitle: {
-          fontSize: theme.custom.typography.bodyMedium.fontSize,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
           color: theme.colors.onSurfaceVariant,
-          fontWeight: "500",
-          opacity: 0.8,
+          fontWeight: "400",
         },
-        statusDot: {
-          width: theme.custom.spacing.xs + 2,
-          height: theme.custom.spacing.xs + 2,
-          borderRadius: (theme.custom.spacing.xs + 2) / 2,
-          marginLeft: theme.custom.spacing.sm,
-        },
-        statusGlow: {
-          position: "absolute",
-          width: theme.custom.spacing.lg,
-          height: theme.custom.spacing.lg,
-          borderRadius: theme.custom.spacing.lg / 2,
-        },
+
         heroCard: {
-          marginBottom: theme.custom.spacing.sm,
+          marginBottom: theme.custom.spacing.md,
+          marginHorizontal: theme.custom.spacing.xs,
           borderRadius: theme.custom.sizes.borderRadius.xxl,
           overflow: "hidden",
           elevation: 0,
+          backgroundColor: theme.colors.elevation.level1,
         },
         heroContent: {
-          padding: theme.custom.spacing.lg,
-          minHeight: 120,
+          flexDirection: "row",
+          alignItems: "center",
+          padding: theme.custom.spacing.md,
+        },
+        heroIcon: {
+          width: 48,
+          height: 48,
+          borderRadius: theme.custom.sizes.borderRadius.lg,
+          justifyContent: "center",
+          alignItems: "center",
+          marginRight: theme.custom.spacing.md,
+          backgroundColor: theme.colors.primaryContainer,
+        },
+        heroTextContainer: {
+          flex: 1,
         },
         heroTitle: {
-          fontSize: theme.custom.typography.labelLarge.fontSize,
-          fontWeight: "700",
-          color: theme.colors.onSurface,
-          marginBottom: theme.custom.spacing.xs,
+          fontSize: theme.custom.typography.labelSmall.fontSize,
+          fontWeight: "600",
+          color: theme.colors.onSurfaceVariant,
           textTransform: "uppercase",
-          letterSpacing: theme.custom.typography.labelLarge.letterSpacing,
-          opacity: 0.7,
+          letterSpacing: theme.custom.typography.labelSmall.letterSpacing,
+          marginBottom: 2,
         },
         heroValue: {
-          fontSize: theme.custom.typography.displayMedium.fontSize,
-          fontWeight: "900",
+          fontSize: theme.custom.typography.headlineLarge.fontSize,
+          fontWeight: "700",
           color: theme.colors.onSurface,
-          letterSpacing: -2,
-          marginBottom: theme.custom.spacing.xs,
+          letterSpacing: -0.5,
+          marginBottom: 2,
         },
         heroSubtitle: {
-          fontSize: theme.custom.typography.bodyLarge.fontSize,
+          fontSize: theme.custom.typography.bodySmall.fontSize,
           color: theme.colors.onSurfaceVariant,
-          fontWeight: "600",
+          fontWeight: "400",
+        },
+        sectionHeader: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: theme.custom.spacing.sm,
+          paddingHorizontal: theme.custom.spacing.xs,
+        },
+        editButton: {
+          margin: 0,
+        },
+        actionButtonsContainer: {
+          flexDirection: "row",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: theme.custom.spacing.sm,
+          paddingHorizontal: theme.custom.spacing.lg,
+          marginBottom: theme.custom.spacing.md,
+        },
+        actionButton: {
+          backgroundColor: theme.colors.surfaceVariant,
+          margin: 0,
         },
       }),
-    [theme, insets.top],
+    [theme, insets.top, headerMaxHeight],
   );
 
   React.useEffect(() => {
     void loadWeatherSummary();
   }, [loadWeatherSummary]);
-
-  const renderStatusIndicator = (isHealthy: boolean) => {
-    const color = isHealthy ? theme.colors.primary : theme.colors.error;
-    return (
-      <View style={{ position: "relative" }}>
-        <Animated.View
-          style={[
-            styles.statusGlow,
-            {
-              backgroundColor: color,
-              opacity: glowAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.2, 0.5],
-              }),
-              transform: [{ scale: pulseAnim }],
-            },
-          ]}
-        />
-        <View style={[styles.statusDot, { backgroundColor: color }]} />
-      </View>
-    );
-  };
 
   return (
     <View style={styles.container}>
@@ -422,8 +440,85 @@ const MainDashboard = () => {
         />
       )}
 
+      {/* Animated Header */}
+      <Animated.View
+        style={[
+          styles.headerContainer,
+          { height: animatedValues.headerHeight },
+        ]}
+      >
+        <Animated.View
+          style={[
+            styles.headerBackground,
+            {
+              height: animatedValues.headerHeight,
+              opacity: animatedValues.headerBackgroundOpacity,
+              backgroundColor: theme.colors.background,
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.headerContent,
+            { height: animatedValues.headerHeight },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.titleContainer,
+              {
+                opacity: animatedValues.titleOpacity,
+              },
+            ]}
+          >
+            <Text style={styles.greeting}>{greeting}</Text>
+            <Text style={styles.date}>{dateString}</Text>
+            {weatherSummary && (
+              <View style={styles.weatherContainer}>
+                <LottieWeatherIcon
+                  condition={weatherSummary.condition}
+                  size={48}
+                  autoPlay
+                  loop
+                />
+                <Text style={styles.weatherTemp}>
+                  {weatherSummary.temperature}
+                </Text>
+              </View>
+            )}
+          </Animated.View>
+        </Animated.View>
+      </Animated.View>
+
+      {/* Sticky Header */}
+      <Animated.View style={[styles.stickyButtonsContainer]}>
+        <View
+          style={[
+            styles.stickyHeader,
+            { paddingTop: insets.top, height: headerMinHeight },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.stickyTitleContainer,
+              {
+                opacity: animatedValues.stickyTitleOpacity,
+              },
+            ]}
+          >
+            <Text style={styles.stickyTitle}>Dashboard</Text>
+          </Animated.View>
+        </View>
+      </Animated.View>
+
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false },
+        )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -432,216 +527,216 @@ const MainDashboard = () => {
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View style={styles.greetingBlock}>
-              <Text style={styles.greeting}>{greeting}</Text>
-              <Text style={styles.date}>{dateString}</Text>
-            </View>
-            {weatherSummary && (
-              <TouchableOpacity
-                onPress={() => router.push("/(auth)/settings/widgets")}
-                activeOpacity={0.7}
-              >
-                <BlurView
-                  intensity={theme.dark ? 40 : 20}
-                  tint={theme.dark ? "dark" : "light"}
-                  style={styles.weatherTouch}
-                >
-                  <LottieWeatherIcon
-                    condition={weatherSummary.condition}
-                    size={28}
-                    autoPlay
-                    loop
-                  />
-                  <Text style={styles.weatherTemp}>
-                    {weatherSummary.temperature}
-                  </Text>
-                </BlurView>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
+        {/* Action Buttons - Fade out when scrolling */}
+        <Animated.View
+          style={[
+            styles.actionButtonsContainer,
+            { opacity: animatedValues.titleOpacity },
+          ]}
+        >
+          <IconButton
+            icon="robot"
+            size={22}
+            iconColor={theme.colors.onSurfaceVariant}
+            style={styles.actionButton}
+            onPress={() => router.push("/(auth)/settings/conversational-ai")}
+          />
+          <IconButton
+            icon="cog"
+            size={22}
+            iconColor={theme.colors.onSurfaceVariant}
+            style={styles.actionButton}
+            onPress={() => router.push("/(auth)/settings")}
+          />
+        </Animated.View>
 
         {/* Hero Stats Card */}
         <View style={styles.section}>
           <TouchableOpacity
             onPress={() => router.push("/(auth)/(tabs)/services")}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
             <Surface style={styles.heroCard} elevation={0}>
-              <LinearGradient
-                colors={
-                  healthOverview.offline > 0
-                    ? theme.dark
-                      ? ["#3d1f1f", "#2d1515"]
-                      : ["#ffe5e5", "#ffd5d5"]
-                    : theme.dark
-                      ? ["#1f2d3d", "#15202d"]
-                      : ["#e5f2ff", "#d5e8ff"]
-                }
-                style={StyleSheet.absoluteFill}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
               <View style={styles.heroContent}>
-                <Text style={styles.heroTitle}>Services Status</Text>
-                <Text style={styles.heroValue}>
-                  {healthOverview.online}/{healthOverview.total}
-                </Text>
-                <Text style={styles.heroSubtitle}>
-                  {healthOverview.offline > 0
-                    ? `${healthOverview.offline} services need attention`
-                    : "All systems operational"}
-                </Text>
+                <View style={styles.heroIcon}>
+                  <MaterialCommunityIcons
+                    name="server-network"
+                    size={24}
+                    color={theme.colors.onPrimaryContainer}
+                  />
+                </View>
+                <View style={styles.heroTextContainer}>
+                  <Text style={styles.heroTitle}>Services Status</Text>
+                  <Text style={styles.heroValue}>
+                    {healthOverview.online}/{healthOverview.total}
+                  </Text>
+                  <Text style={styles.heroSubtitle}>
+                    {healthOverview.offline > 0
+                      ? `${healthOverview.offline} offline`
+                      : "All operational"}
+                  </Text>
+                </View>
+                <MaterialCommunityIcons
+                  name="chevron-right"
+                  size={20}
+                  color={theme.colors.onSurfaceVariant}
+                />
               </View>
             </Surface>
           </TouchableOpacity>
         </View>
 
         {/* Quick Actions */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.section,
-            { paddingRight: theme.custom.spacing.lg },
-          ]}
-        >
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/(tabs)/services")}
-            activeOpacity={0.7}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <IconButton
+              icon="pencil"
+              size={18}
+              iconColor={theme.colors.onSurfaceVariant}
+              style={styles.editButton}
+              onPress={() => router.push("/(auth)/settings/quick-actions")}
+            />
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickActions}
           >
-            <Surface style={styles.quickActionCard} elevation={0}>
-              <View style={styles.quickActionContent}>
-                <View style={styles.quickActionIcon}>
-                  <MaterialCommunityIcons
-                    name="magnify"
-                    size={22}
-                    color={theme.colors.onPrimaryContainer}
-                  />
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/(tabs)/services")}
+              activeOpacity={0.7}
+            >
+              <Surface style={styles.quickActionCard} elevation={0}>
+                <View style={styles.quickActionContent}>
+                  <View style={styles.quickActionIcon}>
+                    <MaterialCommunityIcons
+                      name="magnify"
+                      size={22}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Search</Text>
                 </View>
-                <Text style={styles.quickActionLabel}>Search</Text>
-              </View>
-            </Surface>
-          </TouchableOpacity>
+              </Surface>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/(tabs)/calendar")}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.quickActionCard} elevation={0}>
-              <View style={styles.quickActionContent}>
-                <View style={styles.quickActionIcon}>
-                  <MaterialCommunityIcons
-                    name="calendar"
-                    size={22}
-                    color={theme.colors.onPrimaryContainer}
-                  />
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/(tabs)/calendar")}
+              activeOpacity={0.7}
+            >
+              <Surface style={styles.quickActionCard} elevation={0}>
+                <View style={styles.quickActionContent}>
+                  <View style={styles.quickActionIcon}>
+                    <MaterialCommunityIcons
+                      name="calendar"
+                      size={22}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Calendar</Text>
                 </View>
-                <Text style={styles.quickActionLabel}>Calendar</Text>
-              </View>
-            </Surface>
-          </TouchableOpacity>
+              </Surface>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/(tabs)/downloads")}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.quickActionCard} elevation={0}>
-              {activeDownloadsCount > 0 && (
-                <View style={styles.quickActionBadge}>
-                  <Text style={styles.quickActionBadgeText}>
-                    {activeDownloadsCount}
-                  </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/(tabs)/downloads")}
+              activeOpacity={0.7}
+            >
+              <Surface style={styles.quickActionCard} elevation={0}>
+                {activeDownloadsCount > 0 && (
+                  <View style={styles.quickActionBadge}>
+                    <Text style={styles.quickActionBadgeText}>
+                      {activeDownloadsCount}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.quickActionContent}>
+                  <View style={styles.quickActionIcon}>
+                    <MaterialCommunityIcons
+                      name="download"
+                      size={22}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Downloads</Text>
                 </View>
-              )}
-              <View style={styles.quickActionContent}>
-                <View style={styles.quickActionIcon}>
-                  <MaterialCommunityIcons
-                    name="download"
-                    size={22}
-                    color={theme.colors.onPrimaryContainer}
-                  />
-                </View>
-                <Text style={styles.quickActionLabel}>Downloads</Text>
-              </View>
-            </Surface>
-          </TouchableOpacity>
+              </Surface>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/monitoring")}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.quickActionCard} elevation={0}>
-              <View style={styles.quickActionContent}>
-                <View style={styles.quickActionIcon}>
-                  <MaterialCommunityIcons
-                    name="monitor-dashboard"
-                    size={22}
-                    color={theme.colors.onPrimaryContainer}
-                  />
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/monitoring")}
+              activeOpacity={0.7}
+            >
+              <Surface style={styles.quickActionCard} elevation={0}>
+                <View style={styles.quickActionContent}>
+                  <View style={styles.quickActionIcon}>
+                    <MaterialCommunityIcons
+                      name="monitor-dashboard"
+                      size={22}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Monitor</Text>
                 </View>
-                <Text style={styles.quickActionLabel}>Monitor</Text>
-              </View>
-            </Surface>
-          </TouchableOpacity>
+              </Surface>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/(tabs)/recently-added")}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.quickActionCard} elevation={0}>
-              <View style={styles.quickActionContent}>
-                <View style={styles.quickActionIcon}>
-                  <MaterialCommunityIcons
-                    name="clock-outline"
-                    size={22}
-                    color={theme.colors.onPrimaryContainer}
-                  />
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/(tabs)/recently-added")}
+              activeOpacity={0.7}
+            >
+              <Surface style={styles.quickActionCard} elevation={0}>
+                <View style={styles.quickActionContent}>
+                  <View style={styles.quickActionIcon}>
+                    <MaterialCommunityIcons
+                      name="clock-outline"
+                      size={22}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Recent</Text>
                 </View>
-                <Text style={styles.quickActionLabel}>Recent</Text>
-              </View>
-            </Surface>
-          </TouchableOpacity>
+              </Surface>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/discover")}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.quickActionCard} elevation={0}>
-              <View style={styles.quickActionContent}>
-                <View style={styles.quickActionIcon}>
-                  <MaterialCommunityIcons
-                    name="compass-outline"
-                    size={22}
-                    color={theme.colors.onPrimaryContainer}
-                  />
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/discover")}
+              activeOpacity={0.7}
+            >
+              <Surface style={styles.quickActionCard} elevation={0}>
+                <View style={styles.quickActionContent}>
+                  <View style={styles.quickActionIcon}>
+                    <MaterialCommunityIcons
+                      name="compass-outline"
+                      size={22}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Discover</Text>
                 </View>
-                <Text style={styles.quickActionLabel}>Discover</Text>
-              </View>
-            </Surface>
-          </TouchableOpacity>
+              </Surface>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/(tabs)/settings")}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.quickActionCard} elevation={0}>
-              <View style={styles.quickActionContent}>
-                <View style={styles.quickActionIcon}>
-                  <MaterialCommunityIcons
-                    name="cog"
-                    size={22}
-                    color={theme.colors.onPrimaryContainer}
-                  />
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/(tabs)/settings")}
+              activeOpacity={0.7}
+            >
+              <Surface style={styles.quickActionCard} elevation={0}>
+                <View style={styles.quickActionContent}>
+                  <View style={styles.quickActionIcon}>
+                    <MaterialCommunityIcons
+                      name="cog"
+                      size={22}
+                      color={theme.colors.onPrimaryContainer}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Settings</Text>
                 </View>
-                <Text style={styles.quickActionLabel}>Settings</Text>
-              </View>
-            </Surface>
-          </TouchableOpacity>
-        </ScrollView>
+              </Surface>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
 
         {/* Activity Section */}
         <View style={styles.section}>
@@ -649,37 +744,18 @@ const MainDashboard = () => {
 
           <TouchableOpacity onPress={showDownloads} activeOpacity={0.7}>
             <Surface style={styles.card} elevation={0}>
-              <LinearGradient
-                colors={
-                  theme.dark
-                    ? ["rgba(98, 126, 188, 0.1)", "rgba(76, 100, 148, 0.05)"]
-                    : ["rgba(98, 126, 188, 0.05)", "rgba(76, 100, 148, 0.02)"]
-                }
-                style={styles.cardGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
               <View style={styles.cardContent}>
                 <View style={styles.cardIcon}>
-                  <LinearGradient
-                    colors={[
-                      theme.colors.secondaryContainer,
-                      theme.colors.secondary,
-                    ]}
-                    style={styles.cardIconGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  />
                   <MaterialCommunityIcons
                     name="download"
-                    size={28}
-                    color={theme.colors.onSecondaryContainer}
+                    size={24}
+                    color={theme.colors.primary}
                   />
                 </View>
                 <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>
                     {activeDownloadsCount > 0
-                      ? `${activeDownloadsCount} Active`
+                      ? `${activeDownloadsCount} Active Downloads`
                       : "No Active Downloads"}
                   </Text>
                   <Text style={styles.cardSubtitle}>
@@ -688,10 +764,9 @@ const MainDashboard = () => {
                       : "All downloads complete"}
                   </Text>
                 </View>
-                {activeDownloadsCount > 0 && renderStatusIndicator(true)}
                 <MaterialCommunityIcons
                   name="chevron-right"
-                  size={24}
+                  size={20}
                   color={theme.colors.onSurfaceVariant}
                 />
               </View>
@@ -726,31 +801,12 @@ const MainDashboard = () => {
             activeOpacity={0.7}
           >
             <Surface style={styles.card} elevation={0}>
-              <LinearGradient
-                colors={
-                  theme.dark
-                    ? ["rgba(188, 98, 188, 0.1)", "rgba(148, 76, 148, 0.05)"]
-                    : ["rgba(188, 98, 188, 0.05)", "rgba(148, 76, 148, 0.02)"]
-                }
-                style={styles.cardGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
               <View style={styles.cardContent}>
                 <View style={styles.cardIcon}>
-                  <LinearGradient
-                    colors={[
-                      theme.colors.tertiaryContainer,
-                      theme.colors.tertiary,
-                    ]}
-                    style={styles.cardIconGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  />
                   <MaterialCommunityIcons
                     name="calendar-clock"
-                    size={28}
-                    color={theme.colors.onTertiaryContainer}
+                    size={24}
+                    color={theme.colors.tertiary}
                   />
                 </View>
                 <View style={styles.cardText}>
@@ -765,7 +821,7 @@ const MainDashboard = () => {
                 </View>
                 <MaterialCommunityIcons
                   name="chevron-right"
-                  size={24}
+                  size={20}
                   color={theme.colors.onSurfaceVariant}
                 />
               </View>
@@ -777,39 +833,15 @@ const MainDashboard = () => {
             activeOpacity={0.7}
           >
             <Surface style={styles.card} elevation={0}>
-              <LinearGradient
-                colors={
-                  aggregatedHealth?.criticalIssues?.length
-                    ? theme.dark
-                      ? ["rgba(188, 98, 98, 0.1)", "rgba(148, 76, 76, 0.05)"]
-                      : ["rgba(188, 98, 98, 0.05)", "rgba(148, 76, 76, 0.02)"]
-                    : theme.dark
-                      ? ["rgba(98, 188, 98, 0.1)", "rgba(76, 148, 76, 0.05)"]
-                      : ["rgba(98, 188, 98, 0.05)", "rgba(76, 148, 76, 0.02)"]
-                }
-                style={styles.cardGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
               <View style={styles.cardContent}>
                 <View style={styles.cardIcon}>
-                  <LinearGradient
-                    colors={
-                      aggregatedHealth?.criticalIssues?.length
-                        ? [theme.colors.errorContainer, theme.colors.error]
-                        : [theme.colors.surfaceVariant, theme.colors.outline]
-                    }
-                    style={styles.cardIconGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  />
                   <MaterialCommunityIcons
                     name="monitor-dashboard"
-                    size={28}
+                    size={24}
                     color={
                       aggregatedHealth?.criticalIssues?.length
-                        ? theme.colors.onErrorContainer
-                        : theme.colors.onSurfaceVariant
+                        ? theme.colors.error
+                        : theme.colors.primary
                     }
                   />
                 </View>
@@ -821,12 +853,9 @@ const MainDashboard = () => {
                       : "View logs, health & metrics"}
                   </Text>
                 </View>
-                {aggregatedHealth?.criticalIssues?.length
-                  ? renderStatusIndicator(false)
-                  : null}
                 <MaterialCommunityIcons
                   name="chevron-right"
-                  size={24}
+                  size={20}
                   color={theme.colors.onSurfaceVariant}
                 />
               </View>
