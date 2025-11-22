@@ -815,7 +815,13 @@ const JellyfinItemDetailsScreen = () => {
                 contentStyle={styles.playButtonContent}
                 labelStyle={styles.playButtonLabel}
               >
-                Play
+                {(() => {
+                  const progress = item.UserData?.PlayedPercentage ?? 0;
+                  const hasProgress = progress > 0 && progress < 100;
+                  return hasProgress
+                    ? `Play (${Math.round(progress)}%)`
+                    : "Play";
+                })()}
               </Button>
             )}
 
@@ -834,7 +840,17 @@ const JellyfinItemDetailsScreen = () => {
                       compact
                       style={styles.playSeriesButton}
                     >
-                      Play
+                      {(() => {
+                        const firstUnwatched =
+                          episodes.find((ep) => !ep.UserData?.Played) ??
+                          episodes[0];
+                        const progress =
+                          firstUnwatched?.UserData?.PlayedPercentage ?? 0;
+                        const hasProgress = progress > 0 && progress < 100;
+                        return hasProgress
+                          ? `Play (${Math.round(progress)}%)`
+                          : "Play";
+                      })()}
                     </Button>
                   )}
                 </View>

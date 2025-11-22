@@ -6,6 +6,11 @@ import type {
   IConnector,
   SystemHealth,
 } from "./IConnector";
+import type {
+  LogQueryOptions,
+  ServiceLog,
+  LogFileInfo,
+} from "@/models/logger.types";
 import type { ServiceConfig } from "@/models/service.types";
 import { handleApiError } from "@/utils/error.utils";
 import { logger } from "@/services/logger/LoggerService";
@@ -469,5 +474,49 @@ export abstract class BaseConnector<
     };
 
     return withRetry(operation, retryOptions);
+  }
+
+  /**
+   * Retrieve logs from the service.
+   * Default implementation returns empty array - services should override this method.
+   */
+  async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+    void logger.debug("getLogs called on service without log support.", {
+      serviceId: this.config.id,
+      serviceType: this.config.type,
+      options,
+    });
+    return [];
+  }
+
+  /**
+   * Retrieve a specific log file by filename.
+   * Default implementation throws an error - services should override this method.
+   */
+  async getLogFile(filename: string): Promise<string> {
+    void logger.debug(
+      "getLogFile called on service without log file support.",
+      {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        filename,
+      },
+    );
+    throw new Error(`Log file retrieval not supported for ${this.config.type}`);
+  }
+
+  /**
+   * List available log files from the service.
+   * Default implementation returns empty array - services should override this method.
+   */
+  async listLogFiles(): Promise<LogFileInfo[]> {
+    void logger.debug(
+      "listLogFiles called on service without log file support.",
+      {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+      },
+    );
+    return [];
   }
 }

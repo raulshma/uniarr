@@ -146,24 +146,31 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   }
 
   const handleImageLoad = useCallback(() => {
-    setImageState((prev) => ({ ...prev, loaded: true, loading: false }));
+    // Use setTimeout to defer state update and avoid Glide errors on Android
+    // This ensures we're not starting/clearing loads within RequestListener callbacks
+    setTimeout(() => {
+      setImageState((prev) => ({ ...prev, loaded: true, loading: false }));
 
-    if (progressiveLoading) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
+      if (progressiveLoading) {
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    }, 0);
   }, [progressiveLoading, fadeAnim]);
 
   const handleError = useCallback(() => {
-    setImageState((prev) => ({
-      ...prev,
-      loaded: false,
-      loading: false,
-      error: true,
-    }));
+    // Use setTimeout to defer state update and avoid Glide errors on Android
+    setTimeout(() => {
+      setImageState((prev) => ({
+        ...prev,
+        loaded: false,
+        loading: false,
+        error: true,
+      }));
+    }, 0);
   }, []);
 
   // Optimized container style calculation
@@ -260,7 +267,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
           priority={priority}
           transition={progressiveLoading ? 250 : 0} // Slightly reduced for snappier feel
           onLoad={handleImageLoad}
-          onLoadEnd={handleImageLoad}
           onError={handleError}
           // Only render when we have a valid resolved URI to prevent flickering
           key={imageState.resolvedUri || "placeholder"}

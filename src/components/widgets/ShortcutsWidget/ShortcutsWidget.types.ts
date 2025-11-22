@@ -78,6 +78,13 @@ export const DEFAULT_SHORTCUTS: Shortcut[] = [
     route: "/(auth)/jellyfin-downloads",
     enabled: true,
   },
+  {
+    id: "monitoring",
+    label: "Monitoring",
+    icon: "monitor-dashboard",
+    route: "/(auth)/monitoring",
+    enabled: true,
+  },
 ];
 
 // Additional optional shortcuts

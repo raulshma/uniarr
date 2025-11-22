@@ -137,6 +137,12 @@ const EpisodeCard: React.FC<{
               <Text variant="bodySmall" style={styles.seasonEpisode}>
                 S{seasonNumber.toString().padStart(2, "0")}E
                 {episodeNumber.toString().padStart(2, "0")}
+                {showProgressBar && (
+                  <Text style={styles.progressText}>
+                    {" "}
+                    • {Math.round(playbackProgress)}%
+                  </Text>
+                )}
               </Text>
               <IconButton
                 icon="play-circle"
@@ -343,6 +349,10 @@ const createStyles = (theme: AppTheme) =>
     seasonEpisode: {
       color: theme.colors.onSurfaceVariant,
       fontWeight: "500",
+    },
+    progressText: {
+      color: theme.colors.primary,
+      fontWeight: "600",
     },
     episodeFooter: {
       flexDirection: "row",

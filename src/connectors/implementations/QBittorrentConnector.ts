@@ -9,6 +9,11 @@ import type {
   TorrentTransferInfo,
 } from "@/models/torrent.types";
 import type { SystemHealth } from "@/connectors/base/IConnector";
+import type {
+  LogQueryOptions,
+  ServiceLog,
+  ServiceLogLevel,
+} from "@/models/logger.types";
 
 const QB_API_PREFIX = "/api/v2";
 
@@ -404,5 +409,153 @@ export class QBittorrentConnector extends BaseConnector<Torrent> {
         "Content-Type": "application/x-www-form-urlencoded",
       },
     });
+  }
+
+  /**
+   * Retrieve logs from qBittorrent using the /api/v2/log/main endpoint.
+   * Parses qBittorrent log format and normalizes to unified ServiceLog format.
+   * Maps qBittorrent log levels to standard levels.
+   */
+  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+    await this.ensureAuthenticated();
+
+    try {
+      // qBittorrent log API parameters
+      const params: Record<string, unknown> = {
+        // last_known_id: -1 means get all logs
+        last_known_id: -1,
+      };
+
+      // qBittorrent supports filtering by log level
+      // Levels: normal=1, info=2, warning=4, critical=8
+      // We can combine them with bitwise OR
+      if (options?.level && options.level.length > 0) {
+        let levelMask = 0;
+        options.level.forEach((level) => {
+          switch (level) {
+            case "trace":
+            case "debug":
+            case "info":
+              levelMask |= 1 | 2; // normal + info
+              break;
+            case "warn":
+              levelMask |= 4; // warning
+              break;
+            case "error":
+            case "fatal":
+              levelMask |= 8; // critical
+              break;
+          }
+        });
+        if (levelMask > 0) {
+          params.normal = (levelMask & 1) !== 0;
+          params.info = (levelMask & 2) !== 0;
+          params.warning = (levelMask & 4) !== 0;
+          params.critical = (levelMask & 8) !== 0;
+        }
+      }
+
+      const response = await this.client.get<
+        {
+          id: number;
+          message: string;
+          timestamp: number;
+          type: number;
+        }[]
+      >(`${QB_API_PREFIX}/log/main`, { params });
+
+      let logs = (response.data ?? []).map((log) =>
+        this.normalizeQBittorrentLogEntry(log),
+      );
+
+      // Apply time range filtering if specified
+      if (options?.since || options?.until) {
+        logs = logs.filter((log) => {
+          if (options.since && log.timestamp < options.since) {
+            return false;
+          }
+          if (options.until && log.timestamp > options.until) {
+            return false;
+          }
+          return true;
+        });
+      }
+
+      // Apply search term filtering if specified
+      if (options?.searchTerm) {
+        const searchLower = options.searchTerm.toLowerCase();
+        logs = logs.filter((log) =>
+          log.message.toLowerCase().includes(searchLower),
+        );
+      }
+
+      // Apply pagination
+      const limit = options?.limit ?? 50;
+      const startIndex = options?.startIndex ?? 0;
+      const paginatedLogs = logs.slice(startIndex, startIndex + limit);
+
+      return paginatedLogs;
+    } catch (error) {
+      logger.error("[QBittorrentConnector] Failed to retrieve logs", {
+        serviceId: this.config.id,
+        error,
+      });
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getLogs",
+        endpoint: `${QB_API_PREFIX}/log/main`,
+      });
+    }
+  }
+
+  /**
+   * Normalize a qBittorrent log entry to the unified ServiceLog format.
+   * qBittorrent log types: 1=normal, 2=info, 4=warning, 8=critical
+   */
+  private normalizeQBittorrentLogEntry(log: {
+    id: number;
+    message: string;
+    timestamp: number;
+    type: number;
+  }): ServiceLog {
+    // Convert Unix timestamp (milliseconds) to Date
+    const timestamp = new Date(log.timestamp);
+
+    // Map qBittorrent log type to ServiceLogLevel
+    const level = this.normalizeQBittorrentLogLevel(log.type);
+
+    return {
+      id: `qbittorrent-${this.config.id}-${log.id}`,
+      serviceId: this.config.id,
+      serviceName: this.config.name,
+      serviceType: this.config.type,
+      timestamp,
+      level,
+      message: log.message,
+      raw: JSON.stringify(log),
+      metadata: {
+        qbittorrentType: log.type,
+      },
+    };
+  }
+
+  /**
+   * Normalize qBittorrent log level to the unified ServiceLogLevel format.
+   * qBittorrent types: 1=normal, 2=info, 4=warning, 8=critical
+   */
+  private normalizeQBittorrentLogLevel(type: number): ServiceLogLevel {
+    switch (type) {
+      case 1: // normal
+        return "debug";
+      case 2: // info
+        return "info";
+      case 4: // warning
+        return "warn";
+      case 8: // critical
+        return "error";
+      default:
+        return "info";
+    }
   }
 }

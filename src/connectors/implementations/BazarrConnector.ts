@@ -16,6 +16,12 @@ import type {
   BazarrStatistics,
 } from "@/models/bazarr.types";
 import { handleApiError } from "@/utils/error.utils";
+import { logger } from "@/services/logger/LoggerService";
+import type {
+  LogQueryOptions,
+  ServiceLog,
+  ServiceLogLevel,
+} from "@/models/logger.types";
 
 /**
  * Bazarr connector for subtitle management
@@ -455,5 +461,144 @@ export class BazarrConnector extends BaseConnector<
     // Bazarr doesn't have traditional search like Sonarr/Radarr
     // Return empty array for now - could be extended to search movies/episodes by title
     return [];
+  }
+
+  /**
+   * Retrieve logs from Bazarr using the /system/logs endpoint.
+   * Note: Bazarr's log API is simpler and returns logs as an array of strings.
+   * We'll parse and normalize them to the unified ServiceLog format.
+   */
+  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+    try {
+      const response = await this.client.get<string[]>("/system/logs");
+      const logLines = response.data || [];
+
+      // Bazarr returns logs as an array of strings, we need to parse them
+      const logs = logLines
+        .map((line, index) => this.parseBazarrLogLine(line, index))
+        .filter((log): log is ServiceLog => log !== null);
+
+      // Apply filters
+      let filteredLogs = logs;
+
+      // Apply level filter if specified
+      if (options?.level && options.level.length > 0) {
+        filteredLogs = filteredLogs.filter((log) =>
+          options.level!.includes(log.level),
+        );
+      }
+
+      // Apply time range filtering if specified
+      if (options?.since || options?.until) {
+        filteredLogs = filteredLogs.filter((log) => {
+          if (options.since && log.timestamp < options.since) {
+            return false;
+          }
+          if (options.until && log.timestamp > options.until) {
+            return false;
+          }
+          return true;
+        });
+      }
+
+      // Apply search term filtering if specified
+      if (options?.searchTerm) {
+        const searchLower = options.searchTerm.toLowerCase();
+        filteredLogs = filteredLogs.filter((log) =>
+          log.message.toLowerCase().includes(searchLower),
+        );
+      }
+
+      // Apply limit
+      if (options?.limit) {
+        const startIndex = options.startIndex ?? 0;
+        filteredLogs = filteredLogs.slice(
+          startIndex,
+          startIndex + options.limit,
+        );
+      }
+
+      return filteredLogs;
+    } catch (error) {
+      logger.error("[BazarrConnector] Failed to retrieve logs", {
+        serviceId: this.config.id,
+        error,
+      });
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getLogs",
+        endpoint: "/system/logs",
+      });
+    }
+  }
+
+  /**
+   * Parse a Bazarr log line into a ServiceLog entry.
+   * Bazarr log format is typically: "YYYY-MM-DD HH:MM:SS LEVEL :: message"
+   */
+  private parseBazarrLogLine(line: string, index: number): ServiceLog | null {
+    if (!line || line.trim().length === 0) {
+      return null;
+    }
+
+    // Try to parse the log line
+    // Format: "2024-01-15 10:30:45 INFO :: message here"
+    const logPattern =
+      /^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(\w+)\s+::\s+(.+)$/;
+    const match = line.match(logPattern);
+
+    if (match && match[1] && match[2] && match[3]) {
+      const timestamp = match[1];
+      const level = match[2];
+      const message = match[3];
+      return {
+        id: `bazarr-${this.config.id}-${index}`,
+        serviceId: this.config.id,
+        serviceName: this.config.name,
+        serviceType: this.config.type,
+        timestamp: new Date(timestamp),
+        level: this.normalizeBazarrLogLevel(level),
+        message: message.trim(),
+        raw: line,
+      };
+    }
+
+    // If parsing fails, return a basic log entry
+    return {
+      id: `bazarr-${this.config.id}-${index}`,
+      serviceId: this.config.id,
+      serviceName: this.config.name,
+      serviceType: this.config.type,
+      timestamp: new Date(),
+      level: "info",
+      message: line,
+      raw: line,
+    };
+  }
+
+  /**
+   * Normalize Bazarr log level to the unified ServiceLogLevel format.
+   */
+  private normalizeBazarrLogLevel(level: string): ServiceLogLevel {
+    const levelLower = level.toLowerCase();
+    switch (levelLower) {
+      case "trace":
+        return "trace";
+      case "debug":
+        return "debug";
+      case "info":
+        return "info";
+      case "warn":
+      case "warning":
+        return "warn";
+      case "error":
+        return "error";
+      case "fatal":
+      case "critical":
+        return "fatal";
+      default:
+        return "info";
+    }
   }
 }

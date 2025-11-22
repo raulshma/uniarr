@@ -27,6 +27,12 @@ import type {
 import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
 import { authManager } from "@/services/auth/AuthManager";
 import { logger } from "@/services/logger/LoggerService";
+import type {
+  LogQueryOptions,
+  ServiceLog,
+  ServiceLogLevel,
+} from "@/models/logger.types";
+import { handleApiError } from "@/utils/error.utils";
 
 const DEFAULT_RESUME_TYPES = ["Movie", "Episode"];
 const DEFAULT_SEARCH_TYPES = ["Movie", "Series", "Episode"];
@@ -906,6 +912,210 @@ export class JellyfinConnector
   } {
     // Jellyfin manages authentication via tokens, so no basic auth configuration is required here.
     return {};
+  }
+
+  // ==================== LOG RETRIEVAL METHODS ====================
+
+  /**
+   * Retrieve logs from Jellyfin using the /System/Logs endpoint.
+   * Requires admin permissions.
+   * Parses Jellyfin log format and normalizes to unified ServiceLog format.
+   */
+  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+    await this.ensureAuthenticated();
+
+    try {
+      // Jellyfin's /System/Logs endpoint returns a list of log files
+      // We'll fetch the main log file and parse it
+      const response =
+        await this.client.get<
+          { Name: string; DateModified: string; Size: number }[]
+        >("/System/Logs");
+
+      if (!response.data || response.data.length === 0) {
+        return [];
+      }
+
+      // Get the most recent log file (usually "log_*.txt")
+      const logFiles = response.data.sort(
+        (a, b) =>
+          new Date(b.DateModified).getTime() -
+          new Date(a.DateModified).getTime(),
+      );
+      const latestLogFile = logFiles[0];
+
+      if (!latestLogFile) {
+        return [];
+      }
+
+      // Fetch the log file content
+      const logContentResponse = await this.client.get<string>(
+        `/System/Logs/Log`,
+        {
+          params: {
+            name: latestLogFile.Name,
+          },
+          responseType: "text",
+          transformResponse: (data) => data,
+        },
+      );
+
+      const logContent =
+        typeof logContentResponse.data === "string"
+          ? logContentResponse.data
+          : "";
+
+      // Parse log lines
+      const logLines = logContent.split("\n").filter((line) => line.trim());
+
+      // Apply limit
+      const limit = options?.limit ?? 50;
+      const startIndex = options?.startIndex ?? 0;
+
+      // Parse and normalize log entries
+      let logs = logLines
+        .map((line, index) => this.parseJellyfinLogLine(line, index))
+        .filter((log): log is ServiceLog => log !== null);
+
+      // Apply level filter if specified
+      if (options?.level && options.level.length > 0) {
+        logs = logs.filter((log) => options.level!.includes(log.level));
+      }
+
+      // Apply time range filtering if specified
+      if (options?.since || options?.until) {
+        logs = logs.filter((log) => {
+          if (options.since && log.timestamp < options.since) {
+            return false;
+          }
+          if (options.until && log.timestamp > options.until) {
+            return false;
+          }
+          return true;
+        });
+      }
+
+      // Apply search term filtering if specified
+      if (options?.searchTerm) {
+        const searchLower = options.searchTerm.toLowerCase();
+        logs = logs.filter(
+          (log) =>
+            log.message.toLowerCase().includes(searchLower) ||
+            log.logger?.toLowerCase().includes(searchLower) ||
+            log.exception?.toLowerCase().includes(searchLower),
+        );
+      }
+
+      // Apply pagination
+      const paginatedLogs = logs.slice(startIndex, startIndex + limit);
+
+      return paginatedLogs;
+    } catch (error) {
+      logger.error("[JellyfinConnector] Failed to retrieve logs", {
+        serviceId: this.config.id,
+        error,
+      });
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getLogs",
+        endpoint: "/System/Logs",
+      });
+    }
+  }
+
+  /**
+   * Parse a Jellyfin log line into a ServiceLog entry.
+   * Jellyfin log format: [timestamp] [level] [logger]: message
+   * Example: [2024-01-15 10:30:45.123 +00:00] [INF] [Jellyfin.Server]: Application started
+   */
+  private parseJellyfinLogLine(line: string, index: number): ServiceLog | null {
+    if (!line.trim()) {
+      return null;
+    }
+
+    // Jellyfin log format regex
+    // [2024-01-15 10:30:45.123 +00:00] [INF] [Jellyfin.Server]: Message
+    const logRegex = /^\[([^\]]+)\]\s+\[([^\]]+)\]\s+\[([^\]]+)\]:\s*(.*)$/;
+    const match = line.match(logRegex);
+
+    if (!match) {
+      // If line doesn't match expected format, treat it as a continuation or raw log
+      return {
+        id: `jellyfin-${this.config.id}-${index}`,
+        serviceId: this.config.id,
+        serviceName: this.config.name,
+        serviceType: this.config.type,
+        timestamp: new Date(),
+        level: "info",
+        message: line,
+        raw: line,
+      };
+    }
+
+    const [, timestampStr, levelStr, loggerStr, message] = match;
+
+    // Parse timestamp - ensure we have a valid string
+    let timestamp: Date;
+    try {
+      if (timestampStr) {
+        timestamp = new Date(timestampStr);
+        if (isNaN(timestamp.getTime())) {
+          timestamp = new Date();
+        }
+      } else {
+        timestamp = new Date();
+      }
+    } catch {
+      timestamp = new Date();
+    }
+
+    // Normalize log level
+    const level = this.normalizeJellyfinLogLevel(levelStr ?? "");
+
+    return {
+      id: `jellyfin-${this.config.id}-${index}`,
+      serviceId: this.config.id,
+      serviceName: this.config.name,
+      serviceType: this.config.type,
+      timestamp,
+      level,
+      message: (message ?? "").trim(),
+      logger: (loggerStr ?? "").trim(),
+      raw: line,
+    };
+  }
+
+  /**
+   * Normalize Jellyfin log level to the unified ServiceLogLevel format.
+   * Jellyfin uses: VRB (Verbose), DBG (Debug), INF (Info), WRN (Warning), ERR (Error), FTL (Fatal)
+   */
+  private normalizeJellyfinLogLevel(level: string): ServiceLogLevel {
+    const levelUpper = level.toUpperCase().trim();
+
+    switch (levelUpper) {
+      case "VRB":
+      case "VERBOSE":
+        return "trace";
+      case "DBG":
+      case "DEBUG":
+        return "debug";
+      case "INF":
+      case "INFO":
+        return "info";
+      case "WRN":
+      case "WARN":
+      case "WARNING":
+        return "warn";
+      case "ERR":
+      case "ERROR":
+        return "error";
+      case "FTL":
+      case "FATAL":
+        return "fatal";
+      default:
+        return "info";
+    }
   }
 
   // ==================== DOWNLOAD CONNECTOR METHODS ====================

@@ -60,20 +60,20 @@ const DashboardHeader = React.memo(
         flexDirection: "row" as const,
         alignItems: "center" as const,
         justifyContent: "center" as const,
-        marginTop: theme.custom.spacing.xxxs,
-        gap: theme.custom.spacing.none,
+        marginTop: theme.custom.spacing.xs,
+        gap: theme.custom.spacing.xs,
       }),
-      [theme.custom.spacing.xxxs, theme.custom.spacing.none],
+      [theme.custom.spacing.xs],
     );
 
     const stickyWeatherHeaderRowStyle = useMemo(
       () => ({
         flexDirection: "row" as const,
         alignItems: "center" as const,
-        gap: theme.custom.spacing.none,
+        gap: theme.custom.spacing.xs,
         opacity: animatedValues.stickyTitleOpacity,
       }),
-      [theme.custom.spacing.none, animatedValues.stickyTitleOpacity],
+      [theme.custom.spacing.xs, animatedValues.stickyTitleOpacity],
     );
 
     const styles = useMemo(
@@ -124,14 +124,19 @@ const DashboardHeader = React.memo(
             alignItems: "center",
           },
           title: {
-            fontSize: theme.custom.typography.titleLarge.fontSize,
-            fontWeight: "800",
+            fontSize: theme.custom.typography.displaySmall.fontSize,
+            fontWeight: "900",
             color: theme.colors.onBackground,
-            letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
+            letterSpacing: theme.custom.typography.displaySmall.letterSpacing,
+            textShadowColor: theme.dark
+              ? "rgba(0, 0, 0, 0.3)"
+              : "rgba(255, 255, 255, 0.8)",
+            textShadowOffset: { width: 0, height: theme.custom.spacing.xxxs },
+            textShadowRadius: theme.custom.spacing.xs,
           },
           stickyTitle: {
             fontSize: theme.custom.typography.titleMedium.fontSize,
-            fontWeight: "600",
+            fontWeight: "700",
             color: theme.colors.onBackground,
             letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
           },
@@ -188,19 +193,22 @@ const DashboardHeader = React.memo(
                 },
               ]}
             >
-              <Text style={styles.title}>Widgets</Text>
+              <Text style={styles.title}>Dashboard</Text>
               {weatherSummary && (
                 <View style={weatherHeaderRowStyle}>
                   <LottieWeatherIcon
                     condition={weatherSummary.condition}
-                    size={40}
+                    size={48}
                     autoPlay
                     loop
                   />
                   <Text
                     style={{
-                      fontSize: theme.custom.typography.labelSmall.fontSize,
+                      fontSize: theme.custom.typography.headlineMedium.fontSize,
+                      fontWeight: "700",
                       color: theme.colors.onBackground,
+                      letterSpacing:
+                        theme.custom.typography.headlineMedium.letterSpacing,
                     }}
                   >
                     {weatherSummary.temperature}
