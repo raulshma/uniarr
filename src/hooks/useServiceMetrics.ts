@@ -278,9 +278,7 @@ export function useTimeRangePreset(preset: "24h" | "7d" | "30d"): TimeRange {
  * ```
  */
 export function useCustomTimeRange(start: Date, end: Date): TimeRange {
-  return useMemo(() => {
-    return { start, end, preset: "custom" };
-  }, [start, end]);
+  return useMemo(() => ({ start, end, preset: "custom" }), [start, end]);
 }
 
 /**
@@ -379,37 +377,36 @@ export function useFormatMetric(
   value: number | undefined,
   type: "percentage" | "count" | "rate" | "bytes" | "speed",
 ): string {
-  return useMemo(() => {
-    if (value === undefined || value === null) {
-      return "N/A";
-    }
+  // React Compiler handles simple string formatting
+  if (value === undefined || value === null) {
+    return "N/A";
+  }
 
-    switch (type) {
-      case "percentage":
-        return `${value.toFixed(1)}%`;
+  switch (type) {
+    case "percentage":
+      return `${value.toFixed(1)}%`;
 
-      case "count":
-        return value.toLocaleString();
+    case "count":
+      return value.toLocaleString();
 
-      case "rate":
-        return `${value.toFixed(2)}/s`;
+    case "rate":
+      return `${value.toFixed(2)}/s`;
 
-      case "bytes":
-        if (value < 1024) return `${value.toFixed(0)} B`;
-        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-        if (value < 1024 * 1024 * 1024)
-          return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-        return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    case "bytes":
+      if (value < 1024) return `${value.toFixed(0)} B`;
+      if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+      if (value < 1024 * 1024 * 1024)
+        return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+      return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 
-      case "speed":
-        if (value < 1024) return `${value.toFixed(0)} B/s`;
-        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB/s`;
-        if (value < 1024 * 1024 * 1024)
-          return `${(value / (1024 * 1024)).toFixed(1)} MB/s`;
-        return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB/s`;
+    case "speed":
+      if (value < 1024) return `${value.toFixed(0)} B/s`;
+      if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB/s`;
+      if (value < 1024 * 1024 * 1024)
+        return `${(value / (1024 * 1024)).toFixed(1)} MB/s`;
+      return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB/s`;
 
-      default:
-        return value.toString();
-    }
-  }, [value, type]);
+    default:
+      return value.toString();
+  }
 }

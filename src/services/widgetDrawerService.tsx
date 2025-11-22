@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from "react";
 import type { ContentMetadata } from "@/components/widgets/ContentDrawer";
 
 export interface DrawerState {
@@ -52,29 +59,32 @@ export const useWidgetDrawer = () => {
 export const WidgetDrawerProvider = ({ children }: { children: ReactNode }) => {
   const [drawerState, setDrawerState] = useState<DrawerState>(initialState);
 
-  const openDrawer = (state: Omit<DrawerState, "visible">) => {
+  const openDrawer = useCallback((state: Omit<DrawerState, "visible">) => {
     setDrawerState({
       ...state,
       visible: true,
     });
-  };
+  }, []);
 
-  const closeDrawer = () => {
+  const closeDrawer = useCallback(() => {
     setDrawerState((prev) => ({
       ...prev,
       visible: false,
     }));
-  };
+  }, []);
 
-  return React.createElement(
-    WidgetDrawerContext.Provider,
-    {
-      value: {
-        drawerState,
-        openDrawer,
-        closeDrawer,
-      },
-    },
-    children,
+  const contextValue = useMemo(
+    () => ({
+      drawerState,
+      openDrawer,
+      closeDrawer,
+    }),
+    [drawerState, openDrawer, closeDrawer],
+  );
+
+  return (
+    <WidgetDrawerContext.Provider value={contextValue}>
+      {children}
+    </WidgetDrawerContext.Provider>
   );
 };

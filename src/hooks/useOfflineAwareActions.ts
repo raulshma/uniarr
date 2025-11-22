@@ -4,6 +4,7 @@ import { Alert } from "react-native";
 import { useOfflineSync } from "./useOfflineSync";
 import { useNetworkStatus } from "./useNetworkStatus";
 import { useHaptics } from "./useHaptics";
+import { queryKeys } from "@/hooks/queryKeys";
 import { mutationQueueService } from "@/services/storage/MutationQueueService";
 import { logger } from "@/services/logger/LoggerService";
 
@@ -121,7 +122,7 @@ export const useOfflineAwareActions = () => {
           if (queueWhenOffline) {
             await queueMutationForOffline({
               mutationFn: action,
-              queryKey: ["offline-action"],
+              queryKey: queryKeys.offline.action,
               variables: {},
             });
 
@@ -155,7 +156,7 @@ export const useOfflineAwareActions = () => {
         try {
           await queueMutationForOffline({
             mutationFn: action,
-            queryKey: ["offline-action"],
+            queryKey: queryKeys.offline.action,
             variables: {},
           });
 

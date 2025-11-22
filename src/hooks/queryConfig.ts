@@ -130,6 +130,92 @@ export const QUERY_CONFIG = {
     ...RETRY_CONFIG.DEFAULT,
     ...REFETCH_CONFIG.DEFAULT,
   },
+  // Library data (movies, series) - medium freshness
+  LIBRARY: {
+    staleTime: STALE_TIME.LONG, // 5 minutes
+    cacheTime: CACHE_TIME.LONG,
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Library details - shorter freshness
+  LIBRARY_DETAIL: {
+    staleTime: STALE_TIME.SHORT * 8, // 2 minutes
+    cacheTime: CACHE_TIME.MEDIUM,
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Anime/Jikan data - medium freshness
+  ANIME: {
+    staleTime: STALE_TIME.LONG, // 5 minutes
+    cacheTime: CACHE_TIME.LONG,
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Anime details - longer freshness
+  ANIME_DETAIL: {
+    staleTime: STALE_TIME.VERY_LONG, // 15 minutes
+    cacheTime: CACHE_TIME.VERY_LONG,
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Subtitles data - short freshness
+  SUBTITLES: {
+    staleTime: STALE_TIME.SHORT, // 15 seconds
+    cacheTime: CACHE_TIME.MEDIUM,
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Subtitles statistics - medium freshness
+  SUBTITLES_STATS: {
+    staleTime: STALE_TIME.LONG * 2, // 10 minutes
+    cacheTime: CACHE_TIME.LONG,
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Library check - medium freshness with limited retry
+  LIBRARY_CHECK: {
+    staleTime: STALE_TIME.LONG, // 5 minutes
+    cacheTime: CACHE_TIME.LONG * 2, // 10 minutes
+    retry: 1,
+    refetchOnWindowFocus: false,
+  },
+  // Discover releases - medium freshness, offline-first
+  DISCOVER_RELEASES: {
+    staleTime: STALE_TIME.LONG * 2, // 10 minutes
+    cacheTime: CACHE_TIME.LONG * 2, // 30 minutes
+    ...RETRY_CONFIG.DEFAULT,
+    networkMode: "offlineFirst" as const,
+    refetchOnWindowFocus: false,
+  },
+  // Unified discover - longer freshness
+  UNIFIED_DISCOVER: {
+    staleTime: STALE_TIME.VERY_LONG, // 15 minutes
+    cacheTime: CACHE_TIME.LONG * 2, // 30 minutes
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Recently added - short freshness with auto-refetch
+  RECENTLY_ADDED: {
+    staleTime: STALE_TIME.SHORT * 8, // 2 minutes
+    cacheTime: CACHE_TIME.MEDIUM,
+    refetchInterval: STALE_TIME.LONG, // 5 minutes
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Recommendations - very long freshness
+  RECOMMENDATIONS: {
+    staleTime: 24 * 60 * 60 * 1000, // 24 hours
+    cacheTime: 7 * 24 * 60 * 60 * 1000, // 7 days
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
+  // Content gaps - very long freshness
+  CONTENT_GAPS: {
+    staleTime: 24 * 60 * 60 * 1000, // 24 hours
+    cacheTime: 7 * 24 * 60 * 60 * 1000, // 7 days
+    ...RETRY_CONFIG.DEFAULT,
+    refetchOnWindowFocus: false,
+  },
 } as const;
 
 /**

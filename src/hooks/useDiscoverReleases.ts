@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/hooks/queryKeys";
+import { QUERY_CONFIG } from "@/hooks/queryConfig";
 import {
   useConnectorsStore,
   selectGetConnectorsByType,
@@ -84,14 +85,16 @@ export const useDiscoverReleases = (
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
 
   return useQuery<NormalizedRelease[], Error>({
-    queryKey: [
-      ...queryKeys.discover.releases,
-      { mediaType, tmdbId, tvdbId, imdbId, preferQuality, minSeeders },
-    ] as const,
+    queryKey: queryKeys.discover.releases({
+      mediaType,
+      tmdbId,
+      tvdbId,
+      imdbId,
+      preferQuality,
+      minSeeders,
+    }),
     enabled: enabled && Boolean(tmdbId || tvdbId || imdbId),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
-    networkMode: "offlineFirst",
+    ...QUERY_CONFIG.DISCOVER_RELEASES,
     queryFn: async (context) => {
       if (!tmdbId && !tvdbId && !imdbId) {
         throw new Error(

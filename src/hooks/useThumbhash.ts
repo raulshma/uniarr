@@ -26,65 +26,57 @@ export const useThumbhash = (
 ) => {
   const { autoGenerate = true, generateDelay = 0 } = options;
 
-  const [thumbhash, setThumbhash] = useState<string | undefined>(() =>
-    uri ? thumbhashService.getThumbhash(uri) : undefined,
-  );
+  // Compute thumbhash directly from service (derived state)
+  const cachedThumbhash = uri ? thumbhashService.getThumbhash(uri) : undefined;
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [generatedThumbhash, setGeneratedThumbhash] = useState<
+    string | undefined
+  >(undefined);
 
-  // Update thumbhash when URI changes
+  // Only use effect for async generation (legitimate external operation)
   useEffect(() => {
-    if (!uri) {
-      setThumbhash(undefined);
-      setIsGenerating(false);
-      setHasError(false);
-      return;
-    }
-
-    // Check if we already have a thumbhash for this URI
-    const existingThumbhash = thumbhashService.getThumbhash(uri);
-    if (existingThumbhash) {
-      setThumbhash(existingThumbhash);
-      setIsGenerating(false);
-      setHasError(false);
-      return;
-    }
-
-    // Reset state for new URI
-    setThumbhash(undefined);
+    // Reset generation state when URI changes
+    setGeneratedThumbhash(undefined);
     setHasError(false);
 
-    // Auto-generate if enabled
-    if (autoGenerate) {
-      const generate = async () => {
-        try {
-          setIsGenerating(true);
-          setHasError(false);
-
-          const generatedThumbhash =
-            await thumbhashService.generateThumbhash(uri);
-
-          if (generatedThumbhash) {
-            setThumbhash(generatedThumbhash);
-            setHasError(false);
-          } else {
-            setHasError(true);
-          }
-        } catch {
-          setHasError(true);
-        } finally {
-          setIsGenerating(false);
-        }
-      };
-
-      if (generateDelay > 0) {
-        const timeoutId = setTimeout(generate, generateDelay);
-        return () => clearTimeout(timeoutId);
-      } else {
-        void generate();
-      }
+    if (!uri || cachedThumbhash || !autoGenerate) {
+      setIsGenerating(false);
+      return;
     }
-  }, [uri, autoGenerate, generateDelay]);
+
+    // Auto-generate if enabled and not cached
+    const generate = async () => {
+      try {
+        setIsGenerating(true);
+        setHasError(false);
+
+        const generated = await thumbhashService.generateThumbhash(uri);
+
+        if (generated) {
+          setGeneratedThumbhash(generated);
+          setHasError(false);
+        } else {
+          setHasError(true);
+        }
+      } catch {
+        setHasError(true);
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+    if (generateDelay > 0) {
+      const timeoutId = setTimeout(generate, generateDelay);
+      return () => clearTimeout(timeoutId);
+    } else {
+      void generate();
+    }
+  }, [uri, cachedThumbhash, autoGenerate, generateDelay]);
+
+  // Compute final thumbhash value (derived state)
+  const thumbhash = cachedThumbhash || generatedThumbhash;
 
   return {
     thumbhash,

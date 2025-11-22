@@ -961,11 +961,17 @@ export const useSettingsStore = create<SettingsState>()(
     },
   ),
 );
+// ============================================================================
+// Individual Setting Selectors - Use these for granular access
+// ============================================================================
+
 export const selectThemePreference = (state: SettingsState): ThemePreference =>
   state.theme;
 export const selectCustomThemeConfig = (
   state: SettingsState,
 ): CustomThemeConfig => state.customThemeConfig;
+export const selectOledEnabled = (state: SettingsState): boolean =>
+  state.oledEnabled;
 export const selectNotificationsEnabled = (state: SettingsState): boolean =>
   state.notificationsEnabled;
 export const selectReleaseNotificationsEnabled = (
@@ -1058,3 +1064,251 @@ export const selectRecommendationKeyId = (
 export const selectDefaultDashboard = (
   state: SettingsState,
 ): "main" | "widgets" => state.defaultDashboard;
+export const selectTmdbEnabled = (state: SettingsState): boolean =>
+  state.tmdbEnabled;
+export const selectMaxImageCacheSize = (state: SettingsState): number =>
+  state.maxImageCacheSize;
+export const selectLogLevel = (state: SettingsState): LogLevel =>
+  state.logLevel;
+export const selectHapticFeedback = (state: SettingsState): boolean =>
+  state.hapticFeedback;
+
+// ============================================================================
+// Grouped Selectors - Use these when multiple related settings are needed
+// Use with shallow equality to prevent re-renders when values haven't changed
+// ============================================================================
+
+/**
+ * Selects all theme-related settings
+ * Use with shallow: useSettingsStore(selectThemeSettings, shallow)
+ */
+export const selectThemeSettings = (state: SettingsState) => ({
+  theme: state.theme,
+  customThemeConfig: state.customThemeConfig,
+  oledEnabled: state.oledEnabled,
+});
+
+/**
+ * Selects all notification-related settings
+ * Use with shallow: useSettingsStore(selectNotificationSettings, shallow)
+ */
+export const selectNotificationSettings = (state: SettingsState) => ({
+  notificationsEnabled: state.notificationsEnabled,
+  releaseNotificationsEnabled: state.releaseNotificationsEnabled,
+  downloadNotificationsEnabled: state.downloadNotificationsEnabled,
+  failedDownloadNotificationsEnabled: state.failedDownloadNotificationsEnabled,
+  requestNotificationsEnabled: state.requestNotificationsEnabled,
+  serviceHealthNotificationsEnabled: state.serviceHealthNotificationsEnabled,
+  quietHours: state.quietHours,
+  criticalHealthAlertsBypassQuietHours:
+    state.criticalHealthAlertsBypassQuietHours,
+});
+
+/**
+ * Selects all calendar-related settings
+ * Use with shallow: useSettingsStore(selectCalendarSettings, shallow)
+ */
+export const selectCalendarSettings = (state: SettingsState) => ({
+  lastCalendarView: state.lastCalendarView,
+  lastCalendarRange: state.lastCalendarRange,
+  refreshIntervalMinutes: state.refreshIntervalMinutes,
+});
+
+/**
+ * Selects all Jellyfin-related settings
+ * Use with shallow: useSettingsStore(selectJellyfinSettings, shallow)
+ */
+export const selectJellyfinSettings = (state: SettingsState) => ({
+  jellyfinLocalAddress: state.jellyfinLocalAddress,
+  jellyfinPublicAddress: state.jellyfinPublicAddress,
+  jellyfinPlayerAutoPlay: state.jellyfinPlayerAutoPlay,
+  jellyfinPlayerDefaultSubtitleLanguage:
+    state.jellyfinPlayerDefaultSubtitleLanguage,
+});
+
+/**
+ * Selects all recommendation-related settings
+ * Use with shallow: useSettingsStore(selectRecommendationSettings, shallow)
+ */
+export const selectRecommendationSettings = (state: SettingsState) => ({
+  enableAIRecommendations: state.enableAIRecommendations,
+  recommendationIncludeHiddenGems: state.recommendationIncludeHiddenGems,
+  recommendationLimit: state.recommendationLimit,
+  recommendationExcludedGenres: state.recommendationExcludedGenres,
+  recommendationContentRatingLimit: state.recommendationContentRatingLimit,
+  recommendationCacheDurationHours: state.recommendationCacheDurationHours,
+  recommendationBackgroundUpdatesEnabled:
+    state.recommendationBackgroundUpdatesEnabled,
+  recommendationProvider: state.recommendationProvider,
+  recommendationModel: state.recommendationModel,
+  recommendationKeyId: state.recommendationKeyId,
+});
+
+/**
+ * Selects all API logger settings
+ * Use with shallow: useSettingsStore(selectApiLoggerSettings, shallow)
+ */
+export const selectApiLoggerSettings = (state: SettingsState) => ({
+  apiLoggerEnabled: state.apiLoggerEnabled,
+  apiLoggerActivePreset: state.apiLoggerActivePreset,
+  apiLoggerCustomCodes: state.apiLoggerCustomCodes,
+  apiLoggerRetentionDays: state.apiLoggerRetentionDays,
+  apiLoggerCaptureRequestBody: state.apiLoggerCaptureRequestBody,
+  apiLoggerCaptureResponseBody: state.apiLoggerCaptureResponseBody,
+  apiLoggerCaptureRequestHeaders: state.apiLoggerCaptureRequestHeaders,
+  apiLoggerAiLoggingEnabled: state.apiLoggerAiLoggingEnabled,
+  apiLoggerAiCapturePrompt: state.apiLoggerAiCapturePrompt,
+  apiLoggerAiCaptureResponse: state.apiLoggerAiCaptureResponse,
+  apiLoggerAiCaptureMetadata: state.apiLoggerAiCaptureMetadata,
+  apiLoggerAiRetentionDays: state.apiLoggerAiRetentionDays,
+});
+
+/**
+ * Selects all S3 backup settings
+ * Use with shallow: useSettingsStore(selectS3BackupSettings, shallow)
+ */
+export const selectS3BackupSettings = (state: SettingsState) => ({
+  s3BackupEnabled: state.s3BackupEnabled,
+  s3BucketName: state.s3BucketName,
+  s3Region: state.s3Region,
+  s3CustomEndpoint: state.s3CustomEndpoint,
+  s3ForcePathStyle: state.s3ForcePathStyle,
+  s3AutoBackupEnabled: state.s3AutoBackupEnabled,
+  s3AutoBackupFrequency: state.s3AutoBackupFrequency,
+  s3LastAutoBackupTimestamp: state.s3LastAutoBackupTimestamp,
+  s3DeleteLocalAfterUpload: state.s3DeleteLocalAfterUpload,
+});
+
+// ============================================================================
+// Action Selectors - These never cause re-renders
+// Use these when you only need to call actions, not read data
+// ============================================================================
+
+/**
+ * Selects theme action functions only
+ * These are stable references that never change
+ */
+export const selectThemeActions = (state: SettingsState) => ({
+  setTheme: state.setTheme,
+  updateCustomThemeConfig: state.updateCustomThemeConfig,
+  setCustomThemeConfig: state.setCustomThemeConfig,
+  resetCustomThemeConfig: state.resetCustomThemeConfig,
+  setOledEnabled: state.setOledEnabled,
+});
+
+/**
+ * Selects notification action functions only
+ * These are stable references that never change
+ */
+export const selectNotificationActions = (state: SettingsState) => ({
+  setNotificationsEnabled: state.setNotificationsEnabled,
+  setReleaseNotificationsEnabled: state.setReleaseNotificationsEnabled,
+  setDownloadNotificationsEnabled: state.setDownloadNotificationsEnabled,
+  setFailedDownloadNotificationsEnabled:
+    state.setFailedDownloadNotificationsEnabled,
+  setRequestNotificationsEnabled: state.setRequestNotificationsEnabled,
+  setServiceHealthNotificationsEnabled:
+    state.setServiceHealthNotificationsEnabled,
+  updateQuietHoursConfig: state.updateQuietHoursConfig,
+  setCriticalHealthAlertsBypassQuietHours:
+    state.setCriticalHealthAlertsBypassQuietHours,
+});
+
+/**
+ * Selects calendar action functions only
+ * These are stable references that never change
+ */
+export const selectCalendarActions = (state: SettingsState) => ({
+  setLastCalendarView: state.setLastCalendarView,
+  setLastCalendarRange: state.setLastCalendarRange,
+  setRefreshIntervalMinutes: state.setRefreshIntervalMinutes,
+});
+
+/**
+ * Selects all action functions
+ * Use this when you need multiple actions from different categories
+ * These are stable references that never change
+ */
+export const selectAllActions = (state: SettingsState) => ({
+  setTheme: state.setTheme,
+  updateCustomThemeConfig: state.updateCustomThemeConfig,
+  setCustomThemeConfig: state.setCustomThemeConfig,
+  resetCustomThemeConfig: state.resetCustomThemeConfig,
+  setOledEnabled: state.setOledEnabled,
+  setNotificationsEnabled: state.setNotificationsEnabled,
+  setReleaseNotificationsEnabled: state.setReleaseNotificationsEnabled,
+  setDownloadNotificationsEnabled: state.setDownloadNotificationsEnabled,
+  setFailedDownloadNotificationsEnabled:
+    state.setFailedDownloadNotificationsEnabled,
+  setRequestNotificationsEnabled: state.setRequestNotificationsEnabled,
+  setServiceHealthNotificationsEnabled:
+    state.setServiceHealthNotificationsEnabled,
+  setRefreshIntervalMinutes: state.setRefreshIntervalMinutes,
+  updateQuietHoursConfig: state.updateQuietHoursConfig,
+  setCriticalHealthAlertsBypassQuietHours:
+    state.setCriticalHealthAlertsBypassQuietHours,
+  setLastCalendarView: state.setLastCalendarView,
+  setLastCalendarRange: state.setLastCalendarRange,
+  setTmdbEnabled: state.setTmdbEnabled,
+  setJellyseerrRetryAttempts: state.setJellyseerrRetryAttempts,
+  setMaxImageCacheSize: state.setMaxImageCacheSize,
+  setLogLevel: state.setLogLevel,
+  setHapticFeedback: state.setHapticFeedback,
+  setJellyfinLocalAddress: state.setJellyfinLocalAddress,
+  setJellyfinPublicAddress: state.setJellyfinPublicAddress,
+  setJellyfinPlayerAutoPlay: state.setJellyfinPlayerAutoPlay,
+  setJellyfinPlayerDefaultSubtitleLanguage:
+    state.setJellyfinPlayerDefaultSubtitleLanguage,
+  setPreferredJellyseerrServiceId: state.setPreferredJellyseerrServiceId,
+  setRecentActivitySourceServiceIds: state.setRecentActivitySourceServiceIds,
+  setPreferredRecentActivityServiceId:
+    state.setPreferredRecentActivityServiceId,
+  setLastReleaseNotesCheckedAt: state.setLastReleaseNotesCheckedAt,
+  setFrostedWidgetsEnabled: state.setFrostedWidgetsEnabled,
+  setGradientBackgroundEnabled: state.setGradientBackgroundEnabled,
+  setExperimentalWeatherEffectsEnabled:
+    state.setExperimentalWeatherEffectsEnabled,
+  setApiLoggerEnabled: state.setApiLoggerEnabled,
+  setApiLoggerActivePreset: state.setApiLoggerActivePreset,
+  setApiLoggerCustomCodes: state.setApiLoggerCustomCodes,
+  setApiLoggerRetentionDays: state.setApiLoggerRetentionDays,
+  setApiLoggerCaptureRequestBody: state.setApiLoggerCaptureRequestBody,
+  setApiLoggerCaptureResponseBody: state.setApiLoggerCaptureResponseBody,
+  setApiLoggerCaptureRequestHeaders: state.setApiLoggerCaptureRequestHeaders,
+  setApiLoggerAiLoggingEnabled: state.setApiLoggerAiLoggingEnabled,
+  setApiLoggerAiCapturePrompt: state.setApiLoggerAiCapturePrompt,
+  setApiLoggerAiCaptureResponse: state.setApiLoggerAiCaptureResponse,
+  setApiLoggerAiCaptureMetadata: state.setApiLoggerAiCaptureMetadata,
+  setApiLoggerAiRetentionDays: state.setApiLoggerAiRetentionDays,
+  setLoaderConfig: state.setLoaderConfig,
+  setBackdropWithBlurEnabled: state.setBackdropWithBlurEnabled,
+  setTrailerFeatureEnabled: state.setTrailerFeatureEnabled,
+  setDiscoverBannerDismissed: state.setDiscoverBannerDismissed,
+  setAnimeHubBannerDismissed: state.setAnimeHubBannerDismissed,
+  setByokGeocodeMapsCoApiKey: state.setByokGeocodeMapsCoApiKey,
+  setS3BackupEnabled: state.setS3BackupEnabled,
+  setS3BucketName: state.setS3BucketName,
+  setS3Region: state.setS3Region,
+  setS3CustomEndpoint: state.setS3CustomEndpoint,
+  setS3ForcePathStyle: state.setS3ForcePathStyle,
+  setS3AutoBackupEnabled: state.setS3AutoBackupEnabled,
+  setS3AutoBackupFrequency: state.setS3AutoBackupFrequency,
+  setS3LastAutoBackupTimestamp: state.setS3LastAutoBackupTimestamp,
+  setS3DeleteLocalAfterUpload: state.setS3DeleteLocalAfterUpload,
+  setEnableAISearch: state.setEnableAISearch,
+  setEnableAIRecommendations: state.setEnableAIRecommendations,
+  setRecommendationIncludeHiddenGems: state.setRecommendationIncludeHiddenGems,
+  setRecommendationLimit: state.setRecommendationLimit,
+  setRecommendationExcludedGenres: state.setRecommendationExcludedGenres,
+  setRecommendationContentRatingLimit:
+    state.setRecommendationContentRatingLimit,
+  setRecommendationCacheDurationHours:
+    state.setRecommendationCacheDurationHours,
+  setRecommendationBackgroundUpdatesEnabled:
+    state.setRecommendationBackgroundUpdatesEnabled,
+  setRecommendationProvider: state.setRecommendationProvider,
+  setRecommendationModel: state.setRecommendationModel,
+  setRecommendationKeyId: state.setRecommendationKeyId,
+  setDefaultDashboard: state.setDefaultDashboard,
+  reset: state.reset,
+});

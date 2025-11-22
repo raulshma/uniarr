@@ -10,6 +10,7 @@ import type {
   DiscoverMediaKind,
   DiscoverMediaItem,
 } from "@/models/discover.types";
+import { queryKeys } from "@/hooks/queryKeys";
 
 export interface FoundService {
   readonly tmdbId?: number;
@@ -177,10 +178,9 @@ export const useBatchCheckInLibrary = (
   }));
 
   const query = useQuery({
-    queryKey: [
-      "batch-check-in-library",
-      checkItems.map((item) => `${item.id}`).join(","),
-    ],
+    queryKey: queryKeys.library.batchCheckInLibrary(
+      checkItems.map((item) => `${item.id}`),
+    ),
     queryFn: async () => checkItemsInLibrary(checkItems, getConnectorsByType),
     enabled: items.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes

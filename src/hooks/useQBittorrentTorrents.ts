@@ -128,7 +128,7 @@ export const useQBittorrentTorrents = (
   const invalidateData = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: queryKeys.qbittorrent.service(serviceId),
+        queryKey: queryKeys.qbittorrent.torrents(serviceId),
       }),
       queryClient.invalidateQueries({
         queryKey: queryKeys.qbittorrent.transferInfo(serviceId),
@@ -183,7 +183,7 @@ export const useQBittorrentTorrents = (
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.qbittorrent.service(serviceId),
+        queryKey: queryKeys.qbittorrent.torrents(serviceId),
       });
     },
   });

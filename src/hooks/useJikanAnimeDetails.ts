@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/hooks/queryKeys";
+import { QUERY_CONFIG } from "@/hooks/queryConfig";
 import { JikanClient } from "@/services/jikan/JikanClient";
 import type { JikanAnimeFull } from "@/models/jikan.types";
 
@@ -12,9 +13,9 @@ export const useJikanAnimeDetails = (malId?: number) => {
 
   // Main anime details query
   const animeQuery = useQuery<JikanAnimeFull, Error>({
-    queryKey: queryKeys.discover.jikanDetail(numericMalId ?? 0),
+    queryKey: queryKeys.discover.jikan.detail(numericMalId ?? 0),
     enabled: Boolean(numericMalId),
-    staleTime: 5 * 60 * 1000,
+    ...QUERY_CONFIG.ANIME,
     queryFn: async () => {
       if (!numericMalId) {
         throw new Error("Invalid MyAnimeList id");
@@ -25,13 +26,9 @@ export const useJikanAnimeDetails = (malId?: number) => {
 
   // Additional data queries with staggered execution
   const recommendationsQuery = useQuery({
-    queryKey: [
-      ...queryKeys.discover.jikanDetail(numericMalId ?? 0),
-      "recommendations",
-    ],
+    queryKey: queryKeys.discover.jikan.detailRecommendations(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
-    staleTime: 30 * 60 * 1000, // 30 minutes - recommendations don't change often
-    gcTime: 60 * 60 * 1000, // 1 hour
+    ...QUERY_CONFIG.ANIME_DETAIL,
     queryFn: async () => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
       // Small delay to space out requests
@@ -41,10 +38,9 @@ export const useJikanAnimeDetails = (malId?: number) => {
   });
 
   const reviewsQuery = useQuery({
-    queryKey: [...queryKeys.discover.jikanDetail(numericMalId ?? 0), "reviews"],
+    queryKey: queryKeys.discover.jikan.reviews(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
-    staleTime: 60 * 60 * 1000, // 1 hour - reviews are relatively stable
-    gcTime: 2 * 60 * 60 * 1000, // 2 hours
+    ...QUERY_CONFIG.ANIME_DETAIL,
     queryFn: async () => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
       // Small delay to space out requests
@@ -54,13 +50,9 @@ export const useJikanAnimeDetails = (malId?: number) => {
   });
 
   const picturesQuery = useQuery({
-    queryKey: [
-      ...queryKeys.discover.jikanDetail(numericMalId ?? 0),
-      "pictures",
-    ],
+    queryKey: queryKeys.discover.jikan.pictures(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
-    staleTime: 2 * 60 * 60 * 1000, // 2 hours - pictures rarely change
-    gcTime: 4 * 60 * 60 * 1000, // 4 hours
+    ...QUERY_CONFIG.ANIME_DETAIL,
     queryFn: async () => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
       // Small delay to space out requests
@@ -70,13 +62,9 @@ export const useJikanAnimeDetails = (malId?: number) => {
   });
 
   const episodesQuery = useQuery({
-    queryKey: [
-      ...queryKeys.discover.jikanDetail(numericMalId ?? 0),
-      "episodes",
-    ],
+    queryKey: queryKeys.discover.jikan.episodes(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
-    staleTime: 60 * 60 * 1000, // 1 hour - episode lists are stable
-    gcTime: 2 * 60 * 60 * 1000, // 2 hours
+    ...QUERY_CONFIG.ANIME_DETAIL,
     queryFn: async () => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
       // Small delay to space out requests
@@ -86,13 +74,9 @@ export const useJikanAnimeDetails = (malId?: number) => {
   });
 
   const statisticsQuery = useQuery({
-    queryKey: [
-      ...queryKeys.discover.jikanDetail(numericMalId ?? 0),
-      "statistics",
-    ],
+    queryKey: queryKeys.discover.jikan.statistics(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
-    staleTime: 15 * 60 * 1000, // 15 minutes - statistics change more frequently
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    ...QUERY_CONFIG.ANIME_DETAIL,
     queryFn: async () => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
       // Small delay to space out requests
@@ -102,13 +86,9 @@ export const useJikanAnimeDetails = (malId?: number) => {
   });
 
   const streamingQuery = useQuery({
-    queryKey: [
-      ...queryKeys.discover.jikanDetail(numericMalId ?? 0),
-      "streaming",
-    ],
+    queryKey: queryKeys.discover.jikan.streaming(numericMalId ?? 0),
     enabled: Boolean(numericMalId) && animeQuery.isSuccess,
-    staleTime: 60 * 60 * 1000, // 1 hour - streaming info is relatively stable
-    gcTime: 2 * 60 * 60 * 1000, // 2 hours
+    ...QUERY_CONFIG.ANIME_DETAIL,
     queryFn: async () => {
       if (!numericMalId) throw new Error("Invalid MyAnimeList id");
       // Small delay to space out requests

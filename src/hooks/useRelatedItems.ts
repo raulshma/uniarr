@@ -107,19 +107,29 @@ export const useRelatedItems = (
       return [];
     }
 
+    // Optimized: Combine map and filter into single pass using reduce
+    // This reduces O(2n) to O(n) and avoids creating intermediate array
     if (mediaType === "movie") {
       const results = (detailsQuery.data.recommendations?.results ??
         []) as MovieListItem[];
-      return results
-        .map((entry) => buildMovieDiscoverItem(entry))
-        .filter((item) => typeof item.tmdbId === "number" && item.tmdbId > 0);
+      return results.reduce<DiscoverMediaItem[]>((acc, entry) => {
+        const item = buildMovieDiscoverItem(entry);
+        if (typeof item.tmdbId === "number" && item.tmdbId > 0) {
+          acc.push(item);
+        }
+        return acc;
+      }, []);
     }
 
     const results = (detailsQuery.data.recommendations?.results ??
       []) as TvListItem[];
-    return results
-      .map((entry) => buildTvDiscoverItem(entry))
-      .filter((item) => typeof item.tmdbId === "number" && item.tmdbId > 0);
+    return results.reduce<DiscoverMediaItem[]>((acc, entry) => {
+      const item = buildTvDiscoverItem(entry);
+      if (typeof item.tmdbId === "number" && item.tmdbId > 0) {
+        acc.push(item);
+      }
+      return acc;
+    }, []);
   }, [detailsQuery.data, mediaType]);
 
   const similar = useMemo(() => {
@@ -127,18 +137,28 @@ export const useRelatedItems = (
       return [];
     }
 
+    // Optimized: Combine map and filter into single pass using reduce
+    // This reduces O(2n) to O(n) and avoids creating intermediate array
     if (mediaType === "movie") {
       const results = (detailsQuery.data.similar?.results ??
         []) as MovieListItem[];
-      return results
-        .map((entry) => buildMovieDiscoverItem(entry))
-        .filter((item) => typeof item.tmdbId === "number" && item.tmdbId > 0);
+      return results.reduce<DiscoverMediaItem[]>((acc, entry) => {
+        const item = buildMovieDiscoverItem(entry);
+        if (typeof item.tmdbId === "number" && item.tmdbId > 0) {
+          acc.push(item);
+        }
+        return acc;
+      }, []);
     }
 
     const results = (detailsQuery.data.similar?.results ?? []) as TvListItem[];
-    return results
-      .map((entry) => buildTvDiscoverItem(entry))
-      .filter((item) => typeof item.tmdbId === "number" && item.tmdbId > 0);
+    return results.reduce<DiscoverMediaItem[]>((acc, entry) => {
+      const item = buildTvDiscoverItem(entry);
+      if (typeof item.tmdbId === "number" && item.tmdbId > 0) {
+        acc.push(item);
+      }
+      return acc;
+    }, []);
   }, [detailsQuery.data, mediaType]);
 
   return {

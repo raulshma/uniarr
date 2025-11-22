@@ -58,15 +58,37 @@ interface UseUnifiedSearchResult {
   readonly clearHistory: () => Promise<void>;
 }
 
-const normalizeArray = <T extends string>(
+// Cache for normalized arrays to ensure reference stability
+// This prevents unnecessary re-renders by returning the same reference
+// when the normalized result is equivalent
+const normalizedArrayCache = new WeakMap<
+  readonly string[],
+  string[] | undefined
+>();
+
+const normalizeArrayStable = <T extends string>(
   values?: readonly T[],
 ): T[] | undefined => {
   if (!values || values.length === 0) {
     return undefined;
   }
 
+  // Check cache for stable reference
+  const cached = normalizedArrayCache.get(values as readonly string[]);
+  if (cached !== undefined) {
+    return cached as T[] | undefined;
+  }
+
   const deduped = Array.from(new Set(values.filter(Boolean) as T[]));
-  return deduped.length > 0 ? deduped : undefined;
+  const result = deduped.length > 0 ? deduped : undefined;
+
+  // Store in cache for future calls
+  normalizedArrayCache.set(
+    values as readonly string[],
+    result as string[] | undefined,
+  );
+
+  return result;
 };
 
 export const useUnifiedSearch = (
@@ -76,44 +98,36 @@ export const useUnifiedSearch = (
   const service = useMemo(() => UnifiedSearchService.getInstance(), []);
   const queryClient = useQueryClient();
 
-  const normalizedTerm = useMemo(() => term.trim(), [term]);
+  // React Compiler handles simple string operations
+  const normalizedTerm = term.trim();
+
+  // Use stable normalization to ensure reference equality when values don't change
+  // This prevents unnecessary re-renders in child components
   const normalizedServiceIds = useMemo(
-    () => normalizeArray(config.serviceIds),
+    () => normalizeArrayStable(config.serviceIds),
     [config.serviceIds],
   );
   const normalizedMediaTypes = useMemo(
-    () => normalizeArray(config.mediaTypes),
+    () => normalizeArrayStable(config.mediaTypes),
     [config.mediaTypes],
   );
   const normalizedGenres = useMemo(
-    () => normalizeArray(config.genres),
+    () => normalizeArrayStable(config.genres),
     [config.genres],
   );
 
-  const searchOptions = useMemo<UnifiedSearchOptions>(
-    () => ({
-      serviceIds: normalizedServiceIds,
-      mediaTypes: normalizedMediaTypes,
-      limitPerService: config.limitPerService,
-      quality: config.quality,
-      status: config.status,
-      genres: normalizedGenres,
-      releaseYearMin: config.releaseYearMin,
-      releaseYearMax: config.releaseYearMax,
-      releaseType: config.releaseType,
-    }),
-    [
-      config.limitPerService,
-      config.quality,
-      config.releaseType,
-      config.releaseYearMax,
-      config.releaseYearMin,
-      config.status,
-      normalizedGenres,
-      normalizedMediaTypes,
-      normalizedServiceIds,
-    ],
-  );
+  // React Compiler handles simple object literals
+  const searchOptions: UnifiedSearchOptions = {
+    serviceIds: normalizedServiceIds,
+    mediaTypes: normalizedMediaTypes,
+    limitPerService: config.limitPerService,
+    quality: config.quality,
+    status: config.status,
+    genres: normalizedGenres,
+    releaseYearMin: config.releaseYearMin,
+    releaseYearMax: config.releaseYearMax,
+    releaseType: config.releaseType,
+  };
 
   const searchQuery = useQuery<UnifiedSearchResponse, Error>({
     queryKey: queryKeys.unifiedSearch.results(normalizedTerm, {
@@ -146,6 +160,8 @@ export const useUnifiedSearch = (
 
   const recordedKeyRef = useRef<string | null>(null);
 
+  // Optimized automatic history recording effect
+  // Only records when search succeeds and only invalidates history query
   useEffect(() => {
     if (config.autoRecordHistory === false) {
       return;
@@ -155,17 +171,22 @@ export const useUnifiedSearch = (
       return;
     }
 
+    // Generate history key using optimized function
     const historyKey = createUnifiedSearchHistoryKey(
       normalizedTerm,
       normalizedServiceIds,
       normalizedMediaTypes,
     );
+
+    // Skip if this exact search was already recorded
     if (historyKey === recordedKeyRef.current) {
       return;
     }
 
     recordedKeyRef.current = historyKey;
 
+    // Record search and only invalidate history query (not search results)
+    // This ensures history recording doesn't cause unnecessary search refetches
     void service
       .recordSearch(normalizedTerm, normalizedServiceIds, normalizedMediaTypes)
       .then(() =>
@@ -174,7 +195,8 @@ export const useUnifiedSearch = (
         }),
       )
       .catch(() => {
-        // ignore history persistence failures at the hook level
+        // Ignore history persistence failures at the hook level
+        // History is a nice-to-have feature and shouldn't break search
       });
   }, [
     config.autoRecordHistory,
@@ -193,19 +215,32 @@ export const useUnifiedSearch = (
         return;
       }
 
-      const serviceIds = normalizeArray(
+      // Use stable normalization for consistent references
+      const serviceIds = normalizeArrayStable(
         overrides?.serviceIds ?? config.serviceIds,
       );
-      const mediaTypes = normalizeArray(
+      const mediaTypes = normalizeArrayStable(
         overrides?.mediaTypes ?? config.mediaTypes,
       );
 
-      await service.recordSearch(nextTerm, serviceIds, mediaTypes);
-      recordedKeyRef.current = createUnifiedSearchHistoryKey(
+      // Generate history key to check if we've already recorded this exact search
+      const historyKey = createUnifiedSearchHistoryKey(
         nextTerm,
         serviceIds,
         mediaTypes,
       );
+
+      // Skip recording and invalidation if this exact search was just recorded
+      // This prevents unnecessary query invalidations and re-renders
+      if (historyKey === recordedKeyRef.current) {
+        return;
+      }
+
+      await service.recordSearch(nextTerm, serviceIds, mediaTypes);
+      recordedKeyRef.current = historyKey;
+
+      // Only invalidate the history query, not the search results query
+      // This ensures search history recording doesn't trigger unnecessary refetches
       await queryClient.invalidateQueries({
         queryKey: queryKeys.unifiedSearch.history,
       });

@@ -622,7 +622,7 @@ const MainDashboard = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push("/(auth)/(tabs)/calendar")}
+              onPress={() => router.push("/(auth)/calendar")}
               activeOpacity={0.7}
             >
               <Surface style={styles.quickActionCard} elevation={0}>
@@ -683,7 +683,7 @@ const MainDashboard = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push("/(auth)/(tabs)/recently-added")}
+              onPress={() => router.push("/(auth)/recently-added")}
               activeOpacity={0.7}
             >
               <Surface style={styles.quickActionCard} elevation={0}>
@@ -776,7 +776,7 @@ const MainDashboard = () => {
           <TouchableOpacity
             onPress={() => {
               if (!nextRelease) {
-                router.push("/(auth)/(tabs)/calendar");
+                router.push("/(auth)/calendar");
                 return;
               }
 
@@ -792,10 +792,10 @@ const MainDashboard = () => {
                   );
                 } catch (error) {
                   console.error("Navigation error:", error);
-                  router.push("/(auth)/(tabs)/calendar");
+                  router.push("/(auth)/calendar");
                 }
               } else {
-                router.push("/(auth)/(tabs)/calendar");
+                router.push("/(auth)/calendar");
               }
             }}
             activeOpacity={0.7}

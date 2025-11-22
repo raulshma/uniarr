@@ -106,7 +106,19 @@ export const useCalendar = (): UseCalendarReturn => {
   });
 
   const updateState = useCallback((updates: Partial<CalendarState>) => {
-    setState((prev) => ({ ...prev, ...updates }));
+    setState((prev) => {
+      // Optimized: Only update if values actually changed
+      const hasChanges = Object.keys(updates).some((key) => {
+        const stateKey = key as keyof CalendarState;
+        return prev[stateKey] !== updates[stateKey];
+      });
+
+      if (!hasChanges) {
+        return prev; // Return same reference if nothing changed
+      }
+
+      return { ...prev, ...updates };
+    });
   }, []);
 
   const setView = useCallback(
@@ -149,7 +161,40 @@ export const useCalendar = (): UseCalendarReturn => {
   const setFilters = useCallback(
     (filters: Partial<CalendarFilters>) => {
       setState((prev) => {
+        // Optimized: Only update if filters actually changed
         const nextFilters = { ...prev.filters, ...filters };
+
+        // Check if filters are actually different
+        const filtersChanged = Object.keys(filters).some((key) => {
+          const filterKey = key as keyof CalendarFilters;
+          const oldValue = prev.filters[filterKey];
+          const newValue = nextFilters[filterKey];
+
+          // Deep comparison for arrays and objects
+          if (Array.isArray(oldValue) && Array.isArray(newValue)) {
+            return (
+              oldValue.length !== newValue.length ||
+              oldValue.some((v, i) => v !== newValue[i])
+            );
+          }
+
+          if (filterKey === "dateRange") {
+            const oldRange = oldValue as CalendarFilters["dateRange"];
+            const newRange = newValue as CalendarFilters["dateRange"];
+            if (!oldRange && !newRange) return false;
+            if (!oldRange || !newRange) return true;
+            return (
+              oldRange.start !== newRange.start || oldRange.end !== newRange.end
+            );
+          }
+
+          return oldValue !== newValue;
+        });
+
+        if (!filtersChanged) {
+          return prev; // Return same reference if nothing changed
+        }
+
         return { ...prev, filters: nextFilters };
       });
 
@@ -225,7 +270,12 @@ export const useCalendar = (): UseCalendarReturn => {
     [setCurrentDate, setSelectedDate],
   );
 
-  // Calendar data computation
+  // Calendar data computation - optimized with stable dateRange reference
+  const dateRange = state.filters.dateRange;
+  const dateRangeKey = dateRange
+    ? `${dateRange.start}-${dateRange.end}`
+    : undefined;
+
   const calendarData = useMemo(() => {
     return generateCalendarData(
       state.currentDate,
@@ -233,7 +283,8 @@ export const useCalendar = (): UseCalendarReturn => {
       releases,
       state.filters.dateRange,
     );
-  }, [state.currentDate, state.view, releases, state.filters.dateRange]);
+    // Using dateRangeKey instead of state.filters.dateRange for stable reference
+  }, [state.currentDate, state.view, releases, dateRangeKey]);
 
   // Statistics computation
   const stats = useMemo((): CalendarStats => {
@@ -395,17 +446,20 @@ function generateRangeData(
   endDate: string,
   releases: MediaRelease[],
 ): CalendarRange {
-  const rangeReleases = releases.filter((release) => {
-    return release.releaseDate >= startDate && release.releaseDate <= endDate;
-  });
+  // Optimized: Single pass filter and sort in O(n log n)
+  const rangeReleases = releases
+    .filter((release) => {
+      return release.releaseDate >= startDate && release.releaseDate <= endDate;
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime(),
+    );
 
   return {
     startDate,
     endDate,
-    releases: rangeReleases.sort(
-      (a, b) =>
-        new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime(),
-    ),
+    releases: rangeReleases,
   };
 }
 
@@ -419,6 +473,33 @@ function generateMonthData(
   const lastDay = new Date(year, month + 1, 0);
   const startOfWeek = new Date(firstDay);
   startOfWeek.setDate(firstDay.getDate() - firstDay.getDay());
+
+  // Optimized: Pre-compute today's date string once
+  const todayStr = new Date().toISOString().split("T")[0]!;
+
+  // Optimized: Create a Map for O(1) lookup of releases by date
+  const releasesByDate = new Map<string, MediaRelease[]>();
+  let totalReleases = 0;
+
+  // Single pass through releases - O(n)
+  for (const release of releases) {
+    const releaseDate = new Date(release.releaseDate);
+    const dateStr = release.releaseDate;
+
+    // Track releases in current month for totalReleases
+    if (
+      releaseDate.getMonth() === month &&
+      releaseDate.getFullYear() === year
+    ) {
+      totalReleases++;
+    }
+
+    // Group releases by date for O(1) lookup
+    if (!releasesByDate.has(dateStr)) {
+      releasesByDate.set(dateStr, []);
+    }
+    releasesByDate.get(dateStr)!.push(release);
+  }
 
   const weeks: CalendarWeek[] = [];
   let currentWeek = new Date(startOfWeek);
@@ -434,14 +515,13 @@ function generateMonthData(
       dayDate.setDate(currentWeek.getDate() + i);
       const dateStr = dayDate.toISOString().split("T")[0]!;
 
-      const dayReleases = releases.filter(
-        (release) => release.releaseDate === dateStr,
-      );
+      // Optimized: O(1) lookup instead of O(n) filter
+      const dayReleases = releasesByDate.get(dateStr) ?? [];
 
       days.push({
         date: dateStr,
         isCurrentMonth: dayDate.getMonth() === month,
-        isToday: dateStr === new Date().toISOString().split("T")[0]!,
+        isToday: dateStr === todayStr,
         isSelected: false, // Will be set by parent component
         releases: dayReleases,
       });
@@ -455,13 +535,6 @@ function generateMonthData(
 
     currentWeek.setDate(currentWeek.getDate() + 7);
   }
-
-  const totalReleases = releases.filter((release) => {
-    const releaseDate = new Date(release.releaseDate);
-    return (
-      releaseDate.getMonth() === month && releaseDate.getFullYear() === year
-    );
-  }).length;
 
   return {
     year,
@@ -478,6 +551,19 @@ function generateWeekData(
   const startOfWeek = new Date(current);
   startOfWeek.setDate(current.getDate() - current.getDay());
 
+  // Optimized: Pre-compute today's date string once
+  const todayStr = new Date().toISOString().split("T")[0]!;
+
+  // Optimized: Create a Map for O(1) lookup of releases by date
+  const releasesByDate = new Map<string, MediaRelease[]>();
+  for (const release of releases) {
+    const dateStr = release.releaseDate;
+    if (!releasesByDate.has(dateStr)) {
+      releasesByDate.set(dateStr, []);
+    }
+    releasesByDate.get(dateStr)!.push(release);
+  }
+
   const days: CalendarDay[] = [];
 
   for (let i = 0; i < 7; i++) {
@@ -485,14 +571,13 @@ function generateWeekData(
     dayDate.setDate(startOfWeek.getDate() + i);
     const dateStr = dayDate.toISOString().split("T")[0]!;
 
-    const dayReleases = releases.filter(
-      (release) => release.releaseDate === dateStr,
-    );
+    // Optimized: O(1) lookup instead of O(n) filter
+    const dayReleases = releasesByDate.get(dateStr) ?? [];
 
     days.push({
       date: dateStr,
       isCurrentMonth: true,
-      isToday: dateStr === new Date().toISOString().split("T")[0]!,
+      isToday: dateStr === todayStr,
       isSelected: false,
       releases: dayReleases,
     });
@@ -511,6 +596,9 @@ function generateWeekData(
 
 function generateDayData(current: Date, releases: MediaRelease[]): CalendarDay {
   const dateStr = current.toISOString().split("T")[0]!;
+  const todayStr = new Date().toISOString().split("T")[0]!;
+
+  // Optimized: Single pass filter - O(n)
   const dayReleases = releases.filter(
     (release) => release.releaseDate === dateStr,
   );
@@ -518,7 +606,7 @@ function generateDayData(current: Date, releases: MediaRelease[]): CalendarDay {
   return {
     date: dateStr,
     isCurrentMonth: true,
-    isToday: dateStr === new Date().toISOString().split("T")[0]!,
+    isToday: dateStr === todayStr,
     isSelected: false,
     releases: dayReleases,
   };

@@ -643,3 +643,243 @@ export const useConversationalAIStore = create<ConversationalAIState>()(
     },
   ),
 );
+
+// ============================================================================
+// Granular Data Selectors - Use these to minimize re-renders
+// ============================================================================
+
+/**
+ * Selects the current session ID only
+ * Components using this only re-render when the session ID changes
+ */
+export const selectCurrentSessionId = (
+  state: ConversationalAIState,
+): string | null => state.currentSessionId;
+
+/**
+ * Selects the messages array only
+ * Components using this only re-render when messages change
+ */
+export const selectMessages = (state: ConversationalAIState): Message[] =>
+  state.messages;
+
+/**
+ * Selects the loading state only
+ * Components using this only re-render when loading state changes
+ */
+export const selectIsLoading = (state: ConversationalAIState): boolean =>
+  state.isLoading;
+
+/**
+ * Selects the streaming state only
+ * Components using this only re-render when streaming state changes
+ */
+export const selectIsStreaming = (state: ConversationalAIState): boolean =>
+  state.isStreaming;
+
+/**
+ * Selects the error state only
+ * Components using this only re-render when error changes
+ */
+export const selectError = (state: ConversationalAIState): Error | null =>
+  state.error;
+
+/**
+ * Selects the assistant config only
+ * Components using this only re-render when config changes
+ */
+export const selectConfig = (state: ConversationalAIState): AssistantConfig =>
+  state.config;
+
+/**
+ * Selects a specific config property
+ * Use this for even more granular access to config
+ */
+export const selectConfigProperty =
+  <K extends keyof AssistantConfig>(key: K) =>
+  (state: ConversationalAIState): AssistantConfig[K] =>
+    state.config[key];
+
+/**
+ * Selects the sessions Map only
+ * Components using this only re-render when sessions change
+ */
+export const selectSessions = (
+  state: ConversationalAIState,
+): Map<string, ConversationSession> => state.sessions;
+
+/**
+ * Selects the count of messages in current session
+ * Components using this only re-render when message count changes
+ */
+export const selectMessageCount = (state: ConversationalAIState): number =>
+  state.messages.length;
+
+/**
+ * Selects the count of sessions
+ * Components using this only re-render when session count changes
+ */
+export const selectSessionCount = (state: ConversationalAIState): number =>
+  state.sessions.size;
+
+/**
+ * Selects whether there are any messages
+ * Useful for conditional rendering
+ */
+export const selectHasMessages = (state: ConversationalAIState): boolean =>
+  state.messages.length > 0;
+
+/**
+ * Selects whether there is a current session
+ * Useful for conditional rendering
+ */
+export const selectHasCurrentSession = (
+  state: ConversationalAIState,
+): boolean => state.currentSessionId !== null;
+
+/**
+ * Selects the last message in the current session
+ * Returns undefined if no messages exist
+ */
+export const selectLastMessage = (
+  state: ConversationalAIState,
+): Message | undefined => state.messages[state.messages.length - 1];
+
+/**
+ * Selects a specific message by ID
+ * Returns undefined if message doesn't exist
+ */
+export const selectMessageById =
+  (messageId: string) =>
+  (state: ConversationalAIState): Message | undefined =>
+    state.messages.find((m) => m.id === messageId);
+
+/**
+ * Selects whether a specific message is streaming
+ * Returns false if message doesn't exist
+ */
+export const selectIsMessageStreaming =
+  (messageId: string) =>
+  (state: ConversationalAIState): boolean =>
+    state.messages.find((m) => m.id === messageId)?.isStreaming ?? false;
+
+// ============================================================================
+// Grouped Data Selectors - Use these when multiple related values are needed
+// Use with shallow equality to prevent re-renders
+// ============================================================================
+
+/**
+ * Selects UI state (loading, streaming, error)
+ * Use with shallow: useConversationalAIStore(selectUIState, shallow)
+ */
+export const selectUIState = (state: ConversationalAIState) => ({
+  isLoading: state.isLoading,
+  isStreaming: state.isStreaming,
+  error: state.error,
+});
+
+/**
+ * Selects session info (current session ID and count)
+ * Use with shallow: useConversationalAIStore(selectSessionInfo, shallow)
+ */
+export const selectSessionInfo = (state: ConversationalAIState) => ({
+  currentSessionId: state.currentSessionId,
+  sessionCount: state.sessions.size,
+  hasCurrentSession: state.currentSessionId !== null,
+});
+
+/**
+ * Selects message info (messages array and count)
+ * Use with shallow: useConversationalAIStore(selectMessageInfo, shallow)
+ */
+export const selectMessageInfo = (state: ConversationalAIState) => ({
+  messages: state.messages,
+  messageCount: state.messages.length,
+  hasMessages: state.messages.length > 0,
+});
+
+// ============================================================================
+// Action Selectors - These never cause re-renders
+// Use these when you only need to call actions, not read data
+// ============================================================================
+
+/**
+ * Selects session management actions only
+ * These are stable references that never change
+ */
+export const selectSessionActions = (state: ConversationalAIState) => ({
+  createSession: state.createSession,
+  loadSession: state.loadSession,
+  deleteSession: state.deleteSession,
+  archiveSession: state.archiveSession,
+  setCurrentSessionTitle: state.setCurrentSessionTitle,
+  getSessions: state.getSessions,
+  getCurrentSession: state.getCurrentSession,
+});
+
+/**
+ * Selects message management actions only
+ * These are stable references that never change
+ */
+export const selectMessageActions = (state: ConversationalAIState) => ({
+  addMessage: state.addMessage,
+  addStreamingChunk: state.addStreamingChunk,
+  completeStreamingMessage: state.completeStreamingMessage,
+  setMessageError: state.setMessageError,
+  updateMessageMetadata: state.updateMessageMetadata,
+  clearHistory: state.clearHistory,
+});
+
+/**
+ * Selects workflow management actions only
+ * These are stable references that never change
+ */
+export const selectWorkflowActions = (state: ConversationalAIState) => ({
+  updateWorkflowProgress: state.updateWorkflowProgress,
+  cancelWorkflow: state.cancelWorkflow,
+});
+
+/**
+ * Selects state management actions only
+ * These are stable references that never change
+ */
+export const selectStateActions = (state: ConversationalAIState) => ({
+  setError: state.setError,
+  setLoading: state.setLoading,
+  setStreaming: state.setStreaming,
+});
+
+/**
+ * Selects config management actions only
+ * These are stable references that never change
+ */
+export const selectConfigActions = (state: ConversationalAIState) => ({
+  updateConfig: state.updateConfig,
+});
+
+/**
+ * Selects all action functions
+ * Use this when you need multiple actions from different categories
+ * These are stable references that never change
+ */
+export const selectAllActions = (state: ConversationalAIState) => ({
+  createSession: state.createSession,
+  loadSession: state.loadSession,
+  deleteSession: state.deleteSession,
+  archiveSession: state.archiveSession,
+  setCurrentSessionTitle: state.setCurrentSessionTitle,
+  getSessions: state.getSessions,
+  getCurrentSession: state.getCurrentSession,
+  addMessage: state.addMessage,
+  addStreamingChunk: state.addStreamingChunk,
+  completeStreamingMessage: state.completeStreamingMessage,
+  setMessageError: state.setMessageError,
+  updateMessageMetadata: state.updateMessageMetadata,
+  clearHistory: state.clearHistory,
+  updateWorkflowProgress: state.updateWorkflowProgress,
+  cancelWorkflow: state.cancelWorkflow,
+  setError: state.setError,
+  setLoading: state.setLoading,
+  setStreaming: state.setStreaming,
+  updateConfig: state.updateConfig,
+});

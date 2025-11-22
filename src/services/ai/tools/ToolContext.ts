@@ -2,7 +2,6 @@ import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { UnifiedSearchService } from "@/services/search/UnifiedSearchService";
 import type { UnifiedSearchResult } from "@/models/search.types";
 import { ToolError, ToolErrorCategory } from "./types";
-import { logger } from "@/services/logger/LoggerService";
 
 /**
  * Provides shared context and utilities for all AI tools.

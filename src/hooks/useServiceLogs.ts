@@ -14,6 +14,7 @@ import {
 import { LogHealthCacheService } from "@/services/cache/LogHealthCacheService";
 import type { ServiceLog, LogQueryOptions } from "@/models/logger.types";
 import { STALE_TIME, CACHE_TIME, RETRY_CONFIG } from "@/hooks/queryConfig";
+import { queryKeys } from "@/hooks/queryKeys";
 
 /**
  * Query key factory for log queries
@@ -422,7 +423,7 @@ export function useLogCacheTimestamp(serviceIds: string[] = []): Date | null {
   );
 
   const { data } = useQuery({
-    queryKey: useMemo(() => ["logs", "cacheTimestamp", cacheKey], [cacheKey]),
+    queryKey: queryKeys.logs.cacheTimestamp(cacheKey),
     queryFn: async () => {
       return await cacheService.getLogsCacheTimestamp(cacheKey);
     },
@@ -451,18 +452,25 @@ export function useRefreshLogs() {
   return useCallback(
     async (serviceIds: string[] = []) => {
       // Invalidate all log queries for the given service IDs
-      await queryClient.invalidateQueries({
-        queryKey: ["logs", "aggregated"],
-        predicate: (query) => {
-          const key = query.queryKey as unknown[];
-          if (key[0] === "logs" && key[1] === "aggregated" && key[2]) {
-            const params = key[2] as { serviceIds: string[] };
-            if (serviceIds.length === 0) return true;
-            return serviceIds.some((id) => params.serviceIds?.includes(id));
-          }
-          return false;
-        },
-      });
+      if (serviceIds.length === 0) {
+        // Invalidate all aggregated log queries
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.logs.base,
+        });
+      } else {
+        // Invalidate specific service log queries using predicate
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.logs.base,
+          predicate: (query) => {
+            const key = query.queryKey as unknown[];
+            if (key[0] === "logs" && key[1] === "aggregated" && key[2]) {
+              const params = key[2] as { serviceIds: string[] };
+              return serviceIds.some((id) => params.serviceIds?.includes(id));
+            }
+            return false;
+          },
+        });
+      }
     },
     [queryClient],
   );

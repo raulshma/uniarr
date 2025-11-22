@@ -7,6 +7,8 @@ import {
 } from "@/store/connectorsStore";
 import { logger } from "@/services/logger/LoggerService";
 import type { DiscoverMediaKind } from "@/models/discover.types";
+import { queryKeys } from "@/hooks/queryKeys";
+import { QUERY_CONFIG } from "@/hooks/queryConfig";
 
 export interface FoundService {
   readonly serviceId: string;
@@ -128,18 +130,15 @@ export const useCheckInLibrary = (
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
 
   const query = useQuery({
-    queryKey: [
-      "check-in-library",
-      params.tmdbId,
-      params.tvdbId,
-      params.sourceId,
-      params.mediaType,
-    ],
+    queryKey: queryKeys.library.checkInLibrary({
+      tmdbId: params.tmdbId,
+      tvdbId: params.tvdbId,
+      imdbId: params.sourceId,
+      mediaType: params.mediaType,
+    }),
     queryFn: async () => checkItemInLibrary(params, getConnectorsByType),
     enabled: params.enabled !== false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: 1,
+    ...QUERY_CONFIG.LIBRARY_CHECK,
   });
 
   return {

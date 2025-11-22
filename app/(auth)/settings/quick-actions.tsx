@@ -36,7 +36,7 @@ const AVAILABLE_ACTIONS: QuickAction[] = [
     id: "calendar",
     label: "Calendar",
     icon: "calendar",
-    route: "/(auth)/(tabs)/calendar",
+    route: "/(auth)/calendar",
   },
   {
     id: "downloads",
@@ -54,7 +54,7 @@ const AVAILABLE_ACTIONS: QuickAction[] = [
     id: "recent",
     label: "Recent",
     icon: "clock-outline",
-    route: "/(auth)/(tabs)/recently-added",
+    route: "/(auth)/recently-added",
   },
   {
     id: "discover",

@@ -102,7 +102,7 @@ export const useSonarrQueue = (
   serviceId: string,
   options: QueueQueryOptions = {},
 ) => {
-  // Merge with default options
+  // Keep memoized to prevent unnecessary re-renders in dependent hooks
   const queryOptions = useMemo(
     () => ({
       ...DEFAULT_QUERY_OPTIONS,
@@ -140,19 +140,15 @@ export const useSonarrQueue = (
         const response = await (connector as any).client.get("/api/v3/queue");
         let rawQueueItems = response.data?.records ?? [];
 
-        // Collect episode IDs that are missing episode details
-        const missingEpisodeIds = rawQueueItems
-          .filter(
-            (item: components["schemas"]["QueueResource"]) =>
-              item.episodeId && (!item.episode || !item.episode.title),
-          )
-          .map(
-            (item: components["schemas"]["QueueResource"]) => item.episodeId!,
-          )
-          .filter(
-            (id: number, index: number, arr: number[]) =>
-              arr.indexOf(id) === index,
-          ); // Remove duplicates
+        // Optimized: Collect episode IDs that are missing episode details in single pass
+        // Use Set for O(n) deduplication instead of O(n²) indexOf
+        const missingEpisodeIdsSet = new Set<number>();
+        for (const item of rawQueueItems) {
+          if (item.episodeId && (!item.episode || !item.episode.title)) {
+            missingEpisodeIdsSet.add(item.episodeId);
+          }
+        }
+        const missingEpisodeIds = Array.from(missingEpisodeIdsSet);
 
         // Fetch missing episode details if needed
         if (missingEpisodeIds.length > 0) {
@@ -226,48 +222,76 @@ export const useSonarrQueue = (
   const filteredItems = useMemo(() => {
     if (!data?.items) return [];
 
-    let result = data.items;
+    // Optimized: Combine all filters into single pass for better performance
+    // This reduces O(5n) to O(n) when multiple filters are active
+    const hasStatusFilter =
+      queryOptions.status && queryOptions.status.length > 0;
+    const hasProtocolFilter =
+      queryOptions.protocol && queryOptions.protocol.length > 0;
+    const hasSeriesFilter =
+      queryOptions.seriesIds && queryOptions.seriesIds.length > 0;
+    const hasLanguageFilter =
+      queryOptions.languages && queryOptions.languages.length > 0;
+    const hasQualityFilter =
+      queryOptions.quality && queryOptions.quality.length > 0;
 
-    // Filter by status
-    if (queryOptions.status && queryOptions.status.length > 0) {
-      result = result.filter((item: DetailedSonarrQueueItem) =>
-        queryOptions.status!.includes(item.status),
-      );
+    // If no filters, return original array
+    if (
+      !hasStatusFilter &&
+      !hasProtocolFilter &&
+      !hasSeriesFilter &&
+      !hasLanguageFilter &&
+      !hasQualityFilter
+    ) {
+      return data.items;
     }
 
-    // Filter by protocol
-    if (queryOptions.protocol && queryOptions.protocol.length > 0) {
-      result = result.filter((item: DetailedSonarrQueueItem) =>
-        queryOptions.protocol!.includes(item.protocol || "unknown"),
-      );
-    }
+    // Single pass filter combining all conditions
+    const result = data.items.filter((item: DetailedSonarrQueueItem) => {
+      // Filter by status
+      if (hasStatusFilter && !queryOptions.status!.includes(item.status)) {
+        return false;
+      }
 
-    // Filter by series IDs
-    if (queryOptions.seriesIds && queryOptions.seriesIds.length > 0) {
-      result = result.filter(
-        (item: DetailedSonarrQueueItem) =>
-          item.seriesId && queryOptions.seriesIds!.includes(item.seriesId),
-      );
-    }
+      // Filter by protocol
+      if (
+        hasProtocolFilter &&
+        !queryOptions.protocol!.includes(item.protocol || "unknown")
+      ) {
+        return false;
+      }
 
-    // Filter by languages
-    if (queryOptions.languages && queryOptions.languages.length > 0) {
-      result = result.filter((item: DetailedSonarrQueueItem) => {
+      // Filter by series IDs
+      if (
+        hasSeriesFilter &&
+        (!item.seriesId || !queryOptions.seriesIds!.includes(item.seriesId))
+      ) {
+        return false;
+      }
+
+      // Filter by languages
+      if (hasLanguageFilter) {
         if (!item.languages) return false;
-        return item.languages.some((lang: components["schemas"]["Language"]) =>
-          queryOptions.languages!.includes(lang.id!),
+        const hasMatchingLanguage = item.languages.some(
+          (lang: components["schemas"]["Language"]) =>
+            queryOptions.languages!.includes(lang.id!),
         );
-      });
-    }
+        if (!hasMatchingLanguage) return false;
+      }
 
-    // Filter by quality
-    if (queryOptions.quality && queryOptions.quality.length > 0) {
-      result = result.filter(
-        (item: DetailedSonarrQueueItem) =>
-          item.quality?.quality?.id &&
-          queryOptions.quality!.includes(item.quality.quality.id),
-      );
-    }
+      // Filter by quality
+      if (hasQualityFilter) {
+        if (
+          !item.quality?.quality?.id ||
+          !queryOptions.quality!.includes(item.quality.quality.id)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
     return result;
   }, [data?.items, queryOptions]);
 
