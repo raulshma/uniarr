@@ -1361,20 +1361,6 @@ const ConversationalAIScreen: React.FC = () => {
               >
                 Selected Tools: {selectedToolsPref.length}
               </Text>
-              <Button
-                mode="outlined"
-                onPress={() => {
-                  const config = useConversationalAIStore.getState().config;
-                  console.log("📊 Full Config:", config);
-                  alert(
-                    `Config:\nStreaming: ${config.enableStreaming}\nMethod: ${config.streamingMethod}\nTools: ${config.enableTools}\nSelected: ${config.selectedTools?.length || 0}`,
-                  );
-                }}
-                style={{ marginTop: 8 }}
-                compact
-              >
-                Log Config
-              </Button>
             </View>
           )}
 
@@ -1416,7 +1402,6 @@ const ConversationalAIScreen: React.FC = () => {
                     streamingMethodPref === "sse" ? "contained" : "outlined"
                   }
                   onPress={() => {
-                    console.log("🔘 Setting streaming method to SSE");
                     updateConversationalConfig({
                       streamingMethod: "sse",
                     });
@@ -1430,7 +1415,6 @@ const ConversationalAIScreen: React.FC = () => {
                     streamingMethodPref === "fetch" ? "contained" : "outlined"
                   }
                   onPress={() => {
-                    console.log("🔘 Setting streaming method to Fetch");
                     updateConversationalConfig({
                       streamingMethod: "fetch",
                     });

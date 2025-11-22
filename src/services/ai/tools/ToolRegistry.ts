@@ -26,7 +26,7 @@ export class ToolRegistry {
   private readonly tools = new Map<string, ToolDefinition<any, any>>();
 
   private constructor() {
-    void logger.info("ToolRegistry initialized");
+    // ToolRegistry initialized
   }
 
   /**
@@ -72,11 +72,6 @@ export class ToolRegistry {
     }
 
     this.tools.set(toolDef.name, toolDef);
-
-    void logger.info("Tool registered successfully", {
-      toolName: toolDef.name,
-      description: toolDef.description,
-    });
   }
 
   /**
@@ -91,11 +86,7 @@ export class ToolRegistry {
    * ```
    */
   unregister(name: string): void {
-    const existed = this.tools.delete(name);
-
-    if (existed) {
-      void logger.info("Tool unregistered", { toolName: name });
-    }
+    this.tools.delete(name);
   }
 
   /**
@@ -187,31 +178,10 @@ export class ToolRegistry {
           description: toolDef.description,
           inputSchema: toolDef.parameters,
           execute: async (params: unknown) => {
-            void logger.warn(`🔧 ToolRegistry.execute wrapper for ${name}`, {
-              toolName: name,
-              params,
-              paramsType: typeof params,
-              paramsKeys:
-                params && typeof params === "object"
-                  ? Object.keys(params)
-                  : "not-an-object",
-            });
-
             try {
-              void logger.debug("Tool execution started", {
-                toolName: name,
-                params,
-              });
-
               const startTime = Date.now();
               const result = await toolDef.execute(params);
               const executionTime = Date.now() - startTime;
-
-              void logger.debug("Tool execution completed", {
-                toolName: name,
-                success: result.success,
-                executionTime,
-              });
 
               // Add execution time to metadata if not already present
               if (result.metadata) {
@@ -253,11 +223,6 @@ export class ToolRegistry {
       }
     }
 
-    void logger.debug("Converted tools to Vercel AI SDK format", {
-      toolCount: Object.keys(vercelTools).length,
-      toolNames: Object.keys(vercelTools),
-    });
-
     return vercelTools;
   }
 
@@ -266,12 +231,7 @@ export class ToolRegistry {
    * Useful for testing or resetting the registry.
    */
   clear(): void {
-    const count = this.tools.size;
     this.tools.clear();
-
-    void logger.info("All tools cleared from registry", {
-      clearedCount: count,
-    });
   }
 
   /**
@@ -282,7 +242,6 @@ export class ToolRegistry {
     if (ToolRegistry.instance) {
       ToolRegistry.instance.clear();
       ToolRegistry.instance = null;
-      void logger.info("ToolRegistry instance reset");
     }
   }
 }

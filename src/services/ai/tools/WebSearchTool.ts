@@ -83,20 +83,10 @@ export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
   parameters: webSearchParamsSchema,
 
   async execute(params: WebSearchParams): Promise<ToolResult<WebSearchResult>> {
-    void logger.warn("🚀🚀🚀 WebSearchTool.execute() ENTRY POINT", {
-      params,
-      paramsType: typeof params,
-      paramsKeys: params ? Object.keys(params) : "null/undefined",
-      query: params?.query,
-      queryType: typeof params?.query,
-    });
-
     const startTime = Date.now();
     const context = ToolContext.getInstance();
 
     try {
-      void logger.warn("🚀 WebSearchTool execution started", { params });
-
       // Validate query exists and is a string
       if (!params.query || typeof params.query !== "string") {
         throw new ToolError(
@@ -148,12 +138,6 @@ export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
         searchResults.length,
         params.query,
       );
-
-      void logger.debug("WebSearchTool execution completed", {
-        query: params.query,
-        totalResults: searchResults.length,
-        returnedResults: limitedResults.length,
-      });
 
       return {
         success: true,
@@ -243,12 +227,8 @@ async function performSearch(
   region: string,
 ): Promise<SearchResultItem[]> {
   try {
-    void logger.warn("🔍 performSearch called", { query, region });
-
     // Use our custom DuckDuckGo implementation that works in React Native
     const { search, SafeSearchType } = await import("@/utils/duckduckgo");
-
-    void logger.warn("📦 DuckDuckGo module imported, starting search");
 
     // Perform the search
     const searchResults = await search(query, {
@@ -256,27 +236,9 @@ async function performSearch(
       locale: region,
     });
 
-    void logger.warn("✅ Search completed", {
-      resultCount: searchResults.results.length,
-      noResults: searchResults.noResults,
-    });
-
     // Map results to our format
-    void logger.warn("🗺️ Mapping search results", {
-      resultCount: searchResults.results.length,
-    });
-
     const formattedResults: SearchResultItem[] = searchResults.results.map(
-      (result, index) => {
-        void logger.warn(`📋 Formatting result ${index}`, {
-          title: result.title,
-          titleType: typeof result.title,
-          description: result.description,
-          descriptionType: typeof result.description,
-          url: result.url,
-          hostname: result.hostname,
-        });
-
+      (result) => {
         return {
           title: cleanText(result.title),
           snippet: cleanSnippet(result.description),
@@ -285,10 +247,6 @@ async function performSearch(
         };
       },
     );
-
-    void logger.warn("✅ Results formatted successfully", {
-      count: formattedResults.length,
-    });
 
     return formattedResults;
   } catch (error) {
@@ -305,57 +263,31 @@ async function performSearch(
  * Clean and normalize text content
  */
 function cleanText(text: string | undefined): string {
-  void logger.warn("🧹 cleanText called", {
-    text,
-    textType: typeof text,
-    textValue: String(text),
-  });
-
   if (!text || typeof text !== "string") {
-    void logger.warn("⚠️ cleanText: text is empty or not a string");
     return "";
   }
 
-  try {
-    const cleaned = text
-      // Remove excessive whitespace
-      .replace(/\s+/g, " ")
-      // Remove HTML entities
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      // Trim
-      .trim();
+  const cleaned = text
+    // Remove excessive whitespace
+    .replace(/\s+/g, " ")
+    // Remove HTML entities
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    // Trim
+    .trim();
 
-    void logger.warn("✅ cleanText completed", {
-      original: text.substring(0, 30),
-      cleaned: cleaned.substring(0, 30),
-    });
-
-    return cleaned;
-  } catch (error) {
-    void logger.error("❌ Error in cleanText", {
-      error: error instanceof Error ? error.message : String(error),
-      text: String(text),
-    });
-    throw error;
-  }
+  return cleaned;
 }
 
 /**
  * Clean and truncate snippet text
  */
 function cleanSnippet(snippet: string | undefined): string {
-  void logger.warn("✂️ cleanSnippet called", {
-    snippet,
-    snippetType: typeof snippet,
-  });
-
   if (!snippet || typeof snippet !== "string") {
-    void logger.warn("⚠️ cleanSnippet: snippet is empty or not a string");
     return "";
   }
 

@@ -29,8 +29,6 @@ export class ToolContext {
   private constructor() {
     this.connectorManager = ConnectorManager.getInstance();
     this.searchService = UnifiedSearchService.getInstance();
-
-    void logger.info("ToolContext initialized");
   }
 
   /**
@@ -462,7 +460,6 @@ export class ToolContext {
   static resetInstance(): void {
     if (ToolContext.instance) {
       ToolContext.instance = null;
-      void logger.info("ToolContext instance reset");
     }
   }
 }

@@ -123,7 +123,6 @@ export class WorkflowEngine {
   private constructor() {
     this.workflows = new Map();
     this.toolRegistry = ToolRegistry.getInstance();
-    void logger.info("WorkflowEngine initialized");
   }
 
   /**
@@ -166,11 +165,6 @@ export class WorkflowEngine {
     this.validateWorkflow(workflow);
 
     this.workflows.set(workflow.id, workflow);
-    void logger.info("Workflow registered", {
-      workflowId: workflow.id,
-      workflowName: workflow.name,
-      stepCount: workflow.steps.length,
-    });
   }
 
   /**
@@ -180,11 +174,7 @@ export class WorkflowEngine {
    * @returns True if workflow was found and removed, false otherwise
    */
   unregisterWorkflow(workflowId: string): boolean {
-    const removed = this.workflows.delete(workflowId);
-    if (removed) {
-      void logger.info("Workflow unregistered", { workflowId });
-    }
-    return removed;
+    return this.workflows.delete(workflowId);
   }
 
   /**
@@ -601,7 +591,6 @@ export class WorkflowEngine {
   static resetInstance(): void {
     if (WorkflowEngine.instance) {
       WorkflowEngine.instance = null;
-      void logger.info("WorkflowEngine instance reset");
     }
   }
 }

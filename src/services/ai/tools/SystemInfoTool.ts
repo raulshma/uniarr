@@ -105,8 +105,6 @@ export const systemInfoTool: ToolDefinition<
     const connectorManager = context.getConnectorManager();
 
     try {
-      void logger.debug("SystemInfoTool execution started", { params });
-
       // Determine which connectors to check
       const connectorsToCheck = params.serviceIds
         ? params.serviceIds
@@ -236,12 +234,6 @@ export const systemInfoTool: ToolDefinition<
       };
 
       const message = generateSummaryMessage(summary, systemInfos, warnings);
-
-      void logger.debug("SystemInfoTool execution completed", {
-        summary,
-        checkedServices: systemInfos.length,
-        warnings: warnings.length,
-      });
 
       return {
         success: true,

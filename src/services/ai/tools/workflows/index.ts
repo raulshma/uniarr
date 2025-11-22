@@ -296,17 +296,6 @@ export function registerBuiltInWorkflows(): void {
     engine.registerWorkflow(findAndRemoveDuplicatesWorkflow);
     engine.registerWorkflow(bulkAddFromListWorkflow);
     engine.registerWorkflow(qualityUpgradeWorkflow);
-
-    void logger.info("Built-in workflows registered successfully", {
-      workflowCount: 5,
-      workflowIds: [
-        searchAndAddWorkflow.id,
-        healthCheckAndRestartWorkflow.id,
-        findAndRemoveDuplicatesWorkflow.id,
-        bulkAddFromListWorkflow.id,
-        qualityUpgradeWorkflow.id,
-      ],
-    });
   } catch (error) {
     void logger.error("Failed to register built-in workflows", {
       error: error instanceof Error ? error.message : String(error),

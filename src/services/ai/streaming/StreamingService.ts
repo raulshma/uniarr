@@ -178,13 +178,6 @@ export class StreamingService {
       const url = this.getEndpointUrl(config.provider);
       const headers = await this.getHeaders(config.provider, config.keyId);
 
-      void logger.info("🔄 Starting SSE stream", {
-        provider: config.provider,
-        model: config.model,
-        url,
-        messageCount: config.messages.length,
-      });
-
       const requestBody: Record<string, unknown> = {
         model: config.model,
         messages: config.messages,
@@ -278,12 +271,6 @@ export class StreamingService {
               }
             }
 
-            void logger.info("SSE stream completed", {
-              responseLength: fullResponse.length,
-              toolCallCount: toolCalls.size,
-              usage: usageData,
-              hasReasoning: reasoningText.length > 0,
-            });
             return;
           }
 
@@ -390,13 +377,12 @@ export class StreamingService {
 
       // Handle connection open
       eventSource.addEventListener("open", () => {
-        void logger.info("SSE connection opened");
+        // Connection opened
       });
 
       // Handle abort signal
       if (options?.signal) {
         options.signal.addEventListener("abort", () => {
-          void logger.info("SSE stream aborted by user");
           eventSource?.close();
         });
       }
@@ -427,13 +413,6 @@ export class StreamingService {
     try {
       const url = this.getEndpointUrl(config.provider);
       const headers = await this.getHeaders(config.provider, config.keyId);
-
-      void logger.info("🔄 Starting fetch stream", {
-        provider: config.provider,
-        model: config.model,
-        url,
-        messageCount: config.messages.length,
-      });
 
       const requestBody: Record<string, unknown> = {
         model: config.model,
@@ -543,12 +522,6 @@ export class StreamingService {
                 }
               }
 
-              void logger.info("Fetch stream completed", {
-                responseLength: fullResponse.length,
-                toolCallCount: toolCalls.size,
-                usage: usageData,
-                hasReasoning: reasoningText.length > 0,
-              });
               return;
             }
 
@@ -705,9 +678,7 @@ export class StreamingService {
         }
       }
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        void logger.info("Fetch stream aborted by user");
-      } else {
+      if (error instanceof Error && error.name !== "AbortError") {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         void logger.error("Failed to stream with fetch", {

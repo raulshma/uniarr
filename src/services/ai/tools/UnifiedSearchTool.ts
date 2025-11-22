@@ -262,10 +262,6 @@ async function executeUnifiedSearch(
       }
 
       // No results and no errors - provide helpful suggestions
-      void logger.info("UnifiedSearchTool: Search returned no results", {
-        query: params.query,
-        mediaType: params.mediaType,
-      });
 
       const suggestions: string[] = [];
       suggestions.push("No results found for your search.");
