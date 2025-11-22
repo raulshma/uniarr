@@ -6,7 +6,7 @@ import BottomSheet, {
   BottomSheetBackdropProps,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import Animated, { SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { ANIMATION_DURATIONS } from "@/utils/animations.utils";
 
 type Props = {
@@ -125,13 +125,19 @@ const BottomDrawer: React.FC<Props> = ({
 
   const renderBackdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={backdropOpacity}
-        pressBehavior={closeOnBackdropPress ? "close" : "none"}
-      />
+      <Animated.View
+        entering={FadeIn.duration(ANIMATION_DURATIONS.NORMAL)}
+        exiting={FadeOut.duration(ANIMATION_DURATIONS.QUICK)}
+        style={StyleSheet.absoluteFill}
+      >
+        <BottomSheetBackdrop
+          {...props}
+          disappearsOnIndex={-1}
+          appearsOnIndex={0}
+          opacity={backdropOpacity}
+          pressBehavior={closeOnBackdropPress ? "close" : "none"}
+        />
+      </Animated.View>
     ),
     [backdropOpacity, closeOnBackdropPress],
   );
@@ -141,11 +147,7 @@ const BottomDrawer: React.FC<Props> = ({
   }
 
   return (
-    <Animated.View
-      entering={SlideInDown.duration(ANIMATION_DURATIONS.NORMAL).springify()}
-      exiting={SlideOutDown.duration(ANIMATION_DURATIONS.QUICK)}
-      style={StyleSheet.absoluteFill}
-    >
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <BottomSheet
         ref={sheetRef}
         index={0}
@@ -165,6 +167,7 @@ const BottomDrawer: React.FC<Props> = ({
           paddingTop: 8,
           paddingBottom: 4,
         }}
+        animateOnMount={true}
       >
         <View>
           <View style={styles.headerRow}>
@@ -193,7 +196,7 @@ const BottomDrawer: React.FC<Props> = ({
           {children}
         </BottomSheetScrollView>
       </BottomSheet>
-    </Animated.View>
+    </View>
   );
 };
 
