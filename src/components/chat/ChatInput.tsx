@@ -17,6 +17,7 @@ type ChatInputProps = {
   placeholder?: string;
   allowVoice?: boolean;
   onVoicePress?: () => void;
+  onNewConversation?: () => void;
 };
 
 const MAX_MESSAGE_LENGTH = 500;
@@ -28,6 +29,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
   placeholder = "Ask about movies, shows.",
   allowVoice = true,
   onVoicePress,
+  onNewConversation,
 }) => {
   const theme = useTheme();
   const inputRef = useRef<TextInput>(null);
@@ -112,10 +114,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
           minHeight: 44,
         },
         utilityButton: {
-          width: 34,
-          height: 34,
-          borderRadius: theme.custom.spacing.sm,
-          marginRight: theme.custom.spacing.xs,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: theme.colors.surface,
@@ -141,6 +142,24 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
   return (
     <View style={styles.wrapper}>
       <View style={styles.container}>
+        {onNewConversation && (
+          <Pressable
+            style={styles.utilityButton}
+            onPress={onNewConversation}
+            disabled={isLoading || isStreaming}
+            accessibilityLabel="New conversation"
+          >
+            <MaterialCommunityIcons
+              name="plus"
+              size={24}
+              color={
+                isLoading || isStreaming
+                  ? theme.colors.onSurfaceVariant
+                  : theme.colors.primary
+              }
+            />
+          </Pressable>
+        )}
         <View style={styles.inputShell}>
           <TextInput
             ref={inputRef}
@@ -163,7 +182,17 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
           {allowVoice ? (
             <Pressable
-              style={styles.utilityButton}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: theme.custom.spacing.sm,
+                marginRight: theme.custom.spacing.xs,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: theme.colors.surface,
+                borderWidth: 1,
+                borderColor: theme.colors.outline,
+              }}
               onPress={onVoicePress}
               disabled={isLoading || isStreaming}
               accessibilityLabel="Start voice input"

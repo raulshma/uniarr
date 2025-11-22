@@ -1207,7 +1207,7 @@ const SettingsScreen = () => {
           <SettingsGroup>
             <AnimatedListItem
               index={0}
-              totalItems={2}
+              totalItems={3}
               animated={animationsEnabled}
             >
               <SettingsListItem
@@ -1223,7 +1223,21 @@ const SettingsScreen = () => {
             </AnimatedListItem>
             <AnimatedListItem
               index={1}
-              totalItems={2}
+              totalItems={3}
+              animated={animationsEnabled}
+            >
+              <SettingsListItem
+                title="Debug Streaming"
+                subtitle="Test AI streaming with SSE and fetch"
+                left={{ iconName: "bug" }}
+                trailing={<ChevronTrailing />}
+                onPress={() => router.push("/(auth)/debug-streaming")}
+                groupPosition="middle"
+              />
+            </AnimatedListItem>
+            <AnimatedListItem
+              index={2}
+              totalItems={3}
               animated={animationsEnabled}
             >
               <SettingsListItem

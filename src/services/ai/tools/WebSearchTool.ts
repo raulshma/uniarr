@@ -11,7 +11,9 @@ const webSearchParamsSchema = z.object({
   query: z
     .string()
     .min(2)
-    .describe("Search query to look up on the web using DuckDuckGo"),
+    .describe(
+      "REQUIRED: The search query string to look up on the web using DuckDuckGo. Example: 'Dune 2024 release date' or 'best sci-fi movies 2024'",
+    ),
   limit: z
     .number()
     .int()
@@ -19,13 +21,13 @@ const webSearchParamsSchema = z.object({
     .max(10)
     .default(5)
     .describe(
-      "Maximum number of search results to return (default: 5, max: 10)",
+      "Optional: Maximum number of search results to return (default: 5, max: 10)",
     ),
   region: z
     .string()
     .optional()
     .describe(
-      "Region/locale for search results (e.g., 'us-en', 'uk-en', 'de-de'). Defaults to 'us-en'",
+      "Optional: Region/locale for search results (e.g., 'us-en', 'uk-en', 'de-de'). Defaults to 'us-en'",
     ),
 });
 
@@ -77,15 +79,33 @@ interface WebSearchResult {
 export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
   name: "search_web",
   description:
-    "Search the web using DuckDuckGo for general information, release dates, reviews, cast information, ratings, and media details. Returns search results with titles, snippets, and URLs. Use this when you need current information not available in your knowledge base or when users ask about release dates, reviews, or general media information.",
+    "Search the web using DuckDuckGo for current information. REQUIRED PARAMETER: 'query' - the search terms to look up. Use this tool when you need: release dates, reviews, cast information, ratings, current events, or any information not in your knowledge base. Always provide a specific search query string.",
   parameters: webSearchParamsSchema,
 
   async execute(params: WebSearchParams): Promise<ToolResult<WebSearchResult>> {
+    void logger.warn("🚀🚀🚀 WebSearchTool.execute() ENTRY POINT", {
+      params,
+      paramsType: typeof params,
+      paramsKeys: params ? Object.keys(params) : "null/undefined",
+      query: params?.query,
+      queryType: typeof params?.query,
+    });
+
     const startTime = Date.now();
     const context = ToolContext.getInstance();
 
     try {
-      void logger.debug("WebSearchTool execution started", { params });
+      void logger.warn("🚀 WebSearchTool execution started", { params });
+
+      // Validate query exists and is a string
+      if (!params.query || typeof params.query !== "string") {
+        throw new ToolError(
+          "Search query is required",
+          ToolErrorCategory.INVALID_PARAMETERS,
+          "The 'query' parameter is required for web search. Please call the tool again with a query string. Example: {query: 'Dune 2024 release date', limit: 5}",
+          { params },
+        );
+      }
 
       // Validate query length
       if (params.query.trim().length < 2) {
@@ -223,8 +243,12 @@ async function performSearch(
   region: string,
 ): Promise<SearchResultItem[]> {
   try {
+    void logger.warn("🔍 performSearch called", { query, region });
+
     // Use our custom DuckDuckGo implementation that works in React Native
     const { search, SafeSearchType } = await import("@/utils/duckduckgo");
+
+    void logger.warn("📦 DuckDuckGo module imported, starting search");
 
     // Perform the search
     const searchResults = await search(query, {
@@ -232,15 +256,39 @@ async function performSearch(
       locale: region,
     });
 
+    void logger.warn("✅ Search completed", {
+      resultCount: searchResults.results.length,
+      noResults: searchResults.noResults,
+    });
+
     // Map results to our format
+    void logger.warn("🗺️ Mapping search results", {
+      resultCount: searchResults.results.length,
+    });
+
     const formattedResults: SearchResultItem[] = searchResults.results.map(
-      (result) => ({
-        title: cleanText(result.title),
-        snippet: cleanSnippet(result.description),
-        url: result.url,
-        hostname: result.hostname,
-      }),
+      (result, index) => {
+        void logger.warn(`📋 Formatting result ${index}`, {
+          title: result.title,
+          titleType: typeof result.title,
+          description: result.description,
+          descriptionType: typeof result.description,
+          url: result.url,
+          hostname: result.hostname,
+        });
+
+        return {
+          title: cleanText(result.title),
+          snippet: cleanSnippet(result.description),
+          url: result.url || "",
+          hostname: result.hostname || "",
+        };
+      },
     );
+
+    void logger.warn("✅ Results formatted successfully", {
+      count: formattedResults.length,
+    });
 
     return formattedResults;
   } catch (error) {
@@ -256,11 +304,20 @@ async function performSearch(
 /**
  * Clean and normalize text content
  */
-function cleanText(text: string): string {
-  if (!text) return "";
+function cleanText(text: string | undefined): string {
+  void logger.warn("🧹 cleanText called", {
+    text,
+    textType: typeof text,
+    textValue: String(text),
+  });
 
-  return (
-    text
+  if (!text || typeof text !== "string") {
+    void logger.warn("⚠️ cleanText: text is empty or not a string");
+    return "";
+  }
+
+  try {
+    const cleaned = text
       // Remove excessive whitespace
       .replace(/\s+/g, " ")
       // Remove HTML entities
@@ -271,15 +328,36 @@ function cleanText(text: string): string {
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
       // Trim
-      .trim()
-  );
+      .trim();
+
+    void logger.warn("✅ cleanText completed", {
+      original: text.substring(0, 30),
+      cleaned: cleaned.substring(0, 30),
+    });
+
+    return cleaned;
+  } catch (error) {
+    void logger.error("❌ Error in cleanText", {
+      error: error instanceof Error ? error.message : String(error),
+      text: String(text),
+    });
+    throw error;
+  }
 }
 
 /**
  * Clean and truncate snippet text
  */
-function cleanSnippet(snippet: string): string {
-  if (!snippet) return "";
+function cleanSnippet(snippet: string | undefined): string {
+  void logger.warn("✂️ cleanSnippet called", {
+    snippet,
+    snippetType: typeof snippet,
+  });
+
+  if (!snippet || typeof snippet !== "string") {
+    void logger.warn("⚠️ cleanSnippet: snippet is empty or not a string");
+    return "";
+  }
 
   const cleaned = cleanText(snippet);
 

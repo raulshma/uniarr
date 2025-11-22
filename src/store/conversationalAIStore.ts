@@ -15,6 +15,7 @@ const STORE_KEY = "conversational-ai-store";
 
 const defaultConfig: AssistantConfig = {
   enableStreaming: false,
+  streamingMethod: "sse", // Default to SSE for better compatibility
   maxHistoryLength: 50,
   autoSaveSessions: true,
   showTokenCount: false,

@@ -187,6 +187,16 @@ export class ToolRegistry {
           description: toolDef.description,
           inputSchema: toolDef.parameters,
           execute: async (params: unknown) => {
+            void logger.warn(`🔧 ToolRegistry.execute wrapper for ${name}`, {
+              toolName: name,
+              params,
+              paramsType: typeof params,
+              paramsKeys:
+                params && typeof params === "object"
+                  ? Object.keys(params)
+                  : "not-an-object",
+            });
+
             try {
               void logger.debug("Tool execution started", {
                 toolName: name,

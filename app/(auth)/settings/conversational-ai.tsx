@@ -101,8 +101,19 @@ const ConversationalAIScreen: React.FC = () => {
   const activeSessions = useMemo(() => {
     return Array.from(allSessions.values())
       .filter((session) => !session.archived)
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      .sort((a, b) => {
+        const aTime = a.updatedAt?.getTime() ?? 0;
+        const bTime = b.updatedAt?.getTime() ?? 0;
+        return bTime - aTime;
+      });
   }, [allSessions]);
+
+  // Get current session title for header display
+  const currentSessionTitle = useMemo(() => {
+    if (!currentSessionId) return null;
+    const session = allSessions.get(currentSessionId);
+    return session?.title ?? null;
+  }, [currentSessionId, allSessions]);
 
   // Check if AI provider is configured
   useEffect(() => {
@@ -155,6 +166,10 @@ const ConversationalAIScreen: React.FC = () => {
   const addMessageToStore = useConversationalAIStore((s) => s.addMessage);
   const enableStreamingPref = useConversationalAIStore(
     (s) => s.config.enableStreaming,
+  );
+
+  const streamingMethodPref = useConversationalAIStore(
+    (s) => s.config.streamingMethod || "sse",
   );
 
   const showTokenCountPref = useConversationalAIStore(
@@ -294,6 +309,12 @@ const ConversationalAIScreen: React.FC = () => {
           fontWeight: "700",
           color: theme.colors.onBackground,
         },
+        headerSubtitle: {
+          fontSize: 13,
+          fontWeight: "400",
+          color: theme.colors.onSurfaceVariant,
+          marginTop: 2,
+        },
         headerButton: {
           width: 40,
           height: 40,
@@ -408,7 +429,11 @@ const ConversationalAIScreen: React.FC = () => {
           name: msg.role === "user" ? "You" : "UniArr Assistant",
         },
       }))
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => {
+        const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+        const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+        return bTime - aTime;
+      });
   }, [messages]);
 
   const handleSendMessage = useCallback(
@@ -845,23 +870,52 @@ const ConversationalAIScreen: React.FC = () => {
             <View style={styles.content}>
               {/* Minimal Header */}
               <View style={styles.headerContainer}>
-                <Text style={styles.headerTitle}>Media AI</Text>
-                <Animated.View style={animatedButtonStyle}>
-                  <Pressable
-                    style={styles.headerButton}
-                    onPress={() => setSettingsDrawerVisible(true)}
-                    onPressIn={handleButtonPressIn}
-                    onPressOut={handleButtonPressOut}
-                    accessibilityRole="button"
-                    accessibilityLabel="Open settings"
-                  >
-                    <MaterialCommunityIcons
-                      name="cog-outline"
-                      size={22}
-                      color={theme.colors.onBackground}
-                    />
-                  </Pressable>
-                </Animated.View>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.headerTitle}>Media AI</Text>
+                  {currentSessionTitle && (
+                    <Text
+                      style={styles.headerSubtitle}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {currentSessionTitle}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <Animated.View style={animatedButtonStyle}>
+                    <Pressable
+                      style={styles.headerButton}
+                      onPress={() => setConversationDrawerVisible(true)}
+                      onPressIn={handleButtonPressIn}
+                      onPressOut={handleButtonPressOut}
+                      accessibilityRole="button"
+                      accessibilityLabel="Conversation history"
+                    >
+                      <MaterialCommunityIcons
+                        name="history"
+                        size={22}
+                        color={theme.colors.onBackground}
+                      />
+                    </Pressable>
+                  </Animated.View>
+                  <Animated.View style={animatedButtonStyle}>
+                    <Pressable
+                      style={styles.headerButton}
+                      onPress={() => setSettingsDrawerVisible(true)}
+                      onPressIn={handleButtonPressIn}
+                      onPressOut={handleButtonPressOut}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open settings"
+                    >
+                      <MaterialCommunityIcons
+                        name="cog-outline"
+                        size={22}
+                        color={theme.colors.onBackground}
+                      />
+                    </Pressable>
+                  </Animated.View>
+                </View>
               </View>
 
               {/* Error Banner */}
@@ -922,21 +976,22 @@ const ConversationalAIScreen: React.FC = () => {
                 </View>
               </View>
 
-              {/* Provider-Model Display */}
-              <ProviderModelDisplay
-                provider={selectedProvider}
-                model={selectedModel}
-              />
-
-              {/* Chat Input */}
-              <ChatInput
-                onSendMessage={(text) => {
-                  void handleSendMessage(text);
-                }}
-                isLoading={isLoading}
-                isStreaming={isStreaming}
-                placeholder="Ask about movies, shows."
-              />
+              {/* Provider-Model Display and Chat Input Container */}
+              <View>
+                <ProviderModelDisplay
+                  provider={selectedProvider}
+                  model={selectedModel}
+                />
+                <ChatInput
+                  onSendMessage={(text) => {
+                    void handleSendMessage(text);
+                  }}
+                  isLoading={isLoading}
+                  isStreaming={isStreaming}
+                  placeholder="Ask about movies, shows."
+                  onNewConversation={handleNewConversation}
+                />
+              </View>
 
               <Snackbar
                 visible={snackbarVisible}
@@ -1259,6 +1314,144 @@ const ConversationalAIScreen: React.FC = () => {
               color={theme.colors.primary}
             />
           </View>
+
+          {/* Debug Info Card */}
+          {__DEV__ && enableStreamingPref && (
+            <View
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                backgroundColor: theme.colors.surfaceVariant,
+                marginHorizontal: 16,
+                marginVertical: 8,
+                borderRadius: 8,
+              }}
+            >
+              <Text
+                variant="labelSmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  marginBottom: 8,
+                  fontWeight: "bold",
+                }}
+              >
+                🐛 DEBUG INFO
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Streaming: {enableStreamingPref ? "✅ ON" : "❌ OFF"}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Method: {streamingMethodPref}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Tools: {enableToolsPref ? "✅ ON" : "❌ OFF"}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Selected Tools: {selectedToolsPref.length}
+              </Text>
+              <Button
+                mode="outlined"
+                onPress={() => {
+                  const config = useConversationalAIStore.getState().config;
+                  console.log("📊 Full Config:", config);
+                  alert(
+                    `Config:\nStreaming: ${config.enableStreaming}\nMethod: ${config.streamingMethod}\nTools: ${config.enableTools}\nSelected: ${config.selectedTools?.length || 0}`,
+                  );
+                }}
+                style={{ marginTop: 8 }}
+                compact
+              >
+                Log Config
+              </Button>
+            </View>
+          )}
+
+          {/* Streaming Method Selector */}
+          {enableStreamingPref && (
+            <View
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+              }}
+            >
+              <Text
+                variant="bodyLarge"
+                style={{
+                  color: theme.colors.onSurface,
+                  marginBottom: 4,
+                }}
+              >
+                Streaming Method
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  marginBottom: 12,
+                }}
+              >
+                Choose between SSE (Server-Sent Events) or Fetch
+                (ReadableStream)
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 8,
+                }}
+              >
+                <Button
+                  mode={
+                    streamingMethodPref === "sse" ? "contained" : "outlined"
+                  }
+                  onPress={() => {
+                    console.log("🔘 Setting streaming method to SSE");
+                    updateConversationalConfig({
+                      streamingMethod: "sse",
+                    });
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  SSE
+                </Button>
+                <Button
+                  mode={
+                    streamingMethodPref === "fetch" ? "contained" : "outlined"
+                  }
+                  onPress={() => {
+                    console.log("🔘 Setting streaming method to Fetch");
+                    updateConversationalConfig({
+                      streamingMethod: "fetch",
+                    });
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  Fetch
+                </Button>
+              </View>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.primary,
+                  marginTop: 8,
+                  fontWeight: "bold",
+                }}
+              >
+                Current: {streamingMethodPref.toUpperCase()}
+              </Text>
+            </View>
+          )}
 
           {/* Token Count Toggle */}
           <View
