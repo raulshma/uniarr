@@ -208,13 +208,11 @@ const ServiceStatusWidget: React.FC<ServiceStatusWidgetProps> = ({
         });
       } catch (error) {
         console.error("Failed to load service statuses:", error);
-        // If we failed and have no cached data, show empty state
-        if (serviceStatuses.length === 0) {
-          setServiceStatuses([]);
-        }
+        // If we failed, keep existing state or show empty
+        setServiceStatuses((prev) => (prev.length > 0 ? prev : []));
       }
     },
-    [configSignature, fetchServiceStatuses, widget.id, serviceStatuses.length],
+    [configSignature, fetchServiceStatuses, widget.id],
   );
 
   useEffect(() => {

@@ -170,11 +170,12 @@ export function useAggregatedHealth(options: UseAggregatedHealthOptions = {}) {
   ]);
 
   // Refresh health data when coming back online
+  const refetch = query.refetch;
   useEffect(() => {
     if (isConnected && enabled) {
-      void query.refetch();
+      void refetch();
     }
-  }, [isConnected, enabled, query]);
+  }, [isConnected, enabled, refetch]);
 
   return query;
 }
