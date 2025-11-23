@@ -10,6 +10,10 @@ import { Platform, View } from "react-native";
 import { PaperProvider, Portal } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  configureReanimatedLogger,
+  ReanimatedLogLevel,
+} from "react-native-reanimated";
 
 import { queryClient } from "@/config/queryClient";
 import {
@@ -45,6 +49,12 @@ import {
   cleanupAsyncStorage,
 } from "@/utils/storage.migration";
 import { registerAllTools } from "@/services/ai/tools";
+
+// Disable Reanimated strict mode warnings for mixed Animated API usage
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
+});
 
 const RootLayout = () => {
   const theme = useTheme();

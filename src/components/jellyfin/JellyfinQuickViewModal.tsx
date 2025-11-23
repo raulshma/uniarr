@@ -12,12 +12,10 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   interpolate,
-  Extrapolate,
   Easing,
   runOnJS,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Image } from "expo-image";
 
@@ -84,6 +82,7 @@ export const JellyfinQuickViewModal: React.FC<JellyfinQuickViewModalProps> = ({
           easing: Easing.ease,
         },
         (finished) => {
+          "worklet";
           if (finished) {
             runOnJS(setDisplayItem)(null);
             runOnJS(setDisplayLayout)(null);
@@ -115,7 +114,15 @@ export const JellyfinQuickViewModal: React.FC<JellyfinQuickViewModalProps> = ({
   }));
 
   const containerStyle = useAnimatedStyle(() => {
-    if (!displayLayout) return {};
+    if (!displayLayout) {
+      return {
+        left: 0,
+        top: 0,
+        width: 0,
+        height: 0,
+        borderRadius: 16,
+      };
+    }
 
     // Interpolate position and size from initial layout to modal layout
     const targetX = (SCREEN_WIDTH - MODAL_WIDTH) / 2;
@@ -153,18 +160,8 @@ export const JellyfinQuickViewModal: React.FC<JellyfinQuickViewModalProps> = ({
   });
 
   const contentStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      progress.value,
-      [0.6, 1],
-      [0, 1],
-      Extrapolate.CLAMP,
-    );
-    const translateY = interpolate(
-      progress.value,
-      [0.6, 1],
-      [20, 0],
-      Extrapolate.CLAMP,
-    );
+    const opacity = interpolate(progress.value, [0.6, 1], [0, 1], "clamp");
+    const translateY = interpolate(progress.value, [0.6, 1], [20, 0], "clamp");
 
     return {
       opacity,
@@ -172,6 +169,7 @@ export const JellyfinQuickViewModal: React.FC<JellyfinQuickViewModalProps> = ({
     };
   });
 
+  // Don't render at all if never opened
   if (!displayItem || !displayLayout) return null;
 
   const backdropUri = connector?.config.url
@@ -228,9 +226,6 @@ export const JellyfinQuickViewModal: React.FC<JellyfinQuickViewModalProps> = ({
 
   const styles = createStyles(theme);
 
-  // Don't render at all if never opened
-  if (!displayItem && !visible) return null;
-
   return (
     <View
       style={StyleSheet.absoluteFill}
@@ -241,16 +236,10 @@ export const JellyfinQuickViewModal: React.FC<JellyfinQuickViewModalProps> = ({
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: "rgba(0,0,0,0.6)" },
+            { backgroundColor: "rgba(0,0,0,0.85)" },
             backdropStyle,
           ]}
-        >
-          <BlurView
-            style={StyleSheet.absoluteFill}
-            intensity={80}
-            tint="dark"
-          />
-        </Animated.View>
+        />
       </TouchableWithoutFeedback>
 
       {/* Animated Card */}

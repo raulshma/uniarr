@@ -494,15 +494,20 @@ const ConversationalAIScreen: React.FC = () => {
 
   // Animated button press feedback
   const buttonScale = useSharedValue(1);
-  const animatedButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
+  const animatedButtonStyle = useAnimatedStyle(() => {
+    "worklet";
+    return {
+      transform: [{ scale: buttonScale.value }],
+    };
+  }, []);
 
   const handleButtonPressIn = useCallback(() => {
+    "worklet";
     buttonScale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
   }, [buttonScale]);
 
   const handleButtonPressOut = useCallback(() => {
+    "worklet";
     buttonScale.value = withSpring(1, { damping: 15, stiffness: 300 });
   }, [buttonScale]);
 
