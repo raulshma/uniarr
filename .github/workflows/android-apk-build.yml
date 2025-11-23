@@ -81,7 +81,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release with APK
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
@@ -91,13 +91,6 @@ jobs:
             🚀 New Android build released
             - Version: v${{ steps.package_version.outputs.version }}
             - Commit: ${{ github.sha }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
-
-      - name: Upload APK to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ steps.package_version.outputs.version }}"
           files: ./release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
