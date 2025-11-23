@@ -2,7 +2,6 @@ import React, { useCallback, useMemo, useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
-  ScrollView,
   FlatList,
   RefreshControl,
   Pressable,
@@ -11,6 +10,9 @@ import {
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolate,
 } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
 import { Text, useTheme, IconButton, Banner } from "react-native-paper";
@@ -27,13 +29,19 @@ import { useSkeletonLoading } from "@/hooks/useSkeletonLoading";
 import { useConnectorsStore } from "@/store/connectorsStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { AnimeCard, AnimeHubSectionSkeleton } from "@/components/anime";
+import QuickViewModal from "@/components/anime/QuickViewModal";
 import { AnimatedListItem } from "@/components/common/AnimatedComponents";
 import AnimatedSkiaBackground from "@/components/common/AnimatedSkiaBackground";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
+
 type JellyseerrSearchResult =
   | components["schemas"]["MovieResult"]
   | components["schemas"]["TvResult"];
+
+const HEADER_MAX_HEIGHT = 180;
+const HEADER_MIN_HEIGHT = 100;
+const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 
 const AnimeHubScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
@@ -62,6 +70,12 @@ const AnimeHubScreen: React.FC = () => {
     show: false,
     visible: false,
   });
+
+  // State for Quick View Modal
+  const [quickViewData, setQuickViewData] = useState<{
+    item: any;
+    layout: any;
+  } | null>(null);
 
   // Initialize skeleton loading hook with 500ms minimum display time
   const skeleton = useSkeletonLoading({ minLoadingTime: 500 });
@@ -220,6 +234,16 @@ const AnimeHubScreen: React.FC = () => {
             posterUrl={posterUrl}
             rating={rating}
             onPress={() => handleCardPress(item)}
+            onLongPress={(layout) => {
+              const overview =
+                "overview" in item && item.overview
+                  ? (item.overview as string)
+                  : undefined;
+              setQuickViewData({
+                item: { id: idNum, title, posterUrl, rating, overview },
+                layout,
+              });
+            }}
             width={160}
           />
         </AnimatedListItem>
@@ -243,6 +267,18 @@ const AnimeHubScreen: React.FC = () => {
           posterUrl={item.posterUrl}
           rating={item.rating}
           onPress={() => handleJikanCardPress(item)}
+          onLongPress={(layout) =>
+            setQuickViewData({
+              item: {
+                id: item.id,
+                title: item.title,
+                posterUrl: item.posterUrl,
+                rating: item.rating,
+                overview: item.synopsis ?? undefined,
+              },
+              layout,
+            })
+          }
           width={160}
         />
       </AnimatedListItem>
@@ -295,8 +331,7 @@ const AnimeHubScreen: React.FC = () => {
     }
   }, [isLoading, jikan.isLoading, jellyseerrService, skeleton]);
 
-  // All callback functions are already defined above
-
+  // Styles
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -305,107 +340,168 @@ const AnimeHubScreen: React.FC = () => {
           backgroundColor: theme.colors.background,
         },
         header: {
-          paddingHorizontal: spacing.md,
-          paddingTop: spacing.md,
-          paddingBottom: spacing.sm,
-          backgroundColor: "transparent",
-        },
-        headerTop: {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: spacing.md,
-        },
-        title: {
-          fontSize: 28,
-          fontWeight: "bold",
-          color: theme.colors.onBackground,
-        },
-        searchBar: {
-          height: 48,
-          borderRadius: 24,
-          overflow: "hidden",
-          marginBottom: spacing.md,
-          backgroundColor: theme.dark
-            ? "rgba(30, 41, 59, 0.3)"
-            : "rgba(248, 250, 252, 0.5)",
-        },
-        searchBarContent: {
           position: "absolute",
           top: 0,
           left: 0,
           right: 0,
-          bottom: 0,
+          zIndex: 100,
+          overflow: "hidden",
+        },
+        headerContent: {
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+          justifyContent: "flex-end",
+        },
+        headerTitle: {
+          fontSize: 34,
+          fontWeight: "700",
+          color: theme.colors.onBackground,
+          marginBottom: spacing.xs,
+        },
+        headerSubtitle: {
+          fontSize: 16,
+          color: theme.colors.onSurfaceVariant,
+          marginBottom: spacing.md,
+        },
+        searchBar: {
+          height: 52,
+          borderRadius: 26,
+          overflow: "hidden",
+          backgroundColor: theme.dark
+            ? "rgba(30, 41, 59, 0.6)"
+            : "rgba(240, 242, 245, 0.8)",
+          borderWidth: 1,
+          borderColor: theme.dark
+            ? "rgba(255, 255, 255, 0.1)"
+            : "rgba(0, 0, 0, 0.05)",
+        },
+        searchBarContent: {
+          flex: 1,
           flexDirection: "row",
           alignItems: "center",
           paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
         },
         searchPlaceholder: {
           flex: 1,
           marginLeft: spacing.sm,
           color: theme.colors.onSurfaceVariant,
-          fontSize: theme.custom.typography.bodyLarge.fontSize,
+          fontSize: 16,
           fontFamily: theme.custom.typography.bodyLarge.fontFamily,
         },
         scrollContent: {
+          paddingTop: HEADER_MAX_HEIGHT + spacing.md,
           paddingBottom: spacing.xl * 2,
         },
         section: {
-          marginBottom: spacing.lg,
+          marginBottom: spacing.xl,
         },
         sectionHeader: {
-          paddingHorizontal: spacing.md,
-          marginBottom: spacing.sm,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.md,
         },
         sectionTitle: {
-          fontSize: 20,
-          fontWeight: "bold",
+          fontSize: 22,
+          fontWeight: "700",
           color: theme.colors.onBackground,
         },
+        sectionAction: {
+          color: theme.colors.primary,
+          fontSize: 14,
+          fontWeight: "600",
+        },
         list: {
-          paddingLeft: spacing.md,
+          paddingHorizontal: spacing.lg,
         },
         emptyContainer: {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
           paddingHorizontal: spacing.lg,
-        },
-        loadingContainer: {
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
+          paddingTop: HEADER_MAX_HEIGHT,
         },
         episodeInfo: {
           flexDirection: "row",
           alignItems: "center",
           gap: spacing.xs,
-          paddingHorizontal: spacing.md,
-          marginBottom: spacing.sm,
+          marginTop: spacing.xs,
         },
         episodeText: {
           fontSize: 13,
           color: theme.colors.onSurfaceVariant,
         },
-        menuButton: {
-          margin: 0,
-        },
-        banner: {
-          marginHorizontal: spacing.md,
-          marginBottom: spacing.md,
-        },
         bannerAnimated: {
           position: "absolute",
-          top: 0,
+          top: HEADER_MAX_HEIGHT,
           left: 0,
           right: 0,
           zIndex: 10,
-          height: 80,
         },
       }),
     [theme],
   );
+
+  // Animated Styles
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    const height = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE],
+      [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+      Extrapolate.CLAMP,
+    );
+
+    return {
+      height,
+    };
+  });
+
+  const headerTitleAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE / 2],
+      [1, 0],
+      Extrapolate.CLAMP,
+    );
+    const translateY = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE],
+      [0, -20],
+      Extrapolate.CLAMP,
+    );
+
+    return {
+      opacity,
+      transform: [{ translateY }],
+    };
+  });
+
+  const smallHeaderTitleAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
+      [0, 1],
+      Extrapolate.CLAMP,
+    );
+
+    return {
+      opacity,
+    };
+  });
+
+  const headerBackgroundAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE],
+      [0, 1],
+      Extrapolate.CLAMP,
+    );
+
+    return {
+      opacity,
+    };
+  });
 
   // Combined loading state — show skeletons while both sources are fetching
   const combinedLoading =
@@ -426,57 +522,40 @@ const AnimeHubScreen: React.FC = () => {
           </RNAnimated.View>
         ) : null}
 
-        {/* Banner with delay and animation */}
-        {bannerState.show && (
-          <RNAnimated.View
-            style={[
-              styles.bannerAnimated,
-              {
-                opacity: bannerState.visible ? 1 : 0,
-                top: spacing.sm,
-              },
-            ]}
-          >
-            <Banner
-              visible
-              actions={[
-                {
-                  label: "Settings",
-                  onPress: handleBannerSettingsPress,
-                },
-                {
-                  label: "Dismiss",
-                  onPress: handleBannerDismiss,
-                },
-              ]}
-              icon="information"
-            >
-              Enable backdrop effects in Experimental Settings
-            </Banner>
-          </RNAnimated.View>
-        )}
-
-        <View style={[styles.header, { backgroundColor: "transparent" }]}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>Anime Hub</Text>
-          </View>
+        <View style={[styles.header, { height: HEADER_MAX_HEIGHT }]}>
+          <BlurView
+            style={StyleSheet.absoluteFill}
+            intensity={80}
+            tint={theme.dark ? "dark" : "light"}
+          />
+          <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+            <View style={[styles.headerContent, { flex: 1 }]}>
+              <Text style={styles.headerTitle}>Anime Hub</Text>
+              <View style={styles.searchBar}>
+                <View style={styles.searchBarContent}>
+                  <IconButton icon="magnify" size={24} />
+                  <Text style={styles.searchPlaceholder}>
+                    Search for anime...
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </SafeAreaView>
         </View>
 
-        {/* Scrollable skeleton sections */}
-        <ScrollView
+        <Animated.ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          removeClippedSubviews
         >
-          {/* Render 6 skeleton sections matching the typical page layout */}
-          {Array.from({ length: 6 }).map((_, index) => (
+          {Array.from({ length: 4 }).map((_, index) => (
             <AnimeHubSectionSkeleton key={`skeleton-section-${index}`} />
           ))}
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     );
   }
+
   // Show error state when both sources failed
   if (combinedError) {
     return (
@@ -491,41 +570,24 @@ const AnimeHubScreen: React.FC = () => {
           </RNAnimated.View>
         ) : null}
 
-        {/* Banner with delay and animation */}
-        {bannerState.show && (
-          <RNAnimated.View
-            style={[
-              styles.bannerAnimated,
-              {
-                opacity: bannerState.visible ? 1 : 0,
-                top: spacing.sm,
-              },
-            ]}
+        <View style={[styles.header, { height: HEADER_MIN_HEIGHT }]}>
+          <BlurView
+            style={StyleSheet.absoluteFill}
+            intensity={80}
+            tint={theme.dark ? "dark" : "light"}
+          />
+          <SafeAreaView
+            edges={["top"]}
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
           >
-            <Banner
-              visible
-              actions={[
-                {
-                  label: "Settings",
-                  onPress: handleBannerSettingsPress,
-                },
-                {
-                  label: "Dismiss",
-                  onPress: handleBannerDismiss,
-                },
-              ]}
-              icon="information"
-            >
-              Enable backdrop effects in Experimental Settings
-            </Banner>
-          </RNAnimated.View>
-        )}
-
-        <View style={[styles.header, { backgroundColor: "transparent" }]}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>Anime Hub</Text>
-          </View>
+            <Text style={{ fontSize: 20, fontWeight: "bold" }}>Anime Hub</Text>
+          </SafeAreaView>
         </View>
+
         <View style={styles.emptyContainer}>
           <EmptyState
             title="Failed to Load"
@@ -538,10 +600,8 @@ const AnimeHubScreen: React.FC = () => {
     );
   }
 
-  // All memoized data getter functions and render functions are defined before early returns
-
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <View style={styles.container}>
       {enableBackdropWithBlur ? (
         <RNAnimated.View style={{ opacity: 1 }}>
           <AnimatedSkiaBackground
@@ -552,14 +612,80 @@ const AnimeHubScreen: React.FC = () => {
         </RNAnimated.View>
       ) : null}
 
-      {/* Banner with delay and animation */}
+      {/* Animated Header */}
+      <Animated.View style={[styles.header, headerAnimatedStyle]}>
+        <Animated.View
+          style={[StyleSheet.absoluteFill, headerBackgroundAnimatedStyle]}
+        >
+          <BlurView
+            style={StyleSheet.absoluteFill}
+            intensity={80}
+            tint="dark"
+          />
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: "rgba(0,0,0,0.3)" },
+            ]}
+          />
+        </Animated.View>
+        <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+          <View style={[styles.headerContent, { flex: 1 }]}>
+            {/* Small Title (Visible on Scroll) */}
+            <Animated.View
+              style={[
+                {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  justifyContent: "center",
+                  alignItems: "center",
+                },
+                smallHeaderTitleAnimatedStyle,
+              ]}
+            >
+              <Text style={{ fontSize: 20, fontWeight: "bold" }}>
+                Anime Hub
+              </Text>
+            </Animated.View>
+
+            {/* Large Title (Visible initially) */}
+            <Animated.View style={headerTitleAnimatedStyle}>
+              <Text style={styles.headerTitle}>Anime Hub</Text>
+              <Text style={styles.headerSubtitle}>
+                Discover your next favorite anime
+              </Text>
+            </Animated.View>
+
+            {/* Search Bar */}
+            <Pressable onPress={handleSearch}>
+              <View style={styles.searchBar}>
+                <View style={styles.searchBarContent}>
+                  <IconButton
+                    icon="magnify"
+                    size={24}
+                    onPress={handleSearch}
+                    style={{ margin: 0 }}
+                  />
+                  <Text style={styles.searchPlaceholder}>
+                    Search for anime titles
+                  </Text>
+                </View>
+              </View>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </Animated.View>
+
+      {/* Banner */}
       {bannerState.show && (
         <RNAnimated.View
           style={[
             styles.bannerAnimated,
             {
               opacity: bannerState.visible ? 1 : 0,
-              top: spacing.sm,
             },
           ]}
         >
@@ -576,50 +702,12 @@ const AnimeHubScreen: React.FC = () => {
               },
             ]}
             icon="information"
+            style={{ marginHorizontal: spacing.md, borderRadius: 16 }}
           >
             Enable backdrop effects in Experimental Settings
           </Banner>
         </RNAnimated.View>
       )}
-
-      {/* Fixed Header */}
-      <View style={[styles.header, { backgroundColor: "transparent" }]}>
-        <View style={styles.headerTop}>
-          <Text style={styles.title}>Anime Hub</Text>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <IconButton
-              icon="dots-vertical"
-              size={24}
-              onPress={() => {}}
-              style={styles.menuButton}
-            />
-          </View>
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchBar}>
-          <BlurView
-            style={StyleSheet.absoluteFill}
-            intensity={10}
-            tint={theme.dark ? "dark" : "light"}
-          />
-          <Pressable
-            style={styles.searchBarContent}
-            onPress={handleSearch}
-            accessibilityRole="button"
-          >
-            <IconButton
-              icon="magnify"
-              size={24}
-              onPress={handleSearch}
-              accessibilityLabel="Search for anime"
-            />
-            <Text style={styles.searchPlaceholder}>
-              Search for anime titles
-            </Text>
-          </Pressable>
-        </View>
-      </View>
 
       {/* Scrollable Content */}
       <Animated.ScrollView
@@ -628,13 +716,13 @@ const AnimeHubScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
-        removeClippedSubviews
         refreshControl={
           <RefreshControl
             refreshing={false}
             onRefresh={() => Promise.all([refetch(), jikan.refetch()])}
             colors={[theme.colors.primary]}
             tintColor={theme.colors.primary}
+            progressViewOffset={HEADER_MAX_HEIGHT}
           />
         }
       >
@@ -643,6 +731,9 @@ const AnimeHubScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Recommended For You</Text>
+              <Pressable>
+                <Text style={styles.sectionAction}>See All</Text>
+              </Pressable>
             </View>
             <FlatList
               data={recommendations}
@@ -665,60 +756,54 @@ const AnimeHubScreen: React.FC = () => {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>What's New</Text>
             </View>
-            {upcoming.slice(0, 2).map((item) => (
+            {upcoming.slice(0, 3).map((item) => (
               <Pressable
                 key={`new-${getJellyId(item)}`}
                 onPress={() => handleCardPress(item)}
-                style={{ marginBottom: spacing.sm }}
+                style={{
+                  marginBottom: spacing.md,
+                  marginHorizontal: spacing.lg,
+                  backgroundColor: theme.colors.surfaceVariant,
+                  borderRadius: 20,
+                  padding: spacing.sm,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    paddingHorizontal: spacing.md,
-                    alignItems: "center",
-                  }}
-                >
-                  <AnimeCard
-                    id={getJellyId(item)}
-                    title={getJellyTitle(item)}
-                    posterUrl={
-                      getJellyPosterPath(item)
-                        ? `https://image.tmdb.org/t/p/w342${getJellyPosterPath(item)}`
-                        : undefined
-                    }
-                    rating={getJellyVoteAverage(item)}
-                    onPress={() => handleCardPress(item)}
-                    width={100}
-                  />
-                  <View style={{ flex: 1, marginLeft: spacing.md }}>
-                    <Text
-                      variant="titleMedium"
-                      numberOfLines={2}
-                      style={{
-                        color: theme.colors.onSurface,
-                        marginBottom: spacing.xs,
-                      }}
-                    >
-                      {(item as any).title ??
-                        (item as any).name ??
-                        (item as any).mediaInfo?.title ??
-                        "Untitled"}
+                <AnimeCard
+                  id={getJellyId(item)}
+                  title="" // Hide title in card, show in list item
+                  posterUrl={
+                    getJellyPosterPath(item)
+                      ? `https://image.tmdb.org/t/p/w342${getJellyPosterPath(item)}`
+                      : undefined
+                  }
+                  rating={getJellyVoteAverage(item)}
+                  onPress={() => handleCardPress(item)}
+                  width={80}
+                />
+                <View style={{ flex: 1, marginLeft: spacing.md }}>
+                  <Text
+                    variant="titleMedium"
+                    numberOfLines={2}
+                    style={{
+                      color: theme.colors.onSurface,
+                      fontWeight: "700",
+                      marginBottom: spacing.xs,
+                    }}
+                  >
+                    {(item as any).title ??
+                      (item as any).name ??
+                      (item as any).mediaInfo?.title ??
+                      "Untitled"}
+                  </Text>
+                  <View style={styles.episodeInfo}>
+                    <Text style={styles.episodeText}>
+                      {item.mediaType === "tv" ? "New Episode" : "New Release"}
                     </Text>
-                    <View style={styles.episodeInfo}>
-                      <Text style={styles.episodeText}>
-                        {item.mediaType === "tv"
-                          ? "S2 E23 - Shibuya Incident"
-                          : "New Release"}
-                      </Text>
-                      <IconButton
-                        icon="dots-horizontal"
-                        size={20}
-                        onPress={() => {}}
-                        style={{ margin: 0 }}
-                      />
-                    </View>
                   </View>
                 </View>
+                <IconButton icon="chevron-right" size={24} />
               </Pressable>
             ))}
           </View>
@@ -729,6 +814,9 @@ const AnimeHubScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Trending Anime Series</Text>
+              <Pressable>
+                <Text style={styles.sectionAction}>See All</Text>
+              </Pressable>
             </View>
             <FlatList
               data={trending}
@@ -752,6 +840,9 @@ const AnimeHubScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>New Anime Movies</Text>
+              <Pressable>
+                <Text style={styles.sectionAction}>See All</Text>
+              </Pressable>
             </View>
             <FlatList
               data={movies}
@@ -775,6 +866,9 @@ const AnimeHubScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>MAL Top Anime</Text>
+              <Pressable>
+                <Text style={styles.sectionAction}>See All</Text>
+              </Pressable>
             </View>
             <FlatList
               data={jikan.top}
@@ -796,6 +890,9 @@ const AnimeHubScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>MAL Recommendations</Text>
+              <Pressable>
+                <Text style={styles.sectionAction}>See All</Text>
+              </Pressable>
             </View>
             <FlatList
               data={jikan.recommendations}
@@ -812,11 +909,14 @@ const AnimeHubScreen: React.FC = () => {
           </View>
         )}
 
-        {/* MyAnimeList (Jikan) - Season Now */}
+        {/* MyAnimeList (Jikan) - Now Airing */}
         {jikan.now.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Season Now</Text>
+              <Text style={styles.sectionTitle}>Now Airing</Text>
+              <Pressable>
+                <Text style={styles.sectionAction}>See All</Text>
+              </Pressable>
             </View>
             <FlatList
               data={jikan.now}
@@ -837,7 +937,10 @@ const AnimeHubScreen: React.FC = () => {
         {jikan.upcoming.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Upcoming Season</Text>
+              <Text style={styles.sectionTitle}>Upcoming</Text>
+              <Pressable>
+                <Text style={styles.sectionAction}>See All</Text>
+              </Pressable>
             </View>
             <FlatList
               data={jikan.upcoming}
@@ -854,7 +957,15 @@ const AnimeHubScreen: React.FC = () => {
           </View>
         )}
       </Animated.ScrollView>
-    </SafeAreaView>
+
+      {/* Quick View Modal */}
+      <QuickViewModal
+        visible={!!quickViewData}
+        item={quickViewData?.item ?? null}
+        initialLayout={quickViewData?.layout ?? null}
+        onClose={() => setQuickViewData(null)}
+      />
+    </View>
   );
 };
 

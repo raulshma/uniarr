@@ -270,12 +270,7 @@ export const useCalendar = (): UseCalendarReturn => {
     [setCurrentDate, setSelectedDate],
   );
 
-  // Calendar data computation - optimized with stable dateRange reference
-  const dateRange = state.filters.dateRange;
-  const dateRangeKey = dateRange
-    ? `${dateRange.start}-${dateRange.end}`
-    : undefined;
-
+  // Calendar data computation
   const calendarData = useMemo(() => {
     return generateCalendarData(
       state.currentDate,
@@ -283,8 +278,7 @@ export const useCalendar = (): UseCalendarReturn => {
       releases,
       state.filters.dateRange,
     );
-    // Using dateRangeKey instead of state.filters.dateRange for stable reference
-  }, [state.currentDate, state.view, releases, dateRangeKey]);
+  }, [state.currentDate, state.view, releases, state.filters.dateRange]);
 
   // Statistics computation
   const stats = useMemo((): CalendarStats => {

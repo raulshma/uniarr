@@ -18,6 +18,11 @@ export interface MediaCardSkeletonProps {
    * Custom style for the container
    */
   style?: any;
+  /**
+   * Border radius for the poster
+   * @default 12
+   */
+  borderRadius?: number;
 }
 
 const sizeConfig = {
@@ -45,6 +50,7 @@ const MediaCardSkeleton: React.FC<MediaCardSkeletonProps> = ({
   size = "medium",
   showMetadata = true,
   style,
+  borderRadius = 12,
 }) => {
   const config = sizeConfig[size];
 
@@ -54,7 +60,7 @@ const MediaCardSkeleton: React.FC<MediaCardSkeletonProps> = ({
       <SkeletonLoader
         width={config.width}
         height={config.height}
-        borderRadius={12}
+        borderRadius={borderRadius}
         shimmerDuration={1200}
       />
 

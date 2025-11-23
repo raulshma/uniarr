@@ -104,6 +104,7 @@ const AnimeHubSectionSkeleton: React.FC<AnimeHubSectionSkeletonProps> = ({
             size={cardSize}
             showMetadata={showMetadata}
             style={{ marginRight: spacing.md }}
+            borderRadius={24}
           />
         )}
       />

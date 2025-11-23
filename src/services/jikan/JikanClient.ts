@@ -345,12 +345,21 @@ export const JikanClient = {
     );
   },
 
-  async searchAnime(query: string, page = 1, limit = 20) {
-    const params: JikanSearchAnimeQuery = {
-      q: query,
-      page,
-      limit,
-    };
+  async getAnimeGenres(
+    filter?: "genres" | "explicit_genres" | "themes" | "demographics",
+  ) {
+    const params: any = {};
+    if (filter) params.filter = filter;
+    return makeRequest(() =>
+      client
+        .get<{
+          data: { mal_id: number; name: string; count: number }[];
+        }>("/genres/anime", { params })
+        .then((r) => r.data.data),
+    );
+  },
+
+  async searchAnime(params: JikanSearchAnimeQuery) {
     return makeRequest(() =>
       client
         .get<JikanAnimeSearchResponse>("/anime", { params })

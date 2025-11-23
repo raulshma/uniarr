@@ -1,4 +1,3 @@
-import { FlashList } from "@shopify/flash-list";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo } from "react";
 import {
@@ -6,16 +5,22 @@ import {
   StyleSheet,
   View,
   useWindowDimensions,
+  RefreshControl,
+  Pressable,
+  ImageBackground,
 } from "react-native";
-import { HelperText, useTheme } from "react-native-paper";
+import { HelperText, useTheme, Text } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
-import { ListRefreshControl } from "@/components/common/ListRefreshControl";
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
 import { SeriesListItemSkeleton } from "@/components/media/skeletons";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ResumePlaybackDialog } from "@/components/jellyfin/ResumePlaybackDialog";
+import { WatchStatusBadge } from "@/components/jellyfin/WatchStatusBadge";
 import LatestMediaSection from "@/components/jellyfin/LatestMediaSection";
+import { JellyfinQuickViewModal } from "@/components/jellyfin/JellyfinQuickViewModal";
 
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
@@ -39,7 +44,6 @@ import {
 import { JellyfinLibraryHeader } from "./components/JellyfinLibraryHeader";
 import { NowPlayingSection } from "./components/NowPlayingSection";
 import { ContinueWatchingSection } from "./components/ContinueWatchingSection";
-import { LibraryGridItem } from "./components/LibraryGridItem";
 
 const JellyfinLibraryScreen = () => {
   const { serviceId: rawServiceId } = useLocalSearchParams<{
@@ -51,7 +55,6 @@ const JellyfinLibraryScreen = () => {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
   const { width: windowWidth } = useWindowDimensions();
-  const numColumns = 2;
 
   // State management
   const { state: libraryState, dispatch } = useJellyfinLibraryState();
@@ -65,6 +68,24 @@ const JellyfinLibraryScreen = () => {
     visible: false,
     item: null,
     resumeTicks: null,
+  });
+
+  // Quick view modal state
+  const [quickViewState, setQuickViewState] = React.useState<{
+    visible: boolean;
+    item: JellyfinItem | null;
+    layout: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      pageX: number;
+      pageY: number;
+    } | null;
+  }>({
+    visible: false,
+    item: null,
+    layout: null,
   });
 
   const connector = useMemo(() => {
@@ -280,6 +301,27 @@ const JellyfinLibraryScreen = () => {
     [router, serviceId],
   );
 
+  const handleQuickView = useCallback(
+    (
+      item: JellyfinItem,
+      layout: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        pageX: number;
+        pageY: number;
+      },
+    ) => {
+      setQuickViewState({
+        visible: true,
+        item,
+        layout,
+      });
+    },
+    [],
+  );
+
   const openPlayer = useCallback(
     (itemId: string, resumeTicks?: number | null) => {
       if (!serviceId || !itemId) return;
@@ -356,105 +398,45 @@ const JellyfinLibraryScreen = () => {
     [resumeQuery.data, nowPlayingItemIds],
   );
 
-  // Render library item
-  const renderLibraryItem = useCallback(
-    ({ item, index }: { item: EnrichedJellyfinItem; index: number }) => (
-      <LibraryGridItem
-        item={item}
-        index={index}
-        connector={connector}
-        serviceId={serviceId}
-        activeSegment={libraryState.activeSegment}
-        windowWidth={windowWidth}
-        numColumns={numColumns}
-        onOpenItem={handleOpenItem}
-        onPlayItem={handlePlayItem}
-      />
-    ),
-    [
-      connector,
-      serviceId,
-      libraryState.activeSegment,
-      windowWidth,
-      handleOpenItem,
-      handlePlayItem,
-    ],
+  // Handle scroll for infinite loading
+  const handleScroll = useCallback(
+    (event: any) => {
+      const { layoutMeasurement, contentOffset, contentSize } =
+        event.nativeEvent;
+      const paddingToBottom = 20;
+      const isCloseToBottom =
+        layoutMeasurement.height + contentOffset.y >=
+        contentSize.height - paddingToBottom;
+
+      if (
+        isCloseToBottom &&
+        libraryItemsInfiniteQuery.hasNextPage &&
+        !libraryItemsInfiniteQuery.isFetchingNextPage
+      ) {
+        void libraryItemsInfiniteQuery.fetchNextPage();
+      }
+    },
+    [libraryItemsInfiniteQuery],
   );
 
-  // List header
-  const listHeader = useMemo(() => {
-    return (
-      <View style={styles.headerContainer}>
-        <JellyfinLibraryHeader
-          serviceName={serviceName}
-          activeSegment={libraryState.activeSegment}
-          selectedLibraryId={libraryState.selectedLibraryId}
-          searchTerm={libraryState.searchTerm}
-          librariesForActiveSegment={librariesForActiveSegment}
-          onNavigateBack={handleNavigateBack}
-          onOpenSettings={handleOpenSettings}
-          onOpenNowPlaying={handleOpenNowPlaying}
-          onSegmentChange={(segment) =>
-            dispatch({ type: "SET_SEGMENT", payload: segment })
-          }
-          onLibraryChange={(libraryId) =>
-            dispatch({ type: "SET_LIBRARY_ID", payload: libraryId })
-          }
-          onSearchChange={(text) =>
-            dispatch({ type: "SET_SEARCH_TERM", payload: text })
-          }
-        />
+  // Split items into two columns for masonry layout
+  const { leftColumn, rightColumn } = useMemo(() => {
+    const left: { item: EnrichedJellyfinItem; height: number }[] = [];
+    const right: { item: EnrichedJellyfinItem; height: number }[] = [];
 
-        <ContinueWatchingSection
-          items={continueWatchingItems}
-          connector={connector}
-          serviceId={serviceId}
-          windowWidth={windowWidth}
-          onOpenItem={handleOpenItem}
-          onPlayItem={handlePlayItem}
-          onRefresh={() => void resumeQuery.refetch()}
-        />
+    displayItemsEnriched.forEach((item, index) => {
+      const heights = [200, 250, 300, 220, 280, 320, 240, 260];
+      const height = heights[index % heights.length] ?? 250;
 
-        <NowPlayingSection
-          sessions={nowPlayingSessions}
-          connector={connector}
-          onOpenItem={handleOpenItem}
-          onPlayItem={handlePlayItem}
-          onOpenNowPlaying={handleOpenNowPlaying}
-          onRefresh={() => void nowPlayingQuery.refetch()}
-        />
+      if (index % 2 === 0) {
+        left.push({ item, height });
+      } else {
+        right.push({ item, height });
+      }
+    });
 
-        {serviceId && (
-          <LatestMediaSection
-            serviceId={serviceId}
-            libraries={librariesQuery.data ?? []}
-            onOpenItem={handleOpenItem}
-          />
-        )}
-      </View>
-    );
-  }, [
-    libraryState.activeSegment,
-    libraryState.selectedLibraryId,
-    libraryState.searchTerm,
-    handleNavigateBack,
-    handleOpenItem,
-    handleOpenSettings,
-    handleOpenNowPlaying,
-    librariesQuery.data,
-    serviceId,
-    continueWatchingItems,
-    resumeQuery,
-    nowPlayingSessions,
-    nowPlayingQuery,
-    serviceName,
-    styles,
-    librariesForActiveSegment,
-    connector,
-    windowWidth,
-    handlePlayItem,
-    dispatch,
-  ]);
+    return { leftColumn: left, rightColumn: right };
+  }, [displayItemsEnriched]);
 
   const listEmptyComponent = useMemo(() => {
     if (!serviceId) {
@@ -521,34 +503,107 @@ const JellyfinLibraryScreen = () => {
         ]}
         pointerEvents={libraryState.contentInteractive ? "auto" : "none"}
       >
-        <FlashList<EnrichedJellyfinItem>
-          data={displayItemsEnriched}
-          keyExtractor={(item: EnrichedJellyfinItem, index: number) => {
-            const baseKey = item.Id || item.Name || "unknown";
-            return `${baseKey}-${index}`;
-          }}
-          renderItem={renderLibraryItem}
-          numColumns={2}
-          contentContainerStyle={styles.listContent}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={listEmptyComponent}
-          onEndReached={() => {
-            if (
-              libraryItemsInfiniteQuery.hasNextPage &&
-              !libraryItemsInfiniteQuery.isFetchingNextPage
-            ) {
-              void libraryItemsInfiniteQuery.fetchNextPage();
-            }
-          }}
-          onEndReachedThreshold={0.5}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={400}
           refreshControl={
-            <ListRefreshControl
+            <RefreshControl
               refreshing={isRefreshing}
               onRefresh={() => void handleRefresh()}
+              tintColor={theme.colors.primary}
             />
           }
-          estimatedItemSize={200}
-        />
+        >
+          {/* Header Section */}
+          <View style={styles.headerContainer}>
+            <JellyfinLibraryHeader
+              serviceName={serviceName}
+              activeSegment={libraryState.activeSegment}
+              selectedLibraryId={libraryState.selectedLibraryId}
+              searchTerm={libraryState.searchTerm}
+              librariesForActiveSegment={librariesForActiveSegment}
+              onNavigateBack={handleNavigateBack}
+              onOpenSettings={handleOpenSettings}
+              onOpenNowPlaying={handleOpenNowPlaying}
+              onSegmentChange={(segment) =>
+                dispatch({ type: "SET_SEGMENT", payload: segment })
+              }
+              onLibraryChange={(libraryId) =>
+                dispatch({ type: "SET_LIBRARY_ID", payload: libraryId })
+              }
+              onSearchChange={(text) =>
+                dispatch({ type: "SET_SEARCH_TERM", payload: text })
+              }
+            />
+
+            <ContinueWatchingSection
+              items={continueWatchingItems}
+              connector={connector}
+              serviceId={serviceId}
+              windowWidth={windowWidth}
+              onOpenItem={handleOpenItem}
+              onPlayItem={handlePlayItem}
+              onRefresh={() => void resumeQuery.refetch()}
+            />
+
+            <NowPlayingSection
+              sessions={nowPlayingSessions}
+              connector={connector}
+              onOpenItem={handleOpenItem}
+              onPlayItem={handlePlayItem}
+              onOpenNowPlaying={handleOpenNowPlaying}
+              onRefresh={() => void nowPlayingQuery.refetch()}
+            />
+
+            {serviceId && (
+              <LatestMediaSection
+                serviceId={serviceId}
+                libraries={librariesQuery.data ?? []}
+                onOpenItem={handleOpenItem}
+              />
+            )}
+          </View>
+
+          {/* Masonry Grid */}
+          {displayItemsEnriched.length > 0 ? (
+            <View style={styles.masonryContainer}>
+              {/* First column - normal scroll */}
+              <View style={styles.column}>
+                {leftColumn.map(({ item, height }, index) => (
+                  <MasonryItem
+                    key={`left-${item.Id || index}`}
+                    item={item}
+                    height={height}
+                    connector={connector}
+                    onOpenItem={handleOpenItem}
+                    onPlayItem={handlePlayItem}
+                    onQuickView={handleQuickView}
+                    theme={theme}
+                  />
+                ))}
+              </View>
+
+              {/* Second column */}
+              <View style={styles.column}>
+                {rightColumn.map(({ item, height }, index) => (
+                  <MasonryItem
+                    key={`right-${item.Id || index}`}
+                    item={item}
+                    height={height}
+                    connector={connector}
+                    onOpenItem={handleOpenItem}
+                    onPlayItem={handlePlayItem}
+                    onQuickView={handleQuickView}
+                    theme={theme}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : (
+            listEmptyComponent
+          )}
+        </ScrollView>
       </View>
 
       {libraryState.showSkeletonLayer ? (
@@ -646,9 +701,175 @@ const JellyfinLibraryScreen = () => {
         playedPercentage={resumeDialogState.item?.UserData?.PlayedPercentage}
         positionTicks={resumeDialogState.resumeTicks ?? undefined}
       />
+
+      <JellyfinQuickViewModal
+        visible={quickViewState.visible}
+        item={quickViewState.item}
+        initialLayout={quickViewState.layout}
+        connector={connector}
+        onDismiss={() =>
+          setQuickViewState({
+            visible: false,
+            item: null,
+            layout: null,
+          })
+        }
+        onOpenDetails={handleOpenItem}
+        onPlay={handlePlayItem}
+      />
     </SafeAreaView>
   );
 };
+
+// Masonry Item Component
+interface MasonryItemProps {
+  item: EnrichedJellyfinItem;
+  height: number;
+  connector: JellyfinConnector | undefined;
+  onOpenItem: (itemId?: string) => void;
+  onPlayItem: (item: JellyfinItem, resumeTicks?: number | null) => void;
+  onQuickView: (
+    item: JellyfinItem,
+    layout: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      pageX: number;
+      pageY: number;
+    },
+  ) => void;
+  theme: AppTheme;
+}
+
+const MasonryItem: React.FC<MasonryItemProps> = ({
+  item,
+  height,
+  connector,
+  onOpenItem,
+  onPlayItem,
+  onQuickView,
+  theme,
+}) => {
+  const styles = useMemo(() => createMasonryItemStyles(theme), [theme]);
+  const itemRef = React.useRef<View>(null);
+  const posterUri = useMemo(
+    () =>
+      `${connector?.config.url}/Items/${item.Id}/Images/Primary?maxHeight=600&quality=90`,
+    [connector, item.Id],
+  );
+
+  const isPlayable =
+    item.Type === "Movie" ||
+    item.Type === "Episode" ||
+    item.Type === "Video" ||
+    item.MediaType === "Video";
+
+  const navigationId = (item as any).__navigationId ?? item.Id;
+
+  const handleLongPress = () => {
+    itemRef.current?.measure((x, y, width, height, pageX, pageY) => {
+      onQuickView(item, { x, y, width, height, pageX, pageY });
+    });
+  };
+
+  return (
+    <Pressable
+      ref={itemRef}
+      onPress={() => onOpenItem(navigationId)}
+      onLongPress={handleLongPress}
+      style={styles.itemContainer}
+    >
+      <ImageBackground
+        source={{ uri: posterUri }}
+        style={[styles.imageBackground, { height }]}
+        imageStyle={styles.imageStyle}
+      >
+        <WatchStatusBadge
+          userData={item.UserData}
+          position="top-right"
+          showProgressBar={true}
+        />
+
+        {isPlayable && (
+          <Pressable
+            style={styles.playOverlay}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              onPlayItem(item, item.UserData?.PlaybackPositionTicks ?? null);
+            }}
+          >
+            <View style={styles.playButton}>
+              <MaterialCommunityIcons
+                name="play"
+                size={24}
+                color={theme.colors.onPrimary}
+              />
+            </View>
+          </Pressable>
+        )}
+
+        <LinearGradient
+          style={styles.gradient}
+          colors={["transparent", "rgba(0, 0, 0, 0.7)"]}
+        >
+          <Text style={styles.itemTitle} numberOfLines={2}>
+            {item.Name ?? "Untitled"}
+          </Text>
+          {item.ProductionYear && (
+            <Text style={styles.itemYear}>{item.ProductionYear}</Text>
+          )}
+        </LinearGradient>
+      </ImageBackground>
+    </Pressable>
+  );
+};
+
+const createMasonryItemStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    itemContainer: {
+      marginBottom: spacing.sm,
+    },
+    imageBackground: {
+      width: "100%",
+      overflow: "hidden",
+      justifyContent: "flex-end",
+    },
+    imageStyle: {
+      borderRadius: 16,
+    },
+    gradient: {
+      padding: spacing.md,
+      alignItems: "flex-start",
+      justifyContent: "flex-end",
+    },
+    itemTitle: {
+      color: "#FFFFFF",
+      fontWeight: "bold",
+      fontSize: 16,
+    },
+    itemYear: {
+      color: "rgba(255, 255, 255, 0.8)",
+      fontSize: 12,
+      marginTop: spacing.xs,
+    },
+    playOverlay: {
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: [{ translateX: -22 }, { translateY: -22 }],
+      zIndex: 2,
+    },
+    playButton: {
+      backgroundColor: "rgba(0, 0, 0, 0.7)",
+      borderRadius: 22,
+      padding: spacing.sm,
+      alignItems: "center",
+      justifyContent: "center",
+      width: 44,
+      height: 44,
+    },
+  });
 
 const createStyles = (theme: AppTheme) =>
   StyleSheet.create({
@@ -656,13 +877,19 @@ const createStyles = (theme: AppTheme) =>
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    listContent: {
-      paddingBottom: spacing.xxl,
-      paddingHorizontal: spacing.lg,
-    },
     headerContainer: {
       gap: spacing.sm,
-      paddingBottom: 0,
+      paddingBottom: spacing.md,
+      paddingHorizontal: spacing.lg,
+    },
+    masonryContainer: {
+      flexDirection: "row",
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.xxl,
+    },
+    column: {
+      flex: 1,
+      paddingHorizontal: spacing.xs,
     },
     toolbar: {
       flexDirection: "row",
