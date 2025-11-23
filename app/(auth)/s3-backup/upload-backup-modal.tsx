@@ -68,6 +68,7 @@ const UploadBackupModal = () => {
         includeApiLoggingConfig: true,
         includeConversationalAISettings: true,
         includeConversationalAIProviderConfig: true,
+        includeS3BackupConfig: true,
         encryptSensitive,
         password,
       };

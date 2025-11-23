@@ -89,8 +89,6 @@ export const serviceHealthTool: ToolDefinition<
     const connectorManager = context.getConnectorManager();
 
     try {
-      void logger.debug("ServiceHealthTool execution started", { params });
-
       // Determine which connectors to check
       const connectorsToCheck = params.serviceIds
         ? params.serviceIds
@@ -201,11 +199,6 @@ export const serviceHealthTool: ToolDefinition<
       };
 
       const message = generateSummaryMessage(summary, healthInfos);
-
-      void logger.debug("ServiceHealthTool execution completed", {
-        summary,
-        checkedServices: healthInfos.length,
-      });
 
       return {
         success: true,

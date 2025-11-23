@@ -17,6 +17,8 @@ export interface ShortcutItemProps {
   onPress: (shortcut: Shortcut) => void;
   disabled?: boolean;
   size?: "small" | "medium" | "large";
+  compact?: boolean;
+  columns?: number;
 }
 
 export interface ShortcutsWidgetProps {
@@ -67,6 +69,20 @@ export const DEFAULT_SHORTCUTS: Shortcut[] = [
     label: "Anime Hub",
     icon: "play-circle",
     route: "/(auth)/anime-hub",
+    enabled: true,
+  },
+  {
+    id: "jellyfin-downloads",
+    label: "Downloads",
+    icon: "download",
+    route: "/(auth)/jellyfin-downloads",
+    enabled: true,
+  },
+  {
+    id: "monitoring",
+    label: "Monitoring",
+    icon: "monitor-dashboard",
+    route: "/(auth)/monitoring",
     enabled: true,
   },
 ];

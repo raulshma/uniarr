@@ -21,6 +21,7 @@ import { useSettingsStore } from "@/store/settingsStore";
 import { spacing } from "@/theme/spacing";
 import { AI_PROVIDERS } from "@/types/ai/AIProvider";
 import type { AIProviderType } from "@/types/ai/AIProvider";
+import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
 
 /**
  * AI Settings Screen for managing BYOK (Bring Your Own Key) configuration
@@ -35,6 +36,14 @@ export default function AISettingsScreen() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [providerDialogVisible, setProviderDialogVisible] = useState(false);
   const [modelDialogVisible, setModelDialogVisible] = useState(false);
+  // Dialog state for Conversational AI
+  const [convProviderDialogVisible, setConvProviderDialogVisible] =
+    useState(false);
+  const [convModelDialogVisible, setConvModelDialogVisible] = useState(false);
+  // Dialog state for Title Summary
+  const [titleProviderDialogVisible, setTitleProviderDialogVisible] =
+    useState(false);
+  const [titleModelDialogVisible, setTitleModelDialogVisible] = useState(false);
   const [providerKeys, setProviderKeys] = useState<
     {
       keyId: string;
@@ -68,6 +77,30 @@ export default function AISettingsScreen() {
   );
   const setRecommendationKeyId = useSettingsStore(
     (s) => s.setRecommendationKeyId,
+  );
+
+  // Conversational AI settings
+  const convProvider = useConversationalAIConfigStore(
+    (s) => s.selectedProvider,
+  );
+  const convModel = useConversationalAIConfigStore((s) => s.selectedModel);
+  const convKeyId = useConversationalAIConfigStore((s) => s.selectedKeyId);
+  const setConvConfig = useConversationalAIConfigStore(
+    (s) => s.setConversationalAIConfig,
+  );
+
+  // Title Summary settings
+  const titleProvider = useConversationalAIConfigStore(
+    (s) => s.selectedTitleProvider,
+  );
+  const titleModel = useConversationalAIConfigStore(
+    (s) => s.selectedTitleModel,
+  );
+  const titleKeyId = useConversationalAIConfigStore(
+    (s) => s.selectedTitleKeyId,
+  );
+  const setTitleConfig = useConversationalAIConfigStore(
+    (s) => s.setTitleSummaryConfig,
   );
 
   const providerManager = AIProviderManager.getInstance();
@@ -135,6 +168,35 @@ export default function AISettingsScreen() {
 
   const handleModelSelect = (model: string) => {
     setRecommendationModel(model);
+  };
+
+  // Conversational AI Handlers
+  const handleConvProviderSelect = (keyId: string) => {
+    const key = providerKeys.find((k) => k.keyId === keyId);
+    if (!key) return;
+
+    // If model is not set for this key, try to use the key's default model or keep current if valid
+    const newModel = key.modelName || convModel;
+    setConvConfig(key.provider, newModel, keyId);
+    setConvProviderDialogVisible(false);
+  };
+
+  const handleConvModelSelect = (model: string) => {
+    setConvConfig(convProvider, model, convKeyId);
+  };
+
+  // Title Summary Handlers
+  const handleTitleProviderSelect = (keyId: string) => {
+    const key = providerKeys.find((k) => k.keyId === keyId);
+    if (!key) return;
+
+    const newModel = key.modelName || titleModel;
+    setTitleConfig(key.provider, newModel, keyId);
+    setTitleProviderDialogVisible(false);
+  };
+
+  const handleTitleModelSelect = (model: string) => {
+    setTitleConfig(titleProvider, model, titleKeyId);
   };
 
   const getProviderKeyLabel = (key: {
@@ -281,6 +343,118 @@ export default function AISettingsScreen() {
                   Select
                 </Button>
               </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Conversational AI Configuration */}
+        {isAIConfigured && (
+          <Card
+            style={[
+              styles.card,
+              { backgroundColor: theme.colors.elevation.level1 },
+            ]}
+          >
+            <Card.Content>
+              <Text variant="titleSmall" style={styles.sectionTitle}>
+                Conversational AI
+              </Text>
+              <Text variant="bodySmall" style={styles.toggleDescription}>
+                Configure the AI model used for chat interactions
+              </Text>
+
+              <Divider style={styles.divider} />
+
+              <View style={styles.configRow}>
+                <View style={styles.configLabel}>
+                  <Text variant="bodyMedium">Chat Provider</Text>
+                  <Text variant="bodySmall" style={styles.configValue}>
+                    {convProvider && convKeyId
+                      ? getProviderKeyLabel(
+                          providerKeys.find((k) => k.keyId === convKeyId) || {
+                            keyId: convKeyId,
+                            provider: convProvider,
+                            apiKeyPreview: "****",
+                          },
+                        )
+                      : "Not configured"}
+                  </Text>
+                </View>
+                <Button
+                  mode="outlined"
+                  onPress={() => setConvProviderDialogVisible(true)}
+                  disabled={providerKeys.length === 0}
+                >
+                  Select
+                </Button>
+              </View>
+
+              <View style={styles.configRow}>
+                <View style={styles.configLabel}>
+                  <Text variant="bodyMedium">Chat Model</Text>
+                  <Text variant="bodySmall" style={styles.configValue}>
+                    {convModel || "Not configured"}
+                  </Text>
+                </View>
+                <Button
+                  mode="outlined"
+                  onPress={() => setConvModelDialogVisible(true)}
+                  disabled={!convProvider}
+                >
+                  Select
+                </Button>
+              </View>
+
+              <Divider style={styles.divider} />
+
+              <Text variant="bodyMedium" style={{ marginTop: 8 }}>
+                Title Generation (Optional)
+              </Text>
+              <Text variant="bodySmall" style={styles.toggleDescription}>
+                Override provider for generating conversation titles
+              </Text>
+
+              <View style={styles.configRow}>
+                <View style={styles.configLabel}>
+                  <Text variant="bodyMedium">Title Provider</Text>
+                  <Text variant="bodySmall" style={styles.configValue}>
+                    {titleProvider && titleKeyId
+                      ? getProviderKeyLabel(
+                          providerKeys.find((k) => k.keyId === titleKeyId) || {
+                            keyId: titleKeyId,
+                            provider: titleProvider,
+                            apiKeyPreview: "****",
+                          },
+                        )
+                      : "Same as Chat"}
+                  </Text>
+                </View>
+                <Button
+                  mode="outlined"
+                  onPress={() => setTitleProviderDialogVisible(true)}
+                  disabled={providerKeys.length === 0}
+                >
+                  Select
+                </Button>
+              </View>
+
+              {titleProvider && (
+                <View style={styles.configRow}>
+                  <View style={styles.configLabel}>
+                    <Text variant="bodyMedium">Title Model</Text>
+                    <Text variant="bodySmall" style={styles.configValue}>
+                      {titleModel || "Not configured"}
+                    </Text>
+                  </View>
+                  <Button
+                    mode="outlined"
+                    onPress={() => setTitleModelDialogVisible(true)}
+                    disabled={!titleProvider}
+                  >
+                    Select
+                  </Button>
+                </View>
+              )}
             </Card.Content>
           </Card>
         )}
@@ -433,6 +607,93 @@ export default function AISettingsScreen() {
           selectedModel={recommendationModel || undefined}
           provider={recommendationProvider as AIProviderType}
           keyId={recommendationKeyId}
+        />
+      )}
+
+      {/* Conversational AI Provider Dialog */}
+      <Portal>
+        <Dialog
+          visible={convProviderDialogVisible}
+          onDismiss={() => setConvProviderDialogVisible(false)}
+        >
+          <Dialog.Title>Select Chat Provider</Dialog.Title>
+          <Dialog.ScrollArea>
+            <ScrollView>
+              <RadioButton.Group
+                onValueChange={handleConvProviderSelect}
+                value={convKeyId || ""}
+              >
+                {providerKeys.map((key) => (
+                  <RadioButton.Item
+                    key={key.keyId}
+                    label={getProviderKeyLabel(key)}
+                    value={key.keyId}
+                  />
+                ))}
+              </RadioButton.Group>
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={() => setConvProviderDialogVisible(false)}>
+              Cancel
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      {/* Conversational AI Model Selector */}
+      {convProvider && (
+        <AIModelSelector
+          visible={convModelDialogVisible}
+          onDismiss={() => setConvModelDialogVisible(false)}
+          onSelectModel={handleConvModelSelect}
+          selectedModel={convModel || undefined}
+          provider={convProvider}
+          keyId={convKeyId || undefined}
+        />
+      )}
+
+      {/* Title Summary Provider Dialog */}
+      <Portal>
+        <Dialog
+          visible={titleProviderDialogVisible}
+          onDismiss={() => setTitleProviderDialogVisible(false)}
+        >
+          <Dialog.Title>Select Title Provider</Dialog.Title>
+          <Dialog.ScrollArea>
+            <ScrollView>
+              <RadioButton.Group
+                onValueChange={handleTitleProviderSelect}
+                value={titleKeyId || ""}
+              >
+                <RadioButton.Item label="Same as Chat" value="" />
+                {providerKeys.map((key) => (
+                  <RadioButton.Item
+                    key={key.keyId}
+                    label={getProviderKeyLabel(key)}
+                    value={key.keyId}
+                  />
+                ))}
+              </RadioButton.Group>
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={() => setTitleProviderDialogVisible(false)}>
+              Cancel
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      {/* Title Summary Model Selector */}
+      {titleProvider && (
+        <AIModelSelector
+          visible={titleModelDialogVisible}
+          onDismiss={() => setTitleModelDialogVisible(false)}
+          onSelectModel={handleTitleModelSelect}
+          selectedModel={titleModel || undefined}
+          provider={titleProvider}
+          keyId={titleKeyId || undefined}
         />
       )}
     </SafeAreaView>

@@ -32,11 +32,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { EmptyState } from "@/components/common/EmptyState";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import DownloadButton from "@/components/downloads/DownloadButton";
+import { ResumePlaybackDialog } from "@/components/jellyfin/ResumePlaybackDialog";
 import type { AppTheme } from "@/constants/theme";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
-import type { JellyfinPerson } from "@/models/jellyfin.types";
+import type { JellyfinPerson, JellyfinItem } from "@/models/jellyfin.types";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
+import { useJellyfinSeriesEpisodes } from "@/hooks/useJellyfinSeriesEpisodes";
+import { EpisodeList } from "@/components/jellyfin/EpisodeList";
 import { spacing } from "@/theme/spacing";
 import { posterSizes } from "@/constants/sizes";
 
@@ -281,6 +284,19 @@ const JellyfinItemDetailsScreen = () => {
   const detailsQuery = useJellyfinItemDetails({ serviceId, itemId });
 
   const item = detailsQuery.data;
+  const isSeries = item?.Type === "Series";
+
+  // Fetch episodes if this is a series
+  const episodesQuery = useJellyfinSeriesEpisodes({
+    serviceId,
+    seriesId: itemId,
+    enabled: isSeries,
+  });
+
+  const episodes = useMemo(
+    () => episodesQuery.data ?? [],
+    [episodesQuery.data],
+  );
   const isLoading = isBootstrapping || detailsQuery.isLoading;
   const errorMessage =
     detailsQuery.error instanceof Error
@@ -395,21 +411,93 @@ const JellyfinItemDetailsScreen = () => {
       return;
     }
 
-    const params: Record<string, string> = {
-      serviceId,
-      itemId: item.Id,
-    };
+    // For series, play the first unwatched episode or the first episode
+    if (isSeries && episodes.length > 0) {
+      const firstUnwatched =
+        episodes.find((ep) => !ep.UserData?.Played) ?? episodes[0];
 
-    const resumeTicks = item.UserData?.PlaybackPositionTicks;
-    if (typeof resumeTicks === "number" && resumeTicks > 0) {
-      params.startTicks = String(Math.floor(resumeTicks));
+      if (firstUnwatched?.Id) {
+        const resumeTicks = firstUnwatched.UserData?.PlaybackPositionTicks;
+        const hasProgress = resumeTicks && resumeTicks > 600_000_000;
+
+        if (hasProgress) {
+          setResumeDialogState({
+            visible: true,
+            item: firstUnwatched,
+            resumeTicks,
+          });
+        } else {
+          router.push({
+            pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+            params: {
+              serviceId,
+              itemId: firstUnwatched.Id,
+            },
+          });
+        }
+      }
+      return;
     }
 
-    router.push({
-      pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
-      params,
-    });
-  }, [router, serviceId, item]);
+    // For movies and other playable items
+    const resumeTicks = item.UserData?.PlaybackPositionTicks;
+    const hasProgress = resumeTicks && resumeTicks > 600_000_000; // More than 1 minute
+
+    if (hasProgress) {
+      setResumeDialogState({
+        visible: true,
+        item,
+        resumeTicks,
+      });
+    } else {
+      router.push({
+        pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+        params: {
+          serviceId,
+          itemId: item.Id,
+        },
+      });
+    }
+  }, [router, serviceId, item, isSeries, episodes]);
+
+  // Resume playback dialog state
+  const [resumeDialogState, setResumeDialogState] = useState<{
+    visible: boolean;
+    item: JellyfinItem | null;
+    resumeTicks: number | null;
+  }>({
+    visible: false,
+    item: null,
+    resumeTicks: null,
+  });
+
+  const handleEpisodePlay = useCallback(
+    (episode: JellyfinItem) => {
+      if (!serviceId || !episode.Id) {
+        return;
+      }
+
+      const resumeTicks = episode.UserData?.PlaybackPositionTicks;
+      const hasProgress = resumeTicks && resumeTicks > 600_000_000; // More than 1 minute
+
+      if (hasProgress) {
+        setResumeDialogState({
+          visible: true,
+          item: episode,
+          resumeTicks,
+        });
+      } else {
+        router.push({
+          pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+          params: {
+            serviceId,
+            itemId: episode.Id,
+          },
+        });
+      }
+    },
+    [router, serviceId],
+  );
 
   const handleSyncMetadata = useCallback(async () => {
     if (!connector || !item) {
@@ -435,6 +523,24 @@ const JellyfinItemDetailsScreen = () => {
       setIsSyncing(false);
     }
   }, [connector, detailsQuery, item]);
+
+  const handleEpisodePress = useCallback(
+    (episode: JellyfinItem) => {
+      if (!serviceId || !episode.Id) {
+        return;
+      }
+
+      // Navigate to episode detail screen
+      router.push({
+        pathname: "/(auth)/jellyfin/[serviceId]/details/[itemId]",
+        params: {
+          serviceId,
+          itemId: episode.Id,
+        },
+      });
+    },
+    [router, serviceId],
+  );
 
   const renderCastMember = useCallback(
     ({ item: person }: { item: (typeof cast)[number] }) => {
@@ -700,16 +806,68 @@ const JellyfinItemDetailsScreen = () => {
             )}
 
             {/* Prominent full-width play button per design */}
-            <Button
-              mode="contained"
-              icon="play"
-              onPress={handlePlay}
-              style={styles.playButton}
-              contentStyle={styles.playButtonContent}
-              labelStyle={styles.playButtonLabel}
-            >
-              Play
-            </Button>
+            {!isSeries && (
+              <Button
+                mode="contained"
+                icon="play"
+                onPress={handlePlay}
+                style={styles.playButton}
+                contentStyle={styles.playButtonContent}
+                labelStyle={styles.playButtonLabel}
+              >
+                {(() => {
+                  const progress = item.UserData?.PlayedPercentage ?? 0;
+                  const hasProgress = progress > 0 && progress < 100;
+                  return hasProgress
+                    ? `Play (${Math.round(progress)}%)`
+                    : "Play";
+                })()}
+              </Button>
+            )}
+
+            {/* Episodes section for series */}
+            {isSeries && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>
+                    Episodes
+                  </Text>
+                  {episodes.length > 0 && (
+                    <Button
+                      mode="contained"
+                      icon="play"
+                      onPress={handlePlay}
+                      compact
+                      style={styles.playSeriesButton}
+                    >
+                      {(() => {
+                        const firstUnwatched =
+                          episodes.find((ep) => !ep.UserData?.Played) ??
+                          episodes[0];
+                        const progress =
+                          firstUnwatched?.UserData?.PlayedPercentage ?? 0;
+                        const hasProgress = progress > 0 && progress < 100;
+                        return hasProgress
+                          ? `Play (${Math.round(progress)}%)`
+                          : "Play";
+                      })()}
+                    </Button>
+                  )}
+                </View>
+                {episodesQuery.isLoading ? (
+                  <View style={styles.episodesLoading}>
+                    <UniArrLoader size={40} centered />
+                  </View>
+                ) : connector ? (
+                  <EpisodeList
+                    episodes={episodes}
+                    connector={connector}
+                    onEpisodePress={handleEpisodePress}
+                    onEpisodePlay={handleEpisodePlay}
+                  />
+                ) : null}
+              </>
+            )}
 
             {/* Sync card with inline Update button on the right */}
             <Surface style={styles.syncCard} elevation={1}>
@@ -744,6 +902,59 @@ const JellyfinItemDetailsScreen = () => {
           <View style={{ height: spacing.xxl }} />
         </AnimatedScrollView>
       </View>
+
+      {/* Resume playback dialog */}
+      <ResumePlaybackDialog
+        visible={resumeDialogState.visible}
+        onDismiss={() =>
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          })
+        }
+        onResume={() => {
+          if (resumeDialogState.item?.Id && serviceId) {
+            const params: Record<string, string> = {
+              serviceId,
+              itemId: resumeDialogState.item.Id,
+            };
+            if (resumeDialogState.resumeTicks) {
+              params.startTicks = String(
+                Math.floor(resumeDialogState.resumeTicks),
+              );
+            }
+            router.push({
+              pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+              params,
+            });
+          }
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          });
+        }}
+        onStartFromBeginning={() => {
+          if (resumeDialogState.item?.Id && serviceId) {
+            router.push({
+              pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+              params: {
+                serviceId,
+                itemId: resumeDialogState.item.Id,
+              },
+            });
+          }
+          setResumeDialogState({
+            visible: false,
+            item: null,
+            resumeTicks: null,
+          });
+        }}
+        itemTitle={resumeDialogState.item?.Name}
+        playedPercentage={resumeDialogState.item?.UserData?.PlayedPercentage}
+        positionTicks={resumeDialogState.resumeTicks ?? undefined}
+      />
     </>
   );
 };
@@ -970,6 +1181,14 @@ const createStyles = (theme: AppTheme) =>
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
+    },
+    episodesLoading: {
+      padding: spacing.lg,
+      alignItems: "center",
+    },
+    playSeriesButton: {
+      borderRadius: 16,
+      height: 36,
     },
   });
 

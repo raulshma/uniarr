@@ -25,22 +25,17 @@ import {
   Chip,
   Text,
   useTheme,
-  IconButton,
   Portal,
   Dialog,
   Checkbox,
   Button,
 } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import DetailHero from "@/components/media/DetailHero/DetailHero";
 import TrailerFadeOverlay from "@/components/media/TrailerFadeOverlay/TrailerFadeOverlay";
 import { EmptyState } from "@/components/common/EmptyState";
-import {
-  AnimatedSection,
-  SettingsGroup,
-  UniArrLoader,
-  SkeletonPlaceholder,
-} from "@/components/common";
+import { AnimatedSection, SkeletonPlaceholder } from "@/components/common";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { useJikanAnimeDetails } from "@/hooks/useJikanAnimeDetails";
@@ -89,7 +84,7 @@ const AnimeHubDetailScreen: React.FC = () => {
 
   // Picture animation values
   const [pictureAnimations] = useState(() =>
-    Array.from({ length: 6 }, () => ({
+    Array.from({ length: 10 }, () => ({
       scale: new Animated.Value(1),
       opacity: new Animated.Value(1),
     })),
@@ -367,6 +362,12 @@ const AnimeHubDetailScreen: React.FC = () => {
           flexDirection: "row",
           flexWrap: "wrap",
           gap: spacing.sm,
+          alignItems: "center",
+        },
+        metaItem: {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
         },
         chip: {
           backgroundColor: theme.colors.secondaryContainer,
@@ -436,7 +437,7 @@ const AnimeHubDetailScreen: React.FC = () => {
           gap: spacing.sm,
         },
         pictureItem: {
-          width: "30%",
+          width: "48%",
           aspectRatio: 16 / 9,
           borderRadius: 8,
           overflow: "hidden",
@@ -1296,15 +1297,6 @@ const AnimeHubDetailScreen: React.FC = () => {
     .filter(Boolean);
   const tags = [...genres, ...themes, ...demographics];
 
-  const metaItems = [
-    anime?.type,
-    anime?.episodes ? `${anime.episodes.length} episodes` : undefined,
-    anime?.duration ?? undefined,
-    anime?.status ?? undefined,
-    anime?.score ? `${anime.score.toFixed(1)} rating` : undefined,
-    anime?.rank ? `Rank #${anime.rank}` : undefined,
-  ].filter(Boolean);
-
   return (
     <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
       <Animated.View
@@ -1341,103 +1333,137 @@ const AnimeHubDetailScreen: React.FC = () => {
               },
             ]}
           >
-            <SettingsGroup>
-              <View style={{ padding: spacing.md, gap: spacing.md }}>
-                <View>
-                  <Text variant="headlineLarge" style={styles.headline}>
-                    {anime?.title ?? "Untitled"}
-                  </Text>
-                  {anime?.title_english &&
-                  anime.title_english !== anime.title ? (
-                    <Text variant="titleMedium" style={styles.body}>
-                      {anime.title_english}
-                    </Text>
-                  ) : null}
-                </View>
-
-                <View style={styles.metaRow}>
-                  {metaItems.map((item) => (
-                    <Chip key={item} compact mode="outlined">
-                      <Text style={styles.metaText}>{item}</Text>
-                    </Chip>
-                  ))}
-                </View>
-
-                <Animated.View
-                  style={[
-                    styles.primaryActions,
-                    {
-                      opacity: sectionAnimations.hero,
-                      transform: [
-                        {
-                          translateY: Animated.multiply(
-                            Animated.subtract(1, sectionAnimations.hero),
-                            8,
-                          ),
-                        },
-                        {
-                          scale: Animated.add(
-                            sectionAnimations.hero.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0.95, 1],
-                            }),
-                            0,
-                          ),
-                        },
-                      ],
-                    },
-                  ]}
+            <View style={{ paddingHorizontal: spacing.md, gap: spacing.sm }}>
+              <View>
+                <Text
+                  variant="headlineLarge"
+                  style={[styles.headline, { fontWeight: "800" }]}
                 >
-                  {isRequesting ? (
-                    <UniArrLoader size={20} centered />
-                  ) : (
-                    <Animated.View
-                      style={{
-                        transform: [{ scale: scaleAnim }],
-                      }}
-                    >
-                      <IconButton
-                        icon="playlist-plus"
-                        size={28}
-                        iconColor={theme.colors.primary}
-                        onPress={() => void handleJellyseerrRequest()}
-                        accessibilityLabel="Request via Jellyseerr"
-                      />
-                    </Animated.View>
-                  )}
-
-                  <Animated.View
-                    style={{
-                      transform: [{ scale: scaleAnim }],
-                    }}
+                  {anime?.title ?? "Untitled"}
+                </Text>
+                {anime?.title_english && anime.title_english !== anime.title ? (
+                  <Text
+                    variant="titleMedium"
+                    style={[styles.body, { opacity: 0.7 }]}
                   >
-                    <IconButton
-                      icon="movie-search"
-                      size={28}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/(auth)/search",
-                          params: { query: anime?.title, mediaType: "series" },
-                        })
-                      }
-                      disabled={!searchableServices.length}
-                      iconColor={
-                        searchableServices.length
-                          ? theme.colors.primary
-                          : theme.colors.onSurfaceVariant
-                      }
-                      accessibilityLabel="Unified Search"
-                    />
-                  </Animated.View>
-                </Animated.View>
-                {jellyseerrConnectors.length === 0 ? (
-                  <Text variant="bodySmall" style={styles.helperText}>
-                    Connect a Jellyseerr service to forward anime requests to
-                    Radarr/Sonarr automatically.
+                    {anime.title_english}
                   </Text>
                 ) : null}
               </View>
-            </SettingsGroup>
+
+              <View style={styles.metaRow}>
+                {anime?.score && (
+                  <View style={styles.metaItem}>
+                    <MaterialCommunityIcons
+                      name="star"
+                      size={18}
+                      color={theme.colors.primary}
+                    />
+                    <Text
+                      variant="titleMedium"
+                      style={{
+                        color: theme.colors.primary,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {anime.score.toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+                {anime?.rank && (
+                  <View style={styles.metaItem}>
+                    <MaterialCommunityIcons
+                      name="trophy"
+                      size={16}
+                      color={theme.colors.tertiary}
+                    />
+                    <Text
+                      variant="labelLarge"
+                      style={{ color: theme.colors.tertiary }}
+                    >
+                      #{anime.rank}
+                    </Text>
+                  </View>
+                )}
+                {anime?.episodes && (
+                  <View style={styles.metaItem}>
+                    <MaterialCommunityIcons
+                      name="television-classic"
+                      size={16}
+                      color={theme.colors.onSurfaceVariant}
+                    />
+                    <Text
+                      variant="labelMedium"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {anime.episodes.length} eps
+                    </Text>
+                  </View>
+                )}
+                {anime?.status && (
+                  <View
+                    style={[
+                      styles.metaItem,
+                      {
+                        backgroundColor: theme.colors.secondaryContainer,
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      },
+                    ]}
+                  >
+                    <Text
+                      variant="labelSmall"
+                      style={{ color: theme.colors.onSecondaryContainer }}
+                    >
+                      {anime.status}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: spacing.md,
+                  marginTop: spacing.sm,
+                }}
+              >
+                <Button
+                  mode="contained"
+                  icon="playlist-plus"
+                  onPress={() => void handleJellyseerrRequest()}
+                  loading={isRequesting}
+                  style={{ flex: 1 }}
+                  contentStyle={{ height: 48 }}
+                >
+                  Request
+                </Button>
+                <Button
+                  mode="outlined"
+                  icon="movie-search"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(auth)/search",
+                      params: { query: anime?.title, mediaType: "series" },
+                    })
+                  }
+                  disabled={!searchableServices.length}
+                  style={{ flex: 1 }}
+                  contentStyle={{ height: 48 }}
+                >
+                  Search
+                </Button>
+              </View>
+              {jellyseerrConnectors.length === 0 ? (
+                <Text
+                  variant="bodySmall"
+                  style={[styles.helperText, { textAlign: "center" }]}
+                >
+                  Connect Jellyseerr to request automatically.
+                </Text>
+              ) : null}
+            </View>
           </Animated.View>
 
           {/* Synopsis Section */}
@@ -1467,14 +1493,19 @@ const AnimeHubDetailScreen: React.FC = () => {
                 },
               ]}
             >
-              <Text style={styles.sectionTitle}>Synopsis</Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md }}>
-                  <Text variant="bodyLarge" style={styles.body}>
-                    {anime.synopsis}
-                  </Text>
-                </View>
-              </SettingsGroup>
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
+                Synopsis
+              </Text>
+              <View style={{ paddingHorizontal: spacing.md }}>
+                <Text
+                  variant="bodyLarge"
+                  style={[styles.body, { lineHeight: 24 }]}
+                >
+                  {anime.synopsis}
+                </Text>
+              </View>
             </Animated.View>
           ) : null}
 
@@ -1529,53 +1560,134 @@ const AnimeHubDetailScreen: React.FC = () => {
                 },
               ]}
             >
-              <Text style={styles.sectionTitle}>Quick Stats</Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md }}>
-                  <View style={styles.statsGrid}>
-                    <View style={styles.statCard}>
-                      <Text variant="headlineSmall" style={styles.statNumber}>
-                        {anime && typeof anime.score === "number"
-                          ? anime.score.toFixed(1)
-                          : "N/A"}
-                      </Text>
-                      <Text variant="labelMedium" style={styles.statLabel}>
-                        Score
-                      </Text>
-                    </View>
-                    <View style={styles.statCard}>
-                      <Text variant="headlineSmall" style={styles.statNumber}>
-                        {anime && typeof anime.rank === "number"
-                          ? `#${anime.rank}`
-                          : "N/A"}
-                      </Text>
-                      <Text variant="labelMedium" style={styles.statLabel}>
-                        Rank
-                      </Text>
-                    </View>
-                    <View style={styles.statCard}>
-                      <Text variant="headlineSmall" style={styles.statNumber}>
-                        {anime && typeof anime.popularity === "number"
-                          ? `#${anime.popularity}`
-                          : "N/A"}
-                      </Text>
-                      <Text variant="labelMedium" style={styles.statLabel}>
-                        Popularity
-                      </Text>
-                    </View>
-                    <View style={styles.statCard}>
-                      <Text variant="headlineSmall" style={styles.statNumber}>
-                        {anime && typeof anime.members === "number"
-                          ? anime.members.toLocaleString()
-                          : "N/A"}
-                      </Text>
-                      <Text variant="labelMedium" style={styles.statLabel}>
-                        Members
-                      </Text>
-                    </View>
-                  </View>
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
+                Quick Stats
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: spacing.md,
+                  gap: spacing.md,
+                }}
+              >
+                <View
+                  style={[
+                    styles.statCard,
+                    {
+                      backgroundColor: theme.colors.surfaceVariant,
+                      minWidth: 100,
+                      padding: spacing.md,
+                      borderRadius: 12,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="star"
+                    size={24}
+                    color={theme.colors.primary}
+                  />
+                  <Text
+                    variant="headlineSmall"
+                    style={[styles.statNumber, { marginTop: 8 }]}
+                  >
+                    {anime && typeof anime.score === "number"
+                      ? anime.score.toFixed(1)
+                      : "N/A"}
+                  </Text>
+                  <Text variant="labelMedium" style={styles.statLabel}>
+                    Score
+                  </Text>
                 </View>
-              </SettingsGroup>
+                <View
+                  style={[
+                    styles.statCard,
+                    {
+                      backgroundColor: theme.colors.surfaceVariant,
+                      minWidth: 100,
+                      padding: spacing.md,
+                      borderRadius: 12,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="trophy"
+                    size={24}
+                    color={theme.colors.tertiary}
+                  />
+                  <Text
+                    variant="headlineSmall"
+                    style={[styles.statNumber, { marginTop: 8 }]}
+                  >
+                    {anime && typeof anime.rank === "number"
+                      ? `#${anime.rank}`
+                      : "N/A"}
+                  </Text>
+                  <Text variant="labelMedium" style={styles.statLabel}>
+                    Rank
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.statCard,
+                    {
+                      backgroundColor: theme.colors.surfaceVariant,
+                      minWidth: 100,
+                      padding: spacing.md,
+                      borderRadius: 12,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="heart"
+                    size={24}
+                    color={theme.colors.error}
+                  />
+                  <Text
+                    variant="headlineSmall"
+                    style={[styles.statNumber, { marginTop: 8 }]}
+                  >
+                    {anime && typeof anime.popularity === "number"
+                      ? `#${anime.popularity}`
+                      : "N/A"}
+                  </Text>
+                  <Text variant="labelMedium" style={styles.statLabel}>
+                    Popularity
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.statCard,
+                    {
+                      backgroundColor: theme.colors.surfaceVariant,
+                      minWidth: 100,
+                      padding: spacing.md,
+                      borderRadius: 12,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="account-group"
+                    size={24}
+                    color={theme.colors.secondary}
+                  />
+                  <Text
+                    variant="headlineSmall"
+                    style={[styles.statNumber, { marginTop: 8 }]}
+                  >
+                    {anime && typeof anime.members === "number"
+                      ? anime.members > 1000000
+                        ? `${(anime.members / 1000000).toFixed(1)}M`
+                        : anime.members.toLocaleString()
+                      : "N/A"}
+                  </Text>
+                  <Text variant="labelMedium" style={styles.statLabel}>
+                    Members
+                  </Text>
+                </View>
+              </ScrollView>
             </Animated.View>
           ) : null}
 
@@ -1599,46 +1711,53 @@ const AnimeHubDetailScreen: React.FC = () => {
             >
               {tags.length ? (
                 <>
-                  <Text style={styles.sectionTitle}>Tags</Text>
-                  <SettingsGroup>
-                    <View style={{ padding: spacing.md }}>
-                      <View style={styles.metaRow}>
-                        {tags.map((tag) => (
-                          <Chip
-                            key={tag}
-                            style={styles.chip}
-                            textStyle={styles.chipText}
-                          >
-                            {tag}
-                          </Chip>
-                        ))}
-                      </View>
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { paddingHorizontal: spacing.md },
+                    ]}
+                  >
+                    Tags
+                  </Text>
+                  <View style={{ paddingHorizontal: spacing.md }}>
+                    <View style={styles.metaRow}>
+                      {tags.map((tag) => (
+                        <Chip
+                          key={tag}
+                          style={styles.chip}
+                          textStyle={styles.chipText}
+                          mode="flat"
+                        >
+                          {tag}
+                        </Chip>
+                      ))}
                     </View>
-                  </SettingsGroup>
+                  </View>
                 </>
               ) : null}
 
               {anime?.studios?.length ? (
                 <>
                   <Text
-                    style={[styles.sectionTitle, { marginTop: spacing.md }]}
+                    style={[
+                      styles.sectionTitle,
+                      { marginTop: spacing.md, paddingHorizontal: spacing.md },
+                    ]}
                   >
                     Studios
                   </Text>
-                  <SettingsGroup>
-                    <View style={{ padding: spacing.md }}>
-                      <View style={styles.metaRow}>
-                        {anime.studios
-                          .map((studio) => studio.name)
-                          .filter(Boolean)
-                          .map((name) => (
-                            <Chip key={name} mode="outlined">
-                              <Text style={styles.metaText}>{name}</Text>
-                            </Chip>
-                          ))}
-                      </View>
+                  <View style={{ paddingHorizontal: spacing.md }}>
+                    <View style={styles.metaRow}>
+                      {anime.studios
+                        .map((studio) => studio.name)
+                        .filter(Boolean)
+                        .map((name) => (
+                          <Chip key={name} mode="outlined" icon="domain">
+                            <Text style={styles.metaText}>{name}</Text>
+                          </Chip>
+                        ))}
                     </View>
-                  </SettingsGroup>
+                  </View>
                 </>
               ) : null}
             </Animated.View>
@@ -1651,98 +1770,134 @@ const AnimeHubDetailScreen: React.FC = () => {
               delay={250}
               animated={animationsEnabled}
             >
-              <Text style={styles.sectionTitle}>Community Stats</Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md }}>
-                  <View style={styles.detailedStats}>
-                    <View style={styles.statRow}>
-                      <View style={styles.statItem}>
-                        <Text variant="headlineSmall" style={styles.statValue}>
-                          {anime &&
-                          anime.statistics &&
-                          typeof anime.statistics.watching === "number"
-                            ? anime.statistics.watching.toLocaleString()
-                            : "0"}
-                        </Text>
-                        <Text variant="labelMedium" style={styles.statLabel}>
-                          Currently Watching
-                        </Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text variant="headlineSmall" style={styles.statValue}>
-                          {anime &&
-                          anime.statistics &&
-                          typeof anime.statistics.completed === "number"
-                            ? anime.statistics.completed.toLocaleString()
-                            : "0"}
-                        </Text>
-                        <Text variant="labelMedium" style={styles.statLabel}>
-                          Completed
-                        </Text>
-                      </View>
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
+                Community Stats
+              </Text>
+              <View style={{ paddingHorizontal: spacing.md }}>
+                <View style={styles.detailedStats}>
+                  <View style={styles.statRow}>
+                    <View
+                      style={[
+                        styles.statItem,
+                        {
+                          backgroundColor: theme.colors.surfaceVariant,
+                          borderRadius: 12,
+                        },
+                      ]}
+                    >
+                      <Text variant="headlineSmall" style={styles.statValue}>
+                        {anime &&
+                        anime.statistics &&
+                        typeof anime.statistics.watching === "number"
+                          ? anime.statistics.watching.toLocaleString()
+                          : "0"}
+                      </Text>
+                      <Text variant="labelMedium" style={styles.statLabel}>
+                        Currently Watching
+                      </Text>
                     </View>
-                    <View style={styles.statRow}>
-                      <View style={styles.statItem}>
-                        <Text variant="headlineSmall" style={styles.statValue}>
-                          {anime &&
-                          anime.statistics &&
-                          typeof anime.statistics.on_hold === "number"
-                            ? anime.statistics.on_hold.toLocaleString()
-                            : "0"}
-                        </Text>
-                        <Text variant="labelMedium" style={styles.statLabel}>
-                          On Hold
-                        </Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text variant="headlineSmall" style={styles.statValue}>
-                          {anime &&
-                          anime.statistics &&
-                          typeof anime.statistics.dropped === "number"
-                            ? anime.statistics.dropped.toLocaleString()
-                            : "0"}
-                        </Text>
-                        <Text variant="labelMedium" style={styles.statLabel}>
-                          Dropped
-                        </Text>
-                      </View>
+                    <View
+                      style={[
+                        styles.statItem,
+                        {
+                          backgroundColor: theme.colors.surfaceVariant,
+                          borderRadius: 12,
+                        },
+                      ]}
+                    >
+                      <Text variant="headlineSmall" style={styles.statValue}>
+                        {anime &&
+                        anime.statistics &&
+                        typeof anime.statistics.completed === "number"
+                          ? anime.statistics.completed.toLocaleString()
+                          : "0"}
+                      </Text>
+                      <Text variant="labelMedium" style={styles.statLabel}>
+                        Completed
+                      </Text>
                     </View>
-                    {anime &&
-                      anime.statistics &&
-                      typeof (anime.statistics as Record<string, unknown>)[
-                        "favorites"
-                      ] === "number" && (
-                        <View style={styles.statRow}>
-                          <View style={styles.statItem}>
-                            <Text
-                              variant="headlineSmall"
-                              style={styles.statValue}
-                            >
-                              {typeof (
-                                anime.statistics as Record<string, unknown>
-                              )["favorites"] === "number"
-                                ? (
-                                    (
-                                      anime.statistics as Record<
-                                        string,
-                                        unknown
-                                      >
-                                    )["favorites"] as number
-                                  ).toLocaleString()
-                                : "0"}
-                            </Text>
-                            <Text
-                              variant="labelMedium"
-                              style={styles.statLabel}
-                            >
-                              Favorited
-                            </Text>
-                          </View>
-                        </View>
-                      )}
                   </View>
+                  <View style={styles.statRow}>
+                    <View
+                      style={[
+                        styles.statItem,
+                        {
+                          backgroundColor: theme.colors.surfaceVariant,
+                          borderRadius: 12,
+                        },
+                      ]}
+                    >
+                      <Text variant="headlineSmall" style={styles.statValue}>
+                        {anime &&
+                        anime.statistics &&
+                        typeof anime.statistics.on_hold === "number"
+                          ? anime.statistics.on_hold.toLocaleString()
+                          : "0"}
+                      </Text>
+                      <Text variant="labelMedium" style={styles.statLabel}>
+                        On Hold
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statItem,
+                        {
+                          backgroundColor: theme.colors.surfaceVariant,
+                          borderRadius: 12,
+                        },
+                      ]}
+                    >
+                      <Text variant="headlineSmall" style={styles.statValue}>
+                        {anime &&
+                        anime.statistics &&
+                        typeof anime.statistics.dropped === "number"
+                          ? anime.statistics.dropped.toLocaleString()
+                          : "0"}
+                      </Text>
+                      <Text variant="labelMedium" style={styles.statLabel}>
+                        Dropped
+                      </Text>
+                    </View>
+                  </View>
+                  {anime &&
+                    anime.statistics &&
+                    typeof (anime.statistics as Record<string, unknown>)[
+                      "favorites"
+                    ] === "number" && (
+                      <View style={styles.statRow}>
+                        <View
+                          style={[
+                            styles.statItem,
+                            {
+                              backgroundColor: theme.colors.surfaceVariant,
+                              borderRadius: 12,
+                            },
+                          ]}
+                        >
+                          <Text
+                            variant="headlineSmall"
+                            style={styles.statValue}
+                          >
+                            {typeof (
+                              anime.statistics as Record<string, unknown>
+                            )["favorites"] === "number"
+                              ? (
+                                  (anime.statistics as Record<string, unknown>)[
+                                    "favorites"
+                                  ] as number
+                                ).toLocaleString()
+                              : "0"}
+                          </Text>
+                          <Text variant="labelMedium" style={styles.statLabel}>
+                            Favorited
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                 </View>
-              </SettingsGroup>
+              </View>
             </AnimatedSection>
           ) : null}
 
@@ -1776,44 +1931,54 @@ const AnimeHubDetailScreen: React.FC = () => {
                 },
               ]}
             >
-              <Text style={styles.sectionTitle}>
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
                 Episodes ({anime && anime.episodes ? anime.episodes.length : 0})
               </Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md }}>
-                  <View style={styles.episodesList}>
-                    {anime.episodes.slice(0, 8).map((episode) => (
-                      <View key={episode.mal_id} style={styles.episodeItem}>
-                        <View style={styles.episodeHeader}>
-                          <Text
-                            variant="bodyMedium"
-                            style={styles.episodeTitle}
-                          >
-                            {episode.title}
-                          </Text>
-                          <Text variant="labelSmall" style={styles.episodeMeta}>
-                            #{episode.episode_id}
-                          </Text>
-                        </View>
-                        {episode.duration && (
-                          <Text variant="labelSmall" style={styles.episodeMeta}>
-                            {episode.duration}
-                          </Text>
-                        )}
+              <View style={{ paddingHorizontal: spacing.md }}>
+                <View style={styles.episodesList}>
+                  {anime.episodes.slice(0, 8).map((episode) => (
+                    <View
+                      key={episode.mal_id}
+                      style={[
+                        styles.episodeItem,
+                        {
+                          backgroundColor: theme.colors.surfaceVariant,
+                          borderRadius: 12,
+                        },
+                      ]}
+                    >
+                      <View style={styles.episodeHeader}>
+                        <Text
+                          variant="bodyMedium"
+                          style={[styles.episodeTitle, { fontWeight: "600" }]}
+                        >
+                          {episode.title}
+                        </Text>
+                        <Text variant="labelSmall" style={styles.episodeMeta}>
+                          #{episode.episode_id}
+                        </Text>
                       </View>
-                    ))}
-                    {anime && anime.episodes && anime.episodes.length > 8 && (
-                      <Text variant="labelMedium" style={styles.showMore}>
-                        +{" "}
-                        {anime && anime.episodes
-                          ? anime.episodes.length - 8
-                          : 0}{" "}
-                        more episodes
-                      </Text>
-                    )}
-                  </View>
+                      {episode.duration && (
+                        <Text variant="labelSmall" style={styles.episodeMeta}>
+                          {episode.duration}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                  {anime && anime.episodes && anime.episodes.length > 8 && (
+                    <Button
+                      mode="text"
+                      onPress={() => {
+                        /* TODO: Show all episodes */
+                      }}
+                    >
+                      View all {anime.episodes.length} episodes
+                    </Button>
+                  )}
                 </View>
-              </SettingsGroup>
+              </View>
             </Animated.View>
           ) : null}
 
@@ -1824,73 +1989,83 @@ const AnimeHubDetailScreen: React.FC = () => {
               delay={350}
               animated={animationsEnabled}
             >
-              <Text style={styles.sectionTitle}>Gallery</Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md }}>
-                  <View style={styles.picturesContainer}>
-                    {anime && anime.pictures
-                      ? anime.pictures.slice(0, 6).map((picture, index) => {
-                          const uri =
-                            picture.jpg?.large_image_url ??
-                            picture.jpg?.image_url ??
-                            undefined;
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
+                Gallery
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: spacing.md,
+                  gap: spacing.md,
+                }}
+              >
+                {anime && anime.pictures
+                  ? anime.pictures.slice(0, 10).map((picture, index) => {
+                      const uri =
+                        picture.jpg?.large_image_url ??
+                        picture.jpg?.image_url ??
+                        undefined;
 
-                          const animation = pictureAnimations[index] || {
-                            scale: new Animated.Value(1),
-                            opacity: new Animated.Value(1),
-                          };
+                      const animation = pictureAnimations[index] || {
+                        scale: new Animated.Value(1),
+                        opacity: new Animated.Value(1),
+                      };
 
-                          const handlePicturePress = () => {
-                            if (uri) {
-                              // Add a spring scale animation on press
-                              Animated.sequence([
-                                Animated.spring(animation.scale, {
-                                  toValue: 0.95,
-                                  useNativeDriver: true,
-                                  friction: 8,
-                                  tension: 80,
-                                }),
-                                Animated.spring(animation.scale, {
-                                  toValue: 1,
-                                  useNativeDriver: true,
-                                  friction: 8,
-                                  tension: 80,
-                                }),
-                              ]).start();
+                      const handlePicturePress = () => {
+                        if (uri) {
+                          // Add a spring scale animation on press
+                          Animated.sequence([
+                            Animated.spring(animation.scale, {
+                              toValue: 0.95,
+                              useNativeDriver: true,
+                              friction: 8,
+                              tension: 80,
+                            }),
+                            Animated.spring(animation.scale, {
+                              toValue: 1,
+                              useNativeDriver: true,
+                              friction: 8,
+                              tension: 80,
+                            }),
+                          ]).start();
 
-                              setSelectedImage(uri);
-                              setModalVisible(true);
-                            }
-                          };
+                          setSelectedImage(uri);
+                          setModalVisible(true);
+                        }
+                      };
 
-                          return (
-                            <Animated.View
-                              key={index}
-                              style={[
-                                styles.pictureItem,
-                                {
-                                  transform: [{ scale: animation.scale }],
-                                  opacity: animation.opacity,
-                                },
-                              ]}
-                            >
-                              <Pressable
-                                style={styles.pictureItem}
-                                onPress={handlePicturePress}
-                              >
-                                <RNImage
-                                  source={{ uri }}
-                                  style={styles.pictureImage}
-                                  resizeMode="cover"
-                                />
-                              </Pressable>
-                            </Animated.View>
-                          );
-                        })
-                      : null}
-                  </View>
-                </View>
-              </SettingsGroup>
+                      return (
+                        <Animated.View
+                          key={index}
+                          style={[
+                            {
+                              width: 200,
+                              aspectRatio: 16 / 9,
+                              borderRadius: 12,
+                              overflow: "hidden",
+                              transform: [{ scale: animation.scale }],
+                              opacity: animation.opacity,
+                            },
+                          ]}
+                        >
+                          <Pressable
+                            style={{ flex: 1 }}
+                            onPress={handlePicturePress}
+                          >
+                            <RNImage
+                              source={{ uri }}
+                              style={{ width: "100%", height: "100%" }}
+                              resizeMode="cover"
+                            />
+                          </Pressable>
+                        </Animated.View>
+                      );
+                    })
+                  : null}
+              </ScrollView>
             </AnimatedSection>
           ) : null}
 
@@ -1901,33 +2076,41 @@ const AnimeHubDetailScreen: React.FC = () => {
               delay={400}
               animated={animationsEnabled}
             >
-              <Text style={styles.sectionTitle}>Related Content</Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md, gap: spacing.md }}>
-                  {anime.relations.map((relation) => (
-                    <View key={relation.relation} style={styles.relationGroup}>
-                      <Text variant="labelMedium" style={styles.relationType}>
-                        {relation.relation}
-                      </Text>
-                      <View style={styles.metaRow}>
-                        {relation.entry?.map((entry) => (
-                          <Chip
-                            key={`${entry.mal_id}-${entry.name}`}
-                            mode="outlined"
-                            onPress={() => {
-                              if (entry.mal_id && entry.type === "anime") {
-                                router.push(`/anime-hub/${entry.mal_id}`);
-                              }
-                            }}
-                          >
-                            <Text style={styles.metaText}>{entry.name}</Text>
-                          </Chip>
-                        )) || []}
-                      </View>
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
+                Related Content
+              </Text>
+              <View style={{ paddingHorizontal: spacing.md, gap: spacing.md }}>
+                {anime.relations.map((relation) => (
+                  <View key={relation.relation} style={styles.relationGroup}>
+                    <Text
+                      variant="labelMedium"
+                      style={[
+                        styles.relationType,
+                        { color: theme.colors.primary, fontWeight: "bold" },
+                      ]}
+                    >
+                      {relation.relation}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      {relation.entry?.map((entry) => (
+                        <Chip
+                          key={`${entry.mal_id}-${entry.name}`}
+                          mode="outlined"
+                          onPress={() => {
+                            if (entry.mal_id && entry.type === "anime") {
+                              router.push(`/anime-hub/${entry.mal_id}`);
+                            }
+                          }}
+                        >
+                          <Text style={styles.metaText}>{entry.name}</Text>
+                        </Chip>
+                      )) || []}
                     </View>
-                  ))}
-                </View>
-              </SettingsGroup>
+                  </View>
+                ))}
+              </View>
             </AnimatedSection>
           ) : null}
 
@@ -1938,37 +2121,39 @@ const AnimeHubDetailScreen: React.FC = () => {
               delay={450}
               animated={animationsEnabled}
             >
-              <Text style={styles.sectionTitle}>Recommended For You</Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md }}>
-                  <View style={styles.metaRow}>
-                    {anime.recommendations.slice(0, 8).map((rec, idx) => {
-                      const entry = Array.isArray(rec.entry)
-                        ? (rec.entry[1] ?? rec.entry[0])
-                        : rec.entry;
-                      const malId = entry?.mal_id ?? entry?.malId ?? undefined;
-                      const name =
-                        entry?.name ??
-                        entry?.title ??
-                        entry?.title_english ??
-                        "Untitled";
-                      return (
-                        <Chip
-                          key={`${malId ?? idx}-${name}`}
-                          mode="outlined"
-                          onPress={() => {
-                            if (malId && entry?.type === "anime") {
-                              router.push(`/anime-hub/${malId}`);
-                            }
-                          }}
-                        >
-                          <Text style={styles.metaText}>{name}</Text>
-                        </Chip>
-                      );
-                    })}
-                  </View>
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
+                Recommended For You
+              </Text>
+              <View style={{ paddingHorizontal: spacing.md }}>
+                <View style={styles.metaRow}>
+                  {anime.recommendations.slice(0, 8).map((rec, idx) => {
+                    const entry = Array.isArray(rec.entry)
+                      ? (rec.entry[1] ?? rec.entry[0])
+                      : rec.entry;
+                    const malId = entry?.mal_id ?? entry?.malId ?? undefined;
+                    const name =
+                      entry?.name ??
+                      entry?.title ??
+                      entry?.title_english ??
+                      "Untitled";
+                    return (
+                      <Chip
+                        key={`${malId ?? idx}-${name}`}
+                        mode="outlined"
+                        onPress={() => {
+                          if (malId && entry?.type === "anime") {
+                            router.push(`/anime-hub/${malId}`);
+                          }
+                        }}
+                      >
+                        <Text style={styles.metaText}>{name}</Text>
+                      </Chip>
+                    );
+                  })}
                 </View>
-              </SettingsGroup>
+              </View>
             </AnimatedSection>
           ) : null}
 
@@ -1999,26 +2184,28 @@ const AnimeHubDetailScreen: React.FC = () => {
                 },
               ]}
             >
-              <Text style={styles.sectionTitle}>Available On</Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md }}>
-                  <View style={styles.metaRow}>
-                    {anime.streaming.map((stream) => (
-                      <Chip
-                        key={`${stream.name}-${stream.url}`}
-                        mode="outlined"
-                        onPress={() => {
-                          if (stream.url) {
-                            Linking.openURL(stream.url);
-                          }
-                        }}
-                      >
-                        <Text style={styles.metaText}>{stream.name}</Text>
-                      </Chip>
-                    ))}
-                  </View>
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
+                Available On
+              </Text>
+              <View style={{ paddingHorizontal: spacing.md }}>
+                <View style={styles.metaRow}>
+                  {anime.streaming.map((stream) => (
+                    <Chip
+                      key={`${stream.name}-${stream.url}`}
+                      mode="outlined"
+                      onPress={() => {
+                        if (stream.url) {
+                          Linking.openURL(stream.url);
+                        }
+                      }}
+                    >
+                      <Text style={styles.metaText}>{stream.name}</Text>
+                    </Chip>
+                  ))}
                 </View>
-              </SettingsGroup>
+              </View>
             </Animated.View>
           ) : null}
 
@@ -2032,43 +2219,49 @@ const AnimeHubDetailScreen: React.FC = () => {
             >
               {anime?.background ? (
                 <>
-                  <Text style={styles.sectionTitle}>Background</Text>
-                  <SettingsGroup>
-                    <View style={{ padding: spacing.md }}>
-                      <Text variant="bodyLarge" style={styles.body}>
-                        {anime.background}
-                      </Text>
-                    </View>
-                  </SettingsGroup>
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      { paddingHorizontal: spacing.md },
+                    ]}
+                  >
+                    Background
+                  </Text>
+                  <View style={{ paddingHorizontal: spacing.md }}>
+                    <Text variant="bodyLarge" style={styles.body}>
+                      {anime.background}
+                    </Text>
+                  </View>
                 </>
               ) : null}
 
               {anime?.external && anime.external.length > 0 ? (
                 <>
                   <Text
-                    style={[styles.sectionTitle, { marginTop: spacing.md }]}
+                    style={[
+                      styles.sectionTitle,
+                      { marginTop: spacing.md, paddingHorizontal: spacing.md },
+                    ]}
                   >
                     External Links
                   </Text>
-                  <SettingsGroup>
-                    <View style={{ padding: spacing.md }}>
-                      <View style={styles.metaRow}>
-                        {anime.external.map((link) => (
-                          <Chip
-                            key={`${link.name}-${link.url}`}
-                            mode="outlined"
-                            onPress={() => {
-                              if (link.url) {
-                                Linking.openURL(link.url);
-                              }
-                            }}
-                          >
-                            <Text style={styles.metaText}>{link.name}</Text>
-                          </Chip>
-                        ))}
-                      </View>
+                  <View style={{ paddingHorizontal: spacing.md }}>
+                    <View style={styles.metaRow}>
+                      {anime.external.map((link) => (
+                        <Chip
+                          key={`${link.name}-${link.url}`}
+                          mode="outlined"
+                          onPress={() => {
+                            if (link.url) {
+                              Linking.openURL(link.url);
+                            }
+                          }}
+                        >
+                          <Text style={styles.metaText}>{link.name}</Text>
+                        </Chip>
+                      ))}
                     </View>
-                  </SettingsGroup>
+                  </View>
                 </>
               ) : null}
             </AnimatedSection>
@@ -2081,25 +2274,42 @@ const AnimeHubDetailScreen: React.FC = () => {
               delay={600}
               animated={animationsEnabled}
             >
-              <Text style={styles.sectionTitle}>Community Reviews</Text>
-              <SettingsGroup>
-                <View style={{ padding: spacing.md, gap: spacing.md }}>
-                  {anime.reviews.slice(0, 3).map((review) => (
-                    <View key={review.mal_id} style={styles.reviewItem}>
-                      <Text variant="bodyMedium" style={styles.reviewContent}>
-                        {review.content
-                          ? `${review.content.substring(0, 200)}...`
-                          : (review as any)?.review
-                            ? `${(review as any).review.substring(0, 200)}...`
-                            : ""}
-                      </Text>
-                      <Text variant="labelSmall" style={styles.reviewAuthor}>
-                        - {review.user?.username || "Anonymous"}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </SettingsGroup>
+              <Text
+                style={[styles.sectionTitle, { paddingHorizontal: spacing.md }]}
+              >
+                Community Reviews
+              </Text>
+              <View style={{ paddingHorizontal: spacing.md, gap: spacing.md }}>
+                {anime.reviews.slice(0, 3).map((review) => (
+                  <View
+                    key={review.mal_id}
+                    style={[
+                      styles.reviewItem,
+                      {
+                        backgroundColor: theme.colors.surfaceVariant,
+                        borderRadius: 12,
+                      },
+                    ]}
+                  >
+                    <Text variant="bodyMedium" style={styles.reviewContent}>
+                      {review.content
+                        ? `${review.content.substring(0, 200)}...`
+                        : (review as any)?.review
+                          ? `${(review as any).review.substring(0, 200)}...`
+                          : ""}
+                    </Text>
+                    <Text
+                      variant="labelSmall"
+                      style={[
+                        styles.reviewAuthor,
+                        { marginTop: 8, textAlign: "right" },
+                      ]}
+                    >
+                      - {review.user?.username || "Anonymous"}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </AnimatedSection>
           ) : null}
 

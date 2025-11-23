@@ -129,8 +129,17 @@ export class RecommendationContextBuilder {
   ): Promise<WatchHistoryItem[]> {
     try {
       const connectorManager = ConnectorManager.getInstance();
-      const jellyfinConnectors =
-        connectorManager.getConnectorsByType("jellyfin");
+
+      // Ensure connectors are loaded from storage before accessing them
+      let jellyfinConnectors = connectorManager.getConnectorsByType("jellyfin");
+
+      if (jellyfinConnectors.length === 0) {
+        void logger.debug(
+          "No Jellyfin connectors in memory, loading saved services",
+        );
+        await connectorManager.loadSavedServices();
+        jellyfinConnectors = connectorManager.getConnectorsByType("jellyfin");
+      }
 
       if (jellyfinConnectors.length === 0) {
         void logger.warn("No Jellyfin connector found for watch history");
@@ -221,8 +230,19 @@ export class RecommendationContextBuilder {
     try {
       const startTime = Date.now();
       const connectorManager = ConnectorManager.getInstance();
-      const sonarrConnectors = connectorManager.getConnectorsByType("sonarr");
-      const radarrConnectors = connectorManager.getConnectorsByType("radarr");
+
+      // Ensure connectors are loaded from storage before accessing them
+      let sonarrConnectors = connectorManager.getConnectorsByType("sonarr");
+      let radarrConnectors = connectorManager.getConnectorsByType("radarr");
+
+      if (sonarrConnectors.length === 0 && radarrConnectors.length === 0) {
+        void logger.debug(
+          "No media connectors in memory, loading saved services",
+        );
+        await connectorManager.loadSavedServices();
+        sonarrConnectors = connectorManager.getConnectorsByType("sonarr");
+        radarrConnectors = connectorManager.getConnectorsByType("radarr");
+      }
 
       let totalItems = 0;
       const genreDistribution: Record<string, number> = {};

@@ -8,6 +8,8 @@
  * https://github.com/Snazzah/duck-duck-scrape
  */
 
+import { logger } from "@/services/logger/LoggerService";
+
 /** The safe search values when searching DuckDuckGo. */
 export enum SafeSearchType {
   /** Strict filtering, no NSFW content. */
@@ -129,6 +131,8 @@ export async function search(
   query: string,
   options?: SearchOptions,
 ): Promise<SearchResponse> {
+  void logger.warn("🔍 DuckDuckGo search started", { query, options });
+
   if (!query) throw new Error("Query cannot be empty!");
 
   const opts = { ...defaultOptions, ...options };
@@ -136,7 +140,9 @@ export async function search(
 
   let vqd = opts.vqd;
   if (!vqd) {
+    void logger.warn("🔑 Getting VQD for query", { query });
     vqd = await getVQD(query);
+    void logger.warn("✅ VQD obtained", { vqd });
   }
 
   // Build query parameters matching duck-duck-scrape
@@ -178,10 +184,17 @@ export async function search(
 
   const searchUrl = `https://links.duckduckgo.com/d.js?${new URLSearchParams(queryParams).toString()}`;
 
+  void logger.warn("🌐 Fetching search results", { searchUrl });
+
   try {
     const response = await fetch(searchUrl, {
       method: "GET",
       headers: COMMON_HEADERS,
+    });
+
+    void logger.warn("📡 Response received", {
+      status: response.status,
+      ok: response.ok,
     });
 
     if (!response.ok) {
@@ -191,6 +204,7 @@ export async function search(
     }
 
     const body = await response.text();
+    void logger.warn("📄 Response body length", { length: body.length });
 
     // Check for errors
     if (body.includes("DDG.deep.is506")) {
@@ -205,6 +219,7 @@ export async function search(
     // Extract search results using regex
     const searchMatch = SEARCH_REGEX.exec(body);
     if (!searchMatch || !searchMatch[1]) {
+      void logger.warn("❌ No search results found in response");
       return {
         noResults: true,
         vqd,
@@ -212,10 +227,16 @@ export async function search(
       };
     }
 
+    void logger.warn("🔍 Parsing search results JSON");
     const searchResults = JSON.parse(searchMatch[1].replace(/\t/g, "    ")) as (
       | CallbackSearchResult
       | CallbackNextSearch
     )[];
+
+    void logger.warn("📊 Raw search results parsed", {
+      count: searchResults.length,
+      firstResult: searchResults[0],
+    });
 
     // Check for no results
     if (
@@ -239,19 +260,55 @@ export async function search(
 
     // Parse results
     const results: SearchResult[] = [];
+    let resultIndex = 0;
     for (const search of searchResults) {
-      if ("n" in search) continue; // Skip "next page" entries
+      if ("n" in search) {
+        void logger.warn("⏭️ Skipping 'next page' entry");
+        continue; // Skip "next page" entries
+      }
 
       const result = search as CallbackSearchResult;
-      results.push({
+
+      void logger.warn(`📝 Processing result ${resultIndex}`, {
         title: result.t,
-        description: decodeHtmlEntities(result.a),
-        rawDescription: result.a,
+        titleType: typeof result.t,
+        description: result.a,
+        descriptionType: typeof result.a,
         hostname: result.i,
-        icon: `https://external-content.duckduckgo.com/ip3/${result.i}.ico`,
+        hostnameType: typeof result.i,
         url: result.u,
+        urlType: typeof result.u,
+        rawResult: result,
       });
+
+      try {
+        const decodedDescription = decodeHtmlEntities(result.a);
+        void logger.warn(`✅ Decoded description for result ${resultIndex}`, {
+          decodedDescription,
+        });
+
+        results.push({
+          title: result.t || "",
+          description: decodedDescription,
+          rawDescription: result.a || "",
+          hostname: result.i || "",
+          icon: `https://external-content.duckduckgo.com/ip3/${result.i}.ico`,
+          url: result.u || "",
+        });
+      } catch (error) {
+        void logger.error(`❌ Error processing result ${resultIndex}`, {
+          error: error instanceof Error ? error.message : String(error),
+          result,
+        });
+        throw error;
+      }
+
+      resultIndex++;
     }
+
+    void logger.warn("✅ Search completed successfully", {
+      resultCount: results.length,
+    });
 
     return {
       noResults: false,
@@ -259,6 +316,12 @@ export async function search(
       results,
     };
   } catch (error) {
+    void logger.error("❌ DuckDuckGo search failed", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      query,
+    });
+
     if (error instanceof Error) {
       throw new Error(`DuckDuckGo search error: ${error.message}`);
     }
@@ -345,20 +408,46 @@ function sanityCheck(options: Required<SearchOptions>): void {
 /**
  * Decode HTML entities
  */
-function decodeHtmlEntities(text: string): string {
-  if (!text) return "";
+function decodeHtmlEntities(text: string | undefined): string {
+  void logger.warn("🔤 decodeHtmlEntities called", {
+    text,
+    textType: typeof text,
+    textValue: String(text),
+  });
 
-  return text
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/<b>/g, "")
-    .replace(/<\/b>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  if (!text || typeof text !== "string") {
+    void logger.warn(
+      "⚠️ Text is empty or not a string, returning empty string",
+    );
+    return "";
+  }
+
+  try {
+    const decoded = text
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&#x27;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/<b>/g, "")
+      .replace(/<\/b>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    void logger.warn("✅ HTML entities decoded successfully", {
+      original: text.substring(0, 50),
+      decoded: decoded.substring(0, 50),
+    });
+
+    return decoded;
+  } catch (error) {
+    void logger.error("❌ Error in decodeHtmlEntities", {
+      error: error instanceof Error ? error.message : String(error),
+      text: String(text),
+    });
+    throw error;
+  }
 }

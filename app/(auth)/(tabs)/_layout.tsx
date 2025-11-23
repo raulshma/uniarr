@@ -10,7 +10,6 @@ import { useTheme } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { AppTheme } from "@/constants/theme";
 import { useSettingsStore } from "@/store/settingsStore";
-import { FloatingChatContainer } from "@/components/chat/FloatingChatContainer";
 
 export default function TabsLayout() {
   const theme = useTheme<AppTheme>();
@@ -71,7 +70,6 @@ export default function TabsLayout() {
           <Label>Settings</Label>
         </NativeTabs.Trigger>
       </NativeTabs>
-      <FloatingChatContainer variant="button" />
     </View>
   );
 }

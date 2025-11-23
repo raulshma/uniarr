@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Modal,
   Pressable,
   type ViewStyle,
 } from "react-native";
@@ -14,9 +13,9 @@ import {
   Badge,
   Button,
   useTheme,
-  Portal,
   FAB,
 } from "react-native-paper";
+import { BottomDrawer } from "@/components/common";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
@@ -285,20 +284,14 @@ const WebhookNotifications: React.FC<WebhookNotificationsProps> = ({
 
   if (modal) {
     return (
-      <Portal>
-        <Modal visible={visible} onDismiss={onDismiss}>
-          <View
-            style={[styles.modal, { backgroundColor: theme.colors.background }]}
-          >
-            {renderContent()}
-            <View style={styles.modalActions}>
-              <Button mode="contained" onPress={onDismiss}>
-                Close
-              </Button>
-            </View>
-          </View>
-        </Modal>
-      </Portal>
+      <BottomDrawer
+        visible={visible ?? false}
+        onDismiss={onDismiss ?? (() => {})}
+        title="Notifications"
+        maxHeight="85%"
+      >
+        {renderContent()}
+      </BottomDrawer>
     );
   }
 
@@ -421,16 +414,6 @@ const styles = StyleSheet.create({
     margin: spacing.md,
     right: 0,
     bottom: 0,
-  },
-  modal: {
-    margin: spacing.lg,
-    borderRadius: 8, // TODO: Replace with theme.custom.sizes.borderRadius.md when moved inside component
-    maxHeight: "80%",
-  },
-  modalActions: {
-    padding: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
   },
 });
 

@@ -108,6 +108,82 @@ export class RecommendationLearningService {
   }
 
   /**
+   * Get all rejected recommendation ids for a user
+   */
+  async getRejectedRecommendationIds(userId: string): Promise<string[]> {
+    const events = await this.getFeedbackEvents(userId);
+    return events
+      .filter((e) => e.feedback === "rejected")
+      .map((e) => e.recommendationId);
+  }
+
+  /**
+   * Get all rejected recommendation events (for UI management)
+   */
+  async getRejectedRecommendations(
+    userId: string,
+  ): Promise<
+    Pick<
+      FeedbackEvent,
+      "recommendationId" | "recommendation" | "reason" | "timestamp"
+    >[]
+  > {
+    const events = await this.getFeedbackEvents(userId);
+    return events
+      .filter((e) => e.feedback === "rejected")
+      .map((e) => ({
+        recommendationId: e.recommendationId,
+        recommendation: e.recommendation,
+        reason: e.reason,
+        timestamp: e.timestamp,
+      }));
+  }
+
+  /**
+   * Remove (clear) rejected recommendation entries for a user — used when user unmarks 'not interested'
+   */
+  async removeRejectedRecommendation(
+    userId: string,
+    recommendationId: string,
+  ): Promise<void> {
+    const key = `${this.FEEDBACK_EVENTS_KEY}:${userId}`;
+    const existingData = await this.storage.getItem(key);
+    const events: FeedbackEvent[] = existingData
+      ? JSON.parse(existingData, this.dateReviver)
+      : [];
+
+    const filtered = events.filter(
+      (e) =>
+        !(e.feedback === "rejected" && e.recommendationId === recommendationId),
+    );
+
+    await this.storage.setItem(key, JSON.stringify(filtered));
+    // Recompute patterns
+    const patterns = this.analyzeFeedbackPatterns(filtered);
+    const patternsKey = `${this.FEEDBACK_PATTERNS_KEY}:${userId}`;
+    await this.storage.setItem(patternsKey, JSON.stringify(patterns));
+  }
+
+  /**
+   * Clear all rejected recommendation feedback for a user
+   */
+  async clearRejectedRecommendations(userId: string): Promise<void> {
+    const key = `${this.FEEDBACK_EVENTS_KEY}:${userId}`;
+    const existingData = await this.storage.getItem(key);
+    const events: FeedbackEvent[] = existingData
+      ? JSON.parse(existingData, this.dateReviver)
+      : [];
+
+    const filtered = events.filter((e) => e.feedback !== "rejected");
+    await this.storage.setItem(key, JSON.stringify(filtered));
+
+    // Recompute patterns
+    const patterns = this.analyzeFeedbackPatterns(filtered);
+    const patternsKey = `${this.FEEDBACK_PATTERNS_KEY}:${userId}`;
+    await this.storage.setItem(patternsKey, JSON.stringify(patterns));
+  }
+
+  /**
    * Store a feedback event in MMKV storage
    */
   private async storeFeedbackEvent(

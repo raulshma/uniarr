@@ -193,6 +193,54 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
 
               toolInvocationsRef.current.set(toolCallId, invocation);
 
+              // Update the assistant message with the new tool invocation immediately
+              const currentMessage = useConversationalAIStore
+                .getState()
+                .messages.find((m) => m.id === assistantMessageId);
+
+              if (currentMessage) {
+                const updatedInvocations = Array.from(
+                  toolInvocationsRef.current.values(),
+                );
+                const updatedMessage: Message = {
+                  ...currentMessage,
+                  toolInvocations: updatedInvocations,
+                };
+
+                // Update the message in the store
+                const store = useConversationalAIStore.getState();
+                const messageIndex = store.messages.findIndex(
+                  (m) => m.id === assistantMessageId,
+                );
+
+                if (messageIndex !== -1) {
+                  const updatedMessages = [...store.messages];
+                  updatedMessages[messageIndex] = updatedMessage;
+
+                  // Update both messages and session
+                  if (store.currentSessionId) {
+                    const session = store.sessions.get(store.currentSessionId);
+                    if (session) {
+                      const sessions = new Map(store.sessions);
+                      sessions.set(store.currentSessionId, {
+                        ...session,
+                        messages: updatedMessages,
+                        updatedAt: new Date(),
+                      });
+
+                      useConversationalAIStore.setState({
+                        messages: updatedMessages,
+                        sessions,
+                      });
+                    }
+                  } else {
+                    useConversationalAIStore.setState({
+                      messages: updatedMessages,
+                    });
+                  }
+                }
+              }
+
               // Notify callback
               onToolCall?.(toolName, args);
 
@@ -212,17 +260,76 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
 
               if (invocation) {
                 invocation.result = result;
-                invocation.state = "completed";
+
+                // Check if the result indicates failure
+                const isFailure =
+                  (result as any)?.success === false ||
+                  (result as any)?.error !== undefined;
+
+                invocation.state = isFailure ? "failed" : "completed";
                 toolInvocationsRef.current.set(
                   invocation.toolCallId,
                   invocation,
                 );
+
+                // Update the assistant message with the completed/failed tool invocation
+                const currentMessage = useConversationalAIStore
+                  .getState()
+                  .messages.find((m) => m.id === assistantMessageId);
+
+                if (currentMessage) {
+                  const updatedInvocations = Array.from(
+                    toolInvocationsRef.current.values(),
+                  );
+                  const updatedMessage: Message = {
+                    ...currentMessage,
+                    toolInvocations: updatedInvocations,
+                  };
+
+                  // Update the message in the store
+                  const store = useConversationalAIStore.getState();
+                  const messageIndex = store.messages.findIndex(
+                    (m) => m.id === assistantMessageId,
+                  );
+
+                  if (messageIndex !== -1) {
+                    const updatedMessages = [...store.messages];
+                    updatedMessages[messageIndex] = updatedMessage;
+
+                    // Update both messages and session
+                    if (store.currentSessionId) {
+                      const session = store.sessions.get(
+                        store.currentSessionId,
+                      );
+                      if (session) {
+                        const sessions = new Map(store.sessions);
+                        sessions.set(store.currentSessionId, {
+                          ...session,
+                          messages: updatedMessages,
+                          updatedAt: new Date(),
+                        });
+
+                        useConversationalAIStore.setState({
+                          messages: updatedMessages,
+                          sessions,
+                        });
+                      }
+                    } else {
+                      useConversationalAIStore.setState({
+                        messages: updatedMessages,
+                      });
+                    }
+                  }
+                }
               }
 
               // Notify callback
               onToolResult?.(toolName, result);
 
-              void logger.info(`Tool result: ${toolName}`, { result });
+              void logger.info(`Tool result: ${toolName}`, {
+                result,
+                success: !(result as any)?.error,
+              });
             },
             onConfirmationRequested: (
               confirmationId: string,
@@ -396,6 +503,11 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
                 };
               },
             ) => {
+              void logger.info("onComplete called in useAIChat", {
+                fullTextLength: _fullText.length,
+                assistantMessageId,
+              });
+
               // Calculate response time
               const duration = Date.now() - startTime;
 

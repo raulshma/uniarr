@@ -51,13 +51,14 @@ const ProviderModelDisplayComponent: React.FC<ProviderModelDisplayProps> = ({
       StyleSheet.create({
         container: {
           paddingHorizontal: 2,
-          paddingVertical: 0,
+          paddingVertical: 4,
           flexDirection: "row",
           alignItems: "center",
+          justifyContent: "center",
           gap: 8,
           borderRadius: 12,
           marginHorizontal: 16,
-          marginBottom: 0,
+          marginBottom: 4,
         },
         iconContainer: {
           width: 24,
@@ -66,7 +67,6 @@ const ProviderModelDisplayComponent: React.FC<ProviderModelDisplayProps> = ({
           justifyContent: "center",
         },
         textContainer: {
-          flex: 1,
           flexDirection: "row",
           alignItems: "center",
           gap: 4,
@@ -85,7 +85,6 @@ const ProviderModelDisplayComponent: React.FC<ProviderModelDisplayProps> = ({
           fontSize: 13,
           fontWeight: "400",
           color: theme.colors.onSurfaceVariant,
-          flex: 1,
         },
       }),
     [theme],

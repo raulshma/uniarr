@@ -2,7 +2,6 @@ import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
 import { UnifiedSearchService } from "@/services/search/UnifiedSearchService";
 import type { UnifiedSearchResult } from "@/models/search.types";
 import { ToolError, ToolErrorCategory } from "./types";
-import { logger } from "@/services/logger/LoggerService";
 
 /**
  * Provides shared context and utilities for all AI tools.
@@ -29,8 +28,6 @@ export class ToolContext {
   private constructor() {
     this.connectorManager = ConnectorManager.getInstance();
     this.searchService = UnifiedSearchService.getInstance();
-
-    void logger.info("ToolContext initialized");
   }
 
   /**
@@ -462,7 +459,6 @@ export class ToolContext {
   static resetInstance(): void {
     if (ToolContext.instance) {
       ToolContext.instance = null;
-      void logger.info("ToolContext instance reset");
     }
   }
 }

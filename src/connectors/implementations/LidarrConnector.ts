@@ -12,8 +12,15 @@ import type {
   RootFolder,
   Track,
 } from "@/models/media.types";
-import type { SearchOptions } from "@/connectors/base/IConnector";
+import type { SearchOptions, SystemHealth } from "@/connectors/base/IConnector";
 import { handleApiError } from "@/utils/error.utils";
+import type {
+  LogQueryOptions,
+  ServiceLog,
+  ServiceLogLevel,
+  HealthMessage,
+  HealthMessageSeverity,
+} from "@/models/logger.types";
 
 export interface LidarrQueueItem {
   readonly id: number;
@@ -85,6 +92,74 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
         operation: "getVersion",
         endpoint: "/api/v1/system/status",
       });
+    }
+  }
+
+  /**
+   * Retrieve health status and messages from Lidarr
+   */
+  override async getHealth(): Promise<SystemHealth> {
+    try {
+      const response = await this.client.get<any[]>("/api/v1/health");
+
+      const healthResources = response.data ?? [];
+
+      // Map Lidarr health resources to our HealthMessage format
+      const messages: HealthMessage[] = healthResources.map((resource: any) => {
+        // Map Lidarr's HealthCheckResult to our severity levels
+        const severityMap: Record<string, HealthMessageSeverity> = {
+          ok: "info",
+          notice: "info",
+          warning: "warning",
+          error: "error",
+        };
+
+        return {
+          id: resource.id?.toString() ?? `health-${Date.now()}`,
+          serviceId: this.config.id,
+          severity: severityMap[resource.type ?? "notice"] ?? "info",
+          message: resource.message ?? "Unknown health issue",
+          timestamp: new Date(),
+          source: resource.source ?? undefined,
+          wikiUrl: resource.wikiUrl ?? undefined,
+        };
+      });
+
+      // Determine overall status based on health messages
+      const hasErrors = messages.some((m) => m.severity === "error");
+      const hasWarnings = messages.some((m) => m.severity === "warning");
+
+      let status: "healthy" | "degraded" | "offline" = "healthy";
+      let message = "Service is healthy";
+
+      if (hasErrors) {
+        status = "degraded";
+        message = `Service has ${messages.filter((m) => m.severity === "error").length} error(s)`;
+      } else if (hasWarnings) {
+        status = "degraded";
+        message = `Service has ${messages.filter((m) => m.severity === "warning").length} warning(s)`;
+      }
+
+      return {
+        status,
+        message,
+        lastChecked: new Date(),
+        messages,
+      };
+    } catch (error) {
+      const diagnostic = handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getHealth",
+        endpoint: "/api/v1/health",
+      });
+
+      return {
+        status: diagnostic.isNetworkError ? "offline" : "degraded",
+        message: diagnostic.message,
+        lastChecked: new Date(),
+        details: diagnostic.details,
+      };
     }
   }
 
@@ -767,5 +842,152 @@ export class LidarrConnector extends BaseConnector<Artist, AddArtistRequest> {
       sizeleft: record.sizeleft,
       timeleft: record.timeleft ?? undefined,
     };
+  }
+
+  /**
+   * Retrieve logs from Lidarr using the /api/v1/log endpoint.
+   * Supports pagination, level filtering, and time range filtering.
+   * Uses appropriate API version for Lidarr (v1).
+   */
+  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+    try {
+      const params: Record<string, unknown> = {
+        pageSize: options?.limit ?? 50,
+        page: options?.startIndex
+          ? Math.floor(options.startIndex / (options.limit ?? 50)) + 1
+          : 1,
+        sortKey: "time",
+        sortDirection: "descending",
+      };
+
+      // Add level filter if specified
+      if (options?.level && options.level.length > 0) {
+        // Lidarr uses uppercase level names (same as other *arr services)
+        params.level = options.level.map((l) => l.toUpperCase()).join(",");
+      }
+
+      // Note: Lidarr's /api/v1/log endpoint doesn't support time range filtering via query params
+      // We'll filter by time after fetching if needed
+      const response = await this.client.get<{
+        page?: number;
+        pageSize?: number;
+        sortKey?: string;
+        sortDirection?: string;
+        totalRecords?: number;
+        records?:
+          | {
+              id?: number;
+              time?: string;
+              exception?: string | null;
+              exceptionType?: string | null;
+              level?: string | null;
+              logger?: string | null;
+              message?: string | null;
+              method?: string | null;
+            }[]
+          | null;
+      }>("/api/v1/log", { params });
+
+      const logs = (response.data.records ?? []).map((log) =>
+        this.normalizeLogEntry(log),
+      );
+
+      // Apply time range filtering if specified
+      let filteredLogs = logs;
+      if (options?.since || options?.until) {
+        filteredLogs = logs.filter((log) => {
+          if (options.since && log.timestamp < options.since) {
+            return false;
+          }
+          if (options.until && log.timestamp > options.until) {
+            return false;
+          }
+          return true;
+        });
+      }
+
+      // Apply search term filtering if specified
+      if (options?.searchTerm) {
+        const searchLower = options.searchTerm.toLowerCase();
+        filteredLogs = filteredLogs.filter(
+          (log) =>
+            log.message.toLowerCase().includes(searchLower) ||
+            log.logger?.toLowerCase().includes(searchLower) ||
+            log.exception?.toLowerCase().includes(searchLower),
+        );
+      }
+
+      return filteredLogs;
+    } catch (error) {
+      logger.error("[LidarrConnector] Failed to retrieve logs", {
+        serviceId: this.config.id,
+        error,
+      });
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getLogs",
+        endpoint: "/api/v1/log",
+      });
+    }
+  }
+
+  /**
+   * Normalize a Lidarr log entry to the unified ServiceLog format.
+   */
+  private normalizeLogEntry(log: {
+    id?: number;
+    time?: string;
+    exception?: string | null;
+    exceptionType?: string | null;
+    level?: string | null;
+    logger?: string | null;
+    message?: string | null;
+    method?: string | null;
+  }): ServiceLog {
+    return {
+      id: `lidarr-${this.config.id}-${log.id ?? Date.now()}`,
+      serviceId: this.config.id,
+      serviceName: this.config.name,
+      serviceType: this.config.type,
+      timestamp: log.time ? new Date(log.time) : new Date(),
+      level: this.normalizeLidarrLogLevel(log.level),
+      message: log.message ?? "",
+      exception: log.exception ?? undefined,
+      logger: log.logger ?? undefined,
+      method: log.method ?? undefined,
+      raw: JSON.stringify(log),
+      metadata: {
+        exceptionType: log.exceptionType,
+      },
+    };
+  }
+
+  /**
+   * Normalize Lidarr log level to the unified ServiceLogLevel format.
+   */
+  private normalizeLidarrLogLevel(level?: string | null): ServiceLogLevel {
+    if (!level) {
+      return "info";
+    }
+
+    const levelLower = level.toLowerCase();
+    switch (levelLower) {
+      case "trace":
+        return "trace";
+      case "debug":
+        return "debug";
+      case "info":
+        return "info";
+      case "warn":
+      case "warning":
+        return "warn";
+      case "error":
+        return "error";
+      case "fatal":
+        return "fatal";
+      default:
+        return "info";
+    }
   }
 }

@@ -103,28 +103,31 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   // URI resolution: use Image component's native caching
   // Track when URI changes to reset state
   const prevUriRef = useRef<string | undefined>(uri);
-  const isUriChanged = prevUriRef.current !== uri;
 
-  if (isUriChanged) {
-    prevUriRef.current = uri;
-    if (!uri) {
-      setImageState({
-        loaded: false,
-        loading: false,
-        error: false,
-        resolvedUri: undefined,
-      });
-      fadeAnim.setValue(0);
-    } else {
-      // Mark as loading to show thumbhash placeholder if available
-      setImageState((prev) => ({
-        ...prev,
-        loading: true,
-        error: false,
-        resolvedUri: uri,
-      }));
+  // Use useEffect to handle URI changes to avoid state updates during render
+  // This prevents Glide errors on Android when images are loaded/cleared in callbacks
+  React.useEffect(() => {
+    if (prevUriRef.current !== uri) {
+      prevUriRef.current = uri;
+      if (!uri) {
+        setImageState({
+          loaded: false,
+          loading: false,
+          error: false,
+          resolvedUri: undefined,
+        });
+        fadeAnim.setValue(0);
+      } else {
+        // Mark as loading to show thumbhash placeholder if available
+        setImageState((prev) => ({
+          ...prev,
+          loading: true,
+          error: false,
+          resolvedUri: uri,
+        }));
+      }
     }
-  }
+  }, [uri, fadeAnim]);
 
   // Use the thumbhash hook with reduced delay for better UX
   // Called after URI tracking to ensure state consistency
@@ -143,24 +146,31 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
   }
 
   const handleImageLoad = useCallback(() => {
-    setImageState((prev) => ({ ...prev, loaded: true, loading: false }));
+    // Use setTimeout to defer state update and avoid Glide errors on Android
+    // This ensures we're not starting/clearing loads within RequestListener callbacks
+    setTimeout(() => {
+      setImageState((prev) => ({ ...prev, loaded: true, loading: false }));
 
-    if (progressiveLoading) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
+      if (progressiveLoading) {
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    }, 0);
   }, [progressiveLoading, fadeAnim]);
 
   const handleError = useCallback(() => {
-    setImageState((prev) => ({
-      ...prev,
-      loaded: false,
-      loading: false,
-      error: true,
-    }));
+    // Use setTimeout to defer state update and avoid Glide errors on Android
+    setTimeout(() => {
+      setImageState((prev) => ({
+        ...prev,
+        loaded: false,
+        loading: false,
+        error: true,
+      }));
+    }, 0);
   }, []);
 
   // Optimized container style calculation
@@ -257,7 +267,6 @@ const MediaPoster: React.FC<MediaPosterProps> = ({
           priority={priority}
           transition={progressiveLoading ? 250 : 0} // Slightly reduced for snappier feel
           onLoad={handleImageLoad}
-          onLoadEnd={handleImageLoad}
           onError={handleError}
           // Only render when we have a valid resolved URI to prevent flickering
           key={imageState.resolvedUri || "placeholder"}

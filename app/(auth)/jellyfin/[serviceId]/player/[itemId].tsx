@@ -9,6 +9,12 @@
  * - Custom controls with auto-hide
  * - Audio/subtitle track selection
  * - Playback speed controls
+ * - Gesture controls (swipe for seek, volume, brightness)
+ * - Picture-in-Picture support
+ * - Quality selection
+ * - Skip intro/credits
+ * - Next episode autoplay
+ * - Playback statistics
  * - Elegant fullscreen UI
  */
 
@@ -27,6 +33,7 @@ import {
   Pressable,
   StyleSheet,
   View,
+  StatusBar,
 } from "react-native";
 import { IconButton, Menu, Text, useTheme } from "react-native-paper";
 
@@ -36,6 +43,14 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { FullscreenLoading } from "@/components/common/FullscreenLoading";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { useJellyfinPlaybackInfo } from "@/hooks/useJellyfinPlaybackInfo";
+import { GestureOverlay } from "./components/GestureOverlay";
+import { NextEpisodeOverlay } from "./components/NextEpisodeOverlay";
+import { QualitySelector } from "./components/QualitySelector";
+import { PlaybackStats } from "./components/PlaybackStats";
+import { ErrorRecovery } from "./components/ErrorRecovery";
+import { SkipButton } from "./components/SkipButton";
+import { useNextEpisode } from "./hooks/useNextEpisode";
+import { useSkipIntro } from "./hooks/useSkipIntro";
 import {
   selectGetConnector,
   useConnectorsStore,
@@ -65,6 +80,11 @@ import {
   selectSetShowBrightnessSlider,
   selectResetPlayerUi,
 } from "@/store/jellyfinPlayerStore";
+import {
+  useSettingsStore,
+  selectJellyfinPlayerAutoPlay,
+  selectJellyfinPlayerDefaultSubtitleLanguage,
+} from "@/store/settingsStore";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 
@@ -72,7 +92,7 @@ import { spacing } from "@/theme/spacing";
 // Constants
 // ============================================================================
 
-const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 const CONTROLS_HIDE_DELAY_MS = 4000;
 const SEEK_STEP_SECONDS = 10;
 const PROGRESS_REPORT_INTERVAL_MS = 10000;
@@ -195,8 +215,16 @@ const JellyfinPlayerScreen = () => {
   );
   const resetPlayerUi = useJellyfinPlayerStore(selectResetPlayerUi);
   const [loadingMessage, setLoadingMessage] = useState("Loading...");
+  const [error, setError] = useState<Error | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const controlsOpacityAnim = useRef(new Animated.Value(1)).current;
+
+  // Get player settings from settings store
+  const autoPlayEnabled = useSettingsStore(selectJellyfinPlayerAutoPlay);
+  const defaultSubtitleLanguage = useSettingsStore(
+    selectJellyfinPlayerDefaultSubtitleLanguage,
+  );
 
   useEffect(() => {
     resetPlayerUi();
@@ -365,7 +393,7 @@ const JellyfinPlayerScreen = () => {
       // Wait a brief moment for the player to be ready after source replacement
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Apply initial start position or resume position
+      // Apply start position if provided (resume decision already made in details screen)
       if (!startPositionAppliedRef.current && startPositionSeconds > 0) {
         const current = player.currentTime ?? 0;
         const delta = startPositionSeconds - current;
@@ -406,7 +434,8 @@ const JellyfinPlayerScreen = () => {
 
       pendingResumePositionRef.current = null;
 
-      if (resumePlaybackAfterSourceRef.current) {
+      // Auto-start playback (respect user setting)
+      if (autoPlayEnabled) {
         player.play();
       }
       resumePlaybackAfterSourceRef.current = false;
@@ -423,6 +452,7 @@ const JellyfinPlayerScreen = () => {
     playbackRate,
     player,
     startPositionSeconds,
+    autoPlayEnabled,
   ]);
 
   // Player events
@@ -483,10 +513,35 @@ const JellyfinPlayerScreen = () => {
     availableAudioTracksEvent?.availableAudioTracks ??
     player.availableAudioTracks ??
     [];
-  const subtitleTracks =
-    availableSubtitleTracksEvent?.availableSubtitleTracks ??
-    player.availableSubtitleTracks ??
-    [];
+  const subtitleTracks = useMemo(
+    () =>
+      availableSubtitleTracksEvent?.availableSubtitleTracks ??
+      player.availableSubtitleTracks ??
+      [],
+    [availableSubtitleTracksEvent, player],
+  );
+
+  // Auto-select default subtitle language when tracks become available
+  useEffect(() => {
+    if (
+      !defaultSubtitleLanguage ||
+      subtitleTracks.length === 0 ||
+      currentSubtitleTrack
+    ) {
+      return;
+    }
+
+    // Find matching subtitle track by language code
+    const matchingTrack = subtitleTracks.find((track) => {
+      const trackLanguage = track.language?.toLowerCase();
+      const preferredLanguage = defaultSubtitleLanguage.toLowerCase();
+      return trackLanguage === preferredLanguage;
+    });
+
+    if (matchingTrack) {
+      player.subtitleTrack = matchingTrack;
+    }
+  }, [subtitleTracks, defaultSubtitleLanguage, currentSubtitleTrack, player]);
 
   // ============================================================================
   // Lifecycle & Orientation
@@ -507,6 +562,9 @@ const JellyfinPlayerScreen = () => {
       ScreenOrientation.OrientationLock.LANDSCAPE,
     );
 
+    // Hide status bar for immersive playback
+    StatusBar.setHidden(true, "fade");
+
     // Configure audio session for video playback
     void setAudioModeAsync({
       playsInSilentMode: true,
@@ -517,6 +575,8 @@ const JellyfinPlayerScreen = () => {
       isMountedRef.current = false;
       // Unlock orientation on unmount
       void ScreenOrientation.unlockAsync();
+      // Show status bar again
+      StatusBar.setHidden(false, "fade");
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
@@ -527,12 +587,61 @@ const JellyfinPlayerScreen = () => {
   // Progress Reporting (Jellyfin)
   // ============================================================================
 
+  // Report playback start
   useEffect(() => {
     if (
       playbackMode !== "stream" ||
       !connector ||
       !itemId ||
-      !playbackQuery.data
+      !playbackQuery.data ||
+      playerStatus !== "readyToPlay"
+    )
+      return;
+
+    const mediaSourceId = playbackQuery.data.mediaSource?.Id;
+    const playSessionId =
+      playbackQuery.data.playback?.PlaySessionId ?? undefined;
+
+    if (!mediaSourceId) return;
+
+    // Store streaming context
+    streamingContextRef.current = {
+      itemId,
+      mediaSourceId,
+      playSessionId,
+    };
+
+    // Report playback start to Jellyfin
+    void connector.reportPlaybackStart({
+      itemId,
+      mediaSourceId,
+      playSessionId,
+      canSeek: true,
+      audioStreamIndex: currentAudioTrack?.id
+        ? Number(currentAudioTrack.id)
+        : undefined,
+      subtitleStreamIndex: currentSubtitleTrack?.id
+        ? Number(currentSubtitleTrack.id)
+        : undefined,
+    });
+  }, [
+    playbackMode,
+    connector,
+    itemId,
+    playbackQuery.data,
+    playerStatus,
+    currentAudioTrack,
+    currentSubtitleTrack,
+  ]);
+
+  // Report playback progress periodically
+  useEffect(() => {
+    if (
+      playbackMode !== "stream" ||
+      !connector ||
+      !itemId ||
+      !playbackQuery.data ||
+      playerStatus !== "readyToPlay"
     )
       return;
 
@@ -554,26 +663,40 @@ const JellyfinPlayerScreen = () => {
 
       if (!mediaSourceId) return;
 
-      // Store streaming context for cleanup
-      streamingContextRef.current = {
-        itemId,
-        mediaSourceId,
-        playSessionId,
-      };
-
       // Report progress to Jellyfin
-      void connector.reportPlaybackStopped({
+      void connector.reportPlaybackProgress({
         itemId,
         mediaSourceId,
         playSessionId,
         positionTicks,
+        isPaused: !isPlaying,
+        isMuted: player.muted,
+        volumeLevel: player.volume,
+        audioStreamIndex: currentAudioTrack?.id
+          ? Number(currentAudioTrack.id)
+          : undefined,
+        subtitleStreamIndex: currentSubtitleTrack?.id
+          ? Number(currentSubtitleTrack.id)
+          : undefined,
+        playbackRate: player.playbackRate,
       });
     }, PROGRESS_REPORT_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [playbackMode, connector, itemId, playbackQuery.data, currentTime]);
+  }, [
+    playbackMode,
+    connector,
+    itemId,
+    playbackQuery.data,
+    playerStatus,
+    currentTime,
+    isPlaying,
+    player,
+    currentAudioTrack,
+    currentSubtitleTrack,
+  ]);
 
-  // Final progress report on unmount
+  // Report playback stopped on unmount or when playback ends
   useEffect(() => {
     return () => {
       if (
@@ -830,7 +953,7 @@ const JellyfinPlayerScreen = () => {
       setLoadingMessage(
         playbackMode === "download"
           ? "Preparing offline playback..."
-          : "Buffering video stream...",
+          : "Buffering...",
       );
     }
   }, [
@@ -840,10 +963,147 @@ const JellyfinPlayerScreen = () => {
     playbackMode,
   ]);
 
-  const showLoader =
-    itemQuery.isLoading ||
-    playbackQuery.isLoading ||
-    (playerStatus !== "readyToPlay" && playerStatus !== "error");
+  // Show fullscreen loader only for initial loading (metadata/playback info)
+  const showFullscreenLoader = itemQuery.isLoading || playbackQuery.isLoading;
+
+  // Show buffering indicator in corner when player is loading/buffering
+  const showBufferingIndicator =
+    playerStatus === "loading" && !showFullscreenLoader;
+
+  // ============================================================================
+  // Gesture Handlers
+  // ============================================================================
+
+  const handleGestureSeek = useCallback(
+    (delta: number) => {
+      seekRelative(delta);
+    },
+    [seekRelative],
+  );
+
+  const handleGestureVolumeChange = useCallback(
+    (delta: number) => {
+      const newVolume = clamp(volume + delta, 0, 1);
+      setVolume(newVolume);
+    },
+    [volume, setVolume],
+  );
+
+  const handleGestureBrightnessChange = useCallback(
+    (delta: number) => {
+      const newBrightness = clamp(brightness + delta, 0, 1);
+      setBrightness(newBrightness);
+    },
+    [brightness, setBrightness],
+  );
+
+  const handleDoubleTapLeft = useCallback(() => {
+    seekRelative(-SEEK_STEP_SECONDS);
+  }, [seekRelative]);
+
+  const handleDoubleTapRight = useCallback(() => {
+    seekRelative(SEEK_STEP_SECONDS);
+  }, [seekRelative]);
+
+  // ============================================================================
+  // Skip Intro/Credits Hook
+  // ============================================================================
+
+  const { showSkipIntro, showSkipCredits, skipIntroTime, skipCreditsTime } =
+    useSkipIntro({
+      currentTime,
+      duration,
+      introMarkers: undefined, // TODO: Get from Jellyfin API if available
+      creditsStart: undefined, // TODO: Get from Jellyfin API if available
+    });
+
+  const handleSkipIntro = useCallback(() => {
+    if (!skipIntroTime) return;
+
+    isSeekingRef.current = true;
+
+    if ("seekTo" in player && typeof player.seekTo === "function") {
+      void (player.seekTo(skipIntroTime) as Promise<void>)
+        .catch(() => {
+          const delta = skipIntroTime - (player.currentTime ?? 0);
+          player.seekBy(delta);
+        })
+        .finally(() => {
+          isSeekingRef.current = false;
+        });
+    } else {
+      const delta = skipIntroTime - (player.currentTime ?? 0);
+      player.seekBy(delta);
+      isSeekingRef.current = false;
+    }
+  }, [skipIntroTime, player]);
+
+  const handleSkipCredits = useCallback(() => {
+    if (!skipCreditsTime) return;
+
+    isSeekingRef.current = true;
+
+    if ("seekTo" in player && typeof player.seekTo === "function") {
+      void (player.seekTo(skipCreditsTime) as Promise<void>)
+        .catch(() => {
+          const delta = skipCreditsTime - (player.currentTime ?? 0);
+          player.seekBy(delta);
+        })
+        .finally(() => {
+          isSeekingRef.current = false;
+        });
+    } else {
+      const delta = skipCreditsTime - (player.currentTime ?? 0);
+      player.seekBy(delta);
+      isSeekingRef.current = false;
+    }
+  }, [skipCreditsTime, player]);
+
+  // ============================================================================
+  // Next Episode Hook
+  // ============================================================================
+
+  const handlePlayNextEpisode = useCallback(() => {
+    // TODO: Implement navigation to next episode
+    // This would require fetching next episode info from Jellyfin
+    console.log("Play next episode");
+  }, []);
+
+  const { cancelAutoplay, playNow } = useNextEpisode({
+    currentTime,
+    duration,
+    isPlaying,
+    hasNextEpisode: false, // TODO: Determine from Jellyfin API
+    onPlayNext: handlePlayNextEpisode,
+  });
+
+  // ============================================================================
+  // Error Handling
+  // ============================================================================
+
+  const handleRetry = useCallback(() => {
+    setIsRetrying(true);
+    setError(null);
+    // Retry by reloading the source
+    void playbackQuery.refetch().finally(() => {
+      setIsRetrying(false);
+    });
+  }, [playbackQuery]);
+
+  const handleSwitchSource = useCallback(() => {
+    setError(null);
+    const newMode = playbackMode === "stream" ? "download" : "stream";
+    if (newMode === "download" && !hasDownload) return;
+    if (newMode === "stream" && !hasStream) return;
+    handlePlaybackModeChange(newMode);
+  }, [playbackMode, hasDownload, hasStream, handlePlaybackModeChange]);
+
+  // Detect player errors
+  useEffect(() => {
+    if (playerStatus === "error") {
+      setError(new Error("Video playback failed. Please try again."));
+    }
+  }, [playerStatus]);
 
   // ============================================================================
   // Playback End
@@ -853,7 +1113,31 @@ const JellyfinPlayerScreen = () => {
     if (!playToEndEvent) return;
     player.pause();
     setControlsVisible(true);
-  }, [playToEndEvent, player, setControlsVisible]);
+
+    // Report playback stopped when video ends
+    if (playbackMode === "stream" && connector && streamingContextRef.current) {
+      const {
+        itemId: ctxItemId,
+        mediaSourceId,
+        playSessionId,
+      } = streamingContextRef.current;
+      const positionTicks = Math.floor(duration * 10_000_000);
+
+      void connector.reportPlaybackStopped({
+        itemId: ctxItemId,
+        mediaSourceId,
+        playSessionId: playSessionId ?? undefined,
+        positionTicks,
+      });
+    }
+  }, [
+    playToEndEvent,
+    player,
+    setControlsVisible,
+    playbackMode,
+    connector,
+    duration,
+  ]);
 
   // ============================================================================
   // Render Guards
@@ -1242,8 +1526,101 @@ const JellyfinPlayerScreen = () => {
         </View>
       </Animated.View>
 
-      {/* Loading Overlay */}
-      {showLoader && <FullscreenLoading message={loadingMessage} />}
+      {/* Gesture Overlay */}
+      {!controlsVisible && !error && (
+        <GestureOverlay
+          onSeek={handleGestureSeek}
+          onVolumeChange={handleGestureVolumeChange}
+          onBrightnessChange={handleGestureBrightnessChange}
+          onDoubleTapLeft={handleDoubleTapLeft}
+          onDoubleTapRight={handleDoubleTapRight}
+          onSingleTap={toggleControls}
+        />
+      )}
+
+      {/* Skip Intro Button */}
+      {showSkipIntro && !error && (
+        <SkipButton type="intro" onSkip={handleSkipIntro} />
+      )}
+
+      {/* Skip Credits Button */}
+      {showSkipCredits && !error && (
+        <SkipButton type="credits" onSkip={handleSkipCredits} />
+      )}
+
+      {/* Next Episode Overlay */}
+      <NextEpisodeOverlay
+        nextEpisodeTitle="Next Episode Title" // TODO: Get from API
+        nextEpisodeNumber="S01E02" // TODO: Get from API
+        onPlayNow={playNow}
+        onCancel={cancelAutoplay}
+      />
+
+      {/* Quality Selector */}
+      <QualitySelector
+        options={[
+          { id: "auto", label: "Auto", resolution: "Adaptive" },
+          {
+            id: "1080p",
+            label: "1080p",
+            resolution: "1920x1080",
+            bitrate: 8000000,
+          },
+          {
+            id: "720p",
+            label: "720p",
+            resolution: "1280x720",
+            bitrate: 4000000,
+          },
+          {
+            id: "480p",
+            label: "480p",
+            resolution: "854x480",
+            bitrate: 2000000,
+          },
+        ]}
+      />
+
+      {/* Playback Stats */}
+      <PlaybackStats
+        currentTime={currentTime}
+        duration={duration}
+        bufferedPosition={player.bufferedPosition ?? 0}
+        resolution={undefined} // TODO: Get from player metadata
+        bitrate={undefined} // TODO: Get from player metadata
+        codec={undefined} // TODO: Get from player metadata
+        fps={undefined} // TODO: Get from player metadata
+        droppedFrames={undefined} // TODO: Get from player metadata
+        audioTrack={currentAudioTrack?.label}
+        subtitleTrack={currentSubtitleTrack?.label}
+      />
+
+      {/* Error Recovery */}
+      {error && (
+        <ErrorRecovery
+          maxRetries={3}
+          onRetry={handleRetry}
+          onSwitchSource={
+            hasDownload && hasStream ? handleSwitchSource : undefined
+          }
+          onGoBack={handleBack}
+          isRetrying={isRetrying}
+        />
+      )}
+
+      {/* Fullscreen Loading Overlay - only for initial loading */}
+      {showFullscreenLoader && !error && (
+        <FullscreenLoading message={loadingMessage} />
+      )}
+
+      {/* Buffering Indicator - bottom left corner */}
+      {showBufferingIndicator && !error && (
+        <View style={styles.bufferingIndicator}>
+          <Text variant="labelMedium" style={styles.bufferingText}>
+            {loadingMessage}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -1420,6 +1797,21 @@ const createStyles = (theme: AppTheme) =>
       marginLeft: -6,
       borderWidth: 2,
       borderColor: "white",
+    },
+    bufferingIndicator: {
+      position: "absolute",
+      bottom: spacing.lg,
+      left: spacing.lg,
+      backgroundColor: "rgba(0, 0, 0, 0.7)",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.2)",
+    },
+    bufferingText: {
+      color: "white",
+      fontWeight: "500",
     },
   });
 

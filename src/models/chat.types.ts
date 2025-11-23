@@ -121,6 +121,8 @@ export interface ConversationState {
 
 export interface AssistantConfig {
   enableStreaming: boolean;
+  /** Streaming method to use: 'sse' (Server-Sent Events) or 'fetch' (ReadableStream) */
+  streamingMethod?: "sse" | "fetch";
   maxHistoryLength: number;
   autoSaveSessions: boolean;
   showTokenCount: boolean;

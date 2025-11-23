@@ -291,6 +291,12 @@ export const queryKeys = {
         "search",
         { term, options },
       ] as const,
+    seriesEpisodes: (serviceId: string, seriesId: string): QueryKeyBuilder =>
+      [
+        ...queryKeys.jellyfin.service(serviceId),
+        "seriesEpisodes",
+        seriesId,
+      ] as const,
   },
   qbittorrent: {
     base: ["qbittorrent"] as const,
@@ -375,10 +381,41 @@ export const queryKeys = {
   },
   discover: {
     base: ["discover"] as const,
-    unified: ["discover", "unified"] as const,
-    releases: ["discover", "releases"] as const,
-    jikanDetail: (malId: number): QueryKeyBuilder =>
-      ["discover", "jikan", "detail", malId] as const,
+    unified: (options?: { tmdbEnabled?: boolean }): QueryKeyBuilder =>
+      ["discover", "unified", options ?? {}] as const,
+    releases: (params?: {
+      mediaType?: string;
+      tmdbId?: number;
+      tvdbId?: number;
+      imdbId?: string;
+      preferQuality?: boolean;
+      minSeeders?: number;
+    }): QueryKeyBuilder => ["discover", "releases", params ?? {}] as const,
+    jikan: {
+      base: ["discover", "jikan"] as const,
+      top: (page?: number): QueryKeyBuilder =>
+        ["discover", "jikan", "top", page ?? 1] as const,
+      recommendationsList: (page?: number): QueryKeyBuilder =>
+        ["discover", "jikan", "recommendations", page ?? 1] as const,
+      seasons: {
+        now: ["discover", "jikan", "seasons", "now"] as const,
+        upcoming: ["discover", "jikan", "seasons", "upcoming"] as const,
+      },
+      detail: (malId: number): QueryKeyBuilder =>
+        ["discover", "jikan", "detail", malId] as const,
+      detailRecommendations: (malId: number): QueryKeyBuilder =>
+        ["discover", "jikan", "detail", malId, "recommendations"] as const,
+      reviews: (malId: number): QueryKeyBuilder =>
+        ["discover", "jikan", "detail", malId, "reviews"] as const,
+      pictures: (malId: number): QueryKeyBuilder =>
+        ["discover", "jikan", "detail", malId, "pictures"] as const,
+      episodes: (malId: number): QueryKeyBuilder =>
+        ["discover", "jikan", "detail", malId, "episodes"] as const,
+      statistics: (malId: number): QueryKeyBuilder =>
+        ["discover", "jikan", "detail", malId, "statistics"] as const,
+      streaming: (malId: number): QueryKeyBuilder =>
+        ["discover", "jikan", "detail", malId, "streaming"] as const,
+    },
   },
   app: {
     base: ["app"] as const,
@@ -452,6 +489,23 @@ export const queryKeys = {
         ["tmdb", "person", "externalIds", personId] as const,
     },
   },
+  prowlarr: {
+    base: ["prowlarr"] as const,
+    service: (serviceId: string): QueryKeyBuilder =>
+      ["prowlarr", serviceId] as const,
+    indexers: (serviceId: string): QueryKeyBuilder =>
+      ["prowlarr", serviceId, "indexers"] as const,
+    statistics: (serviceId: string): QueryKeyBuilder =>
+      ["prowlarr", serviceId, "statistics"] as const,
+    indexerSchema: (serviceId: string): QueryKeyBuilder =>
+      ["prowlarr", serviceId, "indexerSchema"] as const,
+    search: (
+      serviceId: string,
+      query: string,
+      options?: Record<string, unknown>,
+    ): QueryKeyBuilder =>
+      ["prowlarr", serviceId, "search", { query, options }] as const,
+  },
   bazarr: {
     base: ["bazarr"] as const,
     service: (serviceId: string): QueryKeyBuilder =>
@@ -512,6 +566,38 @@ export const queryKeys = {
       ["recommendations", userId] as const,
     contentGaps: (userId: string): QueryKeyBuilder =>
       ["recommendations", userId, "contentGaps"] as const,
+    notInterested: (userId: string): QueryKeyBuilder =>
+      ["recommendations", userId, "notInterested"] as const,
+  },
+  library: {
+    base: ["library"] as const,
+    checkInLibrary: (params: {
+      tmdbId?: number;
+      tvdbId?: number;
+      imdbId?: string | number;
+      mediaType?: string;
+    }): QueryKeyBuilder =>
+      [
+        "library",
+        "check-in-library",
+        params.tmdbId,
+        params.tvdbId,
+        params.imdbId,
+        params.mediaType,
+      ] as const,
+    batchCheckInLibrary: (itemIds: string[]): QueryKeyBuilder =>
+      ["library", "batch-check-in-library", itemIds.join(",")] as const,
+  },
+  logs: {
+    base: ["logs"] as const,
+    aggregated: (serviceIds?: string[]): QueryKeyBuilder =>
+      ["logs", "aggregated", { serviceIds: serviceIds ?? [] }] as const,
+    cacheTimestamp: (cacheKey: string): QueryKeyBuilder =>
+      ["logs", "cacheTimestamp", cacheKey] as const,
+  },
+  offline: {
+    base: ["offline"] as const,
+    action: ["offline", "offline-action"] as const,
   },
 } as const;
 

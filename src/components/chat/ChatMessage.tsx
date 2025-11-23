@@ -1,11 +1,12 @@
 import React, { memo, useEffect, useMemo, useState, useRef } from "react";
 import { Pressable, StyleSheet, View, Animated } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { AIMessageCard } from "./AIMessageCard";
 import { ConfirmationPrompt } from "./ConfirmationPrompt";
 import { WorkflowProgress } from "./WorkflowProgress";
 import { WebSearchResults } from "./WebSearchResults";
 import { MediaDetailsCard } from "./MediaDetailsCard";
-import { Text, IconButton } from "react-native-paper";
+import { Text, IconButton, Snackbar } from "react-native-paper";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import { formatResponseTime, formatTokens } from "@/utils/formatting.utils";
 import AppMarkdown from "@/components/markdown/AppMarkdown";
@@ -36,8 +37,13 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
   const isUser = message.role === "user";
   const [indicatorDots, setIndicatorDots] = useState(".");
   const [isConfirming, setIsConfirming] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
   const chatTextSize = useConversationalAIStore((s) => s.config.chatTextSize);
   const aiChat = useAIChat();
+  const createSession = useConversationalAIStore((s) => s.createSession);
+  const sessions = useConversationalAIStore((s) => s.sessions);
 
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const translateXAnim = useRef(new Animated.Value(0)).current;
@@ -105,6 +111,28 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
     }
   }, [message.timestamp]);
 
+  const metadata = useMemo(() => {
+    if (!message.metadata) return null;
+
+    const durationMs = message.metadata.duration ?? 0;
+    const totalTokens =
+      message.metadata.tokens ?? message.metadata.usage?.totalTokens ?? 0;
+
+    // Calculate throughput (tokens/sec)
+    // Avoid division by zero
+    const throughput =
+      durationMs > 0 && totalTokens > 0
+        ? (totalTokens / (durationMs / 1000)).toFixed(1)
+        : null;
+
+    return {
+      duration: durationMs,
+      tokens: totalTokens,
+      throughput,
+      usage: message.metadata.usage,
+    };
+  }, [message.metadata]);
+
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -127,12 +155,41 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
         },
         bubbleContainer: {
           maxWidth: "100%",
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          borderRadius: 20,
+          paddingHorizontal: 18,
+          paddingVertical: 12,
+          borderRadius: 26,
+          borderBottomRightRadius: isUser ? 4 : 26,
+          borderBottomLeftRadius: isUser ? 26 : 4,
+          backgroundColor: isUser ? theme.colors.primary : theme.colors.surface,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.08,
+          shadowRadius: 3,
+          elevation: 2,
+          position: "relative",
+        },
+        actionButtons: {
+          position: isUser ? undefined : "absolute",
+          top: isUser ? undefined : 8,
+          right: isUser ? undefined : 8,
+          flexDirection: "row",
+          gap: 4,
           backgroundColor: isUser
-            ? theme.colors.primary
-            : theme.colors.surfaceVariant,
+            ? "rgba(0,0,0,0.15)"
+            : "rgba(255,255,255,0.9)",
+          borderRadius: 16,
+          padding: 2,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+        timestampRow: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
         },
         messageText: {
           color: isUser
@@ -187,15 +244,7 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
           alignSelf: isUser ? "flex-end" : "flex-start",
         },
       }),
-    [
-      isUser,
-      theme.colors.primary,
-      theme.colors.surfaceVariant,
-      theme.colors.onPrimary,
-      theme.colors.onSurfaceVariant,
-      theme.colors.error,
-      chatTextSize,
-    ],
+    [isUser, theme, chatTextSize],
   );
 
   const showTokenCount = useConversationalAIStore(
@@ -253,6 +302,57 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
     }
   };
 
+  const handleCopy = async () => {
+    try {
+      await Clipboard.setStringAsync(message.text);
+      setSnackbarMessage("Copied to clipboard");
+      setSnackbarVisible(true);
+    } catch {
+      setSnackbarMessage("Failed to copy");
+      setSnackbarVisible(true);
+    }
+  };
+
+  const handleBranch = () => {
+    // Get all messages up to and including this message
+    const store = useConversationalAIStore.getState();
+    const currentMessages = store.messages;
+    const messageIndex = currentMessages.findIndex((m) => m.id === message.id);
+
+    if (messageIndex === -1) {
+      setSnackbarMessage("Failed to branch conversation");
+      setSnackbarVisible(true);
+      return;
+    }
+
+    // Create a new session with messages up to this point
+    const branchedMessages = currentMessages.slice(0, messageIndex + 1);
+    const timestamp = new Date().toLocaleString();
+    const newSessionId = createSession(`Branch - ${timestamp}`);
+
+    // Load the new session and set its messages
+    if (newSessionId) {
+      const newSession = sessions.get(newSessionId);
+      if (newSession) {
+        const updatedSessions = new Map(sessions);
+        updatedSessions.set(newSessionId, {
+          ...newSession,
+          messages: branchedMessages,
+          updatedAt: new Date(),
+        });
+
+        useConversationalAIStore.setState({
+          sessions: updatedSessions,
+          currentSessionId: newSessionId,
+          messages: branchedMessages,
+        });
+
+        setSnackbarMessage("Branched into new conversation");
+        setSnackbarVisible(true);
+      }
+    }
+  };
+
   return (
     <Animated.View
       style={{
@@ -279,6 +379,34 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
 
         <View style={styles.content}>
           <View style={styles.bubbleContainer}>
+            {/* Action buttons - floating absolutely positioned for AI, inline for user */}
+            {!isUser && !message.isStreaming && message.text.length > 0 && (
+              <View style={styles.actionButtons}>
+                <IconButton
+                  icon="content-copy"
+                  size={14}
+                  onPress={handleCopy}
+                  style={{
+                    margin: 0,
+                    width: 28,
+                    height: 28,
+                  }}
+                  iconColor={theme.colors.onSurfaceVariant}
+                />
+                <IconButton
+                  icon="source-branch"
+                  size={14}
+                  onPress={handleBranch}
+                  style={{
+                    margin: 0,
+                    width: 28,
+                    height: 28,
+                  }}
+                  iconColor={theme.colors.onSurfaceVariant}
+                />
+              </View>
+            )}
+
             {isUser ? (
               <Text style={styles.messageText}>{message.text}</Text>
             ) : (
@@ -301,61 +429,88 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
             {/* Tool Invocations */}
             {message.toolInvocations && message.toolInvocations.length > 0 ? (
               <View style={{ marginTop: 8, gap: 4 }}>
-                {message.toolInvocations.map((invocation) => (
-                  <View
-                    key={invocation.toolCallId}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                      paddingVertical: 4,
-                      paddingHorizontal: 8,
-                      borderRadius: 8,
-                      backgroundColor: isUser
-                        ? "rgba(255,255,255,0.1)"
-                        : theme.colors.surface,
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name={
-                        invocation.state === "completed"
-                          ? "check-circle"
-                          : invocation.state === "failed"
-                            ? "alert-circle"
-                            : invocation.state === "executing"
-                              ? "loading"
-                              : "clock-outline"
-                      }
-                      size={14}
-                      color={
-                        invocation.state === "completed"
-                          ? theme.colors.primary
-                          : invocation.state === "failed"
-                            ? theme.colors.error
-                            : isUser
-                              ? "rgba(255,255,255,0.7)"
-                              : theme.colors.onSurfaceVariant
-                      }
-                    />
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: isUser
-                          ? "rgba(255,255,255,0.8)"
-                          : theme.colors.onSurfaceVariant,
-                        fontWeight: "500",
+                {message.toolInvocations.map((invocation) => {
+                  const errorMessage =
+                    invocation.state === "failed" &&
+                    invocation.result &&
+                    typeof invocation.result === "object"
+                      ? (invocation.result as any).error
+                      : null;
+
+                  return (
+                    <Pressable
+                      key={invocation.toolCallId}
+                      onPress={() => {
+                        if (invocation.state === "failed" && errorMessage) {
+                          setSnackbarMessage(
+                            `${invocation.toolName} failed: ${errorMessage}`,
+                          );
+                          setSnackbarVisible(true);
+                        }
                       }}
+                      style={({ pressed }) => ({
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                        paddingVertical: 6,
+                        paddingHorizontal: 10,
+                        borderRadius: 16,
+                        backgroundColor:
+                          invocation.state === "failed"
+                            ? isUser
+                              ? "rgba(255,100,100,0.2)"
+                              : theme.colors.errorContainer
+                            : isUser
+                              ? "rgba(255,255,255,0.15)"
+                              : theme.colors.surfaceVariant,
+                        opacity: pressed ? 0.7 : 1,
+                      })}
                     >
-                      {invocation.state === "executing"
-                        ? `🔧 ${invocation.toolName}...`
-                        : invocation.state === "completed"
-                          ? `✓ ${invocation.toolName}`
-                          : invocation.state === "failed"
-                            ? `✗ ${invocation.toolName}`
-                            : invocation.toolName}
-                    </Text>
-                  </View>
-                ))}
+                      <MaterialCommunityIcons
+                        name={
+                          invocation.state === "completed"
+                            ? "check-circle"
+                            : invocation.state === "failed"
+                              ? "alert-circle"
+                              : invocation.state === "executing"
+                                ? "loading"
+                                : "clock-outline"
+                        }
+                        size={14}
+                        color={
+                          invocation.state === "completed"
+                            ? theme.colors.primary
+                            : invocation.state === "failed"
+                              ? theme.colors.error
+                              : isUser
+                                ? "rgba(255,255,255,0.7)"
+                                : theme.colors.onSurfaceVariant
+                        }
+                      />
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color:
+                            invocation.state === "failed"
+                              ? theme.colors.error
+                              : isUser
+                                ? "rgba(255,255,255,0.8)"
+                                : theme.colors.onSurfaceVariant,
+                          fontWeight: "500",
+                          flex: 1,
+                        }}
+                      >
+                        {invocation.state === "executing"
+                          ? `🔧 ${invocation.toolName}...`
+                          : invocation.state === "completed"
+                            ? `✓ ${invocation.toolName}`
+                            : invocation.state === "failed"
+                              ? `✗ ${invocation.toolName} (tap for details)`
+                              : invocation.toolName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             ) : null}
 
@@ -365,143 +520,116 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
                 gap: 4,
               }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-start",
-                  alignItems: "center",
-                  gap: theme.custom.spacing.xs,
-                }}
+              <Pressable
+                onLongPress={() => setShowDetails(!showDetails)}
+                delayLongPress={200}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.7 : 1,
+                })}
               >
-                {timestampLabel && !message.isStreaming ? (
-                  <Text style={styles.timestamp}>{timestampLabel}</Text>
-                ) : null}
-                {showTokenCount &&
-                !message.isStreaming &&
-                (message.metadata?.duration !== undefined ||
-                  message.metadata?.tokens !== undefined) ? (
-                  <Text style={styles.metadataText}>
-                    {message.metadata?.duration !== undefined
-                      ? `${formatResponseTime(message.metadata?.duration)} `
-                      : ""}
-                    {message.metadata?.tokens !== undefined
-                      ? ` • ${formatTokens(message.metadata?.tokens)} tokens`
-                      : ""}
-                  </Text>
-                ) : null}
-                {!isUser &&
-                message.metadata?.thinking &&
-                !message.isStreaming ? (
-                  <IconButton
-                    icon="lightbulb-on"
-                    size={16}
-                    onPress={handleShowThinking}
-                    style={{ margin: 0 }}
-                  />
-                ) : null}
-              </View>
-
-              {/* Display reasoning text if available and Meta toggle is on */}
-              {showTokenCount &&
-              !isUser &&
-              !message.isStreaming &&
-              message.metadata?.reasoningText ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "flex-start",
-                    gap: 4,
-                    paddingTop: 2,
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name="brain"
-                    size={12}
-                    color={
-                      isUser
-                        ? "rgba(255,255,255,0.6)"
-                        : theme.colors.onSurfaceVariant
-                    }
-                    style={{ marginTop: 1 }}
-                  />
-                  <Text
-                    style={[
-                      styles.metadataText,
-                      { flex: 1, fontStyle: "italic" },
-                    ]}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                  >
-                    {message.metadata.reasoningText}
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Display usage metadata if available and Meta toggle is on */}
-              {showTokenCount &&
-              !isUser &&
-              !message.isStreaming &&
-              message.metadata?.usage &&
-              typeof message.metadata.usage === "object" &&
-              message.metadata.usage !== null ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    paddingTop: 2,
-                  }}
-                >
-                  {Object.entries(
-                    message.metadata.usage as Record<string, unknown>,
-                  ).map(([key, value]) => {
-                    // Map usage keys to appropriate icons
-                    const getIconForKey = (k: string) => {
-                      const lowerKey = k.toLowerCase();
-                      if (
-                        lowerKey.includes("prompt") ||
-                        lowerKey.includes("input")
-                      )
-                        return "message-text-outline" as const;
-                      if (
-                        lowerKey.includes("completion") ||
-                        lowerKey.includes("output")
-                      )
-                        return "message-reply-text-outline" as const;
-                      if (lowerKey.includes("total")) return "sigma" as const;
-                      if (lowerKey.includes("reasoning"))
-                        return "brain" as const;
-                      if (lowerKey.includes("cache")) return "cached" as const;
-                      return "circle-small" as const;
-                    };
-
-                    return (
-                      <View
-                        key={key}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 3,
-                        }}
-                      >
-                        <MaterialCommunityIcons
-                          name={getIconForKey(key)}
-                          size={12}
-                          color={
-                            isUser
-                              ? "rgba(255,255,255,0.6)"
-                              : theme.colors.onSurfaceVariant
-                          }
+                {isUser ? (
+                  <View style={styles.timestampRow}>
+                    {timestampLabel ? (
+                      <Text style={styles.timestamp}>{timestampLabel}</Text>
+                    ) : null}
+                    {!message.isStreaming && message.text.length > 0 && (
+                      <View style={styles.actionButtons}>
+                        <IconButton
+                          icon="content-copy"
+                          size={14}
+                          onPress={handleCopy}
+                          style={{
+                            margin: 0,
+                            width: 28,
+                            height: 28,
+                          }}
+                          iconColor="rgba(255,255,255,0.9)"
                         />
-                        <Text style={[styles.metadataText, { flexShrink: 1 }]}>
-                          {String(value)}
-                        </Text>
+                        <IconButton
+                          icon="source-branch"
+                          size={14}
+                          onPress={handleBranch}
+                          style={{
+                            margin: 0,
+                            width: 28,
+                            height: 28,
+                          }}
+                          iconColor="rgba(255,255,255,0.9)"
+                        />
                       </View>
-                    );
-                  })}
-                </View>
-              ) : null}
+                    )}
+                  </View>
+                ) : (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-start",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: theme.custom.spacing.xs,
+                    }}
+                  >
+                    {timestampLabel ? (
+                      <Text style={styles.timestamp}>{timestampLabel}</Text>
+                    ) : null}
+
+                    {showTokenCount && !message.isStreaming && metadata ? (
+                      <>
+                        {metadata.duration > 0 && (
+                          <Text style={styles.metadataText}>
+                            • {formatResponseTime(metadata.duration / 1000)}
+                          </Text>
+                        )}
+
+                        {metadata.tokens > 0 && (
+                          <Text style={styles.metadataText}>
+                            • {formatTokens(metadata.tokens)} tokens
+                          </Text>
+                        )}
+
+                        {metadata.throughput && (
+                          <Text style={styles.metadataText}>
+                            • {metadata.throughput} t/s
+                          </Text>
+                        )}
+                      </>
+                    ) : null}
+
+                    {!isUser &&
+                    message.metadata?.thinking &&
+                    !message.isStreaming ? (
+                      <IconButton
+                        icon="lightbulb-on"
+                        size={16}
+                        onPress={handleShowThinking}
+                        style={{ margin: 0, width: 20, height: 20 }}
+                        iconColor={theme.colors.primary}
+                      />
+                    ) : null}
+                  </View>
+                )}
+
+                {/* Detailed Token Usage on Long Press */}
+                {showDetails && metadata?.usage && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 12,
+                      marginTop: 4,
+                      paddingTop: 4,
+                      borderTopWidth: 1,
+                      borderTopColor: "rgba(128,128,128,0.2)",
+                    }}
+                  >
+                    <Text style={[styles.metadataText, { fontSize: 11 }]}>
+                      Input: {formatTokens(metadata.usage.promptTokens)}
+                    </Text>
+                    <Text style={[styles.metadataText, { fontSize: 11 }]}>
+                      Output: {formatTokens(metadata.usage.completionTokens)}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
             </View>
           </View>
 
@@ -555,6 +683,18 @@ const ChatMessageComponent: React.FC<ChatMessageProps> = ({
           ) : null}
         </View>
       </Pressable>
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={2000}
+        style={{
+          position: "absolute",
+          bottom: 0,
+        }}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </Animated.View>
   );
 };

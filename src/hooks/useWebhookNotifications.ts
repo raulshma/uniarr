@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Alert, Platform } from "react-native";
 
 import {
@@ -213,18 +213,21 @@ export const useWebhookNotifications = (
     unreadNotifications: getUnreadNotifications(),
     notificationsByType: (type: string) => getNotificationsByType(type),
 
-    // Stats
-    stats: {
-      total: notifications.length,
-      unread: unreadCount,
-      byType: notifications.reduce(
-        (acc, n) => {
-          const type = n.data.eventType || "unknown";
-          acc[type] = (acc[type] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>,
-      ),
-    },
+    // Stats - memoized to prevent unnecessary recomputation
+    stats: useMemo(
+      () => ({
+        total: notifications.length,
+        unread: unreadCount,
+        byType: notifications.reduce(
+          (acc, n) => {
+            const type = n.data.eventType || "unknown";
+            acc[type] = (acc[type] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
+      }),
+      [notifications, unreadCount],
+    ),
   };
 };

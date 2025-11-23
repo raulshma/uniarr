@@ -1,4 +1,10 @@
 import type { ServiceConfig, ServiceType } from "@/models/service.types";
+import type {
+  LogQueryOptions,
+  ServiceLog,
+  LogFileInfo,
+  HealthMessage,
+} from "@/models/logger.types";
 
 /**
  * Options supported by connector-level search operations. Specific connectors can extend this shape.
@@ -45,6 +51,8 @@ export interface SystemHealth {
   readonly message?: string;
   readonly lastChecked: Date;
   readonly details?: Record<string, unknown>;
+  /** Array of detailed health messages from the service */
+  readonly messages?: HealthMessage[];
 }
 
 /**
@@ -87,6 +95,15 @@ export interface IConnector<
 
   /** Optional delete method for removing a resource from the remote service. */
   delete?(id: string | number): Promise<boolean>;
+
+  /** Optional method to retrieve logs from the service. */
+  getLogs?(options?: LogQueryOptions): Promise<ServiceLog[]>;
+
+  /** Optional method to retrieve a specific log file by filename. */
+  getLogFile?(filename: string): Promise<string>;
+
+  /** Optional method to list available log files from the service. */
+  listLogFiles?(): Promise<LogFileInfo[]>;
 }
 
 export type { ServiceConfig, ServiceType };

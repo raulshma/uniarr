@@ -392,13 +392,16 @@ export class AIProviderManager {
   /**
    * Get the model instance for current provider (for streaming/generation)
    * Uses provider-specific SDKs to ensure the API key is properly configured
+   * @param specificInstance Optional provider instance to use instead of active provider
    */
-  getModelInstance() {
-    if (!this.currentProvider) {
+  getModelInstance(specificInstance?: AIProviderInstance) {
+    const instance = specificInstance || this.currentProvider;
+
+    if (!instance) {
       throw new Error("No active AI provider configured");
     }
 
-    const { provider, model, apiKey } = this.currentProvider;
+    const { provider, model, apiKey } = instance;
 
     if (provider === "google") {
       // Create a provider instance with the configured API key

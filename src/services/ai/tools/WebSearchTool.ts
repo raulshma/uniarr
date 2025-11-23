@@ -11,7 +11,9 @@ const webSearchParamsSchema = z.object({
   query: z
     .string()
     .min(2)
-    .describe("Search query to look up on the web using DuckDuckGo"),
+    .describe(
+      "REQUIRED: The search query string to look up on the web using SearXNG. Example: 'Dune 2024 release date' or 'best sci-fi movies 2024'",
+    ),
   limit: z
     .number()
     .int()
@@ -19,13 +21,13 @@ const webSearchParamsSchema = z.object({
     .max(10)
     .default(5)
     .describe(
-      "Maximum number of search results to return (default: 5, max: 10)",
+      "Optional: Maximum number of search results to return (default: 5, max: 10)",
     ),
   region: z
     .string()
     .optional()
     .describe(
-      "Region/locale for search results (e.g., 'us-en', 'uk-en', 'de-de'). Defaults to 'us-en'",
+      "Optional: Language for search results (e.g., 'en', 'de', 'fr'). Defaults to 'en'",
     ),
 });
 
@@ -52,11 +54,11 @@ interface WebSearchResult {
 }
 
 /**
- * WebSearchTool - Search the web using DuckDuckGo
+ * WebSearchTool - Search the web using SearXNG
  *
  * This tool allows the LLM to search the web for general information,
  * release dates, reviews, media details, and other publicly available
- * information using DuckDuckGo search.
+ * information using SearXNG, a privacy-respecting metasearch engine.
  *
  * @example
  * ```typescript
@@ -66,18 +68,18 @@ interface WebSearchResult {
  *   limit: 5
  * });
  *
- * // Search with specific region
+ * // Search with specific language
  * const result = await execute({
  *   query: 'best sci-fi movies 2024',
  *   limit: 10,
- *   region: 'us-en'
+ *   region: 'en'
  * });
  * ```
  */
 export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
   name: "search_web",
   description:
-    "Search the web using DuckDuckGo for general information, release dates, reviews, cast information, ratings, and media details. Returns search results with titles, snippets, and URLs. Use this when you need current information not available in your knowledge base or when users ask about release dates, reviews, or general media information.",
+    "Search the web using SearXNG for current information. REQUIRED PARAMETER: 'query' - the search terms to look up. Use this tool when you need: release dates, reviews, cast information, ratings, current events, or any information not in your knowledge base. Always provide a specific search query string.",
   parameters: webSearchParamsSchema,
 
   async execute(params: WebSearchParams): Promise<ToolResult<WebSearchResult>> {
@@ -85,7 +87,15 @@ export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
     const context = ToolContext.getInstance();
 
     try {
-      void logger.debug("WebSearchTool execution started", { params });
+      // Validate query exists and is a string
+      if (!params.query || typeof params.query !== "string") {
+        throw new ToolError(
+          "Search query is required",
+          ToolErrorCategory.INVALID_PARAMETERS,
+          "The 'query' parameter is required for web search. Please call the tool again with a query string. Example: {query: 'Dune 2024 release date', limit: 5}",
+          { params },
+        );
+      }
 
       // Validate query length
       if (params.query.trim().length < 2) {
@@ -100,7 +110,7 @@ export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
       // Perform the search
       const searchResults = await performSearch(
         params.query,
-        params.region || "us-en",
+        params.region || "en",
       );
 
       if (!searchResults || searchResults.length === 0) {
@@ -115,7 +125,7 @@ export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
           metadata: {
             executionTime: Date.now() - startTime,
             query: params.query,
-            region: params.region || "us-en",
+            language: params.region || "en",
           },
         };
       }
@@ -129,12 +139,6 @@ export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
         params.query,
       );
 
-      void logger.debug("WebSearchTool execution completed", {
-        query: params.query,
-        totalResults: searchResults.length,
-        returnedResults: limitedResults.length,
-      });
-
       return {
         success: true,
         data: {
@@ -146,7 +150,7 @@ export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
         metadata: {
           executionTime: Date.now() - startTime,
           query: params.query,
-          region: params.region || "us-en",
+          language: params.region || "en",
         },
       };
     } catch (error) {
@@ -216,37 +220,49 @@ export const webSearchTool: ToolDefinition<WebSearchParams, WebSearchResult> = {
 // ==================== HELPER FUNCTIONS ====================
 
 /**
- * Perform a DuckDuckGo search and return formatted results
+ * Perform a SearXNG search and return formatted results
  */
 async function performSearch(
   query: string,
-  region: string,
+  language: string,
 ): Promise<SearchResultItem[]> {
   try {
-    // Use our custom DuckDuckGo implementation that works in React Native
-    const { search, SafeSearchType } = await import("@/utils/duckduckgo");
+    // Use our SearXNG implementation
+    const { search, SafeSearchType } = await import("@/utils/searxng");
 
     // Perform the search
     const searchResults = await search(query, {
       safeSearch: SafeSearchType.MODERATE,
-      locale: region,
+      language,
+      pageSize: 10,
     });
 
     // Map results to our format
     const formattedResults: SearchResultItem[] = searchResults.results.map(
-      (result) => ({
-        title: cleanText(result.title),
-        snippet: cleanSnippet(result.description),
-        url: result.url,
-        hostname: result.hostname,
-      }),
+      (result) => {
+        // Extract hostname from URL
+        let hostname = "";
+        try {
+          const url = new URL(result.url);
+          hostname = url.hostname;
+        } catch {
+          hostname = "";
+        }
+
+        return {
+          title: cleanText(result.title),
+          snippet: cleanSnippet(result.description),
+          url: result.url || "",
+          hostname,
+        };
+      },
     );
 
     return formattedResults;
   } catch (error) {
-    void logger.error("DuckDuckGo search failed", {
+    void logger.error("SearXNG search failed", {
       query,
-      region,
+      language,
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
@@ -256,30 +272,34 @@ async function performSearch(
 /**
  * Clean and normalize text content
  */
-function cleanText(text: string): string {
-  if (!text) return "";
+function cleanText(text: string | undefined): string {
+  if (!text || typeof text !== "string") {
+    return "";
+  }
 
-  return (
-    text
-      // Remove excessive whitespace
-      .replace(/\s+/g, " ")
-      // Remove HTML entities
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      // Trim
-      .trim()
-  );
+  const cleaned = text
+    // Remove excessive whitespace
+    .replace(/\s+/g, " ")
+    // Remove HTML entities
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    // Trim
+    .trim();
+
+  return cleaned;
 }
 
 /**
  * Clean and truncate snippet text
  */
-function cleanSnippet(snippet: string): string {
-  if (!snippet) return "";
+function cleanSnippet(snippet: string | undefined): string {
+  if (!snippet || typeof snippet !== "string") {
+    return "";
+  }
 
   const cleaned = cleanText(snippet);
 

@@ -36,6 +36,50 @@ jest.mock("react-native", () => ({
   },
 }));
 
+// Mock expo-blur
+jest.mock("expo-blur", () => ({
+  BlurView: ({ children }: { children: any }) => children,
+}));
+
+// Mock react-native-reanimated
+jest.mock("react-native-reanimated", () => {
+  return {
+    default: {
+      call: () => {},
+    },
+    SlideInRight: {
+      duration: jest.fn().mockReturnThis(),
+      springify: jest.fn().mockReturnThis(),
+    },
+    SlideOutLeft: {
+      duration: jest.fn().mockReturnThis(),
+      springify: jest.fn().mockReturnThis(),
+    },
+    SlideInUp: {
+      duration: jest.fn().mockReturnThis(),
+      springify: jest.fn().mockReturnThis(),
+    },
+    SlideOutDown: {
+      duration: jest.fn().mockReturnThis(),
+      springify: jest.fn().mockReturnThis(),
+    },
+    FadeIn: {
+      duration: jest.fn().mockReturnThis(),
+    },
+    FadeOut: {
+      duration: jest.fn().mockReturnThis(),
+    },
+    Layout: {
+      springify: jest.fn().mockReturnThis(),
+    },
+    createAnimatedComponent: (component: any) => component,
+    useSharedValue: jest.fn((v) => ({ value: v })),
+    useAnimatedStyle: jest.fn(() => ({})),
+    withTiming: jest.fn((v) => v),
+    withSpring: jest.fn((v) => v),
+  };
+});
+
 // Mock theme system
 jest.mock("@/constants/theme.ts", () => ({
   useTheme: jest.fn(() => ({

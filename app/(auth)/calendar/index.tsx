@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker, {
@@ -10,12 +10,14 @@ import Animated, {
   FadeIn,
   FadeOut,
   LinearTransition,
+  SlideInDown,
+  SlideOutUp,
 } from "react-native-reanimated";
 import {
   Button,
   Chip,
+  IconButton,
   Searchbar,
-  SegmentedButtons,
   Text,
   useTheme,
 } from "react-native-paper";
@@ -24,11 +26,6 @@ import {
   format,
   formatRelative,
   isAfter,
-  isSameMonth,
-  isSameWeek,
-  isToday,
-  isTomorrow,
-  isYesterday,
   parseISO,
 } from "date-fns";
 
@@ -48,7 +45,6 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { LoadingState } from "@/components/common/LoadingState";
 import BottomDrawer from "@/components/common/BottomDrawer";
-import { Card } from "@/components/common/Card";
 import type { AppTheme } from "@/constants/theme";
 import { useCalendar } from "@/hooks/useCalendar";
 import { useImagePrefetch } from "@/hooks/useImagePrefetch";
@@ -58,7 +54,6 @@ import type {
   CalendarMonth,
   CalendarRange,
   CalendarServiceType,
-  CalendarView,
   CalendarWeek,
   MediaRelease,
   MediaType,
@@ -130,13 +125,6 @@ const cloneFilters = (filters: CalendarFilters): CalendarFilters => ({
   searchQuery: filters.searchQuery,
 });
 
-const VIEW_SEGMENTS: { label: string; value: CalendarView }[] = [
-  { label: "Day", value: "day" },
-  { label: "Week", value: "week" },
-  { label: "Month", value: "month" },
-  { label: "Hybrid", value: "custom" },
-];
-
 const CalendarScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
@@ -166,6 +154,7 @@ const CalendarScreen = () => {
   const [serviceOptions, setServiceOptions] = useState<ServiceOption[]>([]);
   const [searchText, setSearchText] = useState(state.filters.searchQuery ?? "");
   const [activeQuickRange, setActiveQuickRange] = useState<number | null>(null);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -209,6 +198,9 @@ const CalendarScreen = () => {
 
   useEffect(() => {
     setSearchText(state.filters.searchQuery ?? "");
+    if (state.filters.searchQuery) {
+      setIsSearchVisible(true);
+    }
   }, [state.filters.searchQuery]);
 
   useEffect(() => {
@@ -249,90 +241,101 @@ const CalendarScreen = () => {
         },
         listContent: {
           paddingBottom: theme.custom.spacing.xl,
-          paddingHorizontal: theme.custom.spacing.xs,
-          gap: theme.custom.spacing.sm,
+          paddingHorizontal: theme.custom.spacing.sm,
+          gap: theme.custom.spacing.md,
         },
         headerContainer: {
-          gap: theme.custom.spacing.md,
-          paddingTop: theme.custom.spacing.md,
+          gap: theme.custom.spacing.sm,
+          paddingTop: theme.custom.spacing.xs,
         },
-        headerTextGroup: {
-          gap: theme.custom.spacing.xs,
+        topBar: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: theme.custom.spacing.xs,
+          marginBottom: theme.custom.spacing.xs,
         },
         headingText: {
-          fontSize: theme.custom.typography.headlineSmall.fontSize,
-          fontFamily: theme.custom.typography.headlineSmall.fontFamily,
-          fontWeight: theme.custom.typography.headlineSmall.fontWeight as any,
-          letterSpacing: theme.custom.typography.headlineSmall.letterSpacing,
+          fontSize: theme.custom.typography.headlineMedium.fontSize,
+          fontFamily: theme.custom.typography.headlineMedium.fontFamily,
+          fontWeight: theme.custom.typography.headlineMedium.fontWeight as any,
+          letterSpacing: theme.custom.typography.headlineMedium.letterSpacing,
           color: theme.colors.onBackground,
         },
         subheadingText: {
-          fontSize: theme.custom.typography.bodySmall.fontSize,
-          fontFamily: theme.custom.typography.bodySmall.fontFamily,
-          fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
-          letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
+          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
+          fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
+          letterSpacing: theme.custom.typography.bodyMedium.letterSpacing,
           color: theme.colors.onSurfaceVariant,
         },
-        segmentedContainer: {
-          borderRadius: 24,
-          backgroundColor: theme.colors.surfaceVariant,
+        topBarActions: {
+          flexDirection: "row",
+          alignItems: "center",
         },
-        segmentedWrapper: {
-          alignSelf: "stretch",
+        searchContainer: {
+          marginBottom: theme.custom.spacing.sm,
         },
         quickFiltersRow: {
           flexDirection: "row",
           flexWrap: "wrap",
           gap: theme.custom.spacing.sm,
           alignItems: "center",
+          paddingHorizontal: theme.custom.spacing.xs,
         },
-        filterSummaryRow: {
-          flexDirection: "row",
-          flexWrap: "wrap",
-          gap: theme.custom.spacing.sm,
+        summaryScrollContent: {
+          paddingVertical: theme.custom.spacing.xs,
+          paddingHorizontal: theme.custom.spacing.xs,
           alignItems: "center",
         },
         summaryChip: {
           backgroundColor: theme.colors.surfaceVariant,
+          borderColor: "transparent",
         },
         summaryChipSpacing: {
           marginRight: theme.custom.spacing.sm,
         },
-        summaryScrollContent: {
-          paddingVertical: theme.custom.spacing.xs,
-          paddingRight: theme.custom.spacing.sm,
-          alignItems: "center",
-        },
         calendarCardWrapper: {
-          borderRadius: 20,
+          borderRadius: 24,
           overflow: "hidden",
+          backgroundColor: theme.colors.surface,
+          // Subtle shadow for depth
+          shadowColor: theme.colors.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 8,
+          elevation: 2,
+          marginHorizontal: theme.custom.spacing.xs,
         },
         agendaSection: {
           gap: theme.custom.spacing.sm,
+          marginTop: theme.custom.spacing.xs,
         },
         agendaHeader: {
           flexDirection: "row",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "baseline",
+          paddingHorizontal: theme.custom.spacing.xs,
         },
         agendaDate: {
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontFamily: theme.custom.typography.titleMedium.fontFamily,
-          fontWeight: theme.custom.typography.titleMedium.fontWeight as any,
-          color: theme.colors.onSurface,
-          letterSpacing: theme.custom.typography.titleMedium.letterSpacing,
+          fontSize: theme.custom.typography.titleLarge.fontSize,
+          fontFamily: theme.custom.typography.titleLarge.fontFamily,
+          fontWeight: theme.custom.typography.titleLarge.fontWeight as any,
+          color: theme.colors.primary,
+          letterSpacing: theme.custom.typography.titleLarge.letterSpacing,
         },
         agendaMeta: {
-          fontSize: theme.custom.typography.bodySmall.fontSize,
-          fontFamily: theme.custom.typography.bodySmall.fontFamily,
-          fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
+          fontSize: theme.custom.typography.bodyMedium.fontSize,
+          fontFamily: theme.custom.typography.bodyMedium.fontFamily,
+          fontWeight: theme.custom.typography.bodyMedium.fontWeight as any,
           color: theme.colors.onSurfaceVariant,
         },
         agendaReleases: {
-          gap: theme.custom.spacing.xs,
+          gap: theme.custom.spacing.sm,
         },
         agendaCard: {
-          borderRadius: 14,
+          borderRadius: 16,
+          overflow: "hidden",
         },
         emptyWrapper: {
           paddingVertical: theme.custom.spacing.xl,
@@ -438,18 +441,6 @@ const CalendarScreen = () => {
     [setFilters],
   );
 
-  const handleSelectSegment = useCallback(
-    (value: string) => {
-      const segment = value as CalendarView;
-      if (segment === state.view) return;
-      setView(segment);
-      if (segment !== "day") {
-        setSelectedDate(undefined);
-      }
-    },
-    [setView, state.view, setSelectedDate],
-  );
-
   const handleDateSelect = useCallback(
     (date: string) => {
       setSelectedDate(date);
@@ -482,6 +473,17 @@ const CalendarScreen = () => {
   const openFilters = useCallback(() => {
     setIsFilterDrawerVisible(true);
   }, []);
+
+  const toggleSearch = useCallback(() => {
+    setIsSearchVisible((prev) => {
+      if (prev) {
+        // Closing search, clear query
+        setSearchText("");
+        setFilters({ searchQuery: undefined });
+      }
+      return !prev;
+    });
+  }, [setFilters]);
 
   const releasesForView = useMemo(() => {
     if (!calendarData) {
@@ -522,59 +524,13 @@ const CalendarScreen = () => {
     return [] as MediaRelease[];
   }, [calendarData, releases, state.view]);
 
-  const headingLabel = useMemo(() => {
-    if (!calendarData) return "";
-
-    if (state.view === "day" && "date" in calendarData) {
-      const date = parseISO((calendarData as CalendarDay).date);
-      if (isToday(date)) return "Today";
-      if (isTomorrow(date)) return "Tomorrow";
-      if (isYesterday(date)) return "Yesterday";
-      return format(date, "EEEE, MMM d");
-    }
-
-    if (state.view === "week" && "days" in calendarData) {
-      const week = calendarData as CalendarWeek;
-      const first = parseISO(week.days[0]?.date ?? state.currentDate);
-      const last = parseISO(
-        week.days[week.days.length - 1]?.date ?? state.currentDate,
-      );
-      if (isSameWeek(first, new Date())) {
-        return "This Week";
-      }
-      return `${format(first, "MMM d")} – ${format(last, "MMM d")}`;
-    }
-
-    if (state.view === "month" && "weeks" in calendarData) {
-      const month = calendarData as CalendarMonth;
-      const monthDate = new Date(month.year, month.month - 1, 1);
-      if (isSameMonth(monthDate, new Date())) {
-        return "This Month";
-      }
-      return format(monthDate, "MMMM yyyy");
-    }
-
-    if (state.view === "custom" && state.filters.dateRange) {
-      const { start, end } = state.filters.dateRange;
-      return `Range • ${format(parseISO(start), "MMM d, yyyy")} → ${format(parseISO(end), "MMM d, yyyy")}`;
-    }
-
-    return navigation.currentPeriod;
-  }, [
-    calendarData,
-    navigation.currentPeriod,
-    state.currentDate,
-    state.filters.dateRange,
-    state.view,
-  ]);
-
   const subheadingLabel = useMemo(() => {
     if (releasesForView.length === 0) {
-      return "No scheduled releases";
+      return "No releases";
     }
     return `${releasesForView.length} release${
       releasesForView.length === 1 ? "" : "s"
-    } in view`;
+    }`;
   }, [releasesForView.length]);
 
   const activeFilterCount = useMemo(() => {
@@ -693,15 +649,6 @@ const CalendarScreen = () => {
       icon: "calendar-range",
       selected: rangeActive,
     });
-
-    if (state.filters.searchQuery) {
-      items.push({
-        key: "search",
-        label: `Search • “${state.filters.searchQuery}”`,
-        icon: "magnify",
-        selected: true,
-      });
-    }
 
     return items;
   }, [serviceOptions, state.filters]);
@@ -827,6 +774,53 @@ const CalendarScreen = () => {
         entering={FadeIn.duration(220)}
         style={styles.headerContainer}
       >
+        <View style={styles.topBar}>
+          <View>
+            <Text style={styles.headingText}>Calendar</Text>
+            <Text style={styles.subheadingText}>{subheadingLabel}</Text>
+          </View>
+          <View style={styles.topBarActions}>
+            <IconButton
+              icon={isSearchVisible ? "magnify-minus" : "magnify"}
+              onPress={toggleSearch}
+              iconColor={
+                isSearchVisible
+                  ? theme.colors.primary
+                  : theme.colors.onSurfaceVariant
+              }
+            />
+            <IconButton
+              icon="filter-variant"
+              onPress={openFilters}
+              iconColor={
+                activeFilterCount > 0
+                  ? theme.colors.primary
+                  : theme.colors.onSurfaceVariant
+              }
+            />
+          </View>
+        </View>
+
+        {isSearchVisible && (
+          <Animated.View
+            entering={SlideInDown.duration(200)}
+            exiting={SlideOutUp.duration(200)}
+            style={styles.searchContainer}
+          >
+            <Searchbar
+              value={searchText}
+              onChangeText={handleSearchChange}
+              placeholder="Search releases..."
+              inputStyle={{
+                fontSize: theme.custom.typography.bodyMedium.fontSize,
+              }}
+              iconColor={theme.colors.onSurfaceVariant}
+              elevation={0}
+              style={{ backgroundColor: theme.colors.surfaceVariant }}
+            />
+          </Animated.View>
+        )}
+
         <EnhancedCalendarHeader
           navigation={navigation}
           view={state.view}
@@ -836,63 +830,28 @@ const CalendarScreen = () => {
             backgroundColor: "transparent",
             elevation: 0,
             shadowOpacity: 0,
-            marginBottom: 0,
+            marginBottom: theme.custom.spacing.xs,
             paddingHorizontal: theme.custom.spacing.none,
             paddingVertical: theme.custom.spacing.none,
           }}
         />
-
-        <View style={styles.headerTextGroup}>
-          <Text style={styles.headingText}>{headingLabel}</Text>
-          <Text style={styles.subheadingText}>{subheadingLabel}</Text>
-        </View>
-
-        <View style={styles.segmentedWrapper}>
-          <SegmentedButtons
-            value={state.view}
-            onValueChange={handleSelectSegment}
-            buttons={VIEW_SEGMENTS}
-            style={styles.segmentedContainer}
-            density="small"
-          />
-        </View>
-
-        <Searchbar
-          value={searchText}
-          onChangeText={handleSearchChange}
-          placeholder="Search releases"
-          inputStyle={{ fontSize: theme.custom.typography.bodyMedium.fontSize }}
-          iconColor={theme.colors.onSurfaceVariant}
-        />
-
-        <View style={styles.quickFiltersRow}>
-          {QUICK_RANGES.map((option) => (
-            <Chip
-              key={option.days}
-              compact
-              selected={activeQuickRange === option.days}
-              onPress={() => handleQuickRangeSelect(option.days)}
-            >
-              {option.label}
-            </Chip>
-          ))}
-          <Chip
-            compact
-            icon="tune-variant"
-            onPress={openFilters}
-            style={styles.advancedFiltersChip}
-          >
-            {activeFilterCount > 0
-              ? `Advanced • ${activeFilterCount}`
-              : "Advanced filters"}
-          </Chip>
-        </View>
 
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.summaryScrollContent}
         >
+          {QUICK_RANGES.map((option) => (
+            <Chip
+              key={option.days}
+              compact
+              selected={activeQuickRange === option.days}
+              onPress={() => handleQuickRangeSelect(option.days)}
+              style={[styles.summaryChip, styles.summaryChipSpacing]}
+            >
+              {option.label}
+            </Chip>
+          ))}
           {filterSummaryItems.map((item) => (
             <Chip
               key={item.key}
@@ -913,9 +872,7 @@ const CalendarScreen = () => {
           layout={LinearTransition.springify().stiffness(340).damping(30)}
           style={styles.calendarCardWrapper}
         >
-          <Card contentPadding={0} animated={false}>
-            {renderCalendarSurface}
-          </Card>
+          {renderCalendarSurface}
         </Animated.View>
       </AnimatedView>
     ),
@@ -924,23 +881,26 @@ const CalendarScreen = () => {
       activeQuickRange,
       filterSummaryItems,
       handleQuickRangeSelect,
-      handleSelectSegment,
       handleSearchChange,
-      headingLabel,
+      isSearchVisible,
       navigation,
       openFilters,
       renderCalendarSurface,
       searchText,
       setView,
       state.currentDate,
+      state.isLoading,
       state.view,
       stats,
       styles,
       subheadingLabel,
       theme.colors.onSurfaceVariant,
-      theme.custom.typography.bodyMedium.fontSize,
+      theme.colors.primary,
+      theme.colors.surfaceVariant,
       theme.custom.spacing.none,
-      state.isLoading,
+      theme.custom.spacing.xs,
+      theme.custom.typography.bodyMedium.fontSize,
+      toggleSearch,
     ],
   );
 

@@ -2,6 +2,7 @@ import { streamText, generateText, stepCountIs, type LanguageModel } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { logger } from "@/services/logger/LoggerService";
+import { apiLogger } from "@/services/logger/ApiLoggerService";
 import { useConversationalAIConfigStore } from "@/store/conversationalAIConfigStore";
 import { useConversationalAIStore } from "@/store/conversationalAIStore";
 import { AIKeyManager } from "@/services/ai/core/AIKeyManager";
@@ -15,6 +16,10 @@ import {
 import { ConfirmationManager } from "@/services/ai/tools/ConfirmationManager";
 import { WorkflowEngine } from "@/services/ai/tools/WorkflowEngine";
 import type { WorkflowProgressCallback } from "@/services/ai/tools/WorkflowEngine";
+import {
+  StreamingService,
+  type ToolDefinition,
+} from "@/services/ai/streaming/StreamingService";
 
 /**
  * Represents a message in the conversation history.
@@ -100,11 +105,13 @@ export class AIChatService {
   private readonly keyManager: AIKeyManager;
   private readonly toolRegistry: ToolRegistry;
   private readonly workflowEngine: WorkflowEngine;
+  private readonly streamingService: StreamingService;
 
   private constructor() {
     this.keyManager = AIKeyManager.getInstance();
     this.toolRegistry = ToolRegistry.getInstance();
     this.workflowEngine = WorkflowEngine.getInstance();
+    this.streamingService = StreamingService.getInstance();
     void logger.info("AIChatService initialized");
   }
 
@@ -268,7 +275,22 @@ export class AIChatService {
     messages: ChatMessage[],
     options?: StreamOptions,
   ): Promise<AsyncIterable<string>> {
+    const startTime = Date.now();
+    let providerType = "unknown";
+    let modelName = "unknown";
+    let lastUserMessage = "";
+
     try {
+      // Extract info early for logging
+      const config = useConversationalAIConfigStore.getState().getConfig();
+      providerType = config.provider || "unknown";
+      modelName = config.model || "unknown";
+      lastUserMessage =
+        messages
+          .slice()
+          .reverse()
+          .find((m) => m.role === "user")?.content || "";
+
       void logger.debug("Sending message to LLM", {
         messageCount: messages.length,
         hasOptions: !!options,
@@ -341,6 +363,22 @@ export class AIChatService {
             textLength: fullText.length,
             hasUsage: !!usage,
           });
+
+          // Log successful AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat",
+            status: "success",
+            prompt: lastUserMessage,
+            response: fullText,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+              usage,
+            },
+          });
         } catch (error) {
           const errorObj =
             error instanceof Error ? error : new Error(String(error));
@@ -354,6 +392,21 @@ export class AIChatService {
           if (options?.onError) {
             options.onError(errorObj);
           }
+
+          // Log failed AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat",
+            status: "error",
+            prompt: lastUserMessage,
+            errorMessage: errorObj.message,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+            },
+          });
 
           throw errorObj;
         }
@@ -374,8 +427,159 @@ export class AIChatService {
         options.onError(errorObj);
       }
 
+      // Log failed AI call (outer catch)
+      const durationMs = Date.now() - startTime;
+      void apiLogger.addAiCall({
+        provider: providerType,
+        model: modelName,
+        operation: "chat",
+        status: "error",
+        prompt: lastUserMessage,
+        errorMessage: errorObj.message,
+        durationMs,
+        metadata: {
+          messageCount: messages.length,
+          errorLocation: "outer-catch",
+        },
+      });
+
       throw errorObj;
     }
+  }
+
+  /**
+   * Convert Vercel AI SDK tools to OpenRouter API format.
+   *
+   * @param vercelTools - Tools in Vercel AI SDK format
+   * @returns Tools in OpenRouter API format
+   */
+  private convertToolsToOpenRouterFormat(
+    vercelTools: Record<string, unknown>,
+  ): ToolDefinition[] {
+    return Object.entries(vercelTools).map(([name, tool]) => {
+      const toolDef = tool as {
+        description?: string;
+        parameters?: Record<string, unknown>;
+        inputSchema?: any; // Zod schema
+      };
+
+      // Vercel AI SDK uses 'inputSchema' which is a Zod schema
+      // We need to convert it to JSON Schema for OpenRouter
+      let jsonSchema: Record<string, unknown> | undefined;
+
+      if (toolDef.inputSchema) {
+        try {
+          // Manually build JSON Schema from Zod schema
+          // The zod-to-json-schema library doesn't handle Zod v3.23+ properly
+          const zodSchema = toolDef.inputSchema;
+
+          if (zodSchema.def && zodSchema.def.shape) {
+            const properties: Record<string, any> = {};
+            const required: string[] = [];
+
+            for (const [key, value] of Object.entries(zodSchema.def.shape)) {
+              const fieldSchema = value as any;
+              const fieldDef = fieldSchema.def;
+
+              // Build property schema
+              const propSchema: any = {};
+
+              // Handle type - recursively unwrap Zod wrappers
+              let currentDef = fieldDef;
+
+              // Unwrap default, optional, nullable wrappers
+              while (
+                currentDef &&
+                (currentDef.type === "default" ||
+                  currentDef.type === "optional" ||
+                  currentDef.type === "nullable")
+              ) {
+                if (currentDef.innerType) {
+                  currentDef = currentDef.innerType.def;
+                } else {
+                  break;
+                }
+              }
+
+              if (currentDef.type === "string") {
+                propSchema.type = "string";
+                if (currentDef.checks) {
+                  for (const check of currentDef.checks) {
+                    if (check.kind === "min")
+                      propSchema.minLength = check.value;
+                    if (check.kind === "max")
+                      propSchema.maxLength = check.value;
+                  }
+                }
+              } else if (currentDef.type === "number") {
+                propSchema.type = "number";
+                if (currentDef.checks) {
+                  for (const check of currentDef.checks) {
+                    if (check.kind === "min") propSchema.minimum = check.value;
+                    if (check.kind === "max") propSchema.maximum = check.value;
+                    if (check.kind === "int") propSchema.type = "integer";
+                  }
+                }
+              } else if (currentDef.type === "enum") {
+                propSchema.type = "string";
+                propSchema.enum = currentDef.values;
+              }
+
+              // Add description if available
+              if (fieldSchema.description) {
+                propSchema.description = fieldSchema.description;
+              }
+
+              properties[key] = propSchema;
+
+              // Check if required (not optional)
+              if (fieldDef.type !== "optional") {
+                required.push(key);
+              }
+            }
+
+            jsonSchema = {
+              type: "object",
+              properties,
+              required: required.length > 0 ? required : undefined,
+            };
+
+            void logger.warn(`✅ Manually built schema for ${name}`, {
+              properties: Object.keys(properties),
+              required,
+              schema: JSON.stringify(jsonSchema).substring(0, 500),
+            });
+          }
+        } catch (err) {
+          void logger.error("Failed to build JSON Schema from Zod", {
+            toolName: name,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      const schema = toolDef.parameters || jsonSchema;
+
+      void logger.warn(`🔧 Converting tool ${name} to OpenRouter format`, {
+        name,
+        description: toolDef.description,
+        hasParameters: !!toolDef.parameters,
+        hasInputSchema: !!toolDef.inputSchema,
+        hasJsonSchema: !!jsonSchema,
+        schemaType: schema ? typeof schema : "undefined",
+        schemaKeys: schema ? Object.keys(schema).slice(0, 10) : [],
+        fullSchema: JSON.stringify(schema, null, 2).substring(0, 500),
+      });
+
+      return {
+        type: "function" as const,
+        function: {
+          name,
+          description: toolDef.description,
+          parameters: schema,
+        },
+      };
+    });
   }
 
   /**
@@ -458,7 +662,33 @@ Remember: You're here to make media management easier and more efficient for sel
     messages: ChatMessage[],
     options?: StreamOptions,
   ): Promise<void> {
+    void logger.warn("🚀🚀🚀 sendMessageWithTools ENTRY", {
+      messageCount: messages.length,
+      hasOptions: !!options,
+    });
+
+    const startTime = Date.now();
+    let providerType = "unknown";
+    let modelName = "unknown";
+    let lastUserMessage = "";
+
     try {
+      // Extract info early for logging
+      const config = useConversationalAIConfigStore.getState().getConfig();
+      providerType = config.provider || "unknown";
+      modelName = config.model || "unknown";
+      lastUserMessage =
+        messages
+          .slice()
+          .reverse()
+          .find((m) => m.role === "user")?.content || "";
+
+      void logger.warn("🔧 Config loaded", {
+        provider: providerType,
+        model: modelName,
+        lastUserMessage: lastUserMessage.substring(0, 50),
+      });
+
       void logger.debug("Sending message with tools to LLM", {
         messageCount: messages.length,
         toolCount: this.toolRegistry.count(),
@@ -470,6 +700,18 @@ Remember: You're here to make media management easier and more efficient for sel
 
       // Get tools from registry in Vercel AI SDK format
       const allTools = this.toolRegistry.toVercelTools();
+
+      void logger.warn("🔧 All tools from registry", {
+        toolNames: Object.keys(allTools),
+        toolCount: Object.keys(allTools).length,
+        searchWebTool: allTools.search_web
+          ? {
+              description: (allTools.search_web as any).description,
+              hasParameters: !!(allTools.search_web as any).parameters,
+              hasInputSchema: !!(allTools.search_web as any).inputSchema,
+            }
+          : "not found",
+      });
 
       // Filter tools based on user's selected tools configuration
       const conversationalConfig = useConversationalAIStore.getState().config;
@@ -516,134 +758,354 @@ Remember: You're here to make media management easier and more efficient for sel
 
       // Check if streaming is enabled
       const enableStreaming = conversationalConfig.enableStreaming;
+      const streamingMethod = conversationalConfig.streamingMethod || "sse";
 
-      // Use streaming or non-streaming based on user preference
+      // Use native streaming with tool support if enabled
       if (enableStreaming) {
-        // Start streaming with tools
-        const result = await streamText({
-          model,
-          messages: messagesWithSystem,
-          tools,
+        void logger.info("🚀 Using native streaming with tool support", {
+          provider: providerType,
+          model: modelName,
+          method: streamingMethod,
+          toolCount: Object.keys(tools).length,
         });
 
+        // Convert tools to OpenRouter format
+        const openRouterTools = this.convertToolsToOpenRouterFormat(tools);
+
         let fullText = "";
-        let reasoningText: string | undefined;
-        let usage:
-          | {
-              promptTokens: number;
-              completionTokens: number;
-              totalTokens: number;
-            }
-          | undefined;
+        const toolCallsExecuted: {
+          id: string;
+          name: string;
+          arguments: string;
+          result: unknown;
+        }[] = [];
 
         try {
-          // Process the stream
-          for await (const chunk of result.fullStream) {
-            // Handle different chunk types
-            if (chunk.type === "text-delta") {
-              // Text chunk from the LLM
-              const text = chunk.text;
-              fullText += text;
+          // Track tool execution promises to ensure they complete before follow-up
+          const toolExecutionPromises: Promise<void>[] = [];
 
-              // Call onChunk callback if provided
-              if (options?.onChunk) {
-                options.onChunk(text);
-              }
-            } else if (chunk.type === "tool-call") {
-              // LLM is invoking a tool
-              void logger.debug("Tool call initiated", {
-                toolName: chunk.toolName,
-                toolCallId: chunk.toolCallId,
-              });
+          // First streaming request - may include tool calls
+          await this.streamingService.stream(
+            {
+              provider: config.provider!,
+              model: config.model!,
+              keyId: config.keyId!,
+              messages: messagesWithSystem.map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+              })),
+              tools: openRouterTools.length > 0 ? openRouterTools : undefined,
+            },
+            {
+              method: streamingMethod,
+              onChunk: (chunk) => {
+                fullText += chunk;
+                options?.onChunk?.(chunk);
+              },
+              onToolCall: (toolCall) => {
+                void logger.debug("Tool call received in stream", {
+                  toolCallId: toolCall.id,
+                  toolName: toolCall.function.name,
+                });
 
-              // Call onToolCall callback if provided
-              if (options?.onToolCall) {
-                options.onToolCall(chunk.toolName, chunk.input);
-              }
-            } else if (chunk.type === "tool-result") {
-              // Tool execution completed
-              void logger.debug("Tool result received", {
-                toolName: chunk.toolName,
-                toolCallId: chunk.toolCallId,
-              });
-
-              // Check if the tool result contains a confirmation request
-              const confirmationRequest = this.checkForConfirmationRequest(
-                chunk.output,
-              );
-
-              if (confirmationRequest) {
-                void logger.info(
-                  "Confirmation requested during tool execution",
-                  {
-                    confirmationId: confirmationRequest.confirmationId,
-                    toolName: chunk.toolName,
-                    severity: confirmationRequest.severity,
-                  },
-                );
-
-                // Call onConfirmationRequested callback if provided
-                if (options?.onConfirmationRequested) {
-                  options.onConfirmationRequested(
-                    confirmationRequest.confirmationId,
-                    confirmationRequest.prompt,
-                    confirmationRequest.severity,
-                  );
+                // Notify about tool call (synchronously)
+                if (options?.onToolCall) {
+                  try {
+                    const args = JSON.parse(toolCall.function.arguments);
+                    options.onToolCall(toolCall.function.name, args);
+                  } catch (err) {
+                    void logger.error("Failed to parse tool arguments", {
+                      error: err,
+                      arguments: toolCall.function.arguments,
+                    });
+                  }
                 }
-              }
 
-              // Call onToolResult callback if provided
-              if (options?.onToolResult) {
-                options.onToolResult(chunk.toolName, chunk.output);
-              }
-            } else if (chunk.type === "finish") {
-              // Extract only usage data from finish chunk
-              if (chunk.totalUsage) {
-                const inputTokens = chunk.totalUsage.inputTokens ?? 0;
-                const outputTokens = chunk.totalUsage.outputTokens ?? 0;
-                usage = {
-                  promptTokens: inputTokens,
-                  completionTokens: outputTokens,
-                  totalTokens: inputTokens + outputTokens,
-                };
-              }
-              if (chunk.finishReason) {
-                reasoningText = String(chunk.finishReason);
-              }
-            }
-          }
+                // Execute the tool asynchronously and track the promise
+                const toolExecutionPromise = (async () => {
+                  try {
+                    void logger.warn("🔧 Parsing tool call arguments", {
+                      toolCallId: toolCall.id,
+                      toolName: toolCall.function.name,
+                      rawArguments: toolCall.function.arguments,
+                      argumentsType: typeof toolCall.function.arguments,
+                      argumentsLength: toolCall.function.arguments?.length,
+                    });
 
-          // Call onComplete callback with metadata if provided
-          if (options?.onComplete) {
-            options.onComplete(fullText, {
-              reasoningText,
-              usage,
-            });
-          }
+                    const args = JSON.parse(toolCall.function.arguments);
 
-          void logger.debug("Message with tools streaming completed", {
-            textLength: fullText.length,
-            hasReasoning: !!reasoningText,
-            hasUsage: !!usage,
-          });
+                    void logger.warn("✅ Tool arguments parsed", {
+                      toolCallId: toolCall.id,
+                      toolName: toolCall.function.name,
+                      parsedArgs: args,
+                      argsKeys: Object.keys(args),
+                    });
+
+                    const toolDef = this.toolRegistry.get(
+                      toolCall.function.name,
+                    );
+
+                    if (!toolDef) {
+                      throw new Error(
+                        `Tool "${toolCall.function.name}" not found in registry`,
+                      );
+                    }
+
+                    const result = await toolDef.execute(args);
+
+                    void logger.debug("Tool execution completed", {
+                      toolCallId: toolCall.id,
+                      toolName: toolCall.function.name,
+                    });
+
+                    // Store tool call result for follow-up request
+                    toolCallsExecuted.push({
+                      id: toolCall.id,
+                      name: toolCall.function.name,
+                      arguments: toolCall.function.arguments,
+                      result,
+                    });
+
+                    // Check for confirmation request
+                    const confirmationRequest =
+                      this.checkForConfirmationRequest(result);
+                    if (
+                      confirmationRequest &&
+                      options?.onConfirmationRequested
+                    ) {
+                      options.onConfirmationRequested(
+                        confirmationRequest.confirmationId,
+                        confirmationRequest.prompt,
+                        confirmationRequest.severity,
+                      );
+                    }
+
+                    // Notify about tool result
+                    if (options?.onToolResult) {
+                      options.onToolResult(toolCall.function.name, result);
+                    }
+                  } catch (err) {
+                    void logger.error("Tool execution failed", {
+                      toolCallId: toolCall.id,
+                      toolName: toolCall.function.name,
+                      error: err,
+                    });
+
+                    // Store error result
+                    toolCallsExecuted.push({
+                      id: toolCall.id,
+                      name: toolCall.function.name,
+                      arguments: toolCall.function.arguments,
+                      result: {
+                        error: err instanceof Error ? err.message : String(err),
+                      },
+                    });
+
+                    // Notify about error
+                    if (options?.onToolResult) {
+                      options.onToolResult(toolCall.function.name, {
+                        error: err instanceof Error ? err.message : String(err),
+                      });
+                    }
+                  }
+                })();
+
+                toolExecutionPromises.push(toolExecutionPromise);
+              },
+              onComplete: async (completeText, initialMetadata) => {
+                // If tools were called, execute them and stream follow-up response
+                if (toolExecutionPromises.length > 0) {
+                  void logger.info("Tool calls detected, executing tools", {
+                    toolCount: toolExecutionPromises.length,
+                  });
+
+                  // Execute all tools in parallel (non-blocking for each other)
+                  const toolStartTime = Date.now();
+                  await Promise.all(toolExecutionPromises);
+                  const toolDuration = Date.now() - toolStartTime;
+
+                  void logger.info(
+                    "Tools executed, starting follow-up stream",
+                    {
+                      toolCallCount: toolCallsExecuted.length,
+                      toolDurationMs: toolDuration,
+                    },
+                  );
+
+                  // Build follow-up messages with tool results
+                  const followUpMessages: {
+                    role: "user" | "assistant" | "system" | "tool";
+                    content: string;
+                    tool_call_id?: string;
+                    name?: string;
+                    tool_calls?: {
+                      id: string;
+                      type: "function";
+                      function: {
+                        name: string;
+                        arguments: string;
+                      };
+                    }[];
+                  }[] = [
+                    ...messagesWithSystem.map((msg) => ({
+                      role: msg.role,
+                      content: msg.content,
+                    })),
+                    {
+                      role: "assistant" as const,
+                      content: completeText || "",
+                      tool_calls: toolCallsExecuted.map((tc) => ({
+                        id: tc.id,
+                        type: "function" as const,
+                        function: {
+                          name: tc.name,
+                          arguments: tc.arguments,
+                        },
+                      })),
+                    },
+                    ...toolCallsExecuted.map((tc) => ({
+                      role: "tool" as const,
+                      content: JSON.stringify(tc.result),
+                      tool_call_id: tc.id,
+                      name: tc.name,
+                    })),
+                  ];
+
+                  // Stream the follow-up response immediately
+                  await this.streamingService.stream(
+                    {
+                      provider: config.provider!,
+                      model: config.model!,
+                      keyId: config.keyId!,
+                      messages: followUpMessages,
+                      tools:
+                        openRouterTools.length > 0
+                          ? openRouterTools
+                          : undefined,
+                    },
+                    {
+                      method: streamingMethod,
+                      onChunk: (chunk) => {
+                        fullText += chunk;
+                        options?.onChunk?.(chunk);
+                      },
+                      onComplete: (finalText, metadata) => {
+                        const durationMs = Date.now() - startTime;
+
+                        void logger.info("Follow-up stream completed", {
+                          finalTextLength: finalText?.length || 0,
+                          fullTextLength: fullText.length,
+                          usage: metadata?.usage,
+                          hasReasoning: !!metadata?.reasoningText,
+                        });
+
+                        void apiLogger.addAiCall({
+                          provider: providerType,
+                          model: modelName,
+                          operation: "chat-native-streaming-with-tools",
+                          status: "success",
+                          prompt: lastUserMessage,
+                          response: fullText,
+                          durationMs,
+                          metadata: {
+                            messageCount: messages.length,
+                            toolCount: Object.keys(tools).length,
+                            extras: {
+                              toolCallsExecuted: toolCallsExecuted.length,
+                              streamingMethod,
+                              multiTurn: true,
+                              toolDurationMs: toolDuration,
+                            },
+                          },
+                        });
+
+                        if (options?.onComplete) {
+                          options.onComplete(fullText, metadata);
+                        }
+                      },
+                      onError: (error) => {
+                        void logger.error("Follow-up stream failed", {
+                          error: error.message,
+                        });
+                        if (options?.onComplete) {
+                          options.onComplete(fullText);
+                        }
+                      },
+                    },
+                  );
+                } else {
+                  // No tool calls, complete normally
+                  const durationMs = Date.now() - startTime;
+                  void apiLogger.addAiCall({
+                    provider: providerType,
+                    model: modelName,
+                    operation: "chat-native-streaming-with-tools",
+                    status: "success",
+                    prompt: lastUserMessage,
+                    response: completeText || fullText,
+                    durationMs,
+                    metadata: {
+                      messageCount: messages.length,
+                      toolCount: Object.keys(tools).length,
+                      extras: {
+                        streamingMethod,
+                      },
+                    },
+                  });
+
+                  if (options?.onComplete) {
+                    // Pass metadata from initial stream
+                    options.onComplete(
+                      completeText || fullText,
+                      initialMetadata,
+                    );
+                  }
+                }
+              },
+              onError: (error) => {
+                const durationMs = Date.now() - startTime;
+                void apiLogger.addAiCall({
+                  provider: providerType,
+                  model: modelName,
+                  operation: "chat-native-streaming-with-tools",
+                  status: "error",
+                  prompt: lastUserMessage,
+                  errorMessage: error.message,
+                  durationMs,
+                  metadata: {
+                    messageCount: messages.length,
+                    toolCount: Object.keys(tools).length,
+                    extras: {
+                      streamingMethod,
+                    },
+                  },
+                });
+
+                if (options?.onError) {
+                  options.onError(error);
+                }
+              },
+            },
+          );
+
+          return; // Exit early - streaming complete
         } catch (error) {
           const errorObj =
             error instanceof Error ? error : new Error(String(error));
-
-          void logger.error("Error during message with tools streaming", {
+          void logger.error("Native streaming with tools failed", {
             error: errorObj.message,
-            formattedError: this.formatError(errorObj),
           });
 
-          // Call onError callback if provided
           if (options?.onError) {
             options.onError(errorObj);
           }
 
           throw errorObj;
         }
-      } else {
-        // Non-streaming mode: use generateText with multi-step tool execution
+      }
+
+      // Non-streaming mode: use generateText with multi-step tool execution
+      if (!enableStreaming) {
         const result = await generateText({
           model,
           messages: messagesWithSystem,
@@ -752,6 +1214,23 @@ Remember: You're here to make media management easier and more efficient for sel
             hasReasoning: !!reasoningText,
             hasUsage: !!usage,
           });
+
+          // Log successful AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat-with-tools",
+            status: "success",
+            prompt: lastUserMessage,
+            response: fullText,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+              toolCount: Object.keys(tools).length,
+              usage,
+            },
+          });
         } catch (error) {
           const errorObj =
             error instanceof Error ? error : new Error(String(error));
@@ -765,6 +1244,22 @@ Remember: You're here to make media management easier and more efficient for sel
           if (options?.onError) {
             options.onError(errorObj);
           }
+
+          // Log failed AI call
+          const durationMs = Date.now() - startTime;
+          void apiLogger.addAiCall({
+            provider: providerType,
+            model: modelName,
+            operation: "chat-with-tools",
+            status: "error",
+            prompt: lastUserMessage,
+            errorMessage: errorObj.message,
+            durationMs,
+            metadata: {
+              messageCount: messages.length,
+              toolCount: Object.keys(tools).length,
+            },
+          });
 
           throw errorObj;
         }
@@ -782,6 +1277,22 @@ Remember: You're here to make media management easier and more efficient for sel
       if (options?.onError) {
         options.onError(errorObj);
       }
+
+      // Log failed AI call (outer catch)
+      const durationMs = Date.now() - startTime;
+      void apiLogger.addAiCall({
+        provider: providerType,
+        model: modelName,
+        operation: "chat-with-tools",
+        status: "error",
+        prompt: lastUserMessage,
+        errorMessage: errorObj.message,
+        durationMs,
+        metadata: {
+          messageCount: messages.length,
+          errorLocation: "outer-catch",
+        },
+      });
 
       throw errorObj;
     }

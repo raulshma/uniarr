@@ -1,10 +1,11 @@
 import React from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import type { AppTheme } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
@@ -35,7 +36,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
   onEdit,
 }) => {
   const router = useRouter();
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const { onPress: hapticPress } = useHaptics();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const styles = useStyles(theme);
@@ -85,6 +86,13 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
               route: "/(auth)/anime-hub",
               enabled: true,
             },
+            {
+              id: "jellyfin-downloads",
+              label: "Downloads",
+              icon: "download",
+              route: "/(auth)/jellyfin-downloads",
+              enabled: true,
+            },
           ]);
         }
       } catch (error) {
@@ -112,25 +120,41 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
 
   const getGridLayout = () => {
     const { size } = widget;
+    const shortcutCount = shortcuts.filter((s) => s.enabled).length;
+
+    // Determine layout based on shortcut count
+    let columns = 2;
+    let compact = false;
+
+    if (shortcutCount > 6) {
+      columns = 4;
+      compact = true;
+    } else if (shortcutCount > 4) {
+      columns = 3;
+      compact = true;
+    }
 
     switch (size) {
       case "small":
         return {
           container: styles.smallContainer,
           scrollContainer: styles.smallScrollContainer,
-          columns: 2,
+          columns,
+          compact,
         };
       case "large":
         return {
           container: styles.largeContainer,
           scrollContainer: styles.largeScrollContainer,
-          columns: 2,
+          columns,
+          compact,
         };
       default: // medium
         return {
           container: styles.mediumContainer,
           scrollContainer: styles.mediumScrollContainer,
-          columns: 2,
+          columns,
+          compact,
         };
     }
   };
@@ -189,7 +213,11 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
           entering={FadeIn.duration(ANIMATION_DURATIONS.QUICK)}
           exiting={FadeOut.duration(ANIMATION_DURATIONS.NORMAL)}
         >
-          <WidgetHeader title={widget.title} onEdit={onEdit} />
+          <WidgetHeader
+            title={widget.title}
+            icon="gesture-tap"
+            onEdit={onEdit}
+          />
           <View style={styles.loadingSkeleton}>
             {Array.from({ length: gridLayout.columns * 2 }).map((_, index) => (
               <View
@@ -225,7 +253,11 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
     return (
       <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
         <View style={[styles.container, gridLayout.container]}>
-          <WidgetHeader title={widget.title} onEdit={onEdit} />
+          <WidgetHeader
+            title={widget.title}
+            icon="gesture-tap"
+            onEdit={onEdit}
+          />
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons
               name="gesture-tap"
@@ -244,7 +276,7 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
   return (
     <Card variant={frostedEnabled ? "frosted" : "custom"} style={styles.card}>
       <View style={[styles.container, gridLayout.container]}>
-        <WidgetHeader title={widget.title} onEdit={onEdit} />
+        <WidgetHeader title={widget.title} icon="gesture-tap" onEdit={onEdit} />
 
         <ScrollView
           style={gridLayout.scrollContainer}
@@ -253,13 +285,20 @@ const ShortcutsWidget: React.FC<ShortcutsWidgetProps> = ({
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.gridContainer}>
+          <View
+            style={[
+              styles.gridContainer,
+              gridLayout.compact && styles.compactGridContainer,
+            ]}
+          >
             {enabledShortcuts.map((shortcut) => (
               <ShortcutItem
                 key={shortcut.id}
                 shortcut={shortcut}
                 onPress={handleShortcutPress}
                 size={widget.size}
+                compact={gridLayout.compact}
+                columns={gridLayout.columns}
               />
             ))}
           </View>
@@ -311,6 +350,10 @@ const useStyles = (theme: AppTheme) =>
       gap: spacing.md,
       width: "100%",
       flex: 1,
+    },
+    compactGridContainer: {
+      justifyContent: "flex-start",
+      gap: spacing.sm,
     },
     loadingSkeleton: {
       flex: 1,

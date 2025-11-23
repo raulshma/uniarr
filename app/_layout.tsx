@@ -10,6 +10,10 @@ import { Platform, View } from "react-native";
 import { PaperProvider, Portal } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  configureReanimatedLogger,
+  ReanimatedLogLevel,
+} from "react-native-reanimated";
 
 import { queryClient } from "@/config/queryClient";
 import {
@@ -19,7 +23,11 @@ import {
 import { AuthProvider, useAuth } from "@/services/auth/AuthProvider";
 import { useTheme } from "@/hooks/useTheme";
 import { defaultTheme } from "@/constants/theme";
-import { ErrorBoundary, DialogProvider } from "@/components/common";
+import {
+  ErrorBoundary,
+  DialogProvider,
+  GlobalSnackbar,
+} from "@/components/common";
 import { OfflineIndicator } from "@/components/common/OfflineIndicator";
 import { DownloadManagerProvider } from "@/providers/DownloadManagerProvider";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
@@ -41,6 +49,12 @@ import {
   cleanupAsyncStorage,
 } from "@/utils/storage.migration";
 import { registerAllTools } from "@/services/ai/tools";
+
+// Disable Reanimated strict mode warnings for mixed Animated API usage
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
+});
 
 const RootLayout = () => {
   const theme = useTheme();
@@ -191,6 +205,7 @@ const RootLayout = () => {
                               <AppContent />
                             </ErrorBoundary>
                             <QueryDevtools />
+                            <GlobalSnackbar />
                           </DownloadManagerProvider>
                         </DialogProvider>
                       </WidgetDrawerProvider>
@@ -233,6 +248,7 @@ const RootLayout = () => {
                               <AppContent />
                             </ErrorBoundary>
                             <QueryDevtools />
+                            <GlobalSnackbar />
                           </DownloadManagerProvider>
                         </DialogProvider>
                       </WidgetDrawerProvider>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   OpenRouterService,
   OpenRouterModel,
@@ -48,21 +48,15 @@ export function useOpenRouterModels({
 
   const openRouterService = OpenRouterService.getInstance();
 
-  // Keep a ref to the filters so that `fetchModels` can be stable
-  // and not trigger effects on every filters object reference change.
-  const initialFilters = filters ?? {};
-  const filtersRef = useRef<ModelFilters>(initialFilters);
-  useEffect(() => {
-    filtersRef.current = filters ?? {};
-  }, [filters]);
-
+  // Use filters directly instead of syncing to ref
   const fetchModels = useCallback(
     async (customFilters?: ModelFilters) => {
       setLoading(true);
       setError(null);
 
       try {
-        const activeFilters = customFilters || filtersRef.current;
+        // Use customFilters if provided, otherwise use current filters prop
+        const activeFilters = customFilters ?? filters ?? {};
         const grouped = await openRouterService.getFilteredGroupedModels(
           activeFilters,
           apiKey,
@@ -95,7 +89,7 @@ export function useOpenRouterModels({
         setLoading(false);
       }
     },
-    [apiKey, openRouterService],
+    [apiKey, openRouterService, filters],
   );
 
   const refetch = useCallback(() => fetchModels(), [fetchModels]);

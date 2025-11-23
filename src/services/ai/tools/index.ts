@@ -42,10 +42,6 @@ export function registerAllTools(): void {
   // Skip registration if tools are already registered
   // This prevents duplicate registration errors during hot reloads or re-renders
   if (registry.count() > 0) {
-    void logger.debug("Tools already registered, skipping registration", {
-      toolCount: registry.count(),
-      toolNames: registry.getToolNames(),
-    });
     return;
   }
 
@@ -82,11 +78,6 @@ export function registerAllTools(): void {
 
     // Register MediaDetailsTool
     registry.register(mediaDetailsTool);
-
-    void logger.info("All AI tools registered successfully", {
-      toolCount: registry.count(),
-      toolNames: registry.getToolNames(),
-    });
 
     // Register built-in workflows
     registerBuiltInWorkflows();

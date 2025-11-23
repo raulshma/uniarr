@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { StyleSheet, View, ScrollView, RefreshControl } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
+import { useTheme } from "@/hooks/useTheme";
 import { useRouter } from "expo-router";
 import Animated from "react-native-reanimated";
 
@@ -16,7 +17,6 @@ import {
   FadeOut,
   ANIMATION_DURATIONS,
 } from "@/utils/animations.utils";
-import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
@@ -41,7 +41,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
   onEdit,
 }) => {
   const router = useRouter();
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const recentActivitySourceIds = useSettingsStore(
     (s) => s.recentActivitySourceServiceIds,
@@ -548,6 +548,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       >
         <WidgetHeader
           title={widget.title}
+          icon="clock-time-three"
           onEdit={onEdit}
           onRefresh={handleRefresh}
           refreshing={refreshing}
@@ -585,6 +586,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         >
           <WidgetHeader
             title={widget.title}
+            icon="clock-time-three"
             onEdit={onEdit}
             onRefresh={handleRefresh}
             refreshing={refreshing}
@@ -628,6 +630,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       >
         <WidgetHeader
           title={widget.title}
+          icon="clock-time-three"
           onEdit={onEdit}
           onRefresh={handleRefresh}
           refreshing={refreshing}
@@ -664,6 +667,7 @@ const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
     >
       <WidgetHeader
         title={widget.title}
+        icon="clock-time-three"
         onEdit={onEdit}
         onRefresh={handleRefresh}
         refreshing={refreshing}

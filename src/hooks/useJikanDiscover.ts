@@ -7,6 +7,7 @@ import {
 } from "@/services/jikan/JikanClient";
 import type { JikanAnime } from "@/models/jikan.types";
 import { queryKeys } from "@/hooks/queryKeys";
+import { QUERY_CONFIG } from "@/hooks/queryConfig";
 
 type DiscoverItem = {
   id: number;
@@ -60,7 +61,7 @@ export const useJikanTopAnime = ({
   enabled?: boolean;
 }) =>
   useQuery({
-    queryKey: [...queryKeys.discover.base, "jikan", "top", page],
+    queryKey: queryKeys.discover.jikan.top(page),
     queryFn: async () => {
       const data = await JikanClient.getTopAnime(page);
       const toRecord = (v: unknown): Record<string, unknown> | null =>
@@ -75,8 +76,7 @@ export const useJikanTopAnime = ({
       return uniqueById(mapped);
     },
     enabled,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    ...QUERY_CONFIG.ANIME,
   });
 
 export const useJikanRecommendations = ({
@@ -87,7 +87,9 @@ export const useJikanRecommendations = ({
   enabled?: boolean;
 }) =>
   useQuery({
-    queryKey: [...queryKeys.discover.base, "jikan", "recommendations", page],
+    queryKey: queryKeys.discover.jikan.recommendationsList(page),
+    enabled,
+    ...QUERY_CONFIG.ANIME,
     queryFn: async () => {
       const data = await JikanClient.getRecommendations(page);
       const toRecord = (v: unknown): Record<string, unknown> | null =>
@@ -177,14 +179,13 @@ export const useJikanRecommendations = ({
         .filter(Boolean) as DiscoverItem[];
       return uniqueById(mapped);
     },
-    enabled,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
   });
 
 export const useJikanSeasonNow = ({ enabled = true }: { enabled?: boolean }) =>
   useQuery({
-    queryKey: [...queryKeys.discover.base, "jikan", "seasons", "now"],
+    queryKey: queryKeys.discover.jikan.seasons.now,
+    enabled,
+    ...QUERY_CONFIG.ANIME,
     queryFn: async () => {
       const data = await JikanClient.getSeasonNow();
       const toRecord = (v: unknown): Record<string, unknown> | null =>
@@ -198,9 +199,6 @@ export const useJikanSeasonNow = ({ enabled = true }: { enabled?: boolean }) =>
       const mapped = list.map(mapAnime);
       return uniqueById(mapped);
     },
-    enabled,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
   });
 
 export const useJikanSeasonUpcoming = ({
@@ -209,7 +207,9 @@ export const useJikanSeasonUpcoming = ({
   enabled?: boolean;
 }) =>
   useQuery({
-    queryKey: [...queryKeys.discover.base, "jikan", "seasons", "upcoming"],
+    queryKey: queryKeys.discover.jikan.seasons.upcoming,
+    enabled,
+    ...QUERY_CONFIG.ANIME,
     queryFn: async () => {
       const data = await JikanClient.getSeasonUpcoming();
       const toRecord = (v: unknown): Record<string, unknown> | null =>
@@ -223,9 +223,6 @@ export const useJikanSeasonUpcoming = ({
       const mapped = list.map(mapAnime);
       return uniqueById(mapped);
     },
-    enabled,
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
   });
 
 export const useJikanDiscover = () => {

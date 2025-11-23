@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
@@ -387,7 +386,7 @@ export const useUnifiedDiscover = () => {
   const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const query = useQuery<UnifiedDiscoverPayload>({
-    queryKey: [...queryKeys.discover.unified, { tmdbEnabled }] as const,
+    queryKey: queryKeys.discover.unified({ tmdbEnabled }),
     queryFn: async (context) => {
       const payload = await fetchUnifiedDiscover(getConnectorsByType, {
         tmdbEnabled,
@@ -423,14 +422,9 @@ export const useUnifiedDiscover = () => {
     refetchOnWindowFocus: false,
   });
 
-  const services = useMemo(
-    () => query.data?.services ?? emptyServices,
-    [query.data?.services],
-  );
-  const sections = useMemo(
-    () => query.data?.sections ?? [],
-    [query.data?.sections],
-  );
+  // React Compiler handles simple extractions
+  const services = query.data?.services ?? emptyServices;
+  const sections = query.data?.sections ?? [];
 
   return {
     sections,

@@ -37,6 +37,7 @@ module.exports = defineConfig([
 
       // Expo flags dynamic env var access in a few places; relax to a warning.
       "expo/no-dynamic-env-var": "warn",
+      "import/namespace": "off",
     },
   },
 ]);

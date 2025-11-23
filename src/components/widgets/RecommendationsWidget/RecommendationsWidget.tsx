@@ -8,6 +8,7 @@ import { Image } from "expo-image";
 import type { AppTheme } from "@/constants/theme";
 import { useHaptics } from "@/hooks/useHaptics";
 import { spacing } from "@/theme/spacing";
+import { useAuth } from "@/services/auth/AuthProvider";
 import { borderRadius } from "@/constants/sizes";
 import type { Widget } from "@/services/widgets/WidgetService";
 import { widgetService } from "@/services/widgets/WidgetService";
@@ -25,8 +26,7 @@ import { ContentRecommendationService } from "@/services/ai/recommendations";
 import type { Recommendation } from "@/models/recommendation.schemas";
 import { logger } from "@/services/logger/LoggerService";
 
-// TODO: Replace with actual user ID from auth context
-const MOCK_USER_ID = "user_123";
+// Use the authenticated or guest user ID
 
 interface RecommendationsWidgetProps {
   widget: Widget;
@@ -49,6 +49,9 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cacheAge, setCacheAge] = useState<number | null>(null);
+
+  const { user } = useAuth();
+  const userId = user?.id ?? "guest";
 
   // Load recommendations
   useEffect(() => {
@@ -78,7 +81,7 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
         // Fetch fresh recommendations
         const service = ContentRecommendationService.getInstance();
         const response = await service.getRecommendations({
-          userId: MOCK_USER_ID,
+          userId,
           limit,
           includeHiddenGems: true,
         });
@@ -110,7 +113,7 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
     };
 
     void loadRecommendations();
-  }, [widget.id]);
+  }, [widget.id, userId]);
 
   const handleViewAll = () => {
     hapticPress();

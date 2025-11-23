@@ -10,6 +10,7 @@ import { base64Encode, base64Decode } from "@/utils/base64";
 import { secureStorage } from "@/services/storage/SecureStorage";
 import { useSettingsStore } from "@/store/settingsStore";
 import { type ServiceConfig, type ServiceType } from "@/models/service.types";
+import { type S3Credentials } from "@/models/s3.types";
 import {
   getStoredTmdbKey,
   setStoredTmdbKey,
@@ -54,6 +55,7 @@ export interface BackupExportOptions {
   includeApiLoggingConfig: boolean;
   includeConversationalAISettings: boolean;
   includeConversationalAIProviderConfig: boolean;
+  includeS3BackupConfig: boolean;
   encryptSensitive: boolean;
   password?: string;
 }
@@ -129,6 +131,11 @@ export interface BackupSelectionConfig {
   conversationalAIProviderConfig: {
     enabled: boolean;
     sensitive: boolean;
+  };
+  s3BackupConfig: {
+    enabled: boolean;
+    sensitive: boolean;
+    includeCredentials: boolean;
   };
 }
 
@@ -235,6 +242,19 @@ export interface EncryptedBackupData {
       selectedTitleModel: string | null;
       selectedTitleKeyId: string | null;
     };
+    s3BackupConfig?: {
+      config: {
+        s3BackupEnabled: boolean;
+        s3BucketName?: string;
+        s3Region?: string;
+        s3CustomEndpoint?: string;
+        s3ForcePathStyle?: boolean;
+        s3AutoBackupEnabled: boolean;
+        s3AutoBackupFrequency?: "daily" | "weekly" | "monthly";
+        s3DeleteLocalAfterUpload: boolean;
+      };
+      credentials?: S3Credentials;
+    };
   };
 }
 
@@ -340,6 +360,19 @@ export interface BackupData {
       selectedTitleProvider: any;
       selectedTitleModel: string | null;
       selectedTitleKeyId: string | null;
+    };
+    s3BackupConfig?: {
+      config: {
+        s3BackupEnabled: boolean;
+        s3BucketName?: string;
+        s3Region?: string;
+        s3CustomEndpoint?: string;
+        s3ForcePathStyle?: boolean;
+        s3AutoBackupEnabled: boolean;
+        s3AutoBackupFrequency?: "daily" | "weekly" | "monthly";
+        s3DeleteLocalAfterUpload: boolean;
+      };
+      credentials?: S3Credentials;
     };
   };
 }
@@ -1140,13 +1173,68 @@ class BackupRestoreService {
         }
       }
 
+      // Collect S3 backup configuration
+      if (options.includeS3BackupConfig) {
+        const settings = useSettingsStore.getState();
+        const s3Config = {
+          s3BackupEnabled: settings.s3BackupEnabled,
+          s3BucketName: settings.s3BucketName,
+          s3Region: settings.s3Region,
+          s3CustomEndpoint: settings.s3CustomEndpoint,
+          s3ForcePathStyle: settings.s3ForcePathStyle,
+          s3AutoBackupEnabled: settings.s3AutoBackupEnabled,
+          s3AutoBackupFrequency: settings.s3AutoBackupFrequency,
+          s3DeleteLocalAfterUpload: settings.s3DeleteLocalAfterUpload,
+        };
+
+        const s3Data: any = { config: s3Config };
+
+        // Collect S3 credentials
+        try {
+          const credentials = await secureStorage.getS3Credentials();
+          if (credentials) {
+            if (options.encryptSensitive) {
+              if (!sensitiveData.s3BackupConfig) {
+                sensitiveData.s3BackupConfig = {};
+              }
+              sensitiveData.s3BackupConfig.credentials = credentials;
+            } else {
+              s3Data.credentials = credentials;
+            }
+          }
+        } catch (error) {
+          await logger.warn("Failed to collect S3 credentials", {
+            location: "BackupRestoreService.createSelectiveBackup",
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        if (options.encryptSensitive) {
+          if (!sensitiveData.s3BackupConfig) {
+            sensitiveData.s3BackupConfig = {};
+          }
+          sensitiveData.s3BackupConfig.config = s3Config;
+        } else {
+          backupData.appData.s3BackupConfig = s3Data;
+        }
+
+        await logger.info("S3 backup configuration collected", {
+          location: "BackupRestoreService.createSelectiveBackup",
+          hasBucket: !!s3Config.s3BucketName,
+          hasCredentials: !!(
+            sensitiveData.s3BackupConfig?.credentials || s3Data.credentials
+          ),
+        });
+      }
+
       // Encrypt sensitive data if needed
       if (
         options.encryptSensitive &&
         (options.includeServiceCredentials ||
           options.includeTmdbCredentials ||
           options.includeSettings ||
-          options.includeWidgetSecureCredentials)
+          options.includeWidgetSecureCredentials ||
+          options.includeS3BackupConfig)
       ) {
         if (!options.password) {
           throw new Error("Password is required for encrypted backup");
@@ -2163,6 +2251,44 @@ class BackupRestoreService {
         }
       }
 
+      // Restore S3 backup configuration if available
+      if (backupData.appData.s3BackupConfig) {
+        try {
+          const { config, credentials } = backupData.appData.s3BackupConfig;
+          const settingsStore = useSettingsStore.getState();
+
+          if (config) {
+            settingsStore.setS3BackupEnabled(config.s3BackupEnabled);
+            settingsStore.setS3BucketName(config.s3BucketName);
+            settingsStore.setS3Region(config.s3Region);
+            settingsStore.setS3CustomEndpoint(config.s3CustomEndpoint);
+            settingsStore.setS3ForcePathStyle(config.s3ForcePathStyle ?? false);
+            settingsStore.setS3AutoBackupEnabled(config.s3AutoBackupEnabled);
+            settingsStore.setS3AutoBackupFrequency(
+              config.s3AutoBackupFrequency,
+            );
+            settingsStore.setS3DeleteLocalAfterUpload(
+              config.s3DeleteLocalAfterUpload,
+            );
+          }
+
+          if (credentials) {
+            await secureStorage.saveS3Credentials(credentials);
+          }
+
+          await logger.info("S3 backup configuration restored", {
+            location: "BackupRestoreService.restoreBackup",
+            hasConfig: !!config,
+            hasCredentials: !!credentials,
+          });
+        } catch (s3Error) {
+          await logger.warn("Failed to restore S3 backup configuration", {
+            location: "BackupRestoreService.restoreBackup",
+            error: s3Error instanceof Error ? s3Error.message : String(s3Error),
+          });
+        }
+      }
+
       // Post-restore: clear caches and reload services from restored configs
       const manager = ConnectorManager.getInstance();
       manager.dispose();
@@ -2277,6 +2403,7 @@ class BackupRestoreService {
       includeApiLoggingConfig: true,
       includeConversationalAISettings: true,
       includeConversationalAIProviderConfig: true,
+      includeS3BackupConfig: true,
       encryptSensitive: false,
     };
   }
@@ -2356,6 +2483,11 @@ class BackupRestoreService {
       conversationalAIProviderConfig: {
         enabled: true,
         sensitive: false,
+      },
+      s3BackupConfig: {
+        enabled: true,
+        sensitive: true,
+        includeCredentials: true,
       },
     };
   }

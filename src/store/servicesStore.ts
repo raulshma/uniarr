@@ -112,13 +112,148 @@ export const useServicesStore = create<ServicesState>()(
   ),
 );
 
+// ============================================================================
+// Individual Data Selectors - Use these for granular access
+// ============================================================================
+
+/**
+ * Selects the active service ID only
+ * Components using this only re-render when the active service changes
+ */
 export const selectActiveServiceId = (state: ServicesState): string | null =>
   state.activeServiceId;
+
+/**
+ * Selects the selected service IDs array only
+ * Components using this only re-render when the selection changes
+ */
 export const selectSelectedServiceIds = (state: ServicesState): string[] =>
   state.selectedServiceIds;
+
+/**
+ * Selects the view mode only
+ * Components using this only re-render when the view mode changes
+ */
 export const selectViewMode = (state: ServicesState): ServicesViewMode =>
   state.viewMode;
+
+/**
+ * Selects the sort key only
+ * Components using this only re-render when the sort key changes
+ */
 export const selectSortKey = (state: ServicesState): ServicesSortKey =>
   state.sortKey;
+
+/**
+ * Selects the sort direction only
+ * Components using this only re-render when the sort direction changes
+ */
 export const selectSortDirection = (state: ServicesState): SortDirection =>
   state.sortDirection;
+
+/**
+ * Selects the count of selected services
+ * Components using this only re-render when the selection count changes
+ */
+export const selectSelectedServiceCount = (state: ServicesState): number =>
+  state.selectedServiceIds.length;
+
+/**
+ * Checks if a specific service is selected
+ * Returns boolean, useful for conditional rendering
+ */
+export const selectIsServiceSelected =
+  (serviceId: string) =>
+  (state: ServicesState): boolean =>
+    state.selectedServiceIds.includes(serviceId);
+
+/**
+ * Checks if any services are selected
+ * Returns boolean, useful for conditional rendering
+ */
+export const selectHasSelection = (state: ServicesState): boolean =>
+  state.selectedServiceIds.length > 0;
+
+/**
+ * Checks if a specific service is active
+ * Returns boolean, useful for conditional rendering
+ */
+export const selectIsServiceActive =
+  (serviceId: string) =>
+  (state: ServicesState): boolean =>
+    state.activeServiceId === serviceId;
+
+// ============================================================================
+// Grouped Data Selectors - Use these when multiple related values are needed
+// Use with shallow equality to prevent re-renders
+// ============================================================================
+
+/**
+ * Selects sort configuration (key and direction)
+ * Use with shallow: useServicesStore(selectSortConfig, shallow)
+ */
+export const selectSortConfig = (state: ServicesState) => ({
+  sortKey: state.sortKey,
+  sortDirection: state.sortDirection,
+});
+
+/**
+ * Selects selection state (active and selected IDs)
+ * Use with shallow: useServicesStore(selectSelectionState, shallow)
+ */
+export const selectSelectionState = (state: ServicesState) => ({
+  activeServiceId: state.activeServiceId,
+  selectedServiceIds: state.selectedServiceIds,
+  selectedCount: state.selectedServiceIds.length,
+  hasSelection: state.selectedServiceIds.length > 0,
+});
+
+/**
+ * Selects view configuration (mode and sort)
+ * Use with shallow: useServicesStore(selectViewConfig, shallow)
+ */
+export const selectViewConfig = (state: ServicesState) => ({
+  viewMode: state.viewMode,
+  sortKey: state.sortKey,
+  sortDirection: state.sortDirection,
+});
+
+// ============================================================================
+// Action Selectors - These never cause re-renders
+// Use these when you only need to call actions, not read data
+// ============================================================================
+
+/**
+ * Selects selection management actions only
+ * These are stable references that never change
+ */
+export const selectSelectionActions = (state: ServicesState) => ({
+  setActiveServiceId: state.setActiveServiceId,
+  setSelectedServiceIds: state.setSelectedServiceIds,
+  toggleServiceSelection: state.toggleServiceSelection,
+  clearSelection: state.clearSelection,
+});
+
+/**
+ * Selects view management actions only
+ * These are stable references that never change
+ */
+export const selectViewActions = (state: ServicesState) => ({
+  setViewMode: state.setViewMode,
+  setSort: state.setSort,
+});
+
+/**
+ * Selects all action functions
+ * Use this when you need multiple actions
+ * These are stable references that never change
+ */
+export const selectAllActions = (state: ServicesState) => ({
+  setActiveServiceId: state.setActiveServiceId,
+  setSelectedServiceIds: state.setSelectedServiceIds,
+  toggleServiceSelection: state.toggleServiceSelection,
+  clearSelection: state.clearSelection,
+  setViewMode: state.setViewMode,
+  setSort: state.setSort,
+  reset: state.reset,
+});

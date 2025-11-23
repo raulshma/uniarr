@@ -128,7 +128,7 @@ export const useTransmissionTorrents = (
   const invalidateData = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: queryKeys.transmission.service(serviceId),
+        queryKey: queryKeys.transmission.torrents(serviceId),
       }),
       queryClient.invalidateQueries({
         queryKey: queryKeys.transmission.transferInfo(serviceId),
@@ -183,7 +183,7 @@ export const useTransmissionTorrents = (
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.transmission.service(serviceId),
+        queryKey: queryKeys.transmission.torrents(serviceId),
       });
     },
   });

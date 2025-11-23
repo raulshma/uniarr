@@ -4,6 +4,15 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { alert } from "@/services/dialogService";
 import { Text, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  findJellyfinItemByExternalIds,
+  getFirstJellyfinServiceId,
+} from "@/utils/jellyfin.utils";
+import {
+  showLoadingSnackbar,
+  dismissSnackbar,
+  showErrorSnackbar,
+} from "@/services/snackbarService";
 
 import { Button } from "@/components/common/Button";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -250,6 +259,78 @@ const SonarrSeriesDetailsScreen = () => {
     [router, series, serviceKey, numericSeriesId],
   );
 
+  const handleEpisodePosterPress = useCallback(
+    async (episode: any) => {
+      if (!series) return;
+
+      // Find which season this episode belongs to
+      let seasonNumber = 0;
+      for (const season of series.seasons || []) {
+        const foundEpisode = season.episodes?.find(
+          (ep) =>
+            ep.id === episode.id || ep.episodeNumber === episode.episodeNumber,
+        );
+        if (foundEpisode) {
+          seasonNumber = season.seasonNumber;
+          break;
+        }
+      }
+
+      // Get Jellyfin service ID
+      const jellyfinServiceId = getFirstJellyfinServiceId();
+      if (!jellyfinServiceId) {
+        alert(
+          "Jellyfin Not Configured",
+          "Please add a Jellyfin service to play episodes.",
+        );
+        return;
+      }
+
+      // Show loading snackbar
+      showLoadingSnackbar("Searching Jellyfin...");
+
+      try {
+        // Find the Jellyfin item
+        const jellyfinItem = await findJellyfinItemByExternalIds(
+          jellyfinServiceId,
+          {
+            tmdbId: series.tmdbId,
+            tvdbId: series.tvdbId,
+            imdbId: series.imdbId,
+            episodeNumber: episode.episodeNumber,
+            seasonNumber: seasonNumber,
+            type: "Episode",
+          },
+        );
+
+        // Dismiss loading snackbar
+        dismissSnackbar();
+
+        if (!jellyfinItem?.Id) {
+          showErrorSnackbar(
+            `Episode not found in Jellyfin: S${seasonNumber}E${episode.episodeNumber}`,
+          );
+          return;
+        }
+
+        // Navigate to Jellyfin
+        router.push({
+          pathname: `/jellyfin/[serviceId]/details/[itemId]`,
+          params: {
+            serviceId: jellyfinServiceId,
+            itemId: jellyfinItem.Id,
+          },
+        });
+      } catch (error) {
+        dismissSnackbar();
+        showErrorSnackbar(
+          `Failed to search Jellyfin: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+      }
+    },
+    [router, series],
+  );
+
   // Handle error states outside of sheet for immediate feedback
   if (!serviceId || !isSeriesIdValid) {
     return (
@@ -390,6 +471,7 @@ const SonarrSeriesDetailsScreen = () => {
                 contentId={numericSeriesId.toString()}
                 totalSizeOnDiskMB={series.totalSizeOnDiskMB}
                 onEpisodeLongPress={handleEpisodeLongPress}
+                onEpisodePosterPress={handleEpisodePosterPress}
               />
             </DetailHero>
           </AnimatedSection>

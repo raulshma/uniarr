@@ -6,7 +6,8 @@ import {
   FlatList,
   ImageBackground,
 } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
+import { useTheme } from "@/hooks/useTheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
@@ -15,7 +16,6 @@ import { useHaptics } from "@/hooks/useHaptics";
 import { Card } from "@/components/common";
 import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { createCalendarNavigation } from "@/utils/navigation.utils";
-import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 import { borderRadius } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
@@ -54,7 +54,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
   onRefresh,
   onEdit,
 }) => {
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const router = useRouter();
   const { onPress } = useHaptics();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
@@ -421,6 +421,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
         <View style={styles.container}>
           <WidgetHeader
             title={widget.title}
+            icon="calendar"
             onRefresh={handleRefresh}
             onEdit={onEdit}
           />
@@ -443,6 +444,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
         >
           <WidgetHeader
             title={widget.title}
+            icon="calendar"
             onRefresh={handleRefresh}
             onEdit={onEdit}
           />
@@ -489,6 +491,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
         <View style={styles.container}>
           <WidgetHeader
             title={widget.title}
+            icon="calendar"
             onRefresh={handleRefresh}
             onEdit={onEdit}
           />
@@ -514,6 +517,7 @@ const CalendarPreviewWidget: React.FC<CalendarPreviewWidgetProps> = ({
       <View style={styles.container}>
         <WidgetHeader
           title={widget.title}
+          icon="calendar"
           onRefresh={handleRefresh}
           onEdit={onEdit}
         />

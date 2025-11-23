@@ -46,6 +46,7 @@ import { useTmdbKey } from "@/hooks/useTmdbKey";
 import { useSettingsStore } from "@/store/settingsStore";
 import { shouldAnimateLayout } from "@/utils/animations.utils";
 import { alert } from "@/services/dialogService";
+import QuickViewModal from "@/components/anime/QuickViewModal";
 
 const placeholderText = "Search for movies, shows, and more";
 type DiscoverSection = ReturnType<
@@ -57,11 +58,19 @@ interface DiscoverCardProps {
   isInLibrary: boolean;
   onAdd: (media: DiscoverMediaItem) => void;
   onPress: (media: DiscoverMediaItem) => void;
+  onLongPress: (media: DiscoverMediaItem, layout: any) => void;
   theme: AppTheme;
 }
 
 const DiscoverCard = React.memo(
-  ({ item, isInLibrary, onAdd, onPress, theme }: DiscoverCardProps) => {
+  ({
+    item,
+    isInLibrary,
+    onAdd,
+    onPress,
+    onLongPress,
+    theme,
+  }: DiscoverCardProps) => {
     const styles = useMemo(
       () =>
         StyleSheet.create({
@@ -102,14 +111,27 @@ const DiscoverCard = React.memo(
       [theme],
     );
 
+    const posterRef = React.useRef<View>(null);
+
     const handlePress = useCallback(() => {
       onPress(item);
     }, [item, onPress]);
 
+    const handleLongPress = useCallback(() => {
+      posterRef.current?.measureInWindow((x, y, width, height) => {
+        onLongPress(item, { x, y, width, height, pageX: x, pageY: y });
+      });
+    }, [item, onLongPress]);
+
     return (
       <View style={styles.container} pointerEvents="box-none">
         <View style={styles.innerWrapper} pointerEvents="box-none">
-          <View style={styles.posterWrapper} pointerEvents="box-none">
+          <Pressable
+            ref={posterRef}
+            style={styles.posterWrapper}
+            onPress={handlePress}
+            onLongPress={handleLongPress}
+          >
             {isInLibrary && (
               <Badge style={styles.badge} size={20}>
                 ✓
@@ -118,7 +140,6 @@ const DiscoverCard = React.memo(
             <MediaPoster
               uri={item.posterUrl}
               size={152}
-              onPress={handlePress}
               overlay={
                 <IconButton
                   icon="plus"
@@ -132,7 +153,7 @@ const DiscoverCard = React.memo(
                 />
               }
             />
-          </View>
+          </Pressable>
           <Text numberOfLines={2} style={styles.title}>
             {item.title}
           </Text>
@@ -218,6 +239,25 @@ const DiscoverScreen = () => {
     undefined,
   );
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+
+  // QuickViewModal state
+  const [quickViewData, setQuickViewData] = useState<{
+    item: {
+      id: number | string;
+      title: string;
+      posterUrl?: string;
+      rating?: number;
+      overview?: string;
+    };
+    layout: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      pageX: number;
+      pageY: number;
+    };
+  } | null>(null);
 
   // Banner delay effect
   useEffect(() => {
@@ -415,6 +455,22 @@ const DiscoverScreen = () => {
     [router],
   );
 
+  const handleCardLongPress = useCallback(
+    (item: DiscoverMediaItem, layout: any) => {
+      setQuickViewData({
+        item: {
+          id: item.id,
+          title: item.title,
+          posterUrl: item.posterUrl,
+          rating: item.rating,
+          overview: item.overview,
+        },
+        layout,
+      });
+    },
+    [],
+  );
+
   const handleDialogDismiss = useCallback(() => {
     setDialogVisible(false);
     setDialogItem(undefined);
@@ -521,6 +577,7 @@ const DiscoverScreen = () => {
                     item={item}
                     isInLibrary={isInLibrary}
                     onPress={handleCardPress}
+                    onLongPress={handleCardLongPress}
                     onAdd={openServicePicker}
                     theme={theme}
                   />
@@ -719,6 +776,13 @@ const DiscoverScreen = () => {
               </PaperButton>
             </Dialog.Actions>
           </Dialog>
+
+          <QuickViewModal
+            visible={!!quickViewData}
+            item={quickViewData?.item ?? null}
+            initialLayout={quickViewData?.layout ?? null}
+            onClose={() => setQuickViewData(null)}
+          />
         </Portal>
       </PageTransition>
     </SafeAreaView>

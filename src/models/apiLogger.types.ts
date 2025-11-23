@@ -136,6 +136,10 @@ export interface AiApiLogMetadata {
   costUsd?: number;
   extras?: Record<string, unknown>;
   fallbackReason?: string;
+  messageCount?: number;
+  usage?: unknown;
+  errorLocation?: string;
+  toolCount?: number;
 }
 
 export interface AiApiLogEntry {

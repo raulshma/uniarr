@@ -55,6 +55,7 @@ const mergeThemeConfig = (
 };
 
 export const useThemeEditor = () => {
+  // Compute hydration status directly (derived state)
   const [isHydrated, setIsHydrated] = useState(
     useSettingsStore.persist.hasHydrated(),
   );
@@ -68,17 +69,21 @@ export const useThemeEditor = () => {
   const themePreference = useSettingsStore((state) => state.theme);
   const systemColorScheme = useColorScheme();
 
+  // Only use effect for external subscription (legitimate)
   useEffect(() => {
-    if (isHydrated) {
+    // If already hydrated, no need to subscribe
+    if (useSettingsStore.persist.hasHydrated()) {
+      setIsHydrated(true);
       return;
     }
 
+    // Subscribe to hydration completion
     const unsubscribe = useSettingsStore.persist.onFinishHydration(() => {
       setIsHydrated(true);
     });
 
     return unsubscribe;
-  }, [isHydrated]);
+  }, []); // Empty deps - only subscribe once
 
   const updateConfig = useCallback((updates: Partial<CustomThemeConfig>) => {
     useSettingsStore.setState((state) => ({
@@ -100,17 +105,13 @@ export const useThemeEditor = () => {
 
   const config = isHydrated ? customThemeConfig : defaultCustomThemeConfig;
 
-  const isDarkMode = useMemo(() => {
-    if (themePreference === "dark") {
-      return true;
-    }
-
-    if (themePreference === "light") {
-      return false;
-    }
-
-    return systemColorScheme !== "light";
-  }, [themePreference, systemColorScheme]);
+  // React Compiler handles simple conditional logic
+  const isDarkMode =
+    themePreference === "dark"
+      ? true
+      : themePreference === "light"
+        ? false
+        : systemColorScheme !== "light";
 
   const previewTheme = useMemo<AppTheme>(() => {
     return createCustomTheme(config, isDarkMode);

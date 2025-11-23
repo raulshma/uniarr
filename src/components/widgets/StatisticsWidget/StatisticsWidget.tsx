@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { StyleSheet, View, TouchableOpacity } from "react-native";
 import Animated from "react-native-reanimated";
-import { Text, useTheme, Button, Portal, Dialog } from "react-native-paper";
+import { Text, Button, Portal, Dialog } from "react-native-paper";
+import { useTheme } from "@/hooks/useTheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { SkeletonPlaceholder } from "@/components/common/Skeleton";
@@ -9,7 +10,6 @@ import { Card } from "@/components/common";
 import WidgetHeader from "@/components/widgets/common/WidgetHeader";
 import { widgetService, type Widget } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
-import type { AppTheme } from "@/constants/theme";
 import { borderRadius, iconSizes } from "@/constants/sizes";
 import { getComponentElevation } from "@/constants/elevation";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
@@ -36,7 +36,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
   onRefresh,
   onEdit,
 }) => {
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const { onPress } = useHaptics();
   const frostedEnabled = useSettingsStore((s) => s.frostedWidgetsEnabled);
   const [statistics, setStatistics] = useState<StatisticsData>({
@@ -380,6 +380,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
         <View style={styles.container}>
           <WidgetHeader
             title={widget.title}
+            icon="chart-box"
             onEdit={onEdit}
             onRefresh={handleRefresh}
           />
@@ -395,6 +396,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
         <View style={styles.container}>
           <WidgetHeader
             title={widget.title}
+            icon="chart-box"
             onEdit={onEdit}
             onRefresh={handleRefresh}
           />
@@ -430,6 +432,7 @@ const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({
       <View style={styles.container}>
         <WidgetHeader
           title={widget.title}
+          icon="chart-box"
           onEdit={onEdit}
           onRefresh={handleRefresh}
           additionalActions={

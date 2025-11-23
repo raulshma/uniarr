@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, Pressable, View } from "react-native";
-import { Icon, Text, useTheme } from "react-native-paper";
+import { Text, useTheme } from "react-native-paper";
 
 import type { AppTheme } from "@/constants/theme";
 import type { MediaRelease } from "@/models/calendar.types";
@@ -31,76 +31,81 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
 
   const styles = StyleSheet.create({
     container: {
-      backgroundColor: compact
-        ? theme.colors.surfaceVariant
-        : theme.colors.surface,
-      borderRadius: compact ? 12 : 18,
-      paddingVertical: compact
-        ? theme.custom.spacing.xs
-        : theme.custom.spacing.sm,
-      paddingHorizontal: compact
-        ? theme.custom.spacing.sm
-        : theme.custom.spacing.md,
+      backgroundColor: theme.colors.surface,
+      borderRadius: compact ? 16 : 24,
+      padding: compact ? theme.custom.spacing.sm : theme.custom.spacing.md,
       flexDirection: "row",
       alignItems: "center",
-      gap: compact ? theme.custom.spacing.xs : theme.custom.spacing.md,
-      borderWidth: compact ? StyleSheet.hairlineWidth : 0,
-      borderColor: compact ? theme.colors.outlineVariant : "transparent",
+      gap: theme.custom.spacing.md,
+      // Subtle shadow
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
       marginBottom: compact ? 0 : theme.custom.spacing.sm,
     },
     pressable: {
       flex: 1,
-    },
-    content: {
       flexDirection: "row",
       alignItems: "center",
-      flex: 1,
-      gap: compact ? theme.custom.spacing.xs : theme.custom.spacing.md,
+      gap: theme.custom.spacing.md,
     },
     posterContainer: {
-      width: compact ? 56 : 80,
+      width: compact ? 48 : 72,
+      aspectRatio: 2 / 3,
+      borderRadius: compact ? 8 : 12,
+      backgroundColor: theme.colors.surfaceVariant,
+      // Poster shadow
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
     },
     info: {
       flex: 1,
-      minWidth: 0,
+      justifyContent: "center",
+      gap: 2,
     },
     title: {
       fontSize: compact
-        ? theme.custom.typography.titleSmall.fontSize
-        : theme.custom.typography.titleMedium.fontSize,
-      fontFamily: compact
-        ? theme.custom.typography.titleSmall.fontFamily
-        : theme.custom.typography.titleMedium.fontFamily,
-      fontWeight: compact
-        ? (theme.custom.typography.titleSmall.fontWeight as any)
-        : (theme.custom.typography.titleMedium.fontWeight as any),
-      lineHeight: compact
-        ? theme.custom.typography.titleSmall.lineHeight
-        : theme.custom.typography.titleMedium.lineHeight,
-      letterSpacing: compact
-        ? theme.custom.typography.titleSmall.letterSpacing
-        : theme.custom.typography.titleMedium.letterSpacing,
+        ? theme.custom.typography.titleMedium.fontSize
+        : theme.custom.typography.titleLarge.fontSize,
+      fontFamily: theme.custom.typography.titleMedium.fontFamily,
+      fontWeight: "600",
       color: theme.colors.onSurface,
+      letterSpacing: -0.2,
     },
-    subtitle: {
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    metaText: {
       fontSize: theme.custom.typography.bodySmall.fontSize,
       fontFamily: theme.custom.typography.bodySmall.fontFamily,
-      fontWeight: theme.custom.typography.bodySmall.fontWeight as any,
-      lineHeight: theme.custom.typography.bodySmall.lineHeight,
-      letterSpacing: theme.custom.typography.bodySmall.letterSpacing,
       color: theme.colors.onSurfaceVariant,
-      marginTop: theme.custom.spacing.xxs,
     },
-    trailing: {
-      width: compact ? 32 : 40,
-      height: compact ? 32 : 40,
-      borderRadius: compact ? 16 : 20,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.surfaceVariant,
+    dot: {
+      width: 3,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: theme.colors.outline,
     },
-    trailingSelected: {
-      backgroundColor: theme.colors.primaryContainer,
+    episodeCode: {
+      color: theme.colors.primary,
+      fontWeight: "600",
+    },
+    statusIndicator: {
+      width: 4,
+      height: "60%",
+      borderRadius: 2,
+      backgroundColor: release.monitored
+        ? theme.colors.primary
+        : theme.colors.outlineVariant,
+      opacity: 0.8,
     },
   });
 
@@ -117,40 +122,48 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
     }
   }, [release.type]);
 
-  const subtitle = useMemo(() => {
-    const parts: string[] = [];
+  const renderMeta = () => {
+    const parts: React.ReactNode[] = [];
 
-    parts.push(typeConfig.label);
+    // Type Label
+    parts.push(
+      <Text key="type" style={styles.metaText}>
+        {typeConfig.label}
+      </Text>,
+    );
 
+    // Episode Info
     if (release.type === "episode") {
       if (release.seasonNumber && release.episodeNumber) {
         const season = String(release.seasonNumber).padStart(2, "0");
         const episode = String(release.episodeNumber).padStart(2, "0");
-        parts.push(`S${season}E${episode}`);
-      } else if (release.seriesTitle) {
-        parts.push(release.seriesTitle);
+        parts.push(
+          <View key="dot1" style={styles.dot} />,
+          <Text key="ep" style={[styles.metaText, styles.episodeCode]}>
+            S{season}E{episode}
+          </Text>,
+        );
       }
     }
 
-    const releaseDate = release.releaseDate ? release.releaseDate : undefined;
-    if (releaseDate) {
-      parts.push(formatTimeToRelease(releaseDate));
+    // Release Time
+    if (release.releaseDate) {
+      parts.push(
+        <View key="dot2" style={styles.dot} />,
+        <Text key="time" style={styles.metaText}>
+          {formatTimeToRelease(release.releaseDate)}
+        </Text>,
+      );
     }
 
-    return parts.join(" • ");
-  }, [release, typeConfig.label]);
-
-  const monitored = release.monitored ?? false;
-  const statusIcon = monitored ? "check-circle" : "bookmark-outline";
-  const statusColor = monitored
-    ? theme.colors.onPrimaryContainer
-    : theme.colors.onSurfaceVariant;
+    return <View style={styles.metaRow}>{parts}</View>;
+  };
 
   return (
     <AnimatedCard
       style={[
         styles.container,
-        isPressed && !compact ? { opacity: 0.9 } : null,
+        isPressed && { transform: [{ scale: 0.98 }] },
         style,
       ]}
       delay={animationDelay}
@@ -164,29 +177,32 @@ const MediaReleaseCard: React.FC<MediaReleaseCardProps> = ({
         accessibilityRole="button"
         accessibilityLabel={`${release.title}, ${typeConfig.label}`}
       >
-        <View style={styles.content}>
-          <View style={styles.posterContainer}>
-            <MediaPoster
-              uri={release.posterUrl}
-              size={compact ? 56 : 80}
-              borderRadius={14}
-              showPlaceholderLabel={false}
-            />
-          </View>
-
-          <View style={styles.info}>
-            <Text style={styles.title} numberOfLines={compact ? 1 : 2}>
-              {release.title}
-            </Text>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {subtitle}
-            </Text>
-          </View>
-
-          <View style={[styles.trailing, monitored && styles.trailingSelected]}>
-            <Icon source={statusIcon} size={20} color={statusColor} />
-          </View>
+        <View style={styles.posterContainer}>
+          <MediaPoster
+            uri={release.posterUrl}
+            size={compact ? 48 : 72} // This prop might be ignored if style overrides, but good for placeholder sizing
+            borderRadius={compact ? 8 : 12}
+            showPlaceholderLabel={false}
+            style={{ width: "100%", height: "100%" }}
+          />
         </View>
+
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={1}>
+            {release.title}
+          </Text>
+          {release.seriesTitle && release.type === "episode" && (
+            <Text
+              style={[styles.metaText, { marginBottom: 2 }]}
+              numberOfLines={1}
+            >
+              {release.seriesTitle}
+            </Text>
+          )}
+          {renderMeta()}
+        </View>
+
+        <View style={styles.statusIndicator} />
       </Pressable>
     </AnimatedCard>
   );

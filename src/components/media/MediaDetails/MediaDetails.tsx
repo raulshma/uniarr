@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Linking, ScrollView, View, Pressable } from "react-native";
+import { ScrollView, View, Pressable } from "react-native";
 import {
   Chip,
   Text,
@@ -20,11 +20,6 @@ import type { ServiceConfig } from "@/models/service.types";
 import { MediaPoster } from "@/components/media/MediaPoster";
 import { DownloadButton } from "@/components/downloads";
 import type { MediaKind } from "@/components/media/MediaCard";
-import {
-  useSettingsStore,
-  selectJellyfinLocalAddress,
-  selectJellyfinPublicAddress,
-} from "@/store/settingsStore";
 import { alert } from "@/services/dialogService";
 
 export type MediaDetailsProps = {
@@ -109,6 +104,10 @@ export type MediaDetailsProps = {
   testID?: string;
   /** Callback when an episode is long-pressed */
   onEpisodeLongPress?: (episodeId: string, episode: any) => void;
+  /** Callback when an episode poster is pressed */
+  onEpisodePosterPress?: (episode: any) => void;
+  /** Callback when the main poster is pressed (for movies/series) */
+  onPosterPress?: () => void;
 };
 
 // Removed top-level MB-based formatter (duplicate). Per-file helpers are defined below where needed.
@@ -159,6 +158,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   contentId,
   totalSizeOnDiskMB,
   onEpisodeLongPress,
+  onEpisodePosterPress,
+  onPosterPress,
 }) => {
   const theme = useTheme<AppTheme>();
   // episodesModalVisible removed — seasons use inline selectedSeason state instead
@@ -166,9 +167,6 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarOnRetry] = useState<(() => void) | null>(null);
-
-  const jellyfinLocalAddress = useSettingsStore(selectJellyfinLocalAddress);
-  const jellyfinPublicAddress = useSettingsStore(selectJellyfinPublicAddress);
 
   const handleMonitorPress = useCallback(() => {
     if (!onToggleMonitor) {
@@ -195,51 +193,18 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
     [onToggleSeasonMonitor],
   );
 
-  const handleViewOnJellyfin = useCallback(async () => {
-    // Determine which Jellyfin address to use (prefer public, fallback to local)
-    const jellyfinAddress = jellyfinPublicAddress || jellyfinLocalAddress;
-
-    if (!jellyfinAddress) {
-      alert(
-        "Jellyfin Not Configured",
-        "Please configure your Jellyfin server address in settings to use this feature.",
-      );
-      return;
-    }
-
-    // Construct search URL using external IDs (IMDB preferred for broadest compatibility)
-    let searchUrl: string;
-    if (imdbId) {
-      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=imdb:${imdbId}`;
-    } else if (tmdbId) {
-      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=tmdb:${tmdbId}`;
-    } else if (tvdbId) {
-      searchUrl = `${jellyfinAddress}/web/index.html#!/search.html?q=tvdb:${tvdbId}`;
+  const handleViewOnJellyfin = useCallback(() => {
+    // Trigger the onPosterPress callback if provided (for movies/series)
+    // This will handle the Jellyfin search and navigation
+    if (onPosterPress) {
+      onPosterPress();
     } else {
       alert(
-        "No External IDs",
-        "This media item doesn't have external IDs (IMDB, TMDB, TVDB) required for Jellyfin linking.",
-      );
-      return;
-    }
-
-    try {
-      const canOpen = await Linking.canOpenURL(searchUrl);
-      if (canOpen) {
-        await Linking.openURL(searchUrl);
-      } else {
-        alert(
-          "Cannot Open Link",
-          "Unable to open Jellyfin link. Please check your Jellyfin server address in settings.",
-        );
-      }
-    } catch (error) {
-      alert(
-        "Error Opening Jellyfin",
-        `Failed to open Jellyfin: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "Not Available",
+        "Jellyfin navigation is not available for this item.",
       );
     }
-  }, [jellyfinLocalAddress, jellyfinPublicAddress, imdbId, tmdbId, tvdbId]);
+  }, [onPosterPress]);
 
   const handleRemoveAndSearchEpisode = useCallback(
     (episodeFileId: number, seasonNumber: number, episodeNumber: number) => {
@@ -318,13 +283,15 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
           entering={ZoomIn.duration(400).springify()}
           style={{ alignItems: "center", paddingVertical: 20 }}
         >
-          <MediaPoster
-            uri={posterUri}
-            size={280}
-            borderRadius={16}
-            accessibilityLabel={`${title} poster`}
-            showPlaceholderLabel
-          />
+          <Pressable onPress={onPosterPress}>
+            <MediaPoster
+              uri={posterUri}
+              size={280}
+              borderRadius={16}
+              accessibilityLabel={`${title} poster`}
+              showPlaceholderLabel
+            />
+          </Pressable>
         </Animated.View>
       ) : null}
 
@@ -576,8 +543,8 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
           </Button>
         </View>
 
-        {/* View on Jellyfin button - show if we have external IDs */}
-        {(imdbId || tmdbId || tvdbId) && (
+        {/* Play on Jellyfin button - show if we have external IDs and onPosterPress handler */}
+        {(imdbId || tmdbId || tvdbId) && onPosterPress && (
           <Button
             mode="outlined"
             onPress={handleViewOnJellyfin}
@@ -589,7 +556,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
             }}
             labelStyle={{ fontWeight: "600" }}
           >
-            View on Jellyfin
+            Play on Jellyfin
           </Button>
         )}
       </Animated.View>
@@ -775,7 +742,10 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                           : theme.colors.error,
                       }}
                     >
-                      <View style={{ alignItems: "center", marginBottom: 12 }}>
+                      <Pressable
+                        onPress={() => onEpisodePosterPress?.(episode)}
+                        style={{ alignItems: "center", marginBottom: 12 }}
+                      >
                         <MediaPoster
                           uri={episode.posterUrl}
                           size={80}
@@ -783,7 +753,7 @@ const MediaDetails: React.FC<MediaDetailsProps> = ({
                           accessibilityLabel={`Episode ${episode.episodeNumber} poster`}
                           showPlaceholderLabel
                         />
-                      </View>
+                      </Pressable>
 
                       <Text
                         variant="bodyMedium"

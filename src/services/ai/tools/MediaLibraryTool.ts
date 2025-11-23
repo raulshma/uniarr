@@ -135,8 +135,6 @@ export const mediaLibraryTool: ToolDefinition<
     const connectorManager = context.getConnectorManager();
 
     try {
-      void logger.debug("MediaLibraryTool execution started", { params });
-
       // Collect all media items from relevant connectors
       const allItems: MediaLibraryItem[] = [];
       const serviceTypes = new Set<string>();

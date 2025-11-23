@@ -25,7 +25,14 @@ import type {
   DownloadInfo,
 } from "@/connectors/base/IDownloadConnector";
 import { ServiceAuthHelper } from "@/services/auth/ServiceAuthHelper";
+import { authManager } from "@/services/auth/AuthManager";
 import { logger } from "@/services/logger/LoggerService";
+import type {
+  LogQueryOptions,
+  ServiceLog,
+  ServiceLogLevel,
+} from "@/models/logger.types";
+import { handleApiError } from "@/utils/error.utils";
 
 const DEFAULT_RESUME_TYPES = ["Movie", "Episode"];
 const DEFAULT_SEARCH_TYPES = ["Movie", "Series", "Episode"];
@@ -83,13 +90,23 @@ export class JellyfinConnector
 
     this.client.interceptors.request.use((requestConfig) => {
       const authHeaders = ServiceAuthHelper.getServiceAuthHeaders(this.config);
-      const headers = requestConfig.headers ?? {};
+
+      void logger.debug("Jellyfin request interceptor - auth headers", {
+        serviceId: this.config.id,
+        endpoint: requestConfig.url,
+        hasAuthHeaders: Object.keys(authHeaders).length > 0,
+        authHeaderKeys: Object.keys(authHeaders),
+        userId: this.userId,
+        userName: this.userName,
+      });
+
+      // Merge auth headers with existing headers
       Object.entries(authHeaders).forEach(([key, value]) => {
-        if (value !== undefined) {
-          (headers as Record<string, unknown>)[key] = value;
+        if (value !== undefined && requestConfig.headers) {
+          requestConfig.headers[key] = value;
         }
       });
-      requestConfig.headers = headers;
+
       return requestConfig;
     });
   }
@@ -143,6 +160,7 @@ export class JellyfinConnector
         "PrimaryImageAspectRatio,MediaSources,Overview,ParentId,SeriesInfo",
       IncludeItemTypes: includeTypes.join(","),
       EnableImages: true,
+      enableUserData: true,
       MediaTypes: "Video",
     };
 
@@ -173,6 +191,7 @@ export class JellyfinConnector
       Fields: "PrimaryImageAspectRatio,Overview,ParentId,ProviderIds",
       IncludeItemTypes: DEFAULT_RESUME_TYPES.join(","),
       EnableImages: true,
+      enableUserData: true,
       UserId: userId,
     };
 
@@ -214,6 +233,7 @@ export class JellyfinConnector
       ParentId: libraryId,
       Recursive: true,
       EnableImages: true,
+      enableUserData: true,
       // Use minimal fields by default for better performance; opt-in to full fields if needed
       Fields: options.includeFullDetails
         ? DEFAULT_ITEM_FIELDS
@@ -263,6 +283,7 @@ export class JellyfinConnector
           params: {
             Fields: DEFAULT_ITEM_FIELDS,
             EnableImages: true,
+            enableUserData: true,
           },
         },
       );
@@ -372,23 +393,96 @@ export class JellyfinConnector
     }
   }
 
+  async reportPlaybackStart(options: {
+    readonly itemId: string;
+    readonly mediaSourceId: string;
+    readonly playSessionId?: string;
+    readonly canSeek?: boolean;
+    readonly audioStreamIndex?: number;
+    readonly subtitleStreamIndex?: number;
+  }): Promise<void> {
+    try {
+      await this.ensureAuthenticated();
+
+      const payload = {
+        ItemId: options.itemId,
+        MediaSourceId: options.mediaSourceId,
+        PlaySessionId: options.playSessionId ?? null,
+        CanSeek: options.canSeek ?? true,
+        AudioStreamIndex: options.audioStreamIndex ?? null,
+        SubtitleStreamIndex: options.subtitleStreamIndex ?? null,
+      };
+
+      await this.client.post("/Sessions/Playing", payload);
+    } catch (error) {
+      await logger.warn("Failed to report Jellyfin playback start.", {
+        serviceId: this.config.id,
+        itemId: options.itemId,
+        error,
+      });
+      // Don't throw - playback reporting is non-critical
+    }
+  }
+
+  async reportPlaybackProgress(options: {
+    readonly itemId: string;
+    readonly mediaSourceId: string;
+    readonly playSessionId?: string;
+    readonly positionTicks: number;
+    readonly isPaused?: boolean;
+    readonly isMuted?: boolean;
+    readonly volumeLevel?: number;
+    readonly audioStreamIndex?: number;
+    readonly subtitleStreamIndex?: number;
+    readonly playbackRate?: number;
+  }): Promise<void> {
+    try {
+      await this.ensureAuthenticated();
+
+      const payload = {
+        ItemId: options.itemId,
+        MediaSourceId: options.mediaSourceId,
+        PlaySessionId: options.playSessionId ?? null,
+        PositionTicks: options.positionTicks,
+        IsPaused: options.isPaused ?? false,
+        IsMuted: options.isMuted ?? false,
+        VolumeLevel:
+          options.volumeLevel !== undefined
+            ? Math.round(options.volumeLevel * 100)
+            : null,
+        AudioStreamIndex: options.audioStreamIndex ?? null,
+        SubtitleStreamIndex: options.subtitleStreamIndex ?? null,
+        PlaybackRate: options.playbackRate ?? null,
+      };
+
+      await this.client.post("/Sessions/Playing/Progress", payload);
+    } catch (error) {
+      await logger.warn("Failed to report Jellyfin playback progress.", {
+        serviceId: this.config.id,
+        itemId: options.itemId,
+        error,
+      });
+      // Don't throw - playback reporting is non-critical
+    }
+  }
+
   async reportPlaybackStopped(options: {
     readonly itemId: string;
     readonly mediaSourceId: string;
     readonly playSessionId?: string;
     readonly positionTicks?: number;
   }): Promise<void> {
-    await this.ensureAuthenticated();
-
-    const payload: JellyfinPlaybackStopInfo = {
-      ItemId: options.itemId,
-      MediaSourceId: options.mediaSourceId,
-      PositionTicks: options.positionTicks ?? 0,
-      PlaySessionId: options.playSessionId ?? null,
-      Failed: false,
-    };
-
     try {
+      await this.ensureAuthenticated();
+
+      const payload: JellyfinPlaybackStopInfo = {
+        ItemId: options.itemId,
+        MediaSourceId: options.mediaSourceId,
+        PositionTicks: options.positionTicks ?? 0,
+        PlaySessionId: options.playSessionId ?? null,
+        Failed: false,
+      };
+
       await this.client.post("/Sessions/Playing/Stopped", payload);
     } catch (error) {
       await logger.warn("Failed to report Jellyfin playback stop.", {
@@ -397,6 +491,7 @@ export class JellyfinConnector
         mediaSourceId: options.mediaSourceId,
         error,
       });
+      // Don't throw - playback reporting is non-critical
     }
   }
 
@@ -550,6 +645,7 @@ export class JellyfinConnector
           params: {
             ActiveWithinSeconds: 600,
             EnableImages: true,
+            enableUserData: true,
             Fields: DEFAULT_ITEM_FIELDS,
           },
         },
@@ -639,8 +735,28 @@ export class JellyfinConnector
   }
 
   private async bootstrapUserContext(): Promise<void> {
-    const session = ServiceAuthHelper.getServiceSession(this.config);
+    // First, check if a specific user is configured in the service config
+    if (this.config.jellyfinUserId) {
+      this.userId = this.config.jellyfinUserId;
+      // Fetch the user's name for display purposes
+      try {
+        const user = await this.getUserById(this.config.jellyfinUserId);
+        if (user?.Name) {
+          this.userName = user.Name;
+        }
+      } catch (error) {
+        void logger.warn("Failed to fetch configured Jellyfin user details", {
+          serviceId: this.config.id,
+          userId: this.config.jellyfinUserId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      this.updateSessionContext();
+      return;
+    }
 
+    // Fall back to session-based user context
+    const session = ServiceAuthHelper.getServiceSession(this.config);
     const context = session?.context ?? {};
 
     if (typeof context.userId === "string" && context.userId.length > 0) {
@@ -651,6 +767,7 @@ export class JellyfinConnector
       this.userName = context.userName;
     }
 
+    // If still no user, fetch from /Users/Me
     if (!this.userId) {
       const profile = await this.fetchCurrentUser();
       if (profile?.Id) {
@@ -659,6 +776,28 @@ export class JellyfinConnector
           this.userName = profile.Name;
         }
       }
+    }
+
+    // Update the session with the resolved user context
+    this.updateSessionContext();
+  }
+
+  /**
+   * Update the AuthManager session with current user context
+   * This ensures auth headers include userId and userName
+   */
+  private updateSessionContext(): void {
+    const session = ServiceAuthHelper.getServiceSession(this.config);
+    if (session && session.isAuthenticated) {
+      const updatedSession = {
+        ...session,
+        context: {
+          ...session.context,
+          userId: this.userId,
+          userName: this.userName,
+        },
+      };
+      authManager.updateSession(this.config.id, updatedSession);
     }
   }
 
@@ -702,6 +841,42 @@ export class JellyfinConnector
     }
   }
 
+  /**
+   * Fetch all users from the Jellyfin server
+   * Requires admin API key
+   */
+  async getUsers(): Promise<JellyfinUserProfile[]> {
+    await this.ensureAuthenticated();
+
+    try {
+      const response = await this.client.get<JellyfinUserProfile[]>("/Users");
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  /**
+   * Fetch a specific user by ID
+   */
+  private async getUserById(
+    userId: string,
+  ): Promise<JellyfinUserProfile | undefined> {
+    try {
+      const response = await this.client.get<JellyfinUserProfile>(
+        `/Users/${userId}`,
+      );
+      return response.data;
+    } catch (error) {
+      void logger.debug("Failed to fetch Jellyfin user by ID.", {
+        serviceId: this.config.id,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
   private async ensureUserId(): Promise<string> {
     if (this.userId) {
       return this.userId;
@@ -737,6 +912,210 @@ export class JellyfinConnector
   } {
     // Jellyfin manages authentication via tokens, so no basic auth configuration is required here.
     return {};
+  }
+
+  // ==================== LOG RETRIEVAL METHODS ====================
+
+  /**
+   * Retrieve logs from Jellyfin using the /System/Logs endpoint.
+   * Requires admin permissions.
+   * Parses Jellyfin log format and normalizes to unified ServiceLog format.
+   */
+  override async getLogs(options?: LogQueryOptions): Promise<ServiceLog[]> {
+    await this.ensureAuthenticated();
+
+    try {
+      // Jellyfin's /System/Logs endpoint returns a list of log files
+      // We'll fetch the main log file and parse it
+      const response =
+        await this.client.get<
+          { Name: string; DateModified: string; Size: number }[]
+        >("/System/Logs");
+
+      if (!response.data || response.data.length === 0) {
+        return [];
+      }
+
+      // Get the most recent log file (usually "log_*.txt")
+      const logFiles = response.data.sort(
+        (a, b) =>
+          new Date(b.DateModified).getTime() -
+          new Date(a.DateModified).getTime(),
+      );
+      const latestLogFile = logFiles[0];
+
+      if (!latestLogFile) {
+        return [];
+      }
+
+      // Fetch the log file content
+      const logContentResponse = await this.client.get<string>(
+        `/System/Logs/Log`,
+        {
+          params: {
+            name: latestLogFile.Name,
+          },
+          responseType: "text",
+          transformResponse: (data) => data,
+        },
+      );
+
+      const logContent =
+        typeof logContentResponse.data === "string"
+          ? logContentResponse.data
+          : "";
+
+      // Parse log lines
+      const logLines = logContent.split("\n").filter((line) => line.trim());
+
+      // Apply limit
+      const limit = options?.limit ?? 50;
+      const startIndex = options?.startIndex ?? 0;
+
+      // Parse and normalize log entries
+      let logs = logLines
+        .map((line, index) => this.parseJellyfinLogLine(line, index))
+        .filter((log): log is ServiceLog => log !== null);
+
+      // Apply level filter if specified
+      if (options?.level && options.level.length > 0) {
+        logs = logs.filter((log) => options.level!.includes(log.level));
+      }
+
+      // Apply time range filtering if specified
+      if (options?.since || options?.until) {
+        logs = logs.filter((log) => {
+          if (options.since && log.timestamp < options.since) {
+            return false;
+          }
+          if (options.until && log.timestamp > options.until) {
+            return false;
+          }
+          return true;
+        });
+      }
+
+      // Apply search term filtering if specified
+      if (options?.searchTerm) {
+        const searchLower = options.searchTerm.toLowerCase();
+        logs = logs.filter(
+          (log) =>
+            log.message.toLowerCase().includes(searchLower) ||
+            log.logger?.toLowerCase().includes(searchLower) ||
+            log.exception?.toLowerCase().includes(searchLower),
+        );
+      }
+
+      // Apply pagination
+      const paginatedLogs = logs.slice(startIndex, startIndex + limit);
+
+      return paginatedLogs;
+    } catch (error) {
+      logger.error("[JellyfinConnector] Failed to retrieve logs", {
+        serviceId: this.config.id,
+        error,
+      });
+      throw handleApiError(error, {
+        serviceId: this.config.id,
+        serviceType: this.config.type,
+        operation: "getLogs",
+        endpoint: "/System/Logs",
+      });
+    }
+  }
+
+  /**
+   * Parse a Jellyfin log line into a ServiceLog entry.
+   * Jellyfin log format: [timestamp] [level] [logger]: message
+   * Example: [2024-01-15 10:30:45.123 +00:00] [INF] [Jellyfin.Server]: Application started
+   */
+  private parseJellyfinLogLine(line: string, index: number): ServiceLog | null {
+    if (!line.trim()) {
+      return null;
+    }
+
+    // Jellyfin log format regex
+    // [2024-01-15 10:30:45.123 +00:00] [INF] [Jellyfin.Server]: Message
+    const logRegex = /^\[([^\]]+)\]\s+\[([^\]]+)\]\s+\[([^\]]+)\]:\s*(.*)$/;
+    const match = line.match(logRegex);
+
+    if (!match) {
+      // If line doesn't match expected format, treat it as a continuation or raw log
+      return {
+        id: `jellyfin-${this.config.id}-${index}`,
+        serviceId: this.config.id,
+        serviceName: this.config.name,
+        serviceType: this.config.type,
+        timestamp: new Date(),
+        level: "info",
+        message: line,
+        raw: line,
+      };
+    }
+
+    const [, timestampStr, levelStr, loggerStr, message] = match;
+
+    // Parse timestamp - ensure we have a valid string
+    let timestamp: Date;
+    try {
+      if (timestampStr) {
+        timestamp = new Date(timestampStr);
+        if (isNaN(timestamp.getTime())) {
+          timestamp = new Date();
+        }
+      } else {
+        timestamp = new Date();
+      }
+    } catch {
+      timestamp = new Date();
+    }
+
+    // Normalize log level
+    const level = this.normalizeJellyfinLogLevel(levelStr ?? "");
+
+    return {
+      id: `jellyfin-${this.config.id}-${index}`,
+      serviceId: this.config.id,
+      serviceName: this.config.name,
+      serviceType: this.config.type,
+      timestamp,
+      level,
+      message: (message ?? "").trim(),
+      logger: (loggerStr ?? "").trim(),
+      raw: line,
+    };
+  }
+
+  /**
+   * Normalize Jellyfin log level to the unified ServiceLogLevel format.
+   * Jellyfin uses: VRB (Verbose), DBG (Debug), INF (Info), WRN (Warning), ERR (Error), FTL (Fatal)
+   */
+  private normalizeJellyfinLogLevel(level: string): ServiceLogLevel {
+    const levelUpper = level.toUpperCase().trim();
+
+    switch (levelUpper) {
+      case "VRB":
+      case "VERBOSE":
+        return "trace";
+      case "DBG":
+      case "DEBUG":
+        return "debug";
+      case "INF":
+      case "INFO":
+        return "info";
+      case "WRN":
+      case "WARN":
+      case "WARNING":
+        return "warn";
+      case "ERR":
+      case "ERROR":
+        return "error";
+      case "FTL":
+      case "FATAL":
+        return "fatal";
+      default:
+        return "info";
+    }
   }
 
   // ==================== DOWNLOAD CONNECTOR METHODS ====================
@@ -1231,6 +1610,7 @@ export class JellyfinConnector
               userId,
               fields: DEFAULT_ITEM_FIELDS.split(","),
               enableImages: true,
+              enableUserData: true,
               sortBy: "ParentIndexNumber,IndexNumber",
               sortOrder: "Ascending",
               startIndex,

@@ -1,11 +1,14 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import { Text, IconButton, useTheme } from "react-native-paper";
+import { Text, IconButton } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useTheme } from "@/hooks/useTheme";
 import type { AppTheme } from "@/constants/theme";
 import { spacing } from "@/theme/spacing";
 
 interface WidgetHeaderProps {
   title: string;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   onEdit?: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -18,19 +21,31 @@ interface WidgetHeaderProps {
  */
 const WidgetHeader: React.FC<WidgetHeaderProps> = ({
   title,
+  icon,
   onEdit,
   onRefresh,
   refreshing = false,
   additionalActions,
 }) => {
-  const theme = useTheme<AppTheme>();
+  const theme = useTheme();
   const styles = useStyles(theme);
 
   return (
     <View style={styles.container}>
-      <Text variant="titleMedium" style={styles.title}>
-        {title}
-      </Text>
+      <View style={styles.titleContainer}>
+        {icon && (
+          <View style={styles.iconContainer}>
+            <MaterialCommunityIcons
+              name={icon}
+              size={18}
+              color={theme.colors.primary}
+            />
+          </View>
+        )}
+        <Text variant="titleMedium" style={styles.title}>
+          {title}
+        </Text>
+      </View>
       <View style={styles.actions}>
         {additionalActions}
         {onRefresh && (
@@ -61,12 +76,27 @@ const useStyles = (theme: AppTheme) =>
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: spacing.xs,
+      marginBottom: spacing.sm,
       gap: spacing.xs,
     },
-    title: {
-      fontWeight: "600",
+    titleContainer: {
       flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    iconContainer: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      backgroundColor: theme.colors.secondaryContainer,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    title: {
+      fontWeight: "700",
+      color: theme.colors.onSurface,
+      letterSpacing: 0.2,
     },
     actions: {
       flexDirection: "row",

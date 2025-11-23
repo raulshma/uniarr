@@ -4,7 +4,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -14,7 +13,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
 import { GiftedChat, type IMessage } from "react-native-gifted-chat";
 import {
@@ -32,6 +30,7 @@ import { useRouter } from "expo-router";
 import { ChatErrorBoundary } from "@/components/chat/ChatErrorBoundary";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { ChatMessage } from "@/components/chat/ChatMessage";
+import { ChatBackground } from "@/components/chat/ChatBackground";
 import { StarterQuestions } from "@/components/chat/StarterQuestions";
 import { ProviderModelDisplay } from "@/components/chat/ProviderModelDisplay";
 import { useDialog } from "@/components/common";
@@ -90,6 +89,7 @@ const ConversationalAIScreen: React.FC = () => {
   const [conversationDrawerVisible, setConversationDrawerVisible] =
     useState(false);
   const [toolsDrawerVisible, setToolsDrawerVisible] = useState(false);
+  const [settingsDrawerVisible, setSettingsDrawerVisible] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
 
@@ -99,10 +99,23 @@ const ConversationalAIScreen: React.FC = () => {
   const currentSessionId = useConversationalAIStore(selectCurrentSessionId);
 
   const activeSessions = useMemo(() => {
+    if (!allSessions || !(allSessions instanceof Map)) return [];
     return Array.from(allSessions.values())
       .filter((session) => !session.archived)
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      .sort((a, b) => {
+        const aTime = a.updatedAt?.getTime() ?? 0;
+        const bTime = b.updatedAt?.getTime() ?? 0;
+        return bTime - aTime;
+      });
   }, [allSessions]);
+
+  // Get current session title for header display
+  const currentSessionTitle = useMemo(() => {
+    if (!currentSessionId || !allSessions || !(allSessions instanceof Map))
+      return null;
+    const session = allSessions.get(currentSessionId);
+    return session?.title ?? null;
+  }, [currentSessionId, allSessions]);
 
   // Check if AI provider is configured
   useEffect(() => {
@@ -155,6 +168,10 @@ const ConversationalAIScreen: React.FC = () => {
   const addMessageToStore = useConversationalAIStore((s) => s.addMessage);
   const enableStreamingPref = useConversationalAIStore(
     (s) => s.config.enableStreaming,
+  );
+
+  const streamingMethodPref = useConversationalAIStore(
+    (s) => s.config.streamingMethod || "sse",
   );
 
   const showTokenCountPref = useConversationalAIStore(
@@ -272,7 +289,6 @@ const ConversationalAIScreen: React.FC = () => {
       StyleSheet.create({
         scaffold: {
           flex: 1,
-          backgroundColor: theme.colors.background,
         },
         safeArea: {
           flex: 1,
@@ -284,108 +300,39 @@ const ConversationalAIScreen: React.FC = () => {
         },
         headerContainer: {
           paddingHorizontal: 16,
-          paddingTop: 16,
-          paddingBottom: 12,
-          gap: 12,
-        },
-        headerTopRow: {
+          paddingTop: 8,
+          paddingBottom: 8,
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
         },
-        headerTextBlock: {
-          flex: 1,
-          gap: 4,
-        },
         headerTitle: {
-          fontSize: 28,
-          fontWeight: "800",
+          fontSize: 20,
+          fontWeight: "700",
           color: theme.colors.onBackground,
-          letterSpacing: -0.5,
         },
         headerSubtitle: {
           fontSize: 13,
+          fontWeight: "400",
           color: theme.colors.onSurfaceVariant,
+          marginTop: 2,
         },
         headerButton: {
           width: 40,
           height: 40,
-          borderRadius: 12,
+          borderRadius: 20,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: theme.colors.surfaceVariant,
         },
-        statusPill: {
-          alignSelf: "flex-start",
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
-          paddingHorizontal: theme.custom.spacing.xxs,
-          borderRadius: 16,
-          backgroundColor: theme.colors.surfaceVariant,
-        },
-        statusPillInner: {
-          flexDirection: "row",
-          flexShrink: 1,
-          alignItems: "center",
-        },
-        statusPillContainer: {
-          alignSelf: "flex-start",
-        },
-        statusPillScroll: {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
-          paddingLeft: theme.custom.spacing.xxs,
-          paddingRight: theme.custom.spacing.xxs,
-        },
-        statusDot: {
-          width: 6,
-          height: 6,
-          borderRadius: 3,
-          backgroundColor: theme.colors.primary,
-        },
-        statusText: {
-          color: theme.colors.onSurfaceVariant,
-          fontSize: 11,
-          fontWeight: "500",
-        },
-        statusDivider: {
-          width: StyleSheet.hairlineWidth,
-          height: 45,
-          backgroundColor:
-            // @ts-ignore
-            theme.colors.outlineVariant ?? theme.colors.onSurfaceVariant,
-          marginHorizontal: 6,
-        },
-        statusLabel: {
-          color: theme.colors.onSurfaceVariant,
-          fontSize: 11,
-          fontWeight: "500",
-          marginRight: 6,
-        },
-        compactSwitch: {
-          transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }],
-        },
-        segmentedCompact: {
-          height: 36,
-          alignSelf: "center",
-          borderRadius: 8,
-          paddingVertical: 2,
-        },
-        segmentButton: {
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: 28,
-        },
+
         chatContainer: {
           flex: 1,
           marginHorizontal: theme.custom.spacing.xs,
           marginTop: 12,
           marginBottom: 12,
           borderRadius: theme.roundness,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: "transparent",
           overflow: "hidden",
         },
         chatContent: {
@@ -484,7 +431,11 @@ const ConversationalAIScreen: React.FC = () => {
           name: msg.role === "user" ? "You" : "UniArr Assistant",
         },
       }))
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => {
+        const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+        const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+        return bTime - aTime;
+      });
   }, [messages]);
 
   const handleSendMessage = useCallback(
@@ -545,39 +496,22 @@ const ConversationalAIScreen: React.FC = () => {
 
   // Animated button press feedback
   const buttonScale = useSharedValue(1);
-  const animatedButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
+  const animatedButtonStyle = useAnimatedStyle(() => {
+    "worklet";
+    return {
+      transform: [{ scale: buttonScale.value }],
+    };
+  }, []);
 
   const handleButtonPressIn = useCallback(() => {
+    "worklet";
     buttonScale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
   }, [buttonScale]);
 
   const handleButtonPressOut = useCallback(() => {
+    "worklet";
     buttonScale.value = withSpring(1, { damping: 15, stiffness: 300 });
   }, [buttonScale]);
-
-  // Pulse animation for status dot when loading/streaming
-  const statusDotScale = useSharedValue(1);
-  const statusDotOpacity = useSharedValue(1);
-
-  useEffect(() => {
-    if (isLoading || isStreaming) {
-      statusDotScale.value = withSpring(1.3, {
-        damping: 2,
-        stiffness: 100,
-      });
-      statusDotOpacity.value = withTiming(0.6, { duration: 800 });
-    } else {
-      statusDotScale.value = withSpring(1, { damping: 15, stiffness: 300 });
-      statusDotOpacity.value = withTiming(1, { duration: 300 });
-    }
-  }, [isLoading, isStreaming, statusDotScale, statusDotOpacity]);
-
-  const animatedStatusDotStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: statusDotScale.value }],
-    opacity: statusDotOpacity.value,
-  }));
 
   const handleNewConversation = useCallback(() => {
     const timestamp = new Date().toLocaleString();
@@ -933,7 +867,7 @@ const ConversationalAIScreen: React.FC = () => {
 
   return (
     <ChatErrorBoundary>
-      <View style={styles.scaffold}>
+      <ChatBackground style={styles.scaffold}>
         <SafeAreaView style={styles.safeArea} edges={["left", "right", "top"]}>
           <KeyboardAvoidingView
             style={{ flex: 1 }}
@@ -941,240 +875,53 @@ const ConversationalAIScreen: React.FC = () => {
             keyboardVerticalOffset={0}
           >
             <View style={styles.content}>
-              {/* Header */}
+              {/* Minimal Header */}
               <View style={styles.headerContainer}>
-                <View style={styles.headerTopRow}>
-                  <View style={styles.headerTextBlock}>
-                    <Text style={styles.headerTitle}>Media AI</Text>
-                    <Text style={styles.headerSubtitle}>
-                      Ask about your library
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    <Animated.View style={animatedButtonStyle}>
-                      <Pressable
-                        style={styles.headerButton}
-                        onPress={handleNewConversation}
-                        onPressIn={handleButtonPressIn}
-                        onPressOut={handleButtonPressOut}
-                        accessibilityRole="button"
-                        accessibilityLabel="Start new conversation"
-                      >
-                        <MaterialCommunityIcons
-                          name="plus"
-                          size={20}
-                          color={theme.colors.onBackground}
-                        />
-                      </Pressable>
-                    </Animated.View>
-
-                    {activeSessions.length > 0 ? (
-                      <Animated.View style={animatedButtonStyle}>
-                        <Pressable
-                          style={styles.headerButton}
-                          onPress={() => setConversationDrawerVisible(true)}
-                          onPressIn={handleButtonPressIn}
-                          onPressOut={handleButtonPressOut}
-                          accessibilityRole="button"
-                          accessibilityLabel="Open conversation history"
-                        >
-                          <MaterialCommunityIcons
-                            name="history"
-                            size={20}
-                            color={theme.colors.onBackground}
-                          />
-                        </Pressable>
-                      </Animated.View>
-                    ) : null}
-
-                    <Animated.View style={animatedButtonStyle}>
-                      <Pressable
-                        style={styles.headerButton}
-                        onPress={() =>
-                          router.push(
-                            "/(auth)/+modal/select-provider-model?target=title",
-                          )
-                        }
-                        onPressIn={handleButtonPressIn}
-                        onPressOut={handleButtonPressOut}
-                        accessibilityRole="button"
-                        accessibilityLabel="Select model for title summaries"
-                      >
-                        <MaterialCommunityIcons
-                          name="format-title"
-                          size={20}
-                          color={theme.colors.onBackground}
-                        />
-                      </Pressable>
-                    </Animated.View>
-
-                    <Animated.View style={animatedButtonStyle}>
-                      <Pressable
-                        style={styles.headerButton}
-                        onPress={() =>
-                          router.push("/(auth)/settings/byok/ai-settings")
-                        }
-                        onPressIn={handleButtonPressIn}
-                        onPressOut={handleButtonPressOut}
-                        accessibilityRole="button"
-                        accessibilityLabel="Configure AI provider"
-                      >
-                        <MaterialCommunityIcons
-                          name="cog"
-                          size={20}
-                          color={theme.colors.onBackground}
-                        />
-                      </Pressable>
-                    </Animated.View>
-                  </View>
-                </View>
-
-                <View style={styles.statusPillContainer}>
-                  <View style={styles.statusPill}>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      nestedScrollEnabled
-                      contentContainerStyle={styles.statusPillScroll}
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.headerTitle}>Media AI</Text>
+                  {currentSessionTitle && (
+                    <Text
+                      style={styles.headerSubtitle}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
                     >
-                      <View style={styles.statusPillInner}>
-                        <Animated.View
-                          style={[styles.statusDot, animatedStatusDotStyle]}
-                        />
-                        <Text style={styles.statusText}>
-                          {isStreaming
-                            ? "Responding…"
-                            : isLoading
-                              ? "Thinking…"
-                              : "Online"}
-                        </Text>
-                        <View style={styles.statusDivider} />
-                        <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <MaterialCommunityIcons
-                            name="waves"
-                            size={16}
-                            color={theme.colors.onSurfaceVariant}
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.statusLabel}>Stream</Text>
-                          <Switch
-                            style={styles.compactSwitch}
-                            value={Boolean(enableStreamingPref)}
-                            onValueChange={() =>
-                              updateConversationalConfig({
-                                enableStreaming: !enableStreamingPref,
-                              })
-                            }
-                            color={theme.colors.primary}
-                          />
-                        </View>
-                        <View style={styles.statusDivider} />
-                        <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <MaterialCommunityIcons
-                            name="information-outline"
-                            size={16}
-                            color={theme.colors.onSurfaceVariant}
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.statusLabel}>Meta</Text>
-                          <Switch
-                            style={styles.compactSwitch}
-                            value={Boolean(showTokenCountPref)}
-                            onValueChange={() =>
-                              updateConversationalConfig({
-                                showTokenCount: !showTokenCountPref,
-                              })
-                            }
-                            color={theme.colors.primary}
-                          />
-                        </View>
-                        <View style={styles.statusDivider} />
-                        <Pressable
-                          onPress={() => {
-                            if (enableToolsPref) {
-                              setToolsDrawerVisible(true);
-                            } else {
-                              updateConversationalConfig({
-                                enableTools: true,
-                              });
-                            }
-                          }}
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <MaterialCommunityIcons
-                            name="tools"
-                            size={16}
-                            color={theme.colors.onSurfaceVariant}
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.statusLabel}>Tools</Text>
-                          <Switch
-                            style={styles.compactSwitch}
-                            value={Boolean(enableToolsPref)}
-                            onValueChange={() =>
-                              updateConversationalConfig({
-                                enableTools: !enableToolsPref,
-                              })
-                            }
-                            color={theme.colors.primary}
-                          />
-                          {enableToolsPref && (
-                            <MaterialCommunityIcons
-                              name="chevron-right"
-                              size={16}
-                              color={theme.colors.onSurfaceVariant}
-                              style={{ marginLeft: 4 }}
-                            />
-                          )}
-                        </Pressable>
-                        <View style={styles.statusDivider} />
-                        <View
-                          accessibilityRole="adjustable"
-                          accessibilityLabel="Text Size"
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <MaterialCommunityIcons
-                            name="format-size"
-                            size={16}
-                            color={theme.colors.onSurfaceVariant}
-                            style={{ marginRight: 6 }}
-                          />
-                          <SegmentedButtons
-                            value={chatTextSizePref ?? "medium"}
-                            onValueChange={(next) =>
-                              updateConversationalConfig({
-                                chatTextSize:
-                                  next as AssistantConfig["chatTextSize"],
-                              })
-                            }
-                            buttons={[
-                              {
-                                value: "small",
-                                label: "S",
-                                style: styles.segmentButton,
-                              },
-                              {
-                                value: "medium",
-                                label: "M",
-                                style: styles.segmentButton,
-                              },
-                              {
-                                value: "large",
-                                label: "L",
-                                style: styles.segmentButton,
-                              },
-                            ]}
-                            style={styles.segmentedCompact}
-                            density="small"
-                          />
-                        </View>
-                      </View>
-                    </ScrollView>
-                  </View>
+                      {currentSessionTitle}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <Animated.View style={animatedButtonStyle}>
+                    <Pressable
+                      style={styles.headerButton}
+                      onPress={() => setConversationDrawerVisible(true)}
+                      onPressIn={handleButtonPressIn}
+                      onPressOut={handleButtonPressOut}
+                      accessibilityRole="button"
+                      accessibilityLabel="Conversation history"
+                    >
+                      <MaterialCommunityIcons
+                        name="history"
+                        size={22}
+                        color={theme.colors.onBackground}
+                      />
+                    </Pressable>
+                  </Animated.View>
+                  <Animated.View style={animatedButtonStyle}>
+                    <Pressable
+                      style={styles.headerButton}
+                      onPress={() => setSettingsDrawerVisible(true)}
+                      onPressIn={handleButtonPressIn}
+                      onPressOut={handleButtonPressOut}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open settings"
+                    >
+                      <MaterialCommunityIcons
+                        name="cog-outline"
+                        size={22}
+                        color={theme.colors.onBackground}
+                      />
+                    </Pressable>
+                  </Animated.View>
                 </View>
               </View>
 
@@ -1236,21 +983,22 @@ const ConversationalAIScreen: React.FC = () => {
                 </View>
               </View>
 
-              {/* Provider-Model Display */}
-              <ProviderModelDisplay
-                provider={selectedProvider}
-                model={selectedModel}
-              />
-
-              {/* Chat Input */}
-              <ChatInput
-                onSendMessage={(text) => {
-                  void handleSendMessage(text);
-                }}
-                isLoading={isLoading}
-                isStreaming={isStreaming}
-                placeholder="Ask about movies, shows."
-              />
+              {/* Provider-Model Display and Chat Input Container */}
+              <View>
+                <ProviderModelDisplay
+                  provider={selectedProvider}
+                  model={selectedModel}
+                />
+                <ChatInput
+                  onSendMessage={(text) => {
+                    void handleSendMessage(text);
+                  }}
+                  isLoading={isLoading}
+                  isStreaming={isStreaming}
+                  placeholder="Ask about movies, shows."
+                  onNewConversation={handleNewConversation}
+                />
+              </View>
 
               <Snackbar
                 visible={snackbarVisible}
@@ -1262,7 +1010,7 @@ const ConversationalAIScreen: React.FC = () => {
             </View>
           </KeyboardAvoidingView>
         </SafeAreaView>
-      </View>
+      </ChatBackground>
 
       {/* Conversation History Drawer */}
       <BottomDrawer
@@ -1438,6 +1186,415 @@ const ConversationalAIScreen: React.FC = () => {
             />
           </>
         )}
+      </BottomDrawer>
+
+      {/* Settings Drawer */}
+      <BottomDrawer
+        visible={settingsDrawerVisible}
+        onDismiss={() => setSettingsDrawerVisible(false)}
+        title="Settings"
+        maxHeight="80%"
+      >
+        {/* Conversations Section */}
+        <View style={{ marginBottom: 24 }}>
+          <Text
+            variant="titleMedium"
+            style={{
+              color: theme.colors.onSurface,
+              fontWeight: "600",
+              marginBottom: 12,
+            }}
+          >
+            Conversations
+          </Text>
+          <DrawerItem
+            icon="plus"
+            label="New Conversation"
+            onPress={() => {
+              handleNewConversation();
+              setSettingsDrawerVisible(false);
+            }}
+          />
+          {activeSessions.length > 0 && (
+            <DrawerItem
+              icon="history"
+              label="Conversation History"
+              onPress={() => {
+                setSettingsDrawerVisible(false);
+                setConversationDrawerVisible(true);
+              }}
+            />
+          )}
+        </View>
+
+        <Divider style={{ marginVertical: 16 }} />
+
+        {/* Model Configuration Section */}
+        <View style={{ marginBottom: 24 }}>
+          <Text
+            variant="titleMedium"
+            style={{
+              color: theme.colors.onSurface,
+              fontWeight: "600",
+              marginBottom: 12,
+            }}
+          >
+            Model Configuration
+          </Text>
+          <DrawerItem
+            icon="robot"
+            label="Select Chat Model"
+            onPress={() => {
+              setSettingsDrawerVisible(false);
+              router.push("/(auth)/+modal/select-provider-model");
+            }}
+          />
+          <DrawerItem
+            icon="format-title"
+            label="Select Title Model"
+            onPress={() => {
+              setSettingsDrawerVisible(false);
+              router.push("/(auth)/+modal/select-provider-model?target=title");
+            }}
+          />
+          <DrawerItem
+            icon="key"
+            label="AI Provider Settings"
+            onPress={() => {
+              setSettingsDrawerVisible(false);
+              router.push("/(auth)/settings/byok/ai-settings");
+            }}
+          />
+        </View>
+
+        <Divider style={{ marginVertical: 16 }} />
+
+        {/* Chat Preferences Section */}
+        <View style={{ marginBottom: 24 }}>
+          <Text
+            variant="titleMedium"
+            style={{
+              color: theme.colors.onSurface,
+              fontWeight: "600",
+              marginBottom: 12,
+            }}
+          >
+            Chat Preferences
+          </Text>
+
+          {/* Streaming Toggle */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+            }}
+          >
+            <View style={{ flex: 1, marginRight: 16 }}>
+              <Text
+                variant="bodyLarge"
+                style={{
+                  color: theme.colors.onSurface,
+                  marginBottom: 4,
+                }}
+              >
+                Enable Streaming
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                }}
+              >
+                Stream responses as they're generated
+              </Text>
+            </View>
+            <Switch
+              value={Boolean(enableStreamingPref)}
+              onValueChange={() =>
+                updateConversationalConfig({
+                  enableStreaming: !enableStreamingPref,
+                })
+              }
+              color={theme.colors.primary}
+            />
+          </View>
+
+          {/* Debug Info Card */}
+          {__DEV__ && enableStreamingPref && (
+            <View
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                backgroundColor: theme.colors.surfaceVariant,
+                marginHorizontal: 16,
+                marginVertical: 8,
+                borderRadius: 8,
+              }}
+            >
+              <Text
+                variant="labelSmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  marginBottom: 8,
+                  fontWeight: "bold",
+                }}
+              >
+                🐛 DEBUG INFO
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Streaming: {enableStreamingPref ? "✅ ON" : "❌ OFF"}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Method: {streamingMethodPref}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Tools: {enableToolsPref ? "✅ ON" : "❌ OFF"}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{ color: theme.colors.onSurfaceVariant }}
+              >
+                Selected Tools: {selectedToolsPref.length}
+              </Text>
+            </View>
+          )}
+
+          {/* Streaming Method Selector */}
+          {enableStreamingPref && (
+            <View
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+              }}
+            >
+              <Text
+                variant="bodyLarge"
+                style={{
+                  color: theme.colors.onSurface,
+                  marginBottom: 4,
+                }}
+              >
+                Streaming Method
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                  marginBottom: 12,
+                }}
+              >
+                Choose between SSE (Server-Sent Events) or Fetch
+                (ReadableStream)
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 8,
+                }}
+              >
+                <Button
+                  mode={
+                    streamingMethodPref === "sse" ? "contained" : "outlined"
+                  }
+                  onPress={() => {
+                    updateConversationalConfig({
+                      streamingMethod: "sse",
+                    });
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  SSE
+                </Button>
+                <Button
+                  mode={
+                    streamingMethodPref === "fetch" ? "contained" : "outlined"
+                  }
+                  onPress={() => {
+                    updateConversationalConfig({
+                      streamingMethod: "fetch",
+                    });
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  Fetch
+                </Button>
+              </View>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.primary,
+                  marginTop: 8,
+                  fontWeight: "bold",
+                }}
+              >
+                Current: {streamingMethodPref.toUpperCase()}
+              </Text>
+            </View>
+          )}
+
+          {/* Token Count Toggle */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+            }}
+          >
+            <View style={{ flex: 1, marginRight: 16 }}>
+              <Text
+                variant="bodyLarge"
+                style={{
+                  color: theme.colors.onSurface,
+                  marginBottom: 4,
+                }}
+              >
+                Show Token Count
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                }}
+              >
+                Display metadata about messages
+              </Text>
+            </View>
+            <Switch
+              value={Boolean(showTokenCountPref)}
+              onValueChange={() =>
+                updateConversationalConfig({
+                  showTokenCount: !showTokenCountPref,
+                })
+              }
+              color={theme.colors.primary}
+            />
+          </View>
+
+          {/* Text Size Selector */}
+          <View
+            style={{
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+            }}
+          >
+            <Text
+              variant="bodyLarge"
+              style={{
+                color: theme.colors.onSurface,
+                marginBottom: 12,
+              }}
+            >
+              Text Size
+            </Text>
+            <SegmentedButtons
+              value={chatTextSizePref ?? "medium"}
+              onValueChange={(next) =>
+                updateConversationalConfig({
+                  chatTextSize: next as AssistantConfig["chatTextSize"],
+                })
+              }
+              buttons={[
+                {
+                  value: "small",
+                  label: "Small",
+                  icon: "format-size",
+                },
+                {
+                  value: "medium",
+                  label: "Medium",
+                  icon: "format-size",
+                },
+                {
+                  value: "large",
+                  label: "Large",
+                  icon: "format-size",
+                },
+              ]}
+              density="regular"
+            />
+          </View>
+        </View>
+
+        <Divider style={{ marginVertical: 16 }} />
+
+        {/* AI Tools Section */}
+        <View style={{ marginBottom: 24 }}>
+          <Text
+            variant="titleMedium"
+            style={{
+              color: theme.colors.onSurface,
+              fontWeight: "600",
+              marginBottom: 12,
+            }}
+          >
+            AI Tools
+          </Text>
+
+          {/* Tools Toggle */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+            }}
+          >
+            <View style={{ flex: 1, marginRight: 16 }}>
+              <Text
+                variant="bodyLarge"
+                style={{
+                  color: theme.colors.onSurface,
+                  marginBottom: 4,
+                }}
+              >
+                Enable AI Tools
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.onSurfaceVariant,
+                }}
+              >
+                Allow AI to interact with your services
+              </Text>
+            </View>
+            <Switch
+              value={Boolean(enableToolsPref)}
+              onValueChange={() =>
+                updateConversationalConfig({
+                  enableTools: !enableToolsPref,
+                })
+              }
+              color={theme.colors.primary}
+            />
+          </View>
+
+          {enableToolsPref && (
+            <DrawerItem
+              icon="tools"
+              label={`Manage Tools (${selectedToolsPref.length}/${availableTools.length})`}
+              onPress={() => {
+                setSettingsDrawerVisible(false);
+                setToolsDrawerVisible(true);
+              }}
+            />
+          )}
+        </View>
       </BottomDrawer>
     </ChatErrorBoundary>
   );
