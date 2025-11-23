@@ -1,10 +1,10 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
-import { Text, useTheme, Chip, Button } from "react-native-paper";
-import Animated, { FadeIn } from "react-native-reanimated";
+import { StyleSheet, View, ScrollView, Pressable } from "react-native";
+import { Text, useTheme, Chip, Button, IconButton } from "react-native-paper";
+import Animated, { FadeIn, FadeInRight } from "react-native-reanimated";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 
-import { Card } from "@/components/common/Card";
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
 import type { AppTheme } from "@/constants/theme";
@@ -26,13 +26,6 @@ export interface ContentGapsSectionProps {
 
 /**
  * Section component for displaying content gaps
- *
- * Features:
- * - Displays missing popular content
- * - Shows gap significance explanation
- * - Displays popularity and rating metrics
- * - Provides actions to add missing content
- * - Loading and error states
  */
 export const ContentGapsSection: React.FC<ContentGapsSectionProps> = ({
   contentGaps,
@@ -47,71 +40,74 @@ export const ContentGapsSection: React.FC<ContentGapsSectionProps> = ({
     () =>
       StyleSheet.create({
         container: {
-          gap: spacing.md,
+          marginTop: spacing.sm,
         },
         description: {
           fontSize: 14,
           color: theme.colors.onSurfaceVariant,
-          marginBottom: spacing.sm,
+          marginBottom: spacing.md,
+          paddingHorizontal: spacing.xs,
         },
-        gapsList: {
+        scrollContent: {
+          paddingHorizontal: spacing.xs,
           gap: spacing.md,
+          paddingBottom: spacing.md,
         },
         gapCard: {
-          padding: spacing.md,
-        },
-        gapContent: {
-          flexDirection: "row",
-          gap: spacing.md,
+          width: 160,
+          borderRadius: 16,
+          backgroundColor: theme.colors.surface,
+          overflow: "hidden",
+          elevation: 4,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 4,
+          borderWidth: 1,
+          borderColor: theme.colors.outlineVariant,
         },
         posterContainer: {
-          width: 80,
-          height: 120,
-          borderRadius: 6,
-          overflow: "hidden",
+          width: "100%",
+          height: 240,
           backgroundColor: theme.colors.surfaceVariant,
         },
         poster: {
           width: "100%",
           height: "100%",
         },
-        posterPlaceholder: {
-          width: "100%",
-          height: "100%",
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: theme.colors.surfaceVariant,
+        posterOverlay: {
+          ...StyleSheet.absoluteFillObject,
         },
-        gapInfo: {
-          flex: 1,
-          gap: spacing.sm,
+        cardContent: {
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: spacing.sm,
         },
         gapTitle: {
           fontWeight: "700",
-          color: theme.colors.onSurface,
-          fontSize: 16,
+          color: "#fff",
+          fontSize: 14,
+          marginBottom: 4,
+          textShadowColor: "rgba(0,0,0,0.8)",
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 2,
         },
-        gapMetadata: {
+        statsRow: {
           flexDirection: "row",
           alignItems: "center",
-          gap: spacing.xs,
-          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: 8,
         },
-        metadataChip: {
-          height: 24,
-        },
-        significance: {
-          fontSize: 13,
-          color: theme.colors.onSurfaceVariant,
-          lineHeight: 18,
-        },
-        gapActions: {
-          flexDirection: "row",
-          gap: spacing.sm,
-          marginTop: spacing.sm,
+        statText: {
+          color: "rgba(255,255,255,0.9)",
+          fontSize: 11,
+          fontWeight: "600",
         },
         addButton: {
-          flex: 1,
+          marginTop: 4,
+          backgroundColor: theme.colors.primary,
         },
         emptyContainer: {
           paddingVertical: spacing.lg,
@@ -168,119 +164,65 @@ export const ContentGapsSection: React.FC<ContentGapsSectionProps> = ({
         library.
       </Text>
 
-      <View style={styles.gapsList}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {contentGaps.map((gap, index) => (
           <Animated.View
             key={gap.id || `gap-${index}`}
-            entering={FadeIn.duration(300).delay(index * 50)}
+            entering={FadeInRight.duration(400)
+              .delay(index * 100)
+              .springify()}
           >
-            <Card contentPadding={0} animated={false}>
-              <View style={styles.gapCard}>
-                <View style={styles.gapContent}>
-                  {/* Poster */}
-                  <View style={styles.posterContainer}>
-                    {gap.metadata.posterUrl ? (
-                      <Image
-                        source={{ uri: gap.metadata.posterUrl }}
-                        style={styles.poster}
-                        contentFit="cover"
-                        transition={200}
-                        accessibilityIgnoresInvertColors
-                      />
-                    ) : (
-                      <View style={styles.posterPlaceholder}>
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            color: theme.colors.onSurfaceVariant,
-                          }}
-                        >
-                          No Image
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+            <View style={styles.gapCard}>
+              <View style={styles.posterContainer}>
+                <Image
+                  source={{ uri: gap.metadata.posterUrl }}
+                  style={styles.poster}
+                  contentFit="cover"
+                  transition={200}
+                />
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.6)", "rgba(0,0,0,0.9)"]}
+                  locations={[0.4, 0.7, 1]}
+                  style={styles.posterOverlay}
+                />
 
-                  {/* Info */}
-                  <View style={styles.gapInfo}>
-                    <Text
-                      variant="titleMedium"
-                      style={styles.gapTitle}
-                      numberOfLines={2}
-                    >
-                      {gap.title}
+                <View style={styles.cardContent}>
+                  <Text style={styles.gapTitle} numberOfLines={2}>
+                    {gap.title}
+                  </Text>
+
+                  <View style={styles.statsRow}>
+                    <Text style={styles.statText}>
+                      ⭐ {gap.metadata.rating.toFixed(1)}
                     </Text>
-
-                    {/* Metadata chips */}
-                    <View style={styles.gapMetadata}>
-                      {gap.year && (
-                        <Chip
-                          compact
-                          style={styles.metadataChip}
-                          textStyle={{ fontSize: 11 }}
-                        >
-                          {gap.year}
-                        </Chip>
-                      )}
-                      <Chip
-                        compact
-                        icon="star"
-                        style={styles.metadataChip}
-                        textStyle={{ fontSize: 11 }}
-                      >
-                        {gap.metadata.rating.toFixed(1)}
-                      </Chip>
-                      <Chip
-                        compact
-                        icon="fire"
-                        style={styles.metadataChip}
-                        textStyle={{ fontSize: 11 }}
-                      >
-                        {gap.metadata.popularity}% popular
-                      </Chip>
-                    </View>
-
-                    {/* Significance explanation */}
-                    {gap.reasonsForMatch.length > 0 && (
-                      <Text style={styles.significance} numberOfLines={2}>
-                        {gap.reasonsForMatch[0]}
-                      </Text>
-                    )}
-
-                    {/* Actions */}
-                    <View style={styles.gapActions}>
-                      <Button
-                        mode="contained"
-                        icon="plus"
-                        onPress={() => {
-                          // TODO: Implement add to library action
-                          // This should open a service selection dialog
-                        }}
-                        disabled={isOffline}
-                        style={styles.addButton}
-                        compact
-                      >
-                        Add to Library
-                      </Button>
-                      <Button
-                        mode="outlined"
-                        icon="information-outline"
-                        onPress={() => {
-                          // TODO: Implement view details action
-                        }}
-                        disabled={isOffline}
-                        compact
-                      >
-                        Details
-                      </Button>
-                    </View>
+                    <Text style={styles.statText}>
+                      🔥 {gap.metadata.popularity}%
+                    </Text>
                   </View>
+
+                  <Button
+                    mode="contained"
+                    icon="plus"
+                    onPress={() => {
+                      // TODO: Implement add to library action
+                    }}
+                    disabled={isOffline}
+                    style={styles.addButton}
+                    labelStyle={{ fontSize: 12, marginVertical: 4 }}
+                    compact
+                  >
+                    Add
+                  </Button>
                 </View>
               </View>
-            </Card>
+            </View>
           </Animated.View>
         ))}
-      </View>
+      </ScrollView>
     </Animated.View>
   );
 };

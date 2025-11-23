@@ -1516,7 +1516,18 @@ export class ContentRecommendationService {
       }),
     );
 
-    return enriched;
+    // Filter out items already in library
+    const filtered = enriched.filter((rec) => !rec.availability?.inLibrary);
+
+    if (filtered.length < enriched.length) {
+      void logger.info("Filtered out items already in library", {
+        original: enriched.length,
+        filtered: filtered.length,
+        removed: enriched.length - filtered.length,
+      });
+    }
+
+    return filtered;
   }
 
   /**
