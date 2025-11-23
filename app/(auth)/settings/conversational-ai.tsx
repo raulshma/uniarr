@@ -99,6 +99,7 @@ const ConversationalAIScreen: React.FC = () => {
   const currentSessionId = useConversationalAIStore(selectCurrentSessionId);
 
   const activeSessions = useMemo(() => {
+    if (!allSessions || !(allSessions instanceof Map)) return [];
     return Array.from(allSessions.values())
       .filter((session) => !session.archived)
       .sort((a, b) => {
@@ -110,7 +111,8 @@ const ConversationalAIScreen: React.FC = () => {
 
   // Get current session title for header display
   const currentSessionTitle = useMemo(() => {
-    if (!currentSessionId) return null;
+    if (!currentSessionId || !allSessions || !(allSessions instanceof Map))
+      return null;
     const session = allSessions.get(currentSessionId);
     return session?.title ?? null;
   }, [currentSessionId, allSessions]);

@@ -1422,33 +1422,6 @@ const SettingsScreen = () => {
           </SettingsGroup>
         </AnimatedSection>
 
-        {/* Resources Section */}
-        <AnimatedSection
-          style={styles.section}
-          delay={250}
-          animated={animationsEnabled}
-        >
-          <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
-            Learning & Support
-          </Text>
-          <SettingsGroup>
-            <AnimatedListItem
-              index={0}
-              totalItems={1}
-              animated={animationsEnabled}
-            >
-              <SettingsListItem
-                title="Resources & Documentation"
-                subtitle="Guides, troubleshooting, and API reference"
-                left={{ iconName: "book-open-variant" }}
-                trailing={<ChevronTrailing />}
-                onPress={() => router.push("/(auth)/resources")}
-                groupPosition="single"
-              />
-            </AnimatedListItem>
-          </SettingsGroup>
-        </AnimatedSection>
-
         {/* System Section */}
         <AnimatedSection
           style={styles.section}
