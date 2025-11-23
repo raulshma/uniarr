@@ -1520,78 +1520,143 @@ export class ContentRecommendationService {
   }
 
   /**
-   * Fetch poster URL from TMDb
+   * Fetch poster URL from TMDb or fallback to other services
    */
   private async fetchPosterUrl(
     recommendation: Recommendation,
   ): Promise<string | undefined> {
     try {
-      // Import getTmdbConnector dynamically to avoid circular dependencies
+      // 1. Try TMDb first
       const { getTmdbConnector } = await import(
         "@/services/tmdb/TmdbConnectorProvider"
       );
-      const connector = await getTmdbConnector();
+      const tmdbConnector = await getTmdbConnector();
 
-      if (!connector) {
-        void logger.debug("No TMDb connector configured", {
-          title: recommendation.title,
+      if (tmdbConnector) {
+        // Search for the content using searchMulti
+        const searchQuery = recommendation.year
+          ? `${recommendation.title} ${recommendation.year}`
+          : recommendation.title;
+
+        const timeout = new Promise<undefined>((resolve) =>
+          setTimeout(() => resolve(undefined), 10_000),
+        );
+
+        const searchPromise = tmdbConnector.searchMulti({
+          query: searchQuery,
+          page: 1,
         });
-        return undefined;
+        const searchResponse = await Promise.race([searchPromise, timeout]);
+
+        if (
+          searchResponse &&
+          searchResponse.results &&
+          searchResponse.results.length > 0
+        ) {
+          // Find best match - filter by media type first
+          const mediaTypeFilter =
+            recommendation.type === "movie" ? "movie" : "tv";
+          const filteredResults = searchResponse.results.filter(
+            (item: any) => item.media_type === mediaTypeFilter,
+          );
+
+          const resultsToSearch =
+            filteredResults.length > 0
+              ? filteredResults
+              : searchResponse.results;
+
+          const match =
+            resultsToSearch.find((item: any) => {
+              const itemTitle = item.title || item.name || "";
+              const itemYear = item.release_date
+                ? parseInt(item.release_date.slice(0, 4), 10)
+                : item.first_air_date
+                  ? parseInt(item.first_air_date.slice(0, 4), 10)
+                  : null;
+
+              const titleMatch =
+                itemTitle.toLowerCase() === recommendation.title.toLowerCase();
+              const yearMatch =
+                !recommendation.year || itemYear === recommendation.year;
+
+              return titleMatch && yearMatch;
+            }) || resultsToSearch[0];
+
+          // Build poster URL
+          const posterPath = match?.poster_path;
+          if (posterPath) {
+            return `https://image.tmdb.org/t/p/w500${posterPath}`;
+          }
+        }
+      } else {
+        void logger.debug(
+          "No TMDb connector configured, skipping TMDB search",
+          {
+            title: recommendation.title,
+          },
+        );
       }
 
-      // Search for the content using searchMulti
-      const searchQuery = recommendation.year
-        ? `${recommendation.title} ${recommendation.year}`
-        : recommendation.title;
+      // 2. Fallback to Sonarr/Radarr if TMDB failed or wasn't configured
+      const connectorManager = ConnectorManager.getInstance();
 
-      const timeout = new Promise<undefined>((resolve) =>
-        setTimeout(() => resolve(undefined), 3000),
-      );
+      if (recommendation.type === "series" || recommendation.type === "anime") {
+        const sonarrConnectors = connectorManager.getConnectorsByType("sonarr");
+        for (const conn of sonarrConnectors) {
+          try {
+            const sonarr = conn as SonarrConnector;
+            // Use a short timeout for the search
+            const searchTimeout = new Promise<undefined>((resolve) =>
+              setTimeout(() => resolve(undefined), 2000),
+            );
+            const searchPromise = sonarr.search(recommendation.title);
+            const results = await Promise.race([searchPromise, searchTimeout]);
 
-      const searchPromise = connector.searchMulti({
-        query: searchQuery,
-        page: 1,
-      });
-      const searchResponse = await Promise.race([searchPromise, timeout]);
+            if (results && results.length > 0) {
+              const match = results.find(
+                (s) =>
+                  s.title.toLowerCase() === recommendation.title.toLowerCase(),
+              );
+              if (match?.posterUrl) return match.posterUrl;
+              // If no exact match, try the first one if it looks reasonable?
+              // Maybe risky. Let's stick to exact title match for now.
+              if (results[0]?.posterUrl) return results[0].posterUrl;
+            }
+          } catch (e) {
+            void logger.debug("Sonarr fallback search failed", {
+              title: recommendation.title,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+      } else if (recommendation.type === "movie") {
+        const radarrConnectors = connectorManager.getConnectorsByType("radarr");
+        for (const conn of radarrConnectors) {
+          try {
+            const radarr = conn as RadarrConnector;
+            const searchTimeout = new Promise<undefined>((resolve) =>
+              setTimeout(() => resolve(undefined), 2000),
+            );
+            const searchPromise = radarr.search(recommendation.title);
+            const results = await Promise.race([searchPromise, searchTimeout]);
 
-      if (
-        !searchResponse ||
-        !searchResponse.results ||
-        searchResponse.results.length === 0
-      ) {
-        return undefined;
-      }
-
-      // Find best match - filter by media type first
-      const mediaTypeFilter = recommendation.type === "movie" ? "movie" : "tv";
-      const filteredResults = searchResponse.results.filter(
-        (item: any) => item.media_type === mediaTypeFilter,
-      );
-
-      const resultsToSearch =
-        filteredResults.length > 0 ? filteredResults : searchResponse.results;
-
-      const match =
-        resultsToSearch.find((item: any) => {
-          const itemTitle = item.title || item.name || "";
-          const itemYear = item.release_date
-            ? parseInt(item.release_date.slice(0, 4), 10)
-            : item.first_air_date
-              ? parseInt(item.first_air_date.slice(0, 4), 10)
-              : null;
-
-          const titleMatch =
-            itemTitle.toLowerCase() === recommendation.title.toLowerCase();
-          const yearMatch =
-            !recommendation.year || itemYear === recommendation.year;
-
-          return titleMatch && yearMatch;
-        }) || resultsToSearch[0];
-
-      // Build poster URL
-      const posterPath = match?.poster_path;
-      if (posterPath) {
-        return `https://image.tmdb.org/t/p/w500${posterPath}`;
+            if (results && results.length > 0) {
+              const match = results.find(
+                (m) =>
+                  m.title.toLowerCase() ===
+                    recommendation.title.toLowerCase() &&
+                  (!recommendation.year || m.year === recommendation.year),
+              );
+              if (match?.posterUrl) return match.posterUrl;
+              if (results[0]?.posterUrl) return results[0].posterUrl;
+            }
+          } catch (e) {
+            void logger.debug("Radarr fallback search failed", {
+              title: recommendation.title,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
       }
 
       return undefined;
