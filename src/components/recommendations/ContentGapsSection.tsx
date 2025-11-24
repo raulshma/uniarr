@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View, ScrollView, Pressable } from "react-native";
-import { Text, useTheme, Chip, Button, IconButton } from "react-native-paper";
+import { StyleSheet, View, ScrollView } from "react-native";
+import { Text, useTheme, Button } from "react-native-paper";
 import Animated, { FadeIn, FadeInRight } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";

@@ -591,6 +591,7 @@ const DiscoverScreen = () => {
     [
       allowAnimations,
       handleCardPress,
+      handleCardLongPress,
       inLibraryIds,
       isFetching,
       openSectionPage,

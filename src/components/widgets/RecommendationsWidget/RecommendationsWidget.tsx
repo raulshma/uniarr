@@ -124,20 +124,57 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
 
   // Load recommendations
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
     let isCancelled = false;
+    let isRequestFinished = false;
 
     const loadRecommendations = async () => {
+      const service = ContentRecommendationService.getInstance();
+
       try {
         setLoading(true);
         setError(null);
 
         // Set a timeout to prevent infinite loading
-        timeoutId = setTimeout(() => {
-          if (!isCancelled) {
-            setLoading(false);
-            setError("Request timed out. Please try again.");
-            void logger.warn("Recommendation widget load timed out");
+        timeoutId = setTimeout(async () => {
+          if (!isCancelled && !isRequestFinished) {
+            void logger.warn(
+              "Recommendation widget load timed out, attempting cache fallback",
+            );
+
+            try {
+              const cached = await service.getCachedRecommendations(userId);
+
+              if (isCancelled || isRequestFinished) return;
+
+              if (cached && cached.recommendations.length > 0) {
+                setRecommendations(cached.recommendations);
+                if (cached.cacheAge !== undefined) {
+                  setCacheAge(cached.cacheAge);
+                } else {
+                  setCacheAge(Date.now() - cached.generatedAt.getTime());
+                }
+                setError(null);
+                void logger.info(
+                  "Recommendation widget timed out, used cached data",
+                );
+              } else {
+                setError("Request timed out. Please try again.");
+                void logger.warn(
+                  "Recommendation widget load timed out and no cache available",
+                );
+              }
+            } catch {
+              if (!isCancelled && !isRequestFinished) {
+                setError("Request timed out. Please try again.");
+              }
+            } finally {
+              if (!isCancelled) {
+                setLoading(false);
+                // Stop the main request from updating UI if it eventually finishes
+                isCancelled = true;
+              }
+            }
           }
         }, 15000); // 15 second timeout
 
@@ -147,7 +184,6 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
 
         // Fetch recommendations from AI service
         // The service handles its own caching, so we don't need to double-cache here
-        const service = ContentRecommendationService.getInstance();
         const response = await service.getRecommendations({
           userId,
           limit,
@@ -161,6 +197,7 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
         });
 
         if (!isCancelled) {
+          isRequestFinished = true;
           clearTimeout(timeoutId);
           setRecommendations(response.recommendations);
 
@@ -173,6 +210,7 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
         }
       } catch (err) {
         if (!isCancelled) {
+          isRequestFinished = true;
           clearTimeout(timeoutId);
           void logger.error("Failed to load recommendations for widget", {
             error: err instanceof Error ? err.message : String(err),

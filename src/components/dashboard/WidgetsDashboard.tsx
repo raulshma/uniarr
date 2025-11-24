@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { StyleSheet, View, RefreshControl, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -11,6 +11,7 @@ import WidgetContainer from "@/components/widgets/WidgetContainer/WidgetContaine
 import { widgetService } from "@/services/widgets/WidgetService";
 import { WeatherBackdrop } from "@/components/weather/WeatherBackdrop";
 import { mapWeatherToBackdrop } from "@/services/weather/weatherMapping";
+import type { WeatherPayload } from "@/services/widgets/dataProviders/weatherProvider";
 
 const WidgetsDashboard = () => {
   const theme = useTheme();
@@ -23,9 +24,8 @@ const WidgetsDashboard = () => {
   const [refreshing, setRefreshing] = React.useState(false);
   const isFocused = useIsFocused();
 
-  const [weatherForBackdrop, setWeatherForBackdrop] = React.useState<
-    any | null
-  >(null);
+  const [weatherForBackdrop, setWeatherForBackdrop] =
+    React.useState<WeatherPayload | null>(null);
 
   const loadWeatherSummary = useCallback(async () => {
     try {
@@ -40,7 +40,9 @@ const WidgetsDashboard = () => {
         return;
       }
 
-      const cached = await widgetService.getWidgetData<any>(headerWidget.id);
+      const cached = await widgetService.getWidgetData<{
+        payload: Record<string, WeatherPayload>;
+      }>(headerWidget.id);
       const payload = cached?.payload;
       if (!payload || typeof payload !== "object") {
         setWeatherForBackdrop(null);
@@ -80,28 +82,32 @@ const WidgetsDashboard = () => {
     }, 1000);
   }, [onPress, loadWeatherSummary]);
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    gradientBackground: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      opacity: theme.dark ? 0.4 : 0.2,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingHorizontal: theme.custom.spacing.xxs,
-      paddingTop: insets.top + theme.custom.spacing.md,
-      paddingBottom: 100,
-    },
-  });
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: theme.colors.background,
+        },
+        gradientBackground: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          opacity: theme.dark ? 0.4 : 0.2,
+        },
+        scrollView: {
+          flex: 1,
+        },
+        scrollContent: {
+          paddingHorizontal: theme.custom.spacing.xxs,
+          paddingTop: insets.top + theme.custom.spacing.md,
+          paddingBottom: 100,
+        },
+      }),
+    [theme, insets.top],
+  );
 
   return (
     <View style={styles.container}>

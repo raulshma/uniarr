@@ -28,6 +28,8 @@ import type {
   HealthMessageSeverity,
 } from "@/models/logger.types";
 
+export type { RadarrQueueItem };
+
 // Aliases for generated OpenAPI types
 type RadarrSystemStatus = components["schemas"]["SystemResource"];
 type RadarrMovieImage = components["schemas"]["MediaCover"];

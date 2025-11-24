@@ -28,6 +28,7 @@ import type {
   RecommendationRequest,
   RecommendationResponseData,
   UserContext,
+  LearningWeights,
 } from "@/models/recommendation.types";
 import {
   AIServiceError,
@@ -38,9 +39,17 @@ import {
   isRateLimitError,
 } from "./errors";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
-import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
-import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
+import type {
+  SonarrConnector,
+  SonarrQueueItem,
+} from "@/connectors/implementations/SonarrConnector";
+import type {
+  RadarrConnector,
+  RadarrQueueItem,
+} from "@/connectors/implementations/RadarrConnector";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
+import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import { z } from "zod";
 import NetInfo from "@react-native-community/netinfo";
 
 /**
@@ -444,9 +453,7 @@ export class ContentRecommendationService {
   /**
    * Get cached recommendations with proper error handling
    */
-  private async getCachedRecommendations(
-    userId: string,
-  ): Promise<RecommendationResponseData | null> {
+  public async getCachedRecommendations(userId: string) {
     try {
       const cached = await this.cache.get(userId);
       if (!cached) {
@@ -1015,7 +1022,7 @@ export class ContentRecommendationService {
         };
       }
 
-      const connector = jellyseerrConnectors[0] as any; // JellyseerrConnector
+      const connector = jellyseerrConnectors[0] as JellyseerrConnector;
 
       // Determine media type
       const mediaType = recommendation.type === "movie" ? "movie" : "tv";
@@ -1032,18 +1039,32 @@ export class ContentRecommendationService {
       }
 
       // Find best match
-      const match =
-        searchResults.find(
-          (r: any) =>
-            r.mediaType === mediaType &&
-            ((r.title || r.name || "").toLowerCase() ===
-              recommendation.title.toLowerCase() ||
-              (r.originalTitle || r.originalName || "").toLowerCase() ===
-                recommendation.title.toLowerCase()),
-        ) ||
-        searchResults.find((r: any) => r.mediaType === mediaType) ||
-        searchResults[0];
+      // Helper to safely extract title from discriminated union
+      const getTitle = (r: (typeof searchResults)[0]) => {
+        if ("title" in r) return r.title;
+        if ("name" in r) return r.name;
+        return undefined;
+      };
+      const getOriginalTitle = (r: (typeof searchResults)[0]) => {
+        if ("originalTitle" in r) return r.originalTitle;
+        if ("originalName" in r) return r.originalName;
+        return undefined;
+      };
 
+      const match =
+        searchResults.find((r) => {
+          if (r.mediaType !== mediaType) return false;
+          const title = getTitle(r);
+          const originalTitle = getOriginalTitle(r);
+          return (
+            (title || "").toLowerCase() ===
+              recommendation.title.toLowerCase() ||
+            (originalTitle || "").toLowerCase() ===
+              recommendation.title.toLowerCase()
+          );
+        }) ||
+        searchResults.find((r) => r.mediaType === mediaType) ||
+        searchResults[0];
       if (!match || !match.id) {
         return {
           success: false,
@@ -1053,7 +1074,9 @@ export class ContentRecommendationService {
       }
 
       // Create the request
-      const requestPayload: any = {
+      const requestPayload: Parameters<
+        JellyseerrConnector["createRequest"]
+      >[0] = {
         mediaId: match.id,
         mediaType,
         is4k: options?.is4k ?? false,
@@ -1262,7 +1285,9 @@ export class ContentRecommendationService {
    * @param timeWindowMs - Time window to analyze (default: last 24 hours)
    * @returns Performance statistics for all operations
    */
-  async getPerformanceStats(timeWindowMs?: number): Promise<Map<string, any>> {
+  async getPerformanceStats(
+    timeWindowMs?: number,
+  ): Promise<Map<string, unknown>> {
     return this.performanceMonitor.getAllStats(timeWindowMs);
   }
 
@@ -1335,8 +1360,8 @@ export class ContentRecommendationService {
       );
 
       // Add IDs to recommendations
-      const recommendations = (result.object as any).recommendations.map(
-        (rec: any, index: number) => ({
+      const recommendations = result.object.recommendations.map(
+        (rec: Recommendation, index: number) => ({
           ...rec,
           id: `rec_${Date.now()}_${index}`,
         }),
@@ -1380,9 +1405,9 @@ export class ContentRecommendationService {
   /**
    * Call AI service with exponential backoff retry logic
    */
-  private async callAIWithRetry(
+  private async callAIWithRetry<T>(
     userId: string,
-    schema: any,
+    schema: z.ZodType<T>,
     prompt: string,
     systemPrompt: string,
     options?: {
@@ -1391,7 +1416,7 @@ export class ContentRecommendationService {
       keyId?: string;
     },
     attempt: number = 0,
-  ): Promise<any> {
+  ): Promise<{ object: T }> {
     const maxAttempts = 3;
 
     try {
@@ -1469,8 +1494,8 @@ export class ContentRecommendationService {
       );
 
       // Add IDs to recommendations
-      const gaps = (result.object as any).recommendations.map(
-        (rec: any, index: number) => ({
+      const gaps = result.object.recommendations.map(
+        (rec: Recommendation, index: number) => ({
           ...rec,
           id: `gap_${Date.now()}_${index}`,
         }),
@@ -1568,7 +1593,7 @@ export class ContentRecommendationService {
           const mediaTypeFilter =
             recommendation.type === "movie" ? "movie" : "tv";
           const filteredResults = searchResponse.results.filter(
-            (item: any) => item.media_type === mediaTypeFilter,
+            (item) => item.media_type === mediaTypeFilter,
           );
 
           const resultsToSearch =
@@ -1577,12 +1602,13 @@ export class ContentRecommendationService {
               : searchResponse.results;
 
           const match =
-            resultsToSearch.find((item: any) => {
-              const itemTitle = item.title || item.name || "";
-              const itemYear = item.release_date
-                ? parseInt(item.release_date.slice(0, 4), 10)
-                : item.first_air_date
-                  ? parseInt(item.first_air_date.slice(0, 4), 10)
+            resultsToSearch.find((item) => {
+              const i = item as any;
+              const itemTitle = i.title || i.name || "";
+              const itemYear = i.release_date
+                ? parseInt(i.release_date.slice(0, 4), 10)
+                : i.first_air_date
+                  ? parseInt(i.first_air_date.slice(0, 4), 10)
                   : null;
 
               const titleMatch =
@@ -1711,7 +1737,7 @@ export class ContentRecommendationService {
           const results = (await Promise.race([
             searchPromise,
             timeout,
-          ])) as any[];
+          ])) as Awaited<ReturnType<JellyfinConnector["search"]>>;
 
           if (results && results.length > 0) {
             availability.inLibrary = true;
@@ -1736,12 +1762,15 @@ export class ContentRecommendationService {
               setTimeout(() => reject(new Error("Timeout")), 2000),
             );
             const queuePromise = connector.getQueue();
-            const queue = (await Promise.race([queuePromise, timeout])) as any;
+            const queue = (await Promise.race([
+              queuePromise,
+              timeout,
+            ])) as SonarrQueueItem[];
 
-            if (queue && Array.isArray(queue.records)) {
-              availability.inQueue = queue.records.some(
-                (item: any) =>
-                  item.title?.toLowerCase() ===
+            if (Array.isArray(queue)) {
+              availability.inQueue = queue.some(
+                (item) =>
+                  (item.seriesTitle || "").toLowerCase() ===
                   recommendation.title.toLowerCase(),
               );
             }
@@ -1766,12 +1795,15 @@ export class ContentRecommendationService {
               setTimeout(() => reject(new Error("Timeout")), 2000),
             );
             const queuePromise = connector.getQueue();
-            const queue = (await Promise.race([queuePromise, timeout])) as any;
+            const queue = (await Promise.race([
+              queuePromise,
+              timeout,
+            ])) as RadarrQueueItem[];
 
-            if (queue && Array.isArray(queue.records)) {
-              availability.inQueue = queue.records.some(
-                (item: any) =>
-                  item.title?.toLowerCase() ===
+            if (Array.isArray(queue)) {
+              availability.inQueue = queue.some(
+                (item) =>
+                  (item.title || "").toLowerCase() ===
                   recommendation.title.toLowerCase(),
               );
             }
@@ -1807,7 +1839,7 @@ export class ContentRecommendationService {
     limit: number,
     includeHiddenGems: boolean,
     context: UserContext,
-    weights: any,
+    weights: LearningWeights,
     notInterestedTitles: string[] = [],
   ): string {
     const libraryTitles = context.watchHistory

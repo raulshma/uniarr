@@ -3,14 +3,12 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   RefreshControl,
   Animated,
   Dimensions,
 } from "react-native";
-import { Text, Surface, IconButton } from "react-native-paper";
+import { Text, IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -21,9 +19,14 @@ import { useCalendar } from "@/hooks/useCalendar";
 import LottieWeatherIcon from "@/components/widgets/WeatherWidget/LottieWeatherIcon";
 import { widgetService } from "@/services/widgets/WidgetService";
 import { useHaptics } from "@/hooks/useHaptics";
-import { useAggregatedHealth } from "@/hooks/useAggregatedHealth";
+
 import { useSettingsStore } from "@/store/settingsStore";
 import { easeOutCubic } from "@/utils/animations.utils";
+import type { WeatherPayload } from "@/services/widgets/dataProviders/weatherProvider";
+
+import QuickActions from "./QuickActions";
+import HeroStatsCard from "./HeroStatsCard";
+import ActivitySection from "./ActivitySection";
 
 const headerMinHeight = 60;
 
@@ -41,7 +44,6 @@ const MainDashboard = () => {
     useServicesHealth();
   const { activeDownloadsCount, showDownloads } = useDownloadIndicator();
   const { releases, goToToday } = useCalendar();
-  const { data: aggregatedHealth } = useAggregatedHealth();
 
   const [refreshing, setRefreshing] = React.useState(false);
   const [weatherSummary, setWeatherSummary] = React.useState<{
@@ -71,7 +73,9 @@ const MainDashboard = () => {
         return;
       }
 
-      const cached = await widgetService.getWidgetData<any>(headerWidget.id);
+      const cached = await widgetService.getWidgetData<{
+        payload: Record<string, WeatherPayload>;
+      }>(headerWidget.id);
       const payload = cached?.payload;
       if (!payload || typeof payload !== "object") {
         setWeatherSummary(null);
@@ -238,17 +242,6 @@ const MainDashboard = () => {
           fontWeight: "500",
           opacity: 0.8,
         },
-        section: {
-          paddingHorizontal: theme.custom.spacing.xs,
-          marginBottom: theme.custom.spacing.md,
-        },
-        sectionTitle: {
-          fontSize: theme.custom.typography.titleMedium.fontSize,
-          fontWeight: "600",
-          marginBottom: theme.custom.spacing.sm,
-          color: theme.colors.onBackground,
-          paddingHorizontal: theme.custom.spacing.xs,
-        },
         scrollContent: {
           paddingBottom: 100,
           paddingTop: headerMaxHeight + insets.top,
@@ -263,146 +256,6 @@ const MainDashboard = () => {
           fontSize: theme.custom.typography.headlineMedium.fontSize,
           color: theme.colors.onBackground,
           fontWeight: "700",
-        },
-        quickActions: {
-          flexDirection: "row",
-          gap: theme.custom.spacing.sm,
-          paddingHorizontal: theme.custom.spacing.xs,
-        },
-        quickActionCard: {
-          minWidth: 85,
-          borderRadius: theme.custom.sizes.borderRadius.xl,
-          overflow: "hidden",
-          backgroundColor: theme.colors.elevation.level1,
-        },
-        quickActionContent: {
-          paddingVertical: theme.custom.spacing.md,
-          paddingHorizontal: theme.custom.spacing.sm,
-          alignItems: "center",
-          gap: theme.custom.spacing.xs,
-        },
-        quickActionIcon: {
-          width: 40,
-          height: 40,
-          borderRadius: theme.custom.sizes.borderRadius.lg,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: theme.colors.primaryContainer,
-        },
-        quickActionLabel: {
-          fontSize: theme.custom.typography.labelSmall.fontSize,
-          fontWeight: "600",
-          color: theme.colors.onSurface,
-          textAlign: "center",
-        },
-        quickActionBadge: {
-          position: "absolute",
-          top: theme.custom.spacing.xs,
-          right: theme.custom.spacing.xs,
-          backgroundColor: theme.colors.error,
-          borderRadius: 10,
-          minWidth: 20,
-          height: 20,
-          justifyContent: "center",
-          alignItems: "center",
-          paddingHorizontal: theme.custom.spacing.xxs,
-        },
-        quickActionBadgeText: {
-          fontSize: 11,
-          fontWeight: "700",
-          color: theme.colors.onError,
-        },
-        card: {
-          marginBottom: theme.custom.spacing.xs,
-          marginHorizontal: theme.custom.spacing.xs,
-          borderRadius: theme.custom.sizes.borderRadius.xxl,
-          overflow: "hidden",
-          elevation: 0,
-          backgroundColor: theme.colors.elevation.level1,
-        },
-        cardContent: {
-          flexDirection: "row",
-          alignItems: "center",
-          padding: theme.custom.spacing.md,
-        },
-        cardIcon: {
-          width: 48,
-          height: 48,
-          borderRadius: theme.custom.sizes.borderRadius.lg,
-          justifyContent: "center",
-          alignItems: "center",
-          marginRight: theme.custom.spacing.md,
-          backgroundColor: theme.colors.surfaceVariant,
-        },
-        cardText: {
-          flex: 1,
-        },
-        cardTitle: {
-          fontSize: theme.custom.typography.bodyLarge.fontSize,
-          fontWeight: "600",
-          color: theme.colors.onSurface,
-          marginBottom: 2,
-        },
-        cardSubtitle: {
-          fontSize: theme.custom.typography.bodySmall.fontSize,
-          color: theme.colors.onSurfaceVariant,
-          fontWeight: "400",
-        },
-
-        heroCard: {
-          marginBottom: theme.custom.spacing.md,
-          marginHorizontal: theme.custom.spacing.xs,
-          borderRadius: theme.custom.sizes.borderRadius.xxl,
-          overflow: "hidden",
-          elevation: 0,
-          backgroundColor: theme.colors.elevation.level1,
-        },
-        heroContent: {
-          flexDirection: "row",
-          alignItems: "center",
-          padding: theme.custom.spacing.md,
-        },
-        heroIcon: {
-          width: 48,
-          height: 48,
-          borderRadius: theme.custom.sizes.borderRadius.lg,
-          justifyContent: "center",
-          alignItems: "center",
-          marginRight: theme.custom.spacing.md,
-          backgroundColor: theme.colors.primaryContainer,
-        },
-        heroTextContainer: {
-          flex: 1,
-        },
-        heroTitle: {
-          fontSize: theme.custom.typography.labelSmall.fontSize,
-          fontWeight: "600",
-          color: theme.colors.onSurfaceVariant,
-          textTransform: "uppercase",
-          letterSpacing: theme.custom.typography.labelSmall.letterSpacing,
-          marginBottom: 2,
-        },
-        heroValue: {
-          fontSize: theme.custom.typography.headlineLarge.fontSize,
-          fontWeight: "700",
-          color: theme.colors.onSurface,
-          letterSpacing: -0.5,
-          marginBottom: 2,
-        },
-        heroSubtitle: {
-          fontSize: theme.custom.typography.bodySmall.fontSize,
-          color: theme.colors.onSurfaceVariant,
-          fontWeight: "400",
-        },
-        sectionHeader: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: theme.custom.spacing.sm,
-          paddingHorizontal: theme.custom.spacing.xs,
-        },
-        editButton: {
-          margin: 0,
         },
         actionButtonsContainer: {
           flexDirection: "row",
@@ -551,317 +404,17 @@ const MainDashboard = () => {
         </Animated.View>
 
         {/* Hero Stats Card */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/(tabs)/services")}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.heroCard} elevation={0}>
-              <View style={styles.heroContent}>
-                <View style={styles.heroIcon}>
-                  <MaterialCommunityIcons
-                    name="server-network"
-                    size={24}
-                    color={theme.colors.onPrimaryContainer}
-                  />
-                </View>
-                <View style={styles.heroTextContainer}>
-                  <Text style={styles.heroTitle}>Services Status</Text>
-                  <Text style={styles.heroValue}>
-                    {healthOverview.online}/{healthOverview.total}
-                  </Text>
-                  <Text style={styles.heroSubtitle}>
-                    {healthOverview.offline > 0
-                      ? `${healthOverview.offline} offline`
-                      : "All operational"}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons
-                  name="chevron-right"
-                  size={20}
-                  color={theme.colors.onSurfaceVariant}
-                />
-              </View>
-            </Surface>
-          </TouchableOpacity>
-        </View>
+        <HeroStatsCard healthOverview={healthOverview} />
 
         {/* Quick Actions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <IconButton
-              icon="pencil"
-              size={18}
-              iconColor={theme.colors.onSurfaceVariant}
-              style={styles.editButton}
-              onPress={() => router.push("/(auth)/settings/quick-actions")}
-            />
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickActions}
-          >
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/(tabs)/services")}
-              activeOpacity={0.7}
-            >
-              <Surface style={styles.quickActionCard} elevation={0}>
-                <View style={styles.quickActionContent}>
-                  <View style={styles.quickActionIcon}>
-                    <MaterialCommunityIcons
-                      name="magnify"
-                      size={22}
-                      color={theme.colors.onPrimaryContainer}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Search</Text>
-                </View>
-              </Surface>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/calendar")}
-              activeOpacity={0.7}
-            >
-              <Surface style={styles.quickActionCard} elevation={0}>
-                <View style={styles.quickActionContent}>
-                  <View style={styles.quickActionIcon}>
-                    <MaterialCommunityIcons
-                      name="calendar"
-                      size={22}
-                      color={theme.colors.onPrimaryContainer}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Calendar</Text>
-                </View>
-              </Surface>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/(tabs)/downloads")}
-              activeOpacity={0.7}
-            >
-              <Surface style={styles.quickActionCard} elevation={0}>
-                {activeDownloadsCount > 0 && (
-                  <View style={styles.quickActionBadge}>
-                    <Text style={styles.quickActionBadgeText}>
-                      {activeDownloadsCount}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.quickActionContent}>
-                  <View style={styles.quickActionIcon}>
-                    <MaterialCommunityIcons
-                      name="download"
-                      size={22}
-                      color={theme.colors.onPrimaryContainer}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Downloads</Text>
-                </View>
-              </Surface>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/monitoring")}
-              activeOpacity={0.7}
-            >
-              <Surface style={styles.quickActionCard} elevation={0}>
-                <View style={styles.quickActionContent}>
-                  <View style={styles.quickActionIcon}>
-                    <MaterialCommunityIcons
-                      name="monitor-dashboard"
-                      size={22}
-                      color={theme.colors.onPrimaryContainer}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Monitor</Text>
-                </View>
-              </Surface>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/recently-added")}
-              activeOpacity={0.7}
-            >
-              <Surface style={styles.quickActionCard} elevation={0}>
-                <View style={styles.quickActionContent}>
-                  <View style={styles.quickActionIcon}>
-                    <MaterialCommunityIcons
-                      name="clock-outline"
-                      size={22}
-                      color={theme.colors.onPrimaryContainer}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Recent</Text>
-                </View>
-              </Surface>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/discover")}
-              activeOpacity={0.7}
-            >
-              <Surface style={styles.quickActionCard} elevation={0}>
-                <View style={styles.quickActionContent}>
-                  <View style={styles.quickActionIcon}>
-                    <MaterialCommunityIcons
-                      name="compass-outline"
-                      size={22}
-                      color={theme.colors.onPrimaryContainer}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Discover</Text>
-                </View>
-              </Surface>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/(tabs)/settings")}
-              activeOpacity={0.7}
-            >
-              <Surface style={styles.quickActionCard} elevation={0}>
-                <View style={styles.quickActionContent}>
-                  <View style={styles.quickActionIcon}>
-                    <MaterialCommunityIcons
-                      name="cog"
-                      size={22}
-                      color={theme.colors.onPrimaryContainer}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Settings</Text>
-                </View>
-              </Surface>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        <QuickActions activeDownloadsCount={activeDownloadsCount} />
 
         {/* Activity Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Activity</Text>
-
-          <TouchableOpacity onPress={showDownloads} activeOpacity={0.7}>
-            <Surface style={styles.card} elevation={0}>
-              <View style={styles.cardContent}>
-                <View style={styles.cardIcon}>
-                  <MaterialCommunityIcons
-                    name="download"
-                    size={24}
-                    color={theme.colors.primary}
-                  />
-                </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>
-                    {activeDownloadsCount > 0
-                      ? `${activeDownloadsCount} Active Downloads`
-                      : "No Active Downloads"}
-                  </Text>
-                  <Text style={styles.cardSubtitle}>
-                    {activeDownloadsCount > 0
-                      ? "Tap to view progress"
-                      : "All downloads complete"}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons
-                  name="chevron-right"
-                  size={20}
-                  color={theme.colors.onSurfaceVariant}
-                />
-              </View>
-            </Surface>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              if (!nextRelease) {
-                router.push("/(auth)/calendar");
-                return;
-              }
-
-              if (
-                nextRelease.type === "episode" &&
-                nextRelease.seriesId &&
-                nextRelease.serviceId &&
-                nextRelease.serviceType === "sonarr"
-              ) {
-                try {
-                  router.push(
-                    `/(auth)/sonarr/${nextRelease.serviceId}/series/${nextRelease.seriesId}`,
-                  );
-                } catch (error) {
-                  console.error("Navigation error:", error);
-                  router.push("/(auth)/calendar");
-                }
-              } else {
-                router.push("/(auth)/calendar");
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.card} elevation={0}>
-              <View style={styles.cardContent}>
-                <View style={styles.cardIcon}>
-                  <MaterialCommunityIcons
-                    name="calendar-clock"
-                    size={24}
-                    color={theme.colors.tertiary}
-                  />
-                </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>
-                    {nextRelease ? nextRelease.title : "Nothing upcoming"}
-                  </Text>
-                  <Text style={styles.cardSubtitle}>
-                    {nextRelease
-                      ? `${new Date(nextRelease.releaseDate).toLocaleDateString()} • ${nextRelease.type}`
-                      : "Check back later"}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons
-                  name="chevron-right"
-                  size={20}
-                  color={theme.colors.onSurfaceVariant}
-                />
-              </View>
-            </Surface>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/monitoring")}
-            activeOpacity={0.7}
-          >
-            <Surface style={styles.card} elevation={0}>
-              <View style={styles.cardContent}>
-                <View style={styles.cardIcon}>
-                  <MaterialCommunityIcons
-                    name="monitor-dashboard"
-                    size={24}
-                    color={
-                      aggregatedHealth?.criticalIssues?.length
-                        ? theme.colors.error
-                        : theme.colors.primary
-                    }
-                  />
-                </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>System Monitoring</Text>
-                  <Text style={styles.cardSubtitle}>
-                    {aggregatedHealth?.criticalIssues?.length
-                      ? `${aggregatedHealth.criticalIssues.length} critical issues`
-                      : "View logs, health & metrics"}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons
-                  name="chevron-right"
-                  size={20}
-                  color={theme.colors.onSurfaceVariant}
-                />
-              </View>
-            </Surface>
-          </TouchableOpacity>
-        </View>
+        <ActivitySection
+          activeDownloadsCount={activeDownloadsCount}
+          showDownloads={showDownloads}
+          nextRelease={nextRelease}
+        />
       </ScrollView>
     </View>
   );
