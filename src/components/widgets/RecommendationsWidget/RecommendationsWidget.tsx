@@ -145,23 +145,8 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
         const widgetConfig = await widgetService.getWidget(widget.id);
         const limit = widgetConfig?.config?.limit || 9; // Default to 9 for 3 batches
 
-        // Try to get cached data first
-        const cached = await widgetService.getWidgetData<{
-          recommendations: Recommendation[];
-          generatedAt: string;
-        }>(widget.id);
-
-        // Only use cache if it has enough recommendations
-        if (cached && cached.recommendations.length >= limit && !isCancelled) {
-          clearTimeout(timeoutId);
-          setRecommendations(cached.recommendations.slice(0, limit));
-          const age = Date.now() - new Date(cached.generatedAt).getTime();
-          setCacheAge(age);
-          setLoading(false);
-          return;
-        }
-
-        // Fetch fresh recommendations
+        // Fetch recommendations from AI service
+        // The service handles its own caching, so we don't need to double-cache here
         const service = ContentRecommendationService.getInstance();
         const response = await service.getRecommendations({
           userId,
@@ -172,24 +157,19 @@ const RecommendationsWidget: React.FC<RecommendationsWidgetProps> = ({
         console.log("Fetched recommendations:", {
           requested: limit,
           received: response.recommendations.length,
+          cacheAge: response.cacheAge,
         });
 
         if (!isCancelled) {
           clearTimeout(timeoutId);
           setRecommendations(response.recommendations);
-          setCacheAge(0);
 
-          // Cache the data
-          await widgetService.setWidgetData(
-            widget.id,
-            {
-              recommendations: response.recommendations,
-              generatedAt: response.generatedAt.toISOString(),
-            },
-            {
-              ttlMs: 24 * 60 * 60 * 1000, // 24 hours
-            },
-          );
+          // Use the cache age from the service, or calculate it
+          if (response.cacheAge !== undefined) {
+            setCacheAge(response.cacheAge);
+          } else {
+            setCacheAge(Date.now() - response.generatedAt.getTime());
+          }
         }
       } catch (err) {
         if (!isCancelled) {
