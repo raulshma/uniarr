@@ -28,6 +28,7 @@ import type {
   RecommendationRequest,
   RecommendationResponseData,
   UserContext,
+  LearningWeights,
 } from "@/models/recommendation.types";
 import {
   AIServiceError,
@@ -38,9 +39,17 @@ import {
   isRateLimitError,
 } from "./errors";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
-import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
-import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
+import type {
+  SonarrConnector,
+  SonarrQueueItem,
+} from "@/connectors/implementations/SonarrConnector";
+import type {
+  RadarrConnector,
+  RadarrQueueItem,
+} from "@/connectors/implementations/RadarrConnector";
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
+import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
+import { z } from "zod";
 import NetInfo from "@react-native-community/netinfo";
 
 /**
@@ -444,9 +453,7 @@ export class ContentRecommendationService {
   /**
    * Get cached recommendations with proper error handling
    */
-  private async getCachedRecommendations(
-    userId: string,
-  ): Promise<RecommendationResponseData | null> {
+  public async getCachedRecommendations(userId: string) {
     try {
       const cached = await this.cache.get(userId);
       if (!cached) {
@@ -1015,7 +1022,7 @@ export class ContentRecommendationService {
         };
       }
 
-      const connector = jellyseerrConnectors[0] as any; // JellyseerrConnector
+      const connector = jellyseerrConnectors[0] as JellyseerrConnector;
 
       // Determine media type
       const mediaType = recommendation.type === "movie" ? "movie" : "tv";
@@ -1032,18 +1039,32 @@ export class ContentRecommendationService {
       }
 
       // Find best match
-      const match =
-        searchResults.find(
-          (r: any) =>
-            r.mediaType === mediaType &&
-            ((r.title || r.name || "").toLowerCase() ===
-              recommendation.title.toLowerCase() ||
-              (r.originalTitle || r.originalName || "").toLowerCase() ===
-                recommendation.title.toLowerCase()),
-        ) ||
-        searchResults.find((r: any) => r.mediaType === mediaType) ||
-        searchResults[0];
+      // Helper to safely extract title from discriminated union
+      const getTitle = (r: (typeof searchResults)[0]) => {
+        if ("title" in r) return r.title;
+        if ("name" in r) return r.name;
+        return undefined;
+      };
+      const getOriginalTitle = (r: (typeof searchResults)[0]) => {
+        if ("originalTitle" in r) return r.originalTitle;
+        if ("originalName" in r) return r.originalName;
+        return undefined;
+      };
 
+      const match =
+        searchResults.find((r) => {
+          if (r.mediaType !== mediaType) return false;
+          const title = getTitle(r);
+          const originalTitle = getOriginalTitle(r);
+          return (
+            (title || "").toLowerCase() ===
+              recommendation.title.toLowerCase() ||
+            (originalTitle || "").toLowerCase() ===
+              recommendation.title.toLowerCase()
+          );
+        }) ||
+        searchResults.find((r) => r.mediaType === mediaType) ||
+        searchResults[0];
       if (!match || !match.id) {
         return {
           success: false,
@@ -1053,7 +1074,9 @@ export class ContentRecommendationService {
       }
 
       // Create the request
-      const requestPayload: any = {
+      const requestPayload: Parameters<
+        JellyseerrConnector["createRequest"]
+      >[0] = {
         mediaId: match.id,
         mediaType,
         is4k: options?.is4k ?? false,
@@ -1262,7 +1285,9 @@ export class ContentRecommendationService {
    * @param timeWindowMs - Time window to analyze (default: last 24 hours)
    * @returns Performance statistics for all operations
    */
-  async getPerformanceStats(timeWindowMs?: number): Promise<Map<string, any>> {
+  async getPerformanceStats(
+    timeWindowMs?: number,
+  ): Promise<Map<string, unknown>> {
     return this.performanceMonitor.getAllStats(timeWindowMs);
   }
 
@@ -1335,8 +1360,8 @@ export class ContentRecommendationService {
       );
 
       // Add IDs to recommendations
-      const recommendations = (result.object as any).recommendations.map(
-        (rec: any, index: number) => ({
+      const recommendations = result.object.recommendations.map(
+        (rec: Recommendation, index: number) => ({
           ...rec,
           id: `rec_${Date.now()}_${index}`,
         }),
@@ -1380,9 +1405,9 @@ export class ContentRecommendationService {
   /**
    * Call AI service with exponential backoff retry logic
    */
-  private async callAIWithRetry(
+  private async callAIWithRetry<T>(
     userId: string,
-    schema: any,
+    schema: z.ZodType<T>,
     prompt: string,
     systemPrompt: string,
     options?: {
@@ -1391,7 +1416,7 @@ export class ContentRecommendationService {
       keyId?: string;
     },
     attempt: number = 0,
-  ): Promise<any> {
+  ): Promise<{ object: T }> {
     const maxAttempts = 3;
 
     try {
@@ -1469,8 +1494,8 @@ export class ContentRecommendationService {
       );
 
       // Add IDs to recommendations
-      const gaps = (result.object as any).recommendations.map(
-        (rec: any, index: number) => ({
+      const gaps = result.object.recommendations.map(
+        (rec: Recommendation, index: number) => ({
           ...rec,
           id: `gap_${Date.now()}_${index}`,
         }),
@@ -1516,82 +1541,159 @@ export class ContentRecommendationService {
       }),
     );
 
-    return enriched;
+    // Filter out items already in library
+    const filtered = enriched.filter((rec) => !rec.availability?.inLibrary);
+
+    if (filtered.length < enriched.length) {
+      void logger.info("Filtered out items already in library", {
+        original: enriched.length,
+        filtered: filtered.length,
+        removed: enriched.length - filtered.length,
+      });
+    }
+
+    return filtered;
   }
 
   /**
-   * Fetch poster URL from TMDb
+   * Fetch poster URL from TMDb or fallback to other services
    */
   private async fetchPosterUrl(
     recommendation: Recommendation,
   ): Promise<string | undefined> {
     try {
-      // Import getTmdbConnector dynamically to avoid circular dependencies
+      // 1. Try TMDb first
       const { getTmdbConnector } = await import(
         "@/services/tmdb/TmdbConnectorProvider"
       );
-      const connector = await getTmdbConnector();
+      const tmdbConnector = await getTmdbConnector();
 
-      if (!connector) {
-        void logger.debug("No TMDb connector configured", {
-          title: recommendation.title,
+      if (tmdbConnector) {
+        // Search for the content using searchMulti
+        const searchQuery = recommendation.year
+          ? `${recommendation.title} ${recommendation.year}`
+          : recommendation.title;
+
+        const timeout = new Promise<undefined>((resolve) =>
+          setTimeout(() => resolve(undefined), 10_000),
+        );
+
+        const searchPromise = tmdbConnector.searchMulti({
+          query: searchQuery,
+          page: 1,
         });
-        return undefined;
+        const searchResponse = await Promise.race([searchPromise, timeout]);
+
+        if (
+          searchResponse &&
+          searchResponse.results &&
+          searchResponse.results.length > 0
+        ) {
+          // Find best match - filter by media type first
+          const mediaTypeFilter =
+            recommendation.type === "movie" ? "movie" : "tv";
+          const filteredResults = searchResponse.results.filter(
+            (item) => item.media_type === mediaTypeFilter,
+          );
+
+          const resultsToSearch =
+            filteredResults.length > 0
+              ? filteredResults
+              : searchResponse.results;
+
+          const match =
+            resultsToSearch.find((item) => {
+              const i = item as any;
+              const itemTitle = i.title || i.name || "";
+              const itemYear = i.release_date
+                ? parseInt(i.release_date.slice(0, 4), 10)
+                : i.first_air_date
+                  ? parseInt(i.first_air_date.slice(0, 4), 10)
+                  : null;
+
+              const titleMatch =
+                itemTitle.toLowerCase() === recommendation.title.toLowerCase();
+              const yearMatch =
+                !recommendation.year || itemYear === recommendation.year;
+
+              return titleMatch && yearMatch;
+            }) || resultsToSearch[0];
+
+          // Build poster URL
+          const posterPath = match?.poster_path;
+          if (posterPath) {
+            return `https://image.tmdb.org/t/p/w500${posterPath}`;
+          }
+        }
+      } else {
+        void logger.debug(
+          "No TMDb connector configured, skipping TMDB search",
+          {
+            title: recommendation.title,
+          },
+        );
       }
 
-      // Search for the content using searchMulti
-      const searchQuery = recommendation.year
-        ? `${recommendation.title} ${recommendation.year}`
-        : recommendation.title;
+      // 2. Fallback to Sonarr/Radarr if TMDB failed or wasn't configured
+      const connectorManager = ConnectorManager.getInstance();
 
-      const timeout = new Promise<undefined>((resolve) =>
-        setTimeout(() => resolve(undefined), 3000),
-      );
+      if (recommendation.type === "series" || recommendation.type === "anime") {
+        const sonarrConnectors = connectorManager.getConnectorsByType("sonarr");
+        for (const conn of sonarrConnectors) {
+          try {
+            const sonarr = conn as SonarrConnector;
+            // Use a short timeout for the search
+            const searchTimeout = new Promise<undefined>((resolve) =>
+              setTimeout(() => resolve(undefined), 2000),
+            );
+            const searchPromise = sonarr.search(recommendation.title);
+            const results = await Promise.race([searchPromise, searchTimeout]);
 
-      const searchPromise = connector.searchMulti({
-        query: searchQuery,
-        page: 1,
-      });
-      const searchResponse = await Promise.race([searchPromise, timeout]);
+            if (results && results.length > 0) {
+              const match = results.find(
+                (s) =>
+                  s.title.toLowerCase() === recommendation.title.toLowerCase(),
+              );
+              if (match?.posterUrl) return match.posterUrl;
+              // If no exact match, try the first one if it looks reasonable?
+              // Maybe risky. Let's stick to exact title match for now.
+              if (results[0]?.posterUrl) return results[0].posterUrl;
+            }
+          } catch (e) {
+            void logger.debug("Sonarr fallback search failed", {
+              title: recommendation.title,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+      } else if (recommendation.type === "movie") {
+        const radarrConnectors = connectorManager.getConnectorsByType("radarr");
+        for (const conn of radarrConnectors) {
+          try {
+            const radarr = conn as RadarrConnector;
+            const searchTimeout = new Promise<undefined>((resolve) =>
+              setTimeout(() => resolve(undefined), 2000),
+            );
+            const searchPromise = radarr.search(recommendation.title);
+            const results = await Promise.race([searchPromise, searchTimeout]);
 
-      if (
-        !searchResponse ||
-        !searchResponse.results ||
-        searchResponse.results.length === 0
-      ) {
-        return undefined;
-      }
-
-      // Find best match - filter by media type first
-      const mediaTypeFilter = recommendation.type === "movie" ? "movie" : "tv";
-      const filteredResults = searchResponse.results.filter(
-        (item: any) => item.media_type === mediaTypeFilter,
-      );
-
-      const resultsToSearch =
-        filteredResults.length > 0 ? filteredResults : searchResponse.results;
-
-      const match =
-        resultsToSearch.find((item: any) => {
-          const itemTitle = item.title || item.name || "";
-          const itemYear = item.release_date
-            ? parseInt(item.release_date.slice(0, 4), 10)
-            : item.first_air_date
-              ? parseInt(item.first_air_date.slice(0, 4), 10)
-              : null;
-
-          const titleMatch =
-            itemTitle.toLowerCase() === recommendation.title.toLowerCase();
-          const yearMatch =
-            !recommendation.year || itemYear === recommendation.year;
-
-          return titleMatch && yearMatch;
-        }) || resultsToSearch[0];
-
-      // Build poster URL
-      const posterPath = match?.poster_path;
-      if (posterPath) {
-        return `https://image.tmdb.org/t/p/w500${posterPath}`;
+            if (results && results.length > 0) {
+              const match = results.find(
+                (m) =>
+                  m.title.toLowerCase() ===
+                    recommendation.title.toLowerCase() &&
+                  (!recommendation.year || m.year === recommendation.year),
+              );
+              if (match?.posterUrl) return match.posterUrl;
+              if (results[0]?.posterUrl) return results[0].posterUrl;
+            }
+          } catch (e) {
+            void logger.debug("Radarr fallback search failed", {
+              title: recommendation.title,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
       }
 
       return undefined;
@@ -1635,7 +1737,7 @@ export class ContentRecommendationService {
           const results = (await Promise.race([
             searchPromise,
             timeout,
-          ])) as any[];
+          ])) as Awaited<ReturnType<JellyfinConnector["search"]>>;
 
           if (results && results.length > 0) {
             availability.inLibrary = true;
@@ -1660,12 +1762,15 @@ export class ContentRecommendationService {
               setTimeout(() => reject(new Error("Timeout")), 2000),
             );
             const queuePromise = connector.getQueue();
-            const queue = (await Promise.race([queuePromise, timeout])) as any;
+            const queue = (await Promise.race([
+              queuePromise,
+              timeout,
+            ])) as SonarrQueueItem[];
 
-            if (queue && Array.isArray(queue.records)) {
-              availability.inQueue = queue.records.some(
-                (item: any) =>
-                  item.title?.toLowerCase() ===
+            if (Array.isArray(queue)) {
+              availability.inQueue = queue.some(
+                (item) =>
+                  (item.seriesTitle || "").toLowerCase() ===
                   recommendation.title.toLowerCase(),
               );
             }
@@ -1690,12 +1795,15 @@ export class ContentRecommendationService {
               setTimeout(() => reject(new Error("Timeout")), 2000),
             );
             const queuePromise = connector.getQueue();
-            const queue = (await Promise.race([queuePromise, timeout])) as any;
+            const queue = (await Promise.race([
+              queuePromise,
+              timeout,
+            ])) as RadarrQueueItem[];
 
-            if (queue && Array.isArray(queue.records)) {
-              availability.inQueue = queue.records.some(
-                (item: any) =>
-                  item.title?.toLowerCase() ===
+            if (Array.isArray(queue)) {
+              availability.inQueue = queue.some(
+                (item) =>
+                  (item.title || "").toLowerCase() ===
                   recommendation.title.toLowerCase(),
               );
             }
@@ -1731,7 +1839,7 @@ export class ContentRecommendationService {
     limit: number,
     includeHiddenGems: boolean,
     context: UserContext,
-    weights: any,
+    weights: LearningWeights,
     notInterestedTitles: string[] = [],
   ): string {
     const libraryTitles = context.watchHistory

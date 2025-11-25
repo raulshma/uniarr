@@ -2,7 +2,8 @@ import React, { useState, useMemo, useCallback } from "react";
 import { ScrollView, StyleSheet, View, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, useTheme, IconButton, Chip, Banner } from "react-native-paper";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -16,8 +17,6 @@ import { useRecommendationFeedback } from "@/hooks/useRecommendationFeedback";
 import { useAuth } from "@/services/auth/AuthProvider";
 import { spacing } from "@/theme/spacing";
 import { logger } from "@/services/logger/LoggerService";
-
-// Get user from auth provider
 
 const RecommendationsScreen = () => {
   const theme = useTheme<AppTheme>();
@@ -141,53 +140,70 @@ const RecommendationsScreen = () => {
           flex: 1,
           backgroundColor: theme.colors.background,
         },
+        gradientBackground: {
+          ...StyleSheet.absoluteFillObject,
+          opacity: 0.15,
+        },
         scrollContent: {
           padding: spacing.md,
-          gap: spacing.md,
+          paddingTop: spacing.lg,
+          gap: spacing.lg,
+          paddingBottom: 100,
         },
         header: {
           marginBottom: spacing.sm,
         },
-        headerRow: {
+        headerTop: {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: spacing.xs,
         },
         title: {
-          fontWeight: "700",
+          fontWeight: "800",
           color: theme.colors.onBackground,
+          fontSize: 32,
+          letterSpacing: -0.5,
         },
         subtitle: {
-          fontSize: 14,
+          fontSize: 16,
           color: theme.colors.onSurfaceVariant,
+          maxWidth: "80%",
+          lineHeight: 24,
         },
         metaRow: {
           flexDirection: "row",
           alignItems: "center",
           gap: spacing.sm,
-          marginTop: spacing.xs,
+          marginTop: spacing.md,
         },
         metaChip: {
-          height: 28,
+          height: 32,
+          backgroundColor: theme.colors.surfaceVariant,
         },
         offlineBanner: {
           marginBottom: spacing.md,
+          borderRadius: 12,
+          overflow: "hidden",
         },
         recommendationsSection: {
-          gap: spacing.md,
+          gap: spacing.lg,
         },
         sectionHeader: {
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
+          marginTop: spacing.md,
         },
         sectionTitle: {
-          fontWeight: "600",
+          fontWeight: "700",
+          fontSize: 20,
           color: theme.colors.onSurface,
         },
         emptyContainer: {
-          paddingVertical: spacing.xl,
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
         },
       }),
     [theme],
@@ -196,150 +212,164 @@ const RecommendationsScreen = () => {
   // Loading state
   if (isLoading || isAuthLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <LoadingState message="Generating personalized recommendations..." />
-        </View>
-      </SafeAreaView>
+      <View style={styles.container}>
+        <LinearGradient
+          colors={[theme.colors.primaryContainer, theme.colors.background]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientBackground}
+        />
+        <SafeAreaView style={styles.emptyContainer}>
+          <LoadingState message="Curating your personal feed..." />
+        </SafeAreaView>
+      </View>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
-        <EmptyState
-          icon="lightbulb-outline"
-          title="Unable to Load Recommendations"
-          description={
-            error instanceof Error
-              ? error.message
-              : "Something went wrong while loading your recommendations."
-          }
-          actionLabel="Retry"
-          onActionPress={() => refetch()}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  // Empty state
-  if (!recommendations || recommendations.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <EmptyState
-          icon="lightbulb-outline"
-          title="No Recommendations Yet"
-          description="Start watching content to get personalized recommendations based on your taste."
-          actionLabel="Refresh"
-          onActionPress={() => refetch()}
-        />
-      </SafeAreaView>
+      <View style={styles.container}>
+        <SafeAreaView style={styles.emptyContainer}>
+          <EmptyState
+            icon="lightbulb-off-outline"
+            title="Unable to Load Recommendations"
+            description={
+              error instanceof Error
+                ? error.message
+                : "Something went wrong while loading your recommendations."
+            }
+            actionLabel="Retry"
+            onActionPress={() => refetch()}
+          />
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={isFetching}
-            onRefresh={handleRefresh}
-            colors={[theme.colors.primary]}
-          />
-        }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <Text variant="headlineMedium" style={styles.title}>
-              For You
-            </Text>
-            <IconButton
-              icon="refresh"
-              size={24}
-              onPress={handleRefresh}
-              disabled={isFetching}
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[theme.colors.primary, theme.colors.background]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.5, y: 0.8 }}
+        style={styles.gradientBackground}
+      />
+
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isFetching}
+              onRefresh={handleRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
             />
-          </View>
-          <Text variant="bodyMedium" style={styles.subtitle}>
-            Personalized recommendations based on your watch history
-          </Text>
-
-          {/* Meta information */}
-          <View style={styles.metaRow}>
-            {cacheAgeDisplay && (
-              <Chip
-                compact
-                icon="clock-outline"
-                style={styles.metaChip}
-                textStyle={{ fontSize: 12 }}
-              >
-                {cacheAgeDisplay}
-              </Chip>
-            )}
-            {context && (
-              <Chip
-                compact
-                icon="history"
-                style={styles.metaChip}
-                textStyle={{ fontSize: 12 }}
-              >
-                {context.watchHistoryCount} watched
-              </Chip>
-            )}
-          </View>
-        </View>
-
-        {/* Offline indicator */}
-        {isOffline && (
-          <Banner visible={true} icon="wifi-off" style={styles.offlineBanner}>
-            You're offline. Showing cached recommendations.
-          </Banner>
-        )}
-
-        {/* Recommendations list */}
-        <Animated.View
-          entering={FadeIn.duration(300)}
-          style={styles.recommendationsSection}
+          }
+          showsVerticalScrollIndicator={false}
         >
-          {recommendations.map((recommendation, index) => (
-            <RecommendationCard
-              key={recommendation.id || `rec-${index}`}
-              recommendation={recommendation}
-              onAccept={handleAccept}
-              onReject={handleReject}
-              isOffline={isOffline}
-              isSubmitting={isSubmitting}
-              userId={userId}
-            />
-          ))}
-        </Animated.View>
+          {/* Header */}
+          <Animated.View
+            entering={FadeInDown.duration(600).springify()}
+            style={styles.header}
+          >
+            <View style={styles.headerTop}>
+              <Text style={styles.title}>For You</Text>
+              <IconButton
+                icon="refresh"
+                mode="contained-tonal"
+                size={24}
+                onPress={handleRefresh}
+                disabled={isFetching}
+              />
+            </View>
+            <Text style={styles.subtitle}>
+              Curated picks based on your unique taste and watching habits.
+            </Text>
 
-        {/* Content Gaps Section */}
-        <View style={styles.sectionHeader}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            Missing from Your Library
-          </Text>
-          <IconButton
-            icon={showContentGaps ? "chevron-up" : "chevron-down"}
-            size={24}
-            onPress={handleToggleContentGaps}
-          />
-        </View>
+            {/* Meta information */}
+            <View style={styles.metaRow}>
+              {cacheAgeDisplay && (
+                <Chip
+                  icon="clock-outline"
+                  style={styles.metaChip}
+                  textStyle={{ fontSize: 12, fontWeight: "600" }}
+                >
+                  {cacheAgeDisplay}
+                </Chip>
+              )}
+              {context && (
+                <Chip
+                  icon="history"
+                  style={styles.metaChip}
+                  textStyle={{ fontSize: 12, fontWeight: "600" }}
+                >
+                  {context.watchHistoryCount} watched
+                </Chip>
+              )}
+            </View>
+          </Animated.View>
 
-        {showContentGaps && (
-          <ContentGapsSection
-            contentGaps={contentGaps}
-            isLoading={isLoadingGaps}
-            error={gapsError}
-            onRefresh={refetchGaps}
-            isOffline={isOffline}
-          />
-        )}
-      </ScrollView>
-    </SafeAreaView>
+          {/* Offline indicator */}
+          {isOffline && (
+            <Banner visible={true} icon="wifi-off" style={styles.offlineBanner}>
+              You're offline. Showing cached recommendations.
+            </Banner>
+          )}
+
+          {/* Empty State check inside scroll view to allow refresh */}
+          {!recommendations || recommendations.length === 0 ? (
+            <View style={{ marginTop: spacing.xl }}>
+              <EmptyState
+                icon="movie-open-outline"
+                title="No Recommendations Yet"
+                description="Start watching content to get personalized recommendations based on your taste."
+                actionLabel="Refresh"
+                onActionPress={() => refetch()}
+              />
+            </View>
+          ) : (
+            <>
+              {/* Recommendations list */}
+              <View style={styles.recommendationsSection}>
+                {recommendations.map((recommendation, index) => (
+                  <RecommendationCard
+                    key={recommendation.id || `rec-${index}`}
+                    recommendation={recommendation}
+                    onAccept={handleAccept}
+                    onReject={handleReject}
+                    isOffline={isOffline}
+                    isSubmitting={isSubmitting}
+                    userId={userId}
+                  />
+                ))}
+              </View>
+
+              {/* Content Gaps Section */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Missing from Library</Text>
+                <IconButton
+                  icon={showContentGaps ? "chevron-up" : "chevron-down"}
+                  size={24}
+                  onPress={handleToggleContentGaps}
+                />
+              </View>
+
+              {showContentGaps && (
+                <ContentGapsSection
+                  contentGaps={contentGaps}
+                  isLoading={isLoadingGaps}
+                  error={gapsError}
+                  onRefresh={refetchGaps}
+                  isOffline={isOffline}
+                />
+              )}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 };
 
