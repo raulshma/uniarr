@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo, useCallback, useState, useEffect } from "react";
+import React, { useMemo, useCallback, useState } from "react";
 import {
   ScrollView,
   View,
@@ -238,7 +238,14 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
   const [rootFolders, setRootFolders] = useState<RootFolder[]>([]);
   const [availableSeasons, setAvailableSeasons] = useState<any[]>([]);
   const [selectedSeasons, setSelectedSeasons] = useState<number[] | null>(null);
-  const [matchedRequests, setMatchedRequests] = useState<any[]>([]);
+
+  // Derive matched requests from the already-fetched data.mediaInfo
+  const matchedRequests = useMemo(() => {
+    // The OpenAPI schema defines data.mediaInfo.requests as MediaRequest[]
+    const requests = (data as any)?.mediaInfo?.requests;
+    return Array.isArray(requests) ? requests : [];
+  }, [data]);
+
   const [isRequesting, setIsRequesting] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -442,41 +449,20 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     [connector, mediaTypeNormalized],
   );
 
-  const refreshJellyseerrMatches = useCallback(async () => {
-    if (!connector || !mediaId) {
-      setMatchedRequests([]);
-      return;
-    }
-    try {
-      const requests = await connector.getRequests();
-      const matches = Array.isArray(requests)
-        ? requests.filter((r: any) => {
-            const media = r?.media as any;
-            const mediaTmdb = media?.tmdbId ?? media?.tmdb_id ?? undefined;
-            const mediaIdVal = mediaTmdb ?? media?.id ?? undefined;
-            return mediaIdVal === mediaId;
-          })
-        : [];
-      setMatchedRequests(matches);
-    } catch {
-      setMatchedRequests([]);
-    }
-  }, [connector, mediaId]);
-
   const handleRemoveJellyseerrRequest = useCallback(
     async (requestId: number) => {
       if (!connector) return;
       setIsRemoving(true);
       try {
         await connector.deleteRequest(requestId);
-        await refreshJellyseerrMatches();
+        await refetch();
       } catch (error) {
         console.warn("Failed to delete request", error);
       } finally {
         setIsRemoving(false);
       }
     },
-    [connector, refreshJellyseerrMatches],
+    [connector, refetch],
   );
 
   const handleSubmitRequest = useCallback(async () => {
@@ -507,7 +493,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
 
       await connector.createRequest(payload);
       setJellyseerrDialogVisible(false);
-      await refreshJellyseerrMatches();
+      await refetch();
     } catch (error) {
       console.error(error);
       setSubmitError(
@@ -520,16 +506,12 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     connector,
     mediaId,
     mediaTypeNormalized,
-    refreshJellyseerrMatches,
+    refetch,
     selectedProfile,
     selectedRootFolder,
     selectedSeasons,
     selectedServer,
   ]);
-
-  useEffect(() => {
-    void refreshJellyseerrMatches();
-  }, [connector, refreshJellyseerrMatches]);
 
   const styles = useMemo(
     () =>
@@ -1325,6 +1307,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
                           <Text>
                             {r.media?.title ||
                               r.media?.name ||
+                              title ||
                               `Request #${r.id}`}
                           </Text>
                           <IconButton
