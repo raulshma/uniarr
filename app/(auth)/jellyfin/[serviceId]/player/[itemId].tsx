@@ -43,6 +43,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { FullscreenLoading } from "@/components/common/FullscreenLoading";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { useJellyfinPlaybackInfo } from "@/hooks/useJellyfinPlaybackInfo";
+import { useNextEpisodeInfo } from "@/hooks/useNextEpisodeInfo";
 import { GestureOverlay } from "./components/GestureOverlay";
 import { NextEpisodeOverlay } from "./components/NextEpisodeOverlay";
 import { QualitySelector } from "./components/QualitySelector";
@@ -1063,17 +1064,32 @@ const JellyfinPlayerScreen = () => {
   // Next Episode Hook
   // ============================================================================
 
+  const nextEpisodeQuery = useNextEpisodeInfo({
+    serviceId,
+    seriesId: itemQuery.data?.SeriesId ?? undefined,
+    currentItemId: itemId,
+  });
+
   const handlePlayNextEpisode = useCallback(() => {
-    // TODO: Implement navigation to next episode
-    // This would require fetching next episode info from Jellyfin
-    console.log("Play next episode");
-  }, []);
+    if (!serviceId || !nextEpisodeQuery.data?.Id) return;
+
+    player.pause();
+    // Replace current screen with next episode player
+    router.replace({
+      pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+      params: {
+        serviceId,
+        itemId: nextEpisodeQuery.data.Id,
+        source: playbackMode === "download" ? "download" : "stream",
+      },
+    });
+  }, [serviceId, nextEpisodeQuery.data?.Id, playbackMode, player, router]);
 
   const { cancelAutoplay, playNow } = useNextEpisode({
     currentTime,
     duration,
     isPlaying,
-    hasNextEpisode: false, // TODO: Determine from Jellyfin API
+    hasNextEpisode: Boolean(nextEpisodeQuery.data),
     onPlayNext: handlePlayNextEpisode,
   });
 
@@ -1550,8 +1566,13 @@ const JellyfinPlayerScreen = () => {
 
       {/* Next Episode Overlay */}
       <NextEpisodeOverlay
-        nextEpisodeTitle="Next Episode Title" // TODO: Get from API
-        nextEpisodeNumber="S01E02" // TODO: Get from API
+        nextEpisodeTitle={nextEpisodeQuery.data?.Name ?? "Next Episode"}
+        nextEpisodeNumber={
+          nextEpisodeQuery.data?.ParentIndexNumber !== undefined &&
+          nextEpisodeQuery.data?.IndexNumber !== undefined
+            ? `S${String(nextEpisodeQuery.data.ParentIndexNumber).padStart(2, "0")}E${String(nextEpisodeQuery.data.IndexNumber).padStart(2, "0")}`
+            : ""
+        }
         onPlayNow={playNow}
         onCancel={cancelAutoplay}
       />
