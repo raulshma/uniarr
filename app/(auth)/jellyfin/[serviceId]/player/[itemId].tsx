@@ -506,6 +506,22 @@ const JellyfinPlayerScreen = () => {
   const duration =
     player.duration > 0 ? player.duration : playbackMetadataDuration;
 
+  // Extract video stream metadata for statistics
+  const videoStream = useMemo(() => {
+    const streams = playbackQuery.data?.mediaSource?.MediaStreams;
+    if (!streams) return undefined;
+    return streams.find((s) => s.Type === "Video");
+  }, [playbackQuery.data?.mediaSource?.MediaStreams]);
+
+  const statsResolution =
+    videoStream?.Width && videoStream?.Height
+      ? `${videoStream.Width}x${videoStream.Height}`
+      : undefined;
+  const statsBitrate = videoStream?.BitRate ?? undefined;
+  const statsCodec = videoStream?.Codec ?? undefined;
+  const statsFps =
+    videoStream?.AverageFrameRate ?? videoStream?.RealFrameRate ?? undefined;
+
   const currentAudioTrack = audioTrackEvent?.audioTrack ?? player.audioTrack;
   const currentSubtitleTrack =
     subtitleTrackEvent?.subtitleTrack ?? player.subtitleTrack;
@@ -1586,11 +1602,11 @@ const JellyfinPlayerScreen = () => {
         currentTime={currentTime}
         duration={duration}
         bufferedPosition={player.bufferedPosition ?? 0}
-        resolution={undefined} // TODO: Get from player metadata
-        bitrate={undefined} // TODO: Get from player metadata
-        codec={undefined} // TODO: Get from player metadata
-        fps={undefined} // TODO: Get from player metadata
-        droppedFrames={undefined} // TODO: Get from player metadata
+        resolution={statsResolution}
+        bitrate={statsBitrate}
+        codec={statsCodec}
+        fps={statsFps}
+        droppedFrames={undefined}
         audioTrack={currentAudioTrack?.label}
         subtitleTrack={currentSubtitleTrack?.label}
       />
