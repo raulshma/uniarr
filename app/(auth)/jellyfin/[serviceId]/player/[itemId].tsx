@@ -51,6 +51,7 @@ import { ErrorRecovery } from "./components/ErrorRecovery";
 import { SkipButton } from "./components/SkipButton";
 import { useNextEpisode } from "./hooks/useNextEpisode";
 import { useSkipIntro } from "./hooks/useSkipIntro";
+import { useJellyfinNextEpisode } from "@/hooks/useJellyfinNextEpisode";
 import {
   selectGetConnector,
   useConnectorsStore,
@@ -1063,17 +1064,37 @@ const JellyfinPlayerScreen = () => {
   // Next Episode Hook
   // ============================================================================
 
+  const seriesId =
+    itemQuery.data?.SeriesId ?? itemQuery.data?.ParentId ?? undefined;
+
+  const nextEpisodeQuery = useJellyfinNextEpisode({
+    serviceId,
+    seriesId,
+    currentItemId: itemId,
+    enabled: Boolean(serviceId && seriesId && itemId),
+  });
+
+  const nextEpisode = nextEpisodeQuery.data;
+
   const handlePlayNextEpisode = useCallback(() => {
-    // TODO: Implement navigation to next episode
-    // This would require fetching next episode info from Jellyfin
-    console.log("Play next episode");
-  }, []);
+    if (nextEpisode && serviceId) {
+      // Use replace to keep the navigation stack clean when binge-watching
+      router.replace({
+        pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+        params: {
+          serviceId,
+          itemId: nextEpisode.Id,
+          source: playbackMode,
+        },
+      });
+    }
+  }, [nextEpisode, serviceId, router, playbackMode]);
 
   const { cancelAutoplay, playNow } = useNextEpisode({
     currentTime,
     duration,
     isPlaying,
-    hasNextEpisode: false, // TODO: Determine from Jellyfin API
+    hasNextEpisode: Boolean(nextEpisode),
     onPlayNext: handlePlayNextEpisode,
   });
 
@@ -1550,8 +1571,12 @@ const JellyfinPlayerScreen = () => {
 
       {/* Next Episode Overlay */}
       <NextEpisodeOverlay
-        nextEpisodeTitle="Next Episode Title" // TODO: Get from API
-        nextEpisodeNumber="S01E02" // TODO: Get from API
+        nextEpisodeTitle={nextEpisode?.Name}
+        nextEpisodeNumber={
+          nextEpisode?.IndexNumber
+            ? `S${nextEpisode.ParentIndexNumber ?? 1}E${nextEpisode.IndexNumber}`
+            : undefined
+        }
         onPlayNow={playNow}
         onCancel={cancelAutoplay}
       />
