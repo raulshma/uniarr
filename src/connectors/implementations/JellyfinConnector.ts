@@ -16,6 +16,7 @@ import type {
   JellyfinMediaSource,
   JellyfinPlaybackInfoResponse,
   JellyfinPlaybackStopInfo,
+  JellyfinIntro,
 } from "@/models/jellyfin.types";
 import type {
   IDownloadConnector,
@@ -52,6 +53,7 @@ const LIBRARY_ITEM_FIELDS = [
   "OfficialRating",
   "IndexNumber",
   "ParentIndexNumber",
+  "Chapters",
 ].join(",");
 
 // Full fields for detailed item views - includes People, Taglines, etc.
@@ -510,6 +512,42 @@ export class JellyfinConnector
       });
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
+    }
+  }
+
+  async getIntroTimestamps(
+    itemId: string,
+    mode: "Introduction" | "Credits" | "Preview" | "Recap",
+  ): Promise<JellyfinIntro | null> {
+    await this.ensureAuthenticated();
+
+    try {
+      const response = await this.client.get<JellyfinIntro>(
+        `/Episode/${itemId}/IntroTimestamps`,
+        {
+          params: {
+            mode,
+          },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      // 404 means no intro timestamps found (or plugin not installed), which is fine
+      if (
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        (error as any).response?.status === 404
+      ) {
+        return null;
+      }
+      void logger.warn("Failed to fetch intro timestamps", {
+        serviceId: this.config.id,
+        itemId,
+        mode,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
     }
   }
 

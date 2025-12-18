@@ -255,8 +255,6 @@ export const queryKeys = {
         libraryId,
         options ?? {},
       ] as const,
-    item: (serviceId: string, itemId: string): QueryKeyBuilder =>
-      [...queryKeys.jellyfin.service(serviceId), "item", itemId] as const,
     nowPlaying: (serviceId: string): QueryKeyBuilder =>
       [...queryKeys.jellyfin.service(serviceId), "nowPlaying"] as const,
     nextUp: (
@@ -296,6 +294,17 @@ export const queryKeys = {
         ...queryKeys.jellyfin.service(serviceId),
         "seriesEpisodes",
         seriesId,
+      ] as const,
+    item: (
+      serviceId: string,
+      itemId: string,
+      ...args: QueryKeySegment[]
+    ): QueryKeyBuilder =>
+      [
+        ...queryKeys.jellyfin.service(serviceId),
+        "item",
+        itemId,
+        ...args,
       ] as const,
   },
   qbittorrent: {
