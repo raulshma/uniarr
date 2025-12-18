@@ -43,6 +43,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { FullscreenLoading } from "@/components/common/FullscreenLoading";
 import { useJellyfinItemDetails } from "@/hooks/useJellyfinItemDetails";
 import { useJellyfinPlaybackInfo } from "@/hooks/useJellyfinPlaybackInfo";
+import { useJellyfinIntroTimestamps } from "@/hooks/useJellyfinIntroTimestamps";
 import { GestureOverlay } from "./components/GestureOverlay";
 import { NextEpisodeOverlay } from "./components/NextEpisodeOverlay";
 import { QualitySelector } from "./components/QualitySelector";
@@ -259,6 +260,16 @@ const JellyfinPlayerScreen = () => {
   }, [getConnector, serviceId]);
 
   const itemQuery = useJellyfinItemDetails({ serviceId, itemId });
+  const introTimestampsQuery = useJellyfinIntroTimestamps({
+    serviceId,
+    itemId,
+    mode: "Introduction",
+  });
+  const creditsTimestampsQuery = useJellyfinIntroTimestamps({
+    serviceId,
+    itemId,
+    mode: "Credits",
+  });
   const playbackQuery = useJellyfinPlaybackInfo({
     serviceId,
     itemId,
@@ -1009,12 +1020,52 @@ const JellyfinPlayerScreen = () => {
   // Skip Intro/Credits Hook
   // ============================================================================
 
+  // Resolve skip markers
+  const introMarkers = useMemo(() => {
+    // 1. Try Intro Skipper plugin results
+    if (
+      introTimestampsQuery.data?.Valid &&
+      introTimestampsQuery.data.IntroStart !== undefined &&
+      introTimestampsQuery.data.IntroEnd !== undefined
+    ) {
+      return {
+        start: introTimestampsQuery.data.IntroStart,
+        end: introTimestampsQuery.data.IntroEnd,
+      };
+    }
+    // 2. Fallback to chapters? (Jellyfin doesn't typically mark intros in chapters, but we could check)
+    // For now just rely on plugin or null
+    return undefined;
+  }, [introTimestampsQuery.data]);
+
+  const creditsStart = useMemo(() => {
+    // 1. Try Intro Skipper plugin results
+    if (
+      creditsTimestampsQuery.data?.Valid &&
+      creditsTimestampsQuery.data.IntroStart !== undefined
+    ) {
+      return creditsTimestampsQuery.data.IntroStart;
+    }
+
+    // 2. Fallback to chapters
+    if (itemQuery.data?.Chapters) {
+      const creditsChapter = itemQuery.data.Chapters.find((chapter) =>
+        chapter.Name?.toLowerCase().includes("credits"),
+      );
+      if (creditsChapter?.StartPositionTicks) {
+        return creditsChapter.StartPositionTicks / 10_000_000;
+      }
+    }
+
+    return undefined;
+  }, [creditsTimestampsQuery.data, itemQuery.data?.Chapters]);
+
   const { showSkipIntro, showSkipCredits, skipIntroTime, skipCreditsTime } =
     useSkipIntro({
       currentTime,
       duration,
-      introMarkers: undefined, // TODO: Get from Jellyfin API if available
-      creditsStart: undefined, // TODO: Get from Jellyfin API if available
+      introMarkers,
+      creditsStart,
     });
 
   const handleSkipIntro = useCallback(() => {

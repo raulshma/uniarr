@@ -58,3 +58,5 @@ export type JellyfinSearchHint = components["schemas"]["SearchHint"];
 
 export type JellyfinSearchOptions =
   paths["/Search/Hints"]["get"]["parameters"]["query"];
+
+export type JellyfinIntro = components["schemas"]["Intro"];
