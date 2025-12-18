@@ -1971,7 +1971,9 @@ const AnimeHubDetailScreen: React.FC = () => {
                     <Button
                       mode="text"
                       onPress={() => {
-                        /* TODO: Show all episodes */
+                        if (validMalId) {
+                          router.push(`/anime-hub/${validMalId}/episodes`);
+                        }
                       }}
                     >
                       View all {anime.episodes.length} episodes
