@@ -318,6 +318,28 @@ export const JikanClient = {
     );
   },
 
+  async getAnimeEpisodesPaginated(malId: number, page = 1) {
+    return makeRequest(() =>
+      client
+        .get<{
+          data: {
+            mal_id?: number;
+            title?: string;
+            episode_id?: number;
+            duration?: string;
+            aired?: string | null;
+            filler?: boolean;
+            recap?: boolean;
+          }[];
+          pagination: {
+            last_visible_page: number;
+            has_next_page: boolean;
+          };
+        }>(`/anime/${malId}/episodes`, { params: { page } })
+        .then((r) => r.data),
+    );
+  },
+
   async getAnimeStatistics(malId: number) {
     return makeRequest(() =>
       client
