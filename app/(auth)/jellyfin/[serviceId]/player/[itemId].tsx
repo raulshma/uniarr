@@ -50,6 +50,7 @@ import { PlaybackStats } from "./components/PlaybackStats";
 import { ErrorRecovery } from "./components/ErrorRecovery";
 import { SkipButton } from "./components/SkipButton";
 import { useNextEpisode } from "./hooks/useNextEpisode";
+import { useJellyfinNextEpisode } from "./hooks/useJellyfinNextEpisode";
 import { useSkipIntro } from "./hooks/useSkipIntro";
 import {
   selectGetConnector,
@@ -1063,19 +1064,47 @@ const JellyfinPlayerScreen = () => {
   // Next Episode Hook
   // ============================================================================
 
+  const nextEpisodeQuery = useJellyfinNextEpisode({
+    serviceId,
+    currentItem: itemQuery.data,
+  });
+
+  const nextEpisode = nextEpisodeQuery.data;
+
   const handlePlayNextEpisode = useCallback(() => {
-    // TODO: Implement navigation to next episode
-    // This would require fetching next episode info from Jellyfin
-    console.log("Play next episode");
-  }, []);
+    if (nextEpisode && serviceId) {
+      router.replace({
+        pathname: "/(auth)/jellyfin/[serviceId]/player/[itemId]",
+        params: {
+          serviceId,
+          itemId: nextEpisode.Id,
+        },
+      });
+    }
+  }, [nextEpisode, serviceId, router]);
 
   const { cancelAutoplay, playNow } = useNextEpisode({
     currentTime,
     duration,
     isPlaying,
-    hasNextEpisode: false, // TODO: Determine from Jellyfin API
+    hasNextEpisode: !!nextEpisode,
     onPlayNext: handlePlayNextEpisode,
   });
+
+  const nextEpisodeNumber = useMemo(() => {
+    if (
+      !nextEpisode ||
+      nextEpisode.ParentIndexNumber === undefined ||
+      nextEpisode.ParentIndexNumber === null ||
+      nextEpisode.IndexNumber === undefined ||
+      nextEpisode.IndexNumber === null
+    ) {
+      return undefined;
+    }
+    const season = String(nextEpisode.ParentIndexNumber).padStart(2, "0");
+    const episode = String(nextEpisode.IndexNumber).padStart(2, "0");
+    return `S${season}E${episode}`;
+  }, [nextEpisode]);
 
   // ============================================================================
   // Error Handling
@@ -1550,8 +1579,8 @@ const JellyfinPlayerScreen = () => {
 
       {/* Next Episode Overlay */}
       <NextEpisodeOverlay
-        nextEpisodeTitle="Next Episode Title" // TODO: Get from API
-        nextEpisodeNumber="S01E02" // TODO: Get from API
+        nextEpisodeTitle={nextEpisode?.Name ?? undefined}
+        nextEpisodeNumber={nextEpisodeNumber}
         onPlayNow={playNow}
         onCancel={cancelAutoplay}
       />
