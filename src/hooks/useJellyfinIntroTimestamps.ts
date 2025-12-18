@@ -49,7 +49,9 @@ export const useJellyfinIntroTimestamps = (
     retry: false, // Don't retry if it fails (e.g. plugin not installed)
     queryFn: async () => {
       if (!serviceId || !itemId) {
-        throw new Error("Jellyfin intro timestamps requires service and item id.");
+        throw new Error(
+          "Jellyfin intro timestamps requires service and item id.",
+        );
       }
 
       const connector = ensureConnector(getConnector, serviceId);
