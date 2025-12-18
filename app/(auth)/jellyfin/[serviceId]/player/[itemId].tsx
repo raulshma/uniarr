@@ -286,6 +286,36 @@ const JellyfinPlayerScreen = () => {
   const hasDownload = Boolean(localFileUri);
   const hasStream = Boolean(playbackQuery.data?.streamUrl);
 
+  // Extract metadata from playback info
+  const metadata = useMemo(() => {
+    const mediaSource = playbackQuery.data?.mediaSource;
+    if (!mediaSource) return undefined;
+
+    const videoStream = mediaSource.MediaStreams?.find(
+      (s) => s.Type === "Video",
+    );
+
+    const width = videoStream?.Width;
+    const height = videoStream?.Height;
+    const resolution =
+      width && height ? `${width}x${height}` : undefined;
+
+    // Use video stream bitrate if available, otherwise media source bitrate
+    const bitrate = videoStream?.BitRate ?? mediaSource.Bitrate ?? undefined;
+
+    const codec = videoStream?.Codec ?? undefined;
+
+    // Prefer average frame rate, fallback to real frame rate
+    const fps = videoStream?.AverageFrameRate ?? videoStream?.RealFrameRate ?? undefined;
+
+    return {
+      resolution,
+      bitrate,
+      codec,
+      fps,
+    };
+  }, [playbackQuery.data?.mediaSource]);
+
   useEffect(() => {
     startPositionAppliedRef.current = startPositionSeconds <= 0;
     pendingResumePositionRef.current = null;
@@ -1586,11 +1616,11 @@ const JellyfinPlayerScreen = () => {
         currentTime={currentTime}
         duration={duration}
         bufferedPosition={player.bufferedPosition ?? 0}
-        resolution={undefined} // TODO: Get from player metadata
-        bitrate={undefined} // TODO: Get from player metadata
-        codec={undefined} // TODO: Get from player metadata
-        fps={undefined} // TODO: Get from player metadata
-        droppedFrames={undefined} // TODO: Get from player metadata
+        resolution={metadata?.resolution}
+        bitrate={metadata?.bitrate}
+        codec={metadata?.codec}
+        fps={metadata?.fps}
+        droppedFrames={undefined}
         audioTrack={currentAudioTrack?.label}
         subtitleTrack={currentSubtitleTrack?.label}
       />
