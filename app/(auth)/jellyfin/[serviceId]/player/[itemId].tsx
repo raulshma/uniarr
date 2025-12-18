@@ -22,7 +22,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { LinearGradient } from "expo-linear-gradient";
 import { VideoView, useVideoPlayer } from "expo-video";
-import type { AudioTrack, SubtitleTrack, VideoSource } from "expo-video";
+import type {
+  AudioTrack,
+  SubtitleTrack,
+  VideoSource,
+  VideoTrack,
+} from "expo-video";
 import { useEvent } from "expo";
 import { setAudioModeAsync } from "expo-audio";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
@@ -490,6 +495,9 @@ const JellyfinPlayerScreen = () => {
   const subtitleTrackEvent = useEvent(player, "subtitleTrackChange", {
     subtitleTrack: player.subtitleTrack,
   });
+  const videoTrackEvent = useEvent(player, "videoTrackChange", {
+    videoTrack: player.videoTrack,
+  });
 
   const playerStatus = statusEvent?.status ?? player.status;
   const isPlaying = playingEvent?.isPlaying ?? player.playing;
@@ -509,6 +517,7 @@ const JellyfinPlayerScreen = () => {
   const currentAudioTrack = audioTrackEvent?.audioTrack ?? player.audioTrack;
   const currentSubtitleTrack =
     subtitleTrackEvent?.subtitleTrack ?? player.subtitleTrack;
+  const currentVideoTrack = videoTrackEvent?.videoTrack ?? player.videoTrack;
   const audioTracks =
     availableAudioTracksEvent?.availableAudioTracks ??
     player.availableAudioTracks ??
@@ -1586,11 +1595,15 @@ const JellyfinPlayerScreen = () => {
         currentTime={currentTime}
         duration={duration}
         bufferedPosition={player.bufferedPosition ?? 0}
-        resolution={undefined} // TODO: Get from player metadata
-        bitrate={undefined} // TODO: Get from player metadata
-        codec={undefined} // TODO: Get from player metadata
-        fps={undefined} // TODO: Get from player metadata
-        droppedFrames={undefined} // TODO: Get from player metadata
+        resolution={
+          currentVideoTrack?.size
+            ? `${currentVideoTrack.size.width}x${currentVideoTrack.size.height}`
+            : undefined
+        }
+        bitrate={currentVideoTrack?.bitrate ?? undefined}
+        codec={currentVideoTrack?.mimeType ?? undefined}
+        fps={currentVideoTrack?.frameRate ?? undefined}
+        droppedFrames={undefined} // Not supported by expo-video
         audioTrack={currentAudioTrack?.label}
         subtitleTrack={currentSubtitleTrack?.label}
       />
