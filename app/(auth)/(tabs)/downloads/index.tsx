@@ -1,5 +1,5 @@
 import { FlashList } from "@shopify/flash-list";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
@@ -165,11 +165,13 @@ const fetchDownloadsOverview = async (): Promise<DownloadsOverview> => {
 const DownloadsScreen = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
+  const isFocused = useIsFocused();
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ["downloads", "overview"],
     queryFn: fetchDownloadsOverview,
-    refetchInterval: 15_000,
+    enabled: isFocused,
+    refetchInterval: isFocused ? 15_000 : false,
     refetchOnWindowFocus: false,
   });
 

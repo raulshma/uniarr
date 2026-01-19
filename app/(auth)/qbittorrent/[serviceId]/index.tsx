@@ -1,5 +1,5 @@
 import { FlashList } from "@shopify/flash-list";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -59,6 +59,7 @@ const QBittorrentServiceScreen = () => {
   const router = useRouter();
   const theme = useTheme<AppTheme>();
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
+  const isFocused = useIsFocused();
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -89,7 +90,10 @@ const QBittorrentServiceScreen = () => {
     recheckError,
     isTransferLoading,
     transferError,
-  } = useQBittorrentTorrents(serviceId);
+  } = useQBittorrentTorrents(serviceId, {
+    enabled: hasValidServiceId && isFocused,
+    pollingEnabled: isFocused,
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -37,6 +37,8 @@ interface UseJellyfinLibraryDataParams {
   selectedLibraryId: string | null;
   activeSegment: CollectionSegmentKey;
   debouncedSearch: string;
+  nowPlayingEnabled?: boolean;
+  nowPlayingPollingEnabled?: boolean;
 }
 
 export const useJellyfinLibraryData = ({
@@ -44,6 +46,8 @@ export const useJellyfinLibraryData = ({
   selectedLibraryId,
   activeSegment,
   debouncedSearch,
+  nowPlayingEnabled = true,
+  nowPlayingPollingEnabled = true,
 }: UseJellyfinLibraryDataParams) => {
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
 
@@ -170,6 +174,8 @@ export const useJellyfinLibraryData = ({
   const nowPlayingQuery = useJellyfinNowPlaying({
     serviceId,
     refetchInterval: 10_000,
+    enabled: nowPlayingEnabled,
+    pollingEnabled: nowPlayingPollingEnabled,
   });
 
   const [resumeQuery] = consolidatedQueries;

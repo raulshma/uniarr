@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo } from "react";
+import { useIsFocused } from "@react-navigation/native";
 import {
   ScrollView,
   StyleSheet,
@@ -54,6 +55,7 @@ const JellyfinLibraryScreen = () => {
   const theme = useTheme<AppTheme>();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
+  const isFocused = useIsFocused();
   const { width: windowWidth } = useWindowDimensions();
 
   // State management
@@ -134,6 +136,8 @@ const JellyfinLibraryScreen = () => {
     selectedLibraryId: libraryState.selectedLibraryId,
     activeSegment: libraryState.activeSegment,
     debouncedSearch: libraryState.debouncedSearch,
+    nowPlayingEnabled: isFocused,
+    nowPlayingPollingEnabled: isFocused,
   });
 
   // Group libraries by segment
