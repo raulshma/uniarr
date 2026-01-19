@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, useTheme, IconButton, Chip, Banner } from "react-native-paper";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 
 import { EmptyState } from "@/components/common/EmptyState";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -17,10 +18,62 @@ import { useRecommendationFeedback } from "@/hooks/useRecommendationFeedback";
 import { useAuth } from "@/services/auth/AuthProvider";
 import { spacing } from "@/theme/spacing";
 import { logger } from "@/services/logger/LoggerService";
+import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
+import { useSettingsStore } from "@/store/settingsStore";
 
 const RecommendationsScreen = () => {
   const theme = useTheme<AppTheme>();
+  const router = useRouter();
   const [showContentGaps, setShowContentGaps] = useState(false);
+
+  const enableAIRecommendations = useSettingsStore(
+    (state) => state.enableAIRecommendations,
+  );
+  const recommendationProvider = useSettingsStore(
+    (state) => state.recommendationProvider,
+  );
+  const recommendationModel = useSettingsStore(
+    (state) => state.recommendationModel,
+  );
+
+  const hasValidProvider = useMemo(() => {
+    if (!recommendationProvider) {
+      return false;
+    }
+
+    const provider = AIProviderManager.getInstance().getProvider(
+      recommendationProvider as any,
+    );
+
+    return Boolean(provider?.isValid);
+  }, [recommendationProvider]);
+
+  const isRecommendationsConfigured =
+    enableAIRecommendations &&
+    Boolean(recommendationProvider) &&
+    Boolean(recommendationModel) &&
+    hasValidProvider;
+
+  const aiSetupMessage = useMemo(() => {
+    if (!enableAIRecommendations) {
+      return "AI recommendations are disabled. Enable them in Settings to get personalized picks.";
+    }
+
+    if (!recommendationProvider || !recommendationModel) {
+      return "Select an AI provider and model in Settings to generate recommendations.";
+    }
+
+    if (!hasValidProvider) {
+      return "Your AI provider isn’t ready. Check your API key in Settings.";
+    }
+
+    return "";
+  }, [
+    enableAIRecommendations,
+    recommendationProvider,
+    recommendationModel,
+    hasValidProvider,
+  ]);
 
   const { user, isLoading: isAuthLoading } = useAuth();
   const userId = user?.id ?? "guest";
@@ -210,7 +263,7 @@ const RecommendationsScreen = () => {
   );
 
   // Loading state
-  if (isLoading || isAuthLoading) {
+  if ((isLoading || isAuthLoading) && isRecommendationsConfigured) {
     return (
       <View style={styles.container}>
         <LinearGradient
@@ -318,15 +371,50 @@ const RecommendationsScreen = () => {
             </Banner>
           )}
 
+          {!isRecommendationsConfigured && (
+            <Banner
+              visible={true}
+              icon="sparkles"
+              style={styles.offlineBanner}
+              actions={[
+                {
+                  label: "Configure",
+                  onPress: () =>
+                    router.push("/(auth)/settings/byok/ai-settings"),
+                },
+              ]}
+            >
+              {aiSetupMessage}
+            </Banner>
+          )}
+
           {/* Empty State check inside scroll view to allow refresh */}
           {!recommendations || recommendations.length === 0 ? (
             <View style={{ marginTop: spacing.xl }}>
               <EmptyState
-                icon="movie-open-outline"
-                title="No Recommendations Yet"
-                description="Start watching content to get personalized recommendations based on your taste."
-                actionLabel="Refresh"
-                onActionPress={() => refetch()}
+                icon={
+                  isRecommendationsConfigured
+                    ? "movie-open-outline"
+                    : "sparkles"
+                }
+                title={
+                  isRecommendationsConfigured
+                    ? "No Recommendations Yet"
+                    : "AI Recommendations Not Ready"
+                }
+                description={
+                  isRecommendationsConfigured
+                    ? "Start watching content to get personalized recommendations based on your taste."
+                    : aiSetupMessage
+                }
+                actionLabel={
+                  isRecommendationsConfigured ? "Refresh" : "Configure"
+                }
+                onActionPress={() =>
+                  isRecommendationsConfigured
+                    ? refetch()
+                    : router.push("/(auth)/settings/byok/ai-settings")
+                }
               />
             </View>
           ) : (
