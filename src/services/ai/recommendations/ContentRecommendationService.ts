@@ -1563,9 +1563,8 @@ export class ContentRecommendationService {
   ): Promise<string | undefined> {
     try {
       // 1. Try TMDb first
-      const { getTmdbConnector } = await import(
-        "@/services/tmdb/TmdbConnectorProvider"
-      );
+      const { getTmdbConnector } =
+        await import("@/services/tmdb/TmdbConnectorProvider");
       const tmdbConnector = await getTmdbConnector();
 
       if (tmdbConnector) {

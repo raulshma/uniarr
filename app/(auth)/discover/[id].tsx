@@ -187,6 +187,19 @@ const DiscoverItemDetails = () => {
   const [selectAllSeasons, setSelectAllSeasons] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
 
+  const getRequestStatusLabel = useCallback((status?: number | null) => {
+    switch (status) {
+      case 1:
+        return "Pending approval";
+      case 2:
+        return "Approved";
+      case 3:
+        return "Declined";
+      default:
+        return "Submitted";
+    }
+  }, []);
+
   // Track pending async operations for cleanup on unmount
   const abortControllerRef = useRef<AbortController>(new AbortController());
 
@@ -783,7 +796,10 @@ const DiscoverItemDetails = () => {
 
       // Only show success alert and clear dialog if component is still mounted
       if (!abortControllerRef.current.signal.aborted) {
-        void alert("Success", "Request submitted successfully!");
+        const statusLabel = getRequestStatusLabel(
+          (createdRequest as any)?.status,
+        );
+        void alert("Success", `Request ${statusLabel.toLowerCase()}.`);
         setMatchedJellyseerrRequests((prev) => {
           const serviceId = (currentConnector as any)?.config?.id;
           const serviceName = (currentConnector as any)?.config?.name;
@@ -819,6 +835,7 @@ const DiscoverItemDetails = () => {
     selectedProfile,
     selectedRootFolder,
     selectedSeasons,
+    getRequestStatusLabel,
   ]);
 
   const handleJellyseerrRequest = useCallback(async () => {

@@ -49,6 +49,19 @@ const isMovieDetails = (d?: JellyDetails): d is MovieDetails =>
 const isTvDetails = (d?: JellyDetails): d is TvDetails =>
   Boolean(d && "name" in d);
 
+const getRequestStatusLabel = (status?: number | null): string => {
+  switch (status) {
+    case 1:
+      return "Pending approval";
+    case 2:
+      return "Approved";
+    case 3:
+      return "Declined";
+    default:
+      return "Submitted";
+  }
+};
+
 const JellyseerrMediaDetailScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
@@ -481,7 +494,7 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
         setIsRemoving(false);
       }
     },
-    [connector, refreshJellyseerrMatches],
+    [connector],
   );
 
   const handleSubmitRequest = useCallback(async () => {
@@ -511,6 +524,8 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
       } as any;
 
       const created = await connector.createRequest(payload);
+      const statusLabel = getRequestStatusLabel((created as any)?.status);
+      void alert("Success", `Request ${statusLabel.toLowerCase()}.`);
       setJellyseerrDialogVisible(false);
       setMatchedRequests((prev) => {
         if (!Array.isArray(prev)) return [created];
@@ -529,7 +544,6 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     connector,
     mediaId,
     mediaTypeNormalized,
-    refreshJellyseerrMatches,
     selectedProfile,
     selectedRootFolder,
     selectedSeasons,

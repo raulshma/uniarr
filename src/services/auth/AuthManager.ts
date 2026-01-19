@@ -60,8 +60,8 @@ export class AuthManager implements IAuthManager {
         authMethod: config.method,
         hasCredentials: Boolean(
           config.credentials.username ||
-            config.credentials.apiKey ||
-            config.credentials.token,
+          config.credentials.apiKey ||
+          config.credentials.token,
         ),
       });
 

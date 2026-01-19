@@ -60,6 +60,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Jellyseerr search result type not needed in this file
 
+const getRequestStatusLabel = (status?: number | null): string => {
+  switch (status) {
+    case 1:
+      return "Pending approval";
+    case 2:
+      return "Approved";
+    case 3:
+      return "Declined";
+    default:
+      return "Submitted";
+  }
+};
+
 const AnimeHubDetailScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const router = useRouter();
@@ -1155,11 +1168,12 @@ const AnimeHubDetailScreen: React.FC = () => {
           : { seasons: "all" }),
       } as any;
 
-      await currentConnector.createRequest(payload);
+      const created = await currentConnector.createRequest(payload);
       if (isMounted) {
-        void alert("Success", "Request submitted successfully!");
+        const statusLabel = getRequestStatusLabel((created as any)?.status);
+        void alert("Success", `Request ${statusLabel.toLowerCase()}.`);
         setJellyseerrDialogVisible(false);
-        await refreshJellyseerrMatches();
+        void refreshJellyseerrMatches();
       }
     } catch (error) {
       console.error(error);

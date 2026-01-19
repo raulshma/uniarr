@@ -594,9 +594,8 @@ export function useAIChat(options?: UseAIChatOptions): UseAIChatReturn {
                   if (assistantCount !== 1) {
                     return;
                   }
-                  const { ConversationalAIService } = await import(
-                    "@/services/ai/conversational-ai/ConversationalAIService"
-                  );
+                  const { ConversationalAIService } =
+                    await import("@/services/ai/conversational-ai/ConversationalAIService");
                   const service = ConversationalAIService.getInstance();
                   const title = await service.generateConversationTitle(
                     session.messages,

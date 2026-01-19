@@ -164,6 +164,19 @@ const getProviderNames = (
   return Array.from(new Set(names)).join(", ");
 };
 
+const getRequestStatusLabel = (status?: number | null): string => {
+  switch (status) {
+    case 1:
+      return "Pending approval";
+    case 2:
+      return "Approved";
+    case 3:
+      return "Declined";
+    default:
+      return "Submitted";
+  }
+};
+
 type MovieListItem = NonNullable<DiscoverMovieResponse["results"]>[number];
 type TvListItem = NonNullable<DiscoverTvResponse["results"]>[number];
 
@@ -993,7 +1006,7 @@ const TmdbDetailPage: React.FC = () => {
         return;
       }
 
-      await currentConnector.createRequest({
+      const created = await currentConnector.createRequest({
         mediaType,
         mediaId: tmdbId,
         tvdbId: undefined,
@@ -1004,9 +1017,10 @@ const TmdbDetailPage: React.FC = () => {
         rootFolder: selectedRootFolder || undefined,
       });
 
-      void alert("Success", "Request submitted successfully!");
+      const statusLabel = getRequestStatusLabel((created as any)?.status);
+      void alert("Success", `Request ${statusLabel.toLowerCase()}.`);
       setJellyseerrDialogVisible(false);
-      await refreshJellyseerrMatches();
+      void refreshJellyseerrMatches();
     } catch (error) {
       console.error(error);
       setSubmitError(
