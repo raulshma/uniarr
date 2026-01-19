@@ -370,8 +370,8 @@ export class JellyfinConnector
       );
       const useStaticStream = Boolean(
         supportsDirectPlayback &&
-          !requiresTranscoding &&
-          !mediaSource?.IsInfiniteStream,
+        !requiresTranscoding &&
+        !mediaSource?.IsInfiniteStream,
       );
 
       const streamUrl = this.buildStreamUrl(itemId, selectedMediaSourceId, {

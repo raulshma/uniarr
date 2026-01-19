@@ -429,9 +429,9 @@ const TmdbDiscoverScreen = () => {
   );
   const showErrorBanner = Boolean(
     items.length &&
-      discoverQuery.isError &&
-      errorMessage &&
-      !errorBannerDismissed,
+    discoverQuery.isError &&
+    errorMessage &&
+    !errorBannerDismissed,
   );
   const allowAnimations = shouldAnimateLayout(
     discoverQuery.isLoading || discoverQuery.isFetching,

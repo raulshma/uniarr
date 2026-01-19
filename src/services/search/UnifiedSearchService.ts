@@ -790,9 +790,9 @@ export class UnifiedSearchService {
       const isRequested = Boolean(
         (Array.isArray(r.requests as unknown) &&
           (r.requests as unknown as unknown[]).length > 0) ||
-          (mediaInfo &&
-            Array.isArray(mediaInfo.requests as unknown) &&
-            (mediaInfo.requests as unknown as unknown[]).length > 0),
+        (mediaInfo &&
+          Array.isArray(mediaInfo.requests as unknown) &&
+          (mediaInfo.requests as unknown as unknown[]).length > 0),
       );
 
       const mediaStatus =

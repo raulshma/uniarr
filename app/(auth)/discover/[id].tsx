@@ -187,6 +187,19 @@ const DiscoverItemDetails = () => {
   const [selectAllSeasons, setSelectAllSeasons] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
 
+  const getRequestStatusLabel = useCallback((status?: number | null) => {
+    switch (status) {
+      case 1:
+        return "Pending approval";
+      case 2:
+        return "Approved";
+      case 3:
+        return "Declined";
+      default:
+        return "Submitted";
+    }
+  }, []);
+
   // Track pending async operations for cleanup on unmount
   const abortControllerRef = useRef<AbortController>(new AbortController());
 
@@ -727,30 +740,52 @@ const DiscoverItemDetails = () => {
     setIsRequesting(true);
 
     try {
-      // Check for existing request
-      const requests = await currentConnector.getRequests({
+      const mediaId = item.tmdbId ?? item.sourceId;
+      if (!mediaId) {
+        setSubmitError("Missing media identifier for request.");
+        return;
+      }
+
+      // Check for existing request using per-media details
+      const details = await currentConnector.getMediaDetails(
+        mediaId,
         mediaType,
-      });
+      );
 
       // Only continue if component is still mounted
       if (abortControllerRef.current.signal.aborted) {
         return;
       }
 
-      const existingRequest = requests.items.find(
-        (req) =>
-          req.media?.tmdbId === item.tmdbId || req.media?.id === item.sourceId,
-      );
+      const existingRequests = Array.isArray(
+        (details as any)?.mediaInfo?.requests,
+      )
+        ? ((details as any).mediaInfo.requests as any[])
+        : [];
 
-      if (existingRequest) {
+      if (existingRequests.length > 0) {
         setSubmitError("This item has already been requested.");
+        setMatchedJellyseerrRequests((prev) => {
+          const serviceId = (currentConnector as any)?.config?.id;
+          const serviceName = (currentConnector as any)?.config?.name;
+          const remaining = prev.filter(
+            (entry) => entry.serviceId !== serviceId,
+          );
+          const nextMatches = existingRequests.map((request) => ({
+            connector: currentConnector,
+            request,
+            serviceId,
+            serviceName,
+          }));
+          return [...remaining, ...nextMatches];
+        });
         return;
       }
 
       // Submit the request
-      await currentConnector.createRequest({
+      const createdRequest = await currentConnector.createRequest({
         mediaType,
-        mediaId: item.tmdbId || item.sourceId!,
+        mediaId,
         tvdbId: item.tvdbId,
         is4k: false,
         ...(mediaType === "tv" && { seasons: selectedSeasons }),
@@ -761,7 +796,26 @@ const DiscoverItemDetails = () => {
 
       // Only show success alert and clear dialog if component is still mounted
       if (!abortControllerRef.current.signal.aborted) {
-        void alert("Success", "Request submitted successfully!");
+        const statusLabel = getRequestStatusLabel(
+          (createdRequest as any)?.status,
+        );
+        void alert("Success", `Request ${statusLabel.toLowerCase()}.`);
+        setMatchedJellyseerrRequests((prev) => {
+          const serviceId = (currentConnector as any)?.config?.id;
+          const serviceName = (currentConnector as any)?.config?.name;
+          const remaining = prev.filter(
+            (entry) => entry.serviceId !== serviceId,
+          );
+          return [
+            ...remaining,
+            {
+              connector: currentConnector,
+              request: createdRequest,
+              serviceId,
+              serviceName,
+            },
+          ];
+        });
         setJellyseerrDialogVisible(false);
       }
     } catch (error) {
@@ -781,6 +835,7 @@ const DiscoverItemDetails = () => {
     selectedProfile,
     selectedRootFolder,
     selectedSeasons,
+    getRequestStatusLabel,
   ]);
 
   const handleJellyseerrRequest = useCallback(async () => {
@@ -860,36 +915,32 @@ const DiscoverItemDetails = () => {
               return;
             }
 
-            const requests = await jelly.getRequests({ mediaType });
+            const mediaId = item.tmdbId ?? item.sourceId;
+            if (!mediaId) {
+              return;
+            }
+
+            const details = await jelly.getMediaDetails(mediaId, mediaType);
 
             // Only update state if component is still mounted
             if (abortControllerRef.current.signal.aborted) {
               return;
             }
 
-            if (requests && Array.isArray(requests.items)) {
-              const found = requests.items.filter(
-                (req: any) =>
-                  req &&
-                  ((req.media &&
-                    req.media.tmdbId &&
-                    item.tmdbId &&
-                    req.media.tmdbId === item.tmdbId) ||
-                    (req.media &&
-                      req.media.id &&
-                      item.sourceId &&
-                      String(req.media.id) === String(item.sourceId))),
-              );
+            const requests = Array.isArray(
+              (details as any)?.mediaInfo?.requests,
+            )
+              ? ((details as any).mediaInfo.requests as any[])
+              : [];
 
-              found.forEach((r: any) =>
-                matches.push({
-                  connector: jelly,
-                  request: r,
-                  serviceId: (connector as any).config?.id,
-                  serviceName: (connector as any).config?.name,
-                }),
-              );
-            }
+            requests.forEach((request: any) =>
+              matches.push({
+                connector: jelly,
+                request,
+                serviceId: (connector as any).config?.id,
+                serviceName: (connector as any).config?.name,
+              }),
+            );
           } catch (err) {
             // Log and continue — we don't want a single connector failure to block the UI
             console.warn(

@@ -496,9 +496,8 @@ Generate 5-8 recommendations for ${genre} that:
       }
 
       // Import AIProviderManager dynamically to avoid circular dependencies
-      const { AIProviderManager } = await import(
-        "@/services/ai/core/AIProviderManager"
-      );
+      const { AIProviderManager } =
+        await import("@/services/ai/core/AIProviderManager");
       const providerManager = AIProviderManager.getInstance();
 
       // Save current provider
@@ -534,9 +533,8 @@ Generate 5-8 recommendations for ${genre} that:
         return;
       }
 
-      const { AIProviderManager } = await import(
-        "@/services/ai/core/AIProviderManager"
-      );
+      const { AIProviderManager } =
+        await import("@/services/ai/core/AIProviderManager");
       const providerManager = AIProviderManager.getInstance();
 
       providerManager.setActiveProvider(this.originalProvider as any);

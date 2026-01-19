@@ -49,6 +49,19 @@ const isMovieDetails = (d?: JellyDetails): d is MovieDetails =>
 const isTvDetails = (d?: JellyDetails): d is TvDetails =>
   Boolean(d && "name" in d);
 
+const getRequestStatusLabel = (status?: number | null): string => {
+  switch (status) {
+    case 1:
+      return "Pending approval";
+    case 2:
+      return "Approved";
+    case 3:
+      return "Declined";
+    default:
+      return "Submitted";
+  }
+};
+
 const JellyseerrMediaDetailScreen: React.FC = () => {
   const theme = useTheme<AppTheme>();
   const insets = useSafeAreaInsets();
@@ -443,25 +456,28 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
   );
 
   const refreshJellyseerrMatches = useCallback(async () => {
+    const dataRequests = (data as any)?.mediaInfo?.requests;
+    if (Array.isArray(dataRequests)) {
+      setMatchedRequests(dataRequests);
+      return;
+    }
+
     if (!connector || !mediaId) {
       setMatchedRequests([]);
       return;
     }
+
     try {
-      const requests = await connector.getRequests();
-      const matches = Array.isArray(requests)
-        ? requests.filter((r: any) => {
-            const media = r?.media as any;
-            const mediaTmdb = media?.tmdbId ?? media?.tmdb_id ?? undefined;
-            const mediaIdVal = mediaTmdb ?? media?.id ?? undefined;
-            return mediaIdVal === mediaId;
-          })
-        : [];
-      setMatchedRequests(matches);
+      const details = await connector.getMediaDetails(
+        mediaId as any,
+        mediaTypeNormalized as any,
+      );
+      const requests = (details as any)?.mediaInfo?.requests;
+      setMatchedRequests(Array.isArray(requests) ? requests : []);
     } catch {
       setMatchedRequests([]);
     }
-  }, [connector, mediaId]);
+  }, [connector, data, mediaId, mediaTypeNormalized]);
 
   const handleRemoveJellyseerrRequest = useCallback(
     async (requestId: number) => {
@@ -469,14 +485,16 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
       setIsRemoving(true);
       try {
         await connector.deleteRequest(requestId);
-        await refreshJellyseerrMatches();
+        setMatchedRequests((prev) =>
+          Array.isArray(prev) ? prev.filter((r) => r?.id !== requestId) : [],
+        );
       } catch (error) {
         console.warn("Failed to delete request", error);
       } finally {
         setIsRemoving(false);
       }
     },
-    [connector, refreshJellyseerrMatches],
+    [connector],
   );
 
   const handleSubmitRequest = useCallback(async () => {
@@ -505,9 +523,15 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
           : { seasons: "all" }),
       } as any;
 
-      await connector.createRequest(payload);
+      const created = await connector.createRequest(payload);
+      const statusLabel = getRequestStatusLabel((created as any)?.status);
+      void alert("Success", `Request ${statusLabel.toLowerCase()}.`);
       setJellyseerrDialogVisible(false);
-      await refreshJellyseerrMatches();
+      setMatchedRequests((prev) => {
+        if (!Array.isArray(prev)) return [created];
+        if (prev.some((r) => r?.id === (created as any)?.id)) return prev;
+        return [created, ...prev];
+      });
     } catch (error) {
       console.error(error);
       setSubmitError(
@@ -520,7 +544,6 @@ const JellyseerrMediaDetailScreen: React.FC = () => {
     connector,
     mediaId,
     mediaTypeNormalized,
-    refreshJellyseerrMatches,
     selectedProfile,
     selectedRootFolder,
     selectedSeasons,

@@ -55,8 +55,7 @@ export interface DownloadNotificationPayload {
   readonly torrent: Torrent;
 }
 
-export interface FailedDownloadNotificationPayload
-  extends DownloadNotificationPayload {
+export interface FailedDownloadNotificationPayload extends DownloadNotificationPayload {
   readonly reason?: string;
 }
 

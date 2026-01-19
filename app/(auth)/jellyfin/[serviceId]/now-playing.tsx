@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View, PixelRatio, Dimensions } from "react-native";
 import {
@@ -84,6 +85,7 @@ const JellyfinNowPlayingScreen = () => {
   const theme = useTheme<AppTheme>();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const manager = useMemo(() => ConnectorManager.getInstance(), []);
+  const isFocused = useIsFocused();
   const connector = useConnectorsStore((s) =>
     serviceId
       ? (s.getConnector(serviceId) as JellyfinConnector | undefined)
@@ -124,6 +126,8 @@ const JellyfinNowPlayingScreen = () => {
   const nowPlayingQuery = useJellyfinNowPlaying({
     serviceId,
     refetchInterval: 10_000,
+    enabled: isFocused,
+    pollingEnabled: isFocused,
   });
   const sessions = useMemo(
     () => nowPlayingQuery.data ?? [],

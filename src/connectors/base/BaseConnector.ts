@@ -36,8 +36,7 @@ export abstract class BaseConnector<
   TResource = unknown,
   TCreatePayload = AddItemRequest,
   TUpdatePayload = Partial<TResource>,
-> implements IConnector<TResource, TCreatePayload, TUpdatePayload>
-{
+> implements IConnector<TResource, TCreatePayload, TUpdatePayload> {
   protected readonly client: AxiosInstance;
   private isAuthenticated = false;
 

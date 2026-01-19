@@ -29,6 +29,9 @@ type TorrentFilters = {
 
 export interface UseTransmissionOptions {
   readonly filters?: TorrentFilters;
+  readonly enabled?: boolean;
+  readonly pollingEnabled?: boolean;
+  readonly refetchIntervalMs?: number;
 }
 
 export interface UseTransmissionResult {
@@ -87,6 +90,12 @@ export const useTransmissionTorrents = (
   serviceId: string,
   options: UseTransmissionOptions = {},
 ): UseTransmissionResult => {
+  const {
+    filters,
+    enabled = true,
+    pollingEnabled = true,
+    refetchIntervalMs = 10_000,
+  } = options;
   const queryClient = useQueryClient();
   const getConnector = useConnectorsStore(selectGetConnector);
   const connector = getConnector(serviceId);
@@ -101,14 +110,18 @@ export const useTransmissionTorrents = (
     [getConnector, serviceId],
   );
 
+  const isEnabled = hasConnector && enabled;
+  const pollingInterval =
+    isEnabled && pollingEnabled ? refetchIntervalMs : false;
+
   const torrentsQuery = useQuery({
-    queryKey: queryKeys.transmission.torrents(serviceId, options.filters),
+    queryKey: queryKeys.transmission.torrents(serviceId, filters),
     queryFn: async () => {
       const connector = resolveConnector();
-      return connector.getTorrents(options.filters);
+      return connector.getTorrents(filters);
     },
-    enabled: hasConnector,
-    refetchInterval: 10_000,
+    enabled: isEnabled,
+    refetchInterval: pollingInterval,
     staleTime: 5_000,
     refetchOnWindowFocus: false,
   });
@@ -119,8 +132,8 @@ export const useTransmissionTorrents = (
       const connector = resolveConnector();
       return connector.getTransferInfo();
     },
-    enabled: hasConnector,
-    refetchInterval: 10_000,
+    enabled: isEnabled,
+    refetchInterval: pollingInterval,
     staleTime: 5_000,
     refetchOnWindowFocus: false,
   });

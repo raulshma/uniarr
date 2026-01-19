@@ -164,6 +164,19 @@ const getProviderNames = (
   return Array.from(new Set(names)).join(", ");
 };
 
+const getRequestStatusLabel = (status?: number | null): string => {
+  switch (status) {
+    case 1:
+      return "Pending approval";
+    case 2:
+      return "Approved";
+    case 3:
+      return "Declined";
+    default:
+      return "Submitted";
+  }
+};
+
 type MovieListItem = NonNullable<DiscoverMovieResponse["results"]>[number];
 type TvListItem = NonNullable<DiscoverTvResponse["results"]>[number];
 
@@ -437,9 +450,9 @@ const TmdbDetailPage: React.FC = () => {
 
   const showErrorBanner = Boolean(
     detailsQuery.data &&
-      detailsQuery.isError &&
-      errorMessage &&
-      !errorBannerDismissed,
+    detailsQuery.isError &&
+    errorMessage &&
+    !errorBannerDismissed,
   );
   const showErrorEmptyState = Boolean(
     !detailsQuery.data && detailsQuery.isError && errorMessage,
@@ -896,7 +909,7 @@ const TmdbDetailPage: React.FC = () => {
   const refreshJellyseerrMatches = useCallback(async () => {
     setCheckingJellyseerr(true);
     try {
-      if (!tmdbId || jellyseerrConnectors.length === 0) {
+      if (!tmdbId || !mediaTypeParam || jellyseerrConnectors.length === 0) {
         setMatchedJellyseerrRequests([]);
         return;
       }
@@ -920,23 +933,13 @@ const TmdbDetailPage: React.FC = () => {
               }
             }
 
-            const list = await jelly.getRequests();
-            const requests = list?.items ?? [];
+            const details = await jelly.getMediaDetails(
+              tmdbId as any,
+              mediaTypeParam === "tv" ? "tv" : "movie",
+            );
+            const requests = (details as any)?.mediaInfo?.requests;
             if (Array.isArray(requests)) {
-              const found = requests.filter(
-                (req: any) =>
-                  req &&
-                  ((req.media &&
-                    req.media.tmdbId &&
-                    tmdbId &&
-                    req.media.tmdbId === tmdbId) ||
-                    (req.media &&
-                      req.media.id &&
-                      tmdbId &&
-                      String(req.media.id) === String(tmdbId))),
-              );
-
-              found.forEach((r: any) =>
+              requests.forEach((r: any) =>
                 matches.push({
                   connector: jelly,
                   request: r,
@@ -959,7 +962,7 @@ const TmdbDetailPage: React.FC = () => {
     } finally {
       setCheckingJellyseerr(false);
     }
-  }, [jellyseerrConnectors, tmdbId]);
+  }, [jellyseerrConnectors, mediaTypeParam, tmdbId]);
 
   const handleSubmitRequest = useCallback(async () => {
     if (!currentConnector || !tmdbId || !mediaTypeParam) {
@@ -984,20 +987,17 @@ const TmdbDetailPage: React.FC = () => {
     setIsRequesting(true);
 
     try {
-      // Check existing requests using the current connector directly.
+      // Check existing requests using media details (faster than full request list).
       let existing;
       try {
-        const list = await currentConnector.getRequests();
-        const requests = list?.items ?? [];
-        existing = requests.find(
-          (req: any) =>
-            (req.media && req.media.tmdbId && req.media.tmdbId === tmdbId) ||
-            (req.media &&
-              req.media.id &&
-              String(req.media.id) === String(tmdbId)),
+        const details = await currentConnector.getMediaDetails(
+          tmdbId as any,
+          mediaType,
         );
+        const requests = (details as any)?.mediaInfo?.requests ?? [];
+        existing = Array.isArray(requests) ? requests[0] : undefined;
       } catch (innerErr) {
-        // Non-fatal; continue to attempt create if connector fails to list.
+        // Non-fatal; continue to attempt create if connector fails to load details.
         console.warn("Failed to fetch existing Jellyseerr requests", innerErr);
       }
 
@@ -1006,7 +1006,7 @@ const TmdbDetailPage: React.FC = () => {
         return;
       }
 
-      await currentConnector.createRequest({
+      const created = await currentConnector.createRequest({
         mediaType,
         mediaId: tmdbId,
         tvdbId: undefined,
@@ -1017,9 +1017,10 @@ const TmdbDetailPage: React.FC = () => {
         rootFolder: selectedRootFolder || undefined,
       });
 
-      void alert("Success", "Request submitted successfully!");
+      const statusLabel = getRequestStatusLabel((created as any)?.status);
+      void alert("Success", `Request ${statusLabel.toLowerCase()}.`);
       setJellyseerrDialogVisible(false);
-      await refreshJellyseerrMatches();
+      void refreshJellyseerrMatches();
     } catch (error) {
       console.error(error);
       setSubmitError(

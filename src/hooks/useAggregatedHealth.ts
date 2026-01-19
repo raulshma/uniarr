@@ -120,8 +120,9 @@ export function useAggregatedHealth(options: UseAggregatedHealthOptions = {}) {
     },
     staleTime: STALE_TIME.MEDIUM, // 1 minute
     gcTime: CACHE_TIME.MEDIUM, // 5 minutes (formerly cacheTime)
-    refetchInterval: isConnected ? refetchInterval : false,
-    refetchOnWindowFocus: true,
+    refetchInterval:
+      isConnected && !enableSubscription ? refetchInterval : false,
+    refetchOnWindowFocus: !enableSubscription,
     refetchOnReconnect: true,
     enabled,
     ...RETRY_CONFIG.AGGRESSIVE,
@@ -168,14 +169,6 @@ export function useAggregatedHealth(options: UseAggregatedHealthOptions = {}) {
     queryKey,
     serviceIds,
   ]);
-
-  // Refresh health data when coming back online
-  const refetch = query.refetch;
-  useEffect(() => {
-    if (isConnected && enabled) {
-      void refetch();
-    }
-  }, [isConnected, enabled, refetch]);
 
   return query;
 }

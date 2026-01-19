@@ -1139,9 +1139,8 @@ class BackupRestoreService {
       // Collect widget secure credentials if requested
       if (options.includeWidgetSecureCredentials) {
         try {
-          const { widgetCredentialService } = await import(
-            "@/services/widgets/WidgetCredentialService"
-          );
+          const { widgetCredentialService } =
+            await import("@/services/widgets/WidgetCredentialService");
 
           const widgetSecureCredentials =
             await widgetCredentialService.getAllCredentials();
@@ -2120,9 +2119,8 @@ class BackupRestoreService {
         Array.isArray(backupData.appData.widgetsConfig)
       ) {
         // Import WidgetService dynamically to avoid circular dependencies
-        const { widgetService } = await import(
-          "@/services/widgets/WidgetService"
-        );
+        const { widgetService } =
+          await import("@/services/widgets/WidgetService");
 
         // Use restoreWidgets which clears cache and rebuilds state
         await widgetService.restoreWidgets(backupData.appData.widgetsConfig);
@@ -2213,9 +2211,8 @@ class BackupRestoreService {
         typeof backupData.appData.widgetSecureCredentials === "object"
       ) {
         try {
-          const { widgetCredentialService } = await import(
-            "@/services/widgets/WidgetCredentialService"
-          );
+          const { widgetCredentialService } =
+            await import("@/services/widgets/WidgetCredentialService");
 
           const widgetSecureCredentials =
             backupData.appData.widgetSecureCredentials;
@@ -2621,9 +2618,8 @@ class BackupRestoreService {
    */
   async exportWidgetProfilesToBackup(): Promise<any[]> {
     try {
-      const { widgetProfileService } = await import(
-        "@/services/widgets/WidgetProfileService"
-      );
+      const { widgetProfileService } =
+        await import("@/services/widgets/WidgetProfileService");
 
       const profiles = await widgetProfileService.listProfiles();
 
@@ -2659,9 +2655,8 @@ class BackupRestoreService {
         return;
       }
 
-      const { widgetProfileService } = await import(
-        "@/services/widgets/WidgetProfileService"
-      );
+      const { widgetProfileService } =
+        await import("@/services/widgets/WidgetProfileService");
 
       for (const profile of profiles) {
         // Validate profile structure before saving
@@ -2753,9 +2748,8 @@ class BackupRestoreService {
           });
 
           // Import S3BackupService dynamically to avoid circular dependencies
-          const { s3BackupService } = await import(
-            "@/services/backup/S3BackupService"
-          );
+          const { s3BackupService } =
+            await import("@/services/backup/S3BackupService");
 
           // Upload to S3 with progress tracking
           s3Key = await s3BackupService.uploadBackup(localPath, onProgress);
@@ -2867,9 +2861,8 @@ class BackupRestoreService {
       });
 
       // Import S3BackupService dynamically to avoid circular dependencies
-      const { s3BackupService } = await import(
-        "@/services/backup/S3BackupService"
-      );
+      const { s3BackupService } =
+        await import("@/services/backup/S3BackupService");
 
       // Download the backup file to temporary directory
       tempFilePath = await s3BackupService.downloadBackup(s3Key, onProgress);

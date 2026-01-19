@@ -12,7 +12,9 @@ import type { JellyfinSession } from "@/models/jellyfin.types";
 
 interface UseJellyfinNowPlayingOptions {
   readonly serviceId?: string;
-  readonly refetchInterval?: number;
+  readonly refetchInterval?: number | false;
+  readonly enabled?: boolean;
+  readonly pollingEnabled?: boolean;
 }
 
 const ensureConnector = (
@@ -33,18 +35,21 @@ const ensureConnector = (
 export const useJellyfinNowPlaying = ({
   serviceId,
   refetchInterval = 10_000,
+  enabled = true,
+  pollingEnabled = true,
 }: UseJellyfinNowPlayingOptions) => {
   const getConnector = useConnectorsStore(selectGetConnector);
-  const enabled = Boolean(serviceId);
+  const isEnabled = Boolean(serviceId) && enabled;
+  const pollingInterval = isEnabled && pollingEnabled ? refetchInterval : false;
 
   return useQuery<JellyfinSession[]>({
     queryKey:
-      enabled && serviceId
+      isEnabled && serviceId
         ? queryKeys.jellyfin.nowPlaying(serviceId)
         : queryKeys.jellyfin.base,
-    enabled,
-    refetchInterval,
-    refetchIntervalInBackground: true,
+    enabled: isEnabled,
+    refetchInterval: pollingInterval,
+    refetchIntervalInBackground: false,
     placeholderData: (previous) => previous ?? [],
     queryFn: async () => {
       if (!serviceId) {
