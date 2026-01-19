@@ -13,6 +13,7 @@
  */
 
 import { AIService } from "@/services/ai/core/AIService";
+import { AIProviderManager } from "@/services/ai/core/AIProviderManager";
 import { RecommendationCache } from "./RecommendationCache";
 import { RecommendationContextBuilder } from "./RecommendationContextBuilder";
 import { RecommendationLearningService } from "./RecommendationLearningService";
@@ -138,6 +139,29 @@ export class ContentRecommendationService {
       includeHiddenGems = recommendationIncludeHiddenGems,
       forceRefresh = false,
     } = request;
+
+    const isAiConfigured = await this.isRecommendationAIConfigured();
+    if (!isAiConfigured) {
+      void logger.info(
+        "AI recommendations not configured; returning cached or empty",
+        { userId },
+      );
+
+      const cached = await this.getCachedRecommendations(userId);
+      if (cached) {
+        return cached;
+      }
+
+      return {
+        recommendations: [],
+        generatedAt: new Date(),
+        context: {
+          watchHistoryCount: 0,
+          favoriteGenres: [],
+          analysisVersion: "1.0",
+        },
+      };
+    }
 
     // Start overall performance timer
     const overallTimerId = this.performanceMonitor.startTimer(
@@ -661,6 +685,15 @@ export class ContentRecommendationService {
   async getContentGaps(userId: string): Promise<Recommendation[]> {
     try {
       void logger.info("Identifying content gaps", { userId });
+
+      const isAiConfigured = await this.isRecommendationAIConfigured();
+      if (!isAiConfigured) {
+        void logger.info(
+          "AI recommendations not configured; skipping content gaps",
+          { userId },
+        );
+        return [];
+      }
 
       // Check if offline
       if (this.isOfflineMode) {
@@ -1400,6 +1433,47 @@ export class ContentRecommendationService {
         `Failed to generate recommendations: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  /**
+   * Check if AI recommendations are configured and ready.
+   */
+  private async isRecommendationAIConfigured(): Promise<boolean> {
+    const settingsStore = useSettingsStore.getState();
+    const {
+      enableAIRecommendations,
+      recommendationProvider,
+      recommendationModel,
+    } = settingsStore;
+
+    if (!enableAIRecommendations) {
+      return false;
+    }
+
+    const hasProvider = Boolean(recommendationProvider);
+    const hasModel = Boolean(recommendationModel);
+    if (hasProvider !== hasModel) {
+      void logger.debug("Recommendation AI settings incomplete", {
+        recommendationProvider,
+        recommendationModel,
+      });
+      return false;
+    }
+
+    if (recommendationProvider) {
+      const providerManager = AIProviderManager.getInstance();
+      const provider = providerManager.getProvider(
+        recommendationProvider as any,
+      );
+      if (!provider || !provider.isValid) {
+        void logger.debug("Recommendation AI provider not available", {
+          recommendationProvider,
+        });
+        return false;
+      }
+    }
+
+    return await this.aiService.isConfigured();
   }
 
   /**
