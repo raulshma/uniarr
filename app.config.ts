@@ -1,122 +1,155 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
+import { ConfigPlugin, withGradleProperties } from "expo/config-plugins";
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
-  ...config,
-  name: "UniArr",
-  slug: "uniarr",
-  scheme: "uniarr",
-  owner: "throwaway0acc",
-  version: "0.4.4",
-  orientation: "portrait",
-  icon: "./assets/icon.png",
-  newArchEnabled: true,
-  userInterfaceStyle: "automatic",
-  splash: {
-    image: "./assets/splash-icon.png",
-    resizeMode: "contain",
-    backgroundColor: "#1F1F1F", // Dark theme background
-  },
-  experiments: {
-    typedRoutes: true,
-    reactCompiler: true,
-  },
-  ios: {
-    supportsTablet: true,
-    bundleIdentifier: "com.uniarr.app",
-    infoPlist: {
-      NSAppTransportSecurity: {
-        NSAllowsArbitraryLoads: true,
-      },
-      // File sharing configuration - allows access to Downloads folder via Files app
-      UIFileSharingEnabled: true,
-      LSSupportsOpeningDocumentsInPlace: true,
-      // Siri Shortcuts Configuration
-      NSSiriUsageDescription:
-        "UniArr uses Siri to help you manage your media library with voice commands.",
-      NSUserActivityTypes: [
-        "com.uniarr.app.search",
-        "com.uniarr.app.services",
-        "com.uniarr.app.downloads",
-        "com.uniarr.app.add",
-        "com.uniarr.app.requests",
-      ],
-    },
-    associatedDomains: ["applinks:uniarr.com"],
-  },
-  android: {
-    adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
+const withGradleJvmArgs: ConfigPlugin = (config) =>
+  withGradleProperties(config, (config) => {
+    const jvmArgs =
+      "-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError";
+    const existingIndex = config.modResults.findIndex(
+      (item) => item.type === "property" && item.key === "org.gradle.jvmargs",
+    );
+
+    if (existingIndex >= 0) {
+      const existingItem = config.modResults[existingIndex];
+      if (existingItem?.type === "property") {
+        existingItem.value = jvmArgs;
+        config.modResults[existingIndex] = existingItem;
+      } else {
+        config.modResults[existingIndex] = {
+          type: "property",
+          key: "org.gradle.jvmargs",
+          value: jvmArgs,
+        };
+      }
+    } else {
+      config.modResults.push({
+        type: "property",
+        key: "org.gradle.jvmargs",
+        value: jvmArgs,
+      });
+    }
+
+    return config;
+  });
+
+export default ({ config }: ConfigContext): ExpoConfig =>
+  withGradleJvmArgs({
+    ...config,
+    name: "UniArr",
+    slug: "uniarr",
+    scheme: "uniarr",
+    owner: "throwaway0acc",
+    version: "0.4.4",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    newArchEnabled: true,
+    userInterfaceStyle: "automatic",
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
       backgroundColor: "#1F1F1F", // Dark theme background
     },
-    package: "com.raulshma.uniarr",
-    edgeToEdgeEnabled: true,
-    predictiveBackGestureEnabled: false,
-    // Permissions for file system access
-    permissions: [
-      "android.permission.INTERNET",
-      "android.permission.READ_EXTERNAL_STORAGE",
-      "android.permission.WRITE_EXTERNAL_STORAGE",
-      // For Android 11+ scoped storage - access to Downloads
-      "android.permission.MANAGE_EXTERNAL_STORAGE",
-    ],
-    intentFilters: [
-      {
-        action: "VIEW",
-        data: [
-          {
-            scheme: "uniarr",
-            path: "/auth/callback",
-          },
-          // Also allow bare scheme for backward compatibility
-          {
-            scheme: "uniarr",
-          },
-        ],
-        category: ["BROWSABLE", "DEFAULT"],
-      },
-    ],
-  },
-  web: {
-    bundler: "metro",
-    favicon: "./assets/favicon.png",
-  },
-  plugins: [
-    "expo-router",
-    "expo-secure-store",
-    "expo-notifications",
-    [
-      "expo-build-properties",
-      {
-        android: {
-          enableMinifyInReleaseBuilds: true,
-          enableShrinkResourcesInReleaseBuilds: true,
-          buildArchs: ["arm64-v8a"],
-          usesCleartextTraffic: true,
-          // Enable storage access for downloads
-          enableRoomDependency: true,
-        },
-      },
-    ],
-    [
-      "expo-web-browser",
-      {
-        // Disable web-browser plugin for web platform
-        disableWeb: true,
-      },
-    ],
-    [
-      "expo-screen-orientation",
-      {
-        initialOrientation: "DEFAULT",
-      },
-    ],
-    ["react-native-localize", { locales: ["en"] }],
-  ],
-  extra: {
-    ...config.extra,
-    eas: {
-      projectId: "35355a36-e839-42ed-866f-8e4b1f4b5600",
+    experiments: {
+      typedRoutes: true,
+      reactCompiler: true,
     },
-    clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "",
-  },
-});
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.uniarr.app",
+      infoPlist: {
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: true,
+        },
+        // File sharing configuration - allows access to Downloads folder via Files app
+        UIFileSharingEnabled: true,
+        LSSupportsOpeningDocumentsInPlace: true,
+        // Siri Shortcuts Configuration
+        NSSiriUsageDescription:
+          "UniArr uses Siri to help you manage your media library with voice commands.",
+        NSUserActivityTypes: [
+          "com.uniarr.app.search",
+          "com.uniarr.app.services",
+          "com.uniarr.app.downloads",
+          "com.uniarr.app.add",
+          "com.uniarr.app.requests",
+        ],
+      },
+      associatedDomains: ["applinks:uniarr.com"],
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#1F1F1F", // Dark theme background
+      },
+      package: "com.raulshma.uniarr",
+      edgeToEdgeEnabled: true,
+      predictiveBackGestureEnabled: false,
+      // Permissions for file system access
+      permissions: [
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        // For Android 11+ scoped storage - access to Downloads
+        "android.permission.MANAGE_EXTERNAL_STORAGE",
+      ],
+      intentFilters: [
+        {
+          action: "VIEW",
+          data: [
+            {
+              scheme: "uniarr",
+              path: "/auth/callback",
+            },
+            // Also allow bare scheme for backward compatibility
+            {
+              scheme: "uniarr",
+            },
+          ],
+          category: ["BROWSABLE", "DEFAULT"],
+        },
+      ],
+    },
+    web: {
+      bundler: "metro",
+      favicon: "./assets/favicon.png",
+    },
+    plugins: [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          android: {
+            enableMinifyInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+            buildArchs: ["arm64-v8a"],
+            usesCleartextTraffic: true,
+            // Enable storage access for downloads
+            enableRoomDependency: true,
+          },
+        },
+      ],
+      [
+        "expo-web-browser",
+        {
+          // Disable web-browser plugin for web platform
+          disableWeb: true,
+        },
+      ],
+      [
+        "expo-screen-orientation",
+        {
+          initialOrientation: "DEFAULT",
+        },
+      ],
+      ["react-native-localize", { locales: ["en"] }],
+    ],
+    extra: {
+      ...config.extra,
+      eas: {
+        projectId: "35355a36-e839-42ed-866f-8e4b1f4b5600",
+      },
+      clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "",
+    },
+  });
