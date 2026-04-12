@@ -1,6 +1,6 @@
 # UniArr
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](package.json)
+[![Version](https://img.shields.io/badge/version-0.4.4-blue.svg)](package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Expo SDK](https://img.shields.io/badge/Expo%20SDK-54-000.svg)](https://expo.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://www.typescriptlang.org/)
@@ -168,7 +168,7 @@ UniArr provides a comprehensive, unified interface for managing all your media a
 ### Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/uniarr.git
+git clone https://github.com/raulshma/uniarr.git
 cd uniarr
 ```
 
