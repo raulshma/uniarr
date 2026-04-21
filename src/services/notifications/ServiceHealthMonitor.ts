@@ -15,6 +15,8 @@ class ServiceHealthMonitor {
 
   private isChecking = false;
 
+  private hasCompletedInitialCheck = false;
+
   private hasBootstrapped = false;
 
   private isRunning = false;
@@ -92,18 +94,22 @@ class ServiceHealthMonitor {
         return;
       }
 
+      const shouldNotifyStatusChanges = this.hasCompletedInitialCheck;
+
       await Promise.all(
         connectors.map(async (connector) => {
           try {
             const health = await connector.getHealth();
             const previousStatus = this.lastStatuses.get(connector.config.id);
 
-            await notificationEventService.notifyServiceStatusChange({
-              serviceId: connector.config.id,
-              serviceName: connector.config.name,
-              health,
-              previousStatus,
-            });
+            if (shouldNotifyStatusChanges) {
+              await notificationEventService.notifyServiceStatusChange({
+                serviceId: connector.config.id,
+                serviceName: connector.config.name,
+                health,
+                previousStatus,
+              });
+            }
 
             this.lastStatuses.set(connector.config.id, health.status);
           } catch (error) {
@@ -115,21 +121,27 @@ class ServiceHealthMonitor {
             });
 
             const previousStatus = this.lastStatuses.get(connector.config.id);
-            await notificationEventService.notifyServiceStatusChange({
-              serviceId: connector.config.id,
-              serviceName: connector.config.name,
-              health: {
-                status: "offline",
-                message: "Service health check failed.",
-                lastChecked: new Date(),
-              },
-              previousStatus,
-            });
+            if (shouldNotifyStatusChanges) {
+              await notificationEventService.notifyServiceStatusChange({
+                serviceId: connector.config.id,
+                serviceName: connector.config.name,
+                health: {
+                  status: "offline",
+                  message: "Service health check failed.",
+                  lastChecked: new Date(),
+                },
+                previousStatus,
+              });
+            }
 
             this.lastStatuses.set(connector.config.id, "offline");
           }
         }),
       );
+
+      if (!this.hasCompletedInitialCheck) {
+        this.hasCompletedInitialCheck = true;
+      }
     } finally {
       this.isChecking = false;
     }
