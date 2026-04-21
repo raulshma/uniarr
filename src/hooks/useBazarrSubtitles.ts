@@ -19,9 +19,8 @@ import type {
 import type { BazarrConnector } from "@/connectors/implementations/BazarrConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 
 interface UseBazarrSubtitlesResult {
@@ -47,99 +46,67 @@ interface UseBazarrSubtitlesResult {
 
 const BAZARR_SERVICE_TYPE = "bazarr";
 
-const ensureBazarrConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): BazarrConnector => {
-  const connector = getConnector(serviceId);
-  if (!connector || connector.config.type !== BAZARR_SERVICE_TYPE) {
-    throw new Error(
-      `Bazarr connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as BazarrConnector;
-};
-
 export const useBazarrSubtitles = (
   serviceId: string,
 ): UseBazarrSubtitlesResult => {
   const queryClient = useQueryClient();
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === BAZARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(
-    () => ensureBazarrConnector(getConnector, serviceId),
-    [getConnector, serviceId],
-  );
+  const bazarrConnector = connector as BazarrConnector;
 
-  // Movies query
   const moviesQuery = useQuery({
     queryKey: queryKeys.bazarr.moviesList(serviceId),
     queryFn: async () => {
-      const connector = resolveConnector();
-      return await connector.getMovies();
+      return await bazarrConnector.getMovies();
     },
     enabled: hasConnector,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Episodes query
   const episodesQuery = useQuery({
     queryKey: queryKeys.bazarr.episodesList(serviceId),
     queryFn: async () => {
-      const connector = resolveConnector();
-      return await connector.getEpisodes();
+      return await bazarrConnector.getEpisodes();
     },
     enabled: hasConnector,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Subtitles query
   const subtitlesQuery = useQuery({
     queryKey: queryKeys.bazarr.subtitlesList(serviceId),
     queryFn: async () => {
-      const connector = resolveConnector();
-      return await connector.getSubtitles();
+      return await bazarrConnector.getSubtitles();
     },
     enabled: hasConnector,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 
-  // Statistics query
   const statisticsQuery = useQuery({
     queryKey: queryKeys.bazarr.statistics(serviceId),
     queryFn: async () => {
-      const connector = resolveConnector();
-      return await connector.getStatistics();
+      return await bazarrConnector.getStatistics();
     },
     enabled: hasConnector,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000,
   });
 
-  // Search subtitles mutation
   const searchSubtitlesMutation = useMutation({
     mutationFn: async (request: BazarrSearchRequest) => {
-      const connector = resolveConnector();
-      return await connector.searchSubtitles(request);
+      return await bazarrConnector.searchSubtitles(request);
     },
-    onSuccess: (data, variables) => {
-      // Optionally update cache or trigger other queries
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.bazarr.subtitlesList(serviceId),
       });
     },
   });
 
-  // Download subtitle mutation
   const downloadSubtitleMutation = useMutation({
     mutationFn: async (request: BazarrDownloadRequest) => {
-      const connector = resolveConnector();
-      return await connector.downloadSubtitle(request);
+      return await bazarrConnector.downloadSubtitle(request);
     },
-    onSuccess: (data, variables) => {
-      // Invalidate subtitles and statistics after download
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.bazarr.subtitlesList(serviceId),
       });
@@ -149,7 +116,6 @@ export const useBazarrSubtitles = (
     },
   });
 
-  // Combined loading state
   const isLoading =
     moviesQuery.isLoading ||
     episodesQuery.isLoading ||
@@ -166,14 +132,12 @@ export const useBazarrSubtitles = (
     subtitlesQuery.isError ||
     statisticsQuery.isError;
 
-  // Combined error state (using first error)
   const error =
     moviesQuery.error ||
     episodesQuery.error ||
     subtitlesQuery.error ||
     statisticsQuery.error;
 
-  // Combined refetch function
   const refetch = useCallback(
     async (options?: RefetchOptions) => {
       const results = await Promise.all([
@@ -182,12 +146,11 @@ export const useBazarrSubtitles = (
         subtitlesQuery.refetch(options),
         statisticsQuery.refetch(options),
       ]);
-      return results[0]; // Return first result for compatibility
+      return results[0];
     },
     [moviesQuery, episodesQuery, subtitlesQuery, statisticsQuery],
   );
 
-  // Get missing subtitles from movies and episodes
   const missingSubtitles = useMemo(() => {
     if (!moviesQuery.data || !episodesQuery.data) return undefined;
 

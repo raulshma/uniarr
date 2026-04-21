@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
 import type { components } from "@/connectors/client-schemas/prowlarr-openapi";
 import { logger } from "@/services/logger/LoggerService";
@@ -45,7 +45,6 @@ interface UseProwlarrIndexersResult {
   ) => Promise<boolean>;
   bulkEnableDisable: (ids: number[], enable: boolean) => Promise<boolean>;
   bulkDelete: (ids: number[]) => Promise<boolean>;
-  // Last API call made by this hook (for UI debugging / feedback)
   lastApiEvent?: ApiEvent | null;
   clearApiEvent: () => void;
 }
@@ -69,9 +68,7 @@ export const useProwlarrIndexers = (
   const [error, setError] = useState<string | null>(null);
   const [lastApiEvent, setLastApiEvent] = useState<ApiEvent | null>(null);
 
-  // Get connector instance
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
 
   const formatDetails = (maybe: unknown): Record<string, unknown> | string => {
     if (maybe && typeof maybe === "object")
@@ -90,13 +87,11 @@ export const useProwlarrIndexers = (
       setIsLoading(true);
       setError(null);
 
-      // Load indexers
       const indexersData =
         (await (connector as any).getIndexers?.()) ??
         (connector as any).getApplications?.();
       setIndexers(indexersData || []);
 
-      // Load statistics (stub for now)
       const stats =
         (await (connector as any).getIndexerStatistics?.()) ??
         (connector as any).getApplicationStatistics?.();
@@ -123,7 +118,6 @@ export const useProwlarrIndexers = (
       indexer: ProwlarrIndexerResource,
     ): Promise<{ ok: boolean; message?: string }> => {
       if (!connector) return { ok: false, message: "Connector not available" };
-      // Build a representative payload and endpoint for UI debugging
       const payload: Partial<components["schemas"]["IndexerResource"]> = {
         name: indexer.name,
         implementation: indexer.implementation,
@@ -144,7 +138,6 @@ export const useProwlarrIndexers = (
           ? await (connector as any).testIndexerConfig(indexer)
           : await (connector as any).testApplication?.(indexer);
 
-        // If API returned a test result object, reflect its validation status
         if (result && typeof result === "object") {
           if (result.isValid === false) {
             const details = Array.isArray(result.errors)
@@ -172,7 +165,6 @@ export const useProwlarrIndexers = (
           return { ok: true };
         }
 
-        // If no structured result, assume success
         setLastApiEvent({
           action: "testIndexer",
           method: "POST",
@@ -226,7 +218,7 @@ export const useProwlarrIndexers = (
         } else {
           await (connector as any).update?.(indexer.id, updatedIndexer);
         }
-        await loadData(); // Refresh data after update
+        await loadData();
         setLastApiEvent({
           action: "toggleIndexer",
           method: "PUT",
@@ -277,7 +269,7 @@ export const useProwlarrIndexers = (
         } else {
           await (connector as any).delete?.(indexerId);
         }
-        await loadData(); // Refresh data after deletion
+        await loadData();
         setLastApiEvent({
           action: "deleteIndexer",
           method: "DELETE",
@@ -439,7 +431,6 @@ export const useProwlarrIndexers = (
         } else if ((connector as any).bulkUpdateApplications) {
           await (connector as any).bulkUpdateApplications({ ids, enable });
         } else {
-          // Fallback: update one by one
           await Promise.all(
             ids.map((id) => (connector as any).update?.(id, { enable })),
           );
@@ -538,7 +529,6 @@ export const useProwlarrIndexers = (
     setLastApiEvent(null);
   }, []);
 
-  // Load data on mount and when serviceId changes
   useEffect(() => {
     if (serviceId) {
       void loadData();

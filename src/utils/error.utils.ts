@@ -192,7 +192,9 @@ export const handleApiError = (
   fallbackMessage = "An unexpected error occurred.",
 ): ApiError => {
   if (error instanceof ApiError) {
-    error.details = mergeContext(error.details, context);
+    if (context) {
+      error.details = mergeContext(error.details, context);
+    }
     return error;
   }
 

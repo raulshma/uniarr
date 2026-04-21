@@ -66,10 +66,9 @@ export async function withRetry<T>(
       }
 
       // Calculate delay with exponential backoff
-      const delay = Math.min(
-        opts.baseDelay * Math.pow(opts.backoffFactor, attempt),
-        opts.maxDelay,
-      );
+      const baseDelay = opts.baseDelay * Math.pow(opts.backoffFactor, attempt);
+      const jitter = Math.random() * opts.baseDelay * 0.3;
+      const delay = Math.min(baseDelay + jitter, opts.maxDelay);
 
       const enhancedContext = {
         ...opts.context,
@@ -129,4 +128,11 @@ export const networkRetryCondition = (error: unknown): boolean => {
 /**
  * Retry condition for authentication errors (401/403)
  */
-export const authRetryCondition = createStatusRetryCondition(401, 403);
+export const authRetryCondition = (error: unknown): boolean => {
+  if (!isAxiosError(error)) {
+    return false;
+  }
+
+  const status = (error as AxiosError).response?.status;
+  return status === 401 || status === 403;
+};

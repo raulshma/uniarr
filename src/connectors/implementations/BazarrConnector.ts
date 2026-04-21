@@ -43,13 +43,11 @@ export class BazarrConnector extends BaseConnector<
         response.data?.bazarrVersion || response.data?.version || "Unknown"
       );
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getVersion",
       });
-
-      throw new Error(`Failed to get Bazarr version: ${diagnostic.message}`);
     }
   }
 
@@ -63,13 +61,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get("/api/movies");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getMovies",
       });
-
-      throw new Error(`Failed to get movies: ${diagnostic.message}`);
     }
   }
 
@@ -81,13 +77,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get(`/api/movies/${id}`);
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getMovieById",
       });
-
-      throw new Error(`Failed to get movie ${id}: ${diagnostic.message}`);
     }
   }
 
@@ -101,13 +95,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get("/api/episodes");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getEpisodes",
       });
-
-      throw new Error(`Failed to get episodes: ${diagnostic.message}`);
     }
   }
 
@@ -121,15 +113,11 @@ export class BazarrConnector extends BaseConnector<
       );
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getEpisodesBySeriesId",
       });
-
-      throw new Error(
-        `Failed to get episodes for series ${seriesId}: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -141,13 +129,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get(`/api/episodes/${id}`);
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getEpisodeById",
       });
-
-      throw new Error(`Failed to get episode ${id}: ${diagnostic.message}`);
     }
   }
 
@@ -161,13 +147,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get("/api/subtitles");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getSubtitles",
       });
-
-      throw new Error(`Failed to get subtitles: ${diagnostic.message}`);
     }
   }
 
@@ -179,15 +163,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get(`/api/subtitles/movie/${movieId}`);
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getSubtitlesByMovieId",
       });
-
-      throw new Error(
-        `Failed to get subtitles for movie ${movieId}: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -201,15 +181,11 @@ export class BazarrConnector extends BaseConnector<
       );
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getSubtitlesByEpisodeId",
       });
-
-      throw new Error(
-        `Failed to get subtitles for episode ${episodeId}: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -226,13 +202,11 @@ export class BazarrConnector extends BaseConnector<
       );
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "searchSubtitles",
       });
-
-      throw new Error(`Failed to search subtitles: ${diagnostic.message}`);
     }
   }
 
@@ -246,13 +220,11 @@ export class BazarrConnector extends BaseConnector<
       await this.client.post("/api/subtitles/download", downloadRequest);
       return true;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "downloadSubtitle",
       });
-
-      throw new Error(`Failed to download subtitle: ${diagnostic.message}`);
     }
   }
 
@@ -266,13 +238,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get("/api/languages");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getLanguages",
       });
-
-      throw new Error(`Failed to get languages: ${diagnostic.message}`);
     }
   }
 
@@ -284,13 +254,11 @@ export class BazarrConnector extends BaseConnector<
       const languages = await this.getLanguages();
       return languages.filter((lang) => lang.enabled);
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getEnabledLanguages",
       });
-
-      throw new Error(`Failed to get enabled languages: ${diagnostic.message}`);
     }
   }
 
@@ -304,13 +272,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get("/api/providers");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getProviders",
       });
-
-      throw new Error(`Failed to get providers: ${diagnostic.message}`);
     }
   }
 
@@ -322,13 +288,11 @@ export class BazarrConnector extends BaseConnector<
       const providers = await this.getProviders();
       return providers.filter((provider) => provider.enabled);
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getEnabledProviders",
       });
-
-      throw new Error(`Failed to get enabled providers: ${diagnostic.message}`);
     }
   }
 
@@ -342,13 +306,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get("/api/profiles");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getProfiles",
       });
-
-      throw new Error(`Failed to get profiles: ${diagnostic.message}`);
     }
   }
 
@@ -362,13 +324,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get("/api/queue");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getQueue",
       });
-
-      throw new Error(`Failed to get queue: ${diagnostic.message}`);
     }
   }
 
@@ -380,13 +340,11 @@ export class BazarrConnector extends BaseConnector<
       const response = await this.client.get("/api/history");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getHistory",
       });
-
-      throw new Error(`Failed to get history: ${diagnostic.message}`);
     }
   }
 
@@ -414,13 +372,11 @@ export class BazarrConnector extends BaseConnector<
         missingSubtitles,
       };
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getStatistics",
       });
-
-      throw new Error(`Failed to get statistics: ${diagnostic.message}`);
     }
   }
 
@@ -441,13 +397,11 @@ export class BazarrConnector extends BaseConnector<
         ...episodes.flatMap((episode) => episode.missingSubtitles || []),
       ];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getAllMissingSubtitles",
       });
-
-      throw new Error(`Failed to get missing subtitles: ${diagnostic.message}`);
     }
   }
 

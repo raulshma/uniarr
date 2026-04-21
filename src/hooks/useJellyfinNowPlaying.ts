@@ -1,12 +1,10 @@
-// no direct React hooks used
 import { useQuery } from "@tanstack/react-query";
 
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 import type { JellyfinSession } from "@/models/jellyfin.types";
 
@@ -17,29 +15,15 @@ interface UseJellyfinNowPlayingOptions {
   readonly pollingEnabled?: boolean;
 }
 
-const ensureConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): JellyfinConnector => {
-  const connector = getConnector(serviceId);
-
-  if (!connector || connector.config.type !== "jellyfin") {
-    throw new Error(
-      `Jellyfin connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as JellyfinConnector;
-};
-
 export const useJellyfinNowPlaying = ({
   serviceId,
   refetchInterval = 10_000,
   enabled = true,
   pollingEnabled = true,
 }: UseJellyfinNowPlayingOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const isEnabled = Boolean(serviceId) && enabled;
+  const connector = useConnectorsStore(selectConnectorById(serviceId ?? ""));
+  const isEnabled =
+    Boolean(serviceId && connector?.config.type === "jellyfin") && enabled;
   const pollingInterval = isEnabled && pollingEnabled ? refetchInterval : false;
 
   return useQuery<JellyfinSession[]>({
@@ -52,12 +36,11 @@ export const useJellyfinNowPlaying = ({
     refetchIntervalInBackground: false,
     placeholderData: (previous) => previous ?? [],
     queryFn: async () => {
-      if (!serviceId) {
+      if (!serviceId || !connector || connector.config.type !== "jellyfin") {
         return [];
       }
 
-      const connector = ensureConnector(getConnector, serviceId);
-      return connector.getNowPlayingSessions();
+      return (connector as JellyfinConnector).getNowPlayingSessions();
     },
   });
 };

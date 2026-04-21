@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
@@ -11,10 +10,9 @@ import type { AddSeriesRequest, Series } from "@/models/media.types";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
-import { IConnector } from "@/connectors/base/IConnector";
 import type { LibraryFilters } from "@/store/libraryFilterStore";
 
 interface UseSonarrSeriesOptions {
@@ -39,33 +37,13 @@ interface UseSonarrSeriesResult {
 
 const SONARR_SERVICE_TYPE = "sonarr";
 
-const ensureSonarrConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): SonarrConnector => {
-  const connector = getConnector(serviceId);
-  if (!connector || connector.config.type !== SONARR_SERVICE_TYPE) {
-    throw new Error(
-      `Sonarr connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as SonarrConnector;
-};
-
 export const useSonarrSeries = ({
   serviceId,
   filters,
 }: UseSonarrSeriesOptions): UseSonarrSeriesResult => {
   const queryClient = useQueryClient();
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === SONARR_SERVICE_TYPE;
-
-  const resolveConnector = useCallback(
-    () => ensureSonarrConnector(getConnector, serviceId),
-    [getConnector, serviceId],
-  );
 
   const seriesQuery = useQuery({
     queryKey: queryKeys.sonarr.seriesList(
@@ -73,8 +51,7 @@ export const useSonarrSeries = ({
       filters as Record<string, unknown> | undefined,
     ),
     queryFn: async () => {
-      const connector = resolveConnector();
-      return connector.getSeries(filters);
+      return (connector as SonarrConnector).getSeries(filters);
     },
     enabled: hasConnector,
     staleTime: 5 * 60 * 1000,
@@ -84,8 +61,7 @@ export const useSonarrSeries = ({
   const addSeriesMutation = useMutation({
     mutationKey: queryKeys.sonarr.seriesList(serviceId),
     mutationFn: async (request: AddSeriesRequest) => {
-      const connector = resolveConnector();
-      return connector.add(request);
+      return (connector as SonarrConnector).add(request);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({

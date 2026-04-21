@@ -1,12 +1,10 @@
-// no direct React hooks used
 import { useQuery } from "@tanstack/react-query";
 
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 import type { JellyfinLatestItem } from "@/models/jellyfin.types";
 
@@ -16,29 +14,16 @@ interface UseJellyfinLatestOptions {
   readonly limit?: number;
 }
 
-const ensureConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): JellyfinConnector => {
-  const connector = getConnector(serviceId);
-
-  if (!connector || connector.config.type !== "jellyfin") {
-    throw new Error(
-      `Jellyfin connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as JellyfinConnector;
-};
-
 export const useJellyfinLatestItems = ({
   serviceId,
   libraryId,
   limit = 20,
 }: UseJellyfinLatestOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
+  const connector = useConnectorsStore(selectConnectorById(serviceId ?? ""));
 
-  const enabled = Boolean(serviceId && libraryId);
+  const enabled = Boolean(
+    serviceId && libraryId && connector?.config.type === "jellyfin",
+  );
 
   return useQuery<JellyfinLatestItem[]>({
     queryKey:
@@ -47,12 +32,16 @@ export const useJellyfinLatestItems = ({
         : queryKeys.jellyfin.base,
     enabled,
     queryFn: async () => {
-      if (!serviceId || !libraryId) {
+      if (
+        !serviceId ||
+        !libraryId ||
+        !connector ||
+        connector.config.type !== "jellyfin"
+      ) {
         return [];
       }
 
-      const connector = ensureConnector(getConnector, serviceId);
-      return connector.getLatestItems(libraryId, limit);
+      return (connector as JellyfinConnector).getLatestItems(libraryId, limit);
     },
   });
 };

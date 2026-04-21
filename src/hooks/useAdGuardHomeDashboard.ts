@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
@@ -12,9 +11,8 @@ import type { AdGuardDashboardOverview } from "@/models/adguard.types";
 import type { AdGuardHomeConnector } from "@/connectors/implementations/AdGuardHomeConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 
 interface UseAdGuardHomeDashboardResult {
   overview: AdGuardDashboardOverview | undefined;
@@ -34,38 +32,19 @@ interface UseAdGuardHomeDashboardResult {
 
 const SERVICE_TYPE = "adguard";
 
-const ensureAdGuardConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): AdGuardHomeConnector => {
-  const connector = getConnector(serviceId);
-  if (!connector || connector.config.type !== SERVICE_TYPE) {
-    throw new Error(
-      `AdGuard connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as AdGuardHomeConnector;
-};
-
 export const useAdGuardHomeDashboard = (
   serviceId: string,
 ): UseAdGuardHomeDashboardResult => {
-  const getConnector = useConnectorsStore(selectGetConnector);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const queryClient = useQueryClient();
-  const connector = getConnector(serviceId);
   const hasConnector = connector?.config.type === SERVICE_TYPE;
 
-  const resolveConnector = useCallback(
-    () => ensureAdGuardConnector(getConnector, serviceId),
-    [getConnector, serviceId],
-  );
+  const adguardConnector = connector as AdGuardHomeConnector;
 
   const overviewQuery = useQuery({
     queryKey: queryKeys.adguard.overview(serviceId),
     queryFn: async () => {
-      const instance = resolveConnector();
-      return instance.getDashboardOverview();
+      return adguardConnector.getDashboardOverview();
     },
     enabled: hasConnector,
     staleTime: 30_000,
@@ -76,8 +55,7 @@ export const useAdGuardHomeDashboard = (
   const toggleProtectionMutation = useMutation({
     mutationKey: queryKeys.adguard.overview(serviceId),
     mutationFn: async (enabled: boolean) => {
-      const instance = resolveConnector();
-      await instance.toggleProtection(enabled);
+      await adguardConnector.toggleProtection(enabled);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -89,8 +67,7 @@ export const useAdGuardHomeDashboard = (
   const refreshFiltersMutation = useMutation({
     mutationKey: [...queryKeys.adguard.overview(serviceId), "refreshFilters"],
     mutationFn: async (options?: { whitelist?: boolean }) => {
-      const instance = resolveConnector();
-      await instance.refreshFilters(options);
+      await adguardConnector.refreshFilters(options);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({

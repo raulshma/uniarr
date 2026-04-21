@@ -59,13 +59,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.get("/api");
       return response.data.version || "Unknown";
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getVersion",
       });
-
-      throw new Error(`Failed to get Prowlarr version: ${diagnostic.message}`);
     }
   }
 
@@ -150,13 +148,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.get("/api/v1/indexer");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getIndexers",
       });
-
-      throw new Error(`Failed to get indexers: ${diagnostic.message}`);
     }
   }
 
@@ -168,13 +164,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.get(`/api/v1/indexer/${id}`);
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getIndexerById",
       });
-
-      throw new Error(`Failed to get indexer ${id}: ${diagnostic.message}`);
     }
   }
 
@@ -188,13 +182,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.post("/api/v1/indexer", application);
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "addIndexer",
       });
-
-      throw new Error(`Failed to add indexer: ${diagnostic.message}`);
     }
   }
 
@@ -209,13 +201,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.put(`/api/v1/indexer/${id}`, data);
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "updateIndexer",
       });
-
-      throw new Error(`Failed to update indexer ${id}: ${diagnostic.message}`);
     }
   }
 
@@ -227,13 +217,11 @@ export class ProwlarrConnector extends BaseConnector<
       await this.client.delete(`/api/v1/indexer/${id}`);
       return true;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "deleteIndexer",
       });
-
-      throw new Error(`Failed to delete indexer ${id}: ${diagnostic.message}`);
     }
   }
 
@@ -310,17 +298,11 @@ export class ProwlarrConnector extends BaseConnector<
           }
         }
 
-        const diagnostic = handleApiError(error, {
+        throw handleApiError(error, {
           serviceId: this.config.id,
           serviceType: this.config.type,
           operation: "testIndexerConfig",
         });
-
-        throw new Error(
-          `Failed to test indexer config: ${diagnostic.message}${
-            details ? ` - Details: ${details}` : ""
-          }`,
-        );
       }
 
       // For other failures, attempt the applications/test endpoint as a fallback
@@ -331,13 +313,11 @@ export class ProwlarrConnector extends BaseConnector<
         );
         return fallbackResp.data;
       } catch (fallbackErr) {
-        const diagnostic = handleApiError(fallbackErr ?? error, {
+        throw handleApiError(fallbackErr ?? error, {
           serviceId: this.config.id,
           serviceType: this.config.type,
           operation: "testIndexerConfig",
         });
-
-        throw new Error(`Failed to test indexer config: ${diagnostic.message}`);
       }
     }
   }
@@ -350,13 +330,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.post("/api/v1/indexer/testall");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "testAllIndexers",
       });
-
-      throw new Error(`Failed to test all indexers: ${diagnostic.message}`);
     }
   }
 
@@ -370,13 +348,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.put("/api/v1/indexer/bulk", bulkData);
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "bulkUpdateIndexers",
       });
-
-      throw new Error(`Failed to bulk update indexers: ${diagnostic.message}`);
     }
   }
 
@@ -390,13 +366,11 @@ export class ProwlarrConnector extends BaseConnector<
       });
       return true;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "bulkDeleteIndexers",
       });
-
-      throw new Error(`Failed to bulk delete indexers: ${diagnostic.message}`);
     }
   }
 
@@ -408,13 +382,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.get("/api/v1/indexer/schema");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getIndexerSchema",
       });
-
-      throw new Error(`Failed to get indexer schema: ${diagnostic.message}`);
     }
   }
 
@@ -431,15 +403,11 @@ export class ProwlarrConnector extends BaseConnector<
         ...(payload ?? {}),
       });
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "executeCommand",
       });
-
-      throw new Error(
-        `Failed to execute command ${commandName}: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -534,15 +502,11 @@ export class ProwlarrConnector extends BaseConnector<
           },
         }));
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getIndexerStatistics",
       });
-
-      throw new Error(
-        `Failed to get application statistics: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -553,13 +517,11 @@ export class ProwlarrConnector extends BaseConnector<
     try {
       await this.executeCommand("ApplicationIndexerSync");
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "syncIndexersToApps",
       });
-
-      throw new Error(`Failed to sync indexers to apps: ${diagnostic.message}`);
     }
   }
 
@@ -570,13 +532,11 @@ export class ProwlarrConnector extends BaseConnector<
     try {
       await this.executeCommand("IndexerRss");
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "rescanIndexers",
       });
-
-      throw new Error(`Failed to rescan indexers: ${diagnostic.message}`);
     }
   }
 
@@ -659,13 +619,11 @@ export class ProwlarrConnector extends BaseConnector<
         syncInProgress,
       };
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getSyncStatus",
       });
-
-      throw new Error(`Failed to get sync status: ${diagnostic.message}`);
     }
   }
 
@@ -675,12 +633,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.get("/api/v1/applications");
       return response.data ?? [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getApplications",
       });
-      throw new Error(`Failed to get applications: ${diagnostic.message}`);
     }
   }
 
@@ -689,12 +646,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.get(`/api/v1/applications/${id}`);
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getApplicationById",
       });
-      throw new Error(`Failed to get application ${id}: ${diagnostic.message}`);
     }
   }
 
@@ -708,12 +664,11 @@ export class ProwlarrConnector extends BaseConnector<
       );
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "addApplication",
       });
-      throw new Error(`Failed to add application: ${diagnostic.message}`);
     }
   }
 
@@ -728,14 +683,11 @@ export class ProwlarrConnector extends BaseConnector<
       );
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "updateApplication",
       });
-      throw new Error(
-        `Failed to update application ${id}: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -744,14 +696,11 @@ export class ProwlarrConnector extends BaseConnector<
       await this.client.delete(`/api/v1/applications/${id}`);
       return true;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "deleteApplication",
       });
-      throw new Error(
-        `Failed to delete application ${id}: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -765,12 +714,11 @@ export class ProwlarrConnector extends BaseConnector<
       );
       return response.data;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "testApplication",
       });
-      throw new Error(`Failed to test application: ${diagnostic.message}`);
     }
   }
 
@@ -779,12 +727,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.post("/api/v1/applications/testall");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "testAllApplications",
       });
-      throw new Error(`Failed to test all applications: ${diagnostic.message}`);
     }
   }
 
@@ -798,14 +745,11 @@ export class ProwlarrConnector extends BaseConnector<
       );
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "bulkUpdateApplications",
       });
-      throw new Error(
-        `Failed to bulk update applications: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -814,14 +758,11 @@ export class ProwlarrConnector extends BaseConnector<
       await this.client.delete("/api/v1/applications/bulk", { data: { ids } });
       return true;
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "bulkDeleteApplications",
       });
-      throw new Error(
-        `Failed to bulk delete applications: ${diagnostic.message}`,
-      );
     }
   }
 
@@ -830,14 +771,11 @@ export class ProwlarrConnector extends BaseConnector<
       const response = await this.client.get("/api/v1/applications/schema");
       return response.data || [];
     } catch (error) {
-      const diagnostic = handleApiError(error, {
+      throw handleApiError(error, {
         serviceId: this.config.id,
         serviceType: this.config.type,
         operation: "getApplicationSchema",
       });
-      throw new Error(
-        `Failed to get application schema: ${diagnostic.message}`,
-      );
     }
   }
 

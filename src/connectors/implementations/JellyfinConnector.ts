@@ -81,6 +81,7 @@ export class JellyfinConnector
   private userName?: string;
   private serverVersion?: string;
   private serverName?: string;
+  private authInterceptorId: number | null = null;
 
   // Download connector properties
   public readonly supportsDownloads = true;
@@ -88,27 +89,43 @@ export class JellyfinConnector
   constructor(config: ServiceConfig) {
     super(config);
 
-    this.client.interceptors.request.use((requestConfig) => {
-      const authHeaders = ServiceAuthHelper.getServiceAuthHeaders(this.config);
+    this.authInterceptorId = this.client.interceptors.request.use(
+      (requestConfig) => {
+        const authHeaders = ServiceAuthHelper.getServiceAuthHeaders(
+          this.config,
+        );
 
-      void logger.debug("Jellyfin request interceptor - auth headers", {
-        serviceId: this.config.id,
-        endpoint: requestConfig.url,
-        hasAuthHeaders: Object.keys(authHeaders).length > 0,
-        authHeaderKeys: Object.keys(authHeaders),
-        userId: this.userId,
-        userName: this.userName,
-      });
+        void logger.debug("Jellyfin request interceptor - auth headers", {
+          serviceId: this.config.id,
+          endpoint: requestConfig.url,
+          hasAuthHeaders: Object.keys(authHeaders).length > 0,
+          authHeaderKeys: Object.keys(authHeaders),
+          userId: this.userId,
+          userName: this.userName,
+        });
 
-      // Merge auth headers with existing headers
-      Object.entries(authHeaders).forEach(([key, value]) => {
-        if (value !== undefined && requestConfig.headers) {
-          requestConfig.headers[key] = value;
-        }
-      });
+        // Merge auth headers with existing headers
+        Object.entries(authHeaders).forEach(([key, value]) => {
+          if (value !== undefined && requestConfig.headers) {
+            requestConfig.headers[key] = value;
+          }
+        });
 
-      return requestConfig;
-    });
+        return requestConfig;
+      },
+    );
+  }
+
+  override dispose(): void {
+    if (this.authInterceptorId !== null) {
+      this.client.interceptors.request.eject(this.authInterceptorId);
+      this.authInterceptorId = null;
+    }
+    this.userId = undefined;
+    this.userName = undefined;
+    this.serverVersion = undefined;
+    this.serverName = undefined;
+    super.dispose();
   }
 
   async initialize(): Promise<void> {
@@ -1549,12 +1566,35 @@ export class JellyfinConnector
    * Check if user has permission to download the item
    */
   private async checkDownloadPermission(
-    item: any,
+    item: { Type?: string; IsPlaceHolder?: boolean | null } | null,
     userId: string,
   ): Promise<boolean> {
-    // For now, assume all authenticated users can download
-    // In a real implementation, you would check user permissions
-    return true;
+    if (!item) return false;
+
+    try {
+      const response = await this.client.get(`/Users/${userId}`);
+      const policy = response.data?.Policy as
+        | { EnableMediaPlayback?: boolean; EnableContentDownloading?: boolean }
+        | undefined;
+
+      if (!policy) return true;
+
+      if (policy.EnableMediaPlayback === false) return false;
+      if (policy.EnableContentDownloading === false) return false;
+
+      return true;
+    } catch (error) {
+      void logger.warn(
+        "Unable to verify Jellyfin download permission; defaulting to allowed",
+        {
+          serviceId: this.config.id,
+          userId,
+          itemId: (item as { Id?: string }).Id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return true;
+    }
   }
 
   /**

@@ -17,7 +17,7 @@ import type { BazarrConnector } from "@/connectors/implementations/BazarrConnect
 import type { IConnector } from "@/connectors/base/IConnector";
 import {
   useConnectorsStore,
-  selectGetConnectorsByType,
+  selectConnectorsByType,
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 import { useRecentlyAdded } from "@/hooks/useRecentlyAdded";
@@ -937,7 +937,31 @@ function groupEventsByDay(events: TimelineEvent[]): TimelineDay[] {
 }
 
 export const useTimelineEvents = (filter?: TimelineFilter) => {
-  const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
+  const sonarrConnectors = useConnectorsStore(
+    selectConnectorsByType("sonarr"),
+  ) as SonarrConnector[];
+  const radarrConnectors = useConnectorsStore(
+    selectConnectorsByType("radarr"),
+  ) as RadarrConnector[];
+  const jellyseerrConnectors = useConnectorsStore(
+    selectConnectorsByType("jellyseerr"),
+  ) as JellyseerrConnector[];
+  const qbittorrentConnectors = useConnectorsStore(
+    selectConnectorsByType("qbittorrent"),
+  );
+  const transmissionConnectors = useConnectorsStore(
+    selectConnectorsByType("transmission"),
+  );
+  const delugeConnectors = useConnectorsStore(selectConnectorsByType("deluge"));
+  const sabnzbdConnectors = useConnectorsStore(
+    selectConnectorsByType("sabnzbd"),
+  );
+  const bazarrConnectors = useConnectorsStore(
+    selectConnectorsByType("bazarr"),
+  ) as BazarrConnector[];
+  const lidarrConnectors = useConnectorsStore(
+    selectConnectorsByType("lidarr"),
+  ) as LidarrConnector[];
   const { recentlyAdded } = useRecentlyAdded();
   const { services, isLoading: healthLoading } = useServicesHealth();
   const { releases } = useCalendar();
@@ -947,26 +971,6 @@ export const useTimelineEvents = (filter?: TimelineFilter) => {
     queryFn: async () => {
       const manager = ConnectorManager.getInstance();
       await manager.loadSavedServices();
-
-      const sonarrConnectors = getConnectorsByType(
-        "sonarr",
-      ) as SonarrConnector[];
-      const radarrConnectors = getConnectorsByType(
-        "radarr",
-      ) as RadarrConnector[];
-      const jellyseerrConnectors = getConnectorsByType(
-        "jellyseerr",
-      ) as JellyseerrConnector[];
-      const qbittorrentConnectors = getConnectorsByType("qbittorrent");
-      const transmissionConnectors = getConnectorsByType("transmission");
-      const delugeConnectors = getConnectorsByType("deluge");
-      const sabnzbdConnectors = getConnectorsByType("sabnzbd");
-      const bazarrConnectors = getConnectorsByType(
-        "bazarr",
-      ) as BazarrConnector[];
-      const lidarrConnectors = getConnectorsByType(
-        "lidarr",
-      ) as LidarrConnector[];
 
       const torrentConnectors = [
         ...qbittorrentConnectors,

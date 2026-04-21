@@ -1,14 +1,10 @@
-// no direct React hooks used
 import { useQuery } from "@tanstack/react-query";
 
-// types Series/Movie not directly needed here
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
-import type { IConnector } from "@/connectors/base/IConnector";
-import type { ServiceType } from "@/models/service.types";
 import {
   useConnectorsStore,
-  selectGetConnectorsByType,
+  selectConnectorsByType,
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 import { ConnectorManager } from "@/connectors/manager/ConnectorManager";
@@ -29,25 +25,21 @@ export type RecentlyAddedOverview = {
 };
 
 const fetchRecentlyAdded = async (
-  getConnectorsByType: (type: ServiceType) => IConnector[],
+  sonarrConnectors: SonarrConnector[],
+  radarrConnectors: RadarrConnector[],
 ): Promise<RecentlyAddedOverview> => {
-  const sonarrConnectors = getConnectorsByType("sonarr") as SonarrConnector[];
-  const radarrConnectors = getConnectorsByType("radarr") as RadarrConnector[];
-
   const recentlyAddedItems: RecentlyAddedItem[] = [];
 
-  // Get recently added series from Sonarr
   for (const connector of sonarrConnectors) {
     try {
       const series = await connector.getSeries();
 
-      // Filter series that have been added and sort by added date (most recent first)
       const recentSeries = series
         .filter((s) => s.added)
         .sort(
           (a, b) => new Date(b.added!).getTime() - new Date(a.added!).getTime(),
         )
-        .slice(0, 10); // Get 10 most recent
+        .slice(0, 10);
 
       for (const item of recentSeries) {
         recentlyAddedItems.push({
@@ -61,7 +53,6 @@ const fetchRecentlyAdded = async (
         });
       }
     } catch (error) {
-      // Skip this connector if it fails
       console.warn(
         `Failed to fetch series from ${connector.config.name}:`,
         error,
@@ -69,12 +60,10 @@ const fetchRecentlyAdded = async (
     }
   }
 
-  // Get recently added movies from Radarr
   for (const connector of radarrConnectors) {
     try {
       const movies = await connector.getMovies();
 
-      // Filter movies that have files (downloaded) and sort by file date (most recent first)
       const recentMovies = movies
         .filter((m) => m.movieFile?.dateAdded)
         .sort(
@@ -82,7 +71,7 @@ const fetchRecentlyAdded = async (
             new Date(b.movieFile!.dateAdded!).getTime() -
             new Date(a.movieFile!.dateAdded!).getTime(),
         )
-        .slice(0, 10); // Get 10 most recent
+        .slice(0, 10);
 
       for (const movie of recentMovies) {
         recentlyAddedItems.push({
@@ -96,7 +85,6 @@ const fetchRecentlyAdded = async (
         });
       }
     } catch (error) {
-      // Skip this connector if it fails
       console.warn(
         `Failed to fetch movies from ${connector.config.name}:`,
         error,
@@ -104,7 +92,6 @@ const fetchRecentlyAdded = async (
     }
   }
 
-  // Sort all items by added date (most recent first) and take top 20
   const sortedItems = recentlyAddedItems
     .sort(
       (a, b) =>
@@ -119,18 +106,22 @@ const fetchRecentlyAdded = async (
 };
 
 export const useRecentlyAdded = () => {
-  const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
+  const sonarrConnectors = useConnectorsStore(
+    selectConnectorsByType("sonarr"),
+  ) as SonarrConnector[];
+  const radarrConnectors = useConnectorsStore(
+    selectConnectorsByType("radarr"),
+  ) as RadarrConnector[];
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.activity.recentlyAdded,
     queryFn: async () => {
-      // Ensure connectors are loaded before fetching
       const manager = ConnectorManager.getInstance();
       await manager.loadSavedServices();
 
-      return fetchRecentlyAdded(getConnectorsByType);
+      return fetchRecentlyAdded(sonarrConnectors, radarrConnectors);
     },
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
-    staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
+    refetchInterval: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 

@@ -157,7 +157,14 @@ export abstract class BaseConnector<
       };
     } catch (error) {
       // Diagnose VPN-specific issues
-      const vpnIssues = diagnoseVpnIssues(error, this.config.type);
+      const vpnIssues = diagnoseVpnIssues(
+        error as {
+          code?: string;
+          message?: string;
+          response?: { status?: number };
+        },
+        this.config.type,
+      );
 
       const diagnostic = handleApiError(error, {
         serviceId: this.config.id,

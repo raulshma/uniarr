@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
@@ -9,10 +8,9 @@ import {
 
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
-import type { IConnector } from "@/connectors/base/IConnector";
 import type { Series } from "@/models/media.types";
 import { queryKeys } from "@/hooks/queryKeys";
 
@@ -102,39 +100,20 @@ export interface UseSonarrSeriesDetailsResult {
 
 const SONARR_SERVICE_TYPE = "sonarr";
 
-const ensureSonarrConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): SonarrConnector => {
-  const connector = getConnector(serviceId);
-  if (!connector || connector.config.type !== SONARR_SERVICE_TYPE) {
-    throw new Error(
-      `Sonarr connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as SonarrConnector;
-};
-
 export const useSonarrSeriesDetails = ({
   serviceId,
   seriesId,
 }: UseSonarrSeriesDetailsParams): UseSonarrSeriesDetailsResult => {
   const queryClient = useQueryClient();
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === SONARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(
-    () => ensureSonarrConnector(getConnector, serviceId),
-    [getConnector, serviceId],
-  );
+  const sonarrConnector = connector as SonarrConnector;
 
   const detailsQuery = useQuery({
     queryKey: queryKeys.sonarr.seriesDetail(serviceId, seriesId),
     queryFn: async () => {
-      const connector = resolveConnector();
-      return connector.getById(seriesId);
+      return sonarrConnector.getById(seriesId);
     },
     enabled: hasConnector && Number.isFinite(seriesId),
     staleTime: 2 * 60 * 1000,
@@ -147,8 +126,7 @@ export const useSonarrSeriesDetails = ({
       "monitor",
     ],
     mutationFn: async (nextState: boolean) => {
-      const connector = resolveConnector();
-      await connector.setMonitored(seriesId, nextState);
+      await sonarrConnector.setMonitored(seriesId, nextState);
     },
     onSuccess: async () => {
       await Promise.all([
@@ -177,8 +155,11 @@ export const useSonarrSeriesDetails = ({
       seasonNumber: number;
       nextState: boolean;
     }) => {
-      const connector = resolveConnector();
-      await connector.setSeasonMonitored(seriesId, seasonNumber, nextState);
+      await sonarrConnector.setSeasonMonitored(
+        seriesId,
+        seasonNumber,
+        nextState,
+      );
     },
     onSuccess: async () => {
       await Promise.all([
@@ -209,8 +190,7 @@ export const useSonarrSeriesDetails = ({
       episodeNumber: number;
       nextState: boolean;
     }) => {
-      const connector = resolveConnector();
-      await connector.setEpisodeMonitored(
+      await sonarrConnector.setEpisodeMonitored(
         seriesId,
         seasonNumber,
         episodeNumber,
@@ -238,8 +218,7 @@ export const useSonarrSeriesDetails = ({
       "search",
     ],
     mutationFn: async () => {
-      const connector = resolveConnector();
-      await connector.triggerSearch(seriesId);
+      await sonarrConnector.triggerSearch(seriesId);
     },
   });
 
@@ -249,8 +228,7 @@ export const useSonarrSeriesDetails = ({
       "searchMissing",
     ],
     mutationFn: async () => {
-      const connector = resolveConnector();
-      await connector.searchMissingEpisodes(seriesId);
+      await sonarrConnector.searchMissingEpisodes(seriesId);
     },
   });
 
@@ -266,10 +244,7 @@ export const useSonarrSeriesDetails = ({
       seasonNumber: number;
       episodeNumber: number;
     }) => {
-      const connector = resolveConnector();
-
-      // Fetch series to get the episode ID
-      const series = await connector.getById(seriesId);
+      const series = await sonarrConnector.getById(seriesId);
       const episode = series.seasons
         ?.flatMap((s) => s.episodes ?? [])
         .find(
@@ -282,8 +257,7 @@ export const useSonarrSeriesDetails = ({
         throw new Error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
       }
 
-      // Search using episodeIds with correct API format
-      await connector.searchEpisodesByIds([episode.id]);
+      await sonarrConnector.searchEpisodesByIds([episode.id]);
     },
   });
 
@@ -293,8 +267,7 @@ export const useSonarrSeriesDetails = ({
       "unmonitorAll",
     ],
     mutationFn: async () => {
-      const connector = resolveConnector();
-      await connector.unmonitorAllEpisodes(seriesId);
+      await sonarrConnector.unmonitorAllEpisodes(seriesId);
     },
     onSuccess: async () => {
       await Promise.all([
@@ -320,8 +293,7 @@ export const useSonarrSeriesDetails = ({
       deleteFiles?: boolean;
       addImportListExclusion?: boolean;
     }) => {
-      const connector = resolveConnector();
-      await connector.deleteSeries(seriesId, options);
+      await sonarrConnector.deleteSeries(seriesId, options);
     },
     onSuccess: async () => {
       await Promise.all([
@@ -347,8 +319,7 @@ export const useSonarrSeriesDetails = ({
       "deleteEpisodeFile",
     ],
     mutationFn: async (episodeFileId: number) => {
-      const connector = resolveConnector();
-      await connector.deleteEpisodeFile(episodeFileId);
+      await sonarrConnector.deleteEpisodeFile(episodeFileId);
     },
     onSuccess: async () => {
       await Promise.all([
@@ -379,10 +350,7 @@ export const useSonarrSeriesDetails = ({
       seasonNumber: number;
       episodeNumber: number;
     }) => {
-      const connector = resolveConnector();
-
-      // First, fetch series to get the episode ID
-      const series = await connector.getById(seriesId);
+      const series = await sonarrConnector.getById(seriesId);
       const episode = series.seasons
         ?.flatMap((s) => s.episodes ?? [])
         .find(
@@ -395,28 +363,20 @@ export const useSonarrSeriesDetails = ({
         throw new Error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
       }
 
-      // Delete the episode file
-      await connector.deleteEpisodeFile(episodeFileId);
-      // Wait
+      await sonarrConnector.deleteEpisodeFile(episodeFileId);
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      // Ensure the episode is monitored
-      await connector.setEpisodeMonitored(
+      await sonarrConnector.setEpisodeMonitored(
         seriesId,
         seasonNumber,
         episodeNumber,
         true,
       );
 
-      // Search for the episode BEFORE deleting the file using episodeIds
-      // This ensures the search command works while episode is in valid state
-      await connector.searchEpisodesByIds([episode.id]);
+      await sonarrConnector.searchEpisodesByIds([episode.id]);
 
-      // Wait for deletion to complete
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Re-monitor the episode after deletion
-      // (Sonarr automatically unmonitors episodes when their files are deleted)
-      await connector.setEpisodeMonitored(
+      await sonarrConnector.setEpisodeMonitored(
         seriesId,
         seasonNumber,
         episodeNumber,

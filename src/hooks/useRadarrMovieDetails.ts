@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import {
   useMutation,
   useQuery,
@@ -9,10 +8,9 @@ import {
 
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
 import type { RadarrConnector } from "@/connectors/implementations/RadarrConnector";
-import type { IConnector } from "@/connectors/base/IConnector";
 import type { Movie } from "@/models/movie.types";
 import { queryKeys } from "@/hooks/queryKeys";
 
@@ -52,39 +50,20 @@ export interface UseRadarrMovieDetailsResult {
 
 const RADARR_SERVICE_TYPE = "radarr";
 
-const ensureRadarrConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): RadarrConnector => {
-  const connector = getConnector(serviceId);
-  if (!connector || connector.config.type !== RADARR_SERVICE_TYPE) {
-    throw new Error(
-      `Radarr connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as RadarrConnector;
-};
-
 export const useRadarrMovieDetails = ({
   serviceId,
   movieId,
 }: UseRadarrMovieDetailsParams): UseRadarrMovieDetailsResult => {
   const queryClient = useQueryClient();
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === RADARR_SERVICE_TYPE;
 
-  const resolveConnector = useCallback(
-    () => ensureRadarrConnector(getConnector, serviceId),
-    [getConnector, serviceId],
-  );
+  const radarrConnector = connector as RadarrConnector;
 
   const detailsQuery = useQuery({
     queryKey: queryKeys.radarr.movieDetail(serviceId, movieId),
     queryFn: async () => {
-      const connector = resolveConnector();
-      return connector.getById(movieId);
+      return radarrConnector.getById(movieId);
     },
     enabled: hasConnector && Number.isFinite(movieId),
     staleTime: 2 * 60 * 1000,
@@ -97,8 +76,7 @@ export const useRadarrMovieDetails = ({
       "monitor",
     ],
     mutationFn: async (nextState: boolean) => {
-      const connector = resolveConnector();
-      await connector.setMonitored(movieId, nextState);
+      await radarrConnector.setMonitored(movieId, nextState);
     },
     onSuccess: async () => {
       await Promise.all([
@@ -121,8 +99,7 @@ export const useRadarrMovieDetails = ({
       "search",
     ],
     mutationFn: async () => {
-      const connector = resolveConnector();
-      await connector.triggerSearch(movieId);
+      await radarrConnector.triggerSearch(movieId);
     },
   });
 
@@ -135,8 +112,7 @@ export const useRadarrMovieDetails = ({
       deleteFiles?: boolean;
       addImportListExclusion?: boolean;
     }) => {
-      const connector = resolveConnector();
-      await connector.deleteMovie(movieId, options);
+      await radarrConnector.deleteMovie(movieId, options);
     },
     onSuccess: async () => {
       await Promise.all([

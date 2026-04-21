@@ -52,7 +52,8 @@ const DISCOVER_TV_ENDPOINT = `${API_PREFIX}/discover/tv`;
 const DISCOVER_MOVIES_ENDPOINT = `${API_PREFIX}/discover/movies`;
 const STATUS_ENDPOINT = `${API_PREFIX}/status`;
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original";
-const ANIME_GENRE_ID = 16; // Animation genre in TMDB
+const ANIME_GENRE_ID = 16;
+const ENRICHMENT_CONCURRENCY = 4;
 
 type ApiPagination = components["schemas"]["PageInfo"];
 
@@ -497,112 +498,129 @@ export class JellyseerrConnector extends BaseConnector<
       let requests = mapPagedRequests(response.data);
 
       if (requests.items.length > 0) {
-        const enrichedResults = await Promise.all(
-          requests.items.map(async (request: JellyseerrRequest) => {
-            try {
-              const requestDetails =
-                await this.getWithRetry<RequestDetailsResponse>(
-                  `${REQUEST_ENDPOINT}/${request.id}`,
-                  undefined,
-                  "getRequestDetails",
+        const enrichedResults: {
+          requestId: number;
+          mediaDetails: JellyseerrMediaSummary;
+        }[] = [];
+
+        for (
+          let i = 0;
+          i < requests.items.length;
+          i += ENRICHMENT_CONCURRENCY
+        ) {
+          const batch = requests.items.slice(i, i + ENRICHMENT_CONCURRENCY);
+
+          const batchResults = await Promise.all(
+            batch.map(async (request: JellyseerrRequest) => {
+              try {
+                const requestDetails =
+                  await this.getWithRetry<RequestDetailsResponse>(
+                    `${REQUEST_ENDPOINT}/${request.id}`,
+                    undefined,
+                    "getRequestDetails",
+                  );
+
+                const requestPayload = requestDetails.data as ApiRequest & {
+                  readonly mediaType?: string;
+                  readonly type?: string;
+                  readonly mediaId?: number;
+                };
+                const media = requestPayload.media as ApiMedia | undefined;
+                const tmdbId =
+                  typeof media?.tmdbId === "number" ? media.tmdbId : undefined;
+                const fallbackId =
+                  typeof requestPayload.mediaId === "number"
+                    ? requestPayload.mediaId
+                    : typeof media?.id === "number"
+                      ? media.id
+                      : undefined;
+                const mediaId = tmdbId ?? fallbackId;
+
+                if (typeof mediaId !== "number") {
+                  void logger.warn(
+                    "Missing Jellyseerr media identifier; skipping enrichment",
+                    {
+                      location: "JellyseerrConnector.getRequests",
+                      requestId: request.id,
+                      serviceId: this.config.id,
+                    },
+                  );
+                  return null;
+                }
+
+                const candidates: (string | undefined)[] = [
+                  requestPayload.mediaType,
+                  requestPayload.type,
+                  media?.mediaType,
+                  (media as { readonly type?: string } | undefined)?.type,
+                ];
+
+                let mediaType: "movie" | "tv" | undefined;
+                for (const candidate of candidates) {
+                  if (candidate === "movie" || candidate === "tv") {
+                    mediaType = candidate;
+                    break;
+                  }
+                }
+
+                if (!mediaType) {
+                  if (
+                    typeof media?.firstAirDate === "string" ||
+                    typeof media?.name === "string" ||
+                    typeof media?.originalName === "string"
+                  ) {
+                    mediaType = "tv";
+                  } else if (
+                    typeof media?.releaseDate === "string" ||
+                    typeof media?.title === "string" ||
+                    typeof media?.originalTitle === "string"
+                  ) {
+                    mediaType = "movie";
+                  }
+                }
+
+                if (!mediaType) {
+                  void logger.warn(
+                    "Unable to determine Jellyseerr media type for request; skipping enrichment",
+                    {
+                      location: "JellyseerrConnector.getRequests",
+                      requestId: request.id,
+                      mediaId,
+                      serviceId: this.config.id,
+                    },
+                  );
+                  return null;
+                }
+
+                const mediaDetails = await this.getMediaDetails(
+                  mediaId,
+                  mediaType,
                 );
 
-              const requestPayload = requestDetails.data as ApiRequest & {
-                readonly mediaType?: string;
-                readonly type?: string;
-                readonly mediaId?: number;
-              };
-              const media = requestPayload.media as ApiMedia | undefined;
-              const tmdbId =
-                typeof media?.tmdbId === "number" ? media.tmdbId : undefined;
-              const fallbackId =
-                typeof requestPayload.mediaId === "number"
-                  ? requestPayload.mediaId
-                  : typeof media?.id === "number"
-                    ? media.id
-                    : undefined;
-              const mediaId = tmdbId ?? fallbackId;
-
-              if (typeof mediaId !== "number") {
-                void logger.warn(
-                  "Missing Jellyseerr media identifier; skipping enrichment",
-                  {
-                    location: "JellyseerrConnector.getRequests",
-                    requestId: request.id,
-                    serviceId: this.config.id,
-                  },
-                );
+                return {
+                  requestId: request.id,
+                  mediaDetails,
+                };
+              } catch (detailsError) {
+                void logger.warn("Failed to fetch request details", {
+                  requestId: request.id,
+                  error: detailsError,
+                });
                 return null;
               }
+            }),
+          );
 
-              const candidates: (string | undefined)[] = [
-                requestPayload.mediaType,
-                requestPayload.type,
-                media?.mediaType,
-                (media as { readonly type?: string } | undefined)?.type,
-              ];
-
-              let mediaType: "movie" | "tv" | undefined;
-              for (const candidate of candidates) {
-                if (candidate === "movie" || candidate === "tv") {
-                  mediaType = candidate;
-                  break;
-                }
-              }
-
-              if (!mediaType) {
-                if (
-                  typeof media?.firstAirDate === "string" ||
-                  typeof media?.name === "string" ||
-                  typeof media?.originalName === "string"
-                ) {
-                  mediaType = "tv";
-                } else if (
-                  typeof media?.releaseDate === "string" ||
-                  typeof media?.title === "string" ||
-                  typeof media?.originalTitle === "string"
-                ) {
-                  mediaType = "movie";
-                }
-              }
-
-              if (!mediaType) {
-                void logger.warn(
-                  "Unable to determine Jellyseerr media type for request; skipping enrichment",
-                  {
-                    location: "JellyseerrConnector.getRequests",
-                    requestId: request.id,
-                    mediaId,
-                    serviceId: this.config.id,
-                  },
-                );
-                return null;
-              }
-
-              const mediaDetails = await this.getMediaDetails(
-                mediaId,
-                mediaType,
-              );
-
-              return {
-                requestId: request.id,
-                mediaDetails,
-              };
-            } catch (detailsError) {
-              void logger.warn("Failed to fetch request details", {
-                requestId: request.id,
-                error: detailsError,
-              });
-              return null;
+          for (const result of batchResults) {
+            if (result) {
+              enrichedResults.push(result);
             }
-          }),
-        );
+          }
+        }
 
         const mediaDetailsMap = new Map<number, JellyseerrMediaSummary>();
         for (const result of enrichedResults) {
-          if (result) {
-            mediaDetailsMap.set(result.requestId, result.mediaDetails);
-          }
+          mediaDetailsMap.set(result.requestId, result.mediaDetails);
         }
 
         if (mediaDetailsMap.size > 0) {
@@ -854,7 +872,7 @@ export class JellyseerrConnector extends BaseConnector<
 
     try {
       const params: Record<string, string | number> = {
-        query: encodeURIComponent(trimmedQuery),
+        query: trimmedQuery,
       };
 
       // Only add page if it's a valid positive number

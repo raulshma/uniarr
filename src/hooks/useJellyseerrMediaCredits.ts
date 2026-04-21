@@ -1,10 +1,9 @@
-// no direct React hooks used
 import { useQuery } from "@tanstack/react-query";
 
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
 import { queryKeys } from "@/hooks/queryKeys";
 
@@ -20,8 +19,8 @@ export const useJellyseerrMediaCredits = (
   mediaType: "movie" | "tv",
   mediaId?: number,
 ) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId) as JellyseerrConnector | undefined;
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
+  const jellyseerrConnector = connector as JellyseerrConnector | undefined;
   const enabled = Boolean(connector && mediaId);
 
   return useQuery<MappedCreditPerson[], Error>({
@@ -33,8 +32,9 @@ export const useJellyseerrMediaCredits = (
     enabled,
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      if (!connector || !mediaId) throw new Error("Connector not found");
-      return connector.getMediaCredits(mediaId, mediaType);
+      if (!jellyseerrConnector || !mediaId)
+        throw new Error("Connector not found");
+      return jellyseerrConnector.getMediaCredits(mediaId, mediaType);
     },
   });
 };

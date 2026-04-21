@@ -182,6 +182,8 @@ export class TmdbConnector {
 
   private readonly useBearerAuth: boolean;
 
+  private disposed = false;
+
   constructor(credential: string) {
     if (!credential || !credential.trim()) {
       throw new Error("TMDB credential is required");
@@ -190,6 +192,13 @@ export class TmdbConnector {
     this.credential = normalizeCredential(credential);
     this.useBearerAuth = looksLikeV4Token(this.credential);
     this.client = this.createHttpClient();
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.client.interceptors.request.clear();
+    this.client.interceptors.response.clear();
   }
 
   private createHttpClient(): AxiosInstance {

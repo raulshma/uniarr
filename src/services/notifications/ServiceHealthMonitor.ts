@@ -96,7 +96,7 @@ class ServiceHealthMonitor {
 
       const shouldNotifyStatusChanges = this.hasCompletedInitialCheck;
 
-      await Promise.all(
+      await Promise.allSettled(
         connectors.map(async (connector) => {
           try {
             const health = await connector.getHealth();

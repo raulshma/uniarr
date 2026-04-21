@@ -3,7 +3,7 @@ import type { RadarrConnector } from "@/connectors/implementations/RadarrConnect
 import type { SonarrConnector } from "@/connectors/implementations/SonarrConnector";
 import {
   useConnectorsStore,
-  selectGetConnectorsByType,
+  selectConnectorsByType,
 } from "@/store/connectorsStore";
 import { logger } from "@/services/logger/LoggerService";
 import type { DiscoverMediaKind } from "@/models/discover.types";
@@ -34,7 +34,8 @@ interface CheckInLibraryParams {
 
 const checkItemInLibrary = async (
   params: CheckInLibraryParams,
-  getConnectorsByType: ReturnType<typeof selectGetConnectorsByType>,
+  radarrConnectors: RadarrConnector[],
+  sonarrConnectors: SonarrConnector[],
 ): Promise<FoundService[]> => {
   const { tmdbId, tvdbId, sourceId, mediaType, enabled = true } = params;
 
@@ -50,15 +51,10 @@ const checkItemInLibrary = async (
 
   try {
     if (mediaType === "movie") {
-      const radarrConnectors = getConnectorsByType(
-        "radarr",
-      ) as RadarrConnector[];
-
       for (const connector of radarrConnectors) {
         try {
           const movies = await connector.getMovies();
           for (const movie of movies) {
-            // Match by tmdbId (movies don't have tvdbId)
             if (tmdbId && movie.tmdbId === tmdbId) {
               foundServices.push({
                 serviceId: connector.config.id,
@@ -66,7 +62,7 @@ const checkItemInLibrary = async (
                 connectorType: "radarr",
                 remoteId: movie.id,
               });
-              break; // Found in this service, move to next
+              break;
             }
           }
         } catch (error) {
@@ -77,15 +73,10 @@ const checkItemInLibrary = async (
         }
       }
     } else if (mediaType === "series") {
-      const sonarrConnectors = getConnectorsByType(
-        "sonarr",
-      ) as SonarrConnector[];
-
       for (const connector of sonarrConnectors) {
         try {
           const series = await connector.getSeries();
           for (const item of series) {
-            // Match by tmdbId or tvdbId
             if (
               (tmdbId && item.tmdbId === tmdbId) ||
               (tvdbId && item.tvdbId === tvdbId)
@@ -96,7 +87,7 @@ const checkItemInLibrary = async (
                 connectorType: "sonarr",
                 remoteId: item.id,
               });
-              break; // Found in this service, move to next
+              break;
             }
           }
         } catch (error) {
@@ -119,15 +110,15 @@ const checkItemInLibrary = async (
   return foundServices;
 };
 
-/**
- * Hook to lazily check if a discover item is already in a user's Radarr/Sonarr library.
- * Performs the check when the hook mounts or when dependencies change.
- * Returns matching services and their remote IDs for navigation or display.
- */
 export const useCheckInLibrary = (
   params: CheckInLibraryParams,
 ): UseCheckInLibraryResult => {
-  const getConnectorsByType = useConnectorsStore(selectGetConnectorsByType);
+  const radarrConnectors = useConnectorsStore(
+    selectConnectorsByType("radarr"),
+  ) as RadarrConnector[];
+  const sonarrConnectors = useConnectorsStore(
+    selectConnectorsByType("sonarr"),
+  ) as SonarrConnector[];
 
   const query = useQuery({
     queryKey: queryKeys.library.checkInLibrary({
@@ -136,7 +127,8 @@ export const useCheckInLibrary = (
       imdbId: params.sourceId,
       mediaType: params.mediaType,
     }),
-    queryFn: async () => checkItemInLibrary(params, getConnectorsByType),
+    queryFn: async () =>
+      checkItemInLibrary(params, radarrConnectors, sonarrConnectors),
     enabled: params.enabled !== false,
     ...QUERY_CONFIG.LIBRARY_CHECK,
   });

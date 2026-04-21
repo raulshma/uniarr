@@ -106,7 +106,20 @@ export async function testServiceAccessibility(
 /**
  * Diagnose VPN connectivity issues
  */
-export function diagnoseVpnIssues(error: any, serviceType: string): string[] {
+export function diagnoseVpnIssues(
+  error:
+    | {
+        code?: string;
+        message?: string;
+        status?: number;
+        response?: { status?: number };
+      }
+    | null
+    | undefined,
+  serviceType: string,
+): string[] {
+  if (!error) return [];
+
   const issues: string[] = [];
 
   if (error.code === "ECONNREFUSED") {

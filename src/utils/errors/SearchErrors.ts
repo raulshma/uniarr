@@ -9,7 +9,7 @@ export class SearchError extends Error {
   constructor(
     message: string,
     public code: string,
-    public details?: Record<string, any>,
+    public details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "SearchError";
@@ -20,7 +20,7 @@ export class SearchError extends Error {
  * Invalid API key error
  */
 export class InvalidApiKeyError extends SearchError {
-  constructor(provider: string, details?: Record<string, any>) {
+  constructor(provider: string, details?: Record<string, unknown>) {
     super(
       `Invalid API key for provider: ${provider}`,
       "INVALID_API_KEY",
@@ -34,7 +34,7 @@ export class InvalidApiKeyError extends SearchError {
  * Network error during search
  */
 export class SearchNetworkError extends SearchError {
-  constructor(message: string, details?: Record<string, any>) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super(message, "NETWORK_ERROR", details);
     this.name = "SearchNetworkError";
   }
@@ -46,7 +46,7 @@ export class SearchNetworkError extends SearchError {
 export class RateLimitError extends SearchError {
   constructor(
     public retryAfterMs: number,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
   ) {
     super(
       `Rate limit exceeded. Retry after ${retryAfterMs}ms`,
@@ -64,7 +64,7 @@ export class ServiceUnavailableError extends SearchError {
   constructor(
     serviceId: string,
     message?: string,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
   ) {
     super(
       message || `Service ${serviceId} is unavailable`,
@@ -79,7 +79,7 @@ export class ServiceUnavailableError extends SearchError {
  * Invalid query format error
  */
 export class InvalidQueryError extends SearchError {
-  constructor(message: string, details?: Record<string, any>) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super(message, "INVALID_QUERY", details);
     this.name = "InvalidQueryError";
   }
@@ -92,7 +92,7 @@ export class SearchTimeoutError extends SearchError {
   constructor(
     public timeoutMs: number,
     serviceId?: string,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
   ) {
     super(
       `Search timed out after ${timeoutMs}ms${serviceId ? ` for service ${serviceId}` : ""}`,
@@ -111,7 +111,7 @@ export class SearchProviderError extends SearchError {
     provider: string,
     public statusCode?: number,
     message?: string,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
   ) {
     super(
       message || `Provider ${provider} returned an error`,
@@ -126,7 +126,7 @@ export class SearchProviderError extends SearchError {
  * No results found error
  */
 export class NoResultsError extends SearchError {
-  constructor(query: string, details?: Record<string, any>) {
+  constructor(query: string, details?: Record<string, unknown>) {
     super(`No results found for query: "${query}"`, "NO_RESULTS", details);
     this.name = "NoResultsError";
   }
@@ -139,7 +139,7 @@ export class UnknownSearchError extends SearchError {
   constructor(
     message: string,
     originalError?: Error,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
   ) {
     super(`Unknown search error: ${message}`, "UNKNOWN_ERROR", {
       ...details,

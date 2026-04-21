@@ -235,36 +235,3 @@ export function createQueryConfig(
   const baseConfig = QUERY_CONFIG[baseType];
   return { ...baseConfig, ...overrides };
 }
-
-/**
- * Common query key patterns
- */
-export const QUERY_KEYS = {
-  // Calendar
-  CALENDAR: ["calendar"] as const,
-  CALENDAR_RANGE: (start: string, end: string) =>
-    ["calendar", { start, end }] as const,
-
-  // Services
-  SERVICES: ["services"] as const,
-  SERVICE_HEALTH: (serviceId: string) =>
-    ["services", serviceId, "health"] as const,
-
-  // Queue/Torrents
-  QUEUE: ["queue"] as const,
-  QUEUE_SERVICE: (serviceId: string) => ["queue", serviceId] as const,
-  TORRENTS: ["torrents"] as const,
-  TORRENTS_SERVICE: (serviceId: string) => ["torrents", serviceId] as const,
-
-  // Search
-  SEARCH: ["search"] as const,
-  SEARCH_HISTORY: ["search", "history"] as const,
-
-  // Metadata
-  TMDB_GENRES: ["tmdb", "genres"] as const,
-  TMDB_DETAILS: (mediaType: string, tmdbId: number) =>
-    ["tmdb", mediaType, tmdbId] as const,
-
-  // Notifications
-  NOTIFICATIONS: ["notifications"] as const,
-} as const;

@@ -1,45 +1,27 @@
-// no direct React hooks used
 import { useQuery } from "@tanstack/react-query";
 
 import type { JellyfinConnector } from "@/connectors/implementations/JellyfinConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 import type { JellyfinLibraryView } from "@/models/jellyfin.types";
 
-const ensureConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): JellyfinConnector => {
-  const connector = getConnector(serviceId);
-
-  if (!connector || connector.config.type !== "jellyfin") {
-    throw new Error(
-      `Jellyfin connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as JellyfinConnector;
-};
-
 export const useJellyfinLibraries = (serviceId: string | undefined) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
+  const connector = useConnectorsStore(selectConnectorById(serviceId ?? ""));
 
   return useQuery<JellyfinLibraryView[]>({
     queryKey: serviceId
       ? queryKeys.jellyfin.libraries(serviceId)
       : queryKeys.jellyfin.base,
-    enabled: Boolean(serviceId),
+    enabled: Boolean(serviceId && connector?.config.type === "jellyfin"),
     queryFn: async () => {
-      if (!serviceId) {
+      if (!serviceId || !connector || connector.config.type !== "jellyfin") {
         return [];
       }
 
-      const connector = ensureConnector(getConnector, serviceId);
-      return connector.getLibraries();
+      return (connector as JellyfinConnector).getLibraries();
     },
   });
 };

@@ -151,11 +151,10 @@ export class DelugeConnector extends BaseConnector<Torrent> {
     status?: string;
   }): Promise<Torrent[]> {
     try {
-      // Get all torrent hashes first
-      const hashesResponse = await this.rpcRequest<DelugeResponse<string[]>>(
+      const response = await this.rpcRequest<DelugeTorrentsResponse>(
         "core.get_torrents_status",
         [
-          {}, // Empty filter to get all torrents
+          {},
           [
             "name",
             "hash",
@@ -181,43 +180,13 @@ export class DelugeConnector extends BaseConnector<Torrent> {
         ],
       );
 
-      const hashes = Object.keys(hashesResponse.result);
-      if (hashes.length === 0) {
+      const torrents = response.result;
+      if (!torrents || Object.keys(torrents).length === 0) {
         return [];
       }
 
-      // Get detailed info for all torrents
-      const detailsResponse = await this.rpcRequest<DelugeTorrentsResponse>(
-        "core.get_torrents_status",
-        [
-          { id: hashes }, // Filter by specific hashes
-          [
-            "name",
-            "hash",
-            "state",
-            "progress",
-            "total_size",
-            "total_downloaded",
-            "total_uploaded",
-            "download_payload_rate",
-            "upload_payload_rate",
-            "eta",
-            "time_added",
-            "completed_time",
-            "seeding_time",
-            "last_seen_complete",
-            "num_seeds",
-            "total_seeds",
-            "num_peers",
-            "total_peers",
-            "ratio",
-            "distributed_copies",
-          ],
-        ],
-      );
-
-      return Object.values(detailsResponse.result).map(
-        (torrent: DelugeTorrent) => this.mapTorrent(torrent),
+      return Object.values(torrents).map((torrent: DelugeTorrent) =>
+        this.mapTorrent(torrent),
       );
     } catch (error) {
       throw handleApiError(error, {

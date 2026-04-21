@@ -4,9 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { JellyseerrConnector } from "@/connectors/implementations/JellyseerrConnector";
 import {
   useConnectorsStore,
-  selectGetConnector,
+  selectConnectorById,
 } from "@/store/connectorsStore";
-import type { IConnector } from "@/connectors/base/IConnector";
 import { queryKeys } from "@/hooks/queryKeys";
 import type { components } from "@/connectors/client-schemas/jellyseerr-openapi";
 type JellyseerrSearchResult =
@@ -20,21 +19,6 @@ type JellyseerrPagedResult<T> = {
 
 const JELLYSEERR_SERVICE_TYPE = "jellyseerr";
 
-const ensureConnector = (
-  getConnector: (id: string) => IConnector | undefined,
-  serviceId: string,
-): JellyseerrConnector => {
-  const connector = getConnector(serviceId);
-
-  if (!connector || connector.config.type !== JELLYSEERR_SERVICE_TYPE) {
-    throw new Error(
-      `Jellyseerr connector not registered for service ${serviceId}.`,
-    );
-  }
-
-  return connector as JellyseerrConnector;
-};
-
 interface UseAnimeDiscoverOptions {
   serviceId: string;
   page?: number;
@@ -46,18 +30,18 @@ export const useAnimeRecommendations = ({
   page = 1,
   enabled = true,
 }: UseAnimeDiscoverOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
 
   return useQuery<JellyseerrPagedResult<JellyseerrSearchResult>, Error>({
     queryKey: queryKeys.jellyseerr.animeRecommendations(serviceId, page),
     queryFn: async () => {
-      const jellyseerrConnector = ensureConnector(getConnector, serviceId);
-      return jellyseerrConnector.getAnimeRecommendations({ page });
+      return (connector as JellyseerrConnector).getAnimeRecommendations({
+        page,
+      });
     },
     enabled: hasConnector && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };
@@ -67,18 +51,16 @@ export const useAnimeUpcoming = ({
   page = 1,
   enabled = true,
 }: UseAnimeDiscoverOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
 
   return useQuery<JellyseerrPagedResult<JellyseerrSearchResult>, Error>({
     queryKey: queryKeys.jellyseerr.animeUpcoming(serviceId, page),
     queryFn: async () => {
-      const jellyseerrConnector = ensureConnector(getConnector, serviceId);
-      return jellyseerrConnector.getAnimeUpcoming({ page });
+      return (connector as JellyseerrConnector).getAnimeUpcoming({ page });
     },
     enabled: hasConnector && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };
@@ -88,18 +70,16 @@ export const useTrendingAnime = ({
   page = 1,
   enabled = true,
 }: UseAnimeDiscoverOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
 
   return useQuery<JellyseerrPagedResult<JellyseerrSearchResult>, Error>({
     queryKey: queryKeys.jellyseerr.trendingAnime(serviceId, page),
     queryFn: async () => {
-      const jellyseerrConnector = ensureConnector(getConnector, serviceId);
-      return jellyseerrConnector.getTrendingAnime({ page });
+      return (connector as JellyseerrConnector).getTrendingAnime({ page });
     },
     enabled: hasConnector && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };
@@ -109,18 +89,16 @@ export const useAnimeMovies = ({
   page = 1,
   enabled = true,
 }: UseAnimeDiscoverOptions) => {
-  const getConnector = useConnectorsStore(selectGetConnector);
-  const connector = getConnector(serviceId);
+  const connector = useConnectorsStore(selectConnectorById(serviceId));
   const hasConnector = connector?.config.type === JELLYSEERR_SERVICE_TYPE;
 
   return useQuery<JellyseerrPagedResult<JellyseerrSearchResult>, Error>({
     queryKey: queryKeys.jellyseerr.animeMovies(serviceId, page),
     queryFn: async () => {
-      const jellyseerrConnector = ensureConnector(getConnector, serviceId);
-      return jellyseerrConnector.getAnimeMovies({ page });
+      return (connector as JellyseerrConnector).getAnimeMovies({ page });
     },
     enabled: hasConnector && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };
