@@ -4,21 +4,38 @@ import { storageAdapter } from "@/services/storage/StorageAdapter";
 const MUTATION_QUEUE_KEY = "MutationQueue_pending";
 const MUTATION_QUEUE_INDEX_KEY = "MutationQueue_index";
 
-interface QueuedMutation {
+interface PersistedQueuedMutation {
   id: string;
   timestamp: number;
   queryKey: readonly unknown[];
-  mutationFn: () => Promise<unknown>;
   variables?: unknown;
+  operationKey?: string;
+  payload?: unknown;
   retryCount: number;
   maxRetries: number;
 }
+
+export interface QueuedMutation extends PersistedQueuedMutation {
+  mutationFn?: () => Promise<unknown>;
+}
+
+export type MutationHandler = (
+  payload: unknown,
+  variables?: unknown,
+) => Promise<unknown>;
+
+type AddQueuedMutationInput = Omit<
+  QueuedMutation,
+  "id" | "timestamp" | "retryCount"
+>;
 
 class MutationQueueService {
   private static instance: MutationQueueService | null = null;
   private isInitialized = false;
   private queue: QueuedMutation[] = [];
   private processingQueue = false;
+  private runtimeMutationFns = new Map<string, () => Promise<unknown>>();
+  private mutationHandlers = new Map<string, MutationHandler>();
 
   static getInstance(): MutationQueueService {
     if (!MutationQueueService.instance) {
@@ -41,6 +58,18 @@ class MutationQueueService {
         );
 
         this.queue = mutations.filter((m) => m !== null) as QueuedMutation[];
+
+        // Clean up malformed entries from index/storage so we don't repeatedly
+        // attempt to hydrate invalid payloads.
+        const hydratedIds = new Set(this.queue.map((mutation) => mutation.id));
+        const staleIds = ids.filter((id) => !hydratedIds.has(id));
+
+        if (staleIds.length > 0) {
+          await Promise.all(
+            staleIds.map((id) => this.removeStoredMutation(id)),
+          );
+          await this.persistIndex();
+        }
       }
 
       this.isInitialized = true;
@@ -58,10 +87,29 @@ class MutationQueueService {
     }
   }
 
-  async addMutation(
-    mutation: Omit<QueuedMutation, "id" | "timestamp" | "retryCount">,
-  ): Promise<string> {
+  registerMutationHandler(
+    operationKey: string,
+    handler: MutationHandler,
+  ): void {
+    this.mutationHandlers.set(operationKey, handler);
+  }
+
+  unregisterMutationHandler(operationKey: string): void {
+    this.mutationHandlers.delete(operationKey);
+  }
+
+  clearMutationHandlers(): void {
+    this.mutationHandlers.clear();
+  }
+
+  async addMutation(mutation: AddQueuedMutationInput): Promise<string> {
     await this.ensureInitialized();
+
+    if (typeof mutation.mutationFn !== "function" && !mutation.operationKey) {
+      throw new Error(
+        "Queued mutation requires either mutationFn or operationKey",
+      );
+    }
 
     const id = `mutation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -71,6 +119,10 @@ class MutationQueueService {
       timestamp: Date.now(),
       retryCount: 0,
     };
+
+    if (typeof mutation.mutationFn === "function") {
+      this.runtimeMutationFns.set(id, mutation.mutationFn);
+    }
 
     this.queue.push(queuedMutation);
     await this.persistMutation(queuedMutation);
@@ -96,6 +148,7 @@ class MutationQueueService {
     const index = this.queue.findIndex((m) => m.id === id);
     if (index !== -1) {
       this.queue.splice(index, 1);
+      this.runtimeMutationFns.delete(id);
       await this.removeStoredMutation(id);
       await this.persistIndex();
 
@@ -130,10 +183,36 @@ class MutationQueueService {
     await storageAdapter.removeItem(MUTATION_QUEUE_INDEX_KEY);
 
     this.queue = [];
+    this.runtimeMutationFns.clear();
 
     await logger.info("Mutation queue cleared", {
       location: "MutationQueueService.clearQueue",
     });
+  }
+
+  resolveMutationExecutor(
+    mutation: Pick<
+      QueuedMutation,
+      "id" | "mutationFn" | "operationKey" | "payload" | "variables"
+    >,
+  ): (() => Promise<unknown>) | null {
+    if (typeof mutation.mutationFn === "function") {
+      return mutation.mutationFn;
+    }
+
+    const runtimeMutation = this.runtimeMutationFns.get(mutation.id);
+    if (typeof runtimeMutation === "function") {
+      return runtimeMutation;
+    }
+
+    if (mutation.operationKey) {
+      const handler = this.mutationHandlers.get(mutation.operationKey);
+      if (handler) {
+        return () => handler(mutation.payload, mutation.variables);
+      }
+    }
+
+    return null;
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -144,9 +223,20 @@ class MutationQueueService {
 
   private async persistMutation(mutation: QueuedMutation): Promise<void> {
     try {
+      const persisted: PersistedQueuedMutation = {
+        id: mutation.id,
+        timestamp: mutation.timestamp,
+        queryKey: mutation.queryKey,
+        variables: mutation.variables,
+        operationKey: mutation.operationKey,
+        payload: mutation.payload,
+        retryCount: mutation.retryCount,
+        maxRetries: mutation.maxRetries,
+      };
+
       await storageAdapter.setItem(
         this.getMutationKey(mutation.id),
-        JSON.stringify(mutation),
+        JSON.stringify(persisted),
       );
     } catch (error) {
       await logger.error("Failed to persist mutation", {
@@ -179,17 +269,35 @@ class MutationQueueService {
         return null;
       }
 
-      const parsed = JSON.parse(stored) as QueuedMutation;
-      // Validate that the mutation function exists and is callable
-      if (typeof parsed.mutationFn !== "function") {
-        await logger.warn("Invalid mutation function in stored mutation", {
+      const parsed = JSON.parse(stored) as Partial<PersistedQueuedMutation>;
+
+      if (
+        typeof parsed.id !== "string" ||
+        typeof parsed.timestamp !== "number" ||
+        !Array.isArray(parsed.queryKey) ||
+        typeof parsed.retryCount !== "number" ||
+        typeof parsed.maxRetries !== "number"
+      ) {
+        await logger.warn("Invalid persisted queued mutation payload", {
           location: "MutationQueueService.getStoredMutation",
           mutationId: id,
         });
         return null;
       }
 
-      return parsed;
+      return {
+        id: parsed.id,
+        timestamp: parsed.timestamp,
+        queryKey: parsed.queryKey,
+        variables: parsed.variables,
+        operationKey:
+          typeof parsed.operationKey === "string"
+            ? parsed.operationKey
+            : undefined,
+        payload: parsed.payload,
+        retryCount: parsed.retryCount,
+        maxRetries: parsed.maxRetries,
+      };
     } catch (error) {
       await logger.error("Failed to get stored mutation", {
         location: "MutationQueueService.getStoredMutation",

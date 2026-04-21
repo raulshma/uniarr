@@ -56,6 +56,11 @@ class ApiLoggerService {
 
   private isRunning = false;
 
+  private dirtyEntryIds: Record<PersistKind, Set<string>> = {
+    error: new Set(),
+    ai: new Set(),
+  };
+
   static getInstance(): ApiLoggerService {
     if (!ApiLoggerService.instance) {
       ApiLoggerService.instance = new ApiLoggerService();
@@ -264,6 +269,7 @@ class ApiLoggerService {
     }
 
     this.errorEntries = [...this.errorEntries, entry].slice(-MAX_ERROR_ENTRIES);
+    this.dirtyEntryIds.error.add(id);
 
     await this.evictErrorEntriesIfNeeded();
     await this.persistErrorEntries();
@@ -348,6 +354,9 @@ class ApiLoggerService {
     this.errorEntries = this.errorEntries.map((e) =>
       idSet.has(e.id) ? { ...e, deletedAt: now } : e,
     );
+    for (const deletedId of ids) {
+      this.dirtyEntryIds.error.add(deletedId);
+    }
 
     await this.persistErrorEntries();
 
@@ -366,6 +375,9 @@ class ApiLoggerService {
       ...e,
       deletedAt: now,
     }));
+    for (const e of this.errorEntries) {
+      this.dirtyEntryIds.error.add(e.id);
+    }
 
     await this.persistErrorEntries();
 
@@ -754,6 +766,7 @@ class ApiLoggerService {
     };
 
     this.aiEntries = [...this.aiEntries, aiEntry].slice(-MAX_AI_ENTRIES);
+    this.dirtyEntryIds.ai.add(id);
 
     await this.evictAiEntriesIfNeeded();
     await this.persistAiEntries();
@@ -830,6 +843,9 @@ class ApiLoggerService {
     this.aiEntries = this.aiEntries.map((entry) =>
       idSet.has(entry.id) ? { ...entry, deletedAt: now } : entry,
     );
+    for (const deletedId of ids) {
+      this.dirtyEntryIds.ai.add(deletedId);
+    }
 
     await this.persistAiEntries();
   }
@@ -842,6 +858,9 @@ class ApiLoggerService {
       ...entry,
       deletedAt: now,
     }));
+    for (const e of this.aiEntries) {
+      this.dirtyEntryIds.ai.add(e.id);
+    }
 
     await this.persistAiEntries();
   }
@@ -962,12 +981,16 @@ class ApiLoggerService {
     entries: T[],
     indexKey: string,
   ): Promise<void> {
+    const dirtyIdsSnapshot = new Set(this.dirtyEntryIds[kind]);
+    this.dirtyEntryIds[kind].clear();
+
     const write = async (): Promise<void> => {
       try {
         const index = entries.map((e) => e.id);
         await storageAdapter.setItem(indexKey, JSON.stringify(index));
 
         for (const entry of entries) {
+          if (!dirtyIdsSnapshot.has(entry.id)) continue;
           const storageKey =
             kind === "error"
               ? getErrorStorageKey(entry.id)

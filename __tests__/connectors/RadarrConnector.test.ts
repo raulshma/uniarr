@@ -7,24 +7,23 @@ import { ApiError, handleApiError } from "@/utils/error.utils";
 
 // Mock network utilities
 jest.mock("@/utils/network.utils", () => ({
-  testNetworkConnectivity: jest.fn().mockResolvedValue({
+  testNetworkConnectivity: jest.fn<() => Promise<any>>().mockResolvedValue({
     success: true,
     latency: 50,
-  } as any),
-  diagnoseVpnIssues: jest.fn().mockReturnValue([] as any),
+  }),
+  diagnoseVpnIssues: jest.fn<() => any>().mockReturnValue([]),
 }));
 
-// Mock API test utilities
 jest.mock("@/utils/api-test.utils", () => ({
-  testSonarrApi: jest.fn().mockResolvedValue({
+  testSonarrApi: jest.fn<() => Promise<any>>().mockResolvedValue({
     success: true,
-  } as any),
-  testRadarrApi: jest.fn().mockResolvedValue({
+  }),
+  testRadarrApi: jest.fn<() => Promise<any>>().mockResolvedValue({
     success: true,
-  } as any),
-  testQBittorrentApi: jest.fn().mockResolvedValue({
+  }),
+  testQBittorrentApi: jest.fn<() => Promise<any>>().mockResolvedValue({
     success: true,
-  } as any),
+  }),
 }));
 
 type MockAxiosInstance = {
@@ -84,6 +83,24 @@ jest.mock("@/services/logger/LoggerService", () => ({
     warn: jest.fn(async () => undefined),
     error: jest.fn(async () => undefined),
   },
+}));
+
+jest.mock("@/services/logger/ApiLoggerService", () => ({
+  apiLogger: {
+    log: jest.fn(async () => undefined),
+    getEntries: jest.fn(() => []),
+    persistEntries: jest.fn(async () => undefined),
+  },
+}));
+
+jest.mock("@/store/settingsStore", () => ({
+  useSettingsStore: Object.assign(
+    () => ({
+      logLevel: 0,
+      apiLoggingEnabled: false,
+    }),
+    { getState: () => ({ logLevel: 0, apiLoggingEnabled: false }) },
+  ),
 }));
 
 jest.mock("@/utils/error.utils", () => {
@@ -189,7 +206,10 @@ describe("RadarrConnector", () => {
           remoteUrl: "https://cdn.example.com/backdrop.jpg",
         },
       ],
-      ratings: { value: 8.5, votes: 1000, type: "tmdb" },
+      ratings: {
+        imdb: { votes: 1000, value: 8.5 },
+        tmdb: { votes: 500, value: 7.8 },
+      },
       statistics: { movieFileCount: 0, sizeOnDisk: 0, percentAvailable: 0 },
       movieFile: {
         id: 2001,
@@ -218,7 +238,10 @@ describe("RadarrConnector", () => {
 
     const result = await connector.getMovies();
 
-    expect(mockAxiosInstance.get).toHaveBeenCalledWith("/api/v3/movie");
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+      "/api/v3/movie",
+      expect.anything(),
+    );
     expect(result).toHaveLength(1);
     const movie = result[0]!;
     expect(movie).toMatchObject({
@@ -231,6 +254,7 @@ describe("RadarrConnector", () => {
     });
     expect(movie.movieFile?.quality?.quality?.name).toBe("Bluray-2160p");
     expect(movie.ratings?.value).toBe(8.5);
+    expect(movie.ratings?.type).toBe("imdb");
   });
 
   it("propagates ApiError when getMovies fails", async () => {

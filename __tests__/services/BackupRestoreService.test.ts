@@ -223,8 +223,12 @@ describe("BackupRestoreService - Backup Options", () => {
       includeWidgetSecureCredentials: false,
       includeWidgetProfiles: false,
       includeWidgetProfileCredentials: false,
+      includeByokConfig: true,
+      includeAiConfig: false,
+      includeApiLoggingConfig: false,
       includeConversationalAISettings: true,
       includeConversationalAIProviderConfig: true,
+      includeS3BackupConfig: false,
       encryptSensitive: false,
     };
 
@@ -252,10 +256,14 @@ describe("BackupRestoreService - Backup Options", () => {
       includeWidgetSecureCredentials: false,
       includeWidgetProfiles: false,
       includeWidgetProfileCredentials: false,
+      includeByokConfig: false,
+      includeAiConfig: false,
+      includeApiLoggingConfig: false,
       includeConversationalAISettings: false,
       includeConversationalAIProviderConfig: false,
+      includeS3BackupConfig: false,
       encryptSensitive: true,
-      password: "test", // Too short
+      password: "test",
     };
 
     const validation =

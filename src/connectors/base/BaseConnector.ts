@@ -294,7 +294,7 @@ export abstract class BaseConnector<
           statusText: response.statusText,
           headers: response.headers,
           dataType: typeof response.data,
-          dataLength: response.data ? JSON.stringify(response.data).length : 0,
+          dataLength: Number(response.headers?.["content-length"]) || 0,
         });
 
         return response;
